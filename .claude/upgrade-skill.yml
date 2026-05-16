@@ -1,0 +1,29 @@
+# /upgrade-skill project config
+# Schema: see design/upgrade-skill-fresh-start-handoff-design.md §3.a
+schema_version: 1
+
+# basic-memory project name for vault rubric resolution (AR-015 fix).
+project_name: a-plus-maxing
+
+# Rubric resolution. The vault note at this path is seeded by /fresh-start Step 9.1.
+rubric:
+  source: vault              # vault | file | bundled
+  path: methodology/anthropic-skill-evaluation-rubric
+
+# Phase 2.5 corpus-fact-check allowlist (F-SEC-005).
+research_roots:
+  - /Users/waltermcgivney/Documents/Projects/a-plus-maxing
+  - ~/Documents/Projects/research_projects/
+
+# Reference-file deployment.
+reference_file_mode: template   # template | manifest (per-skill XOR; AR-002 fix)
+reference_templates_dir: design/references-templates/
+user_local_manifest_path: ~/.claude/<cmd>/manifest.json
+
+# Sanitization contract pin (F-SEC-003). Pinned at /upgrade-skill deploy.
+# Placeholder values `pending-deploy` and `TBD` are treated as first-run by Phase 2.5
+# (AR-003 fix); the orchestrator computes-and-persists on first successful Phase 8.
+sanitization_contract_sha256: pending-deploy
+
+# Beads availability — auto-detected at fresh-start init; do NOT edit manually.
+bd_available: true

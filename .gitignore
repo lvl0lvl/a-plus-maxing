@@ -1,0 +1,20 @@
+# Obsidian vault (local knowledge only)
+vault/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Beads sync artifacts
+.beads/sync/
