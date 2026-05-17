@@ -1,5 +1,6 @@
-# Obsidian vault (local knowledge only)
-vault/
+# Vault: tracked, except raw personal data dropzones
+vault/dna/raw/
+vault/labs/raw/
 
 # Environment
 .env
