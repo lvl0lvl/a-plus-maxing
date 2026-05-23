@@ -33,7 +33,7 @@ Use for any research where output will be ingested into the project wiki:
 3. **Mandatory layers (standard+).** Compound research at standard/deep/ultradeep MUST run prescribing-practice layer dispatch + non-English literature dispatch. Quick mode may skip.
 4. **Type-tag enforcement.** Every claim carries exactly one tag from the [[vault/library/_source-whitelist]] enum. Vendor and anecdote tags never ground numerical claims (Phase 4.75 HALT).
 5. **Three health-specific gates blocking.** Population-mismatch, risk-floor, concentration-audit per [[references/health-gates]]. Each emits `gate-<name>.json verdict: PASS|HALT`.
-6. **Gate verdicts authoritative in JSON.** Orchestrator writes `gate-<N>.json` from each agent's `gate-<N>.md`. Downstream reads JSON only.
+6. **Gate verdicts authoritative in JSON, schema-validated.** Orchestrator writes `gate-<N>.json` from each agent's `gate-<N>.md`. Each `gate-<N>.json` MUST validate against `schemas/gate-<N>.schema.json`. Invalid JSON → orchestrator HALT `schema-validation-failed` BEFORE downstream phase reads it. Downstream reads JSON only.
 7. **Auto-loaded project context.** Phase 1 MUST read `vault/meta/operator-profile.md`, `vault/meta/current-state.md`, `vault/meta/goals.md`, `vault/library/_source-whitelist.md`. Missing any → HALT.
 8. **Additive only.** Skill does NOT modify `~/.claude/skills/deep-research/`. Wraps it.
 
@@ -61,12 +61,25 @@ Phase 8.5 LAYERS GATE      [BLOCKING for standard+ compound research]
 
 | Mode | Phases | Source floor | Report floor | Judge threshold | Layers |
 |------|--------|--------------|--------------|-----------------|--------|
-| quick | 1, 2.5, 2.75, 3, 3.5, 4, 4.75, 8 | 10+ | 2,000w | 85/100 | opt-in |
-| standard (DEFAULT) | 1, 2, 2.5, 2.75, 3, 3.5, 4, 4.5, 4.75, 5, 8, 8.5 | 15+ | 4,000w | 92/100 | **mandatory** |
-| deep | 1-8 + 2.5/2.75/3.5/4.5/4.75/7.5/8.5 | 25+ | 10,000w | 99/100 | **mandatory** |
+| quick | 1, 2.5, 2.75, 3, 3.5, 4, 8 | 10+ | 2,000w | 85/100 | opt-in |
+| standard (DEFAULT) | 1, 2, 2.5, 2.75, 3, 3.5, 4, 4.5, 4.75, 5, 7.5, 8, 8.5 | 15+ | 4,000w | 92/100 | **mandatory** |
+| deep | 1-8 + 2.5/2.75/3.5/4.5/4.75/6/7/7.5/8.5 | 25+ | 10,000w | 99/100 | **mandatory** |
 | ultradeep | deep + extended critique/refine | 30+ | 15,000w | 99/100 | **mandatory** |
 
-All gate phases run in EVERY mode.
+### Gate-by-mode matrix
+
+| Gate | quick | standard | deep | ultradeep |
+|------|-------|----------|------|-----------|
+| 2.75 SCOPE | ✓ | ✓ | ✓ | ✓ |
+| 3.5 JUDGE | ✓ | ✓ | ✓ | ✓ |
+| 4.75 INTEGRITY | **skipped** | ✓ | ✓ | ✓ |
+| 6 CRITIQUE | **skipped** | **skipped** | ✓ | ✓ |
+| 7.5 RISK-FLOOR (compounds only) | **skipped** | ✓ | ✓ | ✓ |
+| 8.5 LAYERS (standard+ compounds only) | **skipped** | ✓ | ✓ | ✓ |
+
+**Quick-mode rationale:** quick exists for triage scans (e.g., "scan a peptide class to pick which candidate to deep-research"). At triage, the integrity gate's cost (corpus retrieval + grep + paraphrase checks) exceeds its value — the orchestrator is judging "is this candidate worth a real research run," not "is this citable in the wiki." The scope + judge gates remain mandatory because they catch context-load failures and judge-fakery that would invalidate even triage output.
+
+**Standard/deep/ultradeep:** all gates fire. Output is wiki-canonical and must be defensible.
 
 ## Phase 1 — SCOPE (auto-load + framing)
 
@@ -251,16 +264,35 @@ Procedure: read `${BASE}/gates/` for highest gate with `verdict: PASS` → resum
 | File | Purpose | Loaded at |
 |------|---------|-----------|
 | [references/health-gates.md](./references/health-gates.md) | Three health-specific gates: population-mismatch, risk-floor, concentration-audit; plus mandatory-layers spec | Phase 4.75, Phase 7.5, Phase 8.5 |
-| [references/citation-integrity.md](./references/citation-integrity.md) | Type-tag enforcement rules, vendor/anecdote-not-numerical check, integrity verifier brief | Phase 4.75 |
+| [references/citation-integrity.md](./references/citation-integrity.md) | 13 IC checks including per-citation corpus scoping (IC-13); integrity verifier brief | Phase 4.75 |
 
 The base source whitelist + type-tag enum lives at `vault/library/_source-whitelist.md` and is NOT duplicated here — single source of truth.
 
+## Schema Files (gate verdict validation)
+
+| Schema | Validates |
+|--------|-----------|
+| [schemas/gate-2.75.schema.json](./schemas/gate-2.75.schema.json) | Phase 2.75 SCOPE gate verdict — context_files, target, output_paths, halt_reasons |
+| [schemas/gate-3.5.schema.json](./schemas/gate-3.5.schema.json) | Phase 3.5 JUDGE gate verdict — per-section judge_verdicts, scores, brief_hash uniqueness |
+| [schemas/gate-4.75.schema.json](./schemas/gate-4.75.schema.json) | Phase 4.75 INTEGRITY gate verdict — 13 IC checks, population_mismatch, concentration_audit, corpus_scoping |
+| [schemas/gate-6.schema.json](./schemas/gate-6.schema.json) | Phase 6 CRITIQUE gate verdict — findings, additional_retrievals (max 3) |
+| [schemas/gate-7.5.schema.json](./schemas/gate-7.5.schema.json) | Phase 7.5 RISK-FLOOR gate verdict — risk-tier-conditional field requirements |
+| [schemas/gate-8.5.schema.json](./schemas/gate-8.5.schema.json) | Phase 8.5 LAYERS gate verdict — practitioner_layer + non_english_layer presence + structure |
+
+**Validation procedure.** After writing each gate-N.json, orchestrator runs:
+```bash
+python3 -c "import json, jsonschema; jsonschema.validate(json.load(open('gate-N.json')), json.load(open('schemas/gate-N.schema.json')))"
+```
+or equivalent. Failure → HALT `schema-validation-failed`; orchestrator does NOT proceed to next phase. The verdict-PASS-but-halt-reasons-non-empty contradiction is mechanically caught by each schema's `allOf` constraint.
+
 ## Known Limitations
 
-- v1 does not implement Quant-style agent-identity-ledger UUIDv4 disjointness enforcement. Brief-hash uniqueness via sha256 is the v1 substitute.
-- v1 does not implement full corpus sanitization (prompt-injection scanning). Tier-1/2 source whitelist + manual review of any Tier 2.5+ source is the v1 substitute.
+- v1 does not implement Quant-style agent-identity-ledger UUIDv4 disjointness enforcement. Brief-hash uniqueness via sha256 is the v1 substitute (enforced in gate-3.5 schema).
+- v1 does not implement full corpus sanitization (prompt-injection scanning of retrieved corpora before grep). Tier-1/2 source whitelist + manual review of any Tier 2.5+ source is the v1 substitute.
+- v1 IC-13 corpus scoping retrieves abstract-only for paywalled content; full-text retrieval bypass is not implemented. Claims relying on full-text-only content that the abstract doesn't cover get `corpus-missing` WARN, not HALT.
 - v1 has no regression fixture suite. Failure modes will inform v2.
 - The "no overwrite" rule at Phase 2.75 step 4 will require an explicit `--update` flag for re-rotation dispatches (e.g., post-FDA-PCAC re-rotation of BPC-157). Not yet implemented — first re-rotation surfaces this gap.
+- Schema validation requires `jsonschema` Python package; orchestrator must verify presence at pre-flight. Missing → HALT `jsonschema-not-installed` with install instruction.
 
 ## Output Path Convention
 

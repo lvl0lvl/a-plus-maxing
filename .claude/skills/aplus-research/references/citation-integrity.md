@@ -83,6 +83,68 @@ Source whitelist + type-tag enum: `vault/library/_source-whitelist.md`.
 > ### IC-12 — No Wikipedia citations
 > `en.wikipedia.org`, `ru.wikipedia.org`, etc. may not appear in the bibliography. Wikipedia is admissible only as a navigation aid (find primary citations). Any Wikipedia URL in bibliography → HALT.
 >
+> ### IC-13 — Per-citation corpus scoping (claims grep against source text)
+>
+> The most consequential check in v1. Addresses the failure mode where a claim is attributed to a paper that does not actually contain the claim (the He L 2022 attribution error in the 2026-05-23 BPC-157 dispatch was a milder version of this; the catastrophic version is fabricated quotes / fabricated numerical claims attributed to real papers).
+>
+> **Mode policy:**
+> - quick: SKIP — gate phase 4.75 itself does not run in quick mode (see SKILL.md §Modes).
+> - standard: ≥50% random sample of citations with numerical or quoted claims (minimum 10).
+> - deep: ≥80% sample (minimum 20).
+> - ultradeep: 100% (all numerical/quoted claims grep-verified).
+>
+> **Procedure (per checked claim):**
+>
+> 1. **Identify load-bearing claims.** Scan the draft for sentences containing:
+>    - Numerical tokens (regex from IC-3): doses, n, effect sizes, %, p-values, half-lives, response rates.
+>    - Verbatim quotations (text inside double quotes, block quotes, or `[N]†L<s>-L<e>` line-range markers).
+>    - Specific scope claims ("the paper documents X", "the study shows Y", "the authors report Z").
+>
+> 2. **Fetch the cited primary's text.** For each claim, retrieve the cited paper's full text or abstract via:
+>    - PubMed `efetch` (if PMID) — abstract minimum
+>    - PMC full-text (if PMC ID)
+>    - WebFetch on the direct URL (if no PubMed/PMC)
+>    - For paywalled content: fetch abstract only; flag claim as `[abstract-only verified]` if found there, or `corpus-missing` if not retrievable
+>    - Cache each retrieved corpus at `${BASE}/corpus/<cite_key>.md` to avoid re-fetching
+>
+> 3. **Grep the claim against the corpus:**
+>    - **Verbatim quotes:** `rg -F -- '<quote text>' <corpus_file>`. Must match (with whitespace/typography normalization: NFKC + collapse-whitespace + smart-quote-to-ASCII).
+>    - **Numerical claims:** `rg -F -- '<number with unit>' <corpus_file>`. If exact match not found, also try `±` variants and unit-normalized forms (e.g., "10 μg/kg" matches "10 microg/kg", "10 µg/kg", "10 ug/kg"). Author derivations (e.g., "calculated from data in [N]") are exempted if claim is annotated `[derived from N]`.
+>    - **Paraphrased scope claims:** require ≥2 content tokens of ≥6 characters (non-stopword) from the claim to appear within 500 characters of each other in the corpus.
+>
+> 4. **Failure modes:**
+>    - `quote-not-found` — verbatim quote does not appear in corpus
+>    - `number-not-found` — numerical claim's exact value not in corpus (with normalization applied)
+>    - `paraphrase-no-token-match` — paraphrased claim's content tokens not in corpus
+>    - `corpus-missing` — corpus could not be retrieved at all (paywall + no abstract OR fetch failure)
+>
+> 5. **Verdict:**
+>    - 0 failures → PASS
+>    - Any `quote-not-found` or `number-not-found` → HALT `corpus-scoping-fail`
+>    - `paraphrase-no-token-match` → WARN (orchestrator decides whether to demand rewrite or accept; multiple in same section → HALT)
+>    - `corpus-missing` → WARN with explicit note in IC-13 findings; not a HALT (paywalls happen)
+>
+> **Caching contract.** All retrieved corpora cached at `${BASE}/corpus/<cite_key>.md`. Cache survives compaction. Re-runs of the gate reuse cached corpora; only newly-cited primaries trigger fetches.
+>
+> **JSON output (in `gate-4.75.json corpus_scoping` block):**
+> ```json
+> {
+>   "corpus_scoping": {
+>     "verdict": "PASS|HALT|SKIP-mode",
+>     "claims_checked": 23,
+>     "claims_failed": [
+>       {
+>         "claim": "BPC-157 reduced bleeding time by 47% [N, animal]",
+>         "cite_key": "stupnisek-2012",
+>         "failure_mode": "number-not-found",
+>         "grep_command": "rg -F '47%' /tmp/aplus-research/bpc-157/corpus/stupnisek-2012.md",
+>         "grep_output": "(no matches)"
+>       }
+>     ]
+>   }
+> }
+> ```
+>
 > ## Output
 >
 > Write `${BASE}/gates/gate-4.75.md` with sections:
@@ -98,6 +160,7 @@ Source whitelist + type-tag enum: `vault/library/_source-whitelist.md`.
 > - `## IC-10 No Fabricated Citations`
 > - `## IC-11 No Placeholder Strings`
 > - `## IC-12 No Wikipedia Citations`
+> - `## IC-13 Per-Citation Corpus Scoping`
 > - `## Verdict`
 >
 > Each section: findings list (with line numbers) OR sentinel `No <X> detected.` Empty section without sentinel = HALT (orchestrator-side check).
@@ -125,6 +188,8 @@ If gate-4.75 HALTs, orchestrator:
 
 ## Limitations
 
-- v1 does not detect paraphrased fabrications (a claim attributed to a real paper that the paper does not actually contain). Catching this requires per-citation corpus scoping (Quant pattern); v1 substitute is the paired-judge gate in Phase 3.5.
-- v1 HEAD-check is best-effort against the listed budget; comprehensive validation defers to ultradeep mode.
-- v1 route-extrapolation check requires route information in bibliography entries; reports that don't include route in citations get "route-unverifiable" warnings, not HALTs.
+- v1 IC-13 covers verbatim quote + numerical-value + paraphrase-token grep. It does NOT catch high-fidelity paraphrase with full word substitution (a paraphrase that uses different words to describe the same concept the paper actually contains, where the paraphrase happens to mention something the paper does not contain). Mitigation: paired-judge gate in Phase 3.5 — judges are expected to flag conceptual paraphrase drift.
+- v1 IC-13 corpus retrieval falls back to abstract-only for paywalled content; claims that the abstract doesn't cover get `corpus-missing` WARN, not HALT. Comprehensive paywall-bypass (institutional access, sci-hub, paper preprint chase) is not implemented in v1.
+- v1 HEAD-check (IC-10) is best-effort against the listed budget; comprehensive validation defers to ultradeep mode.
+- v1 route-extrapolation check (IC-8) requires route information in bibliography entries; reports that don't include route in citations get "route-unverifiable" warnings, not HALTs.
+- v1 does not implement UUIDv4 agent-identity-ledger disjointness. Brief-hash uniqueness (sha256 of agent brief) is the v1 substitute, enforced at Phase 3.5 judge gate.

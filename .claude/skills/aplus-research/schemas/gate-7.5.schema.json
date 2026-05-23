@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aplus-research/schemas/gate-7.5",
+  "title": "Phase 7.5 Risk-Floor Gate Verdict",
+  "type": "object",
+  "required": ["phase", "verdict", "compound_risk_tier", "required_fields", "third_party_monitoring_marker_present", "halt_reasons", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "phase": {"const": "7.5"},
+    "verdict": {"enum": ["PASS", "HALT", "SKIP-not-compound"]},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "compound_risk_tier": {"enum": ["low", "medium", "high", "experimental"]},
+    "compound_entry_path": {"type": "string"},
+    "required_fields": {
+      "type": "object",
+      "required": ["adverse_effects_literature", "contraindications", "monitoring", "stopping_criteria"],
+      "additionalProperties": false,
+      "properties": {
+        "adverse_effects_literature": {"enum": ["populated", "empty", "placeholder-only"]},
+        "contraindications": {"enum": ["populated", "empty", "placeholder-only"]},
+        "monitoring": {"enum": ["populated", "empty", "placeholder-only"]},
+        "stopping_criteria": {"enum": ["populated", "placeholder-with-pointer", "empty"]}
+      }
+    },
+    "third_party_monitoring_marker_present": {"type": "boolean"},
+    "third_party_markers": {"type": "array", "items": {"type": "string"}},
+    "halt_reasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "risk-floor-incomplete",
+          "missing-contraindications",
+          "missing-monitoring",
+          "missing-stopping-criteria",
+          "missing-third-party-marker",
+          "missing-adverse-effects"
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"verdict": {"const": "PASS"}}},
+      "then": {
+        "properties": {
+          "halt_reasons": {"maxItems": 0},
+          "required_fields": {
+            "properties": {
+              "adverse_effects_literature": {"const": "populated"},
+              "contraindications": {"const": "populated"},
+              "monitoring": {"const": "populated"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"allOf": [
+        {"properties": {"verdict": {"const": "PASS"}}},
+        {"properties": {"compound_risk_tier": {"const": "experimental"}}}
+      ]},
+      "then": {"properties": {"third_party_monitoring_marker_present": {"const": true}}}
+    }
+  ]
+}

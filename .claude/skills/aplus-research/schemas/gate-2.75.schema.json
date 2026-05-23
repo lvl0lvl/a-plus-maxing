@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aplus-research/schemas/gate-2.75",
+  "title": "Phase 2.75 Scope Gate Verdict",
+  "type": "object",
+  "required": ["phase", "verdict", "context_files", "target", "output_paths", "halt_reasons", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "phase": {"const": "2.75"},
+    "verdict": {"enum": ["PASS", "HALT"]},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "context_files": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "loaded"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "loaded": {"type": "boolean"}
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["class", "slug", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "class": {"enum": ["peptide", "supplement", "hormone", "nootropic", "pharmaceutical", "herbal", "biomarker", "protocol", "other"]},
+        "slug": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+        "type": {"enum": ["compound", "biomarker", "protocol", "reference"]}
+      }
+    },
+    "output_paths": {
+      "type": "object",
+      "properties": {
+        "research_report": {"type": "string"},
+        "compound_entry": {"type": "string"},
+        "practitioner_layer": {"type": "string"},
+        "non_english_layer": {"type": "string"}
+      }
+    },
+    "halt_reasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "context-load-missing",
+          "target-undeclared",
+          "invalid-slug",
+          "output-path-not-writable",
+          "compound-entry-exists",
+          "whitelist-load-failed"
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"verdict": {"const": "PASS"}}},
+      "then": {
+        "properties": {
+          "halt_reasons": {"maxItems": 0},
+          "context_files": {"items": {"properties": {"loaded": {"const": true}}}}
+        }
+      }
+    }
+  ]
+}

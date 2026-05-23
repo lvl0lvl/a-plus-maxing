@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aplus-research/schemas/gate-4.75",
+  "title": "Phase 4.75 Citation Integrity Gate Verdict",
+  "type": "object",
+  "required": ["phase", "verdict", "ic_checks", "population_mismatch", "concentration_audit", "corpus_scoping", "halt_reasons", "warnings", "iterations", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "phase": {"const": "4.75"},
+    "verdict": {"enum": ["PASS", "HALT"]},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "iterations": {"type": "integer", "minimum": 1, "maximum": 3},
+    "ic_checks": {
+      "type": "object",
+      "required": ["IC-1", "IC-2", "IC-3", "IC-4", "IC-5", "IC-6", "IC-7", "IC-8", "IC-9", "IC-10", "IC-11", "IC-12", "IC-13"],
+      "additionalProperties": false,
+      "patternProperties": {
+        "^IC-(1[0-3]|[1-9])$": {
+          "type": "object",
+          "required": ["status"],
+          "additionalProperties": false,
+          "properties": {
+            "status": {"enum": ["PASS", "HALT", "WARN", "SKIP-mode"]},
+            "findings": {"type": "array", "items": {"type": "string"}},
+            "count_checked": {"type": "integer", "minimum": 0},
+            "count_flagged": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "population_mismatch": {
+      "type": "object",
+      "required": ["verdict", "checked_citations"],
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {"enum": ["PASS", "HALT"]},
+        "checked_citations": {"type": "integer", "minimum": 0},
+        "flagged_citations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["line", "claim", "missing_tag"],
+            "properties": {
+              "line": {"type": "integer"},
+              "claim": {"type": "string"},
+              "missing_tag": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "concentration_audit": {
+      "type": "object",
+      "required": ["verdict", "total_primaries", "largest_cluster_count", "share", "threshold_triggered"],
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {"enum": ["PASS", "HALT"]},
+        "total_primaries": {"type": "integer", "minimum": 0},
+        "largest_cluster_name": {"type": "string"},
+        "largest_cluster_count": {"type": "integer", "minimum": 0},
+        "share": {"type": "number", "minimum": 0, "maximum": 1},
+        "threshold_triggered": {"type": "boolean"},
+        "surfaced_section_heading": {"type": "string"},
+        "surfaced_before_first_indication": {"type": "boolean"}
+      }
+    },
+    "corpus_scoping": {
+      "type": "object",
+      "required": ["verdict", "claims_checked", "claims_failed"],
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {"enum": ["PASS", "HALT", "SKIP-mode"]},
+        "claims_checked": {"type": "integer", "minimum": 0},
+        "claims_failed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["claim", "cite_key", "failure_mode"],
+            "properties": {
+              "claim": {"type": "string"},
+              "cite_key": {"type": "string"},
+              "failure_mode": {"enum": ["quote-not-found", "number-not-found", "paraphrase-no-token-match", "corpus-missing"]},
+              "grep_command": {"type": "string"},
+              "grep_output": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "halt_reasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "untagged-citation",
+          "vendor-grounds-numerical",
+          "anecdote-grounds-numerical",
+          "practitioner-grounds-efficacy",
+          "population-mismatch-unflagged",
+          "route-extrapolation-unflagged",
+          "concentration-not-surfaced",
+          "fabricated-citation",
+          "placeholder-string",
+          "wikipedia-cited",
+          "corpus-scoping-fail",
+          "integrity-non-convergence"
+        ]
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"verdict": {"const": "PASS"}}},
+      "then": {"properties": {"halt_reasons": {"maxItems": 0}}}
+    }
+  ]
+}

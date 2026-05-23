@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aplus-research/schemas/gate-8.5",
+  "title": "Phase 8.5 Layers Gate Verdict",
+  "type": "object",
+  "required": ["phase", "verdict", "mode", "practitioner_layer", "non_english_layer", "halt_reasons", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "phase": {"const": "8.5"},
+    "verdict": {"enum": ["PASS", "HALT", "SKIP-quick-mode", "SKIP-not-compound"]},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "mode": {"enum": ["quick", "standard", "deep", "ultradeep"]},
+    "practitioner_layer": {
+      "type": "object",
+      "required": ["path", "present", "compounding_sheets_count", "named_physicians_count", "has_bibliography", "has_self_check"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string"},
+        "present": {"type": "boolean"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "compounding_sheets_count": {"type": "integer", "minimum": 0},
+        "compounding_sheets_or_null_finding": {"type": "boolean"},
+        "named_physicians_count": {"type": "integer", "minimum": 0},
+        "has_bibliography": {"type": "boolean"},
+        "has_self_check": {"type": "boolean"}
+      }
+    },
+    "non_english_layer": {
+      "type": "object",
+      "required": ["path", "present", "languages_surveyed", "has_bibliography", "has_self_check"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string"},
+        "present": {"type": "boolean"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "languages_surveyed": {
+          "type": "array",
+          "minItems": 3,
+          "items": {"enum": ["Russian", "Chinese", "Croatian", "Korean", "Japanese", "German", "French", "Spanish", "Other"]}
+        },
+        "has_bibliography": {"type": "boolean"},
+        "has_self_check": {"type": "boolean"}
+      }
+    },
+    "halt_reasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "practitioner-layer-missing",
+          "non-english-layer-missing",
+          "practitioner-no-sheets-no-null-finding",
+          "non-english-insufficient-languages",
+          "layer-missing-bibliography",
+          "layer-missing-self-check"
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"verdict": {"const": "PASS"}}},
+      "then": {
+        "properties": {
+          "halt_reasons": {"maxItems": 0},
+          "practitioner_layer": {"properties": {"present": {"const": true}, "has_bibliography": {"const": true}, "has_self_check": {"const": true}}},
+          "non_english_layer": {"properties": {"present": {"const": true}, "has_bibliography": {"const": true}, "has_self_check": {"const": true}}}
+        }
+      }
+    }
+  ]
+}

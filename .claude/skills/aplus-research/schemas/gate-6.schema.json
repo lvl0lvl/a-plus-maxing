@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aplus-research/schemas/gate-6",
+  "title": "Phase 6 Critique Gate Verdict",
+  "type": "object",
+  "required": ["phase", "verdict", "critique_agent_id", "draft_path", "findings", "additional_retrievals", "halt_reasons", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "phase": {"const": "6"},
+    "verdict": {"enum": ["PASS", "HALT"]},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "critique_agent_id": {"type": "string", "pattern": "^[a-zA-Z0-9_-]+$"},
+    "draft_path": {"type": "string"},
+    "draft_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["category", "severity", "description"],
+        "properties": {
+          "category": {"enum": ["missing-perspective", "unexamined-counter-evidence", "alternative-explanation", "bias", "logical-inconsistency", "citation-incomplete", "balance-issue", "objectivity-issue"]},
+          "severity": {"enum": ["critical", "major", "minor"]},
+          "description": {"type": "string"},
+          "required_fix": {"type": "string"}
+        }
+      }
+    },
+    "additional_retrievals": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["retrieve_agent_id", "judge_agent_id", "question", "brief_hash"],
+        "properties": {
+          "retrieve_agent_id": {"type": "string"},
+          "judge_agent_id": {"type": "string"},
+          "question": {"type": "string"},
+          "brief_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        }
+      }
+    },
+    "halt_reasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "critical-finding-unaddressed",
+          "additional-retrieval-budget-exhausted",
+          "additional-retrieval-judge-fail",
+          "self-critique-by-orchestrator"
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"verdict": {"const": "PASS"}}},
+      "then": {
+        "properties": {
+          "halt_reasons": {"maxItems": 0},
+          "findings": {"items": {"properties": {"severity": {"enum": ["minor", "major"]}}}}
+        }
+      }
+    }
+  ]
+}
