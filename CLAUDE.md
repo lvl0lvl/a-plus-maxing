@@ -101,3 +101,7 @@ Two project-level hooks are installed (`.claude/settings.json`):
 - Commit format: `{type}[({scope})]: brief description`
 - All beads issues use priority 0-4 (not high/medium/low)
 - Documents follow the freshness rubric in DOCUMENT_RUBRIC.md
+
+## Project-local skills
+
+- **aplus-research** (`.claude/skills/aplus-research/`) — wraps global `deep-research` with mechanically enforced gates for health-domain research that lands in the wiki. Use via `/aplus-research "<question>" [--mode=...]`. Six blocking gates: scope (Phase 2.75), judge (3.5), integrity (4.75), critique (6, deep+), risk-floor (7.5, compounds), layers (8.5, standard+ compounds). Three health-specific gates not in `deep-research`: population-mismatch, risk-floor, concentration-audit. See `.claude/skills/aplus-research/SKILL.md`.
