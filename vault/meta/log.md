@@ -1,8 +1,15 @@
 ---
 title: Wiki Operation Log
-type: note
-permalink: a-plus-maxing/meta/log
+type: reference
+status: active
+owner: walter
+created: 2026-05-23
+last_reviewed: 2026-05-23
 last_updated: 2026-05-23
+depends_on: []
+superseded_by: null
+review_cadence: session
+permalink: a-plus-maxing/meta/log
 ---
 
 # Wiki Operation Log

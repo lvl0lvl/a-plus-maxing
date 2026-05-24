@@ -1,6 +1,13 @@
 ---
 title: WIKI
-type: note
+type: reference
+status: active
+owner: walter
+created: 2026-05-23
+last_reviewed: 2026-05-23
+depends_on: []
+superseded_by: null
+review_cadence: phase
 permalink: a-plus-maxing/wiki
 ---
 

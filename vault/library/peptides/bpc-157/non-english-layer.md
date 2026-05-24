@@ -1,6 +1,13 @@
 ---
-title: non-english-layer
-type: note
+title: BPC-157 — Non-English Literature Coverage
+type: research-report
+status: active
+owner: walter
+created: 2026-05-23
+last_reviewed: 2026-05-23
+depends_on: ["library/peptides/bpc-157/research-report"]
+superseded_by: null
+review_cadence: phase
 permalink: a-plus-maxing/library/peptides/bpc-157/non-english-layer
 ---
 

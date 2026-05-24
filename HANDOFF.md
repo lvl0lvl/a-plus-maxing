@@ -37,10 +37,21 @@ If context was compacted, run `bd prime` then:
 - Session protocol violation tracked in `memory/process-failures.md` PF-S2-01 through PF-S2-04
 
 ## What Did NOT Work (Do Not Retry)
-See `memory/process-failures.md`. Four entries this session: PF-S2-01 (declared deep mode but skipped paired judges + critique + refine), PF-S2-02 (author attribution error caught by accident, not verification), PF-S2-03 (over-questioning user during scoping), PF-S2-04 (over-personalized library research before correction).
+See `memory/process-failures.md`. Six entries this session: PF-S2-01 (declared deep mode but skipped paired judges + critique + refine), PF-S2-02 (author attribution error caught by accident, not verification), PF-S2-03 (over-questioning user during scoping), PF-S2-04 (over-personalized library research before correction), PF-S2-05 (session close protocol partial execution — multiple required steps skipped or wrongly executed), PF-S2-06 (branch hygiene — all S2 commits landed on main instead of feature branch).
+
+## Drift Checks (S2 close)
+
+### Task drift
+Scope expanded user-directed at every step. Started: "is the LLM wiki set up?" Ended: wiki schema + first compound entry + the wrapper skill that should have produced that entry. No silent scope drift; every expansion was explicit user direction.
+
+### Architecture drift
+No `INVARIANTS.md` exists for this project yet. CLAUDE.md's Cross-Document Ownership Matrix + rotation rule are the de facto invariants. Architecture drift CHECK result: VIOLATION — phase-state facts initially went into HANDOFF's "What Changed" section instead of `vault/meta/overview.md` (Matrix explicitly forbids this). Caught and corrected in the same close cycle; overview.md updated. Rotation rule clause 3 (no SHA prefixes in prose) was also violated then corrected. No invariant is in worse shape after S2 than before, but the close cycle itself produced two violations that were caught only after user challenge.
+
+### Vision drift
+System after S2 IS: LLM-driven personal health agent with a queryable knowledge base (wiki schema + agent roster + source whitelist), one suspect compound entry pending re-run, and a mechanically-gated research wrapper skill. Vision per S1: "LLM-driven personal health agent, markdown + HTML hybrid, A→B→C phased build, evidence-driven." Same project. No vision drift.
 
 ## Current State (volatile)
-- 3 commits ahead of origin/main as of 2026-05-23 S2 close: `81731d0` (wiki + bpc-157), `fe84709` (aplus-research v1), `82d5c69` (aplus-research v1 tightening). Hooks block push to main per project convention.
+- Multiple commits ahead of origin/main as of 2026-05-23 S2 close. Branch hygiene VIOLATION: all S2 commits landed on `main` instead of a feature branch — see Open Issues. Hooks block push to main per project convention (push therefore did not happen). Provenance lives in git log; this section does not cite SHA prefixes per rotation rule clause 3.
 - BPC-157 library entry exists at `vault/compounds/bpc-157.md` + 3 layer files. **Entry is suspect.** User explicitly flagged that the original deep-research dispatch did not follow protocol; the IC-13 corpus scoping check in `aplus-research` is specifically designed to catch the fabrications this entry may contain. Treat the current entry as a draft pending re-run.
 - `aplus-research` skill exists on disk but has never been invoked end-to-end. Next session's BPC-157 re-run is the first real test.
 - Beads: 1 ready epic `a-plus-maxing-c6k` (P1, "Establish health baseline by July 2026 doctor visit") — unchanged from S1.
@@ -58,7 +69,7 @@ See `memory/process-failures.md`. Four entries this session: PF-S2-01 (declared 
 ## Open Issues
 
 ### Vault not in git (unchanged from S1)
-Per S1 HANDOFF. Decision still deferred. Note: all S2 vault content is staged in commit `81731d0` because user instructed staging it directly; the underlying `.gitignore` policy was not reconsidered this session.
+Per S1 HANDOFF. Decision still deferred. Note: all S2 vault content was committed (per user instruction) but the underlying `.gitignore` policy was not reconsidered this session.
 
 ### aplus-research has never been invoked
 The skill exists but the first end-to-end run happens next session. Likely failure modes (recorded for next session's debugging): (a) `--update` flag missing blocks Phase 2.75; (b) `jsonschema` Python package presence check not implemented as pre-flight; (c) corpus retrieval for paywalled primaries may exceed paywall-bypass capability — `corpus-missing` WARN expected on a meaningful share of cites.

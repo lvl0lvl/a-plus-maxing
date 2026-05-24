@@ -1,8 +1,15 @@
 ---
 title: Wiki Index
-type: note
-permalink: a-plus-maxing/meta/index
+type: reference
+status: active
+owner: walter
+created: 2026-05-23
+last_reviewed: 2026-05-23
 last_updated: 2026-05-23
+depends_on: []
+superseded_by: null
+review_cadence: session
+permalink: a-plus-maxing/meta/index
 ---
 
 # Wiki Index
@@ -32,6 +39,9 @@ _(none yet)_
 
 ## decisions/
 - [[decisions/2026-05-16-system-architecture]]
+- [[decisions/2026-05-23-wiki-schema]]
+- [[decisions/2026-05-23-source-whitelist]]
+- [[decisions/2026-05-23-aplus-research-skill]]
 - [[decisions/Project Setup]]
 
 ## experiments/
