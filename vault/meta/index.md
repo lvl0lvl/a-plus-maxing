@@ -52,9 +52,9 @@ _(none yet)_
 - [[library/methodology/evidence-tiers]]
 - [[library/methodology/n-of-1-trial-design]]
 - [[library/peptides/_triage]]
-- [[library/peptides/bpc-157/research-report]] (10,193 words; deep-mode dispatch 2026-05-23; supplementary layers added 2026-05-23)
-- [[library/peptides/bpc-157/practitioner-layer]] (prescribing-practice; pharmacies + named physicians + consensus dose)
-- [[library/peptides/bpc-157/non-english-layer]] (Croatian/Chinese/Russian/Korean coverage)
+- [[library/peptides/bpc-157/research-report]] (rebuilt 2026-05-24 via /aplus-research --update=suspect-fabrications; 1,039 lines / ~20K words refined; 52 dedup primaries; 80.8% Sikirić-Zagreb metro; 6 paired retrievals; IC-13 30/30 PASS; PRIOR ARCHIVED)
+- [[library/peptides/bpc-157/practitioner-layer]] (rebuilt 2026-05-24; prescribing-practice; pharmacies + named physicians + consensus dose; PRIOR ARCHIVED)
+- [[library/peptides/bpc-157/non-english-layer]] (rebuilt 2026-05-24; Croatian/Chinese/Russian/Korean coverage; PRIOR ARCHIVED)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/

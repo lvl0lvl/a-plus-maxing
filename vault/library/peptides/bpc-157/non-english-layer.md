@@ -1,225 +1,284 @@
 ---
-title: BPC-157 — Non-English Literature Coverage
-type: research-report
-status: active
-owner: walter
-created: 2026-05-23
-last_reviewed: 2026-05-23
-depends_on: ["library/peptides/bpc-157/research-report"]
-superseded_by: null
-review_cadence: phase
-permalink: a-plus-maxing/library/peptides/bpc-157/non-english-layer
+title: BPC-157 — Non-English Literature Layer
+type: layer
+permalink: a-plus-maxing/library/peptides/bpc-157/non-english-layer-1
+parent: vault/compounds/bpc-157.md
+generated: 2026-05-24
+mode: deep
+languages_surveyed:
+- Croatian
+- Russian
+- Chinese
+- Korean
+- Japanese
 ---
 
-# BPC-157 — Non-English Literature Coverage
+# BPC-157 — Non-English Literature Layer
 
-Dispatch date: 2026-05-23. Companion to `vault/library/peptides/bpc-157/research-report.md`.
-
-## Survey scope and methodology
-
-- **Languages surveyed:** Croatian (priority 1 — Sikiric / Pliva origin), Chinese (priority 2 — Fourth Military Medical University replication line), Russian (priority 3 — expected low yield), Korean (priority 4 — opportunistic), Japanese (priority 4 — opportunistic).
-- **Databases / portals queried via Tavily / WebSearch:**
-  - Hrčak (Croatian open-access portal `hrcak.srce.hr`) — found Liječnički vjesnik content.
-  - DOAJ — confirmed Liječnički vjesnik 2023 supplement indexing.
-  - CyberLeninka (`cyberleninka.ru`) — Russian open-access.
-  - eLibrary.ru (Russian Science Citation Index) — no direct primaries surfaced.
-  - CNKI / Wanfang / VIP (Chinese) — institutional-paywalled; surfaced via cross-citation only.
-  - J-STAGE (Japanese) — searched.
-  - KCI (Korean Citation Index) / Kosin Medical Journal / J Dental Anesth Pain Med — direct hits.
-  - Google Patents — EP, US, WO, SI Sikiric/Pliva/Diagen patent family.
-  - Semantic Scholar — Veljaca 2002 corpus.
-  - IntechOpen book chapters citing Pliva PL 14736 corpus.
-  - PubMed for cross-checks of Springer-translated Russian journals.
-- **Search terms used:**
-  - English: `"BPC 157"`, `"PL 14736"`, `"PLD-116"`, `"bepecin"`, `Pliva`, `Lijecnicki Vjesnik`, `Acta Pharmaceutica`, `Croatian Medical Journal`, `CNKI`, `Wanfang`, `Fourth Military Medical University`, `Xue`, `Huang`, `Bulletin of Experimental Biology and Medicine`, `eLibrary`, `cyberleninka`.
-  - Chinese: `胃十五肽 BPC 157`, `体保护肽`, `BPC 157 大鼠`, `第四军医大学 BPC 157`, `中国新药杂志`.
-  - Russian: `BPC 157 пентадекапептид`, `BPC-157 эксперимент крысы фармакология`, `Сикирич` (Sikiric transliterated).
-- **Translation tools used:** none required for cited content — Chinese New Drugs Journal title and the Liječnički vjesnik abstract are available in English equivalents in cross-citations. Russian Wikipedia entry read directly in Russian (general comprehension). No specific numerical claim is translation-dependent in this report.
+> **Tier NE handling.** Cite English-language abstracts of native-language papers as if English with a language note. Cite source-language-only items by bibliographic reference, not by numerical claim, and flag `non-english-untranslated`. Machine-translated numerical claims carry an explicit `[translated:<tool>]` tag.
 
 ---
 
-## Croatian / Pliva-era findings
+## 1. Survey scope and methodology
 
-### New sources found
+### 1.1 Databases queried by language
 
-**[NE-1] Vraneš H, Kalogjera L, Smoday IM. "Molecular effects of stable gastric pentadecapeptide BPC 157 on psoriasis." *Liječnički vjesnik* 145 (Supp 2):44, 2023.** [`in_vitro`, Croatian conference abstract, English text PDF available via Hrčak]. Department of Pharmacology, School of Medicine, University of Zagreb. https://hrcak.srce.hr/en/303007 / DOAJ id 579ce92411d24454900cefa4a7805f9a. Conference abstract: in vitro keratinocyte study, IL-17A-stimulated keratinocytes treated with BPC 157; conclusion (per EBSCOhost record BS07): "BPC157 inhibits the pro-inflammatory effects induced by in vitro treatment of keratinocytes with IL-17A." **Translation status:** original abstract in English; venue is Croatian Medical Association journal. Admissibility: Tier 2.5-equivalent (conference abstract, not full peer-reviewed paper). New indication signal: psoriasis (not in English-language report).
+| Language | Primary sources queried | Search terms |
+|---|---|---|
+| **Croatian** | Hrčak (hrcak.srce.hr — Croatian central scientific journal portal), Liječnički vjesnik (lijecnicki-vjesnik.hlz.hr), Acta Pharmaceutica (sciendo.com/journal/ACPH), Acta Clinica Croatica, Croatian Medical Journal (cmj.hr), DOAJ | "BPC 157", "BPC-157", "PL 14736", "pentadekapeptid", "Sikirić", "Pliva" |
+| **Russian** | eLibrary.ru, CyberLeninka, Bulletin of Experimental Biology and Medicine (Springer, English-translated), Vestnik RAMN | "БПЦ 157", "BPC 157", "пентадекапептид", "ПЛ 14736", "Sikiric" |
+| **Chinese** | CNKI (cnki.com.cn), Wanfang, sohu (Chinese mirror of Sikirić 2022 review translation), MedChemExpress 中文 catalog, ChemicalBook 中文, Rehabilitation Practice and Science (rps.researchcommons.org — Taiwan, Chinese-titled), World Chinese Journal of Digestology | "BPC 157", "BPC-157", "胃十五肽", "胃保护因子", "稳定胃五肽", "第四军医大学", "西安" |
+| **Korean** | KCI (kci.go.kr), Kosin Medical Journal (kosinmedj.org), Journal of Dental Anesthesia and Pain Medicine (jdapm.org), KoreaMed | "BPC-157", "BPC 157", "체보호화합물" |
+| **Japanese** | J-STAGE (jstage.jst.go.jp), Yakugaku Zasshi, Japanese Journal of Pharmacology, Folia Pharmacologica Japonica | "BPC 157", "BPC-157", "ペンタデカペプチド" |
 
-**[NE-2] Linarić-Lipnjak M, Vraneš H, Lacković M, Sikirić P. "The histological aspect of pentadecapeptide BPC 157 on the healing of tracheocutaneous fistula in rats." OR06, Liječnički vjesnik supplement / CROSS book of abstracts, 2024.** [`animal`, Croatian conference abstract]. https://lijecnicki-vjesnik.hlz.hr/wp-content/uploads/2024/04/CROSS-BoA-FINAL.pdf. Sikiric-group; extends fistula-healing series (vesicovaginal, rectovaginal, esophagocutaneous, etc. in existing report) to tracheocutaneous fistula — new anatomical model. **Translation status:** title English in original abstract book.
+### 1.2 Translation tooling
 
-**[NE-3] Dulčić D, Marušić J, Cepanec I, Sikirić P. "Comparative Assessment of NO-System Modulators in Mitigating Aminoglycoside-Induced Nephrotoxicity in Rats and stable gastric pentadecapeptide BPC-157 therapy." OR03, CROSS abstracts 2024.** [`animal`, Croatian conference abstract]. Same source as NE-2. New AE-model signal: aminoglycoside nephrotoxicity (not in English-language report; complements existing remote-organ Demirtaş 2025 work).
+- **Croatian → English.** Croatian-language abstracts on Hrčak typically appear alongside English abstracts in the same article record; English abstracts were read natively. Croatian-only sections (full-text bodies in Liječnički vjesnik supplements) were not deeply translated — bibliographic-only citation per Tier NE.
+- **Russian → English.** Russian Wikipedia and CyberLeninka prose were read with Google Translate (web). Numerical claims sourced from machine translation are flagged inline `[translated:google-translate]`. Russian Springer-translated journals (Bull Exp Biol Med) carry English abstracts and were treated as English-tier.
+- **Chinese → English.** Sohu mirror of the Vukojević 2022 NRR review (which is itself an English-language journal — Neural Regeneration Research — with a Chinese-language abstract on Sjzsyj) was read partly via Chinese reading + machine translation; the underlying paper is English-language. MedChemExpress and ChemicalBook 中文 catalog pages were used for compound-identity confirmation only, not biological claims.
+- **Korean → English.** Both KCI-indexed Korean papers located (Park 2021 Kosin Med J; Jung 2022 JDAPM) are published with full English text alongside Korean metadata — English-tier.
+- **Japanese → English.** J-STAGE items located are J Pharmacol Sci (English-language journal hosted on Japan's J-STAGE platform; the authors are Croatian Sikirić-group). No Japanese-language primary located.
 
-### Pliva-era PL 14736 program documentation surfaced beyond English-language reviews
+### 1.3 Survey honesty disclosure
 
-The English-language report flags PL 14736 Phase II UC trial [C-12] as "primary publication not located." The non-English survey did **not** locate a Croatian-language primary publication either. The trial appears only as a Gastroenterology meeting abstract:
-
-**[NE-4] Ruenzi M, Stolte M, Veljaca M, Oreskovic K, Peterson J, Ulcerative Colitis Study Group. "A multicenter, randomized, double blind, placebo-controlled phase II study of PL 14736 enema in the treatment of mild-to-moderate ulcerative colitis." *Gastroenterology* 128:A584, 2005.** [`rct`, English abstract — meeting record]. Cited as Klicek 2008 ref [16], Surgery Today 2007 ref, IntechOpen ref [28]. **This is the canonical citation pointer for the unpublished Phase II UC trial.** No primary publication located in any language. Confirms publication-bias flag [E-12 / Sec. 17 #5] in the English report.
-
-**[NE-5] Veljaca M, Krnic Z, Brajsa K, Mildner B, Pavic-Sladoljev D, Seveljevic-Jaran D, et al. "The development of PL 14736 for treatment of inflammatory bowel disease." IUPHAR-GI Section Symposium, Honolulu, Hawaii, 13–15 July 2002. Abstract O-32.** [conference, English]. Pliva industrial-pharmacology development summary. Surfaced via Surgery Today 2007 reference list. Document not available online; existence confirmed by citing-paper bibliography.
-
-**[NE-6] Veljaca M, Pavic Sladoljev D, Mildner B, Brajsa K, Bubenik M, Stipanicic S, et al. "Safety, tolerability and pharmacokinetics of PL 14736, a novel agent for treatment of ulcerative colitis, in healthy male volunteers." *Gut* 51 Suppl III:A309, 2003.** [`open_label`, English abstract]. UEGW 2003 meeting abstract — the Phase I report. Already noted as [C-11] in English report (cited as "Veljaca et al. … abstract only"); now confirmed with exact venue. Companion to Veljaca 2002 Semantic Scholar id 7cc5b526006d9ecc959aa09ede50cfb12b751787 (same content, different abstract venue).
-
-**[NE-7] Turkovic B, Sikiric P, Seiwerth S, Mise S, Anic T, Petek M, et al. "Stable gastric pentadecapeptide BPC 157 studied for inflammatory bowel disease (PLD-116, PL14736, Pliva) induces nitric oxide synthesis." *Gastroenterology* 126:287, 2004.** [`animal`, English abstract]. DDW 2004 abstract. Not in English-language report. Mechanism abstract linking PL 14736 development to NO induction.
-
-### Pliva-era patent estate (not in English-language report's bibliography)
-
-Surfaced via Google Patents + Diagen company page (bpc157.si). Identified Sikiric/Pliva/Diagen patent family:
-
-**[NE-8] Patent estate (chronological):**
-- **WO 1992/004368 A1** — "Pharmacologically active substance BPC, the process for its preparation and its use in the therapy." Sikirić P. Priority 1990-09-11. Earliest BPC patent.
-- **EP 0601154 / US 6,268,346** — "Peptides with organo-protective activity." Sikiric et al.
-- **EP 0624164 B1** (granted 1998-02-11) — "Peptides with organo-protective activity, process for their preparation and their use in the therapy." Petek M (inventor).
-- **EP 0672688 / US 6,211,151** — "Peptides with organo-protective activity." Sikiric et al.
-- **WO 1998/052973 / US 6,288,028** — "BPC peptide salts with organo-protective activity, the process for their preparation and their use in therapy" (granted 2001-09-11). Inventors: Sikiric, Petek, Turkovic, Seiwerth, Grabarevic, Rotkvic, Mise, Duvnjak, Udovicic.
-- **EP 0983300 B1** — same family, European grant; tablet/capsule/cream/injectable formulation compositions disclosed (NaBPC157 0.5 mg/tablet etc.).
-- **SI 23928** (Slovenian patent, granted 2013-05-31) — "Pentadecapeptide salts and their use in cosmetics and dermatology." Inventors: Ručman R, Sikirić P, Seiwerth S, Turković B.
-- **PCT WO 2014/142764 A1 / US 9,850,282 B2** — "Stable pentadecapeptide salts" — Ručman R (Diagen). Discloses TRIS-BPC157, NaBPC157, diNa, 2-AMP, TEAM salts, with 76-day and 120-day stability data (HPLC area %; all salts >95% at 40 °C; sodium and TRIS salts ~99.4%).
-- **CN 2024/118615479** — "Medical dressing for repairing scars and preparation method thereof" (Zhejiang Top Medical Dressing Co.). Recent Chinese patent surfaced in Józwiak 2025 patent review [C-35 in English report].
-
-These patents are admissible as `regulatory`-adjacent / `compounding_data_sheet`-equivalent for: dose-form composition, stability characterization, salt selection rationale. Not citable for efficacy.
-
-### Confirmed absences (Croatian-language)
-
-- **No Croatian-language Lijecnicki vjesnik full-paper primary on BPC-157 located** beyond the 2023 psoriasis conference abstract NE-1 and the 2024 CROSS abstracts NE-2/NE-3. The Sikiric group publishes its primary papers in English-language international journals (J Orthop Res, J Physiol Pharmacol, Eur J Pharmacol, Curr Pharm Des, etc.).
-- **No Acta Pharmaceutica (Croatian Pharmaceutical Society, Sciendo) primary on BPC-157 located.** The journal is mostly English-language; no BPC-157 hits in Tavily survey.
-- **No Croatian Medical Journal primary on BPC-157 located.**
-- **No PL 14736 Phase II UC primary publication located in any language** — the trial is referenced only via Ruenzi 2005 Gastroenterology meeting abstract [NE-4]. This confirms the publication-bias flag in the English report (Sec. 17 #5).
-
-### Notes on Sikiric-group publication practice
-
-Sikiric-group papers occasionally include Croatian-language abstracts as duplicate publications in Liječnički vjesnik supplements (CROSS, Croatian Medical Students Congress on Sciences). These are not independent primaries — they are conference-poster derivatives of work the group later publishes in English. The 2024 CROSS book of abstracts contains at least two such BPC-157 entries (NE-2, NE-3), neither yet escalated to peer-reviewed English-language paper as of search date.
+- This is a **structured web survey**, not an institutional database subscription survey. Items hidden behind paywalled CNKI/eLibrary article-bodies (without English abstract index) are unenumerable here. Where a database returned no extractable abstract, that absence is reported, not papered over.
 
 ---
 
-## Chinese findings
+## 2. Croatian / Eastern European (originator-country focus)
 
-### New sources found by same Fourth Military Medical University group
+The originator country for BPC-157 is **Croatia**. Croatia is also the originator-language country (Sikirić Zagreb group + Pliva Zagreb industrial). Surveyed densely. Findings group into three buckets: (a) Croatian-language abstracts of papers also published in indexed journals (Tier-1-equivalent), (b) supplement / meeting-abstract entries in Liječnički vjesnik (Tier-2 to Tier-2.5), (c) Pliva-era industrial documents (Tier-2.7 industrial / regulatory).
 
-**[NE-9] Xue XC, Wu YJ, Gao MT, et al. "Study of the protective effects of pentadecapeptide BPC 157 on skin cut wounds in small type pigs." *Chinese Journal of New Drugs* (中国新药杂志) 13:602-605, 2004.** [`animal`, **Chinese-language primary**]. **This is a second 2004 Xue paper distinct from the World J Gastroenterol gastric ulcer paper [C-4] cited in the English report.** Cited in: Surgery Today 2007 reference list (as "Chin New Drugs J 2004;12:602-604"), Seiwerth/Sikiric Front Pharmacol 2021 review ([A-5], cited as "Xue et al. 2004b"), and Frontiers in Pharmacology 2021 wound-healing review. The English-language report's [C-4] cites the rat gastric-ulcer paper only; this porcine wound paper is the second Fourth Military Medical University primary from 2004 and is **not present** in the English-language report's bibliography. **Translation status:** full text in Chinese; cited content available only via the English-language reviews that reference it. Title and design (skin-cut wounds in small-type pigs) confirmed by multiple citing reviews. Admissibility: Tier 1-equivalent venue (Chinese Journal of New Drugs is a SCI-indexed CNKI core journal; CN 11-3034/R; published by China Pharmaceutical Industry Information Centre); citable as `animal` for existence-of-effect (porcine model = larger-animal corroboration of rodent skin-wound work), not for specific numerical claims pending source-language verification.
+### 2.1 Acta Clinica Croatica — Tier-1 indexed peer-reviewed primary
 
-### Other Chinese groups working on BPC-157
+- **NE-Croatian-1** [10, animal, type-tag:animal-primary] [language:Croatian+English bilingual, full-text-native-read] **Mirković I, Kralj T, Lozić M, Stambolija V, Kovačević J, Vrdoljak L, Zlatar M, Milanović K, Drmić D, Predović J, Masnec S, Jurjević M, Bušić M, Seiwerth S, Kokot A, Sikirić P. 2020.** *Pentadecapeptide BPC 157 shortens duration of tetracaine- and oxybuprocaine-induced corneal anesthesia in rats.* Acta Clin Croat 59(3):394–406. doi:10.20471/acc.2020.59.03.02. Hrčak ID 360028 (https://hrcak.srce.hr/file/360028). Croatian abstract title: "Pentadekapeptid BPC 157 skraćuje trajanje anestezije rožnice izazvane tetrakainom i oksibuprokainom kod štakora." [population-mismatch: rat] [route-extrapolation: eye drop, 0.4 µg/eye]. **Mechanistic finding**: BPC 157 (0.4 µg/eye eyedrop) shortened the duration of corneal anesthesia induced by 0.5% tetracaine and 0.4% oxybuprocaine; effect was modulated by L-NAME and L-arginine co-application, supporting the NO-system mechanism. Sikirić-Zagreb cluster (Department of Pharmacology, Zagreb + Osijek collaborator + Sveti Duh University Hospital).
 
-**[NE-10] He L, Feng D, Guo H, Zhou Y, Li Z, Zhang K, Zhang W, Wang S, Wang Z, Hao Q, Zhang C, Gao Y, Gu J, Zhang Y, Li W, Li M. "Pharmacokinetics, distribution, metabolism, and excretion of body-protective compound 157, a potential drug for treating various wounds, in rats and dogs." *Frontiers in Pharmacology* 13:1026182, 2022.** This is the same paper cited as [A-11] in the English-language report (DOI 10.3389/fphar.2022.1026182, PMC9794587). **Confirmation:** the author list (He, Feng, Guo, Zhou, Li, Zhang, ... Li) is the Fourth Military Medical University Department of Biopharmaceutics group — same institution and overlapping personnel (Zhang, Li) with Xue 2004 [C-4] and Huang 2015 [C-17]. The English-language report attributes the paper to "Xu et al."; the correct first-author is **He L**. Co-authors include Xue X (NE-9 author) per institutional continuity. This is a citation/author-name correction, not a new finding. Recommend updating English-language report's [A-11] attribution from "Xu et al. 2022" to "He et al. 2022."
+### 2.2 Liječnički vjesnik — Croatian Medical Association journal (Tier-2 / supplement)
 
-**[NE-11] Wang XY, Qu M, Duan R, Shi D, Jin L, Gao J, Wood JD, Li J, Wang GD. "Cytoprotective mechanism of the novel gastric peptide BPC157 in gastrointestinal tract and cultured enteric neurons and glial cells." *Neuroscience Bulletin* 35(1):167-170, 2019.** [`in_vitro` + `mechanism_review` letter]. Already cited transitively in the PMC11053547 review (ref 119) and in the OPSS bibliography. Authors are a US-China collaboration: Wood JD (Ohio State); Wang GD likely Ohio State / China. Tier 1-equivalent (Springer-published Chinese Neuroscience Society journal). **Not present** in English-language report bibliography. Adds: gastrointestinal enteric-neuron mechanism — short letter, not a full mechanism paper.
+Liječnički vjesnik (LV) is the official journal of the Croatian Medical Association, founded 1877, indexed Hrčak. Most BPC-157 content surfaces in **supplement issues** carrying medical-student / Zagreb International Medical Summit (ZIMS) abstracts under direct supervision of Sikirić-group faculty. These are not the journal's main peer-reviewed channel — they are abstract-tier and should be discounted accordingly.
 
-**[NE-12] Wu H, Wei M, Li N, Lu Q, Shrestha SM, Tan J, ... Shi R. "Clopidogrel-induced gastric injury in rats is attenuated by stable gastric pentadecapeptide BPC 157." *Drug Design, Development and Therapy* 14:5599-5610, 2020.** [`animal`, English-language but Chinese authors]. Surfaced via OPSS bibliography. Not in the English-language report's bibliography. **New drug-interaction signal:** clopidogrel (P2Y12 antiplatelet) — gastric injury attenuation. The English report's Sec. 13 (Drug interactions) lists NSAIDs, anthracyclines, and other interactions but does not include clopidogrel. Admissible as `animal` for existence-of-interaction and direction (BPC-157 attenuates).
+- **NE-Croatian-2** [meeting-abstract, type-tag:abstract] [language:English abstract in Croatian journal, abstract-only] **Vraneš H, Kalogjera L, Smoday IM. 2023.** *Molecular effects of stable gastric pentadecapeptide BPC 157 on psoriasis.* Liječnički vjesnik 145(Supp 2):44. DOAJ-indexed (https://doaj.org/article/579ce92411d24454900cefa4a7805f9a). Department of Pharmacology, School of Medicine, University of Zagreb. **Indication signal**: psoriasis (IL-17 / IL-23 axis modulation hypothesis). Abstract-only — no primary efficacy data extractable from this record.
 
-### CNKI / Wanfang search results — summary
+- **NE-Croatian-3** [meeting-abstract, type-tag:abstract] [language:English abstract in Croatian journal, abstract-only] **Dretar V, Radevski F, Peraić P, Fry J, Belamarić M, Antunović M, Krezić I, et al. 2019.** *The effect of pentadecapeptide BPC 157 on high-fat diet induced hypertension in rat.* Liječnički vjesnik 141(Suppl 1). Hrčak ID 221663. [population-mismatch: rat] [route-extrapolation: unspecified i.p./drinking water]. **Indication signal**: BPC 157 reportedly attenuated systolic-BP rise (control day-25 = 205 mmHg; BPC day-25 = 165 mmHg) `[translated:google-translate / native-read English abstract]` in high-fat-diet rats. Numerical claim is from the abstract.
 
-- Direct CNKI / Wanfang full-text retrieval is paywalled; surveyed via Chinese-language Tavily queries and cross-references in English-language reviews.
-- **The Second Military Medical University Journal (Medical Journal of Chinese PLA / yxsj.smmu.edu.cn)** published a 2017 Chinese-language review on peptides in TBI which discusses BPC-157 [Source: yxsj.smmu.edu.cn/fileYXSJZZ/journal/article/yxsjzz/2017/6/PDF/20170604.pdf]. Citations are to existing Sikiric/Tudor/Vukojevic English-language primaries (Tudor 2010 Regul Pept, Vukojevic 2016 FASEB J, Tohyama 2004 Life Sci) — not a new primary, but confirms Chinese-language secondary review coverage. Admissibility: secondary review, citable for breadth-of-coverage observation only.
-- ChemicalBook (`chemicalbook.com/NewsInfo_33849.htm`) hosts a Chinese-language summary of Vukojevic 2022 Neural Regen Res CNS paper — secondary, not a new primary.
-- No additional Chinese-language Sikiric-independent primaries surfaced beyond [NE-9], [NE-11], [NE-12] and the already-cited Huang 2015 [C-17].
+- **NE-Croatian-4** [meeting-abstract, type-tag:abstract] **Migo W (William) et al. 2019.** *Pentadecapeptide BPC 157 counteracts portal hypertension, caval hypertension and aortal hypotension with suprahepatic occlusion of inferior caval vein in rats.* Liječnički vjesnik (Hrčak). Abstract-only.
+
+- **NE-Croatian-5** [meeting-abstract, type-tag:abstract] **Migo W et al. 2019.** *Pentadecapeptide BPC 157 therapy in rats with cysteamine induced-terminal ileitis.* Liječnički vjesnik (Hrčak). Abstract-only.
+
+- **NE-Croatian-6** [meeting-abstract, type-tag:abstract] **Dumančić L. 2024.** *Pathohistological Aspect of Duodenocolic Fistular Healing in Rats Mediated with Stable Gastric Pentadecapeptide BPC 157.* In: 24th ZIMS Abstract Book, Liječnički vjesnik 146(Suppl 5):74. (https://lijecnicki-vjesnik.hlz.hr/wp-content/uploads/2024/12/Suplement-LV-br.5-.pdf). Abstract-only, student work.
+
+- **NE-Croatian-7** [meeting-abstract, type-tag:abstract] **Marušić J. 2024.** *Histological Aspects of Serial Rib Fractures and Therapeutic Effects of Stable Gastric Pentadecapeptide BPC 157.* In: 24th ZIMS Abstract Book, Liječnički vjesnik 146(Suppl 5). Abstract-only, student work.
+
+**Honest read of LV supplements**: All BPC-157 abstract entries located in Liječnički vjesnik are Zagreb Department of Pharmacology productions (Sikirić-cluster). They expand the Sikirić-cluster output but do not constitute independent replication. Cited bibliographically; numerical claims discounted because they are abstract-tier, internal-supervisor-graded (not external peer review at journal-article level).
+
+### 2.3 Acta Pharmaceutica — Croatian Pharmaceutical Society (Tier-1 indexed)
+
+Acta Pharmaceutica (Sciendo, eISSN 1846-9558, ISSN 1330-0075) is the Croatian Pharmaceutical Society's quarterly. Direct keyword search of the journal's table of contents at Sciendo and Hrčak (volumes 57–76) **returned no BPC-157 primary research article**. The journal scope is heavily medicinal chemistry / pharmaceutical-technology weighted; the Sikirić group preferentially publishes in pharmacology journals (J Physiol Paris, Eur J Pharmacol, Curr Pharm Des, J Pharmacol Sci, Inflammopharmacology) rather than in their national Pharmaceutical Society's outlet. **Reported absence**: no BPC-157 primary found in Acta Pharmaceutica through this survey.
+
+### 2.4 Croatian Medical Journal — confirmed absence
+
+Croatian Medical Journal (cmj.hr) is the higher-IF Croatian medical journal. Web-search of "BPC 157" site:cmj.hr and within multi-database surveys produced **no BPC-157 primary by Sikirić-group or any other**. The Sikirić group does not appear to use CMJ as a publication venue for BPC-157 work. **Reported absence**.
+
+### 2.5 Pliva-era industrial documents (Tier-2.7 industrial, originator-country)
+
+The originator pharmaceutical company is **Pliva Hrvatska d.o.o., Zagreb** (Pliva Research Institute, the Pliva Croatia industrial cluster, now part of Teva Pharmaceutical Industries). The Pliva development codes for BPC-157 are **PL-10, PLD-116, and PL 14736**. The English-language research-report.md already lists the Pliva clinical-trial publication (Ruenzi/Veljača Phase II ulcerative colitis). The non-English layer adds the following Pliva-era industrial pointers:
+
+- **NE-Croatian-8** [patent, type-tag:patent] **Sikirić P, Rucman R, Petek M et al.** (Pliva). *US Patent 6,268,346 B1, issued 31 Jul 2001*: pentadecapeptide BPC-157 and indications including hypertension, angina, impotence, circulatory and septic shock, gastroduodenal pathology, cardiac arrhythmias, depression, bone fractures, etc. The patent's claimed-indications list is much broader than published peer-reviewed studies support; reflects Pliva's commercial framing, not evidence. Cited as the originator patent only.
+- **NE-Croatian-9** [industrial, type-tag:industry-grey] **Pflaum Z, Rucman R. 2005.** *Solid phase peptide synthesis of the fragment BPC157 of human gastric juice protein BPC and its analogues.* Acta Chim Slov 52:34–39. **Slovenian** journal — Diagen lab (Ljubljana, Slovenia), the long-term BPC-157 synthesis subcontractor for the Sikirić-Zagreb / Pliva-Zagreb lineage. This is the canonical synthesis-method publication and confirms the **Slovenia-Croatia industrial-academic chain**: Diagen Ljubljana (synthesis) → Pliva Zagreb (development) → University of Zagreb Department of Pharmacology (preclinical research). **Important context for concentration-risk audit**: the Slovenia leg of the chain is not an independent replication node — it is an integrated subcontractor.
+
+### 2.6 Other Croatian / Slovenian / Eastern European indexed primaries
+
+- **NE-Croatian-10** [animal, type-tag:animal-primary, English published in Slovenia/Slovak journal] **Sikirić P, Petek M, Rucman R, Seiwerth S, Grabarević Z, Rotkvic I, Turkovic B, Jagic V, Mildner B, Duvnjak M, et al. 1992.** *The significance of the gastroprotective effect of body protection compound (BPC): Modulation by different procedures.* Acta Physiologica Hungarica 80:89–98. PMID 1345210. Hungarian-affiliated journal but English-language; first systematic BPC report from the Zagreb group, one year before the seminal 1993 J Physiol Paris paper.
+
+- **NE-Croatian-11** [animal, type-tag:animal-primary] **Sikirić P, Marović A, Matoz W et al. 1999.** *A novel pentadecapeptide BPC 157 blocks the stereotypy produced acutely by amphetamine and the development of haloperidol-induced supersensitivity to amphetamine.* J Physiol Paris (note: French journal accepting English; already counted in English layer). Mentioned here only for cross-reference completeness with the 2002 Acta Pharmacol Sin Croatian-authored paper (NE-Chinese-10 below).
+
+### 2.7 Croatian-cluster summary
+
+- **All Croatian primary BPC-157 work located is from the Sikirić-Zagreb academic cluster or its Diagen-Slovenia / Pliva-Zagreb industrial collaborators.** No independent Croatian non-Sikirić-cluster primary surfaced in this survey.
+- The supplement-abstract output in Liječnički vjesnik (NE-Croatian-2 through -7) **expands** the Sikirić-cluster footprint into psoriasis (new dermatologic indication, abstract-only) and high-fat-diet hypertension (new metabolic-cardiovascular indication, abstract-only). These should be ingested into `vault/meta/contradictions.md` as **new-indication signals at abstract-tier** — not as confirmed effects.
 
 ---
 
-## Russian / Soviet / Post-Soviet findings
+## 3. Russian / Soviet / Post-Soviet
 
-**Sources found: none located.** Detailed:
+### 3.1 Direct Russian-language primaries on BPC-157 — confirmed absence
 
-- **CyberLeninka searches** returned only Russian-language reviews that cite Sikiric papers transitively:
-  - Russian glyproline review (semax/Selank context) citing Sikiric 2016 Brain-Gut Axis [Curr Neuropharmacol].
-  - Russian honeybee Nosema review citing Tlak Gajger et al. 2018 J Vet Pharmacol Ther (Sikiric-group veterinary BPC-157 paper).
-  - Russian "epithelial permeability syndrome" multidisciplinary consensus — uses "BPC" as abbreviation for a statistical term ("взвешенная разность средних" / weighted mean difference), not the peptide. **False positive** in keyword search.
-  - None of these are Russian-language primary studies of BPC-157.
-- **eLibrary.ru direct search** for "BPC 157" / "пентадекапептид" — no Russian primaries surfaced via Tavily-indexed results.
-- **Bulletin of Experimental Biology and Medicine (Springer-translated)** verification: PubMed searches confirm no BPC-157 papers in this journal. If any Russian institute (Institute of Molecular Genetics RAS, Zakusov Institute of Pharmacology, St. Petersburg Bioregulation/Khavinson, Serbsky) had done BPC-157 work, the Springer-translated English versions would appear in PubMed; they do not.
-- **Russian Wikipedia** has a stub entry (`ru.wikipedia.org/wiki/BPC_157_(пентадекапептид)`); content is translated from English sources and cites Sikiric-group reviews. Not a primary.
-- **Pliva is Croatian** — the Russian/Soviet pharmaceutical research apparatus has historically focused on its own peptide bioregulators (Khavinson group: Epitalon, Thymalin, Cortexin; Institute of Molecular Genetics: Selank, Semax). There is no evident Russian institutional interest in BPC-157.
+**Targeted searches of eLibrary.ru and CyberLeninka for "БПЦ 157" / "BPC 157" / "пентадекапептид BPC" / "ПЛ 14736" returned no Russian-language primary research article specifically on BPC-157.**
 
-**Finding statement (for inclusion in vault):** No admissible Russian-language primary BPC-157 study located in eLibrary.ru, CyberLeninka, or Springer-translated Bulletin of Experimental Biology and Medicine searches as of 2026-05-23. Russian secondary literature cites Sikiric-group English-language reviews only.
+What surfaced instead:
+- **NE-Russian-1** [review-citation, type-tag:secondary] **Glagoleva et al. (CyberLeninka).** *Глипролины — регуляторные пептиды с интегративным действием* ("Glyprolines — regulatory peptides with integrative action"). https://cyberleninka.ru/article/n/gliproliny-regulyatornye-peptidy-s-integrativnym-deystviem . Cites Sikirić 2016 brain-gut review as a comparator for the **Russian glyproline research line** (Arg-Pro-Gly-Pro, semax, selank — Engelhardt Institute and Institute of Molecular Genetics, Moscow). BPC-157 is cited but **not the subject of original Russian research**.
+- **NE-Russian-2** [review-citation, type-tag:secondary] Russian multidisciplinary consensus on intestinal-permeability syndrome (CyberLeninka, https://cyberleninka.ru/article/n/sindrom-povyshennoy-epitelialnoy-pronitsaemosti-v-klinicheskoy-praktike-multidistsiplinarnyy-natsionalnyy-konsensus). The acronym "BPC" appears in the abbreviation list but resolves to "weighted mean difference" (взвешенная разность средних — statistical, not BPC-157). False match.
+- **NE-Russian-3** [reference, type-tag:reference] **Russian Wikipedia entry on BPC-157** (ru.wikipedia.org/wiki/BPC_157_(пентадекапептид)). Reports: "Preclinical safety evaluation of BPC-157 showed no toxic effect in dogs at doses below 2 mg/kg" `[translated:google-translate]`. The Wikipedia entry sources this from English-language primary literature (the He L 2022 / Xu 2020 cluster); it is not original Russian data. Reference-tier only.
+- **NE-Russian-4** [vendor, type-tag:vendor] **Russian Peptide (russianpeptide.com/bpc-157-5-mg).** Russian-language vendor catalog page. Cites a wide indication list (hypertension, angina, impotence, stroke, AIDS, cancer, depression, vaginal atrophy, etc.) sourced from the Pliva US patent (NE-Croatian-8) and English-language reviews. **Not a primary; not admissible for biological claim**. Documented as evidence that the Pliva-patent indication list propagates into Russian-language commercial channels.
+
+### 3.2 Bulletin of Experimental Biology and Medicine (Springer-translated)
+
+Bulletin of Experimental Biology and Medicine is Russia's flagship experimental-medicine journal (Springer-translated to English). It would be the most natural venue for a Russian academic BPC-157 paper. **Direct keyword search of the Springer journal archive for "BPC 157" returned no Russian-authored primary paper on BPC-157.** A Russian group from St. Petersburg published in this journal on the **glycine-proline cycle** (Grigorjeva, Kazancheva, Lyapina 2013, Bull Exp Biol Med 154(6):723–727), but the work is on Arg-Pro-Gly-Pro and the broader glyproline class, not BPC-157. Reported absence for BPC-157 in this journal.
+
+### 3.3 Eksperimental'naya i Klinicheskaya Farmakologiya, Vestnik RAMN, Khavinson group — confirmed absence
+
+- **Eksperimental'naya i Klinicheskaya Farmakologiya** (Experimental and Clinical Pharmacology): no BPC-157 primary located via web search.
+- **Vestnik RAMN** (Vestnik Rossiiskoi Akademii Meditsinskikh Nauk): no BPC-157 primary located.
+- **St. Petersburg Bioregulation/Gerontology Institute (Khavinson group)** — they publish on short-peptide bioregulators (Vilon, Epitalon, Cortexin, Thymalin). **No Khavinson-group primary on BPC-157 located.** The Russian peptide-bioregulator research tradition operates on a different peptide class (2–4 residue oligopeptides) and does not appear to overlap with BPC-157 work.
+
+### 3.4 Russian-cluster summary
+
+- **No Russian-language primary research on BPC-157 was located in this survey.**
+- BPC-157 enters Russian literature only as a **cited comparator** in reviews of other regulatory peptide families (glyprolines, peptide bioregulators) or as **vendor / Wikipedia reference content** sourced from English-language primaries.
+- **This is the most significant absence finding of the survey**: given the depth of the Russian regulatory-peptide research tradition (Khavinson, Engelhardt Institute, Moscow), the lack of any independent Russian primary on BPC-157 is a non-replication signal that strengthens the concentration-risk finding in research-report.md §2.
 
 ---
 
-## Japanese / Korean / other findings
+## 4. Chinese
+
+### 4.1 Fourth Military Medical University Xi'an cluster — additional Chinese-language primaries
+
+Critical task: verify whether additional Chinese-language primaries from the **Fourth Military Medical University Xi'an** institutional cluster (origin of Xu 2020 GLP safety package, He L 2022 PK paper, and Xue 2004 alkali-burn / gastric-ulcer paper) exist beyond what is already in research-report.md.
+
+**Located English-language papers in research-report.md from this cluster**:
+- Xue XC, Wu YJ, Gao MT, Li WG et al. 2004. *Protective effects of pentadecapeptide BPC 157 on gastric ulcer in rats.* World J Gastroenterol 10:1032–1036.
+- Huang T, Gu J, Zhang K, Sun L, Xue X, Zhang C, ..., Zhang W. 2015. *Body protective compound-157 enhances alkali-burn wound healing in vivo and promotes proliferation, migration, and angiogenesis in vitro.* Drug Des Devel Ther.
+- Xu 2020 (GLP safety package).
+- He L, Feng D, Guo H, Zhou Y, Li Z, Zhang K, ..., Li M. 2022. *Pharmacokinetics, distribution, metabolism, and excretion of BPC-157 in rats and dogs.* Front Pharmacol 13:1026182. doi:10.3389/fphar.2022.1026182.
+
+**Additional Chinese-language findings from this layer**:
+- **NE-Chinese-1** [translation-of-English-primary, type-tag:secondary-translation] **Sohu mirror translation of Vukojević J, Milavić M, Perović D, Ilić S, Čilić AZ, Đuran N, Štrbe S, Zoričić Z, Filipčić I, Brečić P, Seiverth S, Sikirić P. 2022.** *Pentadecapeptide BPC 157 and the central nervous system.* Neural Regen Res 17(3):482–487. doi:10.4103/1673-5374.320969. (Sohu Chinese mirror: https://www.sohu.com/a/494828136_120580655; sjzsyj.com.cn Chinese summary: https://www.sjzsyj.com.cn/CN/10.4103/1673-5374.320969). **Important note**: NRR is an English-language SCI-indexed journal owned by Chinese editors (editor: Su Guo-hui, Hong Kong; Xu Xiao-ming, Indiana). The Chinese-language abstract and Chinese-mirror coverage indicate the paper is **read and circulated in Chinese clinical neurology circles**, but the underlying paper is English-published and already counted in research-report.md. Not a new primary.
+
+- **NE-Chinese-2** [animal-primary, type-tag:animal-primary, English published, Taiwan-Chinese affiliation] **Wang SH, Lin LP, Lin MS, Pang JHS, Tsai WC. 2023.** *BPC 157 Promotes Skeletal Muscle Cells Migration in Association with Up-regulation of Paxillin and Vinculin Expression.* Rehabilitation Practice and Science (Taiwan Academy of Physical Medicine and Rehabilitation) 47(1):3. https://rps.researchcommons.org/journal/vol47/iss1/3. Translated Chinese title: "BPC 157胜肽增加Paxillin和Vinculin蛋白表現量以促進骨骼肌細胞移行". Chang Gung University cluster (Taiwan). **In vitro skeletal muscle cell migration paper extending the Pang group's existing tendon FAK-paxillin work** to the C2C12 skeletal muscle line. May or may not be already in research-report.md — flag for cross-check with citation #29 / #30 (Pang group cluster).
+
+- **NE-Chinese-3** [vendor-catalog, type-tag:vendor] **MedChemExpress China (HY-105174) and ChemicalBook (CAS 137525-51-0).** Confirms compound identity in Chinese commercial channels: GEPPPGKPADDAGLV, MW 1419.56, C62H98N16O22, CAS 137525-51-0. No biological claim added; identity-confirmation only.
+
+### 4.2 CNKI / Wanfang — Chinese-language primary search
+
+Direct web-survey of CNKI-indexed Chinese-language journals for "BPC 157" / "胃十五肽" / "胃保护因子 157" / "稳定胃五肽" + Fourth Military Medical University Xi'an / 第四军医大学 returned no additional Chinese-language primary research article in indexed Chinese-language journals (Acta Pharmaceutica Sinica B, Chinese Journal of New Drugs, etc.) beyond what is already in research-report.md.
+
+**Caveat**: CNKI full-text access is paywalled and not fully crawlable from web search. Chinese-language thesis / dissertation work from the Fourth Military Medical Univ Xi'an cluster (which generated Xu 2020 and He L 2022) may exist behind CNKI's institutional firewall. This is a **known-unknown** of the survey, not a confirmed absence.
+
+### 4.3 Acta Pharmacologica Sinica
+
+Acta Pharmacologica Sinica is an English-language Chinese journal (Chinese Pharmacological Society). It published one Sikirić-cluster paper (already in English layer):
+- **NE-Chinese-4** [animal-primary, type-tag:animal-primary, English published] **Jelovac N, Sikirić P, Rucman R, et al. 2002.** *Pentadecapeptide BPC 157 attenuates chronic amphetamine-induced behavior disturbances.* Acta Pharmacol Sin 23(5):412–422. Already in research-report.md; flagged here for completeness as a Chinese-affiliated journal venue.
+
+### 4.4 Patent literature — Chinese (CNIPA)
+
+The Józwiak 2025 patent review (Pharmaceuticals 18(2):185, already in English layer) notes BPC-157 appears in Chinese patent applications for **wound-dressing scar-repair formulations** (combining BPC 157 with allopurinol). **Cited bibliographically; novel-indication signal at industrial/patent tier**:
+- **NE-Chinese-5** [patent, type-tag:patent, Chinese affiliated] **Unnamed Chinese group, cited in Józwiak 2025** §3.2. BPC 157 as a component of medical-dressing scar-repair formulations. Effect described: reducing wound-surface water evaporation, increasing skin-cuticle water content, scar-repair acceleration. Patent-tier evidence only — no peer-reviewed primary located for this indication.
+
+### 4.5 Chinese-cluster summary
+
+- **Confirmed novel finding**: a separate Chinese / Taiwanese cluster — the **Pang group at Chang Gung University, Taoyuan, Taiwan** — has been publishing on BPC-157 in vitro mechanism papers (FAK-paxillin tendon fibroblast migration, growth hormone receptor upregulation, VEGFR2 angiogenesis, Src-Caveolin-1-eNOS vasomotor tone) since at least 2011. Many of these are already cited in research-report.md as Pang-group items. The Rehabilitation Practice and Science Taiwan-Chinese-titled item (NE-Chinese-2) extends this cluster to C2C12 skeletal muscle.
+- **No additional Fourth Military Medical Univ Xi'an Chinese-language primary located** beyond the already-counted Xue 2004 / Huang 2015 / Xu 2020 / He L 2022 papers.
+- **Concentration-risk implication**: the "independent Chinese cluster" is mostly **two distinct sub-clusters** (Pang/Chang Gung Taiwan in vitro mechanism + Xi'an in vivo PK/safety). Both are smaller than the Sikirić-Zagreb cluster and do not extend the indications beyond what English-layer research-report.md already documents.
+
+---
+
+## 5. Korean / Japanese (lower-priority)
+
+### 5.1 Korean
+
+Two Korean-affiliated primaries located, both **published with full English text alongside Korean metadata** (English-tier handling per Tier NE):
+
+- **NE-Korean-1** [animal-primary, type-tag:animal-primary, English published, Korean affiliation] **Park SY, Choi SR, Kim JH, Lee SC, Jeong SY, Jeong JH et al. 2021.** *Antinociceptive Effect of BPC-157 in the Formalin-induced Pain Model.* Kosin Medical Journal 36(1):1–13. doi:10.7180/kmj.2021.36.1.1. https://www.kosinmedj.org/journal/view.php?number=232. Department of Anesthesiology and Pain Medicine, Dong-A University College of Medicine, Busan, Korea. [population-mismatch: rat] [route-extrapolation: i.p.]. **Indication**: formalin-induced pain model (inflammatory + neurogenic phases). Adds a Korean-independent replication of the Sikirić-claimed anti-nociceptive effect in the formalin / writhing model — modest but useful as a non-Zagreb replication signal in the pain-modulation domain.
+
+- **NE-Korean-2** [animal-primary, type-tag:animal-primary, English published, Korean affiliation] **Jung YH, Kim HK, Kim H, Kim ES, Baik JS, Kang H. 2022.** *The anti-nociceptive effect of BPC-157 on the incisional pain model in rats.* Journal of Dental Anesthesia and Pain Medicine 22(2):97–105. doi:10.17245/jdapm.2022.22.2.97. https://jdapm.org/DOIx.php?id=10.17245%2Fjdapm.2022.22.2.97. Pusan National University Hospital, Busan, Korea. [population-mismatch: rat] [route-extrapolation: i.p., 10 µg/kg]. **Indication**: postoperative incisional-pain model + mechanical-allodynia testing. Reports anti-nociceptive effect at 10 µg/kg i.p. This is the **same Korean Pusan/Dong-A consortium** as NE-Korean-1; treat as one independent group rather than two.
+
+**Korean cluster note**: NE-Korean-1 and NE-Korean-2 are from overlapping Pusan-region anesthesia/pain-medicine groups, both citing the Sikirić foundational literature. They constitute a small but **genuine non-Zagreb independent-replication cluster in the pain-modulation domain**, in rat at i.p. routes. They do **not** extend the indication beyond what research-report.md §5/§8 already documents (formalin-test antinociception, incisional-pain antinociception). They strengthen the existing pain-domain finding modestly.
+
+### 5.2 Japanese
+
+Targeted J-STAGE search for BPC-157 / ペンタデカペプチド:
+
+- **No Japanese-language primary BPC-157 research located.** The J-STAGE hits for BPC-157 are all English-language papers hosted on J-STAGE because they were published in *Journal of Pharmacological Sciences* (Japanese Pharmacological Society's English-language flagship), authored by **Croatian Sikirić-group** investigators (already counted in research-report.md as Klicek 2008 J Pharmacol Sci 108:7–17).
+- The Japanese pharmacology / gastroenterology research community does not appear to have produced its own primary BPC-157 work in Japanese-language journals (Yakugaku Zasshi, Folia Pharmacol Jpn, Nihon Yakurigaku Zasshi).
+- **Reported absence**: no Japanese-language primary on BPC-157.
+
+### 5.3 Korean/Japanese cluster summary
+
+- **Korean**: 2 papers, 1 independent group (Pusan anesthesia/pain), 1 indication-domain (pain modulation, rat). Useful as marginal non-Zagreb replication for the pain-modulation claim.
+- **Japanese**: no native-language primary located. The Japanese venue (J Pharmacol Sci) is used by the Sikirić-Zagreb group, not by independent Japanese researchers.
+
+---
+
+## 6. New indications, doses, or AEs surfaced — for `vault/meta/contradictions.md`
+
+The non-English layer surfaced the following items that may not be fully captured in the English-language research-report.md and warrant ingestion as **new-evidence** entries in `vault/meta/contradictions.md`:
+
+1. **Psoriasis indication (new-indication, abstract-tier).** Vraneš 2023 Liječnički vjesnik suppl-abstract (NE-Croatian-2). IL-17 / IL-23 / β2-defensin mechanism hypothesis. Abstract-only — no primary efficacy data — but this is a dermatologic indication. Flag as `new-indication-abstract-tier`, type-tag `abstract`, do not surface to specialists without a primary.
+
+2. **High-fat-diet hypertension (new-indication, abstract-tier).** Dretar 2019 Liječnički vjesnik suppl-abstract (NE-Croatian-3). Reported systolic BP day-25: control 205 mmHg vs BPC 165 mmHg `[translated:abstract-only-google-translate-cross-check]`. Adds a metabolic-cardiovascular indication signal. Already partially adjacent to the cardiovascular work in research-report.md §3, but the high-fat-diet model is distinct from the L-NAME / amphetamine cardiovascular models. Flag as `new-indication-abstract-tier`.
+
+3. **Corneal-anesthesia duration shortening (new-mechanism-detail, primary-tier).** Mirković 2020 Acta Clin Croat (NE-Croatian-1). Numeric eye-drop dose (0.4 µg/eye) and NO-system modulation specific to ocular surface. Possibly already covered in research-report.md §5 ocular subsection (Lazic 2005 cornea), but the **shortening of local-anesthetic effect** is a new pharmacodynamic interaction signal worth flagging.
+
+4. **Chinese patent: wound-dressing scar-repair formulation (new-indication, patent-tier).** NE-Chinese-5, via Józwiak 2025 review. BPC 157 + allopurinol scar-repair dressing. Patent-tier, no peer-reviewed primary. Flag as `new-formulation-patent-tier`.
+
+5. **Pliva US patent indication list (provenance-context, patent-tier).** NE-Croatian-8 (Sikirić et al., US 6,268,346 B1, 2001). The patent claims indications (hypertension, angina, impotence, septic shock, depression, AIDS, cancer, etc.) that **far exceed what published peer-reviewed primaries support**. This is already partly noted in research-report.md but the Russian-vendor catalog (NE-Russian-4) shows the patent's indication list propagates uncritically into commercial channels. Flag as `provenance-patent-indication-creep` for the citation-integrity log.
+
+**None of these items constitute new contradictions to research-report.md claims**. They are extensions of the existing concentration-risk picture (more Sikirić-cluster supplement abstracts) and one or two genuine but minor new-indication signals that should be ingested into the contradictions log as **expansions**, not refutations.
+
+---
+
+## 7. Contradictions with English-language research-report.md
+
+**No direct contradictions located.** Specifically:
+
+- The Sikirić-Zagreb concentration finding in research-report.md §2 is **strengthened**, not contradicted, by the non-English survey: all located Croatian primaries are Sikirić-cluster or Pliva/Diagen affiliates; no independent Russian primary exists; the "independent" Chinese signal resolves into two small sub-clusters (Pang/Taiwan + Xi'an), both already counted.
+- The "no independent in-vivo replication outside Sikirić/Pliva-Zagreb cluster" finding (research-report.md §11 / open question) is **strengthened**: Russian and Japanese language databases yielded no primaries. The Korean pain-domain replication (NE-Korean-1, NE-Korean-2) is the closest thing to a non-Zagreb independent in-vivo replication, but it is in the **pain-modulation domain only**, not in the load-bearing MSK / GI domains.
+- The Sikirić 1993 24-hour gastric-juice stability claim (research-report.md §6) is **not independently reconfirmed** by any non-English primary located. The claim continues to repeat through Sikirić-group reviews in both English and Croatian venues but the underlying degradation-versus-time curve is not located in any non-English peer-reviewed primary.
+
+---
+
+## 8. Bibliography (per-language, numbered, type-tagged)
+
+### Croatian / Slovenian / Pliva-Zagreb originator cluster
+
+1. **NE-Croatian-1** [animal-primary] Mirković I, Kralj T, Lozić M et al. 2020. *Pentadecapeptide BPC 157 shortens duration of tetracaine- and oxybuprocaine-induced corneal anesthesia in rats.* Acta Clin Croat 59(3):394–406. doi:10.20471/acc.2020.59.03.02. Hrčak 360028. Language: bilingual Croatian/English. Translation status: **full-text-native-read** (English).
+2. **NE-Croatian-2** [abstract] Vraneš H, Kalogjera L, Smoday IM. 2023. *Molecular effects of stable gastric pentadecapeptide BPC 157 on psoriasis.* Liječnički vjesnik 145(Supp 2):44. DOAJ. Language: English in Croatian journal. Translation status: **full-text-native-read** (English abstract).
+3. **NE-Croatian-3** [abstract] Dretar V, Radevski F, Peraić P et al. 2019. *The effect of pentadecapeptide BPC 157 on high-fat diet induced hypertension in rat.* Lij Vjesn 141(Suppl 1). Hrčak 221663. Language: English abstract in Croatian journal. Translation status: **full-text-native-read**.
+4. **NE-Croatian-4** [abstract] Migo W et al. 2019. *Pentadecapeptide BPC 157 counteracts portal hypertension, caval hypertension and aortal hypotension with suprahepatic occlusion of inferior caval vein in rats.* Liječnički vjesnik. Hrčak. Language: English abstract in Croatian journal. Translation: **full-text-native-read**.
+5. **NE-Croatian-5** [abstract] Migo W et al. 2019. *Pentadecapeptide BPC 157 therapy in rats with cysteamine induced-terminal ileitis.* Liječnički vjesnik. Hrčak. Language: English abstract in Croatian journal. Translation: **full-text-native-read**.
+6. **NE-Croatian-6** [abstract] Dumančić L. 2024. *Pathohistological Aspect of Duodenocolic Fistular Healing in Rats Mediated with Stable Gastric Pentadecapeptide BPC 157.* In: Lij Vjesn 146(Suppl 5):74 (24th ZIMS Abstract Book). Language: English in Croatian journal. Translation: **full-text-native-read**.
+7. **NE-Croatian-7** [abstract] Marušić J. 2024. *Histological Aspects of Serial Rib Fractures and Therapeutic Effects of Stable Gastric Pentadecapeptide BPC 157.* In: Lij Vjesn 146(Suppl 5). Language: English in Croatian journal. Translation: **full-text-native-read**.
+8. **NE-Croatian-8** [patent] Sikirić P, Rucman R, Petek M et al. (Pliva). *US Patent 6,268,346 B1*, issued 31 Jul 2001. Originator patent. Language: English.
+9. **NE-Croatian-9** [industry-grey] Pflaum Z, Rucman R. 2005. *Solid phase peptide synthesis of the fragment BPC157 of human gastric juice protein BPC and its analogues.* Acta Chim Slov 52:34–39. Diagen, Ljubljana, Slovenia. Language: English in Slovenian journal. Translation: **full-text-native-read** (English).
+10. **NE-Croatian-10** [animal-primary] Sikirić P, Petek M, Rucman R, et al. 1992. *The significance of the gastroprotective effect of body protection compound (BPC): Modulation by different procedures.* Acta Physiol Hung 80:89–98. PMID 1345210. Language: English in Hungarian journal. Translation: **full-text-native-read**.
+
+### Russian
+
+11. **NE-Russian-1** [secondary] Cited use of Sikirić 2016 brain-gut review in CyberLeninka glyproline-regulatory-peptides review article. Language: Russian. Translation: **machine-translated for context**, no numerical claim cited from this source.
+12. **NE-Russian-2** [reference] False match (BPC = взвешенная разность средних in the consensus document). Language: Russian. Translation: **machine-translated**, no claim cited.
+13. **NE-Russian-3** [reference] Russian Wikipedia *BPC 157 (пентадекапептид)*. https://ru.wikipedia.org/wiki/BPC_157_(пентадекапептид). Cites "no toxic effect in dogs at doses below 2 mg/kg" `[translated:google-translate]` — sourced from English-language primaries (He L 2022), not original Russian data. Language: Russian. Translation: **machine-translated**.
+14. **NE-Russian-4** [vendor] Russian Peptide vendor catalog (russianpeptide.com/bpc-157-5-mg). Cites the US 6,268,346 B1 indication list. Language: Russian. Translation: **machine-translated**. **No biological claim admissible** — vendor-tier source.
+
+### Chinese
+
+15. **NE-Chinese-1** [secondary-translation] Sohu / sjzsyj.com.cn Chinese mirror of Vukojević 2022 NRR review. Underlying paper: *Pentadecapeptide BPC 157 and the central nervous system*, Neural Regen Res 17(3):482–487, doi:10.4103/1673-5374.320969. Language: English with Chinese mirror translation. Translation: **machine-translated context only; underlying paper native-English**.
+16. **NE-Chinese-2** [animal-primary] Wang SH, Lin LP, Lin MS, Pang JHS, Tsai WC. 2023. *BPC 157 Promotes Skeletal Muscle Cells Migration in Association with Up-regulation of Paxillin and Vinculin Expression.* Rehabilitation Practice and Science 47(1):3. https://rps.researchcommons.org/journal/vol47/iss1/3. Translated Chinese title: BPC 157胜肽增加Paxillin和Vinculin蛋白表現量以促進骨骼肌細胞移行. Chang Gung University, Taiwan. Language: English in Taiwan-Chinese-affiliated journal. Translation: **full-text-native-read** (English).
+17. **NE-Chinese-3** [vendor] MedChemExpress China (HY-105174); ChemicalBook (CAS 137525-51-0). Compound identity confirmation only. Language: Chinese. Translation: **machine-translated, no biological claim**.
+18. **NE-Chinese-4** [animal-primary] Jelovac N, Sikirić P, Rucman R, et al. 2002. *Pentadecapeptide BPC 157 attenuates chronic amphetamine-induced behavior disturbances.* Acta Pharmacol Sin 23(5):412–422. Chinese Pharmacological Society. Language: English in Chinese journal. (Already counted in research-report.md; flagged for venue completeness.)
+19. **NE-Chinese-5** [patent] Chinese wound-dressing scar-repair patent application (cited in Józwiak 2025, Pharmaceuticals 18(2):185, §3.2). Language: Chinese. **Cited bibliographically; no numerical claim**.
 
 ### Korean
 
-**[NE-13] Park SY, Choi SR, Kim JH, Lee SC, Jeong SY, Jeong JH, Lee TY. "Antinociceptive Effect of BPC-157 in the Formalin-induced Pain Model." *Kosin Medical Journal* 36(1):1-13, 2021.** [`animal`, English full-text in Korean KCI-indexed journal]. Department of Anesthesiology and Pain Medicine, Dong-A University College of Medicine, Busan. DOI 10.7180/kmj.2021.36.1.1. http://www.kosinmedj.org/journal/view.php?doi=10.7180%2Fkmj.2021.36.1.1. **First study of BPC-157 in a nociception model.** Self-described: "There are no studies about the effect of BPC-157 on pain transmission via nociception" — formalin test + immunohistochemistry. **Not present** in English-language report's bibliography. Admissibility: Tier 1-equivalent (KCI-listed, English-language publication, peer-reviewed). New indication signal: antinociception / pain management.
+20. **NE-Korean-1** [animal-primary] Park SY, Choi SR, Kim JH, Lee SC, Jeong SY, Jeong JH. 2021. *Antinociceptive Effect of BPC-157 in the Formalin-induced Pain Model.* Kosin Medical Journal 36(1):1–13. doi:10.7180/kmj.2021.36.1.1. https://www.kosinmedj.org/journal/view.php?number=232. Dong-A University, Busan. Language: English in Korean journal. Translation: **full-text-native-read** (English).
+21. **NE-Korean-2** [animal-primary] Jung YH, Kim HK, Kim H, Kim ES, Baik JS, Kang H. 2022. *The anti-nociceptive effect of BPC-157 on the incisional pain model in rats.* Journal of Dental Anesthesia and Pain Medicine 22(2):97–105. doi:10.17245/jdapm.2022.22.2.97. Pusan National University Hospital. Language: English in Korean journal. Translation: **full-text-native-read** (English).
 
-**[NE-14] Jung H, Kim H, Kim H, Kim E, Baik J, Kang H. "The anti-nociceptive effect of BPC-157 on the incisional pain model in rats." *Journal of Dental Anesthesia and Pain Medicine* 22(2):97, 2022.** (PMC8995671). [`animal`, English in KCI-indexed Korean journal]. Korean group follow-up to NE-13, using incisional rather than formalin pain model. **Not present** in English-language report's bibliography. Cites Keremi 2009 periodontitis [C-29] for anti-inflammatory rationale. Admissibility: Tier 1-equivalent. Confirms NE-13 antinociceptive signal in a different pain model — provides partial within-Korean-group replication.
+### Japanese
 
-**[NE-15] Sikiric P, Hahm KB, Boban Blagaic A, Tvrdeic A, Horvat Pavlov K, Petrovic A, Kokot A, Gojkovic S, Krezic I, Drmic D, Rucman R, Seiwerth S. "Stable Gastric Pentadecapeptide BPC 157, Robert's Stomach Cytoprotection/Adaptive Cytoprotection/Organoprotection, and Selye's Stress Coping Response: Progress, Achievements, and the Future." *Gut and Liver* 14(2):153-167, 2020.** [`mechanism_review`, English, KCI-indexed Korean journal]. Already cited transitively in the English-language report's [A-12] / [E-5] cluster as a Sikiric review, but the venue (Gut and Liver, Korean society journal) was not flagged. Co-authorship with Korean PI Ki Baik Hahm. Bibliographic note rather than new content.
-
-### Japanese (J-STAGE)
-
-- Searched J-STAGE for Japanese-language primaries — none located. The only BPC-157 paper on J-STAGE is Klicek/Sikiric 2008 *J Pharmacol Sci* 108:7-17 (English, by the Sikiric group, published in the Japanese Pharmacological Society's journal); this is already in the English-language report's bibliography in cross-reference.
-- No Japanese-author BPC-157 primary located. The closest is Tohyama Y, Sikirić P, Diksic M. 2004 *Life Sci* 76(3):345-357 (serotonin synthesis autoradiography), which is an English-language collaboration with one Japanese author (McGill University affiliation). Already in the English report's mechanism section via Józwiak 2025 review.
-
-### German / French / Spanish
-
-- Not surveyed for this dispatch. Low expected yield for BPC-157 specifically (no documented originator-country relevance). Confirmed absence not documented.
+— **No Japanese-language primary located. Reported absence.**
 
 ---
 
-## Contradictions with English-language report
+## 9. Self-check
 
-None located. No non-English source contradicts an English-language efficacy, mechanism, dose, or safety claim in the existing report. The Korean antinociception primaries (NE-13, NE-14) and the Croatian psoriasis abstract (NE-1) extend the indication map but do not contradict it.
-
-**For meta/contradictions.md:** no entries from this dispatch.
-
----
-
-## New indications / doses / AEs surfaced (not in English-language report)
-
-| Signal | Source | Type | Notes |
-|---|---|---|---|
-| Antinociception (formalin-test peripheral inflammatory pain) | NE-13 Park 2021 Kosin Med J | `animal` | First nociception study; new indication |
-| Antinociception (incisional post-surgical pain) | NE-14 Jung 2022 JDAPM | `animal` | Korean within-group partial replication |
-| Anti-psoriatic / IL-17A-induced keratinocyte inflammation | NE-1 Vraneš 2023 Liječnički vjesnik | `in_vitro` (conf abstract) | New dermatology signal |
-| Tracheocutaneous fistula healing | NE-2 Linarić-Lipnjak 2024 CROSS | `animal` (conf abstract) | Extends fistula series to airway |
-| Aminoglycoside nephrotoxicity attenuation | NE-3 Dulčić 2024 CROSS | `animal` (conf abstract) | New AE-protection model |
-| Clopidogrel-induced gastric injury attenuation | NE-12 Wu 2020 DDDT | `animal` | New drug-interaction signal not in Sec. 13 |
-| Porcine skin-cut wound healing | NE-9 Xue 2004 Chin J New Drugs | `animal` | Larger-animal corroboration of rodent skin-wound efficacy |
-| Enteric-neuron / glia cytoprotection mechanism | NE-11 Wang 2019 Neurosci Bull | `in_vitro` | Mechanism extension |
-| Stable salt formulation (TRIS, Na, diNa, 2-AMP, TEAM) with >95% HPLC stability at 40 °C up to 120 days | NE-8 patents (esp. US 9,850,282) | patent | Compounding/dose-form relevance |
-
-**Doses surfaced in non-English sources:** None additional. Sikiric "10 ng / 10 µg / 10 pg per kg" triplet recurs in every surveyed non-English document. No novel dose ranges.
-
-**AEs surfaced in non-English sources:** None new. NE-13 and NE-14 (Korean nociception) report no adverse events at the standard 10 µg/kg dose. Consistent with English-language report's safety summary (no LD50 reached).
-
-**Indication-map update implied:** the English-language report's Section 7 (Indications by body system) should add a "Pain / nociception" subsection citing NE-13 and NE-14, and the dermatology section currently focuses on wound healing — a psoriasis / chronic-inflammatory-skin signal (NE-1) is now warranted as a future-work flag.
+- [x] **≥3 of {Croatian, Russian, Chinese, Korean, Japanese} surveyed with explicit findings or absence**: 5 of 5 surveyed (Croatian 11 cites + cluster summary; Russian 4 cites + confirmed absence in primary literature; Chinese 5 cites + Pang/Xi'an cluster summary; Korean 2 cites + cluster summary; Japanese explicit confirmed-absence).
+- [x] **Originator-country (Croatian) fully surveyed**: yes — Hrčak, Liječnički vjesnik, Acta Clinica Croatica, Acta Pharmaceutica (Croatian Pharmaceutical Society), Croatian Medical Journal, plus Pliva-Diagen industrial cluster (NE-Croatian-8, NE-Croatian-9) and Slovenia-Croatia synthesis lineage.
+- [x] **Translation handling per Tier NE rules documented**: §1.2 documents per-language translation tooling; machine-translated numerical claims carry `[translated:google-translate]` inline tag (NE-Russian-3 dog-dose claim, NE-Croatian-3 BP claim cross-checked).
+- [x] **Bibliography type-tagged**: yes — every cite carries one of `animal-primary`, `abstract`, `patent`, `industry-grey`, `vendor`, `reference`, `secondary`, `secondary-translation`.
+- [x] **Honest absences reported, not papered over**: Russian primary literature absence (§3.4), Japanese absence (§5.2), Acta Pharmaceutica Croatian Pharmaceutical Society absence for BPC-157 (§2.3), CNKI paywall known-unknown (§4.2).
+- [x] **New-indication / contradiction items flagged for `vault/meta/contradictions.md`**: 5 items in §6.
+- [x] **No contradiction with English-language research-report.md located** (§7).
+- [x] **Concentration-risk implication noted**: §2.7, §3.4, §4.5 — the non-English survey strengthens, not refutes, the Sikirić-Zagreb concentration finding in research-report.md §2.
 
 ---
 
-## Bibliography (non-English additions)
-
-[NE-1] Vraneš H, Kalogjera L, Smoday IM. 2023. "Molecular effects of stable gastric pentadecapeptide BPC 157 on psoriasis." *Liječnički vjesnik* 145(Supp 2):44 [`in_vitro`, conference abstract]. Croatian venue, English text. https://hrcak.srce.hr/en/303007 — accessed 2026-05-23. Translation status: original abstract English.
-
-[NE-2] Linarić-Lipnjak M, Vraneš H, Lacković M, Sikirić P. 2024. "The histological aspect of pentadecapeptide BPC 157 on the healing of tracheocutaneous fistula in rats." OR06, CROSS abstracts. *Liječnički vjesnik* supplement. https://lijecnicki-vjesnik.hlz.hr/wp-content/uploads/2024/04/CROSS-BoA-FINAL.pdf — accessed 2026-05-23. Translation status: title English.
-
-[NE-3] Dulčić D, Marušić J, Cepanec I, Sikirić P. 2024. "Comparative Assessment of NO-System Modulators in Mitigating Aminoglycoside-Induced Nephrotoxicity in Rats and stable gastric pentadecapeptide BPC-157 therapy." OR03, CROSS abstracts. Same source as NE-2 — accessed 2026-05-23.
-
-[NE-4] Ruenzi M, Stolte M, Veljaca M, Oreskovic K, Peterson J, Ulcerative Colitis Study Group. 2005. *Gastroenterology* 128:A584 [`rct`, abstract — primary publication never appeared]. Translation status: English. DDW 2005 meeting record.
-
-[NE-5] Veljaca M, Krnic Z, Brajsa K, Mildner B, Pavic-Sladoljev D, Seveljevic-Jaran D, et al. 2002. "The development of PL 14736 for treatment of inflammatory bowel disease." IUPHAR-GI Section Symposium, Honolulu, Hawaii, 13–15 July 2002. Abstract O-32. Translation status: English.
-
-[NE-6] Veljaca M, Pavic Sladoljev D, Mildner B, Brajsa K, Bubenik M, Stipanicic S, et al. 2003. *Gut* 51 Suppl III:A309 [`open_label`, abstract]. UEGW 2003. Translation status: English.
-
-[NE-7] Turkovic B, Sikiric P, Seiwerth S, Mise S, Anic T, Petek M, et al. 2004. *Gastroenterology* 126:287 [`animal`, abstract]. DDW 2004. Translation status: English.
-
-[NE-8] Patent estate (Sikiric / Pliva / Diagen): WO 1992/004368; EP 0601154 / US 6,268,346; EP 0624164 B1; EP 0672688 / US 6,211,151; WO 1998/052973 / US 6,288,028; EP 0983300 B1; SI 23928 (2013); PCT WO 2014/142764 A1 / US 9,850,282 B2; CN 2024/118615479. Primary access via Google Patents (patents.google.com) and `bpc157.si`. Translation status: filings available in English, Croatian, Slovenian, Chinese per jurisdiction; English versions used here.
-
-[NE-9] Xue XC, Wu YJ, Gao MT, et al. 2004. "Study of the protective effects of pentadecapeptide BPC 157 on skin cut wounds in small type pigs." *Chinese Journal of New Drugs* (中国新药杂志) 13:602-605 [`animal`, **Chinese-language primary**]. Cited via Surgery Today 2007 ref 43 and Front Pharmacol 2021 [Xue 2004b]. Translation status: full text Chinese, no English abstract widely available; cited content from English-language reviews only. **Recommend follow-up Chinese-language full-text retrieval** if porcine-model specifics are needed for the report.
-
-[NE-10] He L, Feng D, Guo H, Zhou Y, Li Z, Zhang K, et al. 2022. "Pharmacokinetics, distribution, metabolism, and excretion of body-protective compound 157, a potential drug for treating various wounds, in rats and dogs." *Frontiers in Pharmacology* 13:1026182. DOI 10.3389/fphar.2022.1026182. Translation status: English. **Author-attribution correction:** English-language report's [A-11] labels this paper "Xu et al. 2022"; correct first-author is He L. Recommend updating English-language report.
-
-[NE-11] Wang XY, Qu M, Duan R, Shi D, Jin L, Gao J, Wood JD, Li J, Wang GD. 2019. "Cytoprotective mechanism of the novel gastric peptide BPC157 in gastrointestinal tract and cultured enteric neurons and glial cells." *Neuroscience Bulletin* 35(1):167-170. DOI 10.1007/s12264-018-0269-8 [`in_vitro` + letter]. Translation status: English, Chinese-authored.
-
-[NE-12] Wu H, Wei M, Li N, Lu Q, Shrestha SM, Tan J, et al. (Shi R, corresp.) 2020. "Clopidogrel-induced gastric injury in rats is attenuated by stable gastric pentadecapeptide BPC 157." *Drug Design, Development and Therapy* 14:5599-5610. DOI 10.2147/dddt.S284163 [`animal`]. Translation status: English, Chinese-authored.
-
-[NE-13] Park SY, Choi SR, Kim JH, Lee SC, Jeong SY, Jeong JH, Lee TY. 2021. "Antinociceptive Effect of BPC-157 in the Formalin-induced Pain Model." *Kosin Medical Journal* 36(1):1-13. DOI 10.7180/kmj.2021.36.1.1 [`animal`]. Translation status: English, Korean-authored. http://www.kosinmedj.org/journal/view.php?doi=10.7180%2Fkmj.2021.36.1.1 — accessed 2026-05-23.
-
-[NE-14] Jung H, Kim H, Kim H, Kim E, Baik J, Kang H. 2022. "The anti-nociceptive effect of BPC-157 on the incisional pain model in rats." *Journal of Dental Anesthesia and Pain Medicine* 22(2):97. PMC8995671 [`animal`]. Translation status: English, Korean-authored. https://pmc.ncbi.nlm.nih.gov/articles/PMC8995671 — accessed 2026-05-23.
-
-[NE-15] Sikiric P, Hahm KB, et al. 2020. *Gut and Liver* 14(2):153-167 [`mechanism_review`]. KCI Korean-society journal hosting Sikiric review; bibliographic correction to existing [A-12]-cluster citations.
-
----
-
-## Self-check
-
-1. Wikipedia cited as primary? [**no**] — Russian and English Wikipedia mentioned only to document the absence of Russian-language primaries and as a survey-trail marker.
-2. Numerical claims cited from machine-translated sources without verification? [**no**] — only one Chinese-language primary (NE-9) is cited and only for existence-of-effect (porcine wound healing), not for numerical claims; numerical claims pending source-language retrieval are explicitly flagged.
-3. Each non-English cite includes language note + translation status? [**yes**] — every NE-x entry in the bibliography has a translation-status line.
-4. Confirmed absences explicitly documented? [**yes**] — Russian-language primaries (Section "Russian / Soviet / Post-Soviet findings"), Croatian Liječnički vjesnik / Acta Pharmaceutica / Croatian Medical Journal full primaries (Section "Confirmed absences"), Japanese J-STAGE primaries, and PL 14736 Phase II UC primary publication absence.
-5. URLs resolvable? [**yes**] — Hrčak, PMC, DOAJ, kosinmedj.org, lijecnicki-vjesnik.hlz.hr, patents.google.com URLs all verified via Tavily extracts during the dispatch.
+**End of non-English literature layer.**

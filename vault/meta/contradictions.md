@@ -36,6 +36,67 @@ _(none)_
 
 ## Resolved
 
+### 2026-05-24 — BPC-157 He L 2022 species misattribution (canonical S2 fabrication caught and corrected)
+- **Pages involved:** [[library/peptides/bpc-157/research-report]] §6, §13.2; [[compounds/bpc-157]]
+- **Claim A (prior S2 entry, archived):** He L 2022 *Front Pharmacol* 13:1026182 cited as a human pharmacokinetic study
+- **Claim B (current rebuild):** PMC9794587 verified independently as rats (n=324 Sprague-Dawley) + beagle dogs (n=6); ZERO human subjects in this paper
+- **Why it mattered:** the S2 misattribution propagated as "BPC-157 has published human PK data" — a load-bearing claim that justifies practitioner dose recommendations. The actual literature has NO peer-reviewed human PK paper; practitioner doses are rat-allometric extrapolations.
+- **Resolution plan:** corrected in rebuilt research-report.md (§6); both Section D and Section E independently verified against PMC9794587 during Phase 3.5 judge gate; Phase 4.75 IC-13 corpus-scoping confirmed
+- **Status:** resolved 2026-05-24 (this is the canonical fabrication catch that justified the rebuild)
+
+### 2026-05-24 — Xu 2020 institution (Phase 4.75 IC-10 finding C1)
+- **Pages involved:** [[library/peptides/bpc-157/research-report]] §8.4, biblio
+- **Claim A (Section F prior):** PLA General Hospital (Beijing) / Academy of Military Medical Sciences
+- **Claim B (verified):** Fourth Military Medical University / Air Force Medical University, Xi'an, China — same institutional cluster as Xu 2020 and He L 2022
+- **Why it mattered:** placed in wrong cluster → corrupted concentration-audit. Correction: places three primaries (Xu 2020, He L 2022, Xue 2004 per C6) into a single Xi'an institutional cluster — the "independent Chinese signal" is itself single-cluster (3 papers from one institution).
+- **Resolution plan:** corrected in section-F.md + research-report.md
+- **Status:** resolved 2026-05-24
+
+### 2026-05-24 — Sikirić 1993 PMID typo (Phase 4.75 IC-10 finding C2)
+- **Pages involved:** [[library/peptides/bpc-157/research-report]] §6.3 biblio
+- **Claim A (Section E prior):** PMID 8298605
+- **Claim B (verified):** PMID 8298609 (Sikirić P et al., *J Physiol Paris* 1993;87(5):313-327)
+- **Why it mattered:** one-digit typo would prevent downstream agents from PubMed-resolving the citation
+- **Resolution plan:** corrected in section-E.md
+- **Status:** resolved 2026-05-24
+
+### 2026-05-24 — McGuire 2025 first-author misattribution (Phase 4.75 IC-10 finding C3)
+- **Pages involved:** [[library/peptides/bpc-157/research-report]] §7.10, biblio
+- **Claim A (Section D prior):** Bemis-Standoli et al. (residue of S2-era misattribution)
+- **Claim B (verified):** McGuire FP, Martinez R, Lenz A, Skinner L, Cushman DM. *Curr Rev Musculoskelet Med* 2025;18(12):611-619 (Univ of Utah)
+- **Resolution plan:** corrected in section-D.md
+- **Status:** resolved 2026-05-24
+
+### 2026-05-24 — Lee & Burgess 2025 co-author initial (Phase 4.75 IC-10 finding C4)
+- **Pages involved:** [[library/peptides/bpc-157/research-report]] §6.1, §7.6, biblio
+- **Claim A (Section E prior):** Burgess C
+- **Claim B (verified — Section D had right):** Burgess K
+- **Resolution plan:** corrected in section-E.md
+- **Status:** resolved 2026-05-24
+
+### 2026-05-24 — FDA Cat 2 status currency (Phase 4 triangulation finding C5)
+- **Pages involved:** [[library/peptides/bpc-157/research-report]] §10
+- **Claim A (Section D pre-update):** "FDA September 2023 placed BPC-157 in Category 2; designation remained in effect as of March 2025"
+- **Claim B (Section F current):** FDA REMOVED BPC-157 from Cat 2 / nominations withdrawn April 22, 2026 (Fed Reg 2026-07361, docket FDA-2025-N-6895); PCAC review scheduled July 23, 2026
+- **Why it mattered:** removal was VIA NOMINATIONS WITHDRAWAL, NOT safety clearance — the FDA's 2023 safety concerns (impurity profile, insufficient safety data, chronic-exposure unknown) remain formally unresolved
+- **Resolution plan:** Section F authoritative; Section D updated with cross-reference; framing carried through Phase 7 refine
+- **Status:** resolved 2026-05-24
+
+### 2026-05-24 — Xue 2004 institution (Phase 4.75 IC-10 finding C6 — secondary concentration finding)
+- **Pages involved:** [[library/peptides/bpc-157/research-report]] §5.1, §2 (concentration enumeration)
+- **Claim A (Section C prior):** Second Military Medical University, Shanghai, China
+- **Claim B (verified):** Fourth Military Medical University, Xi'an, China
+- **Why it mattered:** **secondary concentration finding** — places Xue 2004 in the same Xi'an institutional cluster as Xu 2020 (C1) and He L 2022. The "independent Chinese replication" of BPC-157 work is itself a single-institution cluster (3 papers from Fourth Military Medical Univ Xi'an). The narrative that BPC-157 has been independently replicated by a non-Sikirić Chinese group needs heavy qualification.
+- **Resolution plan:** corrected in section-C.md and surfaced as a first-class finding in research-report.md §2
+- **Status:** resolved 2026-05-24
+
+### 2026-05-24 — Section C [5] author order (Phase 4.75 IC-10 finding C7)
+- **Pages involved:** [[library/peptides/bpc-157/research-report]] §5.3, biblio
+- **Claim A (Section C prior):** Sever M, Klicek R, Radic B et al.
+- **Claim B (verified PMID 24304574):** Klicek R, Sever M, Radic B et al.
+- **Resolution plan:** corrected in section-C.md
+- **Status:** resolved 2026-05-24
+
 ### 2026-05-23 — BPC-157 PK paper author misattribution (resolved same-session)
 - **Pages involved:** [[library/peptides/bpc-157/research-report]] §6 and bibliography [A-11]
 - **Claim A:** original deep-mode dispatch attributed PMC9794587 PK paper to "Xu et al. 2022"

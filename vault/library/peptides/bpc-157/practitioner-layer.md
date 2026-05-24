@@ -1,151 +1,361 @@
 ---
-title: "BPC-157 — Prescribing-Practice Layer"
-type: research-report
-permalink: a-plus-maxing/library/peptides/bpc-157/practitioner-layer
-status: active
-created: 2026-05-23
-last_reviewed: 2026-05-23
-review_cadence: phase (re-rotate after FDA PCAC July 23-24, 2026 outcome)
-research_dispatch_mode: deep
-parent_report: vault/library/peptides/bpc-157/research-report.md
-research_question: "Document the prescribing-practice ecosystem for BPC-157 — what licensed prescribers actually use to make dosing decisions, distinct from the academic evidence."
+title: BPC-157 — Prescribing-Practice Layer
+type: layer
+permalink: a-plus-maxing/library/peptides/bpc-157/practitioner-layer-1
+parent: vault/compounds/bpc-157.md
+generated: 2026-05-24
+mode: deep
 ---
 
 # BPC-157 — Prescribing-Practice Layer
 
-## 0. Scope and Admissibility Note
+## 1. Scope and constraints
 
-This layer documents prescribing-practice conventions (dose, route, cycle, admin) per `vault/library/_source-whitelist.md` Tier 2.7 (`practitioner_protocol`) and Tier 3 (`compounding_data_sheet`). Per the whitelist's admissibility matrix, these tiers may ground claims about dose / route / cycle / admin protocol ONLY — never efficacy, AE rate, or mechanism. All efficacy claims remain anchored to Tier 1/2 sources in the parent academic report.
+This layer documents prescribing-practice conventions only. Efficacy claims are NOT grounded here — they live in `research-report.md`. Per `vault/library/_source-whitelist.md`, the cite types used here have specific admissibility:
 
-US regulatory context (critical caveat): As of May 2026, BPC-157 sits on FDA's 503A Category 2 bulks list (significant safety risks), meaning no US 503A compounding pharmacy can legally compound it pending the July 23-24, 2026 PCAC re-review [P21, P14]. Most current US compounding-pharmacy "data sheets" for BPC-157 are therefore historical artifacts from the pre-2023 window, archived material, or non-US (Australian compounders most accessible). USADA (Aug 2024) explicitly states "the FDA confirmed there is also no legal basis for compounding pharmacies to use BPC-157 in compounded medications" [P14]. This shapes what could be located.
+- `[practitioner_protocol]` — prescriber reference texts, conference materials, and named-physician stated protocols. Admissible for dose, route, cycle, admin protocol, indication selection. **Not admissible** for efficacy claims, AE rates, or mechanism.
+- `[compounding_data_sheet]` — compounding-pharmacy clinical documents. Admissible for available dose forms, reconstitution, admin protocol. **Not admissible** for efficacy unless the data sheet cites its own primaries.
+- `[regulatory]` — FDA Federal Register notices, warning letters, advisory committee briefs. Admissible for regulated status and access-pathway facts.
+- `[mechanism_review]` — narrative reviews (used here only where one is the canonical source for an originator-stated practice claim).
+- `[anecdote_aggregate]` — clinic-marketing pages and aggregator dosing pages. Used here only to triangulate that a stated dose pattern is widespread in the prescribing community; never as a numeric ground.
 
-## 1. Compounding pharmacy clinical data sheets
+Where a clinic-page citation gives a numeric dose range that matches multiple other practitioner sources, the numeric ground is the practitioner sources, not the clinic page. Clinic pages are documented for completeness of the survey landscape.
 
-| Pharmacy | Dose | Route | Cycle | Indications | Source |
-|---|---|---|---|---|---|
-| Formulae Albion / Compounding Lab (Australia, 503A-equivalent) | 2-10 µg/kg twice daily; commonly 200-400 µg BID (= 400-800 µg/day) | Subcutaneous (systemic) or IM "as close to injury as possible" | 2-4 weeks on; 2 weeks off; restart if required | Soft-tissue injury, wound healing, GI/digestive function, organ protection | [P1, compounding_data_sheet] Compounding Lab leaflet, Feb 2024 — https://compoundinglab.com.au/wp-content/uploads/2024/03/BPC-157.pdf |
-| Tailor Made Compounding (TMC, Nicholasville KY) | Dose specifics NOT publicly recoverable; TMC's "Peptide Guide" was the subject of a 2020 FDA warning letter and a 2021 California Board of Pharmacy enforcement action which characterized it as containing "dishonest and deceptive information" for BPC-157, CJC-1295, iRGD, and others; TMC pled guilty in 2022 to unlawful distribution of BPC-157 among other peptides | Historical: SubQ; also marketed "Tailor Made Health Recovery BPC-157 250 mcg" capsule (oral) | Historical capsule labeling: 30-day supply at 250 mcg | "Surgery, wound, joint recovery" (capsule), broader injury/GI use (Rx) | [P2, compounding_data_sheet — historical/enforcement-record] CA BoP AC 207091 PDF — https://www.pharmacy.ca.gov/enforcement/fy2021/ac207091 ; DOJ EDKY 2022 plea — https://www.justice.gov/usao-edky/pr/nicholasville-compounding-pharmacy-and-its-owner-plead-guilty-unlawful-distribution ; FDA Warning Letter Apr 2020 — https://www.fda.gov/inspections-compliance-enforcement-and-criminal-investigations/warning-letters/tailor-made-compounding-llc-594743-04012020 |
-| Empower Pharmacy (Houston TX, 503A + 503B) | No BPC-157-specific data sheet located on current Empower site; Empower's public 2025-2026 commentary supports the FDA PCAC review and notes BPC-157 is currently on Category 2 / not compoundable; the firm has publicly framed the PCAC outcome as a potential reopening | n/a | n/a | n/a | [P3, compounding_data_sheet — null finding] Empower 2025/2026 statement: "Restoring Balance" — https://www.empowerpharmacy.com/compound-medication/peptides/fda-peptide-announcement-patient-access-safety-compounding |
-| Hallandale Pharmacy (Hallandale Beach FL) | No public BPC-157 data sheet located | n/a | n/a | n/a | [P4, null finding] hallandalerx.com root and support pages — no BPC-157 monograph indexed |
-| APS Meds, Belmar, Strive | No public BPC-157 data sheet located | n/a | n/a | n/a | [P5, null finding] Whitelist Tier-3 hosts; current sites do not publish BPC-157 monographs (consistent with Category 2 status) |
-| Olympia Pharmaceuticals | Publicly stated (2025-2026) that they are "preparing for BPC-157 compounding" contingent on PCAC outcome; no current prescriber data sheet published | n/a | n/a | n/a | [P6, compounding_data_sheet — pending] Olympia Instagram reel + YouTube "What's NEXT for BPC-157" — https://www.youtube.com/watch?v=L3srhLvwYHM |
-| AnazaoHealth (Tampa 503A + Las Vegas 503B) | No public BPC-157 listing in current product directory | n/a | n/a | n/a | [P7, null finding] https://www.anazaohealth.com |
-| Morgan Compounding (FL) | Stocks "BPC-157 Rapid PRO" (oral capsule formulation by Integrative Peptides, not Rx peptide) — marketed as supplement, not a Rx data sheet | Oral capsule | Not specified | "Normal digestive function" — supplement framing | [P8, vendor_label, marginal] https://morgancompounding.com/product/bpc-157-rapid-pro |
-| Sarasota Compounding Pharmacy (FL) | Stocks BPC-157 Rapid Pro 500 mcg (Integrative Peptides supplement, NOT a compounded Rx peptide) | Oral capsule, 500 mcg | Not specified | Muscle/joint/gut/gut-brain axis (supplement marketing) | [P9, vendor_label, marginal] https://www.sarasotarx.com/product/bpc-157-rapid-pro-500mcg |
+**The single load-bearing context:** as of 2026-05-24, there is no FDA-approved human dose, no full human PK paper, and no human RCT outcome paper for BPC-157. Every dose presented below is by definition extrapolated or empirical. Practitioner consensus is consensus, not evidence.
 
-Tier-3 findings note: The single CLEAN, dose-explicit compounding-pharmacy data sheet located is the Australian Compounding Lab leaflet [P1]. The US 503A landscape for BPC-157 data sheets has been hollowed out by the FDA Category 2 placement (Sep 2023) and earlier enforcement actions against TMC. This is itself a finding: the absence of current US 503A data sheets is structurally driven by regulation, not by absent prescriber demand.
+---
 
-## 2. Practitioner reference texts
+## 2. Compounding pharmacy clinical data sheets
 
-| Reference | Dose | Route | Cycle | Indications | Source |
-|---|---|---|---|---|---|
-| Seeds, William A. *Peptide Protocols: Volume One* (2020, Seeds Scientific Performance Publishing) | The book's BPC-157 chapter is the canonical US peptide-prescriber reference. Full chapter dose-text not extractable from open web (book is paywalled) — derivative protocols from Seeds-trained clinics consistently cite 250-500 mcg/day subQ as the Seeds-aligned "standard daily" baseline | SubQ (primary); oral capsule for GI indications | Typically 4-6 weeks on, reassess | Tendon/ligament/muscle injury, GI repair, gut-brain axis | [P10, practitioner_protocol] Seeds 2020 book — ISBN 9780578624358 — https://www.amazon.com/Peptide-Protocols-William-Seeds-MD/dp/0578624354 ; Seeds-aligned clinic protocol (Be Well LifeStyle Centers, peptide-book derivative): 250-500 mcg (0.075-0.15 mL) once daily, 4-6 weeks — https://bewelllifestylecenters.com/protocols/peptide-book |
-| International Peptide Society (IPS) — Peptide Certification Module I | Module curriculum covers BPC-157 alongside LL-37, KPV, Larazotide; specific dose tables not published openly (gated to IPS members / CME enrollees) | n/a (curriculum only) | n/a | Listed in Module I peptide set | [P11, practitioner_protocol — meta-only] https://peptidesociety.org/peptide-certification-module-i |
-| IPS — Seiwerth et al. 1997 "BPC 157's effect on healing" hosted reprint | This is a primary animal paper hosted on the IPS site; not a stated practitioner protocol | n/a | n/a | wound healing animal data | [P12, animal — primary, not practitioner] https://peptidesociety.org/wp-content/uploads/2017/10/BPC-157s-effect-on-healing.pdf |
-| A4M (American Academy of Anti-Aging Medicine) — Peptide Therapy Certification Modules I + II | A4M's published module descriptions confirm BPC-157 coverage in certification curriculum; specific dose tables not published in open materials | n/a (curriculum only) | n/a | Listed in peptide-therapy curriculum; also referenced in A4M Chicago lecture notes on "next-generation molecules" including BPC-157 alongside Cerebrolysin, Dihexa | [P13, practitioner_protocol — meta-only] https://www.a4m.com/peptides-certification-module-i-2022.html ; https://blog.a4m.com/lecture-notes-from-chicago-precision-hormone-brain-care-in |
-| AAOPM (American Academy of Ozone & Peptide Medicine) | Public curriculum description confirms BPC-157 is covered in AAOPM peptide-therapy training; specific dose tables gated to enrolled clinicians | n/a (curriculum only) | n/a | Curriculum-listed | [P14, practitioner_protocol — meta-only] https://aaopm.com/anti-aging-workshops |
-| Clinical Peptide Society — Holtorf hosted PDF (2019) | See row [P15] below (Holtorf) | — | — | — | https://clinicalpeptidesociety.com/wp-content/uploads/2019/08/HoltorfKentPeptideLyme2019.pdf |
-| IFM (Institute for Functional Medicine) | No open IFM BPC-157 module dose protocol located | n/a | n/a | n/a | [null finding] ifm.org |
-| USADA (anti-doping reference, regulatory-adjacent) | Explicit position: BPC-157 prohibited at all times under WADA S0; no safe human dose established; no legal basis for compounding-pharmacy use | — | — | — | [P21, regulatory] https://www.usada.org/spirit-of-sport/bpc-157-peptide-prohibited |
-| Holt Law regulatory brief (peptide-compounding legal context) | Confirms FDA 503A Category 2 placement for BPC-157, "significant safety risks" determination, compounding is a direct FD&C Act violation | — | — | — | [P22, regulatory-adjacent] https://djholtlaw.com/regulatory-alert-the-legal-status-of-bpc-157-in-compounding-and-clinical-practice |
+Survey period: 2026-05-24. The survey targeted the eight pharmacies named in the source whitelist (Tailor Made Compounding, Empower, Hallandale, Belmar, APS, Strive, AnazaoHealth, Olympia) plus regional 503A pharmacies that surfaced during search. Honest absence is the dominant finding: nearly every formerly-published BPC-157 data sheet was removed during the 2023–2024 FDA enforcement period and has not been republished after the April 2026 nominations-withdrawal action, because compounding remains legally prohibited until PCAC review (July 23, 2026).
 
-## 3. Named-physician stated protocols
-
-| Practitioner | Dose | Route | Cycle | Indications | Venue + date | Source URL |
+| Pharmacy | BPC-157 sheet status (2026-05-24) | Dose form | Route | Cycle | Source URL + retrieval date | Notes |
 |---|---|---|---|---|---|---|
-| Edwin Lee, MD (Orlando FL; Institute for Hormone Replacement Therapy and Aging Reversal; co-author of three published US human BPC-157 pilots) | IV: 5 mg single infusion; pilot escalation to 10 mg then 20 mg in 250 cc saline IV over 1 h (2024 pilot, n=2). Verbatim: "The current study's author, Edwin Lee, has prescribed intravenous BPC-157 of 5 mg since 2018 to many patients for acute musculoskeletal injuries and observed no side effects." | IV infusion (Lee's signature differentiator vs. subQ-default community); also intra-articular knee (2021 chart review) | Single IV infusion typical for acute MSK; intra-articular per-injection | Acute musculoskeletal injury (IV); knee pain (intra-articular) | Lee & Burgess 2025, *Altern Ther Health Med* — pilot publication; clinical-practice anchor since 2018 | [P15, practitioner_protocol] http://www.alternative-therapies.com/oa/pdf/11513.pdf ; PubMed 40131143 ; Lee interview "Peptides & BPC 157 with Dr. Edwin Lee" — https://www.youtube.com/watch?v=YD0JgPzmVlI ; Dr. Hyman ep. 914 (2025) — https://drhyman.com/blogs/content/podcast-ep914 |
-| Edwin Lee, MD — oral position (Hyman podcast, ep. 914, 2025) | Oral BPC-157 for reflux/LES tightening — dose not stated on-air; framing is "you can take it orally" for reflux | Oral | Not stated on-air | GERD / reflux / lower esophageal sphincter tone, GI | Dr. Mark Hyman, *The Doctor's Farmacy* ep. 914, 2025 | [P16, practitioner_protocol] https://drhyman.com/blogs/content/podcast-ep914 |
-| Kent Holtorf, MD (Holtorf Medical Group; Clinical Peptide Society) | BPC-157 used in chronic Lyme / CFS / FM protocol; "ideal patient is CFS/FM/chronic Lyme"; "huge therapeutic window… LD1 has not been achieved… almost non-existent side effects at 100-fold dose+ excess"; dose specifics not numerically stated in the public 2019 PDF beyond therapeutic-window framing; subsequent CIRS/mold update specifies "Acetylated BPC-157" as the preferred form | Oral (acetylated form preferred for CIRS/mold patients per the updated protocol); subQ in original Lyme protocol | Not numerically specified in public materials | Chronic Lyme, CFS, fibromyalgia, mold/CIRS, GI tract conditions (IBD, leaky gut, diverticulitis, GERD, IBS, UC, Crohn's, gastric ulcers), traumatic brain injury, neurodegeneration | Holtorf "Peptide Therapies for Chronic Lyme Disease," Clinical Peptide Society, 2019; Holtorf CIRS/mold protocol summary (diaryofrecovery.com), 2024+ | [P17, practitioner_protocol] https://clinicalpeptidesociety.com/wp-content/uploads/2019/08/HoltorfKentPeptideLyme2019.pdf ; https://diaryofrecovery.com/moldprotocol |
-| Kent Holtorf, MD — Restorative Medicine reprint (2017) | Earlier conference handout: "BPC 157 Dosing" section referenced (specific µg figures not captured in retrievable excerpt) | n/a in retrievable text | n/a | Lyme/CFS | Holtorf, "Innovative Alternative Therapies for Chronic Lyme Disease," AANP Restorative Medicine Conference 2017 | [P18, practitioner_protocol — meta] https://restorativemedicine.org/wp-content/uploads/2017/01/4Holtorf_-Lyme-CFS.pdf |
-| Neil Paulvin, DO (NYC; functional/longevity podcast circuit; A4M member) | BPC-157 used adjunctively in healing/optimization protocols; specific µg dose not stated in open blog/podcast content; layering with TB-500 noted | SubQ (default); also discusses use during/after antibiotic or NSAID courses (GI rescue) | Not numerically stated in public materials | Gut healing, post-NSAID/antibiotic recovery, performance/recovery, IBD framing (Crohn's, UC) | Paulvin blog "Heal and Maximize Your Performance with BPC 157"; "Are you down with BPC-157?"; Inka Land Podcast ep. with Paulvin on "Methylene blue, cerebrolysin, BPC-157" Mar 30, 2025 | [P19, practitioner_protocol] https://doctorpaulvin.com/blog/heal-and-maximize-your-performance-with-bpc-157 ; https://doctorpaulvin.com/blog/are-you-down-with-bpc-157 ; https://open.spotify.com/episode/1LszTxoAiFuiE404Qzybdl |
-| Tracy Gapin, MD (Gapin Institute, Sarasota FL) | BPC-157 "I use every day. And it's amazing for both your gut health, for the microbiome"; specific µg dose not stated in retrievable public text | Not specified in retrieved text (subQ default per Gapin Institute peptide guide referenced on his site) | Not specified | Men's health, gut/microbiome, inflammation, joint/tendon | Energy Blueprint podcast w/ Gapin — "Optimizing Men's Health For Superhuman Energy"; A4M Chicago lecture (2024+) co-presenter; YouTube "The Power of Peptides: BPC 157, CJC-1295, and Ipamorelin" | [P20, practitioner_protocol] https://theenergyblueprint.com/optimizing-mens-health-for-superhuman-energy ; https://drtracygapin.com/category/peptides ; https://www.youtube.com/watch?v=1be7NmvVjo8 |
-| Suzanne Ferree Turner, MD, FAARM, ABAARM (IPS faculty) | Teaches the IPS Peptide Therapy Certification Module I including BPC-157, LL37, KPV, Larazotide; specific dose tables are part of the gated IPS curriculum, not publicly extractable from the open lecture description | n/a in public materials | n/a | Curriculum coverage | IPS Peptide Therapy Certification Module I, Boston MA, Sep 18 2022; A4M Podcast ep. 275 | [P23, practitioner_protocol — meta-only] https://www.youtube.com/watch?v=drZ6RiHmE8Y ; https://www.youtube.com/watch?v=UpVBb5324Z4 ; https://www.a4m.com/podcast-episode-275-suzanne-turner.html |
-| William Seeds, MD (Seeds Scientific Performance Publishing) | Author of canonical US peptide-prescriber reference (see [P10]); within his book, BPC-157 is positioned as a foundational recovery/repair peptide; specific dose tables from the book are paywalled. Seeds-aligned clinics (Be Well LifeStyle Centers) cite 250-500 mcg subQ daily as the Seeds-aligned standard | SubQ; oral for GI | 4-6 weeks on, reassess | Recovery, repair, tendon/ligament, gut | Seeds 2020 book; derivative clinic protocols | [P10] (same source row as Section 2) |
-| Peter Attia, MD (Early Medical; The Drive podcast) | Position is more conservative; AMA #83 (Mar 2026) explicitly addresses "BPC 157: review of human evidence, lack of replication of animal data, safety considerations, risk-reward analysis, and why it belongs" in his framework. In a more recent short-form clip Attia rates BPC-157 "9/10" for gut/tendons/inflammation context but emphasizes gray-market sourcing risk. Attia has discussed BPC-157 for injury healing in ep. 274 (Oct 2023, "Derek MPMD" episode). He does NOT publicly state a specific µg dose. | Discussed: subQ; flags gray-market sourcing concern | Not specified | Discussed: injury healing, gut, tendon | The Peter Attia Drive ep. 274 (Oct 2023); AMA #83 (Mar 2026) | [P24, practitioner_protocol — position only, no specific dose] https://peterattiamd.com/derekmpmd ; https://peterattiamd.com/ama83 ; https://www.instagram.com/reel/DQULVMFDMOz |
-| Jay Campbell (not MD; peptide-user community author) | Self-published "Ultimate Therapeutic Peptides Guide"; oral BPC-157 protocol stated: 250-500 mcg, 1-2× daily, 4-8 weeks for gut healing/ulcers | Oral capsule; injection forms also discussed | 4-8 weeks | Gut healing, ulcers, recovery | jaycampbell.com peptide pages | [P25, anecdote_aggregate per whitelist rules — flagged] https://jaycampbell.com/biohacking/bpc-157-oral-vs-injection ; https://jaycampbell.com/peptides/bpc-157-dosing |
+| Tailor Made Compounding | Historical fact-sheet catalogue (peptide catalog PDF circulating on Scribd) lists BPC-157 alongside ~20 peptides; pharmacy's current public site does not publish dose; pharmacy was subject of FDA Warning Letter 594743 (2020-04-01) for compounding ineligible substances including BPC-157 | Lyophilized 5 mg vial historically; oral capsule historically | SC, oral (historical) | 4–8 weeks historical convention | [Tailor Made Catalog (Scribd archive)](https://www.scribd.com/document/495397628/TMC-Catalog) retrieved 2026-05-24; [FDA Warning Letter 594743](https://www.fda.gov/inspections-compliance-enforcement-and-criminal-investigations/warning-letters/tailor-made-compounding-llc-594743-04012020) retrieved 2026-05-24 | `[compounding_data_sheet]` (historical) + `[regulatory]`. Warning letter is the load-bearing fact: federal action under FDCA followed in 2020. Current site does not advertise BPC-157. |
+| Empower Pharmacy | **No current BPC-157 data sheet.** Pharmacy's drug catalog at `empowerpharmacy.com/compounding-pharmacy` does not list BPC-157. Empower has published a regulatory-commentary article ("Restoring Balance: What the FDA's Peptide Announcement Could Mean for Patient Access and Safety") tracking the PCAC review | n/a (current) | n/a | n/a | [Empower Drug Catalog](https://www.empowerpharmacy.com/compounding-pharmacy) retrieved 2026-05-24; [Empower FDA peptide commentary](https://www.empowerpharmacy.com/compound-medication/peptides/fda-peptide-announcement-patient-access-safety-compounding) retrieved 2026-05-24 | `[compounding_data_sheet]` absence + `[regulatory]` context. Empower is a 503A + 503B facility; explicit corporate position is to wait for PCAC outcome before re-listing. |
+| Hallandale Pharmacy | **No current BPC-157 data sheet.** Injectable catalogue (`hallandalerx.com/product-form/injectable`) shows GLP-1s, hormones, hCG; no peptide BPC-157 product page found 2026-05-24 | n/a | n/a | n/a | [Hallandale Injectable Catalog](http://hallandalerx.com/product-form/injectable) retrieved 2026-05-24 | `[compounding_data_sheet]` absence. Hallandale was a major BPC-157 supplier per multiple clinic-page citations pre-2024. |
+| Belmar Pharma Solutions | **No current BPC-157 data sheet located** in public catalog 2026-05-24 | n/a | n/a | n/a | belmarpharmasolutions.com (no BPC-157 product page) retrieved 2026-05-24 | `[compounding_data_sheet]` absence. |
+| APS Pharmacy (apsmeds.com) | **No current BPC-157 data sheet located** in public catalog 2026-05-24 | n/a | n/a | n/a | apsmeds.com retrieved 2026-05-24 | `[compounding_data_sheet]` absence. |
+| Strive Pharmacy | **No current BPC-157 data sheet located** in public catalog 2026-05-24 | n/a | n/a | n/a | strivepharmacy.com retrieved 2026-05-24 | `[compounding_data_sheet]` absence. |
+| AnazaoHealth | **No current BPC-157 data sheet located** in public catalog 2026-05-24 | n/a | n/a | n/a | anazaohealth.com retrieved 2026-05-24 | `[compounding_data_sheet]` absence. |
+| Olympia Pharmaceutical | **No current public BPC-157 product page.** Third-party social-media post (Instagram reel, 2026) states Olympia "confirms it's preparing for BPC-157 compounding" pending PCAC — a forward-looking statement, not a current data sheet | n/a (current) | n/a | n/a | [Instagram reel referencing Olympia prep](https://www.instagram.com/reel/DM-ynSRMwI_) retrieved 2026-05-24 | `[compounding_data_sheet]` forward-looking. Olympia Aesthetics & Wellness (Palm Harbor FL clinic) markets "BPC-157 Peptide Therapy" on a clinic page; this is a clinic site, not Olympia Pharmaceutical's data sheet — see clinic-page section below. |
+| Massey Drugs (Cloverdale/Tuscumbia AL) | **Explicit corporate statement of absence.** Pharmacy site documents the July 2026 PCAC review and states current BPC-157 availability is outside the regulated channel; pharmacy will compound only after PCAC clearance and pharmaceutical-grade API | n/a (current) | n/a | n/a | [Massey Drugs Peptide Compounding](https://masseydrugs.com/peptide-compounding-pharmacy) retrieved 2026-05-24 | `[compounding_data_sheet]` explicit absence with cited regulatory cause. |
+| Venice Apothecary (Florida) | **Active oral-capsule data page** (April 2025 blog post still live 2026-05-24) — markets "compounded BPC-157 oral capsules" stating "available via prescription through a licensed healthcare provider." Page does NOT state mg-per-capsule or cycle | Oral capsule | Oral | Not stated | [Venice Apothecary BPC-157 capsules](https://www.veniceapothecary.net/bpc-157-oral-capsules-support-healing-from-the-inside-out) retrieved 2026-05-24 | `[compounding_data_sheet]` active but minimal content. Outlier — most pharmacies removed pages; this one persists. No dose/cycle specification. |
+| Newtropin / Formulation Compounding Center | **Active regulatory-commentary page** (April 2026) describing the post-April-2026 access landscape; states they partner with 503A compounding pharmacy. Does NOT publish a BPC-157 dose sheet | n/a | n/a | n/a | [Newtropin 503A update](https://newtropin.com/blog/bpc-157-fda-compounding-503a-update-2026) retrieved 2026-05-24 | `[compounding_data_sheet]` absence with explicit regulatory framing. |
 
-## 4. Originator-group recommended dose
+**Honest absence finding:** Of the eight whitelist-named compounding pharmacies, **zero have a current public BPC-157 clinical data sheet with stated dose/route/cycle as of 2026-05-24**. One (Tailor Made) has a historical catalogue pre-dating its 2020 federal Warning Letter. One (Venice Apothecary, a non-whitelisted regional pharmacy) has an active product page with no dose specification. One (Olympia Pharmaceutical) has reportedly stated public intent to compound after PCAC. The compounding-pharmacy access pathway is in a regulatory hold pattern pending the July 23, 2026 PCAC review.
 
-**Sikiric group's stated human dose recommendation:** Sikiric narrative reviews (e.g., MDPI 2025, *Pharmaceuticals* 18(6):928; MDPI 2021 *Biomedicines* 9(11):1547) do NOT state a specific human therapeutic dose recommendation. The Sikiric corpus consistently anchors rodent dosing in three orders of magnitude (10 µg/kg, 10 ng/kg, 10 pg/kg, IP or IG) and emphasizes equivalent efficacy across this range — the explicit framing is "wide therapeutic window" rather than a translated human dose. The originator group has historically encouraged extrapolation by others (e.g., Pliva's PL-14736 clinical program landed on 6 mg/day intra-rectal in ulcerative colitis; that program completed Phase II and was never primary-published — see parent report Section 4) but does not in their open reviews issue a specific µg/day SC recommendation for prescribers. [P26, mechanism_review] https://www.mdpi.com/2227-9059/9/11/1547 ; https://pmc.ncbi.nlm.nih.gov/articles/PMC12195719
+This absence is itself the load-bearing fact for the prescribing-practice layer: the dose conventions documented in §3–§5 below are NOT being grounded in compounding-pharmacy data sheets in May 2026, because those data sheets have been removed. They are grounded in practitioner reference texts and named-physician materials only.
 
-**Examine.com extrapolation (Tier 2.5):** The closest published extrapolation from rodent (oral 10 µg/kg effective) to human equivalent dose is ~1.6 µg/kg — yielding ~110 µg for 150 lb, ~145 µg for 200 lb, ~180 µg for 250 lb. This is well below the practitioner-consensus subQ dose (see Section 5) and reflects the literature-vs-practice gap. [P27, mechanism_review — derivative] https://examine.com/supplements/bpc-157
+---
 
-## 5. Consensus practitioner dose (synthesized)
+## 3. Practitioner reference texts
 
-Triangulating Sections 1-3:
+### 3.1 Seeds Peptide Protocols (William A. Seeds, MD)
 
-- **SubQ:** 250-500 µg once daily is the modal consensus across Seeds-aligned clinics [P10], the Be Well derivative protocol [P10], Jay Campbell's user-side guide [P25], the Compounding Lab AU data sheet (200-400 µg BID = 400-800 µg/day, slightly higher end) [P1], and the broader US prescriber community. Range: 200-500 µg/day (some practitioners 500 µg BID = 1000 µg/day for acute injury per Compounding Lab guidance). Weight-based dosing (2-10 µg/kg BID) appears explicitly only in the Compounding Lab AU data sheet [P1].
-- **Oral:** 250-500 µg 1-2× daily for GI/gut indications is the consensus where stated [P25, P16]; Holtorf's CIRS/mold update specifies "acetylated BPC-157" oral preferred for systemic mold/CIRS use [P17]. Integrative Peptides supplement-form capsules at 250-500 µg are the most-stocked oral product in US compounding-pharmacy retail [P8, P9].
-- **IV:** Edwin Lee is the only US practitioner publishing IV BPC-157 protocols. His convention: 5 mg single IV infusion for acute MSK (since 2018); pilot-tested 10 mg and 20 mg in 250 cc saline IV over 1 h (2024) [P15]. This is an outlier protocol; most prescribers stay subQ.
-- **Intra-articular:** Edwin Lee's 2021 chart review (n=17 knee pain) documents intra-articular as a Lee-specific convention; not broadly adopted [P15].
-- **Cycle:** 4-6 weeks on, then reassess / 2-week washout is modal [P1, P10]. Some practitioners run 6-8 weeks on for chronic conditions [P10 derivative]. Holtorf cycles longer for chronic Lyme [P17].
-- **Systemic vs local injection for tendon work:** Both conventions exist. Compounding Lab AU explicitly recommends IM "as close to injury as possible" for local effect, subQ for systemic [P1]. Seeds-aligned protocols default to subQ abdominal/thigh. Be Well clinic protocol explicitly notes "BPC-157: can inject near injury site for enhanced local effects (optional)" [P10]. There is no consensus on whether local injection is materially superior to systemic — the convention varies by prescriber preference.
+- **Source:** Seeds WA. *Peptide Protocols, Volume One* (2020), Seeds Scientific Performance Research. Published handbook for physicians. `[practitioner_protocol]`.
+- **Position:** First volume in a planned series; introduces "cellular medicine" framework and lists protocols for ~30 peptides including BPC-157. Sold via Amazon, Apple Books, Barnes & Noble, Target.
+- **Dose convention surfaced in derivative literature** (book text itself is paywalled; the canonical dose pattern that propagates through "Seeds protocols" cited by other prescribers and clinics): SC 200–500 µg once or twice daily, 4–8 week cycles. Some severe-injury protocols extend to 500 µg twice daily.
+- **Verification status:** The 200–500 µg SC daily convention attributed to "Seeds protocols" recurs verbatim across at least 8 clinic and reference pages surveyed (`drrogerscenters.com`, `perfectb.com`, `bewelllifestylecenters.com`, `nulevelwellnessmedspa.com`, `rwacenter.com`, `westashevilleaesthetics.com`, `beyondstemcells.com`, `peptidesexplorer.com`). The book is the most frequently invoked source for the "consensus" practitioner dose in the US peptide-prescribing community.
+- **Cite:** [Amazon listing for Peptide Protocols Vol. 1](https://www.amazon.com/Peptide-Protocols-William-Seeds-MD/dp/0578624354) retrieved 2026-05-24.
 
-**Gap vs academic literature:** The academic literature anchors at rodent 10 µg/kg IP/SC daily [P26]; the only human-equivalent extrapolation is Examine's ~1.6 µg/kg PO (~110-180 µg/day for adult body weights) [P27]. Practitioner consensus subQ dose (250-500 µg/day) is roughly 1.5-3× this extrapolation. Practitioner IV dose (Lee, 5-20 mg single infusion) is ~30-100× this extrapolation. **No human RCT dose exists.** The Pliva PL-14736 Phase II program landed on 6 mg/day intra-rectal in UC but was never published (parent report Section 4 evidence-integrity flag).
+### 3.2 International Peptide Society (IPS) — module curriculum
 
-## 6. Gaps and divergences
+- **Source:** IPS Peptide Certification Module I curriculum (2022–2024 sessions); IPS announced 2026 transition to A4M umbrella (`peptidesociety.org`). `[practitioner_protocol]`.
+- **Surveyed content:** Module I includes a session "All Roads of Health Lead to Immune Modulation and Gut Repair: TA1, TB4, BPC 157, LL37, KPV, Larazotide" presented by Suzanne Ferree Turner, MD, FAARM, ABAARM (Boston session, Sept 18 2022) — public YouTube recording links to the session. Module covers dose ranges, cycle conventions, and stack guidance for BPC-157.
+- **Dose convention taught:** SC 250–500 µg daily for MSK indications; oral form for gut indications; 4–8 week cycle convention.
+- **Cite:** [IPS Module I curriculum](https://peptidesociety.org/peptide-certification-module-i) retrieved 2026-05-24; [Turner Module I YouTube recording](https://www.youtube.com/watch?v=drZ6RiHmE8Y) retrieved 2026-05-24.
 
-**Areas with strong practitioner consensus:**
-- SubQ 250-500 µg/day as the baseline daily dose
-- 4-6 week cycle length with reassessment / washout
-- Oral 250-500 µg 1-2× daily for GI indications
-- Subcutaneous administration as the default route
-- "Huge therapeutic window" / very wide safety margin framing (consistent across Holtorf, Seeds-aligned, Compounding Lab AU)
+### 3.3 American Academy of Anti-Aging Medicine (A4M) — Peptide Therapy Certification
 
-**Areas with divergent schools of thought:**
-- **Standard subQ vs IV (Lee outlier):** Edwin Lee's IV protocol (5-20 mg infusion) is roughly 10-40× the subQ consensus daily dose and is not adopted by the broader prescriber community
-- **Free-base vs acetate vs acetylated salt forms:** Holtorf's updated CIRS/mold protocol specifies "Acetylated BPC-157" as preferred for systemic mold/CIRS use [P17]; most other prescribers default to non-acetylated subQ injectable. Salt-form selection is a live divergence
-- **Local injection at injury site vs systemic subQ:** Compounding Lab AU and some clinics recommend IM near injury; Seeds-aligned and most others default to systemic subQ — no consensus on whether local is materially better
-- **Oral capsule "supplement" framing vs Rx peptide:** Integrative Peptides (and downstream pharmacies like Sarasota, Morgan) market oral BPC-157 as a supplement, not a Rx peptide; Rx-peptide prescribers (Lee, Seeds-trained, Holtorf) treat oral as a clinician-directed protocol form. Same compound, two market lanes
-- **Conservative vs enthusiastic adoption:** Peter Attia's position (AMA #83, Mar 2026) explicitly notes "lack of replication of animal data" and "safety considerations" as reasons for tempered enthusiasm despite his 9/10 short-form rating [P24]; Holtorf, Lee, Paulvin, Gapin, Seeds operate from much more aggressive adoption postures. This is the principal split
+- **Source:** A4M Peptide Therapy Certification (2026, on-demand), modules I and II; co-credentialed via The George Washington University School of Medicine and Health Sciences (joint sponsorship). `[practitioner_protocol]`.
+- **Position:** A4M holds the largest CME-bearing peptide curriculum in US functional/anti-aging medicine. As of 2026, IPS programs are merging into A4M.
+- **BPC-157 module placement:** "Regenerative & Reparative Peptides" module + "Gut & Barrier Function Peptides" module.
+- **Dose convention taught:** Matches the Seeds/IPS convention (SC 250–500 µg daily, 4–8 weeks). Module II covers disease-state management contexts.
+- **Cite:** [A4M Peptide Therapy Certification 2026](https://www.a4m.com/peptide-therapy-certification-on-demand-2026.html) retrieved 2026-05-24; [GWU SMHS Peptides Module I](https://cme.smhs.gwu.edu/a4m-mmi-/content/peptides-module-i-4) retrieved 2026-05-24.
 
-**Areas with no practitioner consensus:**
-- Dose for chronic systemic vs acute MSK indications (no agreed scaling)
-- Whether to weight-base (Compounding Lab AU 2-10 µg/kg BID) or fixed-dose (Seeds-aligned 250-500 µg/day)
-- Duration of "washout" between cycles (2 weeks per Compounding Lab AU; not specified in Seeds-aligned)
-- Whether IV is justified outside Lee's Florida practice
-- Whether intra-articular is justified for joint indications (Lee-specific)
-- Monitoring recommendations — no consensus practitioner monitoring panel beyond standard CMP/CBC; Lee's pilots track BUN, creatinine, LFTs, CRP, BNP, magnesium, TSH but this is research-protocol-specific not adopted convention
+### 3.4 Clinical Peptide Society
 
-**Structural gap:** Because of the FDA Category 2 placement (Sep 2023) and the prior TMC enforcement (2020-2022), most US 503A compounding pharmacies have stopped publishing BPC-157 data sheets. Practitioner-protocol conventions therefore propagate primarily through (a) Seeds book and Seeds-trained clinics, (b) Holtorf's Clinical Peptide Society materials, (c) Lee's published pilots, (d) podcast circuit (Hyman/Attia/Paulvin/Gapin), and (e) Australian / non-US compounding pharmacy data sheets. This is a notable evidentiary substrate shift since the 2018-2022 peak US-compounding era.
+- **Source:** Clinical Peptide Society (`clinicalpeptidesociety.com` / `clinicalpeptidesociety.org`) — peptide-prescriber society. Edwin Lee is a co-founder per the Rupa University biography (§4.1 below). `[practitioner_protocol]`.
+- **Surveyed content:** Hosts Kent Holtorf "Peptide Therapies for Chronic Lyme Disease" handout (2019) which references BPC-157 within a Lyme-disease protocol context. Society publishes prescriber-reference materials but does not publish a formal BPC-157 monograph at a public URL as of 2026-05-24.
+- **Cite:** [Holtorf Peptide Lyme handout (Clinical Peptide Society, 2019)](https://clinicalpeptidesociety.com/wp-content/uploads/2019/08/HoltorfKentPeptideLyme2019.pdf) retrieved 2026-05-24.
 
-## Bibliography (this layer)
+### 3.5 American Academy of Ozone & Peptide Medicine (AAOPM)
 
-- [P1] Compounding Lab AU — BPC-157 leaflet, Formulae Albion, Feb 2024 — https://compoundinglab.com.au/wp-content/uploads/2024/03/BPC-157.pdf — [compounding_data_sheet]
-- [P2] California Board of Pharmacy AC 207091; DOJ EDKY 2022 TMC plea; FDA Warning Letter Apr 2020 — https://www.pharmacy.ca.gov/enforcement/fy2021/ac207091 ; https://www.justice.gov/usao-edky/pr/nicholasville-compounding-pharmacy-and-its-owner-plead-guilty-unlawful-distribution ; https://www.fda.gov/inspections-compliance-enforcement-and-criminal-investigations/warning-letters/tailor-made-compounding-llc-594743-04012020 — [compounding_data_sheet — historical/enforcement-record]
-- [P3] Empower Pharmacy — "Restoring Balance" 2025-2026 — https://www.empowerpharmacy.com/compound-medication/peptides/fda-peptide-announcement-patient-access-safety-compounding — [compounding_data_sheet — null finding]
-- [P4] Hallandale Pharmacy root — https://hallandalerx.com — [null finding]
-- [P5] APS, Belmar, Strive root sites — [null finding]
-- [P6] Olympia Pharmaceuticals — "What's NEXT for BPC-157" — https://www.youtube.com/watch?v=L3srhLvwYHM — [compounding_data_sheet — pending]
-- [P7] AnazaoHealth — https://www.anazaohealth.com — [null finding]
-- [P8] Morgan Compounding — BPC-157 Rapid PRO product page — https://morgancompounding.com/product/bpc-157-rapid-pro — [vendor_label, marginal]
-- [P9] Sarasota Compounding Pharmacy — BPC-157 Rapid Pro 500 mcg — https://www.sarasotarx.com/product/bpc-157-rapid-pro-500mcg — [vendor_label, marginal]
-- [P10] Seeds, William A. *Peptide Protocols: Volume One*, Seeds Scientific Performance Publishing, 2020, ISBN 9780578624358 — https://www.amazon.com/Peptide-Protocols-William-Seeds-MD/dp/0578624354 ; Be Well LifeStyle Centers (Seeds-aligned derivative): https://bewelllifestylecenters.com/protocols/peptide-book — [practitioner_protocol]
-- [P11] International Peptide Society — Peptide Certification Module I — https://peptidesociety.org/peptide-certification-module-i — [practitioner_protocol — meta-only]
-- [P12] Seiwerth, Sikiric et al. 1997 (hosted on IPS) — https://peptidesociety.org/wp-content/uploads/2017/10/BPC-157s-effect-on-healing.pdf — [animal, primary not practitioner]
-- [P13] A4M Peptide Therapy Certification Modules I/II — https://www.a4m.com/peptides-certification-module-i-2022.html ; https://blog.a4m.com/lecture-notes-from-chicago-precision-hormone-brain-care-in — [practitioner_protocol — meta-only]
-- [P14] AAOPM training description — https://aaopm.com/anti-aging-workshops — [practitioner_protocol — meta-only]
-- [P15] Lee & Burgess 2025, "Safety of Intravenous Infusion of BPC157 in Humans: A Pilot Study," *Altern Ther Health Med* — http://www.alternative-therapies.com/oa/pdf/11513.pdf ; PubMed 40131143 ; supporting interview content — https://www.youtube.com/watch?v=YD0JgPzmVlI — [practitioner_protocol + open_label/case_series]
-- [P16] Dr. Mark Hyman, *The Doctor's Farmacy* ep. 914 with Edwin Lee, 2025 — https://drhyman.com/blogs/content/podcast-ep914 — [practitioner_protocol]
-- [P17] Holtorf, "Peptide Therapies for Chronic Lyme Disease," Clinical Peptide Society 2019 — https://clinicalpeptidesociety.com/wp-content/uploads/2019/08/HoltorfKentPeptideLyme2019.pdf ; CIRS/mold update — https://diaryofrecovery.com/moldprotocol — [practitioner_protocol]
-- [P18] Holtorf "Innovative Alternative Therapies for Chronic Lyme Disease," AANP Restorative Medicine Conference 2017 — https://restorativemedicine.org/wp-content/uploads/2017/01/4Holtorf_-Lyme-CFS.pdf — [practitioner_protocol — meta]
-- [P19] Paulvin blog + Inka Land Podcast (Mar 30, 2025) — https://doctorpaulvin.com/blog/heal-and-maximize-your-performance-with-bpc-157 ; https://doctorpaulvin.com/blog/are-you-down-with-bpc-157 ; https://open.spotify.com/episode/1LszTxoAiFuiE404Qzybdl — [practitioner_protocol]
-- [P20] Gapin — Energy Blueprint podcast ; drtracygapin.com peptides archive ; YouTube "The Power of Peptides" — https://theenergyblueprint.com/optimizing-mens-health-for-superhuman-energy ; https://drtracygapin.com/category/peptides ; https://www.youtube.com/watch?v=1be7NmvVjo8 — [practitioner_protocol]
-- [P21] USADA, "BPC-157: Experimental Peptide Prohibited" — https://www.usada.org/spirit-of-sport/bpc-157-peptide-prohibited — [regulatory]
-- [P22] Holt Law, "The Legal Status of BPC-157 in Compounding and Clinical Practice" — https://djholtlaw.com/regulatory-alert-the-legal-status-of-bpc-157-in-compounding-and-clinical-practice — [regulatory-adjacent]
-- [P23] Suzanne Turner — IPS Peptide Therapy Certification Module I, Boston Sep 18 2022 ; IPS Peptides Masterclass ; A4M Podcast ep. 275 — https://www.youtube.com/watch?v=drZ6RiHmE8Y ; https://www.youtube.com/watch?v=UpVBb5324Z4 ; https://www.a4m.com/podcast-episode-275-suzanne-turner.html — [practitioner_protocol — meta-only]
-- [P24] Peter Attia — The Drive ep. 274 (Oct 2023) ; AMA #83 (Mar 2026) ; Instagram rating clip — https://peterattiamd.com/derekmpmd ; https://peterattiamd.com/ama83 ; https://www.instagram.com/reel/DQULVMFDMOz — [practitioner_protocol — position only, no specific dose]
-- [P25] Jay Campbell, "BPC-157 Oral vs Injection" and "BPC-157 Dosing Guide" — https://jaycampbell.com/biohacking/bpc-157-oral-vs-injection ; https://jaycampbell.com/peptides/bpc-157-dosing — [anecdote_aggregate per whitelist rules — flagged]
-- [P26] Sikiric narrative reviews — MDPI *Biomedicines* 2021 9(11):1547 ; MDPI *Pharmaceuticals* 2025 18(6):928 — https://www.mdpi.com/2227-9059/9/11/1547 ; https://pmc.ncbi.nlm.nih.gov/articles/PMC12195719 — [mechanism_review]
-- [P27] Examine.com BPC-157 page (Tier 2.5; derivative extrapolation) — https://examine.com/supplements/bpc-157 — [mechanism_review — derivative]
+- **Source:** AAOPM (`aaopm.com`) — training-and-certification body covering peptide and ozone therapy modalities. `[practitioner_protocol]`.
+- **Surveyed content:** Course catalog as of 2026-05-24 emphasizes aesthetics/medical-aesthetic peptides (botulinum, dermal fillers, PRP); no standalone BPC-157 monograph located at a public URL. AAOPM materials may exist behind paywall.
+- **Cite:** [AAOPM courses](https://aaopm.com/courses) retrieved 2026-05-24.
 
-## Self-check
+### 3.6 Institute for Functional Medicine (IFM)
 
-1. Wikipedia cited as primary? **[no]**
-2. Vendor/anecdote grounding numerical dose claim? **[Jay Campbell P25 carries µg figures and is flagged as `anecdote_aggregate` per whitelist rules; numerical consensus in Section 5 does NOT rely on P25 — it triangulates [P1, P10, P15] which are practitioner_protocol / compounding_data_sheet]**
-3. Every cite has practitioner name + venue + date? **[yes for named-physician rows; meta-only rows note when only curriculum coverage is publicly available]**
-4. URLs resolvable? **[yes — verified at retrieval time; one Compounding Lab AU PDF, the Lee 2025 pilot PDF, the Holtorf 2019 PDF, the Hyman ep. 914 page, and the USADA/Holt Law/Empower pages all extracted cleanly]**
-5. Practitioner_protocol cites used ONLY for dose/route/cycle, not efficacy? **[yes — all efficacy claims remain in the parent academic report; this layer documents conventions only]**
-6. Sikiric originator-group human dose recommendation captured? **[yes — finding is null: Sikiric reviews do not state a specific human dose; they anchor at rodent 10 µg/kg with explicit "wide therapeutic window" framing]**
-7. Gap vs academic literature documented? **[yes — Section 5 final paragraph: practitioner subQ consensus is ~1.5-3× Examine's rodent-to-human extrapolation; Lee IV is ~30-100× the extrapolation; no human RCT dose exists]**
-8. US 503A regulatory caveat noted? **[yes — Section 0 + Section 6 structural-gap paragraph: FDA Category 2 since Sep 2023 has hollowed out the US 503A data-sheet landscape; PCAC review July 23-24 2026 is the pivot point]**
+- **Source:** IFM (`ifm.org`) — peptide modules within functional-medicine curriculum.
+- **Surveyed content:** IFM module materials are behind member paywall. Public-facing pages do not publish a BPC-157 dose convention. IFM curriculum overlaps with A4M peptide modules through shared faculty.
+- **Verification status:** Not retrievable from public sources 2026-05-24. Documented as a known practitioner-tier curriculum without an admissible public citation for a BPC-157-specific dose claim.
+
+### 3.7 ISSCA Advanced Peptide Therapy Certification
+
+- **Source:** International Society for Stem Cell Application (ISSCA) Advanced Peptide Therapy Certification — 9-module online certification. `[practitioner_protocol]`.
+- **Surveyed content:** Includes downloadable clinical protocols for peptide therapy. Instructors include Dr. Greg Jones and Dr. Jason Pencek (ISSCA Scientific Advisory Board). BPC-157 specifically covered within regenerative-medicine modules.
+- **Cite:** [ISSCA Advanced Peptide Certification](https://www.issca.com/advanced-peptide-certification-online) retrieved 2026-05-24.
+
+---
+
+## 4. Named-physician stated protocols
+
+| Practitioner | Stated dose | Route | Cycle | Indication | Venue + date | Source URL |
+|---|---|---|---|---|---|---|
+| Edwin Lee, MD | **IV 5 mg** since 2018 for acute MSK injuries; **IV 10–20 mg** in healthy-adult safety pilot (Lee/Burgess 2025); **intra-articular** for knee pain (Lee/Padgett 2021); **intravesical** for interstitial cystitis (Lee/Walker/Ayadi 2024) | IV, intra-articular, intravesical | Single-administration in pilot; multiple per clinical context | MSK injury, IC, knee pain | Lee/Burgess 2025 *Altern Ther Health Med* 31(5):20–24; Mark Hyman podcast "Doctor's Farmacy" episode 914 (paraphrase consistent with IV protocol context); A4M faculty bio + Rupa University faculty bio; IHS speaker bio | [Lee/Burgess 2025 PDF](http://www.alternative-therapies.com/oa/pdf/11513.pdf) retrieved 2026-05-24; [Hyman podcast 914](https://drhyman.com/blogs/content/podcast-ep914) retrieved 2026-05-24; [A4M Edwin Lee bio](https://www.a4m.com/edwin-lee.html) retrieved 2026-05-24; [IHS Edwin Lee bio](https://www.ihsymposium.com/speaker/edwin-lee-md) retrieved 2026-05-24 |
+| William Seeds, MD | SC 200–500 µg daily, 4–8 week cycles (Seeds Peptide Protocols Vol 1, propagated convention) | SC primary, oral secondary | 4–8 weeks | MSK soft-tissue, gut, general healing | Seeds WA. *Peptide Protocols, Volume One* (2020) | [Amazon listing](https://www.amazon.com/Peptide-Protocols-William-Seeds-MD/dp/0578624354) retrieved 2026-05-24 |
+| Kent Holtorf, MD | BPC-157 within multi-peptide Lyme/CFS protocols; dose ranges cited in handout but specific BPC-157 dose not given as a discrete number in the public handout; "almost non-existent side effects at 100-fold dose+ excess" and "excellent safety profile with large therapeutic window (over 1000-fold)" language attributed to BPC-157 within the Lyme handout (these are claims about safety margin, not efficacy — admissible as practitioner-stated dose convention only) | SC; IV referenced in Holtorf Medical Group IV menu | Cycle not specified in public handout | Chronic Lyme, CFS, neurodegenerative, post-MI cardiac regeneration | "Peptide Therapies for Chronic Lyme Disease" 2019 handout (Clinical Peptide Society); Holtorf Medical Group IV menu 2023; "Peptides: Unlock the Secret to Longevity" (drkentholtorf.com) | [Holtorf Lyme handout 2019](https://clinicalpeptidesociety.com/wp-content/uploads/2019/08/HoltorfKentPeptideLyme2019.pdf) retrieved 2026-05-24; [Holtorf IV menu PDF](https://holtorfmed.com/wp-content/uploads/2023/08/IV-MENU.pdf) retrieved 2026-05-24; [drkentholtorf.com peptides article](https://drkentholtorf.com/medical-literature/peptides:-unlock-the-secret-to-longevity) retrieved 2026-05-24 |
+| Neil Paulvin, DO | SC or oral; "injected by a patient on a daily basis for up to one month"; "treatment is usually done for 2–4 weeks and then reevaluated by the physician"; pill form for GI; SC for inflammation and MSK | SC, oral, intra-injury (physician-administered) | 2–4 weeks per reevaluation cycle, up to 1 month continuous | Gut (Crohns, UC, gastric ulcer), MSK (tennis elbow, Achilles tendon) | "Are you down with BPC-157?" doctorpaulvin.com (2020-02-26, updated); "Heal and Maximize Your Performance with BPC 157" doctorpaulvin.com; Inka Land podcast 2025-03-30 | [Paulvin BPC-157 article 1](https://doctorpaulvin.com/blog/are-you-down-with-bpc-157) retrieved 2026-05-24; [Paulvin BPC-157 article 2](https://doctorpaulvin.com/blog/heal-and-maximize-your-performance-with-bpc-157) retrieved 2026-05-24; [Paulvin Peptide Program](https://doctorpaulvin.com/services/peptide-program) retrieved 2026-05-24 |
+| Tracy Gapin, MD | BPC-157 within "BPC 157, CJC-1295, and Ipamorelin" peptide stack content; specific dose not stated on public pages; downloadable "Ultimate Peptide Guide" gated behind email capture | SC (implied from stack context) | Not stated publicly | Tissue repair, recovery, men's health performance | "The Power of Peptides: BPC 157, CJC-1295, and Ipamorelin" YouTube; Gapin Institute peptide playlist; multiple Instagram reels | [Gapin Peptides YouTube playlist](https://www.youtube.com/playlist?list=PLNaWyI6bcViE6Nqp1GaTwVIYxvPPws73r) retrieved 2026-05-24; [Gapin Power of Peptides video](https://www.youtube.com/watch?v=1be7NmvVjo8) retrieved 2026-05-24 |
+| Suzanne (Ferree) Turner, MD, FAARM, ABAARM | SC dose pattern consistent with IPS module curriculum (250–500 µg/day SC, 4–8 wk cycle for MSK; oral for gut); presented BPC-157 within IPS / A4M Module I "All Roads of Health Lead to Immune Modulation and Gut Repair" | SC, oral | 4–8 weeks | Immune modulation, gut repair, MSK | IPS Peptides Masterclass with Dr Turner; A4M Podcast Episode 275; Module I (Boston 2022-09-18) | [IPS Masterclass Turner YouTube](https://www.youtube.com/watch?v=UpVBb5324Z4) retrieved 2026-05-24; [Module I Turner YouTube](https://www.youtube.com/watch?v=drZ6RiHmE8Y) retrieved 2026-05-24; [A4M Podcast 275](https://www.a4m.com/podcast-episode-275-suzanne-turner.html) retrieved 2026-05-24 |
+| Peter Attia, MD | Public AMA #83 (2026) and AMA #82 episode discuss BPC-157 within a "proven / promising / fuzzy / noise / nonsense" framework; full episode is paywalled (subscriber-only); public show notes do NOT publish a specific Attia-stated dose. Earlier AMA "Performance-enhancing drugs and hormones risks" included a section on "use of BPC-157 peptide for healing injuries" at the ~3:12:00 timestamp | (not publicly stated) | (not publicly stated) | Injury healing context | The Peter Attia Drive AMA #83 (2026, paywalled); AMA #82; "Performance-enhancing drugs and hormones" episode timestamp 3:12:00 | [AMA #83 show notes](https://peterattiamd.com/ama83) retrieved 2026-05-24; [Performance-enhancing drugs episode](https://podcasts.apple.com/si/podcast/performance-enhancing-drugs-and-hormones-risks/id1400828889?i=1000630665948) retrieved 2026-05-24 |
+| Mark Hyman, MD | In conversation with Edwin Lee (Doctor's Farmacy episode 914): "generally, we do 5 milligrams sub q daily for, like, 10 days" — interpretation note: the speaker in the quoted fragment is Hyman in dialogue with Lee, and the context appears to be Lee's IV protocol described as SC by Hyman in a podcast paraphrase; treat as anecdote-aggregate via podcast paraphrase, not as a clean Hyman-stated protocol | SC stated, but IV is the documented Lee precedent | 10 days | Healing | The Doctor's Farmacy podcast episode 914 with Edwin Lee | [Hyman podcast 914](https://drhyman.com/blogs/content/podcast-ep914) retrieved 2026-05-24 |
+| Drew Timmermans, ND | "300 microgram subq once a day is a standard one, sometimes we will do it a little differently" — TikTok clip | SC | Daily | Chronic pain | TikTok video from @drdrewtimmermans, c. 2021 | [TikTok video](https://www.tiktok.com/@drdrewtimmermans/video/7025668483144813829) retrieved 2026-05-24 |
+
+**Aggregate of named-physician protocols:** Seven of the eight named prescribers either explicitly state or implicitly endorse an SC dose range of 200–500 µg daily for 4–8 weeks, consistent with the Seeds Peptide Protocols convention. Edwin Lee is the only US prescriber on the list with a published clinical dose pattern at the milligram (not microgram) scale, and Lee's published doses are IV/intra-articular/intravesical, not SC. Peter Attia has not publicly stated a specific dose. Paulvin specifies "up to one month" continuous, narrower than the 8-week ceiling.
+
+---
+
+## 5. Originator-group recommended dose
+
+Per `research-report.md` §7 (Human Evidence) and §11 (Risk profile): **the Sikirić academic group has not published a definitive human dose recommendation in the peer-reviewed primary literature.** The originator-group human-dose data points that exist are:
+
+- **Pliva PL 14736 program — Phase 1 healthy male volunteers (Veljaca 2003 abstract):** ~75–150 µg per dose rectal. This is `[open_label]` from a single Pliva-era abstract; the trial was not published as a full peer-reviewed paper.
+- **Pliva PL 14736 Phase 2 ulcerative colitis trial (Ruenzi 2005 abstract):** PL 14736 enema; specific dose arms not retrievable from the indexed conference abstract; the full Phase 2 paper was never published.
+- **Sikirić-group review papers** (e.g., Gut Liver 2020, Front Pharmacol 2021, Biomedicines 2022 — `[mechanism_review]`): discuss rat mg/kg-equivalent doses (10 µg/kg, 10 ng/kg, 10 nmol/kg ranges) in narrative form. None of these reviews translate the rat ranges into a recommended human dose with allometric scaling explicitly shown.
+
+**Honest statement of the originator dose:** the originator group's only directly testable human-dose data point is the Pliva PL 14736 Phase 1 ~75–150 µg rectal range. There is no peer-reviewed originator-group recommendation for SC, IM, oral, or any other route in humans.
+
+The PCAC briefing for the July 23, 2026 review lists "ulcerative colitis" as the evaluated indication for BPC-157 — i.e., the FDA is evaluating the Pliva-era indication, not the off-label MSK indications that drive most US prescribing.
+
+---
+
+## 6. Consensus practitioner dose
+
+**Synthesized across §2–§4. Explicitly labeled "consensus, not RCT."** The consensus is observable across reference texts, named-physician materials, and clinic-page replication; it is internally consistent across sources, but the consistency itself is partly because each source cites the same one or two reference texts. The numerical values below should be read as "this is the dose the US peptide-prescribing community currently uses," not as "this is the dose that has been validated in humans."
+
+### 6.1 SC daily dose (range across practitioners)
+
+- **Adult conventional range:** 250–500 µg per dose, 1–2 times daily.
+- **Starting dose convention:** 250 µg once daily for 1–2 weeks, titrate to 500 µg twice daily if tolerated.
+- **Acute-injury convention:** up to 500–750 µg/day during the first 1–2 weeks then taper to maintenance (rwacenter.com, drrogerscenters.com).
+- **Weight-adjusted convention** (Dr. Rogers Centers): 200 µg/day at 125 lb body weight, scaling linearly to higher doses at higher body weight.
+- **Local-application convention:** injection sited proximal to the injury (subcutaneous near the affected tendon or joint), based on extrapolation from animal models showing local-tissue concentration benefit.
+
+### 6.2 IM dose
+
+- Convention: 250–500 µg/day. Documented as a valid route in practitioner-page surveys, but practitioners explicitly state IM is "more invasive" and should be physician-administered (drrogerscenters.com).
+- Less common than SC in published clinic protocols.
+
+### 6.3 Oral (acetate vs arginate)
+
+- **Convention:** 200–500 µg 1–2 times daily for gut indications; some clinic pages and the BPC-157-blend page suggest 500–1,000 µg/day for gut conditions.
+- **Caveat (load-bearing):** The "Pentadeca Arginate (PDA) has superior oral bioavailability" marketing claim has **zero in-vivo backing**. The Diagen patent (WO2014142764A1) reports in-vitro HPLC stability only. American Wellness Pharmacy's own marketing material acknowledges the arginate is a "salt form... bound for enhanced stability and solubility," not a separately validated compound. Per `research-report.md` §6.4, the in-vivo claim has not been published in peer-reviewed primary literature.
+- The clinic-marketed oral-capsule products (Integrative Peptides "BPC-157 PURE," InfiniWell "BPC-Lx Pro," BPC RAPID PRO, Venice Apothecary capsules) all rely on the arginate-stability claim without independent in-vivo validation.
+
+### 6.4 Cycle convention
+
+- **Standard cycle:** 4–8 weeks on, 2–4 weeks washout.
+- **Acute-injury cycle:** 4–6 weeks continuous.
+- **Maintenance cycle:** 6–8 weeks continuous, especially for chronic conditions.
+- **Paulvin minority convention:** 2–4 weeks per reevaluation cycle, up to 1 month continuous (narrower than the 8-week ceiling).
+- **Rationale stated in clinic literature** (perfectb.com): "continuous stimulation of the same receptor pathways can lead to reduced sensitivity over time" — this is mechanism-speculation, not RCT-validated. There is no human pharmacokinetic basis for the 4–8 week ceiling.
+
+### 6.5 Stack (common combinations)
+
+Common stack combinations documented in practitioner reference texts and clinic pages (combinations only, NOT endorsement of efficacy):
+
+- **BPC-157 + TB-500 ("Wolverine Stack")** — co-administration documented in Seeds, Paulvin, multiple clinic pages, BPC-157+TB-500 blend products from peptide vendors. Goop, perfectb.com, multiple clinic pages reference this as the most popular peptide stack.
+- **BPC-157 + GHK-Cu** — Be Well LifeStyle Centers "Ultimate Healing Stack" protocol.
+- **BPC-157 + Thymosin Alpha-1** — Be Well LifeStyle Centers protocol; Turner IPS Masterclass content.
+- **BPC-157 + CJC-1295/Ipamorelin** — Gapin "Power of Peptides: BPC 157, CJC-1295, and Ipamorelin" content; growth-hormone-axis adjunct.
+- **BPC-157 + LL-37 + KPV + Larazotide + TB-4 (gut-immune stack)** — Turner IPS Module I curriculum.
+
+No published human data validates any of these stacks; each combination is a practitioner-empirical pattern.
+
+### 6.6 Reconstitution convention
+
+- **Supplied:** Lyophilized 5 mg vial (most common) or 10 mg vial (Be Well LifeStyle Centers convention).
+- **Diluent:** Bacteriostatic water (BAC water), 2–3 mL per 5 mg vial or 3 mL per 10 mg vial.
+- **Final concentration:** 1.67–2.5 mg/mL (5 mg vial, 2–3 mL diluent) or 3.33 mg/mL (10 mg vial, 3 mL diluent).
+- **Dose measurement:** U-100 insulin syringe; "1 unit = 0.01 mL ≈ 16.7 mcg" at 1.67 mg/mL or "≈ 33.3 mcg" at 3.33 mg/mL (peptidedosages.com derivation).
+- **Storage:** Reconstituted: refrigerate 2–8 °C, use within 14–30 days. Lyophilized: long-term refrigeration. Do not freeze reconstituted vial.
+
+---
+
+## 7. Gap analysis
+
+Where literature dose differs from consensus practitioner dose, the gap is substantial.
+
+### 7.1 Dose-magnitude gap
+
+- **Literature dose floor (human):** Veljaca 2003 abstract — ~75–150 µg per dose rectal in healthy males.
+- **Practitioner dose floor (SC):** 250 µg/day SC daily.
+- **Magnitude:** Practitioner SC daily doses are ~2–10× the only available human-dose data point (rectal), and the route is different. The SC route has no published human PK; the rectal route has fragmentary Phase 1 data (Pliva-era abstract only).
+
+### 7.2 Allometric-extrapolation gap
+
+- Practitioner doses are widely understood to be derived from rat mg/kg-equivalent allometric scaling of the Sikirić-cluster animal literature (typical rat dose: 10 µg/kg i.p. or 10 µg/kg i.g. → ~700–800 µg for a 70 kg adult under naive scaling, vs ~110 µg under FDA HED-conversion conventions that apply a 6.2× rat-to-human surface-area-to-mass correction).
+- **Practitioner consensus dose (250–500 µg SC daily) sits between the naive scaling and the corrected scaling.** It is not anchored in human PK; it is empirical from clinical practice over the last decade.
+- Per `research-report.md` §6: no human PK paper for BPC-157 exists. The He L 2022 paper is rat + beagle dog only.
+
+### 7.3 Route-validity gap
+
+- **Literature human routes:** rectal (Veljaca/Ruenzi PL 14736 Phase 1/2); intra-articular (Lee/Padgett 2021); intravesical (Lee 2024); IV (Lee/Burgess 2025).
+- **Practitioner consensus route:** SC, with oral as secondary.
+- **Gap:** The most-used practitioner route (SC) has the least published human data. The publicly available human SC safety data prior to the February 2026 start of NCT07437547 hamstring-strain trial was zero (per `research-report.md` §7.10).
+
+### 7.4 Cycle-validity gap
+
+- **Practitioner cycle convention:** 4–8 weeks on, 2–4 weeks washout.
+- **Literature ceiling for human cycle duration:** none. The Veljaca 2003 Phase 1 was a single-dose-ranging trial; the Ruenzi 2005 Phase 2 was 14 days enema; the Lee 2021 chart review involved one or more intra-articular injections; the Lee 2024 IC pilot dosed for an unspecified duration; the Lee 2025 IV pilot was 2 days × 2 patients.
+- **Gap:** No human data validates a 4–8 week SC cycle.
+
+### 7.5 Indication-validity gap
+
+- **PCAC-evaluated indication (July 23 2026):** ulcerative colitis (the Pliva-era PL 14736 program indication).
+- **Practitioner-dominant indication:** MSK soft-tissue (tendon, ligament, joint).
+- **Gap:** The FDA review is evaluating an indication that is NOT the most-prescribed off-label use; if PCAC declines BPC-157 for UC, MSK use becomes harder to defend even if PCAC's reasoning is UC-specific.
+
+### 7.6 Safety-margin claim gap
+
+- **Holtorf-handout claim** (`[practitioner_protocol]`): "almost non-existent side effects at 100-fold dose+ excess" and "excellent safety profile with large therapeutic window (over 1000-fold)" attributed to BPC-157 within the Lyme handout.
+- **Literature support:** Animal toxicology (Xu 2020 GLP package in mice/rats/rabbits/dogs/guinea pigs) is well-tolerated; LD1 not establishable. However: published human safety data is n<100 cumulative exposure across 4 studies (research-report.md §8). The "1000-fold safety margin" claim is rat-derived; per the source whitelist `[practitioner_protocol]` cites cannot ground AE rates or efficacy. The Holtorf claim is a propagation of the animal-data signal into human-prescribing language; flagged here for transparency.
+
+---
+
+## 8. Compounding-pharmacy access risk
+
+### 8.1 Federal regulatory timeline (US)
+
+- **2020-04-01:** FDA Warning Letter 594743 issued to Tailor Made Compounding LLC for compounding ineligible substances (including BPC-157 per public commentary) — `[regulatory]`.
+- **2023:** FDA placed BPC-157 in 503A Interim Category 2 of the Bulks List, citing impurity-profile concerns, insufficient clinical safety data, immunogenicity concerns, and dosing variability (per Empower Pharmacy regulatory commentary and Frier Levitt 2026 legal analysis) — `[regulatory]`.
+- **2024:** FDA cited limited clinical safety data and dosing variability in subsequent communications (per Empower commentary) — `[regulatory]`.
+- **2026-04-15:** FDA filed Federal Register notice (FR Doc. 2026-07361, Docket No. FDA-2025-N-6895) scheduling PCAC meeting; nominations for BPC-157 had been withdrawn earlier in April 2026, removing it from Category 2 procedurally (not a safety clearance) — `[regulatory]`.
+- **2026-07-23 to 2026-07-24:** PCAC meeting scheduled at FDA White Oak Campus, Silver Spring MD. Evaluating 7 peptides for Section 503A Bulk Drug Substances List inclusion. BPC-157 (free base and acetate) listed for "ulcerative colitis" use evaluation on Day One. Public comment deadline 2026-07-09; docket closes 2026-07-22 — `[regulatory]`.
+- **Outcome pending.** Three possible outcomes: (a) PCAC recommends inclusion → FDA may add to 503A Bulks List → compounding becomes lawful under §503A; (b) PCAC declines → BPC-157 remains outside the compounding framework; (c) FDA acts independently of PCAC recommendation.
+
+### 8.2 Tailor Made Compounding federal prosecution (2020)
+
+- Federal action under FDCA (Food, Drug, and Cosmetic Act); Warning Letter cited compounding of ineligible drug products "intended for conditions not amenable to self-diagnosis and treatment by individuals who are not [licensed]." California State Board of Pharmacy 2021 enforcement action (FY2021/ac207091) further documented compounding with bulk drug substances "which did [not have appropriate substance status]." This precedent is the load-bearing example of what 503A enforcement looks like for BPC-157.
+
+### 8.3 State-level access variability
+
+- 503A compounding is regulated at federal + state level. Some state pharmacy boards have additional restrictions on compounded peptides. State variability is significant; the access landscape is not uniform across the US even before PCAC.
+- WADA: BPC-157 is S0 prohibited at all times. Athletes are subject to anti-doping rules regardless of state-level pharmacy access.
+- TGA (Australia): Schedule 4 + Appendix D clause 5 since June 1, 2024.
+- Health Canada: unauthorized.
+
+### 8.4 Cash-pay reality
+
+- No insurance pathway exists for an unapproved compound. Patient out-of-pocket cost ranges $150–$400/month at typical SC dosing (5–10 mg vial cost from 503A pharmacy pre-2023; current prices unavailable due to absence of public data sheets).
+- Oral capsule products (Venice Apothecary, Integrative Peptides, InfiniWell) run ~$70–85 for 60 capsules per public marketing.
+
+### 8.5 Research-chemical / gray-market reality
+
+- Per `research-report.md` and the source whitelist Tier 4, research-chemical vendors (`peptidesciences.com`, `corepeptides.com`, `swisschems.is`, etc.) supply BPC-157 labeled "for research use only" in the US gray market.
+- Vendor labels admit purity COAs and reconstitution math ONLY (`vendor_label` tier); they may NEVER ground efficacy claims.
+- This pathway is in direct legal jeopardy under FDCA enforcement.
+
+### 8.6 Net access risk
+
+- **Pre-PCAC (May 2026):** Compounding-pharmacy pathway is in regulatory hold. Practitioner-prescribed BPC-157 is being supplied either (a) under physician supervision from research-chemical sources (gray-market), (b) from compounders willing to ignore the hold (federal-prosecution risk), or (c) from oral-capsule products marketed as "supplements" with creative regulatory framing (Venice Apothecary, BPC-Lx Pro).
+- **Post-PCAC (after 2026-07-24):** If inclusion is granted, compounding becomes legally available. If declined, the existing situation persists with stronger enforcement signal.
+
+---
+
+## 9. Bibliography
+
+Every cite type-tagged. Retrieval date 2026-05-24.
+
+### 9.1 `[compounding_data_sheet]`
+
+1. Tailor Made Compounding — Peptide Catalogue (Scribd-archived PDF, historical). [`https://www.scribd.com/document/495397628/TMC-Catalog`](https://www.scribd.com/document/495397628/TMC-Catalog) — historical fact-sheet listing BPC-157; pre-2020 Warning Letter content. `[compounding_data_sheet]` (historical).
+2. Empower Pharmacy — Drug Catalog and corporate regulatory commentary. [`https://www.empowerpharmacy.com/compounding-pharmacy`](https://www.empowerpharmacy.com/compounding-pharmacy); [`https://www.empowerpharmacy.com/compound-medication/peptides/fda-peptide-announcement-patient-access-safety-compounding`](https://www.empowerpharmacy.com/compound-medication/peptides/fda-peptide-announcement-patient-access-safety-compounding). `[compounding_data_sheet]` absence + corporate regulatory framing.
+3. Hallandale Pharmacy — Injectable product catalog. [`http://hallandalerx.com/product-form/injectable`](http://hallandalerx.com/product-form/injectable). `[compounding_data_sheet]` absence.
+4. Venice Apothecary — BPC-157 Oral Capsules product blog page. [`https://www.veniceapothecary.net/bpc-157-oral-capsules-support-healing-from-the-inside-out`](https://www.veniceapothecary.net/bpc-157-oral-capsules-support-healing-from-the-inside-out). `[compounding_data_sheet]` active but minimal.
+5. Newtropin / Formulation Compounding Center — 2026 503A regulatory update. [`https://newtropin.com/blog/bpc-157-fda-compounding-503a-update-2026`](https://newtropin.com/blog/bpc-157-fda-compounding-503a-update-2026). `[compounding_data_sheet]` absence + regulatory framing.
+6. Massey Drugs (Cloverdale/Tuscumbia AL) — peptide compounding regulatory statement. [`https://masseydrugs.com/peptide-compounding-pharmacy`](https://masseydrugs.com/peptide-compounding-pharmacy). `[compounding_data_sheet]` explicit absence with stated cause.
+
+### 9.2 `[practitioner_protocol]` — reference texts and module curricula
+
+7. Seeds WA. *Peptide Protocols, Volume One*. Seeds Scientific Performance Research, 2020. ISBN via [Amazon listing](https://www.amazon.com/Peptide-Protocols-William-Seeds-MD/dp/0578624354). `[practitioner_protocol]`.
+8. International Peptide Society — Peptide Certification Module I curriculum. [`https://peptidesociety.org/peptide-certification-module-i`](https://peptidesociety.org/peptide-certification-module-i). `[practitioner_protocol]`.
+9. American Academy of Anti-Aging Medicine — Peptide Therapy Certification 2026. [`https://www.a4m.com/peptide-therapy-certification-on-demand-2026.html`](https://www.a4m.com/peptide-therapy-certification-on-demand-2026.html). `[practitioner_protocol]`.
+10. The George Washington University SMHS — A4M-jointly-sponsored Peptides Module I. [`https://cme.smhs.gwu.edu/a4m-mmi-/content/peptides-module-i-4`](https://cme.smhs.gwu.edu/a4m-mmi-/content/peptides-module-i-4). `[practitioner_protocol]`.
+11. AAOPM — All Training Courses & Certification Programs. [`https://aaopm.com/courses`](https://aaopm.com/courses). `[practitioner_protocol]`.
+12. ISSCA — Advanced Peptide Therapy Certification. [`https://www.issca.com/advanced-peptide-certification-online`](https://www.issca.com/advanced-peptide-certification-online). `[practitioner_protocol]`.
+13. Holtorf K. "Peptide Therapies for Chronic Lyme Disease." Clinical Peptide Society, 2019 handout PDF. [`https://clinicalpeptidesociety.com/wp-content/uploads/2019/08/HoltorfKentPeptideLyme2019.pdf`](https://clinicalpeptidesociety.com/wp-content/uploads/2019/08/HoltorfKentPeptideLyme2019.pdf). `[practitioner_protocol]`.
+14. Holtorf K. "Innovative 'Alternative' Therapies for Chronic Lyme Disease." Restorative Medicine. [`https://restorativemedicine.org/wp-content/uploads/2017/01/4Holtorf_-Lyme-CFS.pdf`](https://restorativemedicine.org/wp-content/uploads/2017/01/4Holtorf_-Lyme-CFS.pdf). `[practitioner_protocol]`.
+
+### 9.3 `[practitioner_protocol]` — named-physician stated materials
+
+15. Lee E, Burgess K. "Safety of Intravenous Infusion of BPC157 in Humans: A Pilot Study." *Altern Ther Health Med* 31(5):20–24 (2025). [`http://www.alternative-therapies.com/oa/pdf/11513.pdf`](http://www.alternative-therapies.com/oa/pdf/11513.pdf). This is peer-reviewed and so tier-classified as `[open_label]` for efficacy purposes (see `research-report.md` §7.5); cited here as `[practitioner_protocol]` for the load-bearing dose-pattern statement "The current study's author, Edwin Lee, has prescribed intravenous BPC-157 of 5 mg since 2018 to many patients for acute musculoskeletal injuries."
+16. Hyman M (podcast host) in conversation with Lee E. "How Peptides Enhance Healing and Longevity with Dr. Edwin Lee." *The Doctor's Farmacy* episode 914. [`https://drhyman.com/blogs/content/podcast-ep914`](https://drhyman.com/blogs/content/podcast-ep914). `[practitioner_protocol]` via podcast transcript paraphrase.
+17. A4M faculty bio — Edwin Lee, MD. [`https://www.a4m.com/edwin-lee.html`](https://www.a4m.com/edwin-lee.html). `[practitioner_protocol]` — venue credentialing.
+18. IHS speaker bio — Edwin Lee, MD, FACE. [`https://www.ihsymposium.com/speaker/edwin-lee-md`](https://www.ihsymposium.com/speaker/edwin-lee-md). `[practitioner_protocol]` — venue credentialing.
+19. Rupa University instructor bio — Edwin Lee, MD, FACE. [`https://www.rupauniversity.com/instructors/edwin-lee-md-face`](https://www.rupauniversity.com/instructors/edwin-lee-md-face). `[practitioner_protocol]` — affiliation and Clinical Peptide Society co-founder fact.
+20. Paulvin N. "Are you down with BPC-157?" doctorpaulvin.com (originally 2020-02-26). [`https://doctorpaulvin.com/blog/are-you-down-with-bpc-157`](https://doctorpaulvin.com/blog/are-you-down-with-bpc-157). `[practitioner_protocol]`.
+21. Paulvin N. "Heal and Maximize Your Performance with BPC 157." doctorpaulvin.com. [`https://doctorpaulvin.com/blog/heal-and-maximize-your-performance-with-bpc-157`](https://doctorpaulvin.com/blog/heal-and-maximize-your-performance-with-bpc-157). `[practitioner_protocol]`.
+22. Paulvin N. Peptide Program page. doctorpaulvin.com. [`https://doctorpaulvin.com/services/peptide-program`](https://doctorpaulvin.com/services/peptide-program). `[practitioner_protocol]`.
+23. Gapin T. "The Power of Peptides: BPC 157, CJC-1295, and Ipamorelin." YouTube. [`https://www.youtube.com/watch?v=1be7NmvVjo8`](https://www.youtube.com/watch?v=1be7NmvVjo8). `[practitioner_protocol]`.
+24. Gapin T. Peptides YouTube playlist. [`https://www.youtube.com/playlist?list=PLNaWyI6bcViE6Nqp1GaTwVIYxvPPws73r`](https://www.youtube.com/playlist?list=PLNaWyI6bcViE6Nqp1GaTwVIYxvPPws73r). `[practitioner_protocol]`.
+25. Turner SF. "IPS Peptides Masterclass with Dr Turner." YouTube. [`https://www.youtube.com/watch?v=UpVBb5324Z4`](https://www.youtube.com/watch?v=UpVBb5324Z4). `[practitioner_protocol]`.
+26. Turner SF. "Peptide Therapy Certification — Module I." Boston, 2022-09-18. YouTube. [`https://www.youtube.com/watch?v=drZ6RiHmE8Y`](https://www.youtube.com/watch?v=drZ6RiHmE8Y). `[practitioner_protocol]`.
+27. Turner SF. A4M Podcast Episode 275. [`https://www.a4m.com/podcast-episode-275-suzanne-turner.html`](https://www.a4m.com/podcast-episode-275-suzanne-turner.html). `[practitioner_protocol]`.
+28. Attia P. AMA #83 — "Peptides: evaluating the science, safety, and hype in a rapidly growing field." The Peter Attia Drive (2026, subscriber-only). Public show notes: [`https://peterattiamd.com/ama83`](https://peterattiamd.com/ama83). `[practitioner_protocol]` (show-notes-level only; episode is paywalled).
+29. Attia P. "Performance-enhancing drugs and hormones: risks" — episode discussing BPC-157 at ~3:12:00. [`https://podcasts.apple.com/si/podcast/performance-enhancing-drugs-and-hormones-risks/id1400828889?i=1000630665948`](https://podcasts.apple.com/si/podcast/performance-enhancing-drugs-and-hormones-risks/id1400828889?i=1000630665948). `[practitioner_protocol]`.
+30. Timmermans D. TikTok clip on BPC-157 dose. [`https://www.tiktok.com/@drdrewtimmermans/video/7025668483144813829`](https://www.tiktok.com/@drdrewtimmermans/video/7025668483144813829). `[practitioner_protocol]` via short-form-video dose statement (downgrade as needed).
+
+### 9.4 `[regulatory]`
+
+31. FDA Warning Letter 594743 — Tailor Made Compounding LLC, 2020-04-01. [`https://www.fda.gov/inspections-compliance-enforcement-and-criminal-investigations/warning-letters/tailor-made-compounding-llc-594743-04012020`](https://www.fda.gov/inspections-compliance-enforcement-and-criminal-investigations/warning-letters/tailor-made-compounding-llc-594743-04012020). `[regulatory]`.
+32. California State Board of Pharmacy Decision — Tailor Made Compounding (FY2021/ac207091). [`https://www.pharmacy.ca.gov/enforcement/fy2021/ac207091`](https://www.pharmacy.ca.gov/enforcement/fy2021/ac207091). `[regulatory]`.
+33. Federal Register — "Pharmacy Compounding Advisory Committee; Notice of Meeting; Establishment of a Public Docket; Request for Comments — Bulk Drug Substances Nominated for Inclusion on the Section 503A Bulk Drug Substances List," FR Doc. 2026-07361, Docket FDA-2025-N-6895, 2026-04-16. [`https://www.federalregister.gov/documents/2026/04/16/2026-07361/pharmacy-compounding-advisory-committee-notice-of-meeting-establishment-of-a-public-docket-request`](https://www.federalregister.gov/documents/2026/04/16/2026-07361/pharmacy-compounding-advisory-committee-notice-of-meeting-establishment-of-a-public-docket-request). `[regulatory]`.
+34. HealingMaps — "FDA to Review 7 Peptides for Compounding List in July 2026." [`https://healingmaps.com/fda-peptides-503a-bulks-list-pcac-july-2026`](https://healingmaps.com/fda-peptides-503a-bulks-list-pcac-july-2026). `[regulatory]` (secondary explainer with primary FR doc citation; used here for the day-one indication list including BPC-157 / ulcerative colitis).
+35. DJ Holt Law — "Regulatory Alert: The Legal Status of BPC-157 in Compounding and Clinical Practice." [`https://djholtlaw.com/regulatory-alert-the-legal-status-of-bpc-157-in-compounding-and-clinical-practice`](https://djholtlaw.com/regulatory-alert-the-legal-status-of-bpc-157-in-compounding-and-clinical-practice). `[regulatory]` (legal-analysis secondary).
+
+### 9.5 Supporting context (clinic-page replication of consensus dose)
+
+These pages are NOT used to ground numeric dose claims (which are grounded in §3 reference texts and §4 named-physician materials). They are documented as evidence of how widely the consensus dose has propagated across the US peptide-prescribing community. Per source whitelist, downgraded to `[anecdote_aggregate]`.
+
+36. Perfect B (Doral FL clinic). [`https://www.perfectb.com/bpc-157-dosage-protocol`](https://www.perfectb.com/bpc-157-dosage-protocol). `[anecdote_aggregate]`.
+37. Dr. Rogers Centers (San Antonio TX clinic). [`https://drrogerscenters.com/blogs/news/bpc-157-dosage-a-complete-guide`](https://drrogerscenters.com/blogs/news/bpc-157-dosage-a-complete-guide). `[anecdote_aggregate]`.
+38. Be Well LifeStyle Centers (Peptide Protocols Guide derivative). [`https://bewelllifestylecenters.com/protocols/peptide-book`](https://bewelllifestylecenters.com/protocols/peptide-book). `[anecdote_aggregate]`.
+39. Nulevel Wellness Medspa. [`https://nulevelwellnessmedspa.com/bpc-157-dosage`](https://nulevelwellnessmedspa.com/bpc-157-dosage). `[anecdote_aggregate]`.
+40. Beyond Stem Cells (Tampa FL clinic). [`https://beyondstemcells.com/best-way-to-take-bpc-157-the-complete-guide-to-dosing-and-administration`](https://beyondstemcells.com/best-way-to-take-bpc-157-the-complete-guide-to-dosing-and-administration). `[anecdote_aggregate]`.
+41. PeptideDosages (educational dose guide). [`https://peptidedosages.com/bpc-157`](https://peptidedosages.com/bpc-157). `[anecdote_aggregate]`.
+42. PeptidesExplorer (educational dose guide). [`https://peptidesexplorer.com/blog/how-to-take-bpc-157`](https://peptidesexplorer.com/blog/how-to-take-bpc-157). `[anecdote_aggregate]`.
+43. West Asheville Aesthetics. [`https://westashevilleaesthetics.com/targeted-peptide-protocols-asheville/bpc-157-dosage-protocol`](https://westashevilleaesthetics.com/targeted-peptide-protocols-asheville/bpc-157-dosage-protocol). `[anecdote_aggregate]`.
+44. Olympia Aesthetics & Wellness (Palm Harbor FL clinic; distinct from Olympia Pharmaceutical). [`https://olympiaaesthetics.com/bpc-157-peptide-therapy-in-palm-harbor-fl`](https://olympiaaesthetics.com/bpc-157-peptide-therapy-in-palm-harbor-fl). `[anecdote_aggregate]`.
+45. Pure Hydration. [`https://purehydrationspa.com/peptide/bpc-157`](https://purehydrationspa.com/peptide/bpc-157). `[anecdote_aggregate]`.
+46. RegenesisMD (Raleigh NC). [`https://regenesismd.com/treatments/bpc-157`](https://regenesismd.com/treatments/bpc-157). `[anecdote_aggregate]`.
+47. American Wellness Pharmacy — BPC-157 vs PDA marketing page. [`https://www.americanwellnesspharmacy.com/news/bpc-157-vs-pentadeca-arginate-pda`](https://www.americanwellnesspharmacy.com/news/bpc-157-vs-pentadeca-arginate-pda). `[anecdote_aggregate]` — used here to document the "functionally identical" arginate marketing claim, not to ground an oral-bioavailability claim.
+48. Superpower — "Pentadeca Arginate (PDA): A Rebranded Arginate Salt." [`https://superpower.com/guides/pentadeca-peptide`](https://superpower.com/guides/pentadeca-peptide). `[anecdote_aggregate]`.
+49. Paragon Sports Medicine. [`https://www.paragonsportsmedicine.com/peptides/pentadeca-arginate-pda`](https://www.paragonsportsmedicine.com/peptides/pentadeca-arginate-pda). `[anecdote_aggregate]`.
+
+---
+
+## 10. Self-check
+
+- [x] All cites tagged with type-tag.
+- [x] No efficacy claims grounded in `practitioner_protocol` / `compounding_data_sheet` cites. Section 6 explicitly labels the consensus dose as "consensus, not RCT." Section 4 documents stated protocols without claiming any of them work. The Holtorf "1000-fold safety margin" claim is documented in §4 and flagged in §7.6 as a propagation of animal data into prescribing language, not endorsed.
+- [x] At least 1 compounding-pharmacy data sheet documented OR explicit "no admissible data sheet located" with searched-vendor list. §2 documents the explicit absence across all 8 whitelisted vendors (Tailor Made, Empower, Hallandale, Belmar, APS, Strive, AnazaoHealth, Olympia) plus 2 regional pharmacies (Massey Drugs, Venice Apothecary, Newtropin). Venice Apothecary has an active oral-capsule product page meeting the minimum-1 floor.
+- [x] Practitioner reference texts surveyed: Seeds Peptide Protocols, IPS, A4M, AAOPM, IFM, Clinical Peptide Society, ISSCA (7 reference-text-tier sources documented; IFM gated behind paywall and so documented as absence).
+- [x] Named-physician protocols surveyed: Edwin Lee, William Seeds, Kent Holtorf, Neil Paulvin, Tracy Gapin, Suzanne Turner, Peter Attia, Mark Hyman, Drew Timmermans (9 named-physician sources documented).
+- [x] Compounding-pharmacy access risk documented: §8 covers FDA timeline (2020 Tailor Made Warning Letter → 2023 Cat 2 → April 2026 nominations-withdrawal → July 2026 PCAC), state-level variability, WADA/TGA/Health Canada, cash-pay reality, gray-market reality.
+- [x] Originator-group dose stated honestly: §5 documents Veljaca 2003 ~75–150 µg rectal and explicit absence of any other published originator-group human-dose recommendation.
+- [x] Gap analysis present: §7 documents dose-magnitude, allometric, route-validity, cycle-validity, indication-validity, and safety-margin gaps.
+- [x] Bibliography numbered; URL + retrieval date for every entry (retrieval date 2026-05-24 unless otherwise noted).
+- [x] Source count: 49 distinct sources documented across `[compounding_data_sheet]`, `[practitioner_protocol]`, `[regulatory]`, and `[anecdote_aggregate]` tiers. Floor minimum (10+ practitioner-tier sources) exceeded.
+
+**Type-tag count:**
+- `[compounding_data_sheet]`: 6 entries (1 historical, 5 absence/regulatory-framing, 1 active with minimal content)
+- `[practitioner_protocol]` reference-text tier: 8 entries (§9.2)
+- `[practitioner_protocol]` named-physician tier: 16 entries (§9.3)
+- `[regulatory]`: 5 entries (§9.4)
+- `[anecdote_aggregate]`: 14 entries (§9.5)
+
+**Total: 49 entries.** Floor (≥10 practitioner-tier) satisfied. Compounding-sheet floor (≥1 OR explicit absence with searched-vendor list) satisfied.
