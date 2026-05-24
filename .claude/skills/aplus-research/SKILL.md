@@ -1,7 +1,7 @@
 ---
 name: aplus-research
 description: Health-domain research pipeline that wraps deep-research with mechanically enforced gates. Use for any compound, intervention, biomarker, or protocol research where claims will be ingested into the project wiki. Adds paired-judge enforcement, type-tag discipline, three health-specific gates (population-mismatch, risk-floor, concentration-audit), and mandatory prescribing-practice + non-English literature layers for compound research at standard+ modes.
-argument-hint: "<research question> [--mode=quick|standard|deep|ultradeep] [--target=<vault path>]"
+argument-hint: "<research question> [--mode=quick|standard|deep|ultradeep] [--target=<vault path>] [--update[=<reason-slug>]]"
 allowed-tools: Skill, Agent, Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, mcp__tavily__tavily_search, mcp__tavily__tavily_extract, mcp__basic-memory__write_note, mcp__basic-memory__search_notes
 ---
 
@@ -128,7 +128,14 @@ The orchestrator verifies:
 1. All four context files in §1.1 were read (record file paths + sha256 in `gate-2.75.json`).
 2. `target_class`, `target_slug`, `target_type` declared.
 3. Output paths constructed and writable (test mkdir).
-4. For compound research: `vault/compounds/<target_slug>.md` does not exist (avoid overwrite without explicit `--update` flag); if exists, HALT `compound-entry-exists`.
+4. For compound research, evaluate overwrite policy:
+   - **Without `--update`**: if `vault/compounds/<target_slug>.md` exists OR `vault/library/<class>s/<target_slug>/` contains anything besides `_archive/`, HALT `compound-entry-exists`.
+   - **With `--update[=<reason-slug>]`**: archive existing artifacts BEFORE any new write. Reason-slug defaults to `rerotation` if omitted; must match `^[a-z0-9][a-z0-9-]{0,40}$`.
+     - Library folder children (everything except an existing `_archive/`) → `vault/library/<class>s/<target_slug>/_archive/<YYYY-MM-DD>-<reason-slug>/`
+     - Compound entry (if exists) → `vault/compounds/_archive/<target_slug>-<YYYY-MM-DD>-<reason-slug>.md`
+     - If the archive target path already exists (two updates same day same reason) → HALT `archive-collision`. Caller must pass a distinct `--update=<reason-slug>` to disambiguate.
+     - Any filesystem failure during archive → HALT `archive-write-failed`. No partial-state allowed: if any move fails the orchestrator rolls back already-moved files to original locations and HALTs.
+     - Each archive move recorded in `archive_paths` as `{from, to, archived_at}`.
 5. Source whitelist loaded; type-tag enum extracted.
 
 Emit `${BASE}/gates/gate-2.75.json`:
@@ -139,9 +146,13 @@ Emit `${BASE}/gates/gate-2.75.json`:
   "context_files": [{"path": "...", "sha256": "...", "loaded": true}, ...],
   "target": {"class": "...", "slug": "...", "type": "..."},
   "output_paths": {"research_report": "...", "compound_entry": "..."},
+  "update_mode": false,
+  "archive_paths": [],
   "halt_reasons": []
 }
 ```
+
+When `--update` is in effect: `update_mode: true` and `archive_paths` lists each performed move (empty array allowed only if nothing existed to archive — first dispatch with redundant flag).
 
 Phase 3 refuses entry unless `verdict: PASS`.
 
@@ -230,7 +241,7 @@ Generate three artifacts:
 
 1. **Research report** — `vault/library/<class>s/<target_slug>/research-report.md`. Frontmatter includes `revisions:` log, `supplementary_layers:` pointers, `re_rotation_triggers:` list.
 2. **Compound entry** — `vault/compounds/<target_slug>.md` populated from template, operator-specific fields blank.
-3. **Index + log updates** — append to `vault/meta/index.md` and `vault/meta/log.md`.
+3. **Index + log updates** — append to `vault/meta/index.md` and `vault/meta/log.md`. When `update_mode: true`, the log op is `update` (not `create`) and the line MUST reference the archive folder so the prior version is one path-resolution away. Index entry path is unchanged (archive content is invisible to the live index).
 
 For standard+ compound research, ALSO dispatch:
 
@@ -291,7 +302,6 @@ or equivalent. Failure → HALT `schema-validation-failed`; orchestrator does NO
 - v1 does not implement full corpus sanitization (prompt-injection scanning of retrieved corpora before grep). Tier-1/2 source whitelist + manual review of any Tier 2.5+ source is the v1 substitute.
 - v1 IC-13 corpus scoping retrieves abstract-only for paywalled content; full-text retrieval bypass is not implemented. Claims relying on full-text-only content that the abstract doesn't cover get `corpus-missing` WARN, not HALT.
 - v1 has no regression fixture suite. Failure modes will inform v2.
-- The "no overwrite" rule at Phase 2.75 step 4 will require an explicit `--update` flag for re-rotation dispatches (e.g., post-FDA-PCAC re-rotation of BPC-157). Not yet implemented — first re-rotation surfaces this gap.
 - Schema validation requires `jsonschema` Python package; orchestrator must verify presence at pre-flight. Missing → HALT `jsonschema-not-installed` with install instruction.
 
 ## Output Path Convention

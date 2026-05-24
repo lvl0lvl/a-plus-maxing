@@ -1,6 +1,6 @@
 ---
 description: "Health-domain research wrapping deep-research with mechanically enforced gates (paired judges, type-tag enforcement, population-mismatch / risk-floor / concentration-audit gates, mandatory prescribing-practice + non-English layers)."
-argument-hint: "<research question> [--mode=quick|standard|deep|ultradeep] [--target=<class/slug>]"
+argument-hint: "<research question> [--mode=quick|standard|deep|ultradeep] [--target=<class/slug>] [--update[=<reason-slug>]]"
 allowed-tools: Skill, Agent, Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, mcp__tavily__tavily_search, mcp__tavily__tavily_extract, mcp__basic-memory__write_note, mcp__basic-memory__search_notes
 ---
 
@@ -11,10 +11,10 @@ Invoke the `aplus-research` skill for the argument research question. Skill is p
 ## Usage
 
 ```
-/aplus-research "<research question>" [--mode=quick|standard|deep|ultradeep] [--target=<class/slug>]
+/aplus-research "<research question>" [--mode=quick|standard|deep|ultradeep] [--target=<class/slug>] [--update[=<reason-slug>]]
 ```
 
-Default mode: `standard`. Default target: derived from question.
+Default mode: `standard`. Default target: derived from question. Default update behavior: HALT on existing compound entry; pass `--update` to permit overwrite (existing artifacts are archived, never destroyed).
 
 Modes:
 - `quick` — 10+ sources, 2,000w, 85/100 judge threshold; layers opt-in
@@ -48,9 +48,17 @@ Missing any → HALT `context-load-missing`.
 | Biomarker | `vault/library/biomarkers/<slug>/research-report.md` | `vault/biomarkers/<slug>.md` |
 | Protocol | `vault/library/protocols/<slug>/research-report.md` | `vault/protocols/<slug>.md` |
 
-## Re-rotation
+## Re-rotation (`--update`)
 
-Future use of `--update` flag (not yet implemented) will permit overwrite of existing compound entries for re-rotation events (e.g., FDA PCAC July 23-24, 2026 outcome for BPC-157).
+Use when re-running research against an existing entry (suspect prior content, new evidence, post-regulatory-event refresh). Behavior:
+
+- Reason slug defaults to `rerotation` if omitted; supply a descriptive slug for clarity: `--update=suspect-fabrications`, `--update=fda-pcac-2026-07`, etc. Pattern: `^[a-z0-9][a-z0-9-]{0,40}$`.
+- Existing artifacts are moved (not deleted) BEFORE any new write:
+  - `vault/library/<class>s/<slug>/*` → `vault/library/<class>s/<slug>/_archive/<YYYY-MM-DD>-<reason-slug>/`
+  - `vault/compounds/<slug>.md` → `vault/compounds/_archive/<slug>-<YYYY-MM-DD>-<reason-slug>.md`
+- If the archive target already exists (two updates same day same reason), HALT `archive-collision` — pass a distinct reason slug.
+- Any filesystem failure during archive → HALT `archive-write-failed`; orchestrator rolls back any partial moves.
+- `vault/meta/log.md` op recorded as `update` with archive folder referenced; `vault/meta/index.md` path unchanged (archive invisible to live index).
 
 ## Reference
 

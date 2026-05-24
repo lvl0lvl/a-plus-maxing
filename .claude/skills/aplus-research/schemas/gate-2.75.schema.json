@@ -3,7 +3,7 @@
   "$id": "aplus-research/schemas/gate-2.75",
   "title": "Phase 2.75 Scope Gate Verdict",
   "type": "object",
-  "required": ["phase", "verdict", "context_files", "target", "output_paths", "halt_reasons", "timestamp"],
+  "required": ["phase", "verdict", "context_files", "target", "output_paths", "update_mode", "archive_paths", "halt_reasons", "timestamp"],
   "additionalProperties": false,
   "properties": {
     "phase": {"const": "2.75"},
@@ -42,6 +42,21 @@
         "non_english_layer": {"type": "string"}
       }
     },
+    "update_mode": {"type": "boolean"},
+    "update_reason_slug": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,40}$"},
+    "archive_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "archived_at"],
+        "additionalProperties": false,
+        "properties": {
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "archived_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
     "halt_reasons": {
       "type": "array",
       "items": {
@@ -51,7 +66,10 @@
           "invalid-slug",
           "output-path-not-writable",
           "compound-entry-exists",
-          "whitelist-load-failed"
+          "whitelist-load-failed",
+          "archive-write-failed",
+          "archive-collision",
+          "invalid-update-reason-slug"
         ]
       }
     }
@@ -64,6 +82,15 @@
           "halt_reasons": {"maxItems": 0},
           "context_files": {"items": {"properties": {"loaded": {"const": true}}}}
         }
+      }
+    },
+    {
+      "if": {
+        "properties": {"verdict": {"const": "PASS"}, "update_mode": {"const": true}},
+        "required": ["verdict", "update_mode"]
+      },
+      "then": {
+        "required": ["update_reason_slug"]
       }
     }
   ]
