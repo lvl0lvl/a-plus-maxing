@@ -3,7 +3,7 @@ title: Session Handoff
 type: note
 owner: Walter McGivney
 created: 2026-05-16
-last_reviewed: 2026-05-23
+last_reviewed: 2026-05-24
 status: active
 depends_on: []
 superseded_by: null
@@ -11,6 +11,16 @@ review_cadence: weekly
 ---
 
 # Session Handoff
+
+## 🚨 RESTART → JUMP STRAIGHT HERE 🚨
+
+This handoff was updated mid-session-3 specifically to enable a clean restart. The work needed for the slash command `/aplus-research` to appear in the command picker is **done and committed** (commit `ee3011b`). On restart:
+
+1. Read this section.
+2. Run the command in "What Is Next" → IMMEDIATE NEXT ACTION below.
+3. Do not re-explore the skill, re-design the flag, or re-litigate the archive policy — all settled.
+
+Skip ahead to: [What Is Next (volatile)](#what-is-next-volatile).
 
 ## Recovery After Compaction
 
@@ -25,6 +35,12 @@ If context was compacted, run `bd prime` then:
 8. Read `vault/decisions/` for architecture decisions
 9. Read `.claude/skills/aplus-research/SKILL.md` (project-local research skill with blocking gates — the path to use for all wiki-bound research from session 3 forward)
 10. Read `vault/design/artifact-design-protocol.md` before generating any HTML artifact
+
+## What Changed (Session 3 partial, 2026-05-24 — pre-restart)
+- `aplus-research` skill `--update[=<reason-slug>]` flag implemented (commit `ee3011b`). Phase 2.75 now performs archive-before-write when flag present. Default reason slug `rerotation`; pattern enforced `^[a-z0-9][a-z0-9-]{0,40}$`. Archive paths: library children → `vault/library/<class>s/<slug>/_archive/<YYYY-MM-DD>-<reason>/`; compound entry → `vault/compounds/_archive/<slug>-<YYYY-MM-DD>-<reason>.md`. Rollback on partial filesystem failure. Updated: SKILL.md, schemas/gate-2.75.schema.json (added `update_mode`, `update_reason_slug`, `archive_paths`, halt_reasons `archive-write-failed | archive-collision | invalid-update-reason-slug`, conditional invariant requiring reason_slug when PASS+update_mode), commands/aplus-research.md.
+- 8/8 schema smoke-test cases pass (valid PASS w/ and w/o update, invalid PASS missing reason_slug, invalid PASS+halt_reasons, valid HALTs for compound-entry-exists / archive-collision / archive-write-failed, invalid bad slug pattern).
+- Beads `a-plus-maxing-s5k` closed (force, due to backwards dep on epic `c6k`).
+- Session was NOT closed before restart — pre-restart prep only. Drift checks deferred to the actual S3 close.
 
 ## What Changed (Session 2, 2026-05-23)
 - Karpathy-style wiki schema added at `vault/WIKI.md` with 14-agent consumer roster (personal-trainer, labs-specialist, nutritionist, supplement-specialist, peptide-specialist, endocrine-specialist, lymphatic-specialist, gi-specialist, cardiovascular-specialist, sleep-coach, recovery-specialist, longevity-strategist, mental-performance-coach, medical-liaison)
@@ -55,14 +71,34 @@ System after S2 IS: LLM-driven personal health agent with a queryable knowledge 
 - BPC-157 library entry exists at `vault/compounds/bpc-157.md` + 3 layer files. **Entry is suspect.** User explicitly flagged that the original deep-research dispatch did not follow protocol; the IC-13 corpus scoping check in `aplus-research` is specifically designed to catch the fabrications this entry may contain. Treat the current entry as a draft pending re-run.
 - `aplus-research` skill exists on disk but has never been invoked end-to-end. Next session's BPC-157 re-run is the first real test.
 - Beads: 1 ready epic `a-plus-maxing-c6k` (P1, "Establish health baseline by July 2026 doctor visit") — unchanged from S1.
-- Branch: **`feature/wiki-bpc157-aplus-research`**. `main` was reset to `a061669` (S1 close) at S2 audit close — restored project branch convention after all S2 commits had landed on main in violation. S2 work lives on the feature branch; merge to main happens when work is reviewed/complete. Reflog preserves prior main HEAD. Vault gitignore decision from S1 Open Issues remains unresolved.
+- Branch: **`feature/wiki-bpc157-aplus-research`** at `ee3011b` (post-restart entry point; one commit ahead of S2 close `6b8c335`). `main` at `a061669` (S1 close, restored). Vault gitignore decision from S1 Open Issues remains unresolved.
 
 **Historical (kept for reference):** Session 1 scaffolding context lives in `vault/sessions/session-1.md` (as of 2026-05-23 S2 close).
 
 ## What Is Next (volatile)
-- **First task next session:** implement `--update` flag for `aplus-research` to permit overwrite of existing compound entries. The BPC-157 re-run cannot proceed without this — Phase 2.75 SCOPE GATE currently HALTs on `compound-entry-exists`. Limitation is documented in SKILL.md Known Limitations.
-- **Second task next session:** re-run BPC-157 via `/aplus-research "Build canonical library entry for BPC-157" --mode=deep --target=peptide/bpc-157 --update`. Expectation: IC-13 corpus scoping will surface multiple fabrications or false citations from the original entry. Each finding gets logged to `meta/contradictions.md`. The re-run's gate-4.75 verdict against the original entry's content is the calibration that justifies the skill's existence.
-- **Third task:** create `bd` ticket for the `--update` flag and for any structural fixes the re-run surfaces.
+
+### 🎯 IMMEDIATE NEXT ACTION (post-restart)
+
+**Run this command. No setup needed. Skill is loaded, flag is implemented, archive policy is defined.**
+
+```
+/aplus-research "Build canonical library entry for BPC-157" --mode=deep --target=peptide/bpc-157 --update=suspect-fabrications
+```
+
+Why immediate: `--update` flag was implemented in this session (commit `ee3011b`, beads `a-plus-maxing-s5k` closed). The S2 BPC-157 entry is suspect (deep-mode protocol was skipped — PF-S2-01). This re-run is the first end-to-end test of the `aplus-research` skill and the calibration that justifies its existence. IC-13 corpus scoping (gate-4.75) is expected to surface fabrications/false citations in the original entry.
+
+What `--update=suspect-fabrications` will do BEFORE writing anything new (Phase 2.75):
+- Move `vault/library/peptides/bpc-157/{research-report,practitioner-layer,non-english-layer}.md` → `vault/library/peptides/bpc-157/_archive/2026-05-24-suspect-fabrications/`
+- Move `vault/compounds/bpc-157.md` → `vault/compounds/_archive/bpc-157-2026-05-24-suspect-fabrications.md`
+- If those archive paths already exist (re-run same day same reason), HALT `archive-collision` — change the slug.
+
+Closes beads `a-plus-maxing-3py` on successful completion.
+
+### Other open work (do AFTER the re-run)
+
+- Log every gate-4.75 finding to `vault/meta/contradictions.md` as resolved-by-rerotation entries.
+- Fix backwards beads dependencies (`s5k` and `3py` both have a wrong dep on epic `c6k`; `s5k` was force-closed; `3py` will likely need same). `bd dep` has no remove subcommand — either close+recreate or manually edit `.beads/issues.jsonl`.
+- Add pre-commit hook blocking commits on `main` (recurrence guard for PF-S2-06).
 - Walter still pending: 23andMe raw file to `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health issue characterization (no longer blocking — meta files load context for linkage only).
 - Outstanding from S1: vault git-tracking decision; first HTML artifact generation.
 
