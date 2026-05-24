@@ -55,7 +55,7 @@ System after S2 IS: LLM-driven personal health agent with a queryable knowledge 
 - BPC-157 library entry exists at `vault/compounds/bpc-157.md` + 3 layer files. **Entry is suspect.** User explicitly flagged that the original deep-research dispatch did not follow protocol; the IC-13 corpus scoping check in `aplus-research` is specifically designed to catch the fabrications this entry may contain. Treat the current entry as a draft pending re-run.
 - `aplus-research` skill exists on disk but has never been invoked end-to-end. Next session's BPC-157 re-run is the first real test.
 - Beads: 1 ready epic `a-plus-maxing-c6k` (P1, "Establish health baseline by July 2026 doctor visit") — unchanged from S1.
-- Branch: `main`. Vault gitignore decision from S1 Open Issues remains unresolved.
+- Branch: **`feature/wiki-bpc157-aplus-research`**. `main` was reset to `a061669` (S1 close) at S2 audit close — restored project branch convention after all S2 commits had landed on main in violation. S2 work lives on the feature branch; merge to main happens when work is reviewed/complete. Reflog preserves prior main HEAD. Vault gitignore decision from S1 Open Issues remains unresolved.
 
 **Historical (kept for reference):** Session 1 scaffolding context lives in `vault/sessions/session-1.md` (as of 2026-05-23 S2 close).
 
