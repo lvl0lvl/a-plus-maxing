@@ -4,7 +4,7 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-05-16
+last_reviewed: 2026-05-23
 depends_on: []
 superseded_by: null
 review_cadence: monthly
@@ -31,14 +31,26 @@ Personal health agent focused on longevity + body composition. Bryan Johnson Blu
 ## Knowledge Layers
 - `protocols/` — Walter's current state (what he eats, takes, does)
 - `daily/`, `weekly/`, `reviews/` — Walter's outcome data over time
-- `library/` — research corpus on peptides, supplements, interventions, biomarkers (cited evidence, tier-rated)
+- `library/` — research corpus on peptides, supplements, interventions, biomarkers (cited evidence, tier-rated); base source whitelist at `library/_source-whitelist.md`
+- `compounds/` — canonical compound entries (peptides, supplements, hormones, etc.) — flat folder, class is metadata
+- `biomarkers/` — canonical biomarker entries — populated as labs / wearable data ingested
 - `experiments/` — Walter's structured n=1 trials linking library evidence to his data
 - `dna/` — genetic context
 - `labs/` — biomarker history
 - `decisions/` — why protocol changes were made (cites library + experiments)
 - `interactions/` — friction log informing Phase C
 - `design/` — HTML artifact design protocol (cross-session consistency)
-- `meta/` — system-level orientation (this file, targets)
+- `meta/` — system-level orientation: this file + `targets.md` + `operator-profile.md` (slow-changing Walter context) + `current-state.md` (fast-changing snapshot) + `goals.md` (hard limits + doctor-handout queue) + `contradictions.md` (active contradictions log) + `index.md` (catalog of every wiki entity page) + `log.md` (append-only wiki operation log)
+
+## Wiki Schema (added S2 2026-05-23)
+`vault/WIKI.md` defines the queryable knowledge-base layer:
+- **Entity types** with templates: compounds, biomarkers, protocols, parameters, decisions
+- **Agent consumer roster** — 14 specialist agents (personal-trainer, labs-specialist, nutritionist, supplement-specialist, peptide-specialist, endocrine-specialist, lymphatic-specialist, gi-specialist, cardiovascular-specialist, sleep-coach, recovery-specialist, longevity-strategist, mental-performance-coach, medical-liaison) — agent profiles drafted on-demand, not speculatively
+- **Source whitelist** with 5 standard tiers + Tier 2.7 (practitioner_protocol for prescribing-practice claims) + Tier NE (non-English literature) + 12-tag type enum + admissibility matrix
+- Distinction between **library research** (goal-agnostic canonical entries) and **specialist-agent dispatches** (operator-personalized queries against the wiki)
+
+## Research Pipeline (added S2 2026-05-23)
+`.claude/skills/aplus-research/` wraps the global `deep-research` with mechanically enforced gates. Six blocking gates with JSON-schema-validated verdicts: 2.75 SCOPE, 3.5 JUDGE (paired retrieval+judge), 4.75 INTEGRITY (incl IC-13 per-citation corpus scoping), 6 CRITIQUE (deep+), 7.5 RISK-FLOOR (compounds), 8.5 LAYERS (standard+ compounds). Three health-specific gates not in deep-research: population-mismatch, risk-floor, concentration-audit. Use `/aplus-research` for any wiki-bound research from S3 forward.
 
 ## Data Sources
 - Apple Health (Watch + iPhone) — HR, HRV, steps, workouts, weight
@@ -62,9 +74,16 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
-## Status as of 2026-05-16
-- Vault skeleton created
-- All `protocols/` files are placeholders awaiting Walter's input
-- 23andMe analysis pending raw file
-- Oura purchase imminent (within days)
-- No bloodwork yet (none available, none ordered until July visit)
+## Status as of 2026-05-23 (S2 close)
+- Wiki schema layered onto operational vault (`vault/WIKI.md`)
+- Agent-shared context layer in place: operator-profile, current-state, goals, contradictions, index, log
+- Source whitelist + entity templates (compounds, biomarkers) authored
+- `aplus-research` project-local skill built with 6 mechanically enforced gates; never invoked end-to-end yet
+- First compound library entry (BPC-157) exists at `vault/library/peptides/bpc-157/` + `vault/compounds/bpc-157.md` — **suspect**, scheduled for re-run via `aplus-research` next session (the original deep-research dispatch did not follow protocol; entry may contain hallucinations/fabrications)
+- All `protocols/` files still placeholders awaiting Walter's input (unchanged from S1)
+- 23andMe analysis pending raw file (unchanged from S1)
+- Oura purchase pending (unchanged from S1)
+- No bloodwork yet (none ordered until July 2026 visit)
+
+## Status as of 2026-05-16 (S1 close)
+See `vault/sessions/session-1.md` for the initial vault-skeleton + project-identity work.
