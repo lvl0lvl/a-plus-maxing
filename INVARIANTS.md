@@ -30,17 +30,17 @@ This prevents soft erosion via small exceptions.
 
 | ID | Scope | Property | One-line statement | Mechanical Verification | Auth |
 |---|---|---|---|---|---|
-| INV-HO-ROTATION | HANDOFF.md | 6-clause rotation | Volatile sections contain only current-session content + at most one Historical pointer line | `scripts/handoff-audit.sh` (TODO S4) | S2 |
-| INV-HO-NO-STALE-HASH | HANDOFF.md | no SHA prefixes in narrative | HANDOFF prose does not cite sha256/commit hash prefixes; provenance lives in artifact citations | `scripts/handoff-audit.sh` content-pattern check (TODO S4) | S2 |
+| INV-HO-ROTATION | HANDOFF.md | 6-clause rotation | Volatile sections contain only current-session content + at most one Historical pointer line | `scripts/handoff-audit.sh` (clauses 2 + 5 enforced; clauses 1 + 6 require prior-version diff — v2); smoke tests `scripts/tests/test_handoff_audit.sh` (12/12 pass) | S2 |
+| INV-HO-NO-STALE-HASH | HANDOFF.md | no SHA prefixes in narrative | HANDOFF prose does not cite sha256/commit hash prefixes; provenance lives in artifact citations | `scripts/handoff-audit.sh` content-pattern check (lenient: section-header date OR same-line date satisfies clause 4); smoke tests `scripts/tests/test_handoff_audit.sh` (12/12 pass) | S2 |
 | INV-RESEARCH-ATTESTATION | aplus-research | gate JSON attestation_chain required | Gate JSONs for phases 3.5/4.75/6/7.5/8.5 carry `attestation_chain` matching agent-source sha256 + mtime > iter_start_ts | `lib/gate_attest.py` + schema validation; smoke tests `tests/test_gate_attest.py` (9/9 pass) | S3 |
 | INV-RESEARCH-POPULATION-MISMATCH | aplus-research | animal/in-vitro numerical claims tagged | Every animal/in-vitro numerical claim carries `[population-mismatch: <species>]` in same sentence or has species as subject within 100 chars | aplus-research IC-7 verifier (Phase 4.75) | S2 |
 | INV-RESEARCH-CONCENTRATION-SURFACED | aplus-research | first-class concentration section | When single-cluster share ≥70%, draft has first-class concentration section before any indication subsection | aplus-research IC-9 verifier (Phase 4.75) | S2 |
 | INV-RESEARCH-NO-VENDOR-NUMERICAL | aplus-research | vendor/anecdote cites never ground numerical | `vendor_label` and `anecdote_aggregate` tags never appear in same sentence as dose/effect-size/AE-rate/n claim | aplus-research IC-3 + IC-4 verifier (Phase 4.75) | S2 |
 | INV-RESEARCH-IC13-CORPUS | aplus-research | per-citation corpus scoping | Deep mode requires ≥80% (min 20) of numerical/quoted claims grep-verified against retrieved source corpus | aplus-research IC-13 verifier (Phase 4.75) | S2 |
 | INV-ROLE-INLINING | Task dispatch | full 11-section role profile | Agent dispatches matching role-context (H1=`# {Role Name}` or `roles/<slug>/agent.md` ref) inline the full 11-section profile verbatim | `.claude/hooks/enforce-role-inlining.sh` PreToolUse hook; smoke tests `hooks/tests/test_enforce_role_inlining.sh` (8/8 pass) | S3 |
-| INV-SCOPE-CONTRACT | Session lifecycle | binary AC + WILL/NOT lists | Every session has a written scope contract before any work: Goal, binary ACs, Files I WILL touch, Files I will NOT touch, NOT doing, Invariants at risk | Close protocol step 0 checks for scope contract presence (TODO S4 audit script) | S3 |
-| INV-BRANCH-NOT-MAIN | git | no commits on main | Working commits land on `feature/*` or `fix/*` branches, never `main` | `.claude/hooks/block-push-main.sh` (push only); pre-commit hook TODO S4 | S2 |
-| INV-PF-ATTESTATION | Session close | mandatory "No PF" attestation | Every session close either appends a PF entry OR explicitly attests "No new PF-class entries this session" with rationale | CLAUDE.md close protocol step 4 (manual; audit TODO S5) | S3 |
+| INV-SCOPE-CONTRACT | Session lifecycle | binary AC + WILL/NOT lists | Every session has a written scope contract before any work: Goal, binary ACs, Files I WILL touch, Files I will NOT touch, NOT doing, Invariants at risk | `scripts/scope-contract-audit.sh` (validates 6 required subfields + ≥1 binary checkbox); smoke tests `scripts/tests/test_scope_contract_audit.sh` (12/12 pass) | S3 |
+| INV-BRANCH-NOT-MAIN | git | no commits on main | Working commits land on `feature/*` or `fix/*` branches, never `main` | `.claude/hooks/block-push-main.sh` (push) + `.claude/hooks/block-commit-main.sh` (commit) — both PreToolUse Bash hooks; smoke tests `.claude/hooks/tests/test_block_commit_main.sh` (21/21 pass) | S2 |
+| INV-PF-ATTESTATION | Session close | mandatory "No PF" attestation | Every session close either appends a PF entry OR explicitly attests "No new PF-class entries this session" with rationale | `scripts/pf-attestation-audit.sh` (validates `S<N> close (YYYY-MM-DD):` line presence); smoke tests `scripts/tests/test_pf_attestation_audit.sh` (12/12 pass) | S3 |
 
 ## Category breakdown
 
@@ -54,6 +54,7 @@ This prevents soft erosion via small exceptions.
 | Date | Invariant | Change | Evidence | Session |
 |---|---|---|---|---|
 | 2026-05-25 | (all initial entries) | Created register | PF-S3-01 demonstrated gap; Rigor Framework Discipline 5 adopted | S3 |
+| 2026-05-25 | INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN | Mechanical verification promoted from TODO to live scripts/hooks | Audit scripts + commit-block hook built and tested (57/57 across 4 suites); wired into close protocol step 8.5 | S5 |
 
 ## Audit cadence
 
@@ -63,9 +64,7 @@ This prevents soft erosion via small exceptions.
 
 ## Pending mechanical-enforcement gaps (TODO)
 
-These invariants currently rely on manual discipline; promote to script by S5:
+All S4-vintage TODOs were resolved in S5. Remaining gaps for future sessions:
 
-- INV-HO-ROTATION + INV-HO-NO-STALE-HASH → `scripts/handoff-audit.sh`
-- INV-BRANCH-NOT-MAIN → pre-commit hook (currently only push is blocked)
-- INV-SCOPE-CONTRACT → close-protocol audit (checks HANDOFF.md for scope contract appended at session start)
-- INV-PF-ATTESTATION → close-protocol audit (checks PF log was either appended-to or carries explicit "No PF this session" line dated this session)
+- INV-HO-ROTATION clauses 1 (replace-don't-accrue) + 6 (session-close diff check) require diffing HANDOFF.md against the prior-session-N snapshot. Deferred to v2 once a session-versioned snapshot system exists.
+- `audit-helpers.sh` does not yet emit machine-parseable JSON (only human-readable stderr). Promote to JSON line-protocol if/when a close-protocol orchestrator wants to aggregate results programmatically.

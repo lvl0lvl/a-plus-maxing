@@ -12,6 +12,66 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 5
+
+Goal: Build project-suited drafting-team foundation (4 new roles) and 3 pilot specialist design docs (7 total) via Quant design-doc-protocol. Sequential across roles, parallel within. Probable multi-session work; checkpoint after each role. Defer `/upgrade-agent` runs and agent.md authoring to Session B.
+
+Acceptance criteria:
+- [ ] `design/` folder created with Quant-style README naming the 7-role pipeline
+- [ ] Role 1 health-specialist-architect: 5-phase design-doc-protocol complete; `design/health-specialist-architect-design.md` Status: Final
+- [ ] Role 2 health-implementer: 5-phase design-doc-protocol complete; `design/health-implementer-design.md` Status: Final
+- [ ] Role 3 health-edge-case-reviewer: 5-phase design-doc-protocol complete; `design/health-edge-case-reviewer-design.md` Status: Final
+- [ ] Role 4 medical-safety-reviewer: 5-phase design-doc-protocol complete; `design/medical-safety-reviewer-design.md` Status: Final
+- [ ] Checkpoint pause after roles 1-4 for user authorization before specialist roles
+- [ ] Role 5 labs-specialist: 5-phase design-doc-protocol complete; uses new foundation drafters; `design/labs-specialist-design.md` Status: Final
+- [ ] Role 6 peptide-specialist: 5-phase design-doc-protocol complete; `design/peptide-specialist-design.md` Status: Final
+- [ ] Role 7 medical-liaison: 5-phase design-doc-protocol complete; `design/medical-liaison-design.md` Status: Final
+- [ ] Every dispatched agent prompt pastes the full 11-section role profile verbatim per INV-ROLE-INLINING
+- [ ] No orchestrator self-attestation of red-team verdicts (PF-S3-01 guard); each finding personally verified against cited source
+- [ ] HANDOFF rotation rule applied to VOLATILE sections at each checkpoint commit
+- [ ] PF attestation appended at close in canonical form `S5 close (YYYY-MM-DD): ...`
+- [ ] All three audit scripts (handoff-audit, scope-contract-audit, pf-attestation-audit) exit 0 at close
+- [ ] All commits land on feature branch, none on main
+
+Files I WILL touch:
+- `design/` (new) + `design/README.md`
+- `design/{role}-design.md` × 7
+- `design/.{role}-design-work/*` × 7 (drafts, red-team, OQ-list, domain-research)
+- `HANDOFF.md` (this contract + per-checkpoint progress + close)
+- `vault/sessions/session-5.md` (close note)
+- `memory/process-failures.md` (only if a new PF surfaces)
+- `.beads/*` (via `bd` CLI only)
+
+Files I will NOT touch:
+- `vault/library/*`, `vault/compounds/*`, `vault/biomarkers/*`, `vault/dna/*`, `vault/labs/*`
+- `.claude/skills/*` (including aplus-research and deep-research)
+- `.claude/commands/*` (including upgrade-agent)
+- `.claude/agents/` (deferred to Session B — design docs only this session)
+- `~/Documents/Projects/skills_library/roles/*` (no role profiles deployed; design docs inform Session B authoring)
+- `INVARIANTS.md` (no new invariants this session)
+- `scripts/` (owned by the parallel session)
+- `CLAUDE.md` (owned by the parallel session this cycle)
+- `~/.claude/*` (global config untouched)
+- `main` branch (commits to `feature/wiki-bpc157-aplus-research` only)
+
+NOT doing:
+- Running `/upgrade-agent` against any design doc (Session B)
+- Writing any `agent.md` profile (Session B)
+- The 11 remaining specialists (only pilot 3 + 4 foundation)
+- Tiered vs per-agent design decision (explicit post-pilot review)
+- Vault git-tracking decision
+- LM-04 first HTML artifact generation
+- S4 mechanical-enforcement TODO audit scripts (other session)
+- Bug-001 follow-up / aplus-research v2 calibration
+
+Invariants at risk:
+- INV-ROLE-INLINING — every agent dispatch inlines full 11-section profile verbatim; `enforce-role-inlining.sh` PreToolUse hook is the mechanical check
+- INV-SCOPE-CONTRACT — satisfied by this block; `scope-contract-audit.sh` validates format at close
+- INV-BRANCH-NOT-MAIN — currently on `feature/wiki-bpc157-aplus-research`; discipline-only guard until pre-commit hook lands
+- INV-PF-ATTESTATION — canonical form at close
+- INV-HO-ROTATION / INV-HO-NO-STALE-HASH — rotation rule applied to VOLATILE sections; no SHA prefixes in narrative prose
+- INV-RESEARCH-ATTESTATION — N/A (no `aplus-research` dispatch this session); `/deep-research` paired-judge rigor is the substitute and is NOT self-attested
+
 ## Session 4 close — 2026-05-25
 
 Two cycles this session: (a) the user caught and challenged orchestrator self-attestation of 5 of 6 aplus-research gates (PF-S3-01, recurrence_count=2 of the PF-S2-01 class); (b) rigor-framework adoption + mechanical resistance built and the BPC-157 entry re-verified clean through path-(b) re-dispatches. Commit `8b05b30`. The attestation_chain is now intact across all 6 gates with sha256 of each agent-written source.
@@ -87,7 +147,7 @@ Forward-facing readiness for next session. Replaced at every close, not accumula
 - BUG-001 patched in gate_attest.py: per-section iter_start_ts via `--section` flag for path-b partial remediation; JSON `iteration` field takes precedence over filename suffix; schema iter max 3 → 4.
 - `vault/meta/landmarks.md` register established. 4 active landmarks (LM-01 doctor visit, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact). Landmark-agnostic by design — status flips to `completed` after windows exhausted, no silent failure.
 - Beads: epic `a-plus-maxing-c6k` (P1) ready; `a-plus-maxing-3py` closed in S3.
-- Branch: `feature/wiki-bpc157-aplus-research` at commit `8b05b30`. Ephemeral; no upstream push. Vault gitignore decision still unresolved.
+- Branch: `feature/wiki-bpc157-aplus-research` at commit `8b05b30` as of 2026-05-25 S4 close. Ephemeral; no upstream push. Vault gitignore decision still unresolved.
 
 **Historical (kept for reference):** Session 3 BPC-157 rebuild context lives in `vault/sessions/session-3.md`.
 
@@ -184,3 +244,67 @@ Created `a-plus-maxing-s5k` (implement `--update` flag) and `a-plus-maxing-3py` 
 - `.claude/settings.json` — hook configuration
 - `.beads/` — issue tracker database (epic `a-plus-maxing-c6k`)
 - `memory/process-failures.md` — canonical failure log; four new entries this session
+
+## Scope Contract — Session 5 (2026-05-25)
+
+Goal: Build the 4 mechanical-enforcement audit scripts + shared helpers library + pre-commit branch-block hook, wired into the close protocol and reflected in INVARIANTS.md.
+
+Acceptance criteria:
+- [x] `scripts/lib/audit-helpers.sh` — shared `emit` / `fail` / violations-counter (per Rigor Framework Discipline 5 §3); 16/16 smoke tests pass
+- [x] `scripts/handoff-audit.sh` — checks INV-HO-ROTATION (clauses 2 + 5) + INV-HO-NO-STALE-HASH; 12/12 smoke tests pass; exits 0 on current HANDOFF.md
+- [x] `scripts/scope-contract-audit.sh` — checks HANDOFF.md carries a `## Scope Contract — Session N` block with required subfields and binary ACs; 12/12 smoke tests pass
+- [x] `scripts/pf-attestation-audit.sh` — checks canonical `S<N> close (YYYY-MM-DD):` attestation line; 12/12 smoke tests pass
+- [x] `.claude/hooks/block-commit-main.sh` — PreToolUse Bash hook blocking `git commit` while HEAD = main; wired into `.claude/settings.json`; 21/21 smoke tests pass
+- [x] Smoke tests for each remaining script — all pass (73/73 across 5 suites)
+- [x] `INVARIANTS.md` Mechanical Verification column updated for INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-SCOPE-CONTRACT, INV-PF-ATTESTATION — TODO markers removed; S5 Change Log row added
+- [x] `CLAUDE.md` close protocol step 8.5 expanded to invoke the 3 new audit scripts (handoff, scope-contract, pf-attestation)
+
+Files I WILL touch:
+- `scripts/lib/audit-helpers.sh` (NEW)
+- `scripts/handoff-audit.sh` (NEW)
+- `scripts/scope-contract-audit.sh` (NEW)
+- `scripts/pf-attestation-audit.sh` (NEW)
+- `scripts/tests/` (NEW, smoke fixtures + runner)
+- `.claude/hooks/block-commit-main.sh` (NEW)
+- `.claude/hooks/tests/test_block_commit_main.sh` (NEW)
+- `.claude/settings.json` (add PreToolUse Bash matcher)
+- `INVARIANTS.md` (Mechanical Verification cells + Change Log row)
+- `CLAUDE.md` (close-protocol step 8.5)
+- `HANDOFF.md` (this contract + at session close)
+
+Files I will NOT touch:
+- `vault/library/peptides/bpc-157/*` and `vault/compounds/bpc-157.md`
+- `.claude/skills/aplus-research/*`
+- `vault/meta/landmarks.md`
+- Any agent role profile files (separate session per user direction)
+
+NOT doing:
+- Specialist role profiles (peptide-specialist, medical-liaison) — separate session
+- v2 aplus-research calibration findings
+- Vault git-tracking decision
+- First HTML artifact (LM-04)
+- Beads ticket dep-cleanup
+- Walter pending items (23andMe, Oura, meal-template, Jan-2026 issue)
+
+Invariants at risk:
+- INV-HO-ROTATION + INV-HO-NO-STALE-HASH — audited by this session's own deliverable (built-in falsification)
+- INV-SCOPE-CONTRACT — this contract satisfies it
+- INV-PF-ATTESTATION — mandatory at close
+- INV-BRANCH-NOT-MAIN — already on feature branch; new hook becomes second line of defense
+
+## Session 5 close — audit-scripts cycle (2026-05-25)
+
+Audit-script foundation built and wired. All 8 ACs PASS. 73/73 tests pass across 5 suites. Five INVARIANTS-register entries promoted from TODO-mechanical-verification to live scripts/hooks. CLAUDE.md close-protocol step 8.5 now invokes all three audit scripts.
+
+This is one of two parallel S5 cycles. The other cycle (drafting-team foundation + 7 specialist design docs) is mid-flight with its own Scope Contract above. VOLATILE section rotation is deferred to whichever cycle closes last so that Top-3 / Current State / What Is Next reflect both cycles.
+
+**Drift checks:**
+- **Task drift:** Scope expanded once mid-session — appended the S5 Scope Contract after the audit-helpers AC completed (I omitted step 7 at session start). Caught and corrected; no other drift. Audit-surfaced fix to HANDOFF line 90 (bare SHA) was an explicit one-off per feedback memory; not a workflow.
+- **Architecture drift:** No invariant degraded. Five invariants strengthened by mechanical-enforcement uplift. New audit scripts respect the Cross-Document Ownership Matrix (each script has a single invariant ID it owns).
+- **Vision drift:** Same project. System after S5a IS the same LLM-driven personal health agent with mechanically-enforced session-lifecycle invariants now joining the mechanically-enforced research-domain invariants. Rigor compounds.
+
+**PF attestation:**
+
+S5 close (2026-05-25): No new PF-class entries this session. The HANDOFF line-90 bare-SHA defect surfaced by the audit was a residual S4-close miss (not a new failure mode); fixed in-session as a one-off scope expansion that the audit's own AC required. The mid-session scope-contract-omission (failure to append the contract at step 7) is logged here as an observation; if it recurs N=2 it promotes to PF. No PF-S2-01 or PF-S3-01 class incidents observed.
+
+**Commit:** TBD this commit.

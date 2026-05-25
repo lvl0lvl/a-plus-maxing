@@ -11,6 +11,10 @@
           {
             "type": "command",
             "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/block-push-main.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/block-commit-main.sh"
           }
         ]
       },
