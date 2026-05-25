@@ -3,7 +3,7 @@
   "$id": "aplus-research/schemas/gate-6",
   "title": "Phase 6 Critique Gate Verdict",
   "type": "object",
-  "required": ["phase", "verdict", "critique_agent_id", "draft_path", "findings", "additional_retrievals", "halt_reasons", "timestamp"],
+  "required": ["phase", "verdict", "critique_agent_id", "draft_path", "findings", "additional_retrievals", "halt_reasons", "timestamp", "attestation_chain"],
   "additionalProperties": false,
   "properties": {
     "phase": {"const": "6"},
@@ -48,6 +48,19 @@
           "additional-retrieval-judge-fail",
           "self-critique-by-orchestrator"
         ]
+      }
+    },
+    "attestation_chain": {
+      "type": "object",
+      "required": ["iter_start_ts", "attest_ts", "iteration", "agent_source_path", "agent_source_sha256", "agent_source_mtime"],
+      "additionalProperties": false,
+      "properties": {
+        "iter_start_ts": {"type": "string", "format": "date-time"},
+        "attest_ts": {"type": "string", "format": "date-time"},
+        "iteration": {"type": "integer", "minimum": 1, "maximum": 3},
+        "agent_source_path": {"type": "string"},
+        "agent_source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "agent_source_mtime": {"type": "string", "format": "date-time"}
       }
     }
   },

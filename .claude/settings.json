@@ -13,6 +13,15 @@
             "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/block-push-main.sh"
           }
         ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/enforce-role-inlining.sh"
+          }
+        ]
       }
     ]
   }

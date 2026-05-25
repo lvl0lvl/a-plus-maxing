@@ -3,7 +3,7 @@
   "$id": "aplus-research/schemas/gate-3.5",
   "title": "Phase 3.5 Judge Gate Verdict",
   "type": "object",
-  "required": ["phase", "verdict", "mode_threshold", "judge_verdicts", "halt_reasons", "iterations", "timestamp"],
+  "required": ["phase", "verdict", "mode_threshold", "judge_verdicts", "halt_reasons", "iterations", "timestamp", "attestation_chain"],
   "additionalProperties": false,
   "properties": {
     "phase": {"const": "3.5"},
@@ -24,7 +24,7 @@
           "brief_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
           "score": {"type": "integer", "minimum": 0, "maximum": 100},
           "verdict": {"enum": ["PASS", "HALT"]},
-          "iteration": {"type": "integer", "minimum": 1, "maximum": 3},
+          "iteration": {"type": "integer", "minimum": 1, "maximum": 4},
           "dimension_scores": {
             "type": "object",
             "additionalProperties": {"type": "integer", "minimum": 0, "maximum": 10}
@@ -33,7 +33,33 @@
         }
       }
     },
-    "iterations": {"type": "integer", "minimum": 1, "maximum": 3},
+    "iterations": {"type": "integer", "minimum": 1, "maximum": 4},
+    "attestation_chain": {
+      "type": "object",
+      "required": ["iter_start_ts", "attest_ts", "iteration", "judge_sources"],
+      "additionalProperties": false,
+      "properties": {
+        "iter_start_ts": {"type": "string", "format": "date-time"},
+        "attest_ts": {"type": "string", "format": "date-time"},
+        "iteration": {"type": "integer", "minimum": 1, "maximum": 4},
+        "judge_sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["section", "iteration", "sha256", "path", "mtime"],
+            "additionalProperties": false,
+            "properties": {
+              "section": {"type": "string"},
+              "iteration": {"type": "integer", "minimum": 1, "maximum": 4},
+              "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+              "path": {"type": "string"},
+              "mtime": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    },
     "halt_reasons": {
       "type": "array",
       "items": {

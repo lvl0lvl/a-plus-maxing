@@ -8,13 +8,41 @@ a-plus-maxing project. See HANDOFF.md for current session context.
 
 Every session begins with these steps in order:
 
-1. **Read HANDOFF.md** -- What happened last session. What is next. Any blockers.
-2. **Check git status** -- `git status && git log --oneline -5`. Right branch? Uncommitted changes? Resolve before starting.
-3. **Run test baseline** -- `echo "No test runner configured -- add one to CLAUDE.md"`. If tests fail before you changed anything, fix that first.
-4. **State the task scope** -- Before writing any code, state in plain text:
-   - (a) What files you expect to modify
-   - (b) What the acceptance criteria are
-   - (c) What files you will NOT touch
+1. **Read HANDOFF.md** -- What happened last session. What is next. Any blockers. Read the Top-3 active failure modes pointer FIRST in the volatile section — that's the forward-facing readiness scan.
+2. **Read INVARIANTS.md** -- The active register. Note any TODO mechanical-enforcement entries.
+3. **Check git status** -- `git status && git log --oneline -5`. Right branch? Uncommitted changes? Resolve before starting.
+4. **Read memory/process-failures.md** -- Every session start regardless of task simplicity. The point of the log is the next session doesn't re-make the mistake.
+5. **Read vault/meta/landmarks.md** -- Active landmarks + trigger windows for any landmark within window today.
+6. **Run test baseline** -- `echo "No test runner configured -- add one to CLAUDE.md"`. If tests fail before you changed anything, fix that first.
+7. **Write the Scope Contract** -- Before writing any code, state in plain text and obtain user confirmation:
+
+   ```markdown
+   ## Scope Contract — Session [N]
+   Goal: [one sentence, imperative mood]
+   Acceptance criteria:
+   - [ ] [binary pass/fail criterion 1]
+   - [ ] [binary pass/fail criterion 2]
+   Files I WILL touch: [explicit list]
+   Files I will NOT touch: [explicit list — often the most valuable line]
+   NOT doing: [explicit exclusions of plausibly-in-scope items]
+   Invariants at risk: [IDs from INVARIANTS.md, or "none"]
+   ```
+
+   The contract is appended into HANDOFF.md after user confirmation. At session close, each AC is evaluated PASS / FAIL / CHANGED / N/A in writing. A criterion silently changed during the session is drift.
+
+### Self-recognition flags (catch yourself BEFORE acting on these)
+
+Per Rigor Framework Discipline 7 + PF-S3-01. When you catch yourself producing one of these framings, pause and explicitly call it out, then default to the thorough option:
+
+- "Avoid clutter"
+- "5 min of grunt work"
+- "Minor accretion"
+- "We'll formalize later" / "rolls into next cycle anyway"
+- "Just docs-only" / "no behavior change"
+- "Umbrella bead" / "consolidate into one item"
+- "The fix is mechanical so the verdict is mechanical" (← canonical PF-S3-01 framing)
+- "Re-dispatching would be expensive given how much I've already dispatched"
+- "The agent's prose summary has the answer; the gate JSON is just bookkeeping"
 
 ## Session Close Protocol
 
@@ -27,7 +55,7 @@ Before saying "done" or "complete":
    - **Architecture drift:** Read INVARIANTS.md (or the project's architecture-invariants doc). For each invariant, ask: "Did this session's work move the project closer to violating this invariant?" If yes for any invariant, flag it with the invariant ID.
    - **Vision drift:** In one sentence, state what the system IS after this session's changes. Compare against the first sentence of `design/vision.md` (or the project's vision doc). If they describe different systems, that is drift.
    Write all three checks explicitly. Do not skip any. Do not combine them into a summary.
-4. **Update HANDOFF.md** with What Changed, Current State, What Is Next, Key References. (For "What Did NOT Work", append entries to `memory/process-failures.md`; HANDOFF.md carries a single-line pointer only — see Cross-Document Ownership Matrix below.)
+4. **Update HANDOFF.md** with What Changed, Current State, What Is Next, Key References, and the **Top-3 active failure modes** pointer (VOLATILE — rotates each session). **Mandatory PF attestation:** either append a new entry to `memory/process-failures.md`, OR add an explicit line at the close: `S{N} close (YYYY-MM-DD): No new PF-class entries this session.` followed by 1-2 sentences of rationale listing what was observed but did NOT promote (and why). **Silence is NOT equivalent to absence.** This enforces INV-PF-ATTESTATION.
 5. **Apply the rotation rule to every VOLATILE-labeled section** (mandatory at session close).
 
    The rotation rule applies to:
@@ -54,6 +82,8 @@ Before saying "done" or "complete":
 6. **Update memory** -- Write vault notes for any decisions, patterns, or open questions.
 7. **Update beads** -- `bd close` completed issues, `bd sync --flush-only`.
 8. **Review documents** -- Run the Document Freshness Rubric (see DOCUMENT_RUBRIC.md). Flag or archive stale docs.
+8.5. **Run audit scripts** -- For every invariant in INVARIANTS.md with a Mechanical Verification entry, run that script. On non-zero exit: do NOT commit until fixed or explicit user-adjudicated path-extension granted. Currently active: `python3 .claude/skills/aplus-research/lib/gate_attest.py verify-chain --base <BASE>` for any aplus-research dispatch this session.
+8.7. **Landmark window check** -- Re-read `vault/meta/landmarks.md`. For each `active` landmark whose trigger window opened during this session, verify the corresponding action was performed.
 9. **Commit and push** to feature branch. Open PR if ready.
 
 ## Cross-Document Ownership Matrix

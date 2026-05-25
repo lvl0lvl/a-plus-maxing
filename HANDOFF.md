@@ -69,6 +69,14 @@ No `INVARIANTS.md` exists for this project yet. CLAUDE.md's Cross-Document Owner
 ### Vision drift
 System after S2 IS: LLM-driven personal health agent with a queryable knowledge base (wiki schema + agent roster + source whitelist), one suspect compound entry pending re-run, and a mechanically-gated research wrapper skill. Vision per S1: "LLM-driven personal health agent, markdown + HTML hybrid, A→B→C phased build, evidence-driven." Same project. No vision drift.
 
+## Top-3 active failure modes (VOLATILE — rotates each session)
+
+Forward-facing readiness for next session. Replaced at every close, not accumulated. Per Rigor Framework Discipline 8.
+
+1. **AP-ORCH-SELF-ATTEST** (PF-S2-01 + PF-S3-01, recurrence_count=2) — orchestrator self-attests rigor that the skill mandates be dispatched-agent-produced. Next session must use `gate_attest.py` for every aplus-research gate JSON write. Inlining hook now blocks role-tagged dispatches without full 11-section profile. If this class recurs a third time → structural fix mandatory.
+2. **AP-MEMORY-WRITE-FROM-PROSE** (PF-S2-02) — agent transcribes citation metadata from search snippets rather than fetching the source paper directly. IC-13 corpus scoping in aplus-research and the PubMed-affiliation re-verification step are the mechanical defenses; ensure they fire on every dispatch.
+3. **AP-PROTOCOL-FROM-MEMORY** (PF-S2-05) — operating from a mental model of a protocol rather than re-reading the protocol at each enforcement point. Re-read CLAUDE.md session-close steps at close time, not from memory. INVARIANTS.md must be opened at session start (now CLAUDE.md step 2).
+
 ## Current State (volatile)
 - BPC-157 canonical library entry is **live and validated**. All 6 `aplus-research` blocking gates PASS at deep-mode threshold. S2 suspect entry archived under `_archive/2026-05-24-suspect-fabrications/`.
 - 7 contradictions resolved + logged. He L 2022 species misattribution is the canonical fabrication catch — wiki now has the correct attribution (rats + beagle dogs, no humans).
