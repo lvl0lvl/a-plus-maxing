@@ -213,13 +213,10 @@ All 4 active landmarks (LM-01 doctor visit, LM-02 Oura, LM-03 23andMe, LM-04 fir
 ## Open Issues
 
 ### Vault not in git (unchanged from S1)
-Per S1 HANDOFF. Decision still deferred. Note: all S2 vault content was committed (per user instruction) but the underlying `.gitignore` policy was not reconsidered this session.
+Per S1 HANDOFF. Decision still deferred. Note: all S2+ vault content has been committed (per user instruction) but the underlying `.gitignore` policy was not reconsidered.
 
-### aplus-research has never been invoked
-The skill exists but the first end-to-end run happens next session. Likely failure modes (recorded for next session's debugging): (a) `--update` flag missing blocks Phase 2.75; (b) `jsonschema` Python package presence check not implemented as pre-flight; (c) corpus retrieval for paywalled primaries may exceed paywall-bypass capability — `corpus-missing` WARN expected on a meaningful share of cites.
-
-### Beads ticket dependencies were created backwards
-Created `a-plus-maxing-s5k` (implement `--update` flag) and `a-plus-maxing-3py` (re-run BPC-157), then accidentally made both depend on the long-lived epic `a-plus-maxing-c6k`. Result: both show as blocked in `bd ready` even though they should be the next ready work. `bd dep` CLI has no `remove` subcommand in this version. Next session: either close the broken-dep tickets and re-create, or manually edit the bd JSONL to remove the c6k dep. Tickets are visible via `bd list --status=open`.
+### `agent-verdict-halt` sentinel inconsistency (gate_attest.py vs schemas)
+S6 observation: when an agent emits `verdict: HALT` and the orchestrator's scaffold has empty `halt_reasons`, `gate_attest.py attest` injects `"agent-verdict-halt"` as a fallback. That string is not in any gate schema's `halt_reasons` enum, so schema validation fails. Workaround: orchestrator must pre-populate `halt_reasons` with a valid enum value in the scaffold before attest. Either (a) extend every gate schema's halt_reasons enum to include `agent-verdict-halt`, or (b) change the script's fallback to be phase-aware. Defer to v2.5 cleanup.
 
 ## Key References
 - `CLAUDE.md` — session protocols and project conventions; updated this session to mention the project-local `aplus-research` skill
@@ -378,4 +375,4 @@ All 7 ACs PASS. 4 calibration findings applied in place to the existing skill (n
 
 **PF attestation:**
 
-S6 close (2026-05-25): No new PF-class entries this session. The Phase 4.25 schema mismatch I hit mid-session (top-level `iterations` required vs attest_simple not auto-populating it) was a latent gap in the documented scaffold pattern — surfaced by writing the new tests, fixed by following the pre-existing scaffold convention. Not a PF; documented inline in the test file via T13-T16 examples. The `agent-verdict-halt` sentinel inconsistency observed during T15 debugging is also pre-existing (not in any schema's halt_reasons enum); recorded here for v2.5 cleanup. No PF-S2-01, PF-S3-01, or AP-class incidents observed.
+S6 close (2026-05-25): One new PF entry promoted (PF-S6-01, AP-ACT-BEFORE-VERIFY) caught by user mid-session: started a "beads cleanup" task without verifying current state or having a documented procedure; HANDOFF entry was stale and the issue had been resolved in S3/S4. User's "what procedure did you use" forced the honest answer. Logged in `memory/process-failures.md` with recurrence_count=1; feedback memory `feedback_beads_cleanup_procedure.md` saved with verify-first procedure. No PF-S2-01 or PF-S3-01 class recurrences observed. The Phase 4.25 schema mismatch I hit mid-session (top-level `iterations` required vs attest_simple not auto-populating it) was a latent gap in the documented scaffold pattern — not a PF; documented inline via T13-T16 tests. The `agent-verdict-halt` sentinel inconsistency observed during T15 debugging is pre-existing; recorded as an Open Issue for v2.5 cleanup.
