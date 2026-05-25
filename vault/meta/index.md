@@ -76,3 +76,7 @@ _(none yet — first panel July 2026)_
 - [[meta/goals]]
 - [[meta/contradictions]]
 - [[meta/log]]
+- [[meta/landmarks]] (NEW S4, landmark-agnostic register)
+- INVARIANTS.md at repo root (NEW S4, 11 named invariants)
+- .claude/skills/aplus-research/lib/gate_attest.py (NEW S4, canonical gate JSON writer)
+- .claude/hooks/enforce-role-inlining.sh (NEW S4, role-profile PreToolUse hook)

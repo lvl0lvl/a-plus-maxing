@@ -53,3 +53,15 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - 2026-05-24 | update | library/peptides/bpc-157/practitioner-layer.md | rebuilt; prior archived
 - 2026-05-24 | update | library/peptides/bpc-157/non-english-layer.md | rebuilt; prior archived
 - 2026-05-24 | update | meta/contradictions.md | 7 new resolved entries (C1–C7) from Phase 4.75 IC-10 + Phase 4 triangulation; 1 historical (C8 = He L 2022 species misattribution caught and corrected, supersedes the 2026-05-23 Xu/He attribution resolution which only fixed authorship not species)
+- 2026-05-25 | create | .claude/skills/aplus-research/lib/gate_attest.py | canonical writer for gate-3.5/4.75/6/7.5/8.5 JSONs; mechanical resistance against PF-S3-01 (orchestrator self-attestation); 12/12 smoke tests pass (9 original + 3 BUG-001 regression tests)
+- 2026-05-25 | create | .claude/hooks/enforce-role-inlining.sh | PreToolUse hook on Task tool blocking role-tagged dispatches without full 11-section profile; 8/8 smoke tests pass
+- 2026-05-25 | schema | .claude/skills/aplus-research/schemas/gate-{3.5,4.75,6,7.5,8.5}.schema.json | added required `attestation_chain` field with strict structure (sha256 hex-64 regex, ISO date-times); iter max bumped 3 → 4 in gate-3.5 to accommodate path-b re-dispatch
+- 2026-05-25 | create | INVARIANTS.md | initial register with 11 named invariants and mechanical-verification column; 4 audit-script TODO for S5
+- 2026-05-25 | create | vault/meta/landmarks.md | landmark-agnostic register (4 active LMs); explicit `status: completed` transition prevents silent-degradation-after-landmark-passes
+- 2026-05-25 | update | CLAUDE.md | session start protocol expanded (read INVARIANTS, PF log, landmarks; scope contract template with binary ACs); session close protocol expanded (mandatory PF attestation, audit scripts step, landmark window check); self-recognition flags added
+- 2026-05-25 | update | HANDOFF.md | Top-3 active failure modes pointer added (volatile); S4 close written
+- 2026-05-25 | update | memory/process-failures.md | PF-S3-01 entry created with recurrence_count=2 (predecessor PF-S2-01); AP-ORCH-SELF-ATTEST class identifier reserved
+- 2026-05-25 | create | vault/sessions/session-3.md | retroactive S3 session note (canonical fabrication catch + PF-S3-01 origin)
+- 2026-05-25 | create | vault/sessions/session-4.md | S4 mechanical resistance + path-(b) re-verification + rigor framework adoption
+- 2026-05-25 | update | aplus-research SKILL.md | added Hard Rule 9 (no orchestrator self-attestation of gate verdicts); added Attestation chain section documenting gate_attest.py workflow + halt-reason table + threat model
+- 2026-05-25 | rebuild | BPC-157 attestation chain | all 6 gates now carry valid attestation_chain; per-section judge scores iter-4: A=100/B=100/C=100/D=99/E=99/F=100; gate_attest.py verify-chain returns clean
