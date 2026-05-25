@@ -312,6 +312,129 @@ def main():
     finally:
         shutil.rmtree(base)
 
+    # ─── v2 AC1 calibration (S6 2026-05-25): Phase 4.25 ID-Reconcile gate ────
+    # Source path is sections/id-reconcile-source.md (not gates/gate-4.25.md
+    # — the agent's deliverable lives with sections, the gate JSON lives in
+    # gates/).
+
+    def empty_4_25_classes():
+        return {k: {"scanned": 0, "mismatch_count": 0} for k in
+                ("citations", "institutions", "compound_identifiers",
+                 "regulatory_dates", "trial_registrations")}
+
+    # T13: phase-4.25 PASS round-trip — start-iteration, write source, scaffold
+    # JSON, attest, then verify-chain.
+    base = make_base()
+    try:
+        (base / "sections").mkdir(parents=True, exist_ok=True)
+        run(["start-iteration", "--base", str(base), "--phase", "4.25"])
+        time.sleep(0.1)
+        (base / "sections/id-reconcile-source.md").write_text(
+            "## Verdict\n\nverdict: PASS\n"
+        )
+        cls = empty_4_25_classes()
+        cls["citations"]["scanned"] = 52
+        seed = {
+            "phase": "4.25", "iterations": 1, "entity_classes": cls,
+            "halt_reasons": [], "timestamp": "2026-05-25T12:00:00+00:00",
+        }
+        (base / "gates/gate-4.25.json").write_text(json.dumps(seed))
+        code, _, err = run(["attest", "--base", str(base), "--phase", "4.25"])
+        gate = json.loads((base / "gates/gate-4.25.json").read_text())
+        code2, _, _ = run(["verify-chain", "--base", str(base), "--up-to", "4.25"])
+        test("T13 phase-4.25 PASS round-trip + verify-chain",
+             code == 0 and gate["verdict"] == "PASS" and
+             gate["entity_classes"]["citations"]["scanned"] == 52 and code2 == 0,
+             f"verdict={gate.get('verdict')}")
+    finally:
+        shutil.rmtree(base)
+
+    # T14: phase-4.25 HALT round-trip with mismatch detail preserved.
+    base = make_base()
+    try:
+        (base / "sections").mkdir(parents=True, exist_ok=True)
+        run(["start-iteration", "--base", str(base), "--phase", "4.25"])
+        time.sleep(0.1)
+        (base / "sections/id-reconcile-source.md").write_text(
+            "## Verdict\n\nverdict: HALT\n"
+        )
+        cls = empty_4_25_classes()
+        cls["citations"] = {
+            "scanned": 52, "mismatch_count": 1,
+            "mismatches": [{
+                "entity_id": "He L 2022 PMID",
+                "sections": ["A", "D"],
+                "divergent_values": ["33051527", "33051481"],
+                "suggested_canonical": "33051481",
+                "justification": "PMC9794587 crosswalk",
+            }],
+        }
+        seed = {
+            "phase": "4.25", "iterations": 1, "entity_classes": cls,
+            "halt_reasons": ["citation-mismatch"],
+            "timestamp": "2026-05-25T12:00:00+00:00",
+        }
+        (base / "gates/gate-4.25.json").write_text(json.dumps(seed))
+        code, _, err = run(["attest", "--base", str(base), "--phase", "4.25"])
+        gate = json.loads((base / "gates/gate-4.25.json").read_text())
+        test("T14 phase-4.25 HALT round-trip — halt_reasons preserved",
+             code == 0 and gate["verdict"] == "HALT" and
+             "citation-mismatch" in gate["halt_reasons"],
+             f"verdict={gate.get('verdict')} halts={gate.get('halt_reasons')}")
+    finally:
+        shutil.rmtree(base)
+
+    # T15: phase-4.25 orchestrator-PASS overridden by agent-HALT (markdown is
+    # authoritative). Scaffold must pre-populate halt_reasons with a valid
+    # enum value per documented scaffold pattern.
+    base = make_base()
+    try:
+        (base / "sections").mkdir(parents=True, exist_ok=True)
+        run(["start-iteration", "--base", str(base), "--phase", "4.25"])
+        time.sleep(0.1)
+        (base / "sections/id-reconcile-source.md").write_text(
+            "## Verdict\n\nverdict: HALT\n"
+        )
+        seed = {
+            "phase": "4.25", "iterations": 1,
+            "entity_classes": empty_4_25_classes(),
+            "verdict": "PASS",  # orchestrator's lie
+            "halt_reasons": ["citation-mismatch"],
+            "timestamp": "2026-05-25T12:00:00+00:00",
+        }
+        (base / "gates/gate-4.25.json").write_text(json.dumps(seed))
+        code, _, _ = run(["attest", "--base", str(base), "--phase", "4.25"])
+        gate = json.loads((base / "gates/gate-4.25.json").read_text())
+        test("T15 phase-4.25 orchestrator-PASS-overridden-by-agent-HALT",
+             code == 0 and gate["verdict"] == "HALT",
+             f"final verdict={gate.get('verdict')}")
+    finally:
+        shutil.rmtree(base)
+
+    # T16: phase-4.25 stale-source HALT — source written BEFORE start-iteration
+    # so mtime ≤ iter_start_ts.
+    base = make_base()
+    try:
+        (base / "sections").mkdir(parents=True, exist_ok=True)
+        (base / "sections/id-reconcile-source.md").write_text(
+            "## Verdict\n\nverdict: PASS\n"
+        )
+        time.sleep(0.1)
+        run(["start-iteration", "--base", str(base), "--phase", "4.25"])
+        seed = {
+            "phase": "4.25", "iterations": 1,
+            "entity_classes": empty_4_25_classes(),
+            "halt_reasons": [],
+            "timestamp": "2026-05-25T12:00:00+00:00",
+        }
+        (base / "gates/gate-4.25.json").write_text(json.dumps(seed))
+        code, _, err = run(["attest", "--base", str(base), "--phase", "4.25"])
+        test("T16 phase-4.25 stale-source HALTs",
+             code != 0 and "stale-agent-source" in err,
+             err.strip().splitlines()[-1] if err else "")
+    finally:
+        shutil.rmtree(base)
+
     failed = [r for r in RESULTS if r[0] == "FAIL"]
     print(f"\n{len(RESULTS) - len(failed)}/{len(RESULTS)} passed")
     sys.exit(0 if not failed else 1)

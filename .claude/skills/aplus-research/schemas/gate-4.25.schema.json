@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aplus-research/schemas/gate-4.25",
+  "title": "Phase 4.25 ID-Reconcile Gate Verdict",
+  "type": "object",
+  "required": ["phase", "verdict", "entity_classes", "halt_reasons", "iterations", "timestamp", "attestation_chain"],
+  "additionalProperties": false,
+  "properties": {
+    "phase": {"const": "4.25"},
+    "verdict": {"enum": ["PASS", "HALT"]},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "iterations": {"type": "integer", "minimum": 1, "maximum": 3},
+    "entity_classes": {
+      "type": "object",
+      "required": ["citations", "institutions", "compound_identifiers", "regulatory_dates", "trial_registrations"],
+      "additionalProperties": false,
+      "properties": {
+        "citations": {"$ref": "#/$defs/entity_class_summary"},
+        "institutions": {"$ref": "#/$defs/entity_class_summary"},
+        "compound_identifiers": {"$ref": "#/$defs/entity_class_summary"},
+        "regulatory_dates": {"$ref": "#/$defs/entity_class_summary"},
+        "trial_registrations": {"$ref": "#/$defs/entity_class_summary"}
+      }
+    },
+    "halt_reasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "citation-mismatch",
+          "institution-name-divergence",
+          "compound-identifier-mismatch",
+          "regulatory-date-mismatch",
+          "trial-registration-mismatch",
+          "reconcile-non-convergence"
+        ]
+      }
+    },
+    "attestation_chain": {
+      "type": "object",
+      "required": ["iter_start_ts", "attest_ts", "iteration", "agent_source_path", "agent_source_sha256", "agent_source_mtime"],
+      "additionalProperties": false,
+      "properties": {
+        "iter_start_ts": {"type": "string", "format": "date-time"},
+        "attest_ts": {"type": "string", "format": "date-time"},
+        "iteration": {"type": "integer", "minimum": 1, "maximum": 3},
+        "agent_source_path": {"type": "string"},
+        "agent_source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "agent_source_mtime": {"type": "string", "format": "date-time"}
+      }
+    }
+  },
+  "$defs": {
+    "entity_class_summary": {
+      "type": "object",
+      "required": ["scanned", "mismatch_count"],
+      "additionalProperties": false,
+      "properties": {
+        "scanned": {"type": "integer", "minimum": 0},
+        "mismatch_count": {"type": "integer", "minimum": 0},
+        "mismatches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["entity_id", "sections", "divergent_values"],
+            "additionalProperties": false,
+            "properties": {
+              "entity_id": {"type": "string"},
+              "sections": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z]$"}, "minItems": 2},
+              "divergent_values": {"type": "array", "items": {"type": "string"}, "minItems": 2},
+              "suggested_canonical": {"type": "string"},
+              "justification": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"verdict": {"const": "PASS"}}},
+      "then": {"properties": {"halt_reasons": {"maxItems": 0}}}
+    }
+  ]
+}

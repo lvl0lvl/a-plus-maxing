@@ -52,8 +52,9 @@ import jsonschema  # required dependency; pre-flight should verify presence
 ITER_STATE_FNAME = "_iter-state.json"
 SCHEMA_DIR = pathlib.Path(__file__).resolve().parent.parent / "schemas"
 
-ATTESTED_GATES = ("3.5", "4.75", "6", "7.5", "8.5")
+ATTESTED_GATES = ("3.5", "4.25", "4.75", "6", "7.5", "8.5")
 SOURCE_MD = {
+    "4.25": "sections/id-reconcile-source.md",
     "4.75": "gates/gate-4.75.md",
     "6": "gates/gate-6.md",
     "7.5": "gates/gate-7.5.md",

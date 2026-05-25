@@ -9,6 +9,19 @@ allowed-tools: Skill, Agent, Read, Write, Edit, Bash, Glob, Grep, WebSearch, Web
 
 Wraps the global `deep-research` skill with mechanically enforced gates for the a-plus-maxing project wiki. Designed to address the specific failure mode observed in the 2026-05-23 BPC-157 dispatch: an orchestrator can declare `--mode=deep` and skip paired judges, critique, and refine without mechanical resistance. This skill emits machine-readable gate JSON files that block downstream phases unless `verdict: PASS`.
 
+## Calibration history (S3 → present)
+
+The skill is edited in place. Each calibration is logged here with the session, evidence, and resulting change so the lineage is explicit.
+
+| Cycle | Date | Finding | Change | Evidence |
+|---|---|---|---|---|
+| v1.0 | 2026-05-23 (S2) | initial build | 6 blocking gates; `attestation_chain` deferred to v1.1 | PF-S2-01 (deep-mode self-attestation in `/deep-research`) |
+| v1.1 | 2026-05-25 (S4) | orchestrator self-attested 5 of 6 gates | `gate_attest.py` + `attestation_chain` required in 5 schemas; iter max 3→4; per-section iter_start_ts (BUG-001) | PF-S3-01 (recurrence_count=2) |
+| v2 AC1 | 2026-05-25 (S6) | iter-2 remediations missed cross-section metadata mismatches | Phase 4.25 cross-section identity reconciliation as blocking gate between TRIANGULATE and OUTLINE-REFINE | S3/S4 BPC-157: iter-3 judges surfaced Section A Ref [2] PMID + Section C Xue-2004 narrative drift that iter-2 missed |
+| v2 AC2 | 2026-05-25 (S6) | metadata fixes landed in obvious-place but missed adjacent narrative/tally lines | Post-fix grep enforcement mandatory in remediation briefs (Phase 3.5 iter-2+, 4.75 verifier remediation, 6 critique remediation) | AP-INCOMPLETE-PROPAGATION (S4 Top-3) |
+| v2 AC3 | 2026-05-25 (S6) | judge JSONs returned divergent shapes; orchestrator hardcoded scores into gate-3.5 | Judge brief template includes literal JSON skeleton the judge MUST emit | PF-S3-01 §judge-shape divergence |
+| v2 AC4 | 2026-05-25 (S6) | basic-memory linter auto-suffixed archived compound entry permalink with `-1` | Archived entries get scoped permalinks `a-plus-maxing/compounds/_archive/<slug>-<date>-<reason-slug>` | S3 BPC-157 archive |
+
 ## When to Use
 
 Use for any research where output will be ingested into the project wiki:
@@ -48,6 +61,7 @@ Phase 2.75 SCOPE GATE      [BLOCKING] context-load verified, class identified
 Phase 3   RETRIEVE         [N paired (retrieval + judge) dispatches]
 Phase 3.5 JUDGE GATE       [BLOCKING] N verdicts present, all PASS
 Phase 4   TRIANGULATE      [cross-section concordance]
+Phase 4.25 ID-RECONCILE GATE [BLOCKING for standard+] shared-entity cross-section consistency
 Phase 4.5 OUTLINE REFINE
 Phase 4.75 INTEGRITY GATE  [BLOCKING] type-tag + population-mismatch + concentration-audit
 Phase 5   SYNTHESIZE       [corpus-read-only, tool-log audited]
@@ -63,8 +77,8 @@ Phase 8.5 LAYERS GATE      [BLOCKING for standard+ compound research]
 | Mode | Phases | Source floor | Report floor | Judge threshold | Layers |
 |------|--------|--------------|--------------|-----------------|--------|
 | quick | 1, 2.5, 2.75, 3, 3.5, 4, 8 | 10+ | 2,000w | 85/100 | opt-in |
-| standard (DEFAULT) | 1, 2, 2.5, 2.75, 3, 3.5, 4, 4.5, 4.75, 5, 7.5, 8, 8.5 | 15+ | 4,000w | 92/100 | **mandatory** |
-| deep | 1-8 + 2.5/2.75/3.5/4.5/4.75/6/7/7.5/8.5 | 25+ | 10,000w | 99/100 | **mandatory** |
+| standard (DEFAULT) | 1, 2, 2.5, 2.75, 3, 3.5, 4, 4.25, 4.5, 4.75, 5, 7.5, 8, 8.5 | 15+ | 4,000w | 92/100 | **mandatory** |
+| deep | 1-8 + 2.5/2.75/3.5/4.25/4.5/4.75/6/7/7.5/8.5 | 25+ | 10,000w | 99/100 | **mandatory** |
 | ultradeep | deep + extended critique/refine | 30+ | 15,000w | 99/100 | **mandatory** |
 
 ### Gate-by-mode matrix
@@ -73,6 +87,7 @@ Phase 8.5 LAYERS GATE      [BLOCKING for standard+ compound research]
 |------|-------|----------|------|-----------|
 | 2.75 SCOPE | ✓ | ✓ | ✓ | ✓ |
 | 3.5 JUDGE | ✓ | ✓ | ✓ | ✓ |
+| 4.25 ID-RECONCILE | **skipped** | ✓ | ✓ | ✓ |
 | 4.75 INTEGRITY | **skipped** | ✓ | ✓ | ✓ |
 | 6 CRITIQUE | **skipped** | **skipped** | ✓ | ✓ |
 | 7.5 RISK-FLOOR (compounds only) | **skipped** | ✓ | ✓ | ✓ |
@@ -170,6 +185,63 @@ Judge agent brief: read the retrieval agent's output, score against the Phase 2.
 
 **The orchestrator MUST dispatch both agents.** Self-judging by the retrieval agent (5-question self-check) is NOT a substitute and does not satisfy this phase.
 
+**Judge JSON skeleton — REQUIRED inline in every judge brief (v2 AC3 calibration).** S3 judges returned divergent JSON shapes (some used `total`, some `total_score`, some `score_summary`); the orchestrator hardcoded scores into gate-3.5 from prose rather than re-briefing. The defense: the brief carries the literal skeleton the judge MUST emit. Schema-conformant output at brief time, no orchestrator-side shape massaging.
+
+The orchestrator MUST inject this verbatim block into every Phase 3 judge brief:
+
+```
+OUTPUT FORMAT (non-negotiable)
+
+Write your verdict to: ${BASE}/judges/judge-<SECTION-LETTER>.json
+Where <SECTION-LETTER> is the single-letter section ID (A, B, C, ...) the
+paired retrieval agent covered.
+
+Your output MUST validate against this exact JSON skeleton:
+
+{
+  "section": "A",                            // single uppercase letter
+  "brief_hash": "<sha256 of your brief>",   // dispatching orchestrator records this
+  "iteration": 1,                            // 1, 2, 3, or 4 (path-b)
+  "dimension_scores": {
+    "evidence_quality": 0,                   // 0-100 integer
+    "citation_fidelity": 0,                  // 0-100 integer
+    "type_tag_discipline": 0,                // 0-100 integer
+    "population_annotation": 0,              // 0-100 integer
+    "route_fidelity": 0,                     // 0-100 integer
+    "concentration_audit_handling": 0,       // 0-100 integer
+    "risk_floor_readiness": 0,               // 0-100 integer (or null if N/A
+                                              //   for biomarker/protocol research)
+    "reasoning_integrity": 0,                // 0-100 integer
+    "completeness_vs_brief": 0               // 0-100 integer
+  },
+  "total": 0,                                // 0-100 integer (rounded mean of
+                                              //   non-null dimensions)
+  "threshold": 99,                           // mode threshold: 85/92/99/99
+  "verdict": "PASS",                         // "PASS" or "HALT" exactly
+  "findings": [                              // empty array if PASS
+    {
+      "severity": "critical",                // "critical"|"major"|"minor"
+      "dimension": "citation_fidelity",      // must match a dimension_scores key
+      "claim_or_location": "Section A line 47, Ref [12]",
+      "issue": "First-author surname disagrees with cited PMID",
+      "recommended_fix": "Re-verify against PMID 12345678 and correct attribution"
+    }
+  ]
+}
+
+Required structural rules:
+- `verdict: "PASS"` requires `findings: []` (empty array). A non-empty findings
+  array with verdict PASS is a schema violation; emit HALT instead.
+- `total` MUST equal the rounded mean of the non-null `dimension_scores`. If
+  your computed total < threshold, verdict MUST be "HALT", not "PASS".
+- Do NOT add extra top-level keys. Do NOT rename keys. Do NOT use nested
+  variants ("score_summary": {...}). The orchestrator reads only this shape.
+- Do NOT emit prose outside this JSON. Write your reasoning into the `findings`
+  array's `issue` fields, not as preamble.
+```
+
+This block does NOT replace the rubric — the rubric (Phase 2.5) defines what each dimension means and how to score it. The skeleton defines how to express the result.
+
 ## Phase 3.5 — JUDGE GATE (BLOCKING)
 
 Verify:
@@ -189,6 +261,73 @@ Execute `deep-research` Phase 4. Add inline validation:
 
 - Cross-section concordance: any numerical claim appearing in multiple sections must match (otherwise contradictions log entry).
 - Aggregate concentration audit: deduplicate primaries across sections; compute single-lab share.
+
+## Phase 4.25 — ID-RECONCILE GATE (BLOCKING for standard+)
+
+Cross-section identity reconciliation. Surfaces metadata mismatches BEFORE the integrity verifier (Phase 4.75) has to find them, and BEFORE outline refinement (Phase 4.5) locks structure around inconsistent identifiers. v2 calibration response to S3/S4 BPC-157: iter-3 judges caught Section A Ref [2] PMID inversion + Section C narrative drift on Xue 2004 institution attribution that iter-2 in-skill remediation had missed. A dedicated reconciliation step closes the gap upstream.
+
+Orchestrator dispatches an ID-Reconcile agent that:
+
+1. Scans all section drafts (`sections/section-*.md`) for **shared entities** of these classes:
+   - **Citations** (`[N, tag]` references) — first-author surname + initials, year, PMID/DOI, source-title, source-type
+   - **Institutions** named in any sentence — canonical name (e.g., "Fourth Military Medical University Xi'an", not "FMMU" without expansion)
+   - **Compound/molecule identifiers** — CAS number, ChEMBL ID, InChI key (when given), brand vs INN vs research-code (e.g., PL 14736 vs BPC-157 vs Pliva-14736)
+   - **Dates of regulatory events** — FDA action dates, EMA dates, trial-registration dates
+   - **Trial registrations** — NCT/EudraCT/ChiCTR identifiers
+
+2. For each shared entity that appears in 2+ sections: extract the values used in each section. If values disagree (string-identity for IDs, normalized-form-identity for names), record a `mismatch` entry.
+
+3. Emit `${BASE}/sections/id-reconcile-source.md` with:
+   - `## Verdict` block: `verdict: PASS` (no mismatches found) OR `verdict: HALT` (≥1 mismatch)
+   - Per-class mismatch table: entity-id, sections involved, divergent values, suggested canonical value (with justification when possible)
+   - Whole-corpus tally: total shared entities scanned, mismatch count by class
+
+4. On HALT: the agent's report becomes the work-list for a paired remediation dispatch (Phase 4.25-remediation, treated as iter-2 of this phase). Remediation MUST follow the remediation-brief template (see "Remediation brief addendum" below) including the post-fix grep step.
+
+5. After remediation, re-dispatch the ID-Reconcile agent. Iter max 3 per attestation_chain conventions.
+
+The orchestrator composes the gate JSON via:
+```bash
+python3 .claude/skills/aplus-research/lib/gate_attest.py start-iteration \
+    --base /tmp/aplus-research/<slug> --phase 4.25
+python3 .claude/skills/aplus-research/lib/gate_attest.py attest \
+    --base /tmp/aplus-research/<slug> --phase 4.25
+```
+
+Phase 4.5 refuses entry unless gate-4.25 PASS.
+
+**Schema:** `schemas/gate-4.25.schema.json` validates the composed JSON (`attestation_chain` required, per-class mismatch counts, halt_reasons enum). **Invariant:** INV-RESEARCH-CROSS-SECTION-ID (added to INVARIANTS.md alongside this phase).
+
+**Quick-mode exemption:** quick is a triage scan; cross-section reconciliation cost exceeds value when the output is "is this candidate worth a real run?" The gate is `skipped` in quick (consistent with the rest of the standard+-only blocking gates).
+
+## Remediation brief addendum (Phase 3.5 iter-2+, 4.25 iter-2+, 4.75 verifier remediation, Phase 6 critique remediation)
+
+**v2 AC2 calibration response to AP-INCOMPLETE-PROPAGATION (S4 Top-3).** Iter-2 remediations in S3/S4 landed corrected values in the obvious place (the bibliography line, the abstracted-cite line) but missed adjacent narrative/tally/self-check lines holding the same value. The defense is mechanical at brief time: every remediation agent dispatched for a corrective iteration MUST include the following terminal step in its brief.
+
+The orchestrator MUST inject this verbatim block into every remediation brief:
+
+```
+POST-FIX GREP DISCIPLINE (mandatory before declaring iter-N done)
+
+For each value you corrected:
+  1. Record the OLD value (the wrong one you replaced) and NEW value (the correct one).
+  2. Run grep for the OLD value across the WHOLE artifact (research-report.md or
+     equivalent), case-insensitive, regex-friendly enough to catch trivial
+     variants. Use:
+         grep -inE '<old-value-regex>' <artifact>
+  3. Report every hit found AFTER your correction with line number and 1 line of
+     surrounding context.
+  4. For each hit: either (a) replace with the NEW value (if it's the same
+     instance of the metadata), or (b) annotate why this hit is legitimately
+     unchanged (e.g., quoting the prior literature accurately).
+  5. Include the grep output + your disposition in your final report under
+     `## Post-fix grep audit`. Iteration is NOT done without this section.
+
+Orchestrator will reject the iteration if `## Post-fix grep audit` is missing
+or incomplete (any unresolved hit).
+```
+
+This block does NOT replace the existing remediation rubric — it's a terminal discipline added to every brief. The orchestrator's attest step refuses the iteration if the agent-source markdown lacks the `## Post-fix grep audit` heading.
 
 ## Phase 4.5 — OUTLINE REFINEMENT
 
@@ -244,6 +383,16 @@ Generate three artifacts:
 2. **Compound entry** — `vault/compounds/<target_slug>.md` populated from template, operator-specific fields blank.
 3. **Index + log updates** — append to `vault/meta/index.md` and `vault/meta/log.md`. When `update_mode: true`, the log op is `update` (not `create`) and the line MUST reference the archive folder so the prior version is one path-resolution away. Index entry path is unchanged (archive content is invisible to the live index).
 
+   **Archive permalink policy (v2 AC4):** archived entries get scoped permalinks so basic-memory's linter does not silently append `-1` suffixes that look like typos in the index.
+   - Live compound entry permalink: `a-plus-maxing/compounds/<slug>` (unchanged)
+   - Archived compound entry permalink: `a-plus-maxing/compounds/_archive/<slug>-<YYYY-MM-DD>-<reason-slug>` (mirrors the filesystem path `vault/compounds/_archive/<slug>-<YYYY-MM-DD>-<reason-slug>.md` exactly)
+   - Live library research-report permalink: `a-plus-maxing/library/<class>s/<slug>/research-report` (unchanged)
+   - Archived library research-report permalink: `a-plus-maxing/library/<class>s/<slug>/_archive/<YYYY-MM-DD>-<reason-slug>/research-report`
+
+   The orchestrator MUST rewrite the `permalink:` frontmatter field on every archived file BEFORE the archive move (Phase 2.75 step 4 when `--update` is in effect). Same for any nested layer files (`practitioner-layer.md`, `non-english-layer.md`). If the linter still appends a numeric suffix to a live entry, that signals a stale archive whose permalink was not rewritten — HALT `archive-permalink-collision` and instruct the operator to inspect.
+
+   Decision rationale (S6): basic-memory's auto-suffix is silent corruption — `bpc-157-1` looks like a typo in the live index and degrades searchability. Scoping the permalink to the archive path makes the relationship explicit, matches the filesystem layout, and means the live entry's permalink never has to change.
+
 For standard+ compound research, ALSO dispatch:
 
 4. **Prescribing-practice layer** — separate dispatched agent per [[references/health-gates]] §4. Output: `vault/library/<class>s/<target_slug>/practitioner-layer.md`.
@@ -286,6 +435,7 @@ The base source whitelist + type-tag enum lives at `vault/library/_source-whitel
 |--------|-----------|
 | [schemas/gate-2.75.schema.json](./schemas/gate-2.75.schema.json) | Phase 2.75 SCOPE gate verdict — context_files, target, output_paths, halt_reasons |
 | [schemas/gate-3.5.schema.json](./schemas/gate-3.5.schema.json) | Phase 3.5 JUDGE gate verdict — per-section judge_verdicts, scores, brief_hash uniqueness |
+| [schemas/gate-4.25.schema.json](./schemas/gate-4.25.schema.json) | Phase 4.25 ID-RECONCILE gate verdict — per-class mismatch counts, halt_reasons enum (v2 AC1) |
 | [schemas/gate-4.75.schema.json](./schemas/gate-4.75.schema.json) | Phase 4.75 INTEGRITY gate verdict — 13 IC checks, population_mismatch, concentration_audit, corpus_scoping |
 | [schemas/gate-6.schema.json](./schemas/gate-6.schema.json) | Phase 6 CRITIQUE gate verdict — findings, additional_retrievals (max 3) |
 | [schemas/gate-7.5.schema.json](./schemas/gate-7.5.schema.json) | Phase 7.5 RISK-FLOOR gate verdict — risk-tier-conditional field requirements |

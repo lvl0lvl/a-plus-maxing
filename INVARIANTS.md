@@ -37,6 +37,7 @@ This prevents soft erosion via small exceptions.
 | INV-RESEARCH-CONCENTRATION-SURFACED | aplus-research | first-class concentration section | When single-cluster share ≥70%, draft has first-class concentration section before any indication subsection | aplus-research IC-9 verifier (Phase 4.75) | S2 |
 | INV-RESEARCH-NO-VENDOR-NUMERICAL | aplus-research | vendor/anecdote cites never ground numerical | `vendor_label` and `anecdote_aggregate` tags never appear in same sentence as dose/effect-size/AE-rate/n claim | aplus-research IC-3 + IC-4 verifier (Phase 4.75) | S2 |
 | INV-RESEARCH-IC13-CORPUS | aplus-research | per-citation corpus scoping | Deep mode requires ≥80% (min 20) of numerical/quoted claims grep-verified against retrieved source corpus | aplus-research IC-13 verifier (Phase 4.75) | S2 |
+| INV-RESEARCH-CROSS-SECTION-ID | aplus-research | shared-entity reconciliation | Citations, institutions, compound identifiers, regulatory dates, and trial registrations appearing in 2+ section drafts must agree; mismatches HALT before outline refinement | Phase 4.25 ID-Reconcile gate; schema `schemas/gate-4.25.schema.json`; gate-attest tests T13-T16 (4/4 pass) | S6 |
 | INV-ROLE-INLINING | Task dispatch | full 11-section role profile | Agent dispatches matching role-context (H1=`# {Role Name}` or `roles/<slug>/agent.md` ref) inline the full 11-section profile verbatim | `.claude/hooks/enforce-role-inlining.sh` PreToolUse hook; smoke tests `hooks/tests/test_enforce_role_inlining.sh` (8/8 pass) | S3 |
 | INV-SCOPE-CONTRACT | Session lifecycle | binary AC + WILL/NOT lists | Every session has a written scope contract before any work: Goal, binary ACs, Files I WILL touch, Files I will NOT touch, NOT doing, Invariants at risk | `scripts/scope-contract-audit.sh` (validates 6 required subfields + ≥1 binary checkbox); smoke tests `scripts/tests/test_scope_contract_audit.sh` (12/12 pass) | S3 |
 | INV-BRANCH-NOT-MAIN | git | no commits on main | Working commits land on `feature/*` or `fix/*` branches, never `main` | `.claude/hooks/block-push-main.sh` (push) + `.claude/hooks/block-commit-main.sh` (commit) — both PreToolUse Bash hooks; smoke tests `.claude/hooks/tests/test_block_commit_main.sh` (21/21 pass) | S2 |
@@ -47,7 +48,7 @@ This prevents soft erosion via small exceptions.
 - **Format / Document:** INV-HO-ROTATION, INV-HO-NO-STALE-HASH
 - **Process:** INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN
 - **Role-discipline:** INV-ROLE-INLINING
-- **Research-domain (aplus-research):** INV-RESEARCH-ATTESTATION, INV-RESEARCH-POPULATION-MISMATCH, INV-RESEARCH-CONCENTRATION-SURFACED, INV-RESEARCH-NO-VENDOR-NUMERICAL, INV-RESEARCH-IC13-CORPUS
+- **Research-domain (aplus-research):** INV-RESEARCH-ATTESTATION, INV-RESEARCH-POPULATION-MISMATCH, INV-RESEARCH-CONCENTRATION-SURFACED, INV-RESEARCH-NO-VENDOR-NUMERICAL, INV-RESEARCH-IC13-CORPUS, INV-RESEARCH-CROSS-SECTION-ID
 
 ## Change Log
 
@@ -55,6 +56,7 @@ This prevents soft erosion via small exceptions.
 |---|---|---|---|---|
 | 2026-05-25 | (all initial entries) | Created register | PF-S3-01 demonstrated gap; Rigor Framework Discipline 5 adopted | S3 |
 | 2026-05-25 | INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN | Mechanical verification promoted from TODO to live scripts/hooks | Audit scripts + commit-block hook built and tested (57/57 across 4 suites); wired into close protocol step 8.5 | S5 |
+| 2026-05-25 | INV-RESEARCH-CROSS-SECTION-ID | Added | v2 calibration AC1: S3/S4 BPC-157 iter-3 surfaced cross-section metadata mismatches that iter-2 missed (PMID inversion in Section A; Xue 2004 institution narrative drift in Section C). Phase 4.25 ID-Reconcile gate prevents this class upstream of integrity verifier. | S6 |
 
 ## Audit cadence
 

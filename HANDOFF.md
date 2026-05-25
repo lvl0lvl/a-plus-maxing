@@ -307,4 +307,75 @@ This is one of two parallel S5 cycles. The other cycle (drafting-team foundation
 
 S5 close (2026-05-25): No new PF-class entries this session. The HANDOFF line-90 bare-SHA defect surfaced by the audit was a residual S4-close miss (not a new failure mode); fixed in-session as a one-off scope expansion that the audit's own AC required. The mid-session scope-contract-omission (failure to append the contract at step 7) is logged here as an observation; if it recurs N=2 it promotes to PF. No PF-S2-01 or PF-S3-01 class incidents observed.
 
-**Commit:** TBD this commit.
+**Commit:** `9a3e44f` (S5a audit-scripts cycle).
+
+## Scope Contract — Session 6 (2026-05-25)
+
+Goal: Apply 4 v2 calibration findings to the aplus-research skill in place, with smoke tests where mechanically verifiable. Skill remains usable for the upcoming peptide library campaign.
+
+Acceptance criteria:
+- [x] AC1 — Phase 4.25 ID-Reconcile inserted as BLOCKING gate for standard+; full spec in SKILL.md; `schemas/gate-4.25.schema.json` validated; gate_attest.py wired (ATTESTED_GATES + SOURCE_MD); INV-RESEARCH-CROSS-SECTION-ID added to INVARIANTS register
+- [x] AC2 — Post-fix grep enforcement: dedicated "Remediation brief addendum" section in SKILL.md with verbatim block orchestrator injects into Phase 3.5 iter-2+, 4.25 iter-2+, 4.75 verifier remediation, Phase 6 critique remediation
+- [x] AC3 — Phase 3 judge brief now embeds literal JSON skeleton (9 dimensions + total + threshold + verdict + findings array) with structural rules
+- [x] AC4 — Archive permalink policy documented in Phase 8 §3: scoped under `a-plus-maxing/compounds/_archive/<slug>-<date>-<reason-slug>`; orchestrator rewrites permalink BEFORE archive move in Phase 2.75
+- [x] AC5 — Calibration history table near top of SKILL.md (v1.0 → v1.1 → v2 ACs)
+- [x] AC6 — Smoke verification: gate_attest 16/16 pass (12 existing + 4 new for phase 4.25 round-trip incl. PASS + HALT + override + stale-source); all audit-script suites still green
+- [x] AC7 — Close-protocol audits all exit 0; PF attestation in canonical form (below)
+
+Files I WILL touch:
+- `.claude/skills/aplus-research/SKILL.md`
+- `.claude/skills/aplus-research/references/citation-integrity.md` (if needed)
+- `.claude/skills/aplus-research/schemas/gate-3.5.schema.json` (if AC3 requires)
+- `.claude/skills/aplus-research/schemas/gate-4.75.schema.json` (if AC1 affects)
+- New `.claude/skills/aplus-research/schemas/gate-4.25.schema.json` (only if AC1 = blocking gate)
+- New fixture/smoke test under `.claude/skills/aplus-research/tests/`
+- `HANDOFF.md` (this contract + close note)
+- `memory/process-failures.md` (only if new PF surfaces)
+
+Files I will NOT touch:
+- `vault/library/peptides/bpc-157/*`, `vault/compounds/bpc-157.md`
+- `vault/library/peptides/_triage.md`
+- `scripts/*`, `.claude/hooks/*`
+- `design/*`
+- `INVARIANTS.md` (unless AC1 introduces a new INV; flag at the time)
+- `CLAUDE.md`
+- `~/.claude/skills/deep-research/*`
+
+NOT doing:
+- Peptide library campaign runs (Phase C; separate sessions)
+- Beads dep cleanup (deferred or rolled into close if quick)
+- Specialist role profiles (parallel session)
+- Walter pending items
+- Vault git-tracking decision
+- First HTML artifact (LM-04)
+
+Invariants at risk:
+- INV-RESEARCH-ATTESTATION (gate-3.5 schema touches must preserve attestation_chain)
+- INV-RESEARCH-IC13-CORPUS (remediation grep must stay distinct from IC-13 verifier)
+- INV-HO-ROTATION + INV-HO-NO-STALE-HASH (rotation deferred to last-closing S5/S6 cycle)
+- INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN — standard close discipline
+
+## Session 6 close — v2 aplus-research calibration (2026-05-25)
+
+All 7 ACs PASS. 4 calibration findings applied in place to the existing skill (no fork). One new invariant registered: INV-RESEARCH-CROSS-SECTION-ID. New schema `schemas/gate-4.25.schema.json` + 4 new gate_attest smoke tests (T13-T16). Existing 12 tests still pass.
+
+**Skill changes:**
+- Pipeline overview + mode tables + gate-by-mode matrix updated for Phase 4.25
+- New Phase 4.25 ID-Reconcile spec (5 entity classes: citations, institutions, compound IDs, regulatory dates, trial registrations)
+- New "Remediation brief addendum" section with verbatim post-fix-grep block
+- Phase 3 judge brief includes literal JSON skeleton (9 dimensions, 2 structural rules)
+- Phase 8 §3 archive permalink policy (scoped under `_archive/<slug>-<date>-<reason-slug>`)
+- New Calibration history table near top (v1.0 → v1.1 → v2 ACs)
+- Schema files table updated
+- `lib/gate_attest.py`: phase 4.25 added to ATTESTED_GATES + SOURCE_MD map
+
+**Tests:** 16/16 gate_attest, 89/89 across all audit + hook + gate suites combined.
+
+**Drift checks:**
+- **Task drift:** AC1 introduced a new invariant (INV-RESEARCH-CROSS-SECTION-ID) which was flagged in the original scope contract ("unless AC1 introduces a new INV; flag at the time"). Not silent drift. Otherwise scope held exactly.
+- **Architecture drift:** No invariant degraded. INVARIANTS register gained one mechanically-enforced research-domain invariant. CLAUDE.md Cross-Document Ownership Matrix respected — SKILL.md owns the skill spec, INVARIANTS.md owns the invariants register, schema files own gate verdict structure.
+- **Vision drift:** Same project. System after S6 has the aplus-research skill calibrated against the specific failure modes that S3/S4 BPC-157 surfaced. Skill is now ready for the peptide library campaign (Phase C, separate sessions).
+
+**PF attestation:**
+
+S6 close (2026-05-25): No new PF-class entries this session. The Phase 4.25 schema mismatch I hit mid-session (top-level `iterations` required vs attest_simple not auto-populating it) was a latent gap in the documented scaffold pattern — surfaced by writing the new tests, fixed by following the pre-existing scaffold convention. Not a PF; documented inline in the test file via T13-T16 examples. The `agent-verdict-halt` sentinel inconsistency observed during T15 debugging is also pre-existing (not in any schema's halt_reasons enum); recorded here for v2.5 cleanup. No PF-S2-01, PF-S3-01, or AP-class incidents observed.
