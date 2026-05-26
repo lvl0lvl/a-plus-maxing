@@ -65,3 +65,4 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - 2026-05-25 | create | vault/sessions/session-4.md | S4 mechanical resistance + path-(b) re-verification + rigor framework adoption
 - 2026-05-25 | update | aplus-research SKILL.md | added Hard Rule 9 (no orchestrator self-attestation of gate verdicts); added Attestation chain section documenting gate_attest.py workflow + halt-reason table + threat model
 - 2026-05-25 | rebuild | BPC-157 attestation chain | all 6 gates now carry valid attestation_chain; per-section judge scores iter-4: A=100/B=100/C=100/D=99/E=99/F=100; gate_attest.py verify-chain returns clean
+- 2026-05-26 | create | vault/decisions/2026-05-26-foundation-role-agent-md-location.md | retroactive ADR for foundation-role agent.md canonical-path decision (option C: skills_library canonical + .claude/agents symlink); closes Q4 documentation gap surfaced by parallel design session

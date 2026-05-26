@@ -42,6 +42,7 @@ _(none yet)_
 - [[decisions/2026-05-23-wiki-schema]]
 - [[decisions/2026-05-23-source-whitelist]]
 - [[decisions/2026-05-23-aplus-research-skill]]
+- [[decisions/2026-05-26-foundation-role-agent-md-location]]
 - [[decisions/Project Setup]]
 
 ## experiments/

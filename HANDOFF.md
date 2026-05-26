@@ -135,76 +135,47 @@ System after S2 IS: LLM-driven personal health agent with a queryable knowledge 
 
 Forward-facing readiness for next session. Replaced at every close, not accumulated. Per Rigor Framework Discipline 8.
 
-1. **AP-ORCH-SELF-ATTEST** (PF-S2-01 + PF-S3-01, recurrence_count=2; mitigation hardened this session via `gate_attest.py` + attestation_chain schema + inlining hook). Live going into S5 because the mechanical defenses are still untested in a fresh dispatch — first new aplus-research run in S5+ is the next falsification window. If gate-self-attestation slips past the new defenses → recurrence_count=3 → mandatory structural fix (likely UUIDv4 agent-identity ledger replacing brief-hash uniqueness).
-2. **AP-INCOMPLETE-PROPAGATION** (S4 finding) — when fixing a metadata defect, the fix lands in the obvious place (bibliography line) but adjacent narrative/tally/self-check sections holding the same value are missed. Section A iter-2 missed Ref [2] PMID re-verification; Section C iter-2 missed Xue 2004 institution sweep in narrative lines 43/92/102/106. Mechanical defense: every iter-N remediation must run post-fix grep for the OLD value across the whole file before declaring done. Promote to AP-XXX-NN catalog entry when 2+ AP catalog entries accumulate.
-3. **AP-ORCHESTRATOR-ITER-INFLATION** (S4 finding, BUG-001 root cause) — orchestrator calling `start-iteration --phase X` more times than necessary because of a misconception about iteration scope. Each redundant call moves iter_start_ts forward and invalidates fresh-but-pre-call agent outputs. Mechanical defense: gate_attest.py now supports `--section` for partial-remediation cycles; iteration N is the section's iteration, not the phase's.
+1. **AP-ORCH-SELF-ATTEST** (PF-S2-01 + PF-S3-01, recurrence_count=2) — mechanical defenses (`gate_attest.py` attestation_chain + inlining hook) are live since S4 but **still untested in a fresh aplus-research dispatch**. The first peptide library campaign run (Phase C) is the next falsification window. If gate-self-attestation slips past the new defenses → recurrence_count=3 → mandatory structural fix (likely UUIDv4 agent-identity ledger replacing brief-hash uniqueness).
+2. **AP-INCOMPLETE-PROPAGATION** (S4 finding) — metadata fixes land in obvious places but miss adjacent narrative/tally/self-check sections holding the same value. v2 mitigation embedded in SKILL.md (S6 AC2: post-fix grep block injected into every remediation brief) but untested in production. First Phase 4.25/4.75 remediation cycle in the peptide campaign is the falsification window.
+3. **AP-ACT-BEFORE-VERIFY** (PF-S6-01, new this cycle) — acting on HANDOFF-described state without verifying the state still matches. Caught by user mid-S6 ("what procedure did you use"). Mitigation: `feedback_beads_cleanup_procedure.md` memory; recurrence guard documented. Watch for any "fix the state HANDOFF described" task in future sessions — verify first.
 
 ## Current State (volatile)
-- BPC-157 canonical library entry is **live, re-verified, and carries a clean attestation chain**. All 6 aplus-research gates PASS with agent-source sha256 recorded in each gate JSON. `verify-chain` returns clean.
-- Per-section judge scores (iter-4 final, path-b re-dispatch): A=100, B=100, C=100, D=99, E=99, F=100.
-- Two additional metadata defects surfaced by iter-3 judges (Section A Ref [2] PMID + invented co-author; Section C narrative drift on C6 fix) — both corrected and iter-4 PASS.
-- **Mechanical resistance** is now installed against PF-S3-01 recurrence: `gate_attest.py` + 12/12 smoke tests + required `attestation_chain` in 5 gate schemas; `enforce-role-inlining.sh` PreToolUse hook + 8/8 smoke tests; `INVARIANTS.md` with 11 named invariants (4 still TODO for audit-script wiring in S5).
-- BUG-001 patched in gate_attest.py: per-section iter_start_ts via `--section` flag for path-b partial remediation; JSON `iteration` field takes precedence over filename suffix; schema iter max 3 → 4.
-- `vault/meta/landmarks.md` register established. 4 active landmarks (LM-01 doctor visit, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact). Landmark-agnostic by design — status flips to `completed` after windows exhausted, no silent failure.
-- Beads: epic `a-plus-maxing-c6k` (P1) ready; `a-plus-maxing-3py` closed in S3.
-- Branch: `feature/wiki-bpc157-aplus-research` at commit `8b05b30` as of 2026-05-25 S4 close. Ephemeral; no upstream push. Vault gitignore decision still unresolved.
+- **BPC-157 canonical library entry** live with clean attestation_chain across all 6 gates. Per-section judge scores (iter-4 final, path-b re-dispatch): A=100, B=100, C=100, D=99, E=99, F=100.
+- **Mechanical-enforcement infrastructure complete** (S5a): 3 audit scripts (`handoff-audit.sh`, `scope-contract-audit.sh`, `pf-attestation-audit.sh`) + `audit-helpers.sh` shared lib + `block-commit-main.sh` PreToolUse hook. Wired into CLAUDE.md close step 8.5. 73/73 audit-side tests pass. 5 invariants promoted from TODO to live: INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN.
+- **aplus-research v2 calibration complete** (S6): Phase 4.25 ID-Reconcile gate inserted as BLOCKING for standard+; post-fix grep brief addendum; judge JSON skeleton; archive permalink policy. New schema `gate-4.25.schema.json` + 4 new gate_attest tests (T13-T16). INV-RESEARCH-CROSS-SECTION-ID registered. 16/16 gate_attest tests pass.
+- **Design/Pass 1 complete** (parallel S5 cycle): 4 foundation-role Phase 0 deep-research deliverables for the 14-specialist roster build (health-specialist-architect, health-implementer, health-edge-case-reviewer, medical-safety-reviewer). ~49,500 words total. All cleared 99/100 rubric across iter cycles. Brief at `design/CONTINUATION_BRIEF.md` packages everything for Pass 2 + Pass 3.
+- **INVARIANTS register at 12 entries** (was 8 at S4 close). 4 invariants still rely on manual discipline; remaining gaps documented in INVARIANTS.md §"Pending mechanical-enforcement gaps."
+- **Active landmarks** unchanged: LM-01 doctor visit (July 2026), LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact. No trigger windows open today.
+- **Branch:** `feature/wiki-bpc157-aplus-research` at commit `7437abd` as of 2026-05-26 S5/S6 joint close. Ephemeral; no upstream push.
 
-**Historical (kept for reference):** Session 3 BPC-157 rebuild context lives in `vault/sessions/session-3.md`.
+**Historical (kept for reference):** prior-cycle state lives in `vault/sessions/session-4.md`; design/Pass 1 detail in `design/CONTINUATION_BRIEF.md`.
 
 ## What Is Next (volatile)
 
-### Mechanical-enforcement TODO from INVARIANTS.md (S5–S6)
-- `scripts/handoff-audit.sh` for INV-HO-ROTATION + INV-HO-NO-STALE-HASH (rotation discipline content-pattern + structural-integrity checks per Rigor Framework Discipline 5).
-- pre-commit hook for INV-BRANCH-NOT-MAIN (mirror of push-block; PF-S2-06 recurrence guard).
-- close-protocol audit for INV-SCOPE-CONTRACT (verifies HANDOFF carries a scope contract dated this session).
-- close-protocol audit for INV-PF-ATTESTATION (verifies PF log either has new entry OR explicit "No PF this session" line dated this session).
-- `scripts/lib/audit-helpers.sh` shared library (emit / fail / violations counter) per Rigor Framework Discipline 5 §3.
+### Phase C — Peptide library campaign (highest leverage; aplus-research v2 falsification window)
+The aplus-research skill is now calibrated against its own documented failure modes (S3/S4/S5/S6). The first new `/aplus-research` run since the v2 calibration is the falsification window for Top-3 items 1 + 2. Each peptide run is its own session by default (long-running, per-peptide close-protocol audits matter). Triage queue lives at `vault/library/peptides/_triage.md`.
 
-### v2 calibration findings from S3 + S4 (for next aplus-research upgrade cycle)
-- Cross-section identity reconciliation step in Phase 4 (catches metadata mismatches BEFORE Phase 4.75 verifier needs to). Iter-3 surfaced 2 defects the in-skill iter-2 remediation missed; a Phase 4 sub-step would have caught them earlier.
-- Post-fix grep enforcement in remediation agents — every metadata-correction agent must run grep for the OLD value across the whole file before declaring done (AP-INCOMPLETE-PROPAGATION mitigation).
-- Phase 6 critique re-run on refined draft was correctly required by the gate spec; the orchestrator-self-attest in S3 was the violation, not the spec. The corrected protocol stands.
-- Permalink-suffix collision on `vault/compounds/<slug>.md` permalink when prior archive carries the same permalink (linter auto-suffixes `-1`) — document in SKILL.md as expected behavior or change archive permalinks to scope under `_archive/`.
-- v2 judge briefs must require the literal JSON skeleton inline (S3 judges returned divergent shapes; S4 was templated more tightly and worked cleanly).
+### Design Pass 2 — foundation role design docs (per `design/CONTINUATION_BRIEF.md` §6 option A)
+Sequential per role 1→4 via design-doc-protocol Phase 1-5. Requires no new infrastructure; reuses inlining hook + existing audit scripts. User authorization needed before kickoff (per Pass 1 checkpoint).
 
-### Specialist-role profile rollout (S4–S6)
-- Author 11-section role profile for `peptide-specialist` (first specialist agent that will consume the BPC-157 entry, ahead of the July 2026 doctor visit).
-- Author `medical-liaison` role profile (downstream consumer for the doctor-handout queue).
-- Inlining hook will block their dispatch until full profiles exist — discipline enforced at dispatch time.
+### Design Pass 3 — pilot specialists (labs-specialist, peptide-specialist, medical-liaison)
+Runs after Pass 2 completes. Peptide-specialist is on the LM-01 (July 2026 doctor visit) critical path.
 
-### Open project work
-- Walter pending: 23andMe raw file to `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health issue characterization (per operator-profile.md; `medium+` risk-tier HALT remains active on BPC-157 movement from `researching` to `planned` until populated).
+### Candidate audit-script extensions (from design/Pass 1 §9 candidate invariants)
+- `INV-DESIGN-DOC-SYMMETRY` + `scripts/design-doc-audit.sh` — body↔bibliography symmetry; ~50-line bash; defer until Pass 2 emits its first `design/{role}-design.md`
+- Pattern-label consistency check (synthesis P-labels ⊆ Phase-4 verifier P-catalog)
+- Deep-research deliverable floors (word count, source count, no-placeholder)
+- Fabrication-shaped URL scan
+None promoted yet; require user authorization + INVARIANTS change-discipline ritual.
+
+### v2.5 punch-list (small)
+- `agent-verdict-halt` sentinel inconsistency — `gate_attest.py` fallback string not in any gate schema's `halt_reasons` enum; orchestrator workaround documented as Open Issue. Either extend enums or change fallback.
+- Comment in `enforce-role-inlining.sh` noting the path-obfuscation edge case is known + intentional (per design/Pass 1 Q1 disclosure).
+
+### Open project work (unchanged)
+- Walter pending: 23andMe raw file to `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health issue characterization. `medium+` risk-tier HALT remains active on BPC-157 movement from `researching` to `planned` until populated.
 - Vault git-tracking decision still deferred.
 - First HTML artifact generation still deferred (LM-04 active landmark).
-
-### Drift checks (S4 close)
-
-**Task drift:** S4 began as "build mechanical resistance" then expanded user-directed to "adopt rigor framework + re-verify BPC-157 entry via path-(b)." Every expansion was explicit user direction; every acceptance criterion evaluated PASS. The user-issued path-(a) authorization for the Section A + C iter-3 HALTs was an explicit scope extension, not silent drift. No silent task drift.
-
-**Architecture drift:** Cross-Document Ownership Matrix check — `gate_attest.py` is the canonical writer for gate-3.5 / 4.75 / 6 / 7.5 / 8.5 JSONs (lives in `.claude/skills/aplus-research/lib/`); CLAUDE.md owns session protocols; INVARIANTS.md owns the invariants register; vault/meta/landmarks.md owns the landmark register. Each is single-owner. Rotation rule applied to Top-3 + Current State + What Is Next. No SHA prefixes in narrative prose (commit `8b05b30` self-dated this section close, not embedded in prose elsewhere). No architecture invariant degraded; several were strengthened by mechanical-enforcement uplift.
-
-**Vision drift:** System after S4 IS: LLM-driven personal health agent with the aplus-research skill mechanically resistant to its own documented failure modes (PF-S2-01 + PF-S3-01), a clean attestation chain on the BPC-157 canonical entry, an explicit invariants register, a landmark-agnostic register, and rigor-framework session protocols. Same project as S1; no vision drift. The system can now defend against the failure class that produced PF-S3-01 — the rigor compounds rather than the drift.
-
-### Rigor Framework adoption progress (per §11 sequence)
-
-| Discipline | Adoption status |
-|---|---|
-| 1 Session lifecycle | ✅ Start/close protocols, 3-axis drift, recovery, scope contract template |
-| 2 Memory stack | ✅ Four layers + PF log in place |
-| 3 Document Ownership Matrix | ✅ In CLAUDE.md |
-| 4 Rotation rule (6-clause) | ✅ In CLAUDE.md; audit script TODO S5 |
-| 5 Invariants + mechanical enforcement | 🟡 INVARIANTS.md + 2 mechanical defenses (gate_attest.py, inlining hook); 4 TODO audit scripts |
-| 6 3-session pipeline | 🟡 Recognized; aplus-research v1.1 (`gate_attest.py`) is technically a compressed in-session 3-wave; first true Fork-Upgrade-Run cycle slated for v2 |
-| 7 HALT-and-close-cleanly | ✅ Applied this session (path-(a) authorization, path-(b) re-dispatch); self-recognition flags in CLAUDE.md |
-| 8 Failure-mode discipline | ✅ PF log with recurrence_count, AP class tags emerging, Top-3 pointer in HANDOFF, "No PF this session" attestation mandatory |
-| 9 Agent roles + adversarial review | 🟡 Inlining hook live; 11-section role profiles still TODO for project specialists (peptide-specialist, medical-liaison) |
-| 10 Orchestrator skill spec | 🟡 CLAUDE.md is functional equivalent; not yet a callable `orchestrator` skill |
-
-S5+ priorities: Discipline 5 audit scripts + Discipline 9 specialist role profiles.
-
-## PF attestation (mandatory per CLAUDE.md close step 4)
-
-S4 close (2026-05-25): One new PF entry promoted (PF-S3-01, dated 2026-05-24, written this session with recurrence_count=2). No additional PF-class incidents observed during the S4 mechanical-resistance build + re-verification work. Two AP candidates surfaced (AP-INCOMPLETE-PROPAGATION, AP-ORCHESTRATOR-ITER-INFLATION) but neither has recurrence yet; tracked in Top-3 pointer instead of catalog. The path-(b) re-dispatch discipline worked as designed — surfaced 2 metadata defects the prior remediation cycle had missed, validating the framework's "every Session B catches something" claim.
 
 ## Landmark window check (close step 8.7)
 
