@@ -156,13 +156,16 @@ Forward-facing readiness for next session. Replaced at every close, not accumula
 
 **Highest leverage.** Run `/upgrade-agent` against the now-Final `design/health-specialist-architect-design.md` → produces the deployed `~/Documents/Projects/skills_library/roles/health-specialist-architect/agent.md`. This is the second-half of Pass-2 Role 1 (the design-doc-protocol produced the spec; `/upgrade-agent` produces the agent profile).
 
+**Session-kickoff brief ready** at `design/.health-specialist-architect-design-work/SESSION_B_KICKOFF.md` — read FIRST after standard session-start protocol. Contains operational guide for all 8 `/upgrade-agent` phases + 7 known edge cases + suggested S9 scope contract template + falsification window framing.
+
 Operational substrate ready:
 - Design doc: `design/health-specialist-architect-design.md` (Status: Final, 873 lines, all 18 sections + Appendix A + Phase Coverage Matrix + Self-attest checklist)
 - Phase-4 verification record: `design/.health-specialist-architect-design-work/finding-classifications.md` (38 findings classified)
-- `/upgrade-agent` command at `~/.claude/commands/upgrade-agent.md` (8-phase pipeline)
+- `/upgrade-agent` command at `~/.claude/commands/upgrade-agent.md` (8-phase pipeline, 16,641 bytes)
 - AGENT_TEMPLATE.md at `~/Documents/Projects/skills_library/roles/AGENT_TEMPLATE.md` (10 base sections + Modes)
+- Orchestrator catalog at `~/Documents/Projects/skills_library/roles/orchestrator/catalog.md` (gains a row for the new role at Phase 7)
 
-Estimated cost: per `/upgrade-agent` phase budget. Single session likely sufficient.
+Estimated cost: per `/upgrade-agent` phase budget — 3 research + 2N validation (fact-checker + judge) + 1 adversarial dispatches. Single session likely sufficient if Phase 4 converges in iter-1; two sessions if iter-2 needed.
 
 ### Subsequent sessions (queued in order)
 - **S10–S12:** Pass-2 for Roles 2, 3, 4 (sequential per CONTINUATION_BRIEF §7). Roles 2/3/4 INHERIT the OUTBOUND interface contracts from Role 1's now-Final §4: 8 refusal classes (incl. AUTHORITY_FRAMING_BYPASS), H-class composition (H1-H8 + worst-case-reachable rule), GRADE two-axis discipline, three-mechanism anti-sycophancy, operator-profile R7 precondition, contradiction discipline, aplus-research mode floor, medical-safety-reviewer Council-Mode slot.
