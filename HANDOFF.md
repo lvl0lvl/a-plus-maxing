@@ -146,7 +146,7 @@ Forward-facing readiness for next session. Replaced at every close, not accumula
 - **Design/Pass 1 complete** (parallel S5 cycle): 4 foundation-role Phase 0 deep-research deliverables for the 14-specialist roster build (health-specialist-architect, health-implementer, health-edge-case-reviewer, medical-safety-reviewer). ~49,500 words total. All cleared 99/100 rubric across iter cycles. Brief at `design/CONTINUATION_BRIEF.md` packages everything for Pass 2 + Pass 3.
 - **INVARIANTS register at 12 entries** (was 8 at S4 close). 4 invariants still rely on manual discipline; remaining gaps documented in INVARIANTS.md §"Pending mechanical-enforcement gaps."
 - **Active landmarks** unchanged: LM-01 doctor visit (July 2026), LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact. No trigger windows open today.
-- **Branch:** `feature/wiki-bpc157-aplus-research` at commit `7437abd` as of 2026-05-26 S5/S6 joint close. Ephemeral; no upstream push.
+- **Branch:** `feature/wiki-bpc157-aplus-research` at commit `d6c992a` as of 2026-05-26 S5/S6 joint close. `main` also at `d6c992a`. Both pushed to `origin` (github.com/lvl0lvl/a-plus-maxing) after remote-rebuild bootstrap on 2026-05-26.
 
 **Historical (kept for reference):** prior-cycle state lives in `vault/sessions/session-4.md`; design/Pass 1 detail in `design/CONTINUATION_BRIEF.md`.
 
