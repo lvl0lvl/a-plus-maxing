@@ -135,42 +135,49 @@ System after S2 IS: LLM-driven personal health agent with a queryable knowledge 
 
 Forward-facing readiness for next session. Replaced at every close, not accumulated. Per Rigor Framework Discipline 8.
 
-1. **AP-ORCH-SELF-ATTEST** (PF-S2-01 + PF-S3-01, recurrence_count=2) — mechanical defenses (`gate_attest.py` attestation_chain + inlining hook) are live since S4 but **still untested in a fresh aplus-research dispatch**. The first peptide library campaign run (Phase C) is the next falsification window. If gate-self-attestation slips past the new defenses → recurrence_count=3 → mandatory structural fix (likely UUIDv4 agent-identity ledger replacing brief-hash uniqueness).
-2. **AP-INCOMPLETE-PROPAGATION** (S4 finding) — metadata fixes land in obvious places but miss adjacent narrative/tally/self-check sections holding the same value. v2 mitigation embedded in SKILL.md (S6 AC2: post-fix grep block injected into every remediation brief) but untested in production. First Phase 4.25/4.75 remediation cycle in the peptide campaign is the falsification window.
-3. **AP-ACT-BEFORE-VERIFY** (PF-S6-01, new this cycle) — acting on HANDOFF-described state without verifying the state still matches. Caught by user mid-S6 ("what procedure did you use"). Mitigation: `feedback_beads_cleanup_procedure.md` memory; recurrence guard documented. Watch for any "fix the state HANDOFF described" task in future sessions — verify first.
+1. **AP-ORCH-SELF-ATTEST** (PF-S2-01 + PF-S3-01, recurrence_count=2) — mechanical defenses are live since S4. S7 successfully held the discipline in design-doc-protocol Phase 4 (each finding personally source-read; 2 of 22 rejected with cited evidence). **Still untested in a fresh aplus-research dispatch** — the first peptide library campaign run remains the v2-falsification window. S8 (Pass-2 Role 1) is the second consecutive PF-S3-01-guard test, in the design-doc-protocol context.
+2. **AP-INCOMPLETE-PROPAGATION** (S4 finding) — v2 mitigation (post-fix grep + Phase 4.25 ID-Reconcile + DESIGN_DOC_TEMPLATE §7 self-attest checklist) embedded in three skill/doc layers. S7's 22-finding × 18-section synthesis was the first stress case; the §7 checklist held. **Untested in a real Pass-2 design doc** — S8 is the falsification window for the template-level defenses.
+3. **AP-ACT-BEFORE-VERIFY** (PF-S6-01) — acting on HANDOFF-described state without verifying it still matches. Feedback memory `feedback_beads_cleanup_procedure.md` + verify-first procedure. Recurrence guard: at S8 start, verify Pass-1 deliverables still exist at named paths before dispatching drafters; verify `DESIGN_DOC_TEMPLATE.md` is at commit `0563269` (as of 2026-05-26 S7 close) or later.
 
 ## Current State (volatile)
-- **BPC-157 canonical library entry** live with clean attestation_chain across all 6 gates. Per-section judge scores (iter-4 final, path-b re-dispatch): A=100, B=100, C=100, D=99, E=99, F=100.
-- **Mechanical-enforcement infrastructure complete** (S5a): 3 audit scripts (`handoff-audit.sh`, `scope-contract-audit.sh`, `pf-attestation-audit.sh`) + `audit-helpers.sh` shared lib + `block-commit-main.sh` PreToolUse hook. Wired into CLAUDE.md close step 8.5. 73/73 audit-side tests pass. 5 invariants promoted from TODO to live: INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN.
-- **aplus-research v2 calibration complete** (S6): Phase 4.25 ID-Reconcile gate inserted as BLOCKING for standard+; post-fix grep brief addendum; judge JSON skeleton; archive permalink policy. New schema `gate-4.25.schema.json` + 4 new gate_attest tests (T13-T16). INV-RESEARCH-CROSS-SECTION-ID registered. 16/16 gate_attest tests pass.
-- **Design/Pass 1 complete** (parallel S5 cycle): 4 foundation-role Phase 0 deep-research deliverables for the 14-specialist roster build (health-specialist-architect, health-implementer, health-edge-case-reviewer, medical-safety-reviewer). ~49,500 words total. All cleared 99/100 rubric across iter cycles. Brief at `design/CONTINUATION_BRIEF.md` packages everything for Pass 2 + Pass 3.
-- **INVARIANTS register at 12 entries** (was 8 at S4 close). 4 invariants still rely on manual discipline; remaining gaps documented in INVARIANTS.md §"Pending mechanical-enforcement gaps."
-- **Active landmarks** unchanged: LM-01 doctor visit (July 2026), LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact. No trigger windows open today.
-- **Branch:** `feature/wiki-bpc157-aplus-research` at commit `d6c992a` as of 2026-05-26 S5/S6 joint close. `main` also at `d6c992a`. Both pushed to `origin` (github.com/lvl0lvl/a-plus-maxing) after remote-rebuild bootstrap on 2026-05-26.
+- **`design/DESIGN_DOC_TEMPLATE.md`** is the canonical contract for 18 future design docs (4 foundation + 14 specialists). 774 lines. Status: Final at commit `0563269` as of 2026-05-26 S7 close. Adversarial-review provenance preserved in `design/.design-doc-template-work/` (architect-proposal, red-team-adversarial, finding-classifications).
+- **Pass-2 Role 1 is the next session's work.** Session-kickoff brief written at `design/.health-specialist-architect-design-work/SESSION_KICKOFF.md` with operational guide for Phase 1–5. Pre-flight reads + dispatch patterns + 6 known edge cases documented.
+- **BPC-157 canonical library entry** live with clean attestation_chain across all 6 gates (iter-4 final scores A=100, B=100, C=100, D=99, E=99, F=100). Phase 4.25 ID-Reconcile and post-fix-grep enforcement now built into the aplus-research skill (S6 v2 calibration) but not yet exercised on a fresh peptide run.
+- **Mechanical-enforcement infrastructure** (S5a): 3 audit scripts + `audit-helpers.sh` shared lib + `block-commit-main.sh` PreToolUse hook. 73/73 audit-side tests pass. 5 process/format invariants now mechanically enforced.
+- **INVARIANTS register at 12 entries**. Categories: 2 Format/Document + 3 Process + 1 Role-discipline + 6 Research-domain. Per S7-template §16 disposition, only the first 3 categories (Format/Doc + Process + Role-discipline = 6 invariants) are in-scope for non-research-dispatching roles like the 4 foundation roles.
+- **Active landmarks unchanged.** LM-01 doctor visit (July 2026); LM-02 Oura; LM-03 23andMe; LM-04 first HTML artifact. No trigger windows open today.
+- **Branch:** `feature/wiki-bpc157-aplus-research` at commit `f3533ed` as of 2026-05-26 S7 close. Pushed to `origin/feature/wiki-bpc157-aplus-research`. `main` last sync'd at `d6c992a` (S5/S6 close); main is now 4 commits behind feature.
 
-**Historical (kept for reference):** prior-cycle state lives in `vault/sessions/session-4.md`; design/Pass 1 detail in `design/CONTINUATION_BRIEF.md`.
+**Historical (kept for reference):** S5/S6 + design Pass-1 details in `vault/sessions/session-4.md` and `design/CONTINUATION_BRIEF.md`.
 
 ## What Is Next (volatile)
 
-### Phase C — Peptide library campaign (highest leverage; aplus-research v2 falsification window)
-The aplus-research skill is now calibrated against its own documented failure modes (S3/S4/S5/S6). The first new `/aplus-research` run since the v2 calibration is the falsification window for Top-3 items 1 + 2. Each peptide run is its own session by default (long-running, per-peptide close-protocol audits matter). Triage queue lives at `vault/library/peptides/_triage.md`.
+### S8 — Pass-2 Role 1 design doc (health-specialist-architect)
 
-### Design Pass 2 — foundation role design docs (per `design/CONTINUATION_BRIEF.md` §6 option A)
-Sequential per role 1→4 via design-doc-protocol Phase 1-5. Requires no new infrastructure; reuses inlining hook + existing audit scripts. User authorization needed before kickoff (per Pass 1 checkpoint).
+**Highest leverage; first end-to-end run of DESIGN_DOC_TEMPLATE.md.** Per CONTINUATION_BRIEF §7 sequential ordering, Role 1 is authored first because its design doc establishes the template variant + cross-role references that Roles 2/3/4 will inherit.
 
-### Design Pass 3 — pilot specialists (labs-specialist, peptide-specialist, medical-liaison)
-Runs after Pass 2 completes. Peptide-specialist is on the LM-01 (July 2026 doctor visit) critical path.
+Operational substrate ready:
+- Template: `design/DESIGN_DOC_TEMPLATE.md` (Status: Final, 774 lines)
+- Pass-1 substrate: `design/.health-specialist-architect-design-work/domain-research.md` (~91KB, Findings + R1-R15)
+- Session brief: `design/.health-specialist-architect-design-work/SESSION_KICKOFF.md` (focused operational guide — read FIRST after standard session-start protocol)
+- v1-substitute software role profiles for drafters: `~/Documents/Projects/skills_library/roles/{architect,senior-engineer,qa}/agent.md`
+- v1-substitute software security profile for safety reviewer: `~/Documents/Projects/skills_library/roles/security/agent.md`
 
-### Candidate audit-script extensions (from design/Pass 1 §9 candidate invariants)
-- `INV-DESIGN-DOC-SYMMETRY` + `scripts/design-doc-audit.sh` — body↔bibliography symmetry; ~50-line bash; defer until Pass 2 emits its first `design/{role}-design.md`
-- Pattern-label consistency check (synthesis P-labels ⊆ Phase-4 verifier P-catalog)
-- Deep-research deliverable floors (word count, source count, no-placeholder)
-- Fabrication-shaped URL scan
-None promoted yet; require user authorization + INVARIANTS change-discipline ritual.
+Estimated cost: 5 Agent dispatches (3 drafters + 2 red-team) + orchestrator synthesis. One session if no iter-2 needed.
 
-### v2.5 punch-list (small)
-- `agent-verdict-halt` sentinel inconsistency — `gate_attest.py` fallback string not in any gate schema's `halt_reasons` enum; orchestrator workaround documented as Open Issue. Either extend enums or change fallback.
-- Comment in `enforce-role-inlining.sh` noting the path-obfuscation edge case is known + intentional (per design/Pass 1 Q1 disclosure).
+### Subsequent sessions (queued in order)
+- **S9–S11:** Pass-2 for Roles 2, 3, 4 (sequential per CONTINUATION_BRIEF §7)
+- **Session B per role** (interleaved after each Pass-2 finalizes): `/upgrade-agent` deploys the role's agent.md from the design doc
+- **Pass-3 deep-research for 14 specialists** (after all 4 foundation roles deployed)
+- **Phase C: peptide library campaign** runs in parallel; per-peptide sessions; falsification window for AP-ORCH-SELF-ATTEST and AP-INCOMPLETE-PROPAGATION in aplus-research context (separate from the design-doc-protocol context)
+
+### Candidate audit-script extensions (deferred until Pass-2 emits its first design doc)
+- `INV-DESIGN-DOC-SYMMETRY` + `scripts/design-doc-audit.sh` — body↔bibliography symmetry on `design/{role}-design.md` files; ~50-line bash. Now actionable after S8 completes (will have a first instance to test against).
+- Pattern-label consistency, deep-research deliverable floors, fabrication-shaped URL scan — same deferral pattern.
+
+### v2.5 punch-list (small, deferable indefinitely)
+- `agent-verdict-halt` sentinel inconsistency (gate_attest.py vs schema enums; documented in Open Issues)
+- Comment in `enforce-role-inlining.sh` documenting the path-obfuscation edge case per CONTINUATION_BRIEF §1 Q1
 
 ### Open project work (unchanged)
 - Walter pending: 23andMe raw file to `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health issue characterization. `medium+` risk-tier HALT remains active on BPC-157 movement from `researching` to `planned` until populated.
