@@ -1,10 +1,12 @@
 ---
 title: Session B Kickoff — /upgrade-agent for Role 1 (health-specialist-architect)
 type: session-prep
-status: ready
+status: consumed
 created: 2026-05-26
 prepared_at: S8 close
 target_session: S9 (next session after compaction)
+consumed_at: 2026-05-26 S9 close
+consumed_by: S9 successfully deployed ~/Documents/Projects/skills_library/roles/health-specialist-architect/agent.md
 scope: Run /upgrade-agent against design/health-specialist-architect-design.md to produce deployed agent.md
 predecessor: design/.health-specialist-architect-design-work/SESSION_KICKOFF.md (S7→S8 brief, now consumed)
 ---
