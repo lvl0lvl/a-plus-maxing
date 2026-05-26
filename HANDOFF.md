@@ -353,11 +353,11 @@ S6 close (2026-05-25): One new PF entry promoted (PF-S6-01, AP-ACT-BEFORE-VERIFY
 Goal: Produce the canonical `DESIGN_DOC_TEMPLATE.md` that will structure every Pass-2 design doc (4 foundation roles + 14 specialists). Adapt the Quant command-upgrade design-doc-protocol (which is command-upgrade-shaped) into an agent-role-design-doc-shape, validated against Pass-1 deliverables, `/upgrade-agent` requirements, and AGENT_TEMPLATE.md. Three-step pipeline: Architect proposes adaptation → adversarial-review red-team → orchestrator verifies findings + synthesizes final template.
 
 Acceptance criteria:
-- [ ] AC1 — Architect-role sub-agent dispatched with full 11-section profile inlined (INV-ROLE-INLINING). Reads Quant `design-doc-protocol.md`, `/upgrade-agent` command, `AGENT_TEMPLATE.md`, all 4 Pass-1 `domain-research.md` files, `design/CONTINUATION_BRIEF.md`. Output: `design/.design-doc-template-work/architect-proposal.md` proposing adapted section structure with explicit Quant→medical mapping (what transfers / what must change / what must be added).
-- [ ] AC2 — `/adversarial-review` skill agent dispatched on the proposal. 8-category document walk. Output: `design/.design-doc-template-work/red-team-adversarial.md` with finding-ID + section + description + severity + suggested fix per item.
-- [ ] AC3 — Orchestrator personally verifies each red-team finding (PF-S3-01 guard). Each finding classified Legitimate (factual, not hallucinated, not a goal-misread, adds value) or Rejected (with cited evidence). Burden of proof on rejection. Output: `design/.design-doc-template-work/finding-classifications.md`.
-- [ ] AC4 — Synthesis: `design/DESIGN_DOC_TEMPLATE.md` at design/ root with `Status: Final`. Rejected findings → Appendix A with citations. Every section justified against agent-role-design (not command-upgrade).
-- [ ] AC5 — Close-protocol audits exit 0; PF attestation in canonical form.
+- [x] AC1 — Architect-role sub-agent dispatched with full 11-section profile inlined; produced `design/.design-doc-template-work/architect-proposal.md` (422 lines, 18 sections, full 10-input source-read)
+- [x] AC2 — `/adversarial-review` skill agent dispatched; 22 findings across 11 categories (8 standard + 3 agent-specific); both mechanical coverage checks executed
+- [x] AC3 — Orchestrator personally verified each finding against cited source per PF-S3-01 guard. Classifications: 16 Legitimate, 4 Legitimate-modified, 2 Rejected with cited-evidence attestations at `design/.design-doc-template-work/finding-classifications.md`
+- [x] AC4 — `design/DESIGN_DOC_TEMPLATE.md` synthesized (774 lines), `Status: Final`; rejected findings preserved in §10 with source-of-truth attestations
+- [x] AC5 — All 3 audits exit 0 at `--session 7`; PF attestation below in canonical form
 
 Files I WILL touch:
 - `design/.design-doc-template-work/` (NEW dir + 3 artifacts: architect-proposal.md, red-team-adversarial.md, finding-classifications.md)
@@ -390,3 +390,19 @@ Invariants at risk:
 - INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN — standard close discipline
 
 Self-recognition pre-flight: None of the canonical PF-S3-01 framings apply yet. Specifically watching for "the architect's proposal already looks good, the red-team is just bookkeeping" during AC2/AC3.
+
+## Session 7 close — design-doc template (2026-05-26)
+
+Foundational artifact complete. `design/DESIGN_DOC_TEMPLATE.md` is the canonical contract for 18 downstream design docs (4 foundation roles in Pass-2; 14 specialists in Pass-4). Commit `0563269`. Pushed to `origin/feature/wiki-bpc157-aplus-research`. All 5 ACs PASS. PF-S3-01 guard cleanly held — adversarial-review findings were each personally verified against source before classification; 2 findings rejected with cited-evidence attestation (F-006 R-count empirical premise, F-023 worked-example copy-edit).
+
+**Drift checks:**
+
+- **Task drift:** S7 contract was 5 ACs. Mid-session the user flagged that I had conflated Pass-2 (design doc) with Session B (`/upgrade-agent` deployment) in my original scope-shaping question. I re-read the protocols + brief, restructured the plan, and the user accepted the corrected read. Two scope expansions surfaced: (a) capturing the "reject-but-adopt" pattern as a feedback memory (user-approved); (b) strengthening the Pass-1-complete status snapshot in the template §0.1 so future sessions can't miss it (user-approved). Both expansions were explicit user direction; no silent drift.
+- **Architecture drift:** No invariant degraded. The template itself is a load-bearing new artifact but does not modify existing invariants. The Quant→Medical adaptation followed the project's existing Cross-Document Ownership Matrix (design docs are owned by `design/`; `/upgrade-agent` Phase 7 enforces generic agent.md constraints; the template explicitly delegates to it via §15.1 rather than restating). The 10-vs-11 AGENT_TEMPLATE.md disambiguation (F-001) preserves the existing `enforce-role-inlining.sh` hook semantics — the hook stays correct as-is for its purpose (catching incomplete mature profiles).
+- **Vision drift:** Same project. System after S7 has the canonical design-doc structure that will produce 18 medical-LLM agent profiles. The foundation-role design docs (Pass-2) are now unblocked. The peptide library campaign (Phase C) remains the other parallel forward direction. No vision drift; the rigor compounds.
+
+**PF attestation:**
+
+S7 close (2026-05-26): No new PF-class entries this session. Watched specifically for PF-S3-01 recurrence during AC3 (the verification phase) — the discipline held: each finding was source-read before classification, two were rejected with cited evidence, the reject-but-adopt pattern was documented as a feedback memory rather than smuggled in as Legitimate. Watched for the "minor accretion" framing during the scope expansion for the template §0.1 status snapshot — declined to skip; the snapshot is load-bearing for the next session's correct read of pipeline state. AP-INCOMPLETE-PROPAGATION did NOT surface — synthesizing 22 findings across an 18-section template was the natural stress case for missed-propagation, and the §7 self-attest checklist was the explicit defense.
+
+One observation worth noting (not promoted to PF): the inlining hook caught the H1 pattern `# Adversarial Reviewer` on my second sub-agent dispatch, exactly as Pass-1's CONTINUATION_BRIEF §1 Q1 documented. I rewrote the dispatch to use the `/adversarial-review` skill instead of role-tagged prose. This is the documented edge case where research-using-a-role-file is conflated with role-tagging-a-dispatch; the hook's deterrent behavior is correct.
