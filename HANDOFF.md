@@ -347,3 +347,46 @@ All 7 ACs PASS. 4 calibration findings applied in place to the existing skill (n
 **PF attestation:**
 
 S6 close (2026-05-25): One new PF entry promoted (PF-S6-01, AP-ACT-BEFORE-VERIFY) caught by user mid-session: started a "beads cleanup" task without verifying current state or having a documented procedure; HANDOFF entry was stale and the issue had been resolved in S3/S4. User's "what procedure did you use" forced the honest answer. Logged in `memory/process-failures.md` with recurrence_count=1; feedback memory `feedback_beads_cleanup_procedure.md` saved with verify-first procedure. No PF-S2-01 or PF-S3-01 class recurrences observed. The Phase 4.25 schema mismatch I hit mid-session (top-level `iterations` required vs attest_simple not auto-populating it) was a latent gap in the documented scaffold pattern — not a PF; documented inline via T13-T16 tests. The `agent-verdict-halt` sentinel inconsistency observed during T15 debugging is pre-existing; recorded as an Open Issue for v2.5 cleanup.
+
+## Scope Contract — Session 7 (2026-05-26)
+
+Goal: Produce the canonical `DESIGN_DOC_TEMPLATE.md` that will structure every Pass-2 design doc (4 foundation roles + 14 specialists). Adapt the Quant command-upgrade design-doc-protocol (which is command-upgrade-shaped) into an agent-role-design-doc-shape, validated against Pass-1 deliverables, `/upgrade-agent` requirements, and AGENT_TEMPLATE.md. Three-step pipeline: Architect proposes adaptation → adversarial-review red-team → orchestrator verifies findings + synthesizes final template.
+
+Acceptance criteria:
+- [ ] AC1 — Architect-role sub-agent dispatched with full 11-section profile inlined (INV-ROLE-INLINING). Reads Quant `design-doc-protocol.md`, `/upgrade-agent` command, `AGENT_TEMPLATE.md`, all 4 Pass-1 `domain-research.md` files, `design/CONTINUATION_BRIEF.md`. Output: `design/.design-doc-template-work/architect-proposal.md` proposing adapted section structure with explicit Quant→medical mapping (what transfers / what must change / what must be added).
+- [ ] AC2 — `/adversarial-review` skill agent dispatched on the proposal. 8-category document walk. Output: `design/.design-doc-template-work/red-team-adversarial.md` with finding-ID + section + description + severity + suggested fix per item.
+- [ ] AC3 — Orchestrator personally verifies each red-team finding (PF-S3-01 guard). Each finding classified Legitimate (factual, not hallucinated, not a goal-misread, adds value) or Rejected (with cited evidence). Burden of proof on rejection. Output: `design/.design-doc-template-work/finding-classifications.md`.
+- [ ] AC4 — Synthesis: `design/DESIGN_DOC_TEMPLATE.md` at design/ root with `Status: Final`. Rejected findings → Appendix A with citations. Every section justified against agent-role-design (not command-upgrade).
+- [ ] AC5 — Close-protocol audits exit 0; PF attestation in canonical form.
+
+Files I WILL touch:
+- `design/.design-doc-template-work/` (NEW dir + 3 artifacts: architect-proposal.md, red-team-adversarial.md, finding-classifications.md)
+- `design/DESIGN_DOC_TEMPLATE.md` (NEW — canonical template)
+- `HANDOFF.md` (this contract + close note)
+- `memory/process-failures.md` (only if new PF surfaces)
+
+Files I will NOT touch:
+- Existing `design/.{role}-design-work/` × 4 (Pass-1 deliverables — read-only)
+- `design/CONTINUATION_BRIEF.md`, `design/INTEGRATION_NOTES.md`, `design/README.md`
+- Any actual Pass-2 design doc (Roles 1-4) — those use the template; not this session
+- `vault/library/*`, `vault/compounds/*`, `vault/biomarkers/*`, `vault/dna/*`
+- `.claude/skills/*`, `scripts/*`, `.claude/hooks/*`
+- `INVARIANTS.md` (no new invariants this session unless something forces it; flag at the time)
+- `CLAUDE.md`
+- `~/Documents/Projects/skills_library/roles/*` (read-only — Architect profile inlined, not modified)
+
+NOT doing:
+- Any actual role Pass-2 design doc work (subsequent sessions, one role per session)
+- `/upgrade-agent` runs (Session B per role, after each design doc finalizes)
+- Pass 3 specialist work
+- Peptide library campaign
+- Walter pending items
+- v2.5 punch-list items
+- Vault git-tracking decision
+
+Invariants at risk:
+- INV-ROLE-INLINING — Architect dispatch must inline the full 11-section profile per the hook
+- AP-ORCH-SELF-ATTEST guard (PF-S3-01) — AC3 is the falsification window for design-doc-protocol context; finding classifications must be personal-source-reads, not orchestrator prose self-attestation
+- INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN — standard close discipline
+
+Self-recognition pre-flight: None of the canonical PF-S3-01 framings apply yet. Specifically watching for "the architect's proposal already looks good, the red-team is just bookkeeping" during AC2/AC3.
