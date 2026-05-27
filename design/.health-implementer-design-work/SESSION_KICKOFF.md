@@ -164,29 +164,51 @@ Three load-bearing reads if context is tight:
 
 ---
 
-## 9. Parallel S10 work: /review-pr agent roster rotation
+## 9. Parallel S10 work: agent roster rotation — TWO rosters
 
-User-directed at S9 close: cycle health-specialist-architect into the `/review-pr` Phase 1 agent roster, cycle out one of the standard 6 code-focused agents. This is a separate workstream from the Pass-2 Role 2 design-doc cycle but lives in the same session.
+User-directed at S9 close: cycle health-specialist-architect INTO and cycle one existing agent OUT of two rosters.
 
-**Resolution sequence (suggested):**
+### Roster A — /review-pr
 
-1. **Decide which agent gets cycled out.** Candidates by relevance:
-   - **Security** — least applicable to doc-only PRs (S9 review skipped it); but applicable to security-sensitive code PRs which a-plus-maxing rarely produces
-   - **Bug Hunter** — least applicable to doc-only PRs; applies to runtime code
-   - **Test Coverage** — least applicable when project has no test runner
-   The most aligned with a-plus-maxing's actual PR shape (design docs + role profiles + skill spec updates) is probably to cycle out Security or Bug Hunter; Test Coverage is still useful when the project does have tests (the audit-script smoke tests).
+Global at `~/.claude/commands/review-pr.md` Phase 1 dispatch table. Standard 6: Security, Bug Hunter, Code Quality, Test Coverage, Contracts (architect-mode), Historical Context. Rationale: would have caught S9 architectural-layer-mismatch at Phase 1 instead of Phase 3 triage.
 
-2. **Decide rotation mechanism.**
-   - **Option A (per-PR flag):** `/review-pr 14 --agents=architect-domain,quality,contracts,history,test,security` — explicit override per invocation. Lowest blast radius; reusable across projects.
-   - **Option B (permanent in command):** Edit `~/.claude/commands/review-pr.md` Phase 1 dispatch table directly. Higher blast radius (affects all projects); requires mirroring to skills_library `commands/`.
-   - **Option C (project-local override):** Add a project-scoped review-pr config (e.g., `.claude/review-pr.config.json`) the command reads. Mid blast radius.
+### Roster B — Agent development & review
 
-3. **Decide profile invocation.** Can the project-local `.claude/agents/health-specialist-architect/agent.md` be invoked by a global `/review-pr` command? Or does the rotation require a sibling profile in `~/Documents/Projects/skills_library/roles/` so the global command can find it? This intersects with the S9 re-scope decision — the project-local placement was deliberate to avoid skills_library precedent conflicts; cycling a project-local profile into a global review pipeline reopens that question.
+Used in design-doc-protocol Phase 1 drafters + Phase 3 red-team + /upgrade-agent Phase 4 validators. Per CONTINUATION_BRIEF §7, current drafters are v1-substitute software architect/SE/QA. health-specialist-architect IS the medical-equivalent architect; it should replace the software-architect drafter starting at S10's Role 2 design-doc Phase 1. CB §7 anticipated this exact rotation.
 
-4. **Verify with a dry-run.** Pick a recent PR (the closed #14 on skills_library, or a future small PR on a-plus-maxing) and run `/review-pr` with the new roster. Confirm the architect-domain reviewer surfaces useful findings that the previous roster missed.
+### Sequencing — Roster B is a S10 PREREQUISITE
 
-5. **Document the rotation** in skills_library/CLAUDE.md if permanent, or in a-plus-maxing/CLAUDE.md if project-scoped.
+If Roster B rotation isn't decided before S10 Role 2 Phase 1 dispatch, S10 runs another v1-substitute drafter when the real medical-architect drafter is available. Recommended order:
+1. **First action in S10** (before any Phase-1 dispatch): decide Roster B rotation
+2. Run Role 2 Pass-2 design-doc protocol Phases 1-5 with the rotated roster
+3. **At Role 2 Session B** (separate session, after Pass-2 finalizes): decide Roster A rotation if not already resolved
+4. Session B's `/upgrade-agent` is the first run AFTER Roster B rotation; the deployed Role 2 agent.md is the first reviewed via Roster A rotation
 
-**Sequencing with the Role 2 design-doc work:** the rotation should be tackled BEFORE running the next /review-pr cycle. Recommended order in S10: (a) finish Pass-2 Role 2 design-doc protocol Phases 1-5; (b) decide rotation; (c) Session B for Role 2 will then be the first /upgrade-agent run AFTER the rotation, and the deployed Role 2 agent.md will be reviewed via the new roster.
+### Resolution sequence (both rosters)
 
-**Blocker flag.** If steps 1-3 are unresolvable in S10 without user adjudication, defer to S11 — do NOT make the rotation decision unilaterally. Role 2 Pass-2 design-doc cycle is the primary S10 deliverable; rotation is the secondary deliverable.
+1. **Which agent cycles out.**
+   - **Roster A candidates** (least applicable to recent PR shape): Security or Bug Hunter. Test Coverage stays — audit-script smoke tests need coverage.
+   - **Roster B** (mostly determined by CB §7): software-architect cycles out at design-doc Phase 1; software-SE and software-QA stay until Roles 2 + 3 are deployed (then they replace SE + QA respectively).
+
+2. **Rotation mechanism.**
+   - **Roster A:** per-PR flag `/review-pr 14 --agents=...` (low blast radius) vs permanent edit to global command (high blast radius, requires skills_library `commands/` mirror) vs project-local config file (mid blast radius).
+   - **Roster B:** edit `design/DESIGN_DOC_TEMPLATE.md` §5 Synthesis Order + `design/CONTINUATION_BRIEF.md` §7 v1-substitute table to name the medical-architect as drafter for medical design docs.
+
+3. **Profile invocation scope.** Can the project-local `.claude/agents/health-specialist-architect/agent.md` be invoked by a global command (Roster A) or by the design-doc-protocol Phase-1 drafter dispatch (Roster B)? Intersects with the S9 re-scope decision. Possible resolutions:
+   - (a) keep project-local + use absolute paths in dispatches
+   - (b) symlink to skills_library
+   - (c) maintain a parallel skills_library profile that imports from the project-local one
+   - (d) accept that Roster A stays at the v1-substitute software-architect since the medical-architect is project-local and shouldn't be deployed globally
+
+4. **Verify with a dry-run.** For Roster B, the dry-run IS S10's Role 2 Phase 1 dispatch — that's the first real-use of the medical-architect drafter. For Roster A, pick a recent PR.
+
+5. **Document the rotation.** Roster A → skills_library/CLAUDE.md if permanent, or a-plus-maxing/CLAUDE.md if project-scoped. Roster B → `design/CONTINUATION_BRIEF.md` §7 (already names the v1-substitute table; amend to record the rotation point).
+
+### Blocker flag
+
+- **Roster B blockers:** If open questions 1-3 are unresolvable for Roster B before S10 Phase 1 dispatch, choose the conservative default — stick with v1-substitute software-architect for one more cycle and re-decide at Role 2 Session B. Do NOT make the rotation decision unilaterally without user adjudication. Document the deferral in the S10 scope contract NOT DOING list.
+- **Roster A blockers:** Roster A rotation can defer indefinitely without blocking S10 work — the next /review-pr invocation is whenever the next PR is opened (Role 2 Session B at earliest). Lower urgency.
+
+### Primary vs secondary deliverable
+
+Role 2 Pass-2 design-doc cycle is the **primary** S10 deliverable. Roster B rotation is a **prerequisite to doing it correctly** (else S10 runs another v1-substitute when the real drafter is available). Roster A rotation is **secondary** and can slip to Role 2 Session B.
