@@ -1,0 +1,97 @@
+# Specialist Risk-Class → aplus-research Mode-Floor Map
+#
+# Owner: health-implementer (Role 2)
+# Mirror of: Role 2 design doc §13 row 12.5 + Pass-1 R12 + Insight 8
+# Consumer: scripts/audit-specialist-profile.sh --check mode-floor-correctness
+# Created: 2026-05-27 (S10 Phase 5; resolves S-12 disposition)
+#
+# Each specialist authored by Role 2 must declare an aplus-research --mode floor
+# in its Tools section. The floor MUST be ≥ the role's risk-class-derived
+# minimum below. peptide/supplement/endocrine (compound-class with experimental
+# risk_tier potential) require --mode=deep. sleep/recovery/lifestyle roles
+# require --mode=standard. Roles with no research dispatch ("none — collates
+# only") require an Architecture Question to confirm exemption.
+last_reviewed: 2026-05-27
+
+# Mode-floor enum (matches aplus-research SKILL.md): quick | standard | deep | ultradeep
+# Library-bound research for risk_tier=experimental compounds requires deep+.
+
+specialists:
+  peptide-specialist:
+    risk_class: compound-experimental
+    mode_floor: deep
+    target_class: compound
+    rationale: All peptide research lands at risk_tier=experimental; BPC-157 precedent (S3 vault entry). Deep mode enforces paired judges + critique + refine + risk-floor gate.
+
+  supplement-specialist:
+    risk_class: compound-experimental-or-medium
+    mode_floor: deep
+    target_class: compound
+    rationale: Supplement category contains compounds at risk_tier=experimental (e.g., MK-677, nootropics) AND medium (e.g., creatine, fish oil). Deep mode covers the experimental floor; standard floor would under-protect for high-risk supplements.
+
+  endocrine-specialist:
+    risk_class: compound-medium-or-experimental
+    mode_floor: deep
+    target_class: compound
+    rationale: TRT compounds, GH analogues, thyroid replacement land at risk_tier=experimental or medium. Deep mode required.
+
+  cardiovascular-specialist:
+    risk_class: compound-medium
+    mode_floor: standard
+    target_class: compound
+    rationale: Mainstream cardiovascular compounds (statins, antiplatelet, antihypertensive) at risk_tier=medium with established literature. Standard mode adequate.
+
+  gi-specialist:
+    risk_class: compound-medium
+    mode_floor: standard
+    target_class: compound
+
+  lymphatic-specialist:
+    risk_class: compound-medium
+    mode_floor: standard
+    target_class: compound
+
+  labs-specialist:
+    risk_class: biomarker-reference
+    mode_floor: standard
+    target_class: biomarker
+    rationale: Biomarker reference-range research is well-established; standard mode adequate. Outlier-marker research (e.g., novel inflammation markers) may invoke deep on a per-query basis.
+
+  nutritionist:
+    risk_class: protocol-low
+    mode_floor: standard
+    target_class: protocol
+
+  sleep-coach:
+    risk_class: protocol-low
+    mode_floor: standard
+    target_class: protocol
+    rationale: Sleep protocols + behavioral interventions at risk_tier=low. Standard mode adequate.
+
+  recovery-specialist:
+    risk_class: protocol-low
+    mode_floor: standard
+    target_class: protocol
+
+  longevity-strategist:
+    risk_class: protocol-medium-or-compound-experimental
+    mode_floor: deep
+    target_class: protocol
+    rationale: Longevity overlaps compound (rapamycin, metformin off-label) with protocol (CR, exercise). Deep mode covers compound case.
+
+  mental-performance-coach:
+    risk_class: protocol-medium
+    mode_floor: standard
+    target_class: protocol
+    rationale: Cognitive-training protocols at standard; if a query touches nootropics, escalate to supplement-specialist via Architecture Question (worked example B class).
+
+  personal-trainer:
+    risk_class: protocol-low
+    mode_floor: standard
+    target_class: protocol
+
+  medical-liaison:
+    risk_class: collation-only
+    mode_floor: not_applicable
+    target_class: none
+    rationale: WIKI.md row "Dispatches research on: none — collates only". Tools section MUST NOT declare aplus-research --mode entry (§13 row 12 audit exempts via this field). Confirmed by Architecture Question at first medical-liaison dispatch (see AQ template at design/.health-implementer-design-work/architecture-questions/).

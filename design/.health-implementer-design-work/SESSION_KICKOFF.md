@@ -1,7 +1,8 @@
 ---
 title: Session Kickoff — Pass-2 Role 2 (health-implementer) design doc
 type: session-prep
-status: ready
+status: consumed
+consumed_at: S10 close (2026-05-27); design/health-implementer-design.md Status: Final
 created: 2026-05-26
 prepared_at: S9 close
 target_session: S10 (next session after compaction)

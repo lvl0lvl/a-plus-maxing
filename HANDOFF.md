@@ -131,89 +131,98 @@ No `INVARIANTS.md` exists for this project yet. CLAUDE.md's Cross-Document Owner
 ### Vision drift
 System after S2 IS: LLM-driven personal health agent with a queryable knowledge base (wiki schema + agent roster + source whitelist), one suspect compound entry pending re-run, and a mechanically-gated research wrapper skill. Vision per S1: "LLM-driven personal health agent, markdown + HTML hybrid, A→B→C phased build, evidence-driven." Same project. No vision drift.
 
+## Session 10 close — Pass-2 Role 2 (health-implementer) design doc Final (2026-05-27)
+
+All 6 ACs PASS. Roster B rotation applied (health-specialist-architect drafts §1-4/§13/§15/§16; SE+QA v1-substitutes hold). 40 red-team findings classified (35 LEGITIMATE + 3 LEGITIMATE-MODIFIED + 0 REJECTED + 2 DEFERRED-TO-BEAD). PF-S3-01 guard held — every finding personally source-read before verdict. **Three orchestrator OQ resolutions** locked in at Phase 5: OQ-1 (Role 2 owns audit-script bash), OQ-3 (`templates/refusal-class-taxonomy.yaml` canonical), OQ-7 (QA-strict §13 tag rule project-wide). 11 new beads created. Watch list (4 substrate-unaddressed gaps) all SURFACED via Phase-3 findings; no candidate beads from watch list.
+
+**Drift checks.**
+- **Task drift:** Roster B rotation (AC0) was a S10 prerequisite added before Phase 1 dispatch — flagged in scope contract, not silent. All 7 ACs evaluated PASS. No silent drift.
+- **Architecture drift:** No invariant degraded. INV-ROLE-INLINING strengthened (3 drafter + 2 red-team dispatches inlined full profiles verbatim; hook held). INV-BRANCH-NOT-MAIN held (commits land on feature branch). INV-SCOPE-CONTRACT satisfied. INV-PF-ATTESTATION canonical form below. No INV promotion attempted unilaterally.
+- **Vision drift:** Same project. System after S10 IS the same LLM-driven personal health agent now with 2 of 4 foundation design docs Final (Role 1 deployed at .claude/agents/, Role 2 design Final + ready for Session B /upgrade-agent). `templates/` directory added with 2 project-local artifacts (refusal-class-taxonomy.yaml + specialist-risk-class.yaml) that close OQ-3 + S-12 gates. No vision drift.
+
+**PF attestation.**
+
+S10 close (2026-05-27): No new PF-class entries this session. Observations that did NOT promote: (a) the design doc's own initial section count (23 not 19) was caught by red-team F-001 not by my pre-dispatch self-check — this is a Phase-2-synthesis-omission pattern that has only one observed instance (this session) and is structurally caught by the next-phase audit (red-team Phase 3), which is the correct mechanism; recurrence_count=1, watch but not promote. (b) The architect-drafter unilaterally claimed `scripts/audit-specialist-profile.sh` ownership where Role 1 left it ambiguous (F-007) — caught by red-team, classified LEGITIMATE-MODIFIED, resolved at Phase 5 via OQ-1; not a new PF class because the red-team gate caught it before propagation. (c) AC-3 tautology (F-003) — the regex literal in AC-3 matched only its own AC line, the canonical PF-S3-01 surface at the design-doc layer; the red-team Phase 3 caught it, Phase 4 verified, Phase 5 fixed with unique marker. Three consecutive PF-S3-01 guards still held (S7 / S8 / S9 / S10 across four distinct dispatch surfaces).
+
+**Commit:** (pending — Phase 9 git commit + push).
+
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-Forward-facing readiness for next session. Replaced at every close, not accumulated. Per Rigor Framework Discipline 8.
-
-1. **AP-ORCH-SELF-ATTEST** (PF-S2-01 + PF-S3-01, recurrence_count=2) — mechanical defenses live since S4. **Three consecutive PF-S3-01 guards held**: S7 design-doc adversarial, S8 design-doc Phase-4, S9 `/upgrade-agent` Phase 4 (R1 v3 required 3 validation iterations before PASS — fact-checker found 5 FAILs iter-1 + 1 iter-2; judge found 3 sub-9 dims iter-1 + 1 iter-2; remediator-loop converged at iter-3 with FRESH fact-checker + judge each iteration per HARD RULE; no orchestrator self-attestation of validator verdicts at any iteration). Still untested in a fresh aplus-research dispatch — peptide library campaign remains the v2 falsification window.
-2. **AP-INCOMPLETE-PROPAGATION** (S4 finding) — S9 stress-tested in `/upgrade-agent` Phase 5 synthesis (873-line design doc → 119-line agent.md, compression ratio 7.3x). Adversarial review surfaced 15 findings (1 Critical inherited / 5 Major / 6 Minor / 3 Nitpick); 8 required Phase-7 edits, all applied; F-A01 (refusal-class 7-vs-8 count residual in design-doc §1/§3.1/§5.11/§15.2 prose) deferred per reviewer option (a) to follow-up bead. Still untested in Phase-C peptide library campaign across multiple compound entries.
-3. **Hook-edge-case path-pattern over-trigger (recurrence_count=2 by S9 close)** — distinct from S7/S8 profile-vs-section class. S9 first surfaced: `enforce-role-inlining.sh` regex `roles/[a-z-]+/agent\.md` over-triggers on non-role-tagged research dispatches that merely mention a role-profile path. **Recurred during the S9 review-pr re-scope cycle** when Phase 3 triage and Phase 1 review-agent dispatches blocked on the same pattern + canonical `## Tools` H2 inside prompt body — 4 distinct dispatches blocked across S9 (3 Phase-3 research, 1 Phase-6 adversarial, 1 Phase-1 review-pr, 1 Phase-3 triage; some clustered). Workaround consistent across all: refactor path references to directory only, avoid canonical H2 patterns in prompt examples, explicit framing as "research worker, not role-tagged dispatch". Two distinct hook-edge-case classes now both at recurrence_count=2 (profile-vs-section AND path-pattern); v2.5 punch-list candidate to refine `role-context` detection.
-
-4. **Architectural-layer-mismatch blindness in /review-pr (NEW, recurrence_count=1)** — S9 surfaced: `/review-pr` HARD RULE "every LEGITIMATE finding gets fixed" assumed all findings are at the same architectural layer. When 4 of 14 LEGITIMATE findings collectively meant "wrong architectural location," forcing line-level fixes would have papered over the real defect. The user's instinct ("make it project-specific — does that solve it?") triggered re-triage at the new layer; the original 14 LEGITIMATE classifications correctly collapsed to 3 LEGITIMATE + 11 dissolved/reclassified. Watch: this is the inverse of AP-INCOMPLETE-PROPAGATION (which is "drop a load-bearing item during compression"); this one is "apply N surgical fixes when the real fix is one structural decision."
+1. **AP-ORCH-SELF-ATTEST** (PF-S3-01, recurrence_count=2) — four consecutive guards held now: S7 design-doc adversarial, S8 design-doc Phase-4, S9 /upgrade-agent Phase-4, S10 Pass-2 Phase-4 (40 findings personally source-read; 0 self-attested). Still untested in fresh `aplus-research` dispatch. Phase-C peptide library campaign remains the falsification window.
+2. **AP-INCOMPLETE-PROPAGATION** — S10 stress-tested twice: (i) Phase-2 synthesis from 3 drafters into single 18-section design doc (raw section-count F-001 surfaced; caught by Phase-3 red-team, fixed Phase 5); (ii) Phase-5 disposition application across 38 LEGITIMATE/LEGITIMATE-MODIFIED findings produced 22-row §13 + 3 templates + AQ-001 — all bundled with cross-reference fidelity. Still untested in 14-specialist authoring (Role 2 Session B + Pass-3 specialists).
+3. **Hook-edge-case path-pattern over-trigger (recurrence_count=2)** — S10 hit ZERO blocks. Path-only references + non-canonical-H2-in-prompt workaround applied to all 5 dispatches (3 drafters + 2 red-team). Two distinct edge-case classes (profile-vs-section + path-pattern) both at recurrence_count=2; promotion to hook v2.5 punch-list now tracked as bead `a-plus-maxing-hca`.
 
 ## Current State (volatile)
-- **`.claude/agents/health-specialist-architect/agent.md`** deployed PROJECT-LOCAL at 127 lines / 3,252 cl100k tokens. All 11 AGENT_TEMPLATE.md sections + Modes present; Modes correctly placed between Anti-Patterns and Negative Examples (per design-doc §12.4 + F-A03); anti-sycophancy anchor at line 7 (≤20 primacy); Negative Examples at line 113 of 127 (within last 30 recency); Identity body lexicon-clean (0 must/never/always/refuse). Paired `library-index.md` (24 lines, 5 conditional refs with QUAL-007/QUAL-010/QUAL-011 fixes from re-scope).
-- **Re-scope decision (S9 addendum).** Original deploy went to `~/Documents/Projects/skills_library/roles/` and was reviewed via PR heavydropio/skills_library#14 + /review-pr. Triage surfaced 4 HIST findings naming the cross-project mismatch as architectural defect. Re-scoped to `.claude/agents/` (Claude Code project-local agents convention). PR closed; skills_library feature branch deleted; skills_library/roles/orchestrator/catalog.md row reverted by linter. Token-budget overrun no longer in tension with any shared-library guardrail.
-- **Phase-1-through-8 + Phase-3-triage provenance preserved** in `design/.health-specialist-architect-design-work/upgrade-agent-work/`: 20 artifacts spanning baseline-scorecard, agent-rubric, R1/R2/R3 research outputs (R1 through v3 after 3 validation iterations), 6 validator reports across 3 iter cycles (3 fact-checkers + 3 judges), adversarial-review-agent.md (15 findings), dispatch-ledger.jsonl. The /review-pr triage (17 findings → 14 LEGITIMATE → 11 dissolved by re-scope + 3 applied + 3 DECISION) lives in this session's narrative; will be added as a fresh artifact in S10 if useful for downstream Role 2/3/4 design-doc cycles.
-- **`design/health-specialist-architect-design.md`** unchanged from S8 close (Status: Final, 873 lines). F-A01 (refusal-class residual 7-vs-8 prose at design-doc lines 31/91/168/647) still deferred — agent.md is itself consistent at 8 classes.
-- **`design/DESIGN_DOC_TEMPLATE.md`** unchanged from S7 close (Status: Final at commit `0563269`).
-- **INVARIANTS register at 12 entries** unchanged. Candidate INV-HARM-CLASS-COMPOSITION still PROPOSED (design-doc §16); not promoted unilaterally in S9.
-- **Active landmarks unchanged.** LM-01 / LM-02 / LM-03 / LM-04 — no trigger windows open today.
-- **Branch (as of 2026-05-26 S9 close):** `feature/wiki-bpc157-aplus-research`. All S9 work in-tree; skills_library deploy reverted and gone from origin. Pushed.
 
-**Historical (kept for reference):** S9 deploy + /review-pr re-scope details in S9 close note above (2026-05-26, commits `4176a62` + `280aba9`); pre-S8 details in `design/CONTINUATION_BRIEF.md`.
+- **Role 2 design doc** at `design/health-implementer-design.md` Status: Final. 779 lines / 19 sections (18 + Appendix A). 22 §13 mechanical-enforcement rows (0 LIVE, 1 REFERENCED, 21 PROPOSED — all gated on `scripts/audit-specialist-profile.sh` which is now bead `a-plus-maxing-3y6` P1). 8 OQs documented; 3 RESOLVED at Phase 5 (OQ-1, OQ-3, OQ-7).
+- **Templates directory NEW** at `templates/` — `refusal-class-taxonomy.yaml` (8 canonical classes with statutory anchors; `AUTHORITY_FRAMING_BYPASS` mandatory) and `specialist-risk-class.yaml` (14 specialists with mode-floor + target-class). Both project-local; not in skills_library.
+- **AQ-001** at `design/.health-implementer-design-work/architecture-questions/AQ-001-per-specialist-operator-profile-fields.md` — first open Architecture Question; awaits architect adjudication (bead `a-plus-maxing-h1z` P2).
+- **`.claude/agents/health-specialist-architect/agent.md`** unchanged from S9 close (Status: deployed; 127 lines / 3,252 cl100k tokens; project-local).
+- **Role 1 design doc** unchanged from S8 (Status: Final, 873 lines). F-A01 residual "7-class" prose still deferred (now bead `a-plus-maxing-c7s` P4).
+- **INVARIANTS register at 12 entries** unchanged. INV-HARM-CLASS-COMPOSITION still PROPOSED.
+- **11 new beads created at S10 close**: 6 S10-sourced (P1 audit-script, P2 denylist starter + AQ-001 resolution + hook v2.5, P3 §13 amendment + AQ-queue audit + attestation-chain) + 5 S9-carry-overs (P3 token-budget ADR + project-local agents doc + Roster A rotation, P4 F-A01 residual prose). Plus pre-existing umbrella epic `a-plus-maxing-c6k`.
+- **Roster B rotation in effect** in `design/DESIGN_DOC_TEMPLATE.md` §0.1 + `design/CONTINUATION_BRIEF.md` §7 (architect drafter for medical design docs = project-local health-specialist-architect; SE+QA stay v1-substitute until Roles 2 + 3 deploy).
+- **Active landmarks unchanged.** No trigger windows open today.
+- **Branch (2026-05-27 S10 close):** `feature/wiki-bpc157-aplus-research`. All S10 work in-tree; commit + push pending Phase 9 of close.
+
+**Historical (kept for reference):** S9 details in S9 close note above; pre-S9 in `design/CONTINUATION_BRIEF.md`.
 
 ## What Is Next (volatile)
 
-### S10 — Pass-2 Role 2 (health-implementer) design doc
+### S11 — Pass-2 Role 3 (health-edge-case-reviewer) design doc
 
-**Highest leverage.** Run the design-doc protocol (Phases 1-5) for Role 2 (health-implementer) per `design/DESIGN_DOC_TEMPLATE.md`. Role 2 INHERITS the OUTBOUND interface contracts from Role 1's now-Final §4: 8 refusal classes (incl. AUTHORITY_FRAMING_BYPASS), H-class composition (H1-H8 + worst-case-reachable rule), GRADE two-axis discipline, three-mechanism anti-sycophancy, operator-profile R7 precondition, contradiction discipline, aplus-research mode floor, medical-safety-reviewer Council-Mode slot.
+**Highest leverage.** Run design-doc-protocol Phases 1-5 for Role 3 (health-edge-case-reviewer) per `design/DESIGN_DOC_TEMPLATE.md`. Role 3 INHERITS:
+- Role 1 §4 OUTBOUND (8 rows, by anchor — refusal taxonomy, H-class composition, GRADE, anti-sycophancy, R7, contradiction discipline, aplus-research mode floor, Council-Mode slot)
+- Role 2 §4.2 OUTBOUND (5 rows, by anchor — IDENTICAL/DIFFER discipline, audit-script bash contract, self-audit-before-return contract, Architecture Question artifact, aplus-research mode-floor encoding)
 
-**Session-kickoff brief ready** at `design/.health-implementer-design-work/SESSION_KICKOFF.md` — read FIRST after standard session-start protocol. Contains pre-flight reads order, S10 scope contract template, Role 2 specifics (what Role 2 owns vs Role 1 inheritance), 6 known edge cases (incl. both S7/S8/S9 hook recurrences + the new /review-pr architectural-layer-mismatch from S9 close), and falsification windows.
+Role 3's deliverable is the coverage-gap detection role — reviews specialist `agent.md` files emitted by Role 2 BEFORE deployment. Role 3 has its own Pass-1 substrate at `design/.health-edge-case-reviewer-design-work/domain-research.md` (verified exists per CONTINUATION_BRIEF §4).
 
-Operational substrate ready:
-- `design/DESIGN_DOC_TEMPLATE.md` (canonical contract; Status: Final as of S7 close 2026-05-26)
-- `design/health-specialist-architect-design.md` (Role 1 inheritance reference; §4 OUTBOUND rows for Role 2 to inherit by anchor)
-- `design/.health-implementer-design-work/domain-research.md` (Role 2 Pass-1 substrate; verified exists)
-- `.claude/agents/health-specialist-architect/agent.md` (Role 1 deployed; available for future template-amendment dispatches)
+**Roster B status at S11:** architect drafter = project-local health-specialist-architect (rotation active since S10). SE drafter = v1-substitute software senior-engineer (rotates to health-implementer once Role 2 Session B deploys; S11 likely runs PRE Role 2 Session B, so SE stays substitute). QA drafter = v1-substitute software qa (same logic).
+
+**Recommended S11 first action:** if any of the 6 unblocked beads from S10 close should be addressed BEFORE Role 3 design doc (specifically `a-plus-maxing-3y6` audit-script-bash would un-PROPOSE 21 §13 rows in Role 2 doc but is not a Role-3-Phase-1 prerequisite), decide scope. Most efficient: proceed direct to Role 3 design doc; leave audit-script bash as parallel work for Role 2 Session B prep.
+
+### S11 prerequisites (all met)
+
+- `design/DESIGN_DOC_TEMPLATE.md` Final (S7 close)
+- `design/health-specialist-architect-design.md` Final (S8 close) — §4 OUTBOUND inheritance
+- `design/health-implementer-design.md` Final (S10 close) — §4.2 OUTBOUND inheritance
+- `design/.health-edge-case-reviewer-design-work/domain-research.md` (Pass-1 substrate) — verify at S11 start
+- `templates/refusal-class-taxonomy.yaml` (committed S10) — Role 3 audit may consume
+- `templates/specialist-risk-class.yaml` (committed S10) — Role 3 audit may consume
 
 ### Sessions B per role (interleaved)
-- After each Role 2/3/4 Pass-2 finalizes: run `/upgrade-agent` to deploy that role's agent.md
 
-### Subsequent sessions (queued)
-- **S11–S13:** Roles 3 + 4 Pass-2 + their /upgrade-agent runs
-- **Pass-3 deep-research for 14 specialists** (after all 4 foundation roles deployed)
-- **Phase C: peptide library campaign** in parallel; falsification window for AP-ORCH-SELF-ATTEST + AP-INCOMPLETE-PROPAGATION in aplus-research context
+- **Role 2 Session B** (any time after S10 close, before S13 if possible): run `/upgrade-agent` against `design/health-implementer-design.md` → produces `.claude/agents/health-implementer/agent.md`. Roster A rotation (bead `a-plus-maxing-9yk`) may surface at this Session B's PR review.
 
-### Deferred from S9 (follow-up beads candidates)
-- **F-A01 design-doc residual "7-class" prose** at `design/health-specialist-architect-design.md` lines 31, 91, 168, 647 — fix to "8-class" to align with F-S2 disposition. Mechanical: 4 line edits.
-- **Token-budget characterization documentation** — capture the medical-domain structural overrun rationale as an ADR; project-local roles now have no shared guardrail (the conflict that motivated this disappeared with the re-scope to `.claude/agents/`), but the rationale is still load-bearing for downstream Roles 2/3/4 which will likely also overshoot.
-- **Project-local agents pattern documentation** — add a CLAUDE.md section on `.claude/agents/` as the canonical home for project-specific role profiles; distinct from `~/Documents/Projects/skills_library/roles/` which is the cross-project shared library. The decision lives in S9 close-note narrative; promote to durable doc.
-- **Hook design-attention items (recurrence_count=2 for both classes).** (a) `enforce-role-inlining.sh` profile-vs-section mismatch (`## Audit Protocol` vs `## Modes`); (b) path-pattern over-trigger (`roles/<slug>/agent.md` substring + canonical H2 patterns in prompt bodies). Both classes blocked dispatches in S7/S8 and S9 respectively. Promotion to v2.5 punch-list.
-- **Agent roster rotation — TWO rosters (S10 scope expansion candidate, user-directed).** Cycle health-specialist-architect INTO and cycle one existing agent OUT of:
+### Subsequent sessions queued
 
-  **(A) `/review-pr` roster** (global at `~/.claude/commands/review-pr.md` Phase 1 dispatch table). Standard 6: Security, Bug Hunter, Code Quality, Test Coverage, Contracts (architect-mode), Historical Context. Rationale: medical-LLM PRs (doc-only + design-doc cycles + project-local agent deploys) need an architect-domain reviewer that has the medical-LLM context loaded by default. Would have caught the S9 architectural-layer-mismatch at Phase 1 instead of Phase 3 triage.
+- **S11:** Role 3 (health-edge-case-reviewer) Pass-2 design doc.
+- **S12:** Role 4 (medical-safety-reviewer) Pass-2 design doc — Role 4 is the medical-safety-reviewer; deployment of Role 4 closes the v1-substitute software-security gap that S10 used to fill the safety red-team slot.
+- **S13:** Pass-3 deep-research for the 14 specialists (after all 4 foundation roles deployed).
+- **Phase C: peptide library campaign** — parallel with S11-S13; falsification window for AP-ORCH-SELF-ATTEST + AP-INCOMPLETE-PROPAGATION in `aplus-research` context.
 
-  **(B) Agent development & review roster** (used in design-doc-protocol Phase 1 drafters + Phase 3 red-team + `/upgrade-agent` Phase 4 validators). Per CONTINUATION_BRIEF §7, current Phase-1 drafters are the v1-substitute software architect/SE/QA profiles, and Phase-3 safety reviewer is the v1-substitute software security profile briefed on medical-safety. Now that health-specialist-architect is deployed (S9), it IS the medical-equivalent architect — it should replace the software-architect drafter for medical design-doc cycles. CB §7 anticipated this exact rotation. The software-architect drafter (or another v1-substitute) cycles out.
+### Deferred from S10 (all now beads — see `bd list --status=open`)
 
-  Open questions for S10 across both rosters:
-  1. **Which agent cycles out of each.** Roster A candidates (least applicable to recent PR shape): Security or Bug Hunter. Roster B is mostly determined — software-architect cycles out at design-doc Phase 1; software-SE and software-QA stay until Role 2 (health-implementer) and Role 3 (health-edge-case-reviewer) are deployed, at which point they replace SE and QA respectively (CB §7 sequence).
-  2. **Rotation mechanism.** Per-dispatch flag vs permanent edit. Roster A lives in global `~/.claude/commands/`; Roster B lives in `design/DESIGN_DOC_TEMPLATE.md` §5 Synthesis Order + CONTINUATION_BRIEF §7 v1-substitute table.
-  3. **Profile invocation scope.** Can the project-local `.claude/agents/health-specialist-architect/agent.md` be invoked by a global `/review-pr` command (Roster A) or by the design-doc-protocol Phase-1 drafter dispatch (Roster B)? This intersects with the S9 re-scope decision — the project-local placement was deliberate; cycling a project-local profile into a global review pipeline reopens that question. Possible resolutions: (a) keep project-local + use absolute paths in dispatches; (b) symlink to skills_library; (c) maintain a parallel skills_library profile that imports from the project-local one.
-  4. **Sequencing with Role 2 design-doc cycle.** Roster B rotation should happen BEFORE S10's Role 2 design-doc Phase 1 dispatch — otherwise S10 runs another v1-substitute drafter when the real medical-architect drafter is available. This makes the rotation a S10 prerequisite, not just a S10 deliverable.
+S10 created 11 beads to track follow-up work that previously lived in HANDOFF prose. The `bd ready` view is the canonical "next work" list. Priority unblocked:
 
-  Note: the rotation lives partly in global config (`~/.claude/commands/review-pr.md`) and partly in project docs (`design/DESIGN_DOC_TEMPLATE.md` + `design/CONTINUATION_BRIEF.md`); coordinate scope carefully.
+- **P1**: `a-plus-maxing-3y6` (audit-script + smoke tests) — gates §13 LIVE promotion
+- **P2**: `a-plus-maxing-pmp` (denylist starter), `a-plus-maxing-h1z` (AQ-001 resolution), `a-plus-maxing-hca` (hook v2.5 punch-list)
+- **P3**: `a-plus-maxing-mdg` (Role 1 §13 QA-strict amendment), `a-plus-maxing-5by` (AQ-queue close-protocol), `a-plus-maxing-2qq` (token-budget ADR), `a-plus-maxing-1ox` (.claude/agents/ CLAUDE.md section), `a-plus-maxing-9yk` (Roster A rotation), `a-plus-maxing-6ln` (attestation-chain — BLOCKED on 3y6)
+- **P4**: `a-plus-maxing-c7s` (F-A01 Role 1 7-class residual)
 
-### Candidate audit-script extensions (deferred)
-- `INV-DESIGN-DOC-SYMMETRY` + `scripts/design-doc-audit.sh` — body↔bibliography symmetry on `design/{role}-design.md` files. Now actionable with a first instance (`design/health-specialist-architect-design.md`) to test against.
-- `enforce-role-inlining.sh` extension: accept either `## Modes` OR a project-recognized role-specific section (e.g., `## Audit Protocol`) as satisfying the 11th canonical section. S8 surfaced recurrence_count=2 for the mismatch class.
-- Pattern-label consistency, deep-research deliverable floors, fabrication-shaped URL scan — same deferral pattern.
+### INVARIANTS candidate (S8 surface, unchanged)
 
-### INVARIANTS candidate (S8 surface)
-- `INV-HARM-CLASS-COMPOSITION` — proposed in Role 1 design doc §16 per F-S1; promotion via change-discipline ritual at next review cycle. Owner: orchestrator + user adjudication.
-
-### v2.5 punch-list (small, deferable indefinitely)
-- `agent-verdict-halt` sentinel inconsistency (gate_attest.py vs schema enums; documented in Open Issues)
-- `enforce-role-inlining.sh` profile-vs-section edge case (now recurrence_count=2; promotion candidate)
+- `INV-HARM-CLASS-COMPOSITION` — proposed in Role 1 §16 per F-S1; promotion via change-discipline ritual at next review cycle. Owner: orchestrator + user adjudication.
 
 ### Open project work (unchanged)
+
 - Walter pending: 23andMe raw file to `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health issue characterization. `medium+` risk-tier HALT remains active on BPC-157 movement from `researching` to `planned` until populated.
 - Vault git-tracking decision still deferred.
 - First HTML artifact generation still deferred (LM-04 active landmark).
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S4. LM-01 trigger window opens ~14 days before the July 2026 visit date; the scoped audit dispatch is queued for that date.
+All 4 active landmarks (LM-01 doctor visit, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S10. LM-01 trigger window opens ~14 days before the July 2026 visit date; scoped audit dispatch queued for that date.
 
 ## Open Issues
 
@@ -647,3 +656,66 @@ After initial commit `4176a62` deployed to `~/Documents/Projects/skills_library/
 **Process observation — review-pr against cross-repo PR works but exposes the framework's blind spot:** the skill's HARD RULE "every LEGITIMATE finding gets fixed" assumed all findings are at the same architectural layer. When 4 of 14 LEGITIMATE findings collectively meant "wrong architectural choice," forcing line-level fixes would have papered over the real defect. The user's instinct ("make it project-specific — does that solve it?") was the right escalation; the triage table re-applied at the new layer made the dispositions deterministic.
 
 **Commit:** `280aba9` pushed to `origin/feature/wiki-bpc157-aplus-research` (S9 close state).
+
+## Scope Contract — Session 10 (2026-05-27)
+
+Goal: Run design-doc-protocol Phases 1-5 for Role 2 (health-implementer) against `design/DESIGN_DOC_TEMPLATE.md`. Produce `design/health-implementer-design.md` with `status: Final`. Second end-to-end exercise of the canonical template (first was Role 1 in S8). Roster B rotation applied: project-local `.claude/agents/health-specialist-architect/agent.md` replaces the v1-substitute software-architect drafter at Phase 1; SE + QA remain v1-substitute software until Roles 2/3 deploy.
+
+Acceptance criteria:
+- [ ] AC0 — Roster B rotation documented in `design/DESIGN_DOC_TEMPLATE.md` §0.1 + `design/CONTINUATION_BRIEF.md` §7 BEFORE any Phase-1 dispatch (decision: option (a) project-local with absolute path; SE + QA stay v1-substitute)
+- [ ] AC1 — Phase 1: 3 parallel drafter dispatches (rotated architect = health-specialist-architect / v1-substitute SE / v1-substitute QA). Each prompt inlines full 11-section profile verbatim per INV-ROLE-INLINING; `.claude/hooks/enforce-role-inlining.sh` is mechanical defense. Drafts written to `design/.health-implementer-design-work/{architect,se,qa}-draft.md`. Dispatches recorded in `design/.health-implementer-design-work/dispatch-ledger.jsonl`
+- [ ] AC2 — Phase 2: orchestrator synthesizes `design/health-implementer-design.md` per `DESIGN_DOC_TEMPLATE.md` (frontmatter §0.2 + 18 sections + Appendix A). §4 is INBOUND-only for 8 rows established by Role 1 §4 (refusal taxonomy, H-class composition, GRADE, anti-sycophancy, R7, contradiction discipline, aplus-research mode floor, Role 4 Council slot). Body↔bibliography symmetry verified before Phase 3
+- [ ] AC3 — Phase 3: 2 red-team dispatches (`/adversarial-review` skill + medical-safety v1-substitute per CB §7). Findings to `design/.health-implementer-design-work/red-team-{adversarial,safety}.md`
+- [ ] AC4 — Phase 4: PF-S3-01 guard held — each finding personally source-read by orchestrator; classifications in `design/.health-implementer-design-work/finding-classifications.md` with cited evidence for REJECTED rows. Reject-but-adopt pattern applied where appropriate (per S6 feedback memory)
+- [ ] AC5 — Phase 5: dispositions applied; Appendix A populated with rejected findings + attestations; §7 self-attest 17-item checklist run; frontmatter `status: Final`
+- [ ] AC6 — Close: all 3 audits exit 0 at `--session 10`; PF attestation in canonical form; VOLATILE rotation applied; commit + push to feature branch (never main); `SESSION_KICKOFF.md` marked `status: consumed`
+
+Files I WILL touch:
+- `design/health-implementer-design.md` (NEW — the synthesized design doc)
+- `design/.health-implementer-design-work/{architect,se,qa}-draft.md` (NEW × 3)
+- `design/.health-implementer-design-work/red-team-{adversarial,safety}.md` (NEW × 2)
+- `design/.health-implementer-design-work/finding-classifications.md` (NEW)
+- `design/.health-implementer-design-work/dispatch-ledger.jsonl` (NEW)
+- `design/.health-implementer-design-work/SESSION_KICKOFF.md` (frontmatter → `status: consumed` at close)
+- `design/DESIGN_DOC_TEMPLATE.md` (Roster B rotation — line 39 edit, complete)
+- `design/CONTINUATION_BRIEF.md` (Roster B rotation table — §7 edit, complete)
+- `HANDOFF.md` (this contract + close note + VOLATILE rotation)
+- `vault/meta/index.md`, `vault/meta/log.md` (entity registration + op log)
+- `memory/process-failures.md` (only if a new PF surfaces)
+- `.beads/*` via `bd` CLI only
+
+Files I will NOT touch:
+- `design/health-specialist-architect-design.md` (Status: Final — defects → F-A01 bead, not edit)
+- `.claude/agents/health-specialist-architect/*` (Status: deployed — read-only as drafter source)
+- `.claude/agents/health-implementer/*` (Role 2 Session B work, separate session after this Pass-2 finalizes)
+- `vault/library/*`, `vault/compounds/*`, `vault/biomarkers/*`, `vault/dna/*`
+- `.claude/skills/*`, `.claude/commands/*`, `scripts/*`, `.claude/hooks/*`
+- `~/Documents/Projects/skills_library/*` (read-only as drafter source; Role 2 deploys project-local per S9 decision)
+- `INVARIANTS.md` (no new invariants unless something forces it; flag at the time)
+- `CLAUDE.md`, `~/.claude/*`
+- `main` branch (commits to `feature/wiki-bpc157-aplus-research` only)
+
+NOT doing:
+- Roster A (/review-pr) rotation — deferred to Role 2 Session B per kickoff brief §9
+- Role 2 Session B (`/upgrade-agent` deployment of health-implementer) — separate session after Pass-2 finalizes
+- Roles 3 + 4 Pass-2 (S11 + S12)
+- Pass-3 specialist deep-research
+- Phase C peptide library campaign
+- F-A01 design-doc residual "7-class" prose fix at `design/health-specialist-architect-design.md` (deferred bead)
+- Token-budget characterization ADR (deferred follow-up)
+- CLAUDE.md `.claude/agents/` section addition (deferred follow-up)
+- Hook v2.5 punch-list (both edge-case classes at recurrence_count=2)
+- INV-HARM-CLASS-COMPOSITION promotion (PROPOSED in Role 1 §16; requires change-discipline ritual at review cycle)
+- Walter pending items (23andMe, Oura, meal-template, Jan 2026 issue)
+- Vault git-tracking decision
+- LM-04 first HTML artifact
+
+Invariants at risk:
+- INV-ROLE-INLINING — drafter dispatches must inline full 11-section profile; `enforce-role-inlining.sh` PreToolUse hook is the mechanical defense; project-local profile path (`.claude/agents/health-specialist-architect/agent.md`) may exercise the path-pattern edge case (recurrence_count=2)
+- PF-S3-01 / AP-ORCH-SELF-ATTEST — Phase 4 falsification window (third consecutive guard test if held; recurrence_count=2)
+- AP-INCOMPLETE-PROPAGATION — Phase 5 disposition application across 18 sections + Appendix A; §7 self-attest 17-item checklist is the explicit defense
+- INV-SCOPE-CONTRACT — satisfied by this block; `scope-contract-audit.sh --session 10` validates at close
+- INV-PF-ATTESTATION — canonical form at close
+- INV-HO-ROTATION + INV-HO-NO-STALE-HASH — rotation rule applied to VOLATILE sections; no SHA prefixes in narrative prose
+- INV-BRANCH-NOT-MAIN — feature branch only; `block-commit-main.sh` is mechanical defense
+- INV-RESEARCH-ATTESTATION — N/A (no `aplus-research` dispatch this session)
