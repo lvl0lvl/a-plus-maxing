@@ -161,3 +161,32 @@ Three load-bearing reads if context is tight:
 1. This file (SESSION_KICKOFF.md)
 2. `design/DESIGN_DOC_TEMPLATE.md`
 3. `design/health-specialist-architect-design.md` §4 (OUTBOUND inheritance contract)
+
+---
+
+## 9. Parallel S10 work: /review-pr agent roster rotation
+
+User-directed at S9 close: cycle health-specialist-architect into the `/review-pr` Phase 1 agent roster, cycle out one of the standard 6 code-focused agents. This is a separate workstream from the Pass-2 Role 2 design-doc cycle but lives in the same session.
+
+**Resolution sequence (suggested):**
+
+1. **Decide which agent gets cycled out.** Candidates by relevance:
+   - **Security** — least applicable to doc-only PRs (S9 review skipped it); but applicable to security-sensitive code PRs which a-plus-maxing rarely produces
+   - **Bug Hunter** — least applicable to doc-only PRs; applies to runtime code
+   - **Test Coverage** — least applicable when project has no test runner
+   The most aligned with a-plus-maxing's actual PR shape (design docs + role profiles + skill spec updates) is probably to cycle out Security or Bug Hunter; Test Coverage is still useful when the project does have tests (the audit-script smoke tests).
+
+2. **Decide rotation mechanism.**
+   - **Option A (per-PR flag):** `/review-pr 14 --agents=architect-domain,quality,contracts,history,test,security` — explicit override per invocation. Lowest blast radius; reusable across projects.
+   - **Option B (permanent in command):** Edit `~/.claude/commands/review-pr.md` Phase 1 dispatch table directly. Higher blast radius (affects all projects); requires mirroring to skills_library `commands/`.
+   - **Option C (project-local override):** Add a project-scoped review-pr config (e.g., `.claude/review-pr.config.json`) the command reads. Mid blast radius.
+
+3. **Decide profile invocation.** Can the project-local `.claude/agents/health-specialist-architect/agent.md` be invoked by a global `/review-pr` command? Or does the rotation require a sibling profile in `~/Documents/Projects/skills_library/roles/` so the global command can find it? This intersects with the S9 re-scope decision — the project-local placement was deliberate to avoid skills_library precedent conflicts; cycling a project-local profile into a global review pipeline reopens that question.
+
+4. **Verify with a dry-run.** Pick a recent PR (the closed #14 on skills_library, or a future small PR on a-plus-maxing) and run `/review-pr` with the new roster. Confirm the architect-domain reviewer surfaces useful findings that the previous roster missed.
+
+5. **Document the rotation** in skills_library/CLAUDE.md if permanent, or in a-plus-maxing/CLAUDE.md if project-scoped.
+
+**Sequencing with the Role 2 design-doc work:** the rotation should be tackled BEFORE running the next /review-pr cycle. Recommended order in S10: (a) finish Pass-2 Role 2 design-doc protocol Phases 1-5; (b) decide rotation; (c) Session B for Role 2 will then be the first /upgrade-agent run AFTER the rotation, and the deployed Role 2 agent.md will be reviewed via the new roster.
+
+**Blocker flag.** If steps 1-3 are unresolvable in S10 without user adjudication, defer to S11 — do NOT make the rotation decision unilaterally. Role 2 Pass-2 design-doc cycle is the primary S10 deliverable; rotation is the secondary deliverable.
