@@ -36,7 +36,7 @@ This is the canonical template every Pass-2 (foundation) and Pass-4 (specialist)
 Pass-1 deep-research → design/.{role}-design-work/domain-research.md (DONE for the 4 foundation roles; NOT YET for 14 specialists)
                               ↓
 Pass-2/Pass-4 design-doc-protocol Phases 1–5:
-  Phase 1: 3 parallel drafters (architect / senior-engineer / qa) using v1-substitute software roles
+  Phase 1: 3 parallel drafters (architect / senior-engineer / qa). For medical design docs from S10 onward, architect = project-local `.claude/agents/health-specialist-architect/agent.md` (deployed S9); senior-engineer + qa remain v1-substitute software roles at `~/Documents/Projects/skills_library/roles/{senior-engineer,qa}/agent.md` until Role 2 (S10) and Role 3 (S11) deploy, then they rotate in turn. See CONTINUATION_BRIEF §7 for the rotation table.
   Phase 2: orchestrator synthesizes into design/{role-slug}-design.md following THIS TEMPLATE
   Phase 3: 2 parallel red-team dispatches (/adversarial-review skill + medical-safety-reviewer once Role 4 is deployed; software security agent v1-substitute until then)
   Phase 4: orchestrator personally verifies each finding (PF-S3-01 guard); finding classifications documented
