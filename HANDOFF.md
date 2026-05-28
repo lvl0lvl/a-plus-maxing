@@ -12,6 +12,60 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 12 (2026-05-28)
+
+Goal: Two work-units sequenced. **Unit A:** Fix bead `a-plus-maxing-hca` E1 class (Hook v2.5 punch-list, recurrence=3 mandatory structural fix per Rigor Framework Discipline 8) — extend `.claude/hooks/enforce-role-inlining.sh` to accept the canonical operational-slot synonyms (`## Modes` | `## Audit Protocol` | `## Task Routing`) as the 9th-section equivalent. **Unit B:** Run design-doc-protocol Phases 1–5 for Role 4 (medical-safety-reviewer) per `design/DESIGN_DOC_TEMPLATE.md`; §4 INBOUND inherits 8+5+3=16 rows from Roles 1+2+3; produce `design/medical-safety-reviewer-design.md` Status: Final. Fourth end-to-end exercise of canonical template.
+
+Acceptance criteria:
+- [ ] AC0-A (Unit A) — Hook v2.5 implements operational-slot synonym (Modes | Audit Protocol | Task Routing). Block message lists which slot synonyms are accepted. Existing 8 tests still pass; 3+ new tests cover security profile shape, orchestrator profile shape, and explicit absence of all three.
+- [ ] AC0-B (Unit A) — Bead `a-plus-maxing-hca` E1 class closed with reason citing the structural fix; E2 class (recurrence=2, below mandatory-fix threshold) tracked in either same or new bead.
+- [ ] AC0-C (Unit A) — INVARIANTS.md `INV-ROLE-INLINING` row updated: smoke-test count reflects new total; Change Log row appended for S12 hook v2.5.
+- [ ] AC0-D (Unit A) — Hook v2.5 fix committed BEFORE first Phase-1 dispatch (chronological discipline; the new hook is in effect for all Role 4 dispatches).
+- [ ] AC1 (Unit B) — Phase 1: 3 parallel drafter dispatches, full profiles inlined per INV-ROLE-INLINING via hook v2.5 (no workarounds).
+- [ ] AC2 (Unit B) — Phase 2: orchestrator synthesizes `design/medical-safety-reviewer-design.md` per template. §4 INBOUND tri-table inherits 8+5+3=16 rows. Pre-Phase-3 mechanical body↔bibliography + §11.1-row-pointer checks pass.
+- [ ] AC3 (Unit B) — Phase 3: 2 red-team dispatches (`/adversarial-review` + a peer-review-pattern safety reviewer).
+- [ ] AC4 (Unit B) — Phase 4: PF-S3-01 6th-consecutive guard. Every finding personally source-read before classification; REJECTED rows carry cited-evidence attestations.
+- [ ] AC5 (Unit B) — Phase 5: dispositions applied. §7 self-attest 17/17. Appendix A populated. Frontmatter `status: Final`. `vault/meta/index.md` + `log.md` updated.
+- [ ] AC6 (close) — All 3 audits exit 0 at `--session 12`. PF attestation canonical `S12 close (YYYY-MM-DD):`. VOLATILE rotation. Feature branch only.
+
+Files I WILL touch:
+- `.claude/hooks/enforce-role-inlining.sh` (modify — v2.5)
+- `.claude/hooks/tests/test_enforce_role_inlining.sh` (extend with new tests)
+- `INVARIANTS.md` (Mechanical Verification cell + Change Log row)
+- `design/medical-safety-reviewer-design.md` (NEW)
+- `design/.medical-safety-reviewer-design-work/{architect-draft,se-draft,qa-draft,red-team-adversarial,red-team-safety,finding-classifications,dispatch-ledger.jsonl}.md` (NEW)
+- `design/.medical-safety-reviewer-design-work/SESSION_KICKOFF.md` (flip to `consumed` at close)
+- `HANDOFF.md` (contract + close + VOLATILE rotation)
+- `vault/meta/index.md`, `vault/meta/log.md` (appends)
+- `.beads/*` via `bd` CLI (close hca E1; possibly create E2-followup bead)
+- `memory/process-failures.md` (only if new PF surfaces)
+
+Files I will NOT touch:
+- `design/health-{specialist-architect,implementer,edge-case-reviewer}-design.md` (Status: Final)
+- `design/DESIGN_DOC_TEMPLATE.md`, `design/CONTINUATION_BRIEF.md`, `design/INTEGRATION_NOTES.md`
+- `.claude/agents/health-specialist-architect/` (Session B per role; no deployment this session)
+- `vault/library/*`, `vault/compounds/*`, `vault/biomarkers/*`, `vault/dna/*`
+- `.claude/skills/*`, `scripts/*`, other `.claude/hooks/*`
+- `CLAUDE.md`
+- `~/Documents/Projects/skills_library/roles/*` (read-only — profiles inlined verbatim into dispatches)
+- `main` branch
+
+NOT doing:
+- E2 over-trigger fix (path-pattern + canonical H2 false-positive) — recurrence=2, below Discipline-8 threshold; if quickly co-fixable from E1 work, flag and decide at the time
+- Role 4 Session B `/upgrade-agent`
+- Roles 2 + 3 Session B
+- Pass-3 specialists
+- Walter pending items
+- Other S10/S11 follow-up beads
+
+Invariants at risk:
+- INV-ROLE-INLINING — actively being modified; smoke tests are the falsification window for the modification itself
+- AP-ORCH-SELF-ATTEST (PF-S3-01, recurrence=2) — 6th-consecutive guard at AC4
+- AP-INCOMPLETE-PROPAGATION — largest cross-role §4 inheritance yet (16 rows from 3 prior docs)
+- INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN, INV-HO-ROTATION, INV-HO-NO-STALE-HASH
+
+Self-recognition pre-flight: None of the canonical PF-S3-01 framings apply yet. Specifically watching during Unit B Phase 4 for "the red-team is just bookkeeping after 3 prior successful runs" and "the §4 inheritance is mechanical so the verdict is mechanical."
+
 ## Scope Contract — Session 5
 
 Goal: Build project-suited drafting-team foundation (4 new roles) and 3 pilot specialist design docs (7 total) via Quant design-doc-protocol. Sequential across roles, parallel within. Probable multi-session work; checkpoint after each role. Defer `/upgrade-agent` runs and agent.md authoring to Session B.
