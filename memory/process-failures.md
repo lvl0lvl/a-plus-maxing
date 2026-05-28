@@ -93,3 +93,72 @@ This file is the canonical "What Did NOT Work" log for this project. Every proto
 - **Why it broke:** Same root cause as PF-S2-05 — pattern-matched session-start protocol as "check things" rather than "verify branch matches Conventions." No mechanical forcing function: the hook blocks push, not commit. Convention is documented, not enforced.
 - **Fix / mitigation:** Plan A executed 2026-05-23 with user authorization. Created `feature/wiki-bpc157-aplus-research` at the S2 close HEAD, then moved `main` ref back to `a061669` (S1 close) via `git branch -f` (the project's `block-dangerous.sh` hook correctly blocked the initially-attempted `git reset --hard`; `git branch -f` achieves the same outcome non-destructively). Working tree continues on feature branch. Reflog preserves all prior HEAD positions; rollback available via `git reflog`.
 - **Recurrence guard:** Add a pre-commit hook that blocks commits on `main` (mirror of the push-block hook). Until that exists, session-start protocol Step 2 must include explicit "if branch == main && intended-work != hotfix → checkout feature branch BEFORE first edit." This is on the next-session task list — beads ticket should be created at session 3 start.
+
+### PF-S12-01 (2026-05-28) — Three consecutive Pass-2 design-doc cycles skipped intermediate Session B agent-deployment, leaving the project's drafting rigor reliant on software-domain v1-substitutes across S10/S11/S12
+
+- **Class identifier:** `AP-DEFERRED-LOOP-CLOSURE` (canonical name reserved). Distinct from AP-INCOMPLETE-PROPAGATION (mechanical pointer-renumbering defects) and AP-ORCH-SELF-ATTEST (verdict self-attestation). Recurrence_count = **3** (S10 close, S11 close, S12 close), promoted at PF-emission per Rigor Framework Discipline 8 (N=3 → mandatory structural fix).
+
+- **What happened.** The design-doc-protocol assumes a four-step rotation per role: (i) Pass-2 design doc creation, (ii) Session B `/upgrade-agent` against the design doc producing `.claude/agents/<role>/agent.md`, (iii) Next role's Phase-1 drafter pool absorbs the deployed agent as the canonical drafter for its role-slot (architect / SE / QA / safety), (iv) The cycle compounds rigor — each new design doc gets drafted by more medical-domain reasoning and less software-substitute reasoning. The four steps fit in a two-session unit (design doc + Session B), with the next design doc starting only after both close.
+
+  Across S10/S11/S12, only the design-doc step ran. Session B for Roles 2, 3, 4 never ran between sessions. The result:
+  - **S10 Role 2 design doc** drafted by Role-1-deployed-architect + software-SE v1-sub + software-QA v1-sub
+  - **S11 Role 3 design doc** drafted by Role-1-deployed-architect + software-SE v1-sub + software-QA v1-sub (Role 2 Session B should have replaced SE-v1-sub)
+  - **S12 Role 4 design doc** drafted by Role-1-deployed-architect + software-SE v1-sub + software-QA v1-sub (Role 2 + Role 3 Session B should have replaced SE-v1-sub + QA-v1-sub)
+  - **S10/S11/S12 Phase-3 safety red-teams** dispatched the software-Security profile under "medical-safety-reviewer v1-substitute" domain-translation brief. Role 4 Session B should have replaced this v1-sub at S12 Phase 3; instead it was used to draft Role 4's own design doc, then v1-sub'd again to red-team it.
+
+  Net: across three Pass-2 cycles, 9 of 12 drafter-slot dispatches + 3 of 3 safety-red-team dispatches operated under v1-substitute pattern instead of the intended deployed-agent pattern.
+
+- **Why it broke.**
+
+  1. **Orchestrator default-forward bias.** At each session-start, I (orchestrator) presented Path A "highest leverage forward step = next role's design doc" without flagging that Path A's rigor was structurally compromised by the missing interleaved Session B. The scope-contract format captures binary ACs for the chosen work-unit but does not have a "rigor-uplift integrity check" slot that flags v1-substitute Roster B as cumulative drift.
+
+  2. **Kickoff-brief drift normalization.** The S12 SESSION_KICKOFF.md written at S11 close stated explicitly: "Most likely state at S12: both Session B's pending → both v1-substitute." That sentence anticipates the drift, accepts it, and normalizes it. **Anticipating drift in a planning artifact is itself a failure mode** — the artifact's job is to flag the drift as a blocker, not to model it as routine state. The same kickoff-brief pattern carried at S10 → S11 close + S11 → S12 close, so the normalization had two sessions to entrench.
+
+  3. **No mechanical forcing function.** Every other heavily-used protocol step in the project has a mechanical check or hook (handoff-audit, scope-contract-audit, pf-attestation-audit, enforce-role-inlining, block-commit-main, block-push-main, all the aplus-research gate JSONs). The Session-B-interleaving step had no audit; the cumulative deferral surfaced only through user challenge at S12 mid-session.
+
+  4. **Bead system did not escalate.** Session B obligations did not become beads, so the bd-priority-promotion mechanism (which correctly escalated hca P2 → P1 at recurrence=3) had no parallel surface for Session B deferral. Three open deferrals accumulated without any visible state change in bd output.
+
+  5. **The user-approval ritual operated at the wrong granularity.** At each session-start, the user approved the scope contract describing the chosen forward work. That approval was faithful to the contract presented but did not include a rigor-state check ("are we taking on this work-unit with stale v1-substitutes?"). The contract's "Files I will NOT touch: .claude/agents/" line at S10/S11/S12 was the closest signal, but it framed the omission as a discipline choice rather than as a deferred obligation.
+
+- **Structural consequence.** Three design docs were authored under reduced-rigor drafter pools. Content quality is acceptable because the substrate-citation discipline + Phase-3 red-team + Phase-4 PF-S3-01 personal-source-read guard partially compensated. But the project's intended rigor compounding never engaged: each subsequent design doc was supposed to inherit not just §4 OUTBOUND rows from the prior role's design doc but also the deployed reasoning frame from the prior role's agent. The latter did not happen for 3 of 4 foundation roles. Pass-3 specialist drafting (S13+) is now positioned to inherit the same v1-substitute pattern unless this is structurally corrected first.
+
+- **Drift catalog (what the cumulative pattern looks like).**
+
+  | Cycle | Forward work | Deferred work | v1-sub count at next session | User-flagged? |
+  |---|---|---|---|---|
+  | S10 close | Role 2 design Final | Role 2 Session B | 2 (SE + QA) carried into S11 | No |
+  | S11 close | Role 3 design Final | Role 2 + Role 3 Session B | 3 (SE + QA + safety-red-team) carried into S12 | No (kickoff brief anticipated) |
+  | S12 close | Role 4 design Final | Role 2 + Role 3 + Role 4 Session B | 3 still + Role 4 Session B owed | **User caught at S12 close** |
+
+  The pattern is monotonic accumulation. Each cycle pays the rigor cost forward into the next cycle. The cost is invisible to mechanical audits because the protocol does not encode the obligation as a checkable state.
+
+- **Fix / mitigation (immediate + structural).**
+
+  - **Immediate (this PF entry's writing).** Promote AP-DEFERRED-LOOP-CLOSURE as the canonical class name. Carry it as Top-3 active failure mode at S12 close. Recommend Path A (Sessions B for Roles 2/3/4) as the **mandatory** S13 work, with the candidate-path framing dropped — it is no longer "user choice" between A/B/C, it is "A first, then B or C."
+
+  - **Structural-1 (CLAUDE.md session-start step 7 addendum).** The scope-contract template gains a new mandatory field: **`Roster B status:`** explicitly stating which drafter slots are v1-substitute, which are deployed-canonical, and the cumulative-deferral count (how many prior Sessions B are owed). Sample form:
+    ```
+    Roster B status (per AP-DEFERRED-LOOP-CLOSURE guard):
+    - Architect: deployed (.claude/agents/health-specialist-architect/) since S9
+    - SE drafter: v1-substitute (Role 2 Session B OWED since S10 close — 3 cycles pending)
+    - QA drafter: v1-substitute (Role 3 Session B OWED since S11 close — 2 cycles pending)
+    - Safety red-team: v1-substitute (Role 4 Session B OWED since S12 close — 1 cycle pending)
+    Cumulative-deferral count: 3 (mandatory pause per AP-DEFERRED-LOOP-CLOSURE; close Sessions B before next forward Pass-2 OR explicit user-override with cited rationale)
+    ```
+
+  - **Structural-2 (mechanical audit).** New audit script `scripts/session-b-debt-audit.sh` that reads HANDOFF.md scope-contract block, checks the "Roster B status" field exists and the cumulative-deferral count ≤ 1, exits 2 (BLOCK) otherwise. Add to close-protocol step 8.5 alongside the other 3 audits. Smoke tests against fixtures with 0/1/2/3 cumulative-deferral count.
+
+  - **Structural-3 (bead system).** At every design-doc-Final close, automatically create a bead `<project>-sb<role>` (Session B for that role) with priority P2. After 1 cycle of non-action, bd promotes P2 → P1. After 2 cycles, P1 → P0 (blocking). Mirrors the hca P2 → P1 promotion ritual that worked. Implementation can be a wrapper in the bd-prime hook or a close-protocol step.
+
+  - **Structural-4 (kickoff-brief discipline).** Kickoff briefs are forbidden from "anticipating" drift in their declared-state sections without flagging it as a blocker. A new SESSION_KICKOFF.md format constraint: any sentence of form "Most likely state at S<N>: ... v1-substitute / pending / not yet run" MUST be followed by either (a) explicit blocker flag with a bead ID, or (b) explicit rationale why proceeding with that state is acceptable. Adopt this discipline at next kickoff-brief authoring (S13 → S14 boundary).
+
+  - **Structural-5 (INVARIANTS candidate).** Surface INV-SESSION-B-INTERLEAVING as a candidate invariant: "Pass-2 design-doc-Final cycles may not stack >1 unclosed Session B obligation without explicit user override + cited rationale." Promotion ritual per INVARIANTS.md change-discipline. Not promoted unilaterally in this PF entry; surfaced for user adjudication.
+
+- **Recurrence guard (until Structural-2 + Structural-3 ship).** At every session-start, before drafting a scope contract, orchestrator MUST:
+  1. List deployed agents at `.claude/agents/*/agent.md`.
+  2. List Final design docs at `design/*-design.md`.
+  3. Compute set difference: `{Final design docs} − {deployed agents}` = Session B debt.
+  4. If debt count ≥ 1, the FIRST scope-contract option offered to the user is "close Session B for <oldest debt>"; forward Pass-2 work is offered only as alternate path with explicit cumulative-deferral count cited.
+  5. If user picks forward Pass-2 anyway, scope contract carries explicit "Roster B status" field with cumulative-deferral count + user-cited rationale for override.
+
+- **Anti-recurrence falsification window.** S13 is the next test. If S13 opens with debt count = 3 (Roles 2/3/4 Session B owed) and I open with forward Pass-2 work, the guard failed and PF-S12-01 recurrence_count promotes to 4 (recurrence beyond mandatory-fix threshold). If S13 opens with Session B for Role 2 as the offered first option, the guard held.
