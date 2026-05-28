@@ -82,3 +82,4 @@ _(none yet — first panel July 2026)_
 - .claude/skills/aplus-research/lib/gate_attest.py (NEW S4, canonical gate JSON writer)
 - .claude/hooks/enforce-role-inlining.sh (NEW S4, role-profile PreToolUse hook)
 - design/health-edge-case-reviewer-design.md — Pass-2 Role 3 design doc Final (S11 close, 2026-05-27)
+- design/medical-safety-reviewer-design.md — Pass-2 Role 4 design doc Final (S12 close, 2026-05-28)
