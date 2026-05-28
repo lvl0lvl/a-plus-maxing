@@ -46,7 +46,16 @@ if ! echo "$prompt" | grep -qE '^# [A-Z][a-zA-Z]+( [A-Z][a-zA-Z]+){0,4}$|roles/[
 fi
 
 # Role-context detected. Require all 11 canonical sections.
-CANONICAL=(
+#
+# The 9th-section "operational slot" varies by role per the actual content of
+# ~/Documents/Projects/skills_library/roles/<slug>/agent.md:
+#   - ## Modes              (architect, design-critic, qa, senior-engineer, ui-designer)
+#   - ## Audit Protocol     (security)
+#   - ## Task Routing       (orchestrator)
+# Hook v2.5 (S12) accepts any one of these as the operational-slot equivalent
+# rather than requiring '## Modes' literally. This closes E1 recurrence=3
+# (PF: S9 architect / S10 path-pattern / S11 security profile blocked).
+REQUIRED=(
     "## Identity"
     "## Core Rules"
     "## Role Boundaries"
@@ -55,15 +64,31 @@ CANONICAL=(
     "## Tools"
     "## Communication"
     "## Context Loading"
-    "## Modes"
     "## Anti-Patterns"
     "## Negative Examples"
 )
+OPERATIONAL_SLOT_SYNONYMS=(
+    "## Modes"
+    "## Audit Protocol"
+    "## Task Routing"
+)
 
 missing=()
-for section in "${CANONICAL[@]}"; do
+for section in "${REQUIRED[@]}"; do
     grep -qF "$section" <<< "$prompt" || missing+=("$section")
 done
+
+# Operational slot: pass if ANY synonym is present.
+slot_found=0
+for syn in "${OPERATIONAL_SLOT_SYNONYMS[@]}"; do
+    if grep -qF "$syn" <<< "$prompt"; then
+        slot_found=1
+        break
+    fi
+done
+if [ "$slot_found" -eq 0 ]; then
+    missing+=("operational-slot (one of: ${OPERATIONAL_SLOT_SYNONYMS[*]})")
+fi
 
 if [ ${#missing[@]} -gt 0 ]; then
     {
@@ -72,6 +97,10 @@ if [ ${#missing[@]} -gt 0 ]; then
         echo "Dispatch matched role-context (H1 = '# {Role Name}' or roles/<slug>/agent.md)"
         echo "but is missing canonical sections:"
         for s in "${missing[@]}"; do echo "  - $s"; done
+        echo ""
+        echo "The 9th-section operational slot accepts any one of:"
+        for syn in "${OPERATIONAL_SLOT_SYNONYMS[@]}"; do echo "  - $syn"; done
+        echo "per the actual section names used across skills_library/roles/*/agent.md."
         echo ""
         echo "Required: paste the COMPLETE 11-section role profile verbatim from"
         echo "  ~/Documents/Projects/skills_library/roles/<role-slug>/agent.md"

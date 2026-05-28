@@ -86,6 +86,88 @@ assert_exit "T7 malformed payload passes" 0 $?
 echo '{"tool_input":{"command":"ls -la"}}' | bash "$HOOK"
 assert_exit "T8 non-Task payload passes" 0 $?
 
+# T9 (hook v2.5): security profile shape uses '## Audit Protocol' as operational slot. ALLOW.
+SECURITY_PROFILE="# Security
+You are the Security reviewer.
+## Identity
+You audit for vulnerabilities.
+## Core Rules
+1. Trust nothing.
+## Role Boundaries
+I own audit. I do NOT own implementation.
+## Ask vs Proceed
+Ask when scope is load-bearing.
+## Loop-Breaking
+Escape after 2 passes.
+## Tools
+Read / Grep / Bash.
+## Communication
+YAML output.
+## Context Loading
+3 refs max.
+## Audit Protocol
+Threat-model first, then code.
+## Anti-Patterns
+I don't certify without verification.
+## Negative Examples
+BAD: ... GOOD: ..."
+make_payload "$SECURITY_PROFILE" | bash "$HOOK"
+assert_exit "T9 security profile with '## Audit Protocol' as operational slot passes" 0 $?
+
+# T10 (hook v2.5): orchestrator profile shape uses '## Task Routing' as operational slot. ALLOW.
+ORCH_PROFILE="# Orchestrator
+You are the Orchestrator.
+## Identity
+You coordinate agents.
+## Core Rules
+1. Verify before delegating.
+## Role Boundaries
+I own dispatch. I do NOT own implementation.
+## Ask vs Proceed
+Ask when route is ambiguous.
+## Loop-Breaking
+Escape after 2 routes.
+## Tools
+Task / Read.
+## Communication
+YAML output.
+## Context Loading
+3 refs max.
+## Task Routing
+SE → implementation, QA → tests, Architect → design.
+## Anti-Patterns
+I don't ship without verification.
+## Negative Examples
+BAD: ... GOOD: ..."
+make_payload "$ORCH_PROFILE" | bash "$HOOK"
+assert_exit "T10 orchestrator profile with '## Task Routing' as operational slot passes" 0 $?
+
+# T11 (hook v2.5): role H1 with all 10 required but NO operational slot synonym. BLOCK.
+NO_SLOT_PROFILE="# Senior Engineer
+You are the Senior Engineer.
+## Identity
+You serve the codebase.
+## Core Rules
+1. Test first.
+## Role Boundaries
+I own X. I do NOT own Y.
+## Ask vs Proceed
+Ask when load-bearing.
+## Loop-Breaking
+Escape after 2 passes.
+## Tools
+Read / Edit / Bash.
+## Communication
+YAML output.
+## Context Loading
+3 refs max.
+## Anti-Patterns
+I don't ship without tests.
+## Negative Examples
+BAD: ... GOOD: ..."
+make_payload "$NO_SLOT_PROFILE" | bash "$HOOK" 2>/dev/null
+assert_exit "T11 absence of all operational-slot synonyms blocks" 2 $?
+
 echo ""
 echo "$pass/$((pass + fail)) passed"
 exit $fail
