@@ -213,15 +213,17 @@ Two work-units sequenced. **Unit A (pre-Phase-1 prerequisite per S11 Discipline-
 
 **PF attestation.**
 
-S12 close (2026-05-28): No new PF-class entries this session. Observations that did NOT promote: (a) Mid-Phase-5 §11.1 PF-S6-01 row-pointer defect (cited row 9 instead of row 2 for ancestry-chain mechanical guard) — the renumbering-propagation defect class AP-INCOMPLETE-PROPAGATION caught by post-Phase-5 mechanical check during self-audit, not by red-team Phase 3. Same defect class as F-001..F-003 + F-005 + F-017 + F-018 + S-05 (all caught by Phase-3 red-team this session). Recurrence pattern: AP-INCOMPLETE-PROPAGATION at row-pointer surface across S11 + S12 = 2 of 2 Pass-2 cycles since the class was named; mitigation is post-synthesis grep audit of cross-section pointers. This session's post-Phase-5 self-audit caught the missed PF-S6-01 instance — guard mechanism works at the orchestrator self-audit layer, but the cross-class recurrence_count is now 2 — watch for promotion. (b) Six consecutive PF-S3-01 guards now held (S7/S8/S9/S10/S11/S12). 41 findings personally source-read in S12; 3 REJECTED carry cited-evidence attestations (F-012, F-025, F-030); 3 REJECTED-WITH-ADOPTION (F-011, F-013, S-07) classified per the project's reject-but-adopt feedback memory. (c) The S11 Phase-1-§9-ownership-coordination AP recurred at S12 §4.4 row 9 (Council-Mode protocol added at synthesis without architect-drafter authorship) — flagged honestly via F-009 disposition annotation; same Phase-2-synthesis-content class. Recurrence_count=2 for this class; correct mechanism (synthesis layer) handles it.
+S12 close (2026-05-28): **One new PF entry promoted post-session-close (PF-S12-01 AP-DEFERRED-LOOP-CLOSURE) at user challenge.** Recurrence_count=3 across S10/S11/S12 close cycles. The pattern: three consecutive Pass-2 design-doc cycles skipped intermediate Session B `/upgrade-agent` deployment, leaving 9 of 12 drafter-slot dispatches + 3 of 3 safety-red-team dispatches operating under v1-substitute pattern instead of the intended deployed-agent pattern. User identified the gap with "what agents have been created so far?" — only Role 1 is deployed; Roles 2/3/4 design docs sit unconverted into agent profiles. Per Rigor Framework Discipline 8 (N=3 → mandatory not optional), PF-S12-01 carries 5 structural-fix recommendations including a new scope-contract `Roster B status:` field, a new `scripts/session-b-debt-audit.sh` audit, automatic bead creation at design-doc-Final close, kickoff-brief drift-anticipation prohibition, and INV-SESSION-B-INTERLEAVING candidate invariant. Full entry at `memory/process-failures.md`. Observations that did NOT promote: (a) Mid-Phase-5 §11.1 PF-S6-01 row-pointer defect (cited row 9 instead of row 2 for ancestry-chain mechanical guard) — AP-INCOMPLETE-PROPAGATION class caught by post-Phase-5 self-audit, not by red-team Phase 3. Same defect class as F-001..F-003 + F-005 + F-017 + F-018 + S-05 (all caught by Phase-3 red-team this session). Cross-class recurrence_count=2 — watch for promotion. (b) Six consecutive PF-S3-01 guards now held (S7/S8/S9/S10/S11/S12). 41 findings personally source-read in S12; 3 REJECTED carry cited-evidence attestations (F-012, F-025, F-030); 3 REJECTED-WITH-ADOPTION (F-011, F-013, S-07) per reject-but-adopt feedback memory. (c) The S11 Phase-1-§9-ownership-coordination AP recurred at S12 §4.4 row 9 (Council-Mode protocol added at synthesis without architect-drafter authorship) — flagged honestly via F-009 disposition annotation; same Phase-2-synthesis-content class. Recurrence_count=2 for this class; correct mechanism (synthesis layer) handles it.
 
 **Commit:** Unit A at `f3f3d2d` (already pushed). Unit B + Phase 5 dispositions + close: pending Phase 9.
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **AP-INCOMPLETE-PROPAGATION** — S12 stress-tested at §13 row-renumbering propagation (synthesis consolidated 36 → 25 rows + Phase 5 added rows 26, 27 → 27 total). Red-team Phase 3 caught 7 of 8 row-pointer instances (F-001..F-003 + F-005 + F-017 + F-018 + S-05); orchestrator self-audit caught the 8th (PF-S6-01 row 9→row 2). Cross-class recurrence_count=2 across Pass-2 cycles. Mitigation: mandatory post-synthesis grep audit of cross-section pointers (§11.1, §15.2b, §17.1, §18) at every design doc close. **WATCH for promotion at S13 specialist authoring.**
-2. **AP-ORCH-SELF-ATTEST** (PF-S3-01) — six consecutive guards held now (S7/S8/S9/S10/S11/S12). 41 findings personally source-read in S12; 3 REJECTED-with-cited-evidence; 3 REJECTED-WITH-ADOPTION. Still untested in fresh `aplus-research` dispatch context. Phase-C peptide library campaign remains the falsification window.
-3. **AP-PHASE-2-SYNTHESIS-CONTENT-AUTHORSHIP** — recurrence_count=2 (S11 §9 ownership + S12 §4.4 row 9 Council-Mode). Orchestrator authors content at synthesis that drafters did not source — caught honestly via explicit synthesis-authorship trail annotation. Mechanism (synthesis-trail annotation) handles it but the recurrence is real. Mitigation: at next Pass-2 (S13 specialists), explicitly enumerate orchestrator-authored sections in Phase 1 brief to drafters so they can challenge or co-author.
+1. **AP-DEFERRED-LOOP-CLOSURE (PF-S12-01, recurrence_count=3 — MANDATORY structural fix per Discipline 8)** — three consecutive Pass-2 cycles (S10/S11/S12 close) skipped intermediate Session B `/upgrade-agent` deployment. 9 of 12 drafter slots + 3 of 3 safety-red-team dispatches ran under v1-substitute pattern. User caught at S12 close. 5 structural-fix recommendations queued at `memory/process-failures.md` PF-S12-01 (scope-contract `Roster B status:` field, `scripts/session-b-debt-audit.sh`, auto-bead at design-doc-Final close, kickoff-brief drift-anticipation prohibition, INV-SESSION-B-INTERLEAVING candidate). **S13 MUST open with Session B for Role 2 (oldest debt) as first offered work-unit; forward Pass-3 work is alternate path only with explicit user-override + cited rationale.** Falsification window at S13 session-start.
+2. **AP-INCOMPLETE-PROPAGATION** — S12 stress-tested at §13 row-renumbering propagation (synthesis consolidated 36 → 25 rows + Phase 5 added rows 26, 27 → 27 total). Red-team Phase 3 caught 7 of 8 row-pointer instances (F-001..F-003 + F-005 + F-017 + F-018 + S-05); orchestrator post-Phase-5 self-audit caught the 8th (PF-S6-01 row 9→row 2). Cross-class recurrence_count=2 across Pass-2 cycles. Mitigation: mandatory post-synthesis grep audit of cross-section pointers (§11.1, §15.2b, §17.1, §18) at every design doc close. Watch for promotion at S13 specialist authoring.
+3. **AP-ORCH-SELF-ATTEST** (PF-S3-01) — six consecutive guards held now (S7/S8/S9/S10/S11/S12). 41 findings personally source-read in S12; 3 REJECTED-with-cited-evidence; 3 REJECTED-WITH-ADOPTION. Still untested in fresh `aplus-research` dispatch context. Phase-C peptide library campaign remains the falsification window.
+
+**Demoted from prior Top-3:** AP-PHASE-2-SYNTHESIS-CONTENT-AUTHORSHIP (recurrence_count=2 — S11 §9 ownership + S12 §4.4 row 9 Council-Mode; correct catch-mechanism at synthesis trail annotation; not promoted). Hook-edge-case (E1 class closed at Unit A; E2 class tracked at bead rc1).
 
 ## Current State (volatile)
 
@@ -239,19 +241,20 @@ S12 close (2026-05-28): No new PF-class entries this session. Observations that 
 
 ## What Is Next (volatile)
 
-### S13 candidates (foundation-milestone-passed; user choice)
+### S13 — Session B for Role 2 (MANDATORY per PF-S12-01 AP-DEFERRED-LOOP-CLOSURE)
 
-All 4 foundation design docs are Final. Three forward paths now exist; user picks the order based on falsification-window priority:
+**Session B debt at S12 close = 3.** Per Discipline 8, S13 opens with the oldest debt as the FIRST offered work-unit. Forward Pass-3 specialist work is alternate path only with explicit user-override + cited rationale.
 
-**Path A — Sessions B (deploy the design docs as agent profiles).** Each is its own session.
-- Role 2 Session B: `/upgrade-agent` against `design/health-implementer-design.md` → `.claude/agents/health-implementer/agent.md`
-- Role 3 Session B: `/upgrade-agent` against `design/health-edge-case-reviewer-design.md` → `.claude/agents/health-edge-case-reviewer/agent.md`
-- Role 4 Session B: `/upgrade-agent` against `design/medical-safety-reviewer-design.md` → `.claude/agents/medical-safety-reviewer/agent.md` (replaces v1-substitute used S10/S11/S12)
-- 23 PROPOSED §13 rows in the Role 4 doc gate at Session B post-deployment ACs; many resolve via the new `scripts/audit-safety-reviewer-output.sh` (PROPOSED — Role 4 owns implementation per §18 OQ-1)
+**S13 primary:** `/upgrade-agent` against `design/health-implementer-design.md` → produces `.claude/agents/health-implementer/agent.md`. Closes the oldest Session B debt (since S10). After Role 2 deploys, the SE-drafter slot stops being v1-substitute for the next cycle.
 
-**Path B — Pass-3 specialist design docs.** 14 specialists per `vault/WIKI.md` roster. Each Pass-3 uses the canonical template + 3-axis inheritance from Roles 1/2/3 (and per-specialist Pass-1 substrate). First specialist surfaces the wiki-entry-probe-set adaptation calibration tracked at Role 4 OQ-6. Recommended first candidate: peptide-specialist (BPC-157 wiki entry is ready as the first canonical wiki-entry-review target per Role 4 EC-7).
+**S14 + S15 candidates (in debt order):** Role 3 Session B → Role 4 Session B. Each closes one debt unit. After all three Session B's run, Pass-3 specialist drafting can engage with the project's intended drafter pool.
 
-**Path C — Phase-C peptide library campaign.** Uses `aplus-research` skill against next peptide candidates. This is the falsification window for AP-ORCH-SELF-ATTEST (still untested in fresh aplus-research dispatch context post-S6 calibration). Independent of Role 2/3/4 Session B status (Role 1 is deployed and aplus-research has its own gates).
+### S13 alternate paths (with user override + cited rationale)
+
+If user explicitly authorizes a forward Pass-3 cycle before closing Session B debt:
+
+- **Pass-3 specialist design doc** (recommended candidate: peptide-specialist; BPC-157 wiki entry is the first canonical wiki-entry review target per Role 4 §14 EC-7). Override rationale: documented user choice to accept v1-substitute Roster B for Pass-3 cycles. Cumulative-deferral count would then become 4.
+- **Phase-C peptide library campaign** via `aplus-research`. Falsification window for AP-ORCH-SELF-ATTEST. Independent of Session B debt status — Role 1 is deployed and aplus-research has its own gates.
 
 ### S13 prerequisites (regardless of path)
 
@@ -260,7 +263,8 @@ All 4 foundation design docs are Final. Three forward paths now exist; user pick
 - `templates/refusal-class-taxonomy.yaml`, `templates/specialist-risk-class.yaml` (S10 committed)
 - Hook v2.5 LIVE (S12; ships operational-slot synonym set)
 - AGENT_TEMPLATE.md at skills_library (absolute path)
-- Mandatory post-synthesis grep audit of cross-section row pointers at every design doc close — Top-3 watch item per AP-INCOMPLETE-PROPAGATION recurrence_count=2
+- Mandatory post-synthesis grep audit of cross-section row pointers at every design doc close — Top-3 watch item per AP-INCOMPLETE-PROPAGATION
+- **PF-S12-01 AP-DEFERRED-LOOP-CLOSURE recurrence guard at session-start** (list deployed agents + Final design docs; compute Session B debt; offer oldest debt as first work-unit per PF-S12-01 recurrence guard)
 
 ### Sessions B per role (interleaved)
 
