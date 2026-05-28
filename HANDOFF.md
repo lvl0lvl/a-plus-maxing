@@ -200,56 +200,67 @@ S10 close (2026-05-27): No new PF-class entries this session. Observations that 
 
 **Commit:** (pending — Phase 9 git commit + push).
 
-## Session 11 close — Pass-2 Role 3 (health-edge-case-reviewer) design doc Final (2026-05-27)
+## Session 12 close — Pass-2 Role 4 (medical-safety-reviewer) design doc Final + Hook v2.5 (2026-05-28)
 
-All 7 ACs PASS. Roster B held (architect = project-local; SE+QA v1-substitutes — LAST cycle for v1-sub QA before Role 3 Session B rotation). 32 red-team findings (22 adversarial + 10 medical-safety v1-substitute) classified — 27 LEGITIMATE + 1 LEGITIMATE-MODIFIED + 2 REJECTED-with-cited-evidence + 1 DUPLICATE + 1 WITHDRAWN. Two CRITICAL safety findings (S-01 AFB strict enforcement; S-02 NCC MERP → H-class mapping embed) and one CRITICAL adversarial cluster (F-001..F-004 §11.1 row-pointer drift from synthesis layer) — all 5 fixed at Phase 5. PF-S3-01 5th consecutive guard held — every finding personally source-read. AQ-001 deferred Option A held; Role 3 design surfaces gap without resolving. New: §13 expanded 23 → 26 rows (added rows 24 intra-role cosine, 25 reviewer-side inlining self-check, 26 mid-session divergence); §14 expanded 8 → 9 ECs (added EC-8 S-09 surface); §15.2 expanded 16 → 18 ACs (added AC-12 AFB enforcement + AC-deploy-14a per-sub-command enumeration).
+Two work-units sequenced. **Unit A (pre-Phase-1 prerequisite per S11 Discipline-8 mandate):** Hook v2.5 structural fix shipped at commit `f3f3d2d` BEFORE first Phase-1 dispatch. `.claude/hooks/enforce-role-inlining.sh` 9th-section requirement extended to operational-slot synonym set `{## Modes \| ## Audit Protocol \| ## Task Routing}`; smoke tests 8→11/11; INVARIANTS.md INV-ROLE-INLINING Change Log row appended; bead `a-plus-maxing-hca` E1 class closed (recurrence_count=3 → mandatory structural fix per Rigor Framework Discipline 8 satisfied); new bead `a-plus-maxing-rc1` (P2) tracks remaining E2 path-pattern over-trigger class. **Unit B:** Role 4 design doc Final at `design/medical-safety-reviewer-design.md` (874 lines). §4 MIXED tri-table — 8+5+3=16 INBOUND + 9 OUTBOUND (largest cross-role propagation surface). 27 §13 rows (1 LIVE + 2 REFERENCED-with-PROPOSED-extension + 24 PROPOSED-only). 41 red-team findings → 13 LEGITIMATE + 16 LEGITIMATE-MODIFIED + 3 REJECTED-WITH-ADOPTION + 3 REJECTED-with-cited-evidence + 3 DUPLICATE = 32 active fixes applied at Phase 5. PF-S3-01 6th consecutive guard held — every finding personally source-read against cited evidence before classification. Closes v1-substitute software-security gap for S10/S11/S12 safety-red-team slot.
+
+**Hook v2.5 empirical validation under live conditions.** S12 Phase 3 dispatched medical-safety v1-substitute (Security profile with `## Audit Protocol` operational slot). Hook accepted the dispatch natively without synthetic-section workaround — empirical validation of the Discipline-8 structural fix. Pre-S12 (S11), the same dispatch shape required the workaround.
 
 **Drift checks.**
-- **Task drift:** All 6 ACs evaluated PASS. AQ-001 Option A deferral was explicit in scope contract pre-Phase-1 — not silent. No silent drift.
-- **Architecture drift:** No invariant degraded. INV-ROLE-INLINING strengthened (5 dispatches inlined full profiles verbatim; 1 hook block surfaced E1 edge case at recurrence=3 — see PF attestation below). INV-BRANCH-NOT-MAIN held. INV-SCOPE-CONTRACT + INV-PF-ATTESTATION + INV-HO-ROTATION + INV-HO-NO-STALE-HASH satisfied. 4 candidate INVs proposed in §16 (INV-DESIGN-DOC-SYMMETRY second occurrence; INV-COVERAGE-GAP-FINDING-SCHEMA; INV-REVIEWER-SEVERITY-PROPOSED-ONLY; INV-DIVERGENCE-LOG-PRESENCE) — none promoted unilaterally; all surfaced as §18 OQ entries with bead-tracked promotion ritual.
-- **Vision drift:** Same project. After S11, 3 of 4 foundation design docs Final (Roles 1, 2, 3); Role 4 remains for S12. Role 2 deployment still pending Session B. Pass-3 specialists still deferred to S13. No vision drift.
+- **Task drift:** Both AC0-A through AC0-D (Unit A) + AC1 through AC6 (Unit B) evaluated PASS. The E2 follow-up bead (rc1) was a contingent expansion explicitly flagged in scope contract NOT doing (recurrence=2, below Discipline-8 threshold; would be co-fixable but kept out of scope to preserve Unit B focus). No silent scope drift.
+- **Architecture drift:** No invariant degraded. INV-ROLE-INLINING strengthened mechanically (hook v2.5 closes a recurrence=3 structural defect class; smoke tests promoted 8→11). INV-BRANCH-NOT-MAIN held. INV-SCOPE-CONTRACT + INV-PF-ATTESTATION + INV-HO-ROTATION + INV-HO-NO-STALE-HASH satisfied. 2 candidate INVs surfaced at Role 4 §16 (INV-HARM-CLASS-COMPOSITION cross-doc carried from S8; INV-DEPLOY-VERDICT-BINARY new Role-4-internal) — neither promoted unilaterally; both surfaced as §18 OQ-8 with bead-tracked promotion ritual.
+- **Vision drift:** Same project. After S12, all 4 foundation design docs Final (Roles 1, 2, 3, 4). Role 1 deployed at `.claude/agents/`. Roles 2, 3, 4 await Session B `/upgrade-agent`. Pass-3 specialists still deferred to S13. The 4-of-4-foundation milestone is reached.
 
 **PF attestation.**
 
-S11 close (2026-05-27): **One new PF observation candidate at recurrence=3 (mandatory structural fix promotion).** Hook E1 (Security profile lacks `## Modes` section → `enforce-role-inlining.sh` BLOCKED Phase-3 medical-safety dispatch) hit at recurrence_count=3 (predecessors: S9 architect-profile-section-shape mismatch; S10 path-pattern over-trigger). Per Rigor Framework Discipline 8 (N=3 → mandatory not optional). Workaround applied in S11 (synthetic `## Modes` section appended to inlined profile, naming Medical-Safety-v1-Substitute mode) shipped the dispatch but does NOT close the structural issue. Hook v2.5 punch-list bead `a-plus-maxing-hca` already exists from S10 — promoting to P1 from P2 at S11 close. No new PF-class entry written to `memory/process-failures.md` (the failure is the hook's over-trigger, not a new orchestrator behavior class); the recurrence is tracked via the existing bead. Other observations that did NOT promote: (a) Phase-1-§9-ownership-inconsistency (architect/SE drafters disagreed on §9 ownership) — caught by synthesis (orchestrator authored §9 directly); same Phase-1-brief-coordination class as S10's pattern; recurrence_count=2 (S10 had its own variant); watch but not promote — Phase-2 synthesis is the correct catch layer. (b) §13 row-renumbering propagation defect (4 §11.1 row pointers broke when §13 was consolidated from 44 to 23 rows) — caught by Phase-3 red-team adversarial cluster F-001..F-004 + medical-safety S-06; AP-INCOMPLETE-PROPAGATION class; already promoted by S10; S11 stress-tested it again and red-team caught — correct mechanism. Five consecutive PF-S3-01 guards held (S7/S8/S9/S10/S11 across five distinct dispatch surfaces).
+S12 close (2026-05-28): No new PF-class entries this session. Observations that did NOT promote: (a) Mid-Phase-5 §11.1 PF-S6-01 row-pointer defect (cited row 9 instead of row 2 for ancestry-chain mechanical guard) — the renumbering-propagation defect class AP-INCOMPLETE-PROPAGATION caught by post-Phase-5 mechanical check during self-audit, not by red-team Phase 3. Same defect class as F-001..F-003 + F-005 + F-017 + F-018 + S-05 (all caught by Phase-3 red-team this session). Recurrence pattern: AP-INCOMPLETE-PROPAGATION at row-pointer surface across S11 + S12 = 2 of 2 Pass-2 cycles since the class was named; mitigation is post-synthesis grep audit of cross-section pointers. This session's post-Phase-5 self-audit caught the missed PF-S6-01 instance — guard mechanism works at the orchestrator self-audit layer, but the cross-class recurrence_count is now 2 — watch for promotion. (b) Six consecutive PF-S3-01 guards now held (S7/S8/S9/S10/S11/S12). 41 findings personally source-read in S12; 3 REJECTED carry cited-evidence attestations (F-012, F-025, F-030); 3 REJECTED-WITH-ADOPTION (F-011, F-013, S-07) classified per the project's reject-but-adopt feedback memory. (c) The S11 Phase-1-§9-ownership-coordination AP recurred at S12 §4.4 row 9 (Council-Mode protocol added at synthesis without architect-drafter authorship) — flagged honestly via F-009 disposition annotation; same Phase-2-synthesis-content class. Recurrence_count=2 for this class; correct mechanism (synthesis layer) handles it.
 
-**Commit:** (pending — Phase 9 git commit + push).
+**Commit:** Unit A at `f3f3d2d` (already pushed). Unit B + Phase 5 dispositions + close: pending Phase 9.
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **AP-ORCH-SELF-ATTEST** (PF-S3-01, recurrence_count=2) — five consecutive guards held now: S7 / S8 / S9 / S10 / S11 (31 findings personally source-read in S11; 0 self-attested; 2 REJECTED carry cited evidence per reject-but-adopt feedback memory). Still untested in fresh `aplus-research` dispatch. Phase-C peptide library campaign remains the falsification window.
-2. **AP-INCOMPLETE-PROPAGATION** — S11 stress-tested at §13 row-renumbering propagation (23 → 26 rows; §11.1 row pointers had to track + were caught by red-team F-001..F-004); also at synthesis-layer §9 ownership coordination. Both caught at correct phase (red-team / synthesis respectively). Still untested at 14-specialist authoring scale.
-3. **Hook-edge-case (recurrence_count=3; bead `a-plus-maxing-hca` promoted to P1)** — Profile-vs-section mismatch class hit again in S11 Phase 3 (Security profile genuinely lacks `## Modes`); workaround shipped the dispatch but per Rigor Framework Discipline 8 the structural fix is now mandatory. v2.5 hook punch-list now blocking before next medical Pass-2 (S12 Role 4).
+1. **AP-INCOMPLETE-PROPAGATION** — S12 stress-tested at §13 row-renumbering propagation (synthesis consolidated 36 → 25 rows + Phase 5 added rows 26, 27 → 27 total). Red-team Phase 3 caught 7 of 8 row-pointer instances (F-001..F-003 + F-005 + F-017 + F-018 + S-05); orchestrator self-audit caught the 8th (PF-S6-01 row 9→row 2). Cross-class recurrence_count=2 across Pass-2 cycles. Mitigation: mandatory post-synthesis grep audit of cross-section pointers (§11.1, §15.2b, §17.1, §18) at every design doc close. **WATCH for promotion at S13 specialist authoring.**
+2. **AP-ORCH-SELF-ATTEST** (PF-S3-01) — six consecutive guards held now (S7/S8/S9/S10/S11/S12). 41 findings personally source-read in S12; 3 REJECTED-with-cited-evidence; 3 REJECTED-WITH-ADOPTION. Still untested in fresh `aplus-research` dispatch context. Phase-C peptide library campaign remains the falsification window.
+3. **AP-PHASE-2-SYNTHESIS-CONTENT-AUTHORSHIP** — recurrence_count=2 (S11 §9 ownership + S12 §4.4 row 9 Council-Mode). Orchestrator authors content at synthesis that drafters did not source — caught honestly via explicit synthesis-authorship trail annotation. Mechanism (synthesis-trail annotation) handles it but the recurrence is real. Mitigation: at next Pass-2 (S13 specialists), explicitly enumerate orchestrator-authored sections in Phase 1 brief to drafters so they can challenge or co-author.
 
 ## Current State (volatile)
 
-- **Role 3 design doc** at `design/health-edge-case-reviewer-design.md` Status: Final. 887 lines / 19 sections (18 + Appendix A). 26 §13 mechanical-enforcement rows (0 LIVE, 1 REFERENCED, 25 PROPOSED — all gated on `scripts/audit-reviewer-output.sh` + AQ-001 resolution per row 5; collective pointer at §18 OQ-1). 6 OQs documented (none resolved at Phase 5; resolutions queued for Session B + first-dispatch calibration).
-- **Three foundation design docs Final** (Role 1, Role 2, Role 3). Role 1 deployed at `.claude/agents/health-specialist-architect/`. Roles 2 + 3 await Session B `/upgrade-agent`.
-- **AQ-001 still open** (bead `a-plus-maxing-h1z`); Role 3 design surfaces gap via §13 row 5 prose-only emission + EC-8 + §18 OQ-2 + §17.2 A-5 falsification window.
-- **INVARIANTS register at 12 entries** unchanged. 4 candidate INVs surfaced in Role 3 §16 (cross-doc anchor for INV-DESIGN-DOC-SYMMETRY; three Role-3-specific); 1 cross-doc INV (INV-HARM-CLASS-COMPOSITION from S8) still PROPOSED. None promoted at S11.
-- **No new beads at S11 close** — every Phase-5 disposition was applied in-doc rather than deferred. `a-plus-maxing-hca` priority promoted from P2 → P1 (hook v2.5 punch-list mandatory per recurrence=3). All other S10 beads unchanged.
-- **Roster B status at S12 (next session):** architect = project-local. SE = v1-substitute (rotates to health-implementer post-Role-2-Session-B). QA = NOW rotatable to health-edge-case-reviewer post-Role-3-Session-B; however S12 may run before Role 3 Session B, in which case QA stays v1-substitute.
+- **Role 4 design doc** at `design/medical-safety-reviewer-design.md` Status: Final. 874 lines / 19 sections (18 + Appendix A). 27 §13 mechanical-enforcement rows (1 LIVE row 1, 2 REFERENCED-with-PROPOSED-extension rows 2+25, 24 PROPOSED-only). 10 OQs (5 new at Phase 5: OQ-9 bromism catalog-extension AQ; OQ-10 semantic operator-profile-leak audit; 4-7 covering threat-model catalog ownership, Council-Mode calibration, same-family degradation, wiki-entry probe-set adaptation, Petri toolkit). Closes the v1-substitute software-security gap S10/S11/S12 used.
+- **All 4 foundation design docs Final** (Roles 1, 2, 3, 4). Role 1 deployed at `.claude/agents/health-specialist-architect/`. Roles 2, 3, 4 await Session B `/upgrade-agent`. Foundation milestone reached.
+- **Hook v2.5 LIVE.** `enforce-role-inlining.sh` ships operational-slot synonym set; 11/11 smoke tests pass; INVARIANTS.md INV-ROLE-INLINING Change Log row updated for S12; bead hca closed; bead rc1 tracks remaining E2 class.
+- **AQ-001 still open** (bead `a-plus-maxing-h1z`); Role 4 design surfaces via §13 row 21 scope-annotation contract + EC-8 + §18 OQ-2.
+- **INVARIANTS register at 12 entries** unchanged. 2 candidate INVs surfaced in Role 4 §16 (INV-HARM-CLASS-COMPOSITION cross-doc carried; INV-DEPLOY-VERDICT-BINARY new Role-4-internal); §18 OQ-8 tracks promotion ritual. None promoted at S12.
+- **New beads at S12 close:** `a-plus-maxing-rc1` (P2, hook v2.5 E2 follow-up). No other deferred-work beads from Phase-5 dispositions — every disposition applied in-doc.
+- **Roster B status at S13:** architect = project-local. SE = v1-substitute UNTIL Role 2 Session B runs. QA = v1-substitute UNTIL Role 3 Session B runs. Role 4 Session B unlocks medical-safety-reviewer as canonical safety red-team agent (replacing v1-sub used S10/S11/S12).
 - **Active landmarks unchanged.** No trigger windows open today.
-- **Branch (2026-05-27 S11 close):** `feature/wiki-bpc157-aplus-research`. All S11 work in-tree; commit + push pending Phase 9.
+- **Branch (2026-05-28 S12 close):** `feature/wiki-bpc157-aplus-research`. Unit A pushed at `f3f3d2d`. Unit B + close pending.
 
-**Historical (kept for reference):** S10 details in S10 close note above; pre-S10 in `design/CONTINUATION_BRIEF.md`.
+**Historical (kept for reference):** S11 details in earlier S11 close note above; pre-S11 in `design/CONTINUATION_BRIEF.md`.
 
 ## What Is Next (volatile)
 
-### S12 — Pass-2 Role 4 (medical-safety-reviewer) design doc
+### S13 candidates (foundation-milestone-passed; user choice)
 
-**Highest leverage.** Run design-doc-protocol Phases 1-5 for Role 4 per `design/DESIGN_DOC_TEMPLATE.md`. Role 4 INHERITS from Role 1 §4 OUTBOUND (8 rows), Role 2 §4.2 OUTBOUND (5 rows), AND Role 3 §4.3 OUTBOUND (3 rows: coverage-gap report schema; 4-axis severity composition input; re-review-on-amendment discipline). Role 4's deployment closes the v1-substitute software-security gap that S10 + S11 used to fill the safety red-team slot.
+All 4 foundation design docs are Final. Three forward paths now exist; user picks the order based on falsification-window priority:
 
-**Prerequisite to S12:** address bead `a-plus-maxing-hca` (hook v2.5 punch-list) FIRST. Recurrence=3 makes the structural fix mandatory before another dispatch cycle would hit E1 a fourth time. If hca cannot be addressed pre-S12, document the workaround discipline at S12 start.
+**Path A — Sessions B (deploy the design docs as agent profiles).** Each is its own session.
+- Role 2 Session B: `/upgrade-agent` against `design/health-implementer-design.md` → `.claude/agents/health-implementer/agent.md`
+- Role 3 Session B: `/upgrade-agent` against `design/health-edge-case-reviewer-design.md` → `.claude/agents/health-edge-case-reviewer/agent.md`
+- Role 4 Session B: `/upgrade-agent` against `design/medical-safety-reviewer-design.md` → `.claude/agents/medical-safety-reviewer/agent.md` (replaces v1-substitute used S10/S11/S12)
+- 23 PROPOSED §13 rows in the Role 4 doc gate at Session B post-deployment ACs; many resolve via the new `scripts/audit-safety-reviewer-output.sh` (PROPOSED — Role 4 owns implementation per §18 OQ-1)
 
-### S12 prerequisites
+**Path B — Pass-3 specialist design docs.** 14 specialists per `vault/WIKI.md` roster. Each Pass-3 uses the canonical template + 3-axis inheritance from Roles 1/2/3 (and per-specialist Pass-1 substrate). First specialist surfaces the wiki-entry-probe-set adaptation calibration tracked at Role 4 OQ-6. Recommended first candidate: peptide-specialist (BPC-157 wiki entry is ready as the first canonical wiki-entry-review target per Role 4 EC-7).
 
-- `design/.medical-safety-reviewer-design-work/domain-research.md` — Pass-1 substrate (verify exists per CONTINUATION_BRIEF §4)
-- `design/health-edge-case-reviewer-design.md` Final (S11 close) — §4.3 OUTBOUND inheritance
+**Path C — Phase-C peptide library campaign.** Uses `aplus-research` skill against next peptide candidates. This is the falsification window for AP-ORCH-SELF-ATTEST (still untested in fresh aplus-research dispatch context post-S6 calibration). Independent of Role 2/3/4 Session B status (Role 1 is deployed and aplus-research has its own gates).
+
+### S13 prerequisites (regardless of path)
+
+- All 4 foundation design docs Final + frozen (Role 1/2/3/4 at `design/{role}-design.md`)
 - `design/DESIGN_DOC_TEMPLATE.md` Final (S7 close) — re-read at section boundaries
-- `templates/refusal-class-taxonomy.yaml`, `templates/specialist-risk-class.yaml` (committed S10)
-- AGENT_TEMPLATE.md at skills_library (absolute path; per Bundle C scoping)
-- bead `a-plus-maxing-hca` — Hook v2.5 punch-list (RECOMMENDED before S12; mandatory if E1 hits again)
+- `templates/refusal-class-taxonomy.yaml`, `templates/specialist-risk-class.yaml` (S10 committed)
+- Hook v2.5 LIVE (S12; ships operational-slot synonym set)
+- AGENT_TEMPLATE.md at skills_library (absolute path)
+- Mandatory post-synthesis grep audit of cross-section row pointers at every design doc close — Top-3 watch item per AP-INCOMPLETE-PROPAGATION recurrence_count=2
 
 ### Sessions B per role (interleaved)
 
