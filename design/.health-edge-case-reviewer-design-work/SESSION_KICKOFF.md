@@ -1,7 +1,8 @@
 ---
 title: Session Kickoff — Pass-2 Role 3 (health-edge-case-reviewer) design doc
 type: session-prep
-status: ready
+status: consumed
+consumed_at: S11 close (2026-05-27)
 created: 2026-05-27
 prepared_at: S10 close
 target_session: S11 (next session after compaction)
