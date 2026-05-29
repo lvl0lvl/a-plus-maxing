@@ -67,6 +67,14 @@ Never delete a document. Instead:
 ### Rule 6: Vault Consistency
 Vault notes follow the same rules. When a vault note becomes stale, update it or archive and replace it.
 
+### Rule 7: Budget Overage Triggers a Load-Bearing Review
+When a document exceeds its stated word / line / token budget (e.g., an agent profile over the `/upgrade-agent` ~2,000-token target, a design-doc section over its per-section line budget), the overage **triggers a review, not a blind trim**. The review:
+1. Classifies every element as **load-bearing** (a mechanical binary, a safety threshold, a required teaching example, a cross-role contract) or **reducible** (duplication, restated rationale, illustrative-but-not-required prose). The `/adversarial-review` token-economics verdict format — `REDUCIBLE: <list + savings> | LOAD-BEARING: <rationale>` — is the template.
+2. Focuses all edits on the **reducible** components only.
+3. If the residual still exceeds budget after removing all reducible content, **records the overage as a documented, justified exception** (e.g., against a characterization bead) with the load-bearing rationale — rather than cutting a load-bearing element to hit the number.
+
+Never blind-trim to satisfy a budget number; never cut a load-bearing element to fit. The budget is a trigger for scrutiny, not a cap that overrides correctness. Worked example: S13 `health-implementer` profile (5,007 tokens vs ~2,000 target) — reducible tranche cut, residual documented against bead `2qq`, zero safety binaries removed. Candidate for promotion to INVARIANTS.md (mechanical trigger: `wc`/`tiktoken` over budget) via the change-discipline ritual.
+
 ## Review Checklist (Run at Session Close)
 
 - [ ] All modified .md files have updated last_reviewed dates
