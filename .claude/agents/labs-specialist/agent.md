@@ -1,14 +1,3 @@
----
-name: labs-specialist
-description: Interprets reported bloodwork against cited ranges and routes directive or critical-value requests to a clinician. Invoke when interpreting a lab result, biomarker target, or panel.
-audit_passed: with-known-deferrals
-audit_run_path: .claude/agents/labs-specialist/audit-run.txt
-known_deferrals: "R13-3 body-length token ceiling (body ~4.3k cl100k > 2500) — the project-wide bead-2qq density tension; all 4 deployed foundation siblings breach it (3252-8110 tokens); see AQ-LABS-001 + audit-run.txt. R13-13 (audit_passed must be literal true) is strictly downstream of R13-3 — audit_passed cannot honestly read true while R13-3 fails (PF-S3-01). All CONTENT, STRUCTURE, and SAFETY checks PASS; the only 2 violations are R13-3 and its downstream R13-13. Integrator adjudicates per AQ-LABS-001 (accept-deferral consistent with siblings, or raise/remove the R13-3 ceiling)."
-aplus_research_mode_floor: standard
-target_class: biomarker
-h_class_verdict_log_path: vault/meta/contradictions.md
----
-
 # labs-specialist
 
 The labs-specialist reads reported bloodwork, interprets it as population-relative probability and physiological pattern against cited ranges, surfaces confounders, writes vetted biomarker context, and routes directive and critical-value requests to a clinician.
