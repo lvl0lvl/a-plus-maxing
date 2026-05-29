@@ -1,0 +1,188 @@
+{
+  "judge": "judge-2",
+  "sections": {
+    "A": {
+      "dimensions": {
+        "evidence_quality": 96,
+        "citation_fidelity": 88,
+        "type_tag_discipline": 98,
+        "population_annotation": 95,
+        "concentration_audit": 94,
+        "domain_coverage_vs_brief": 98,
+        "agent_design_relevance": 99,
+        "safety_sensitivity": 98,
+        "reasoning_integrity": 97
+      },
+      "total": 96,
+      "verdict": "REVISE"
+    },
+    "B": {
+      "dimensions": {
+        "evidence_quality": 95,
+        "citation_fidelity": 97,
+        "type_tag_discipline": 98,
+        "population_annotation": 96,
+        "concentration_audit": 95,
+        "domain_coverage_vs_brief": 99,
+        "agent_design_relevance": 99,
+        "safety_sensitivity": 99,
+        "reasoning_integrity": 98
+      },
+      "total": 97,
+      "verdict": "REVISE"
+    },
+    "C": {
+      "dimensions": {
+        "evidence_quality": 95,
+        "citation_fidelity": 87,
+        "type_tag_discipline": 98,
+        "population_annotation": 96,
+        "concentration_audit": 94,
+        "domain_coverage_vs_brief": 99,
+        "agent_design_relevance": 99,
+        "safety_sensitivity": 99,
+        "reasoning_integrity": 98
+      },
+      "total": 96,
+      "verdict": "REVISE"
+    },
+    "D": {
+      "dimensions": {
+        "evidence_quality": 90,
+        "citation_fidelity": 80,
+        "type_tag_discipline": 96,
+        "population_annotation": 97,
+        "concentration_audit": 95,
+        "domain_coverage_vs_brief": 98,
+        "agent_design_relevance": 99,
+        "safety_sensitivity": 96,
+        "reasoning_integrity": 97
+      },
+      "total": 94,
+      "verdict": "REVISE"
+    },
+    "E": {
+      "dimensions": {
+        "evidence_quality": 91,
+        "citation_fidelity": 93,
+        "type_tag_discipline": 97,
+        "population_annotation": 97,
+        "concentration_audit": 98,
+        "domain_coverage_vs_brief": 99,
+        "agent_design_relevance": 99,
+        "safety_sensitivity": 99,
+        "reasoning_integrity": 98
+      },
+      "total": 97,
+      "verdict": "REVISE"
+    }
+  },
+  "citation_checks": [
+    {
+      "cite": "A[5] Ohlander SJ 2018, Erythrocytosis Following Testosterone Therapy, Sex Med Rev, PMID 27784544",
+      "claim": "T-induced erythrocytosis via EPO set-point/hepcidin",
+      "resolved": false,
+      "note": "PMID 27784544 resolves to Jones SD Jr 2015, 'Erythrocytosis and Polycythemia Secondary to Testosterone Replacement Therapy in the Aging Male', Sex Med Rev — NOT Ohlander 2018. Author/year/title all mismatch the PMID. Same journal and topic, so likely a confused/swapped record. Self-flagged in Open gaps as needing one more confirmation pass; mechanism direction also carried by guideline [1], so not solely load-bearing. MAJOR."
+    },
+    {
+      "cite": "A[9] Baggish AL 2017, Cardiovascular Toxicity of Illicit AAS Use, Circulation, PMID 28533317",
+      "claim": "Mean LVEF 52±11% (AAS) vs 63±8% (nonusers)",
+      "resolved": true,
+      "note": "Exact match: title, author, journal, year, and LVEF 52±11% vs 63±8% (P<0.001) all confirmed. Load-bearing AAS cardiac numeric is solid."
+    },
+    {
+      "cite": "A[7] Lincoff 2023 TRAVERSE, NEJM, PMID 37326322",
+      "claim": "Noninferior MACE; AF/PE/AKI higher in T arm; n~5,204",
+      "resolved": true,
+      "note": "Confirmed: Lincoff, NEJM 2023; AF, AKI, and PE all higher in testosterone group per abstract. Enrolled n 5,246 vs section's 5,204 (mITT primary-analysis population) — minor."
+    },
+    {
+      "cite": "B[1] Hadlow NC 2013, TSH-FT4 nonlinear, JCEM, PMID 23671314",
+      "claim": "Complex nonlinear TSH-FT4, 152,261 subjects",
+      "resolved": true,
+      "note": "Exact match: title/author/journal/year confirmed; 152,261 subjects confirmed."
+    },
+    {
+      "cite": "B[4] Rosner I 2019, biotin lab errors, Cureus, PMID 31641565",
+      "claim": "5 mg/day biotin causes falsely low TSH normalizing off-biotin",
+      "resolved": true,
+      "note": "Confirmed: Rosner, Cureus 2019; 5 mg/day biotin case with depressed TSH normalizing one month after stopping. Specific values TSH 0.24->3.30 not in abstract — minor unverified numeric, scenario matches."
+    },
+    {
+      "cite": "B[13] Kruithoff 2025, Thyroid Emergencies Narrative Review, Endocr Pract 31(10):1310-1318, PMID 40553957",
+      "claim": "Thyroid storm/myxedema coma are clinical-diagnosis emergencies",
+      "resolved": true,
+      "note": "Exact match: title/author/journal/volume/pages confirmed."
+    },
+    {
+      "cite": "C[1] Cadegiani 2016, Adrenal fatigue does not exist: systematic review, BMC Endocr Disord, PMID 27557747",
+      "claim": "58 studies, no validated method, 'adrenal fatigue is still a myth'",
+      "resolved": true,
+      "note": "Exact match confirmed including 58-study count and the 'myth' conclusion. The section's load-bearing adrenal-fatigue refusal is well-grounded."
+    },
+    {
+      "cite": "C[5] 'Qureshi AC' 2019, cortisol/CBG/free-cortisol-index in women on ethinyl estradiol, Scand J Clin Lab Invest 79(5):347-353, DOI 10.1080/00365513.2019.1622031",
+      "claim": "Estrogen/OCP raises CBG 2-3x, inflating total cortisol; salivary unaffected",
+      "resolved": false,
+      "note": "DOI is CORRECT and the 2-3x CBG/total-cortisol inflation claim is genuinely supported (CBG 847-3366 vs 860-1940; cortisol 284-994 vs 159-569 on EE). BUT first author is Panton KK (PMID 31161807), not 'Qureshi AC', and pages are 79(5):314-319, not 347-353. Self-flagged in Open gaps as reconstructed-from-metadata. Cohort cite grounding a numeric claim with wrong author + wrong pages. MAJOR (mitigated by valid DOI + honest flag)."
+    },
+    {
+      "cite": "C[6] 2024, salivary cortisol/cortisone circumvent OCP in Synacthen, JCEM 109(7):1899-1908, DOI 10.1210/clinem/dgad762",
+      "claim": "Salivary cortisol/cortisone unaffected by estrogen, circumvents OCP confounder",
+      "resolved": true,
+      "note": "DOI structurally valid (10.1210/clinem/dgad762, JCEM 2024); author string self-flagged as reconstructed. Claim is corroborating not solely-load-bearing (the OCP confounder rests on C[5] plus general physiology). Minor."
+    },
+    {
+      "cite": "D[18] Travis 2016 IGF-I/prostate IPD meta-analysis, Cancer Res, PMID 26921328, DOI 10.1158/0008-5472.CAN-15-1551",
+      "claim": "Overall OR 1.21 (1.11-1.31); prospective 1.29 (1.16-1.43)",
+      "resolved": true,
+      "note": "PMID + DOI resolve to correct Travis 2016 paper. Prospective OR 1.29 (1.16-1.43) confirmed verbatim; the 1.21 overall figure is consistent with the paper's all-studies pooled estimate. Verified."
+    },
+    {
+      "cite": "D[21] Mukama 2023 EPIC-Heidelberg IGF-1/mortality, JCEM 108(10):e1092-e1105, DOI 10.1210/clinem/dgad212",
+      "claim": "U-shaped IGF-1/mortality; Q1 and Q5 both elevated",
+      "resolved": true,
+      "note": "DOI redirects correctly to JCEM 108(10):e1092 (the cited volume/pages). DOI prefix and venue valid. Resolved."
+    },
+    {
+      "cite": "D[15] 'Evans PJ, Lynch RM — Insulin as a drug of abuse in body building (70 IU case)', Br J Sports Med, PMID 12782552",
+      "claim": "70 IU insulin -> neuroglycopenic coma; exogenous insulin H1 self-harm",
+      "resolved": false,
+      "note": "PMID 12782552 resolves to a COMPLETELY UNRELATED paper: Bird S 2003, 'Heart rate responses of women aged 23-67 years during competitive orienteering', BJSM. The correct PMID for Evans & Lynch 'Insulin as a drug of abuse in body building' (BJSM 2003;37(4):356-357) is 12893725. Wrong PMID on a load-bearing H1 safety citation. CRITICAL (citation fidelity), mitigated: the H1 insulin hard-block rule does not numerically depend on this cite, and Open gaps flagged the 70 IU figure as needing confirmation."
+    },
+    {
+      "cite": "E[17] 21 U.S.C. 333(e), GH non-approved distribution felony, Cornell LII",
+      "claim": "Felony, up to 5 yr (10 if minor); HGH = somatrem/somatropin/analogue; DEA investigates",
+      "resolved": true,
+      "note": "Fully confirmed against statute text: felony, 5/10-year penalties, HGH definition, HHS-authorization exception, DEA authority all accurate."
+    },
+    {
+      "cite": "E[16] DEA Schedule-III testosterone, Anabolic Steroids Control Act 1990, PMID 20169675",
+      "claim": "Testosterone is DEA Schedule III under the 1990 ASCA",
+      "resolved": true,
+      "note": "PMID 20169675 resolves to a 2009 DEA Final Rule classifying THREE OTHER steroids (boldione, DMT, 19-nor-androstadienedione) as Schedule III — not the 1990 Anabolic Steroids Control Act and not the testosterone scheduling specifically. The underlying claim (testosterone is Schedule III) is true and the PMID is topically adjacent (a Schedule-III AAS rule), but it is an imprecise anchor for a 1990-act/testosterone statement. Self-flagged: no DEA.gov primary captured. MINOR-MODERATE."
+    },
+    {
+      "cite": "E '81.8%' authority-framing ASR figure",
+      "claim": "Authority-framing accounts for ~81.8% of successful jailbreaks",
+      "resolved": true,
+      "note": "Section E correctly REFUSED to cite the 81.8% figure, anchoring instead to verified ~92% [9], >80% [10], ~88.8% [11] plus framework [12]. That is the correct epistemic move. HOWEVER Section A finding 14 still states '~81.8%' citing 'the project threat model' (not a paper) — an internal inconsistency: A leans on a figure E retired. Minor."
+    }
+  ],
+  "critical_findings": [
+    "D[15] PMID 12782552 is WRONG: it resolves to an unrelated orienteering-heart-rate paper (Bird 2003), not Evans & Lynch 'Insulin as a drug of abuse in body building' (correct PMID 12893725). This is a fabricated/mismatched PMID on a load-bearing H1 (death-class) self-administered-insulin safety citation. Mitigated by an honest open-gap flag and by the H1 hard-block not depending numerically on the cite, but a wrong PMID on the agent's most-severe harm class is critical and must be corrected before any wiki ingestion."
+  ],
+  "major_findings": [
+    "A[5] PMID 27784544 mismatch: resolves to Jones 2015, not the cited Ohlander 2018. Same journal/topic but author/year/title all wrong. Self-flagged; mechanism corroborated by guideline [1].",
+    "C[5] citation fidelity: correct DOI and the 2-3x CBG inflation claim is genuinely supported, but the first author ('Qureshi AC') and page range (347-353) are both wrong (actual: Panton KK, 79(5):314-319, PMID 31161807). A cohort cite grounding a numeric multiplier must carry correct author+pages; self-flagged as reconstructed-from-metadata."
+  ],
+  "minor_findings": [
+    "E[16] PMID 20169675 is a 2009 DEA rule on three other steroids, used to anchor a 1990-ASCA/testosterone Schedule-III claim — true claim, imprecise anchor; self-flagged (no DEA.gov primary).",
+    "Cross-section inconsistency on the '81.8%' authority-framing figure: E correctly retires it; A finding 14 still asserts it from 'the project threat model'. Reconcile A to E's verified anchors.",
+    "B[4] specific TSH 0.24->3.30 values not in the fetched abstract (scenario confirmed); B[1] '445,994 pairs' not independently confirmed (152,261 subjects confirmed).",
+    "A[7] TRAVERSE n cited as 5,204 (mITT) vs 5,246 enrolled — clarify which population.",
+    "Several venue-soft sources (Frontiers [B6], Medscape/Labpedia/Endotext [D4,5,6,7,17], practitioner blog [E13]) are correctly flagged and used for direction only, not numeric grounding."
+  ],
+  "overall_verdict": "REVISE",
+  "overall_note": "Strong, well-reasoned substrate with excellent agent-design-relevance, safety H-class placement, type-tag discipline, and mechanism-vs-outcome separation across all five sections; the dominant-threat authority-framing analysis and composed-harm chains are correctly identified. The blocking problems are citation fidelity, not reasoning. Independent verification surfaced one CRITICAL mismatched PMID (D[15] 12782552 -> wrong paper; correct is 12893725) on the H1 insulin-abuse cite, and two MAJOR mismatches (A[5] PMID -> Jones not Ohlander; C[5] wrong author+pages though correct DOI and supported claim). E[16] is an imprecise but topically-valid anchor (minor), and A vs E disagree on whether to cite the unverifiable 81.8% figure (A should adopt E's retirement). All three correctly verified load-bearing positives — Baggish LVEF, TRAVERSE AF/PE/AKI, Cadegiani adrenal-fatigue refusal, Travis prostate OR, 21 USC 333(e) GH felony — hold exactly. No section reaches the 99 PASS bar; every section carries at least a citation defect or a major/critical, so all REVISE. Remediation is targeted: correct three PMIDs/author-page strings and reconcile the 81.8% framing; the synthesis findings themselves are sound."
+}

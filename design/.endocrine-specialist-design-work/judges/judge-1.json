@@ -1,0 +1,171 @@
+{
+  "judge": "judge-1",
+  "sections": {
+    "A": {
+      "dimensions": {
+        "evidence_quality": 96,
+        "citation_fidelity": 82,
+        "type_tag_discipline": 99,
+        "population_annotation": 95,
+        "concentration_audit": 92,
+        "domain_coverage_vs_brief": 98,
+        "agent_design_relevance": 99,
+        "safety_sensitivity": 98,
+        "reasoning_integrity": 98
+      },
+      "total": 95,
+      "verdict": "REVISE"
+    },
+    "B": {
+      "dimensions": {
+        "evidence_quality": 95,
+        "citation_fidelity": 91,
+        "type_tag_discipline": 98,
+        "population_annotation": 96,
+        "concentration_audit": 93,
+        "domain_coverage_vs_brief": 98,
+        "agent_design_relevance": 99,
+        "safety_sensitivity": 97,
+        "reasoning_integrity": 97
+      },
+      "total": 96,
+      "verdict": "REVISE"
+    },
+    "C": {
+      "dimensions": {
+        "evidence_quality": 95,
+        "citation_fidelity": 70,
+        "type_tag_discipline": 98,
+        "population_annotation": 96,
+        "concentration_audit": 92,
+        "domain_coverage_vs_brief": 99,
+        "agent_design_relevance": 99,
+        "safety_sensitivity": 98,
+        "reasoning_integrity": 98
+      },
+      "total": 94,
+      "verdict": "REVISE"
+    },
+    "D": {
+      "dimensions": {
+        "evidence_quality": 90,
+        "citation_fidelity": 80,
+        "type_tag_discipline": 96,
+        "population_annotation": 96,
+        "concentration_audit": 94,
+        "domain_coverage_vs_brief": 98,
+        "agent_design_relevance": 99,
+        "safety_sensitivity": 99,
+        "reasoning_integrity": 98
+      },
+      "total": 94,
+      "verdict": "REVISE"
+    },
+    "E": {
+      "dimensions": {
+        "evidence_quality": 91,
+        "citation_fidelity": 94,
+        "type_tag_discipline": 97,
+        "population_annotation": 96,
+        "concentration_audit": 97,
+        "domain_coverage_vs_brief": 99,
+        "agent_design_relevance": 99,
+        "safety_sensitivity": 99,
+        "reasoning_integrity": 99
+      },
+      "total": 97,
+      "verdict": "REVISE"
+    }
+  },
+  "citation_checks": [
+    {
+      "cite": "A[5]",
+      "claim": "Ohlander 2018, Sex Med Rev, T-induced erythrocytosis via EPO set-point/hepcidin; PMID 27784544",
+      "resolved": false,
+      "note": "PMID 27784544 resolves to the CORRECT topic and venue (Sexual Medicine Reviews, erythrocytosis/polycythemia secondary to TRT) but the author is Steven D Jones Jr (not Ohlander) and the year is 2015 (not 2018). Author+year on the cite are wrong; topic/venue/PMID match. Mechanism claim is independently corroborated by guideline [1]. Section open-gaps honestly flagged [5] as needing one more confirmation pass. Major (load-bearing author/year mismatch), softened by corroboration + honest flag."
+    },
+    {
+      "cite": "C[5]",
+      "claim": "Qureshi AC/Bahri/Breen — estrogen/OCP/pregnancy raise CBG 2-3x; DOI 10.1080/00365513.2019.1622031",
+      "resolved": false,
+      "note": "DOI is correct and resolves to the right article and topic (New reference intervals for cortisol, CBG and free cortisol index in women using ethinyl estradiol, Scand J Clin Lab Invest 2019; PMID 31161807). Data support the ~2-3x CBG direction (s-CBG 847-3366 vs 860-1940 nmol/L on/off EE). BUT the cited author string Qureshi AC, Bahri A, Breen LA is FABRICATED — actual authors are Panton KK, Mikkelsen G, Irgens WO. Section open-gaps honestly admitted the author string was 'reconstructed from search metadata and not yet verified.' Major: fabricated author on a load-bearing numeric (CBG-multiplier) cite, though DOI and claim are sound."
+    },
+    {
+      "cite": "C[6]",
+      "claim": "Eisenhofer/Debono/Newell-Price — Salivary Cortisol and Cortisone Can Circumvent OCP Effects in Short Synacthen Test, JCEM 2024; DOI 10.1210/clinem/dgad762",
+      "resolved": false,
+      "note": "DOI 10.1210/clinem/dgad762 resolves to a COMPLETELY DIFFERENT article: 'Inositol for Polycystic Ovary Syndrome: A Systematic Review and Meta-analysis...' (Fitz V et al., JCEM 2024). The DOI does NOT point to any salivary-cortisol/Synacthen paper. The cited title, authors, and DOI are mismatched. This was NOT disclosed in the section open-gaps (only the author string was flagged as unverified; the DOI itself is wrong). Critical-leaning major: a load-bearing cite (grounds the salivary-circumvention finding and co-anchors the 2-3x CBG claim) with a fabricated/mismatched DOI that the open-gaps did not surface."
+    },
+    {
+      "cite": "D[15]",
+      "claim": "Evans & Lynch — Insulin as a drug of abuse in body building, BJSM; 70 IU case; PMID 12782552",
+      "resolved": false,
+      "note": "PMID 12782552 is WRONG — it resolves to 'Heart rate responses of women aged 23-67 years during competitive orienteering' (Bird et al., BJSM 2003), an unrelated article. The real Evans & Lynch article DOES exist (Br J Sports Med 2003;37(4):356, PMID 12893725). The cited PMID is therefore unresolvable for the claimed source. The '70 IU' figure could not be confirmed against full text (PMC full-text not machine-readable in this pass); section open-gaps flagged the 70 IU figure as needing confirmation but did NOT flag the wrong PMID. Major: unresolvable PMID on a load-bearing H1 (death-class) insulin cite. Mitigated: companion cite D[14] Heidet (PMID 30527564) independently grounds the lethal-hypoglycemia hazard; tag is mechanism_review (numeric 70 IU not load-bearing for any agent rule, only illustrative)."
+    },
+    {
+      "cite": "E '81.8%'",
+      "claim": "81.8% educational-framing ASR figure",
+      "resolved": true,
+      "note": "CORRECT CALL TO REFUSE. The section explicitly declined to cite the 81.8% figure (open-gap: 'could not be pinned to a single canonical paper with verified provenance') and re-anchored the authority-framing dominance claim to verified alternatives. E[10] Takemoto arXiv:2401.09798 (>80% ASR within ~5 iterations) verifies exactly; E[11] arXiv:2501.13115 Happy-Ending 88.79% verifies exactly; E[9] ~92% research-context is directionally corroborated (PAP method 92% ASR; medical-ethics contextualization 82-100% across models) though anchored to a secondary EmergentMind survey (venue-soft, mechanism_review tag). Authority-framing claim is adequately grounded by the verified alternatives. Exemplary epistemic hygiene — refusing the unverifiable figure rather than laundering it."
+    },
+    {
+      "cite": "B[7]",
+      "claim": "rT3 ordering concentrated among few non-endocrinologist providers, judged inappropriate",
+      "resolved": false,
+      "note": "B[7] DOI string '10.1089/ct.2019;12.11-12' is malformed/non-resolving (Clinical Thyroidology summary, not a primary PMID). Section open-gaps honestly disclosed the primary PMID was not confirmed and the directional claim is corroborated by B[3] Garnett & Devaraj (Ann Clin Lab Sci 2020, PMID 32581030, fully verified per section). Directional rT3-non-actionability claim survives on the verified companion B[3]. Minor: soft/secondary cite, honestly flagged, direction corroborated, no numeric load-bearing on B[7]."
+    },
+    {
+      "cite": "B[14]",
+      "claim": "Myxedema coma / thyroid storm mortality 30-50%",
+      "resolved": false,
+      "note": "B[14] (Wiersinga / Medscape, no PMID) is a secondary/assembled review. Companion B[13] Kruithoff PMID 40553957 verifies as a genuine narrative review of thyroid emergencies (Endocr Pract 2025) and confirms both are clinical-diagnosis emergencies, BUT its abstract does NOT state the 30-50% mortality figure (confirmed by independent fetch). So the directional claim (clinical-diagnosis TIME_CRITICAL emergencies → escalate) survives on verified B[13]; the specific 30-50% numeric does NOT survive on B[13] and rests only on un-PMID'd B[14]. Section open-gaps honestly flagged exactly this. Minor-to-major: the numeric is not yet load-bearing for an agent rule (the H1/H2 AUTO-BLOCK rule turns on symptom-cluster recognition, not the mortality %); honestly flagged. Treated as minor given non-load-bearing numeric + honest disclosure."
+    },
+    {
+      "cite": "A[6]",
+      "claim": "Ory 2022 J Urol — secondary polycythemia on TRT raises MACE/VTE; PMID 35050717",
+      "resolved": true,
+      "note": "Verifies exactly: Jesse Ory, J Urol 2022, secondary polycythemia in men on testosterone therapy increasing MACE/VTE in first year. Title/author/venue/year/PMID all match."
+    },
+    {
+      "cite": "B[1]",
+      "claim": "Hadlow 2013 JCEM — TSH-FT4 nonlinear, differs by age/sex; PMID 23671314",
+      "resolved": true,
+      "note": "Verifies exactly: Narelle C Hadlow, JCEM 2013, 152,261 subjects, nonlinear log-TSH-FT4 relationship differing by age/sex. Title/author/venue/year/PMID all match."
+    },
+    {
+      "cite": "C[1]",
+      "claim": "Cadegiani & Kater 2016 — Adrenal fatigue does not exist, systematic review of 58 studies; PMID 27557747",
+      "resolved": true,
+      "note": "Verifies exactly: Flavio A Cadegiani, BMC Endocrine Disorders 2016, systematic review of 58 studies (33 healthy, 25 symptomatic), concluding adrenal fatigue is a myth. Title/author/venue/year/PMID/n-studies all match."
+    },
+    {
+      "cite": "E[10]",
+      "claim": "Takemoto 2024 arXiv:2401.09798 — black-box jailbreak >80% ASR within ~5 iterations",
+      "resolved": true,
+      "note": "Verifies exactly: Kazuhiro Takemoto, 'All in How You Ask for It: Simple Black-Box Method for Jailbreak Attacks,' 2024, ASR exceeding 80% within an average of five iterations. Author/title/year/figure all match."
+    },
+    {
+      "cite": "E[11]",
+      "claim": "arXiv:2501.13115 — Happy Ending Attack 88.79% avg ASR",
+      "resolved": true,
+      "note": "Verifies exactly: Song et al., 'Dagger Behind Smile: Fool LLMs with a Happy Ending Story,' 2025, 88.79% avg ASR across GPT-4o/Llama3-70b/Gemini-pro. Title/year/figure match; medRxiv/arXiv prefix valid, not future-dated."
+    }
+  ],
+  "critical_findings": [],
+  "major_findings": [
+    "C[6]: DOI 10.1210/clinem/dgad762 is MISMATCHED — it resolves to 'Inositol for PCOS' (Fitz et al., JCEM 2024), not the claimed salivary-cortisol/Synacthen-test paper (cited as Eisenhofer et al.). The cited title, authors, and DOI do not correspond to any single real article. This is a load-bearing cite (co-anchors the 2-3x CBG claim and grounds the salivary-circumvention finding) and the wrong DOI was NOT disclosed in the section open-gaps (only the author string was flagged). Must locate the genuine salivary-cortisol/OCP/Synacthen paper, correct title/authors/DOI/PMID, or drop the finding's salivary-circumvention sub-claim.",
+    "C[5]: Author string FABRICATED. DOI 10.1080/00365513.2019.1622031 and the 2-3x CBG claim are correct (real article: Panton KK, Mikkelsen G, Irgens WO, Scand J Clin Lab Invest 2019, PMID 31161807) but the cited authors 'Qureshi AC, Bahri A, Breen LA' do not appear on the paper. Replace author string with the true authors and add PMID 31161807 before this grounds the load-bearing CBG-multiplier claim. Honestly flagged in open-gaps.",
+    "D[15]: PMID 12782552 is WRONG — resolves to an unrelated orienteering heart-rate study (Bird et al., BJSM 2003). The real Evans & Lynch 'Insulin as a drug of abuse in body building' is BJSM 2003;37(4):356, PMID 12893725. Correct the PMID. The '70 IU' figure remains unconfirmed against full text. Load-bearing H1 (death-class) cite; mitigated by independently-verified companion D[14] Heidet (PMID 30527564) grounding the lethal-hypoglycemia hazard and by the numeric not driving any agent rule. Open-gaps flagged the 70 IU figure but not the wrong PMID.",
+    "A[5]: Author+year mismatch. PMID 27784544 resolves to the correct topic and venue (Sex Med Rev, erythrocytosis from TRT) but the author is Jones SD Jr (not Ohlander) and year is 2015 (not 2018). The EPO/hepcidin mechanism is independently corroborated by guideline [1], so no agent rule fails, but the citation metadata must be corrected before wiki ingestion. Honestly flagged in open-gaps as needing one more confirmation pass."
+  ],
+  "minor_findings": [
+    "B[7]: DOI string '10.1089/ct.2019;12.11-12' is malformed and non-resolving; it is a Clinical Thyroidology secondary summary, not a primary PMID. Directional rT3-non-actionability claim survives on verified companion B[3] (Garnett & Devaraj, PMID 32581030). Replace with the underlying primary PMID. Honestly flagged in open-gaps.",
+    "B[14]: 30-50% myxedema-coma mortality figure rests on an un-PMID'd secondary review (Wiersinga/Medscape); companion B[13] (Kruithoff, PMID 40553957, verified) confirms both crises are clinical-diagnosis emergencies but its abstract does NOT state the mortality percentage. The numeric is non-load-bearing for the H1/H2 AUTO-BLOCK rule (which turns on symptom-cluster recognition), and the gap was honestly disclosed. Re-anchor the 30-50% figure to a primary case-series if it is to be retained as a stated number.",
+    "E[9]: ~92% research-context ASR is anchored to a secondary aggregator (EmergentMind topic survey), not a primary empirical paper. The figure is directionally corroborated by independent literature (PAP method 92% ASR; medical-ethics contextualization 82-100%), but a primary citation would harden it. Tagged mechanism_review; not used to ground an agent numeric beyond the qualitative authority-framing-dominance claim.",
+    "D venue-softness: D[4] Labpedia, D[5]/D[6] Medscape eMedicine, D[7] Mayo Clinic Labs, D[13] AFAR org-page, D[17] Endotext are non-primary tertiary/educational venues carrying mechanism_review tags. They ground qualitative/physiology direction only (none ground a load-bearing numeric), and the section open-gaps acknowledge the venue-soft items need upgrade. Acceptable for substrate but flagged for upgrade before wiki ingestion.",
+    "Type-tag edge case D[14]: insulin-bodybuilder case report tagged anecdote_aggregate is correctly NOT grounding a numeric agent rule (the 70 IU figure lives on D[15] mechanism_review, and even there is illustrative not load-bearing). Tag discipline holds, but the pairing of an anecdote_aggregate case report with a mislabeled-PMID mechanism_review for the same hazard should be cleaned up.",
+    "C population/venue: C[10] Chandrasekhar ashwagandha RCT (PMID 23439798) and C[11] Della Porta meta-analysis are correctly caveated as small/short/industry-linked/below-Tier-1, and the cortisol-lowering is correctly held as a biomarker-not-disease-treatment claim with the supplement-specialist boundary. Good mechanism-vs-outcome separation; flagged only for the open MDPI/industry-link concentration which is surfaced rather than buried."
+  ],
+  "overall_verdict": "REVISE",
+  "overall_note": "The corpus is strong on reasoning integrity, agent-design relevance, H-class safety placement, type-tag discipline, and population annotation — the design-substrate logic is sound and the mechanism-vs-outcome discipline, GRADE two-axis usage, and composed-harm/authority-framing vectors are handled at a high level across all five sections. Section E is the standout: its refusal to cite the unverifiable 81.8% figure and re-anchoring to verified primaries (Takemoto >80%, Happy-Ending 88.79%, both confirmed) is exemplary epistemic hygiene. However, independent citation verification surfaced four citation-fidelity defects that block PASS: C[6] has a fully MISMATCHED DOI (resolves to an inositol/PCOS paper, not the claimed salivary-cortisol paper) that the open-gaps did not disclose; C[5] carries a fabricated author string (real authors Panton/Mikkelsen/Irgens, not Qureshi/Bahri/Breen); D[15] cites a wrong PMID (resolves to an orienteering study; correct PMID is 12893725); and A[5] has an author+year mismatch (Jones 2015, not Ohlander 2018) on an otherwise topic-correct PMID. Three of these four were honestly self-flagged in the sections' open-gaps and all four are corroborated by verified companion cites so no deployed agent rule currently rests on a fabrication — but per rubric a load-bearing cite whose author/PMID/DOI does not resolve to the claimed source is at least major, and these defects are real, not honest-flag-only-soft-direction cases. No critical (no rule fails outright; corroboration holds the safety claims). Every section therefore scores <99 and carries at least one major or minor → REVISE across the board. Remediation is targeted and mechanical: correct the four citation metadata defects (verified replacements supplied in citation_checks: C[5]=PMID 31161807 + Panton authors; D[15]=PMID 12893725; A[5]=Jones SD Jr 2015; C[6]=locate the genuine salivary-cortisol/OCP/Synacthen JCEM paper or drop the sub-claim), re-anchor B[7]/B[14] numerics to primaries, and upgrade Section D venue-soft tertiary sources. None require re-doing the analysis."
+}
