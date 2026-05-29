@@ -27,14 +27,14 @@ Measured with `tiktoken.get_encoding('cl100k_base')` on the post-frontmatter bod
 
 | Profile | cl100k tokens | lines | passes R13-3? |
 |---|---|---|---|
-| labs-specialist (this deliverable, fully compressed) | 4245 | 151 | NO (>2500) |
+| labs-specialist (this deliverable, fully compressed; final post-Phase-7) | 4355 | 151 | NO (>2500) |
 | labs-specialist with ALL 3 code blocks deleted | 3853 | — | NO (and would fail `check_negative_examples`) |
 | health-specialist-architect (deployed) | 3252 | 127 | NO |
 | health-implementer (deployed) | 5245 | 162 | NO |
 | health-edge-case-reviewer (deployed) | 6522 | 191 | NO |
 | medical-safety-reviewer (deployed) | 8110 | 199 | NO |
 
-All four deployed foundation profiles already exceed 2500 cl100k tokens (3252–8110). None has ever met R13-3. The labs-specialist is compressed to 4245 — below every sibling — and still cannot reach 2500 without dropping mandated sections.
+All four deployed foundation profiles already exceed 2500 cl100k tokens (3252–8110). None has ever met R13-3. The labs-specialist at ~4355 is below three of the four siblings (only the architect at 3252 is leaner) — the 2nd-leanest medical profile in the project — and still cannot reach 2500 without dropping mandated sections.
 
 The arithmetic: dense technical prose with code fences, unicode (≥, ×, ⁹), and slash-paths runs ~28 cl100k tokens/line. The design's own §15.1 targets "150–180 lines AND ≤2,500 tokens" — internally inconsistent, since 150 lines at this density is ~4200 tokens. The design also routes the token AC to **/upgrade-agent Phase 7 at ≤2,000 tokens**, a different enforcement layer than this audit's R13-3 row.
 
