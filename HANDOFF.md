@@ -12,6 +12,67 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 15 (2026-05-29)
+
+Goal: Close bead `4ej` (XR-002) as a prerequisite, then deploy Role 4 (medical-safety-reviewer) as a project-local agent AND incorporate it (sub out the safety-red-team v1-substitute), via one full deploy-and-incorporate loop (`/upgrade-agent` → sub-out → `/review-pr` → `/merge` Option A → close). Session B debt 1 → 0 — closes the LAST foundation debt; 4 of 4 foundation agents deployed.
+
+Roster B status (per PF-S12-01 AP-DEFERRED-LOOP-CLOSURE guard):
+- Architect: deployed (`.claude/agents/health-specialist-architect/`) since S9
+- SE drafter: deployed (`.claude/agents/health-implementer/`) since S13
+- QA drafter: deployed (`.claude/agents/health-edge-case-reviewer/`) since S14
+- Safety red-team: v1-substitute → becomes medical-safety-reviewer (deployed) THIS SESSION
+- Cumulative-deferral count: 1 → 0 expected at close
+
+Acceptance criteria:
+- [ ] AC0 — Prerequisite: close bead `4ej` by reconciling Role 1 `design/health-specialist-architect-design.md` §13 row 15 → `DEPLOY or BLOCK_WITH_OVERRIDE_PATH` via design-doc change discipline (bead authorizes the in-place edit to a Status:Final doc; gate allow-list semantics confirmed: PASS on DEPLOY|BLOCK_WITH_OVERRIDE_PATH, hard-FAIL on BLOCK). Done BEFORE `/upgrade-agent` so Role 4 inherits the correct enum.
+- [ ] AC1 — `/upgrade-agent` on `design/medical-safety-reviewer-design.md` → `.claude/agents/medical-safety-reviewer/agent.md` (+ `library-index.md`); 8-phase pipeline; net-new (0/10 baseline); Phase-7 corrections PASS; PF-S3-01 guard held at Phase 4 + 6 (separate+parallel fact-checker/judge; 9/10 every dimension, no rounding; every finding personally source-read).
+- [ ] AC2 — Sub out: safety-red-team slot software-`security` v1-sub → medical-safety-reviewer in `design/DESIGN_DOC_TEMPLATE.md` §0.1 + `design/CONTINUATION_BRIEF.md` §7. 4 of 4 Roster B slots project-local after this.
+- [ ] AC3 — agent.md passes generic Phase-7 constraints (≤200 lines; ≤2000 tokens OR documented overrun per S9/S13/S14 + DOCUMENT_RUBRIC Rule 7 load-bearing review; all AGENT_TEMPLATE.md sections present; reference paths resolve).
+- [ ] AC4 — agent.md post-deployment ACs evaluated (LIVE pass; PROPOSED → beads); confirm the deployed agent carries the corrected (non-inverted) deploy-verdict enum from AC0.
+- [ ] AC5 — `/review-pr` scoped to the S15 deployment commits (local diff range); findings blind-triaged per PF-S3-01; reject-but-adopt where appropriate; frozen-design-doc findings → beads.
+- [ ] AC6 — `/merge` on explicit user go — Option A branch topology (fresh per-session branch off `origin/main`, cherry-pick, clean PR, rebase-merge, delete per-session branch). Never PR feature→main.
+- [ ] AC7 — Close: all 3 audits exit 0 at `--session 15`; canonical `S15 close (YYYY-MM-DD):` PF attestation; VOLATILE rotation 6-clause; debt 1 → 0 recorded; feature branch only until authorized merge.
+- [ ] AC8 — Foundation pipeline marked complete; S15 `SESSION_B_KICKOFF.md` → `consumed`; next forward direction (Pass-3 specialists / Phase-C) noted as unblocked.
+
+Files I WILL touch:
+- `design/health-specialist-architect-design.md` §13 row 15 ONLY (AC0 authorized edit — bead `4ej`)
+- `.claude/agents/medical-safety-reviewer/agent.md` (NEW; + `library-index.md`)
+- `design/.medical-safety-reviewer-design-work/upgrade-agent-work/*` (NEW — phase artifacts)
+- `design/DESIGN_DOC_TEMPLATE.md` §0.1 (safety-red-team sub-out)
+- `design/CONTINUATION_BRIEF.md` §7 (safety-red-team sub-out)
+- `design/.medical-safety-reviewer-design-work/SESSION_B_KICKOFF.md` (→ `consumed` at close)
+- `INVARIANTS.md` (only if AC0 ritual appends a Change Log row; flag at the time)
+- `HANDOFF.md` (this contract + close + VOLATILE rotation)
+- `vault/sessions/session-15.md` (NEW), `vault/meta/index.md`, `vault/meta/log.md`
+- `.beads/*` via `bd` CLI (close `4ej`)
+- `memory/process-failures.md` (only if a new PF surfaces)
+
+Files I will NOT touch:
+- `design/medical-safety-reviewer-design.md` body (Status: Final — READ-ONLY source; defects → bead)
+- The other 3 `*-design.md` bodies beyond Role 1 §13 row 15 (Status: Final — defects → bead)
+- `.claude/agents/health-specialist-architect/`, `health-implementer/`, `health-edge-case-reviewer/` (deployed — read-only drafter sources)
+- `vault/library/*`, `vault/compounds/*`, `vault/biomarkers/*`, `vault/dna/*`
+- `.claude/skills/*`, `scripts/*`, `.claude/hooks/*`
+- `CLAUDE.md`
+- `main` branch directly (only via authorized `/merge`)
+
+NOT doing:
+- Pass-3 specialist deep-research / `/upgrade-agent` for the 14 specialists; Phase-C peptide campaign
+- Beads `ams`, `3y6` build-out; other open beads beyond `4ej`
+- Promoting any candidate INV (INV-SESSION-B-INTERLEAVING etc.) — requires change-discipline ritual
+- Walter pending items (23andMe, Oura, meal-template, Jan-2026 issue)
+
+Invariants at risk:
+- INV-ROLE-INLINING — `/upgrade-agent` role-tagged sub-dispatches inline full profile per hook v2.5; path-pattern edge case (bead `rc1`) on watch
+- PF-S3-01 / AP-ORCH-SELF-ATTEST — Phase 4 + 6 falsification window; separate+parallel fact-checker/judge; no rounding; personal source-read. Role 4 is the most safety-critical profile.
+- AP-INCOMPLETE-PROPAGATION — ~874-line design doc → ≤200-line agent.md compression; §7 mechanical check is the defense; never cut a safety binary to fit (Rule 7)
+- AP-DEFERRED-LOOP-CLOSURE (PF-S12-01) — S15 IS the final remediation; opened with the last debt; debt 1 → 0
+- AP-PROTOCOL-FROM-MEMORY (PF-S13-01) — this open is the falsification window; every step run with real output; this contract gates all work
+- AP-CROSS-ROLE-CONTRACT-DRIFT — AC0 closes the live XR-002 wiring bug before it propagates into the deployed agent + orchestrator gate
+- INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN, INV-HO-ROTATION, INV-HO-NO-STALE-HASH — standard close discipline
+
+Self-recognition pre-flight: Watching at each `/upgrade-agent` Phase 4/6 for "I verified findings like these on Roles 1–3, the pattern is familiar" (familiarity ≠ source-read) and "Role 4's profile must hit ≤200 lines so I'll drop a safety binary to fit" (overrun documented per Rule 7, never compressed at the cost of a safety property). Also watching that the AC0 fix lands in the deployed agent's enum (not just the design doc), and for the AQ-002 use-vs-mention banned-token issue in Role 4's threat-catalog (disposition fixed: deploy faithfully — bead `3y6`; do not re-litigate).
+
 ## Scope Contract — Session 14 (2026-05-29)
 
 Goal: Deploy Role 3 (health-edge-case-reviewer) as a project-local agent AND incorporate it into the bootstrap roster (sub out the QA v1-substitute), via one full deploy-and-incorporate loop (`/upgrade-agent` → sub out → `/review-pr` → `/merge` → close). Session B debt 2 → 1. Closes the next-oldest debt per PF-S12-01 AP-DEFERRED-LOOP-CLOSURE.
@@ -385,43 +446,65 @@ S14 close (2026-05-29): **No new PF-class entries this session.** Both open fals
 
 **Commit:** S14 code landed on `main` via clean per-session PR #2 rebase (as of 2026-05-29 S14 close); close artifacts committed on the feature branch.
 
+## Session 15 close — Role 4 (medical-safety-reviewer) deployed + incorporated; PR #3 merged; foundation pipeline COMPLETE (2026-05-29)
+
+Third clean run of the per-session deploy-and-incorporate loop, closing the LAST Session B debt. AC0 reconciled the XR-002 cross-role enum (bead `4ej` closed). `/upgrade-agent` 8-phase pipeline deployed `.claude/agents/medical-safety-reviewer/agent.md` (198 lines / 8,021 cl100k tokens) + `library-index.md` (net-new, 0/10 baseline; 3 research artifacts validated 9/10 by separate+parallel fact-checker/judge — R3 took 1 remediation; Phase-6 adversarial 8 findings all dispositioned Phase 7). Safety-red-team slot rotated software-`security` v1-sub → medical-safety-reviewer (sub-out). `/review-pr` (S15-scoped local diff): 6 findings → 2 LEGITIMATE fixed+blind-verified, 2 NOT_A_BUG, 2 beaded (`dcy`/`1rm` frozen-design-doc defects). Merged to `main` via clean per-session PR #3 (rebase; Option A). **Session B debt 1 → 0; all 4 foundation roles deployed + incorporated.**
+
+**Scope-contract evaluation (S15 ACs).**
+- AC0 (close `4ej`, reconcile Role 1 §13 row 15 enum): **PASS** — minimal authorized token edit; rg confirms 0 inverted tokens; bead closed.
+- AC1 (`/upgrade-agent` → agent.md, Phase-7 PASS, PF-S3-01 held): **PASS** — 8-phase pipeline; R3 1 remediation; all dimensions 9/10.
+- AC2 (sub-out safety slot): **PASS** — DESIGN_DOC_TEMPLATE §0.1 + CONTINUATION_BRIEF §7; 4/4 Roster B project-local.
+- AC3 (≤200 lines / token-overrun-documented / sections / paths): **PASS** — 198 lines; 8,021 tok documented vs `2qq` per Rule 7; 11 sections; paths resolve.
+- AC4 (post-deploy ACs; corrected enum): **PASS** — AC-deploy-1..15 present; canonical `{DEPLOY, BLOCK, BLOCK_WITH_OVERRIDE_PATH}` confirmed in deployed agent.
+- AC5 (`/review-pr`, PF-S3-01 triage): **PASS** — independent blind triage + blind verification; 2 fixed, 2 beaded, 2 not-a-bug.
+- AC6 (`/merge` on go, Option A): **PASS** — rebase merge of clean PR #3; per-session branch deleted.
+- AC7 (close audits / PF attestation / rotation / branch): **PASS** (this close).
+- AC8 (foundation complete; kickoff consumed; forward unblocked): **PASS**.
+
+**Drift checks.**
+- **Task drift:** all 9 ACs PASS. One in-scope consistency fix beyond the literal AC2 target (the stale "deployments NOT YET RUN" line in DESIGN_DOC_TEMPLATE §0.1, same §0.1 block S13/S14 left un-updated) — flagged, not silent. No other drift.
+- **Architecture drift:** no invariant degraded. INV-ROLE-INLINING held (review agents by registered type = full profiles; upgrade-agent sub-dispatches inlined; no path-pattern over-trigger). INV-BRANCH-NOT-MAIN held (merge via server-side `gh`; close commits on feature; never committed on main). INV-SCOPE-CONTRACT + INV-PF-ATTESTATION satisfied. AC0 STRENGTHENED cross-role consistency — closed the live XR-002 wiring bug before it propagated into the deployed agent + orchestrator gate. Rigor-compounding complete: 4/4 Roster B slots are now project-local medical agents.
+- **Vision drift:** same project. After S15, 4 of 4 foundation agents deployed AND incorporated — the milestone the vision predicted. The 14-specialist Pass-3 pipeline is the next vision-load-bearing element, now unblocked. No vision drift.
+
+**PF attestation.**
+
+S15 close (2026-05-29): **No new PF-class entries this session.** All three open falsification windows HELD: (a) **PF-S13-01 (AP-PROTOCOL-FROM-MEMORY)** — S15 session-open executed each Start-Protocol step with real output (HANDOFF read in full incl. paging past truncation to L718; test baseline RUN not stated; Session-B debt computed via `comm` set-difference not memory; scope contract written + user-confirmed before any work; no AskUserQuestion widget) — recurrence stays 3. (b) **PF-S12-01 (AP-DEFERRED-LOOP-CLOSURE)** — opened with Role 4 (the LAST debt) as first + only work-unit; debt 1 → 0; recurrence stays 3; the loop is now CLOSED (no foundation Session B left to defer). (c) **PF-S3-01 (AP-ORCH-SELF-ATTEST)** held through `/upgrade-agent` Phase 4/6 (separate+parallel fact-checker/judge, 9/10 no rounding) + `/review-pr` (independent blind triage + blind verification; every finding personally source-read). Observations that did NOT promote: (i) my own Phase-7 adversarial-fix (AR-04 probe_floor rename) introduced a local name-divergence that `/review-pr` QUAL-01 caught → fixed → blind-verified — the layered-review mechanism working as designed (an orchestrator-pipeline edit caught by the next independent layer; same class observed S13/S14, caught by the correct mechanism each time, nothing escaped to main; watch — promotion triggers only if such an edit ESCAPES the review layers). (ii) BUG-01 surfaced a genuine frozen-design-doc schema-vs-exemplar inconsistency → beaded `dcy` (routed to the schema owner, not in-place edited) — correct mechanism. (iii) The Option-A git checkout aborted once on the uncommitted HANDOFF scope-contract; recovered via stash → retry (mechanical sequencing, no rigor failure; informs the branch-topology memory: stash HANDOFF before the per-session checkout).
+
+**Commit:** S15 code landed on `main` via clean per-session PR #3 rebase (as of 2026-05-29 S15 close); close artifacts committed on the feature branch.
+
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **AP-DEFERRED-LOOP-CLOSURE (PF-S12-01, recurrence_count=3)** — debt 2 → 1 at S14 (Role 3 Session B closed correctly + incorporated). Guard HELD at S14 (opened with Role 3 debt-closure as the first + only work-unit; recurrence stays 3). **S15 MUST open with Role 4 Session B (the LAST debt) as first offered work-unit; debt 1 → 0.** Falsification window: S15 session-start.
-2. **AP-CROSS-ROLE-CONTRACT-DRIFT** — **bead `4ej` (XR-002, P1) MUST close before Role 4 deploys (S15)** via design-doc change discipline, else the inverted deploy-gate verdict (Role 1 `DEPLOY_WITH_OVERRIDE_PATH` vs Role 4 canonical `BLOCK_WITH_OVERRIDE_PATH`) propagates into the deployed Role 4 agent + orchestrator gate. Plus the S14-surfaced frozen-design-doc inconsistencies in the Role-3 doc (`p47` severity_final flat-vs-nested, `o9y` h_class owned-list omission, `7is` 9-pattern non-enumeration) — watch whether Role 4's doc carries analogous schema-list-vs-canonical mismatches. Plus 9u6/7m1/z8i.
-3. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3)** — open-protocol guard HELD at S14 (each Start-Protocol step run with real output; scope contract written + confirmed before any work; no railroading widget). Stays on the list as the standing session-lifecycle discipline. **S15 session-open is the next falsification window** — execute each step, never operate from memory; if any step is stated-from-memory or work precedes the scope contract, recurrence promotes to 4.
+1. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3)** — open-protocol guard HELD at S15 (every Start-Protocol step run with real output; debt computed via set-difference; scope contract written + confirmed before any work; no railroading widget). Stays on the list as the standing session-lifecycle discipline. **S16 session-open is the next falsification window** — execute each step, never operate from memory; if any step is stated-from-memory or work precedes the scope contract, recurrence promotes to 4.
+2. **AP-ORCH-SELF-ATTEST (PF-S3-01)** — promoted back to Top-3 as the DOMINANT forward risk now that Pass-3 specialist work begins: each of the 14 specialists needs the full review stack (separate+parallel fact-checker/judge in `/upgrade-agent`; independent blind triage + blind verification in `/review-pr`; personal source-read of every finding). Watch the sub-pattern "orchestrator-pipeline-edit introduces a local inconsistency" (S13/S14/S15, caught by the next review layer each time, nothing escaped) — **if such an edit ever ESCAPES the review layers to main, promote to a new PF.**
+3. **AP-CROSS-ROLE-CONTRACT-DRIFT** — frozen-design-doc defects to reconcile via change discipline BEFORE the relevant audit scripts go LIVE or specialists inherit them: `dcy` (XR-S15-01, P2 — §4.4-row2/§13-row5 top-level `harm_class` vs §12.3 exemplar omission; **blocks the row-5 h1h2-autoblock audit-script LIVE**), `1rm` (XR-S15-02, P3 — `probe_floor` two-name), plus carried `p47`/`o9y`/`7is`/`9u6`/`7m1`/`z8i`.
 
-**Demoted from prior Top-3:** AP-ORCH-SELF-ATTEST / PF-S3-01 (8th+ consecutive guard held through `/upgrade-agent` Phase 4/6 + `/review-pr`; independent blind-triage + blind-verification agents are now part of the mechanism). AP-INCOMPLETE-PROPAGATION (design-doc→agent.md compression handled; the layered review caught the residual synthesis defects).
+**Demoted from prior Top-3:** AP-DEFERRED-LOOP-CLOSURE (PF-S12-01) — **the loop is CLOSED** (Session B debt 0; 4/4 foundation roles deployed + incorporated); no foundation Session B remains to defer, so the guard's window no longer opens. Stays in `memory/process-failures.md` as historical. AP-INCOMPLETE-PROPAGATION (design-doc→agent.md compression handled across all 4 roles; the layered review caught residual synthesis defects each time).
 
 ## Current State (volatile)
 
-- **Role 3 (health-edge-case-reviewer) deployed + incorporated.** `.claude/agents/health-edge-case-reviewer/agent.md` (191 lines / 6,364 cl100k tokens — overrun documented vs bead `2qq` per DOCUMENT_RUBRIC Rule 7) + `library-index.md` (22 lines). **3 of 4 foundation agents now live** (Role 1 S9, Role 2 S13, Role 3 S14).
-- **Session B debt = 1** (Role 4 medical-safety-reviewer). Roster B: architect + SE (health-implementer) + QA (health-edge-case-reviewer) all deployed-project-local; safety-red-team = v1-substitute until Role 4 deploys (S15).
-- **PR #2 merged to `main`** (clean per-session branch off origin/main; rebase; Option A). `main` now carries S7–S14 code. **Branch topology:** `main` = code via clean per-session PRs; long-lived `feature/wiki-bpc157-aplus-research` = continuity carrier (HANDOFF/vault bookkeeping), diverged from main by design (do NOT PR feature→main; cut per-session branches off `origin/main`).
-- **New beads (S14, all P3 frozen-design-doc defects surfaced by /review-pr + adversarial review):** `p47` (design §12-vs-§13 severity_final flat-vs-nested), `o9y` (design §2.2 owned-list omits `h_class_equivalent_max`), `7is` (design 9-pattern composition catalog never enumerated).
-- **INVARIANTS register at 12 entries** unchanged; none promoted at S14. Candidates carried (INV-HARM-CLASS-COMPOSITION, INV-SESSION-B-INTERLEAVING, INV-DEPLOY-VERDICT-BINARY, INV-DESIGN-DOC-SYMMETRY, DOCUMENT_RUBRIC Rule 7).
+- **Role 4 (medical-safety-reviewer) deployed + incorporated.** `.claude/agents/medical-safety-reviewer/agent.md` (198 lines / 8,021 cl100k tokens — overrun documented vs bead `2qq` per DOCUMENT_RUBRIC Rule 7) + `library-index.md`. **4 of 4 foundation agents now live** (Role 1 S9, Role 2 S13, Role 3 S14, Role 4 S15). **The foundation pipeline is COMPLETE.**
+- **Session B debt = 0.** Roster B fully self-hosting: architect + SE (health-implementer) + QA (health-edge-case-reviewer) + safety-red-team (medical-safety-reviewer) all deployed-project-local.
+- **PR #3 merged to `main`** (clean per-session branch off origin/main; rebase; Option A; per-session branch deleted). `main` carries S7–S15 code (`origin/main` at `b002146` as of 2026-05-29 S15 close). **Branch topology unchanged:** `main` = code via clean per-session PRs; long-lived `feature/wiki-bpc157-aplus-research` = continuity carrier, diverged by design (do NOT PR feature→main; cut per-session branches off `origin/main`; stash HANDOFF before the per-session checkout).
+- **Beads:** `4ej` (XR-002) CLOSED at AC0. New S15: `dcy` (P2, XR-S15-01 — §4.4-row2/§13-row5 top-level `harm_class` vs §12.3 exemplar omission, blocks row-5 audit-script LIVE), `1rm` (P3, XR-S15-02 — `probe_floor` two-name).
+- **INVARIANTS register at 12 entries** unchanged; none promoted at S15. Candidates carried (INV-HARM-CLASS-COMPOSITION + INV-DEPLOY-VERDICT-BINARY — now promotable since all 4 roles exist; INV-DESIGN-DOC-SYMMETRY; DOCUMENT_RUBRIC Rule 7). INV-SESSION-B-INTERLEAVING is now MOOT (loop closed).
 - **Active landmarks unchanged.** No trigger windows open today (2026-05-29).
 
-**Historical (kept for reference):** S13 close note above; `vault/sessions/session-14.md`.
+**Historical (kept for reference):** `vault/sessions/session-15.md`.
 
 ## What Is Next (volatile)
 
-### S15 — Role 4 Session B (MANDATORY per PF-S12-01 AP-DEFERRED-LOOP-CLOSURE)
+### Foundation pipeline COMPLETE — forward direction unblocks (Pass-3 specialists / Phase-C)
 
-**Session B debt at S14 close = 1.** Per Discipline 8, S15 opens with the LAST debt (Role 4) as the FIRST offered work-unit.
+With 4/4 foundation agents deployed + incorporated and Session B debt = 0, the next vision-load-bearing direction is open: **Pass-3 specialists** — deep-research → design-doc-protocol → `/upgrade-agent` for the 14 specialists (personal-trainer, labs-specialist, nutritionist, supplement-specialist, peptide-specialist, endocrine-specialist, lymphatic-specialist, gi-specialist, cardiovascular-specialist, sleep-coach, recovery-specialist, longevity-strategist, mental-performance-coach, medical-liaison). **Role 7 (medical-liaison) is notable** — it is the `BLOCK_WITH_OVERRIDE_PATH` adjudicator the deployed Role 4 references (pre-Role-7 fallback = `operator-with-warning` until then; closing it flips EC-4 / Break-Condition BC-1). Alternative forward path: the **Phase-C peptide library campaign** (`/aplus-research`). The specialist drafting now inherits the full project-local Roster B (rigor compounding engaged).
 
-**Prerequisite BEFORE Role 4 `/upgrade-agent`: close bead `4ej` (XR-002 verdict-enum inversion)** via design-doc change discipline, else the inverted deploy-gate verdict propagates into the deployed Role 4 agent + orchestrator gate.
+### Recommended before forward work (not blocking)
+- Reconcile the frozen-design-doc defects that gate audit-script LIVE promotion: `dcy` (XR-S15-01) before the row-5 h1h2-autoblock script; the §13 PROPOSED audit-script suite (OQ-1) + `scripts/audit-specialist-profile.sh` (`3y6`/`ams`) before specialists rely on mechanical gating.
+- Promote candidate INVs via the change-discipline ritual now that all 4 roles exist (INV-HARM-CLASS-COMPOSITION, INV-DEPLOY-VERDICT-BINARY).
 
-**S15 primary:** the per-session deploy-and-incorporate loop for Role 4 — `/upgrade-agent` against `design/medical-safety-reviewer-design.md` → `.claude/agents/medical-safety-reviewer/agent.md`; sub-out (safety-red-team slot → medical-safety-reviewer in `DESIGN_DOC_TEMPLATE.md` §0.1 + `CONTINUATION_BRIEF.md` §7); `/review-pr`; `/merge` (Option A — fresh branch off origin/main) on go; close. Debt 1 → 0 (foundation pipeline complete).
-
-### Before any forward (Pass-3) work
-- All Session B debt closed (Role 4 deployed → 4 of 4 foundation agents).
-- Bead `4ej` (P1) closed (Role 4 prerequisite).
-
-### Open beads (S14 close)
-- **P1**: `4ej` (XR-002 verdict-enum — Role 4 prerequisite), `3y6` (audit-script + AQ-002 mention-aware), `ams` (PF-S12-01 mechanical enforcement)
-- **P2**: `9u6` (XR-001 7-class), `pmp` (denylist), `h1z` (AQ-001), `rc1` (hook E2)
-- **P3**: `7m1` (XR-003), `z8i` (XR-004), `f2r`, `yfu`, `2qq` (token-budget ADR), `p47` (design severity_final flat/nested), `o9y` (design h_class owned-list), `7is` (design 9-pattern enum), `mdg`, `5by`, `1ox`, `9yk`
+### Open beads (S15 close)
+- **P1**: `3y6` (audit-script + AQ-002 mention-aware), `ams` (PF-S12-01 mechanical enforcement)
+- **P2**: `dcy` (XR-S15-01 harm_class schema-vs-exemplar), `9u6` (XR-001 7-class), `pmp` (denylist), `h1z` (AQ-001), `rc1` (hook E2)
+- **P3**: `1rm` (XR-S15-02 probe_floor two-name), `7m1` (XR-003), `z8i` (XR-004), `f2r`, `yfu`, `2qq` (token-budget ADR), `p47`, `o9y`, `7is`, `mdg`, `5by`, `1ox`, `9yk`
 
 ### Open project work (unchanged)
 - Walter pending: 23andMe raw file → `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health-issue characterization.

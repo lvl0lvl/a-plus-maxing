@@ -1,7 +1,7 @@
 ---
 title: Session Kickoff — S15 Role 4 Session B (deploy medical-safety-reviewer)
 type: session-prep
-status: ready
+status: consumed
 created: 2026-05-29
 prepared_at: S14 close (compaction prep)
 target_session: S15 (next session after compaction)
