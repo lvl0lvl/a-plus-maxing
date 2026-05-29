@@ -19,3 +19,4 @@ Thumbs.db
 
 # Beads sync artifacts
 .beads/sync/
+coordination/
