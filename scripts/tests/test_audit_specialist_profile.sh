@@ -288,6 +288,17 @@ mutate_aq() {
 }
 mutate_aq
 
+# ---- 5. collation-only role: risk-table mode_floor: not_applicable is mode-floor EXEMPT ----
+# Dir basename = slug. `medical-liaison` is `not_applicable` in templates/specialist-risk-class.yaml,
+# so a correct collate-only profile with NO aplus-research mode floor must PASS (not false-BLOCK R13-12).
+COLLATE="$(printf '%s\n' "$GOOD_AGENT" | sed 's#^I dispatch aplus-research --mode deep --target-class compound for library research\.#I dispatch no research of my own; I collate findings from other specialists.#')"
+mkdir -p "$TMP/medical-liaison"
+printf '%s\n' "$COLLATE" > "$TMP/medical-liaison/agent.md"
+printf '%s' "$LIBINDEX_GOOD" > "$TMP/medical-liaison/library-index.md"
+run_case "collate_only_mode_floor_exempt" "$TMP/medical-liaison" 0 "mode-floor exempt"
+# Control: a NON-collation slug (test-specialist, absent from risk table) with no floor still BLOCKs
+run_case "noncollate_missing_mode_floor_blocks" "$TMP/neg_aplus_mode_floor" 1 "R13-12"
+
 # ---- summary ---------------------------------------------------------------
 echo ""
 echo "audit-specialist-profile tests: $PASS passed, $FAIL failed"
