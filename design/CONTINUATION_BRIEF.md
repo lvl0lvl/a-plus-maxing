@@ -228,7 +228,7 @@ Dispatch architect / senior-engineer / qa sub-agents in parallel from the orches
 | senior-engineer | (rotated — was `~/Documents/Projects/skills_library/roles/senior-engineer/agent.md`) | `.claude/agents/health-implementer/agent.md` (project-local, ACTIVE) | **DONE — S13** (Role 2 deployed + incorporated) |
 | qa | (rotated — was `~/Documents/Projects/skills_library/roles/qa/agent.md`) | `.claude/agents/health-edge-case-reviewer/agent.md` (project-local, ACTIVE) | **DONE — S14** (Role 3 deployed + incorporated) |
 
-Same rotation applies to Phase 3 red-team safety reviewer once Role 4 deploys (Role 4 Session B OWED per PF-S12-01; rotation pending deploy): software-security v1-substitute → `.claude/agents/medical-safety-reviewer/agent.md`. The orchestrator reads the profile from the path in effect for the current session and inlines verbatim.
+Same rotation applied to the Phase 3 red-team safety reviewer: software-security v1-substitute → `.claude/agents/medical-safety-reviewer/agent.md` (project-local, ACTIVE) — **DONE — S15** (Role 4 deployed + incorporated; all 4 foundation roles now project-local, closing the last Session B debt). The orchestrator reads the profile from the path in effect for the current session and inlines verbatim.
 - The Pass 1 Phase 0 deliverable for the role being designed (i.e., `design/.health-specialist-architect-design-work/domain-research.md` for Role 1's Pass 2)
 - The relevant slice of `vault/WIKI.md` Agent Consumers
 - The relevant operator-profile and operator-state context
@@ -247,7 +247,7 @@ The orchestrator reads the 3 drafts and writes `design/{role}-design.md` followi
 
 ### Phase 3 — Red team (2 parallel sub-agents)
 
-Per design-doc-protocol: `/adversarial-review` skill agent + `/critique` skill agent or equivalent. For medical specialist design docs, the second red-team agent should be the **medical-safety-reviewer** (Role 4) once Role 4 is deployed (Session B). Until then, use the project's existing `security` agent briefed on medical-safety as a v1 substitute per the README.md.
+Per design-doc-protocol: `/adversarial-review` skill agent + `/critique` skill agent or equivalent. For medical specialist design docs, the second red-team agent is the **medical-safety-reviewer** (Role 4), deployed + incorporated S15 at `.claude/agents/medical-safety-reviewer/agent.md` (project-local, ACTIVE) — it replaces the former software-`security` v1-substitute.
 
 Each red-team agent emits findings with severity tags. Outputs at `design/.{role}-design-work/red-team-{adversarial,safety}.md`.
 
