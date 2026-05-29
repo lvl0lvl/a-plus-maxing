@@ -225,7 +225,7 @@ Dispatch architect / senior-engineer / qa sub-agents in parallel from the orches
 | Drafter | Source until rotation | Rotates to | Rotation point |
 |---|---|---|---|
 | architect | `~/Documents/Projects/skills_library/roles/architect/agent.md` (software v1-substitute) | `.claude/agents/health-specialist-architect/agent.md` (project-local) | **S10 onward** (Role 1 deployed S9) |
-| senior-engineer | `~/Documents/Projects/skills_library/roles/senior-engineer/agent.md` | `.claude/agents/health-implementer/agent.md` | After Role 2 Session B (post-S10) |
+| senior-engineer | (rotated — was `~/Documents/Projects/skills_library/roles/senior-engineer/agent.md`) | `.claude/agents/health-implementer/agent.md` (project-local, ACTIVE) | **DONE — S13** (Role 2 deployed + incorporated) |
 | qa | `~/Documents/Projects/skills_library/roles/qa/agent.md` | `.claude/agents/health-edge-case-reviewer/agent.md` | After Role 3 Session B (post-S11) |
 
 Same rotation applies to Phase 3 red-team safety reviewer once Role 4 deploys (post-S12): software-security v1-substitute → `.claude/agents/medical-safety-reviewer/agent.md`. The orchestrator reads the profile from the path in effect for the current session and inlines verbatim.
