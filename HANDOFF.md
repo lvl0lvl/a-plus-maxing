@@ -12,6 +12,41 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 16 (2026-05-29)
+
+Goal: Harden the mechanical gate the 14 Pass-3 specialists will be validated against — build `scripts/audit-specialist-profile.sh` (`3y6`) — and first reconcile the three cross-role contract literals that gate enforces so it keys on canonical, not self-contradictory, definitions.
+
+Roster B status: N/A — foundation pipeline complete (4/4 deployed), Session B debt 0; no drafter dispatch or design-doc cycle this session.
+
+Acceptance criteria:
+- [ ] AC1 — `z8i`: Role 4 §13 row 7's literal override-adjudicator phrase made canonical; Roles 1 (§13 row 6/EC-10) + 3 (§13 row 11) reference it by anchor instead of restating. Change-discipline edits (bead-authorized) + Change Log note. `rg` confirms one canonical literal.
+- [ ] AC2 — `7m1`: Role 1 §4 OUTBOUND row 8 generalized to cover specialist-profile deployment gating (not just compound `researching→planned`). Change-discipline edit.
+- [ ] AC3 — `9u6`: all 5 "7-class" prose sites in Role 1 design doc corrected to 8-class (the L410 BAD-block illustrative may stay if deliberately wrong); deployed agent already correct — canonical-doc self-consistency only.
+- [ ] AC4 — `scripts/audit-specialist-profile.sh` ships: implements the Role 1 §13 audit interface against a deployed specialist `agent.md`; AQ-002 mention-aware (excludes fenced/inline code before banned-modal counting); exits 0 PASS / non-zero with per-row failure detail; follows the existing `scripts/lib/audit-helpers.sh` pattern.
+- [ ] AC5 — Per-row smoke tests under `scripts/tests/` exercising the negative case for each §13 row implemented (QA-strict tag rule, OQ-7); all pass; existing audit suites still green.
+- [ ] AC6 — Close: all existing audits (handoff, scope-contract, pf-attestation) exit 0 at `--session 16`; canonical `S16 close (YYYY-MM-DD):` PF attestation; VOLATILE rotation 6-clause; feature branch only.
+
+Files I WILL touch:
+- `scripts/audit-specialist-profile.sh` (NEW), `scripts/tests/*` (NEW fixtures + runner)
+- `design/health-specialist-architect-design.md` (`9u6` 5 sites + `7m1` row 8 + `z8i` anchor — bead-authorized change discipline)
+- `design/health-edge-case-reviewer-design.md` (`z8i` §13 row 11 anchor)
+- `design/medical-safety-reviewer-design.md` (`z8i` — confirm Role 4 row 7 is the canonical literal; anchor target)
+- `HANDOFF.md` (contract + close + rotation), `.beads/*` via `bd`, `memory/process-failures.md` (only if a PF surfaces)
+
+Files I will NOT touch:
+- `.claude/agents/*` (deployed profiles — read-only; already carry the corrected forms)
+- Role 3 `p47`/`o9y`/`7is` design-doc edits (deferred — deployed agents already correct)
+- `INVARIANTS.md` (no INV promotion this session unless user directs the ritual)
+- `CLAUDE.md`, `.claude/hooks/*`, `.claude/skills/*`, `vault/library/*`, `vault/compounds/*`, `vault/biomarkers/*`, `vault/dna/*`
+- `main` branch directly (feature branch only)
+
+NOT doing: building/extending `ams` machinery (closed as overtaken-by-events at S16 open); Pass-3 specialist deep-research / design docs / `/upgrade-agent`; launching the parallel build; INV promotion; Walter pending items.
+
+Invariants at risk:
+- AP-CROSS-ROLE-CONTRACT-DRIFT — AC1–AC3 are the reconciliation; goal is to remove drift before the gate enforces it.
+- PF-S3-01 — N/A to drafter dispatch this session; smoke-test design must be genuine negative-case (no tautological tests per CLAUDE.md mandate), not assertions that pass regardless.
+- INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN, INV-HO-ROTATION, INV-HO-NO-STALE-HASH — standard close discipline.
+
 ## Scope Contract — Session 15 (2026-05-29)
 
 Goal: Close bead `4ej` (XR-002) as a prerequisite, then deploy Role 4 (medical-safety-reviewer) as a project-local agent AND incorporate it (sub out the safety-red-team v1-substitute), via one full deploy-and-incorporate loop (`/upgrade-agent` → sub-out → `/review-pr` → `/merge` Option A → close). Session B debt 1 → 0 — closes the LAST foundation debt; 4 of 4 foundation agents deployed.
@@ -472,39 +507,67 @@ S15 close (2026-05-29): **No new PF-class entries this session.** All three open
 
 **Commit:** S15 code landed on `main` via clean per-session PR #3 rebase (as of 2026-05-29 S15 close); close artifacts committed on the feature branch.
 
+## Session 16 close — gate-hardening: cross-role contract reconciliation + `scripts/audit-specialist-profile.sh` (2026-05-29)
+
+Pre-Pass-3 gate-hardening (Path 3, user-chosen). Reconciled the three cross-role contract literals the specialist deploy-gate keys on, then built + tested that gate. No specialist deployed; foundation pipeline unchanged (4/4 deployed, debt 0). Bead `ams` closed as overtaken-by-events at session open (PF-S12-01 loop closed; the Pass-3 parallel-build model can't reproduce AP-DEFERRED-LOOP-CLOSURE).
+
+**Scope-contract evaluation (S16 ACs).**
+- AC1 (`z8i` override-literal canonicalization): **PASS** — Role 4 §13 row 7 labeled THE canonical literal "operator is overriding a safety block"; Role 1 §13 row 6 + EC-10 (handling + stimulus) and Role 3 §13 row 11 anchor to it; `rg` confirms one literal, 0 divergent phrasings; annotated XR-004 / bead z8i.
+- AC2 (`7m1` OUTBOUND row 8 scope): **PASS** — Role 1 §4 OUTBOUND row 8 generalized to cover specialist-profile + wiki-entry deploy gating (Role 4 §1 + §4.4 row 1), not only compound `researching→planned`.
+- AC3 (`9u6` 7→8 class): **PASS** — all 7 residual "7-class" taxonomy refs corrected (incl. the §12 Negative-Example block, which asserted a false fact about the 8-class Finding 5); 8-class consistent; deployed agent already correct.
+- AC4 (`scripts/audit-specialist-profile.sh`): **PASS** — 25 §13 sub-checks; AQ-002 mention-aware (strips fenced + inline code before banned-modal count); BLOCK→exit 1 / WARN→info; dependency-gated checks degrade to skip-with-info; sources `audit-helpers.sh`.
+- AC5 (per-row negative-case smoke tests): **PASS** — `scripts/tests/test_audit_specialist_profile.sh` 21/21 (GOOD + one negative per BLOCK row + AQ-002 mention/control pair); 7 existing suites still green.
+- AC6 (close): **PASS** (this close).
+
+**Beads.** Closed: `ams` (overtaken-by-events), `z8i`/`7m1`/`9u6` (reconciled). `3y6` advanced (script + BLOCK-row tests shipped) → left OPEN at P2 with precise residual (per-WARN-row negatives; corpus/denylist/schema-gated checks pending those artifacts; step-8.5 wiring at first-specialist-deploy). New: `f2j` (XR-S16-01, P3) — discovered + beaded, not fixed.
+
+**Discovered + beaded (not fixed — frozen doc, out of scope):** `f2j` (XR-S16-01) — Role 1 §13.5 EC-10 detects Role-7-deployed via the skills_library path while Role 4 BC-1 uses the canonical project-local `.claude/agents/` path. Latent until Role 7 deploys.
+
+**Drift checks.**
+- **Task drift:** all 6 ACs PASS. One in-scope judgment beyond literal bead text — fixed the §12 illustrative "7-class" sites (9u6 said the GOOD-block "may stay") because the GOOD example asserted a false fact about Finding 5; flagged in the bead close, not silent. `ams` closed at open (flagged + user-confirmed). No silent drift.
+- **Architecture drift:** no invariant degraded. The session REDUCED AP-CROSS-ROLE-CONTRACT-DRIFT (3 literals reconciled). The new audit script is additive — no existing behavior changed; CLAUDE.md step-8.5 wiring deliberately deferred to first-specialist-deploy (the script runs against deployed specialists; none exist yet). INV-BRANCH-NOT-MAIN held (feature branch). Frozen Status:Final docs edited ONLY under bead authorization (z8i/7m1/9u6); deployed agents untouched (already correct).
+- **Vision drift:** same project. After S16 the specialist deploy-gate is mechanized + tested and the contracts it enforces are internally consistent — the gate the 14 Pass-3 specialists will be validated against is now LIVE-testable. No vision drift.
+
+**PF attestation.**
+
+S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROTOCOL-FROM-MEMORY) falsification window HELD — the session-open executed every Start-Protocol step with real output (HANDOFF read in full incl. paging past both truncations; test baseline RUN not recited; deployed-agents-vs-design-docs set difference computed via `ls`, not memory; scope contract written + user-confirmed before any work; no AskUserQuestion widget) — recurrence stays 3. PF-S6-01 (AP-ACT-BEFORE-VERIFY) HELD — verified each bead's claim against the actual doc before editing, and verified the XR-S16-01 path defect against both design docs before beading. PF-S3-01 N/A (no drafter/validator dispatch this session). Observations that did NOT promote: (i) the script's first crash-test surfaced a refusal-class false-positive (all-caps enum tokens flagged as non-taxonomy classes) + a spec-misaligned WARN-vs-BLOCK on row 7 — both caught by my own crash-test + spec re-read BEFORE writing the test suite, fixed pre-commit (build-then-verify working; nothing escaped). (ii) the test suite's first run caught a real script bug (case-sensitive routing-cue grep) + a test-harness bash gotcha (self-referential `local` under `set -u`) — caught by running the tests, fixed. Neither is a process failure; both are the verify step doing its job.
+
+**Commit:** _(to follow this close note on the feature branch)_
+
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3)** — open-protocol guard HELD at S15 (every Start-Protocol step run with real output; debt computed via set-difference; scope contract written + confirmed before any work; no railroading widget). Stays on the list as the standing session-lifecycle discipline. **S16 session-open is the next falsification window** — execute each step, never operate from memory; if any step is stated-from-memory or work precedes the scope contract, recurrence promotes to 4.
-2. **AP-ORCH-SELF-ATTEST (PF-S3-01)** — promoted back to Top-3 as the DOMINANT forward risk now that Pass-3 specialist work begins: each of the 14 specialists needs the full review stack (separate+parallel fact-checker/judge in `/upgrade-agent`; independent blind triage + blind verification in `/review-pr`; personal source-read of every finding). Watch the sub-pattern "orchestrator-pipeline-edit introduces a local inconsistency" (S13/S14/S15, caught by the next review layer each time, nothing escaped) — **if such an edit ever ESCAPES the review layers to main, promote to a new PF.**
-3. **AP-CROSS-ROLE-CONTRACT-DRIFT** — frozen-design-doc defects to reconcile via change discipline BEFORE the relevant audit scripts go LIVE or specialists inherit them. **`dcy` (XR-S15-01) CLOSED post-S15** (PR #4 merged to `main` 2026-05-29; top-level `harm_class` is the auto-block key, §12.3 + deployed exemplars now populate it; the row-5 h1h2-autoblock script is no longer blocked). Remaining: `1rm` (XR-S15-02, P3 — `probe_floor` two-name), plus carried `p47`/`o9y`/`7is`/`9u6`/`7m1`/`z8i`.
+1. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3)** — open-protocol guard HELD at S16 (every Start-Protocol step run with real output; HANDOFF read in full incl. paging past both truncations; deployed-agents-vs-design-docs set difference computed via `ls`, not memory; scope contract written + confirmed before any work; no railroading widget). Standing session-lifecycle discipline. **S17 session-open is the next falsification window** — execute each step, never operate from memory; if any step is stated-from-memory or work precedes the scope contract, recurrence promotes to 4.
+2. **AP-ORCH-SELF-ATTEST (PF-S3-01)** — DOMINANT forward risk for Pass-3: each of the 14 specialist builds needs the full review stack (separate+parallel fact-checker/judge in `/upgrade-agent`; independent blind triage + blind verification in `/review-pr`; personal source-read of every finding). N/A this session (no dispatch). Sub-pattern watch "pipeline-edit introduces a local inconsistency" — observed again at S16 (my script crash-test + the test-suite first-run each caught defects in my own edits, fixed pre-commit, nothing escaped to a deliverable); **promote to a new PF only if such an edit ESCAPES the verify layer.**
+3. **AP-CROSS-ROLE-CONTRACT-DRIFT** — three literals reconciled at S16 via change discipline (`z8i` override-ack / `7m1` OUTBOUND row 8 scope / `9u6` 8-class — all CLOSED). The specialist deploy-gate `scripts/audit-specialist-profile.sh` is now LIVE-testable to catch this class mechanically at deploy time. Remaining frozen-doc defects: `f2j` (XR-S16-01 NEW — EC-10 detection-path skills_library-vs-project-local), `1rm` (XR-S15-02 `probe_floor` two-name), `p47`/`o9y`/`7is` (Role-3 design-doc self-inconsistencies; deployed agents already correct).
 
-**Demoted from prior Top-3:** AP-DEFERRED-LOOP-CLOSURE (PF-S12-01) — **the loop is CLOSED** (Session B debt 0; 4/4 foundation roles deployed + incorporated); no foundation Session B remains to defer, so the guard's window no longer opens. Stays in `memory/process-failures.md` as historical. AP-INCOMPLETE-PROPAGATION (design-doc→agent.md compression handled across all 4 roles; the layered review caught residual synthesis defects each time).
+**Demoted from prior Top-3:** AP-DEFERRED-LOOP-CLOSURE (PF-S12-01) — loop CLOSED (Session B debt 0; `ams` closed overtaken-by-events at S16 open). AP-INCOMPLETE-PROPAGATION (design-doc→agent.md compression handled across all 4 roles).
 
 ## Current State (volatile)
 
-- **Role 4 (medical-safety-reviewer) deployed + incorporated.** `.claude/agents/medical-safety-reviewer/agent.md` (198 lines / 8,021 cl100k tokens — overrun documented vs bead `2qq` per DOCUMENT_RUBRIC Rule 7) + `library-index.md`. **4 of 4 foundation agents now live** (Role 1 S9, Role 2 S13, Role 3 S14, Role 4 S15). **The foundation pipeline is COMPLETE.**
-- **Session B debt = 0.** Roster B fully self-hosting: architect + SE (health-implementer) + QA (health-edge-case-reviewer) + safety-red-team (medical-safety-reviewer) all deployed-project-local.
-- **PR #3 merged to `main`** (clean per-session branch off origin/main; rebase; Option A; per-session branch deleted). `main` carries S7–S15 code (`origin/main` at `b002146` as of 2026-05-29 S15 close). **Branch topology unchanged:** `main` = code via clean per-session PRs; long-lived `feature/wiki-bpc157-aplus-research` = continuity carrier, diverged by design (do NOT PR feature→main; cut per-session branches off `origin/main`; stash HANDOFF before the per-session checkout).
-- **Beads:** `4ej` (XR-002) CLOSED at AC0; `dcy` (XR-S15-01) CLOSED post-S15 (PR #4 merged to `main` 2026-05-29 — top-level `harm_class` is the auto-block key, exemplars now populate it). Open from S15: `1rm` (P3, XR-S15-02 — `probe_floor` two-name).
-- **INVARIANTS register at 12 entries** unchanged; none promoted at S15. Candidates carried (INV-HARM-CLASS-COMPOSITION + INV-DEPLOY-VERDICT-BINARY — now promotable since all 4 roles exist; INV-DESIGN-DOC-SYMMETRY; DOCUMENT_RUBRIC Rule 7). INV-SESSION-B-INTERLEAVING is now MOOT (loop closed).
+- **Specialist deploy-gate mechanized + tested.** `scripts/audit-specialist-profile.sh` (25 Role-2 §13 sub-checks; AQ-002 mention-aware — strips fenced + inline code before banned-modal counting; BLOCK→exit 1 / WARN→info; dependency-gated checks degrade to skip-with-info) + `scripts/tests/test_audit_specialist_profile.sh` (21/21: GOOD + one negative per BLOCK row + AQ-002 mention/control pair). NOT yet wired into CLAUDE.md step 8.5 — it runs against a *deployed* specialist; deferred until the first specialist exists.
+- **Cross-role contract literals reconciled** (`z8i` override-acknowledgment canonical literal; `7m1` OUTBOUND row 8 deploy-gate scope; `9u6` 8-class taxonomy). Frozen Status:Final docs edited under bead authorization only; deployed agents unchanged (already correct).
+- **Foundation pipeline unchanged:** 4/4 deployed (Role 1 S9, Role 2 S13, Role 3 S14, Role 4 S15); Session B debt 0. `main` carries S7–S15 code (`origin/main` at `b002146` as of 2026-05-29 S15 close — unchanged this session; **S16 work is on the feature branch only, no code reached main**). Branch topology unchanged (do NOT PR feature→main; per-session branches off `origin/main`; stash HANDOFF before the per-session checkout).
+- **Beads:** closed `ams` (overtaken-by-events), `z8i`/`7m1`/`9u6` (reconciled). `3y6` advanced (script + BLOCK-row tests shipped) → OPEN at P2 (residual: per-WARN-row negatives; corpus/denylist/schema-gated checks pending those artifacts; step-8.5 wiring at first-specialist-deploy). New: `f2j` (XR-S16-01, P3).
+- **INVARIANTS register at 12 entries** unchanged; none promoted at S16. Candidates carried (INV-HARM-CLASS-COMPOSITION + INV-DEPLOY-VERDICT-BINARY — promotable; INV-DESIGN-DOC-SYMMETRY; DOCUMENT_RUBRIC Rule 7). INV-SESSION-B-INTERLEAVING MOOT.
 - **Active landmarks unchanged.** No trigger windows open today (2026-05-29).
 
-**Historical (kept for reference):** `vault/sessions/session-15.md`.
+**Historical (kept for reference):** `vault/sessions/session-16.md`.
 
 ## What Is Next (volatile)
 
-### Foundation pipeline COMPLETE — forward direction unblocks (Pass-3 specialists / Phase-C)
+### Pass-3 specialists — deploy-gate now hardened
 
-With 4/4 foundation agents deployed + incorporated and Session B debt = 0, the next vision-load-bearing direction is open: **Pass-3 specialists** — deep-research → design-doc-protocol → `/upgrade-agent` for the 14 specialists (personal-trainer, labs-specialist, nutritionist, supplement-specialist, peptide-specialist, endocrine-specialist, lymphatic-specialist, gi-specialist, cardiovascular-specialist, sleep-coach, recovery-specialist, longevity-strategist, mental-performance-coach, medical-liaison). **Role 7 (medical-liaison) is notable** — it is the `BLOCK_WITH_OVERRIDE_PATH` adjudicator the deployed Role 4 references (pre-Role-7 fallback = `operator-with-warning` until then; closing it flips EC-4 / Break-Condition BC-1). Alternative forward path: the **Phase-C peptide library campaign** (`/aplus-research`). The specialist drafting now inherits the full project-local Roster B (rigor compounding engaged).
+The specialist deploy-gate is LIVE-testable and the cross-role contracts it enforces are internally consistent. Forward direction: **Pass-3 specialists** — deep-research → design-doc-protocol → `/upgrade-agent` for the 14 (personal-trainer, labs-specialist, nutritionist, supplement-specialist, peptide-specialist, endocrine-specialist, lymphatic-specialist, gi-specialist, cardiovascular-specialist, sleep-coach, recovery-specialist, longevity-strategist, mental-performance-coach, medical-liaison). The parallel-build coordination scaffolding (`coordination/`, gitignored) is ready: 3 pilot worktrees (**medical-liaison FIRST** — Role 7 adjudicator; deploying it flips Role 4 EC-4 / BC-1; then peptide-specialist, labs-specialist), this checkout as integrator. Launch recipe in `coordination/kickoffs/`. Alternative: **Phase-C peptide library campaign** (`/aplus-research`).
 
-### Recommended before forward work (not blocking)
-- Reconcile the frozen-design-doc defects that gate audit-script LIVE promotion: `dcy` (XR-S15-01) DONE (PR #4); remaining — the §13 PROPOSED audit-script suite (OQ-1) + `scripts/audit-specialist-profile.sh` (`3y6`/`ams`) before specialists rely on mechanical gating.
-- Promote candidate INVs via the change-discipline ritual now that all 4 roles exist (INV-HARM-CLASS-COMPOSITION, INV-DEPLOY-VERDICT-BINARY).
+### Recommended before / alongside forward work (not blocking)
+- `3y6` residual: per-WARN-row negative tests; dependency-gated checks once a multi-specialist corpus / denylist (`pmp`) / operator-profile schema exist; CLAUDE.md step-8.5 wiring at first-specialist-deploy.
+- Frozen-doc reconciliations via change discipline: `f2j` (XR-S16-01 EC-10 path), `1rm` (probe_floor two-name), `p47`/`o9y`/`7is` (Role-3 design-doc self-inconsistencies; deployed agents already correct).
+- Promote candidate INVs via change-discipline ritual (INV-HARM-CLASS-COMPOSITION, INV-DEPLOY-VERDICT-BINARY).
 
-### Open beads (S15 close)
-- **P1**: `3y6` (audit-script + AQ-002 mention-aware), `ams` (PF-S12-01 mechanical enforcement)
-- **P2**: `9u6` (XR-001 7-class), `pmp` (denylist), `h1z` (AQ-001), `rc1` (hook E2)  _(dcy CLOSED post-S15)_
-- **P3**: `1rm` (XR-S15-02 probe_floor two-name), `7m1` (XR-003), `z8i` (XR-004), `f2r`, `yfu`, `2qq` (token-budget ADR), `p47`, `o9y`, `7is`, `mdg`, `5by`, `1ox`, `9yk`
+### Open beads (S16 close)
+- **P1**: (none — `ams` closed, `3y6` → P2)
+- **P2**: `3y6` (audit-script residual), `pmp` (denylist), `h1z` (AQ-001), `rc1` (hook E2)
+- **P3**: `f2j` (XR-S16-01 EC-10 path), `1rm` (XR-S15-02 probe_floor), `f2r`, `yfu`, `2qq` (token-budget ADR), `p47`, `o9y`, `7is`, `mdg`, `5by`, `1ox`, `9yk`
 
 ### Open project work (unchanged)
 - Walter pending: 23andMe raw file → `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health-issue characterization.
@@ -512,7 +575,7 @@ With 4/4 foundation agents deployed + incorporated and Session B debt = 0, the n
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S14.
+All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S16.
 
 ## Open Issues
 
