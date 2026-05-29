@@ -162,14 +162,19 @@ check_description_routing() { # row 2 — BLOCK (frontmatter-gated)
     info "description-routing: $len chars, $cues routing cue(s)"
 }
 
-check_body_length() { # row 3 — BLOCK
+check_body_length() { # row 3 — BLOCK (≤200 lines) + WARN (token target)
+    # The ≤200-LINE ceiling is the canonical /upgrade-agent HARD RULE → BLOCK. The token
+    # figure is a ~target, not a hard gate: every deployed foundation sibling carries a
+    # documented medical-density overrun (3,252–8,110 cl100k) per DOCUMENT_RUBRIC Rule 7 /
+    # bead 2qq, so the token sub-check is WARN, not BLOCK (S16-pilot finding: a ≤2500 BLOCK
+    # would false-fail all 14 specialists identically).
     local lines toks
     lines="$(wc -l < "$BODY" | tr -d ' ')"
     [[ "$lines" -gt 200 ]] && violation "R13-3" "body is $lines lines (>200)"
     if command -v python3 >/dev/null 2>&1 && python3 -c 'import tiktoken' >/dev/null 2>&1; then
         toks="$(python3 -c "import tiktoken,sys;print(len(tiktoken.get_encoding('cl100k_base').encode(open('$BODY').read())))" 2>/dev/null || echo -1)"
         if [[ "$toks" -ge 0 ]]; then
-            [[ "$toks" -gt 2500 ]] && violation "R13-3" "body is $toks cl100k tokens (>2500)"
+            [[ "$toks" -gt 2500 ]] && warn "R13-3" "body is $toks cl100k tokens (>2500 ~target — documented medical overrun per Rule 7 / bead 2qq; ≤200-line ceiling is the BLOCK)"
             info "body-length: $lines lines, $toks tokens"
         else
             info "body-length: $lines lines (tiktoken unavailable)"
@@ -356,8 +361,18 @@ check_pf_resolution() { # row 11 — BLOCK
     info "pf-resolution: $n distinct PF ids"
 }
 
-check_aplus_mode_floor() { # row 12 — BLOCK
-    local hits
+check_aplus_mode_floor() { # row 12 — BLOCK (risk-table-gated exemption for collation-only roles)
+    # A collation-only specialist (risk table mode_floor: not_applicable / none) dispatches
+    # no research and legitimately declares no aplus-research mode floor — exempt it, else a
+    # correct profile false-BLOCKs (surfaced by the medical-liaison pilot, S16-pilot finding).
+    local hits floor=""
+    if [[ -f "$RISK_TABLE" ]]; then
+        floor="$(awk -v s="$SLUG:" '$0 ~ ("^  " s){f=1;next} f&&/mode_floor:/{print $2;exit} /^  [a-z]/{if(f)exit}' "$RISK_TABLE")"
+    fi
+    if [[ "$floor" == "not_applicable" || "$floor" == "none" ]]; then
+        info "aplus-mode-floor: $SLUG is collation-only (risk table mode_floor=$floor) — mode-floor exempt"
+        return
+    fi
     hits="$(grep -cE 'aplus-research.*--mode.{0,4}(standard|deep|ultradeep)|--mode[ =]+(standard|deep|ultradeep)' "$BODY" || true)"
     [[ "$hits" -lt 1 ]] && violation "R13-12" "no aplus-research --mode floor (standard|deep|ultradeep) in Tools"
     info "aplus-mode-floor: $hits"
@@ -368,6 +383,7 @@ check_mode_floor_correctness() { # row 12.5 — WARN (risk-table-gated)
     local floor
     floor="$(awk -v s="$SLUG:" '$0 ~ ("^  " s){f=1;next} f&&/mode_floor:/{print $2;exit} /^  [a-z]/{if(f)exit}' "$RISK_TABLE")"
     if [[ -z "$floor" ]]; then info "mode-floor-correctness: $SLUG not in risk table — skipped"; return; fi
+    if [[ "$floor" == "not_applicable" || "$floor" == "none" ]]; then info "mode-floor-correctness: $SLUG collation-only (floor=$floor) — no mode floor expected"; return; fi
     grep -qE "aplus-research.*--mode.{0,4}$floor|--mode[ =]+$floor|--mode[ =]+(deep|ultradeep)" "$BODY" \
         || warn "R13-12.5" "declared mode floor does not meet risk-class minimum '$floor' for $SLUG"
     info "mode-floor-correctness: risk-class floor for $SLUG = $floor"
