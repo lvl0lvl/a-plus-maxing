@@ -12,6 +12,63 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 13 (2026-05-28)
+
+Goal: Deploy Role 2 (health-implementer) as a project-local agent AND incorporate it into the bootstrap roster, replacing the software-SE v1-substitute. One full deploy-and-incorporate loop (`/upgrade-agent` → sub out → `/review-pr` → `/merge` → close). Session B debt 3 → 2. First correct execution of the per-session deployment loop (S12 kickoff brief encoded a wrong batched-3 shape; corrected at S13 session-start per user instruction).
+
+Roster B status (per PF-S12-01 Structural-1):
+- Architect: deployed (`.claude/agents/health-specialist-architect/`) since S9
+- SE drafter: v1-substitute → becomes health-implementer (deployed) THIS SESSION
+- QA drafter: v1-substitute (Role 3 Session B = S14)
+- Safety red-team: v1-substitute (Role 4 Session B = S15)
+- Cumulative-deferral count: 3 → 2 expected at close
+
+Acceptance criteria:
+- [ ] AC1 — `/upgrade-agent` on `design/health-implementer-design.md` → `.claude/agents/health-implementer/agent.md`; 8-phase pipeline; Phase-7 corrections all PASS; PF-S3-01 guard held at Phase 4 + 6 (every finding personally source-read before classification)
+- [ ] AC2 — Sub out: Roster B in `design/DESIGN_DOC_TEMPLATE.md` §0.1 + `design/CONTINUATION_BRIEF.md` §7 updated so the SE drafter slot reads health-implementer (deployed), replacing software-SE v1-substitute
+- [ ] AC3 — agent.md passes generic Phase-7 constraints (≤200 lines; ≤2000 tokens OR documented medical-domain overrun per S9 precedent; all AGENT_TEMPLATE.md sections present; reference paths resolve)
+- [ ] AC4 — agent.md §15.2b post-deployment ACs evaluated (LIVE checks pass; PROPOSED checks → follow-up beads)
+- [ ] AC5 — `/review-pr` (existing command) run on the result; findings triaged per PF-S3-01 (personal source-read); reject-but-adopt applied where appropriate
+- [ ] AC6 — `/merge` (existing command) on explicit user go (PR feature → main; this PR carries the S7–S13 backlog so main catches up; from S14 each role is a clean incremental PR)
+- [ ] AC7 — Close: all 3 audits exit 0 at `--session 13`; canonical `S13 close (YYYY-MM-DD):` PF attestation; VOLATILE rotation 6-clause; debt 3 → 2 recorded; feature branch only until the authorized merge
+- [ ] AC8 — Role 3 (S14) queued as next loop iteration; `design/.session-b-deployments/SESSION_KICKOFF.md` corrected and marked `consumed`
+
+Files I WILL touch:
+- `.claude/agents/health-implementer/agent.md` (NEW; + `library-index.md` if the pipeline emits one)
+- `design/DESIGN_DOC_TEMPLATE.md` §0.1 (Roster B sub-out edit)
+- `design/CONTINUATION_BRIEF.md` §7 (Roster B sub-out edit)
+- `design/.health-implementer-design-work/upgrade-agent-work/*` (NEW — phase artifacts)
+- `design/.session-b-deployments/SESSION_KICKOFF.md` (correct the batched-3 shape; flip to `consumed` at close)
+- `HANDOFF.md` (this contract + close + VOLATILE rotation)
+- `vault/meta/index.md`, `vault/meta/log.md` (appends)
+- `.beads/*` via `bd` CLI
+- `memory/process-failures.md` (only if new PF surfaces)
+
+Files I will NOT touch:
+- `design/health-implementer-design.md`, `design/health-edge-case-reviewer-design.md`, `design/medical-safety-reviewer-design.md` (Status: Final — READ-ONLY inputs; defects → bead, not in-place edit)
+- `design/health-specialist-architect-design.md` (Final)
+- `.claude/agents/health-specialist-architect/` (Role 1 deployed — read-only drafter source)
+- `vault/library/*`, `vault/compounds/*`, `vault/biomarkers/*`, `vault/dna/*`
+- `.claude/skills/*`, `scripts/*`, `.claude/hooks/*`
+- `CLAUDE.md`
+- `INVARIANTS.md` (no new invariants this session unless something forces it; flag at the time)
+- `main` branch directly (the only `main` change is via the authorized `/merge`)
+
+NOT doing:
+- Role 3 (S14) + Role 4 (S15) deployments — one role per session
+- Pass-3 specialist design docs; Phase-C peptide library campaign
+- PF-S12-01 Structural-2 (audit script) + Structural-3 (auto-bead) — bead `ams`; user picked path 1 (close debt directly)
+- Bead `3y6` (audit-script); Walter pending items (23andMe, Oura, meal-template, Jan-2026 issue)
+
+Invariants at risk:
+- INV-ROLE-INLINING — `/upgrade-agent` role-tagged sub-dispatches inline full profile per hook v2.5; path-pattern edge case (bead `rc1`) on watch
+- PF-S3-01 / AP-ORCH-SELF-ATTEST — Phase 4 + Phase 6 are the 7th consecutive falsification window; SEPARATE+PARALLEL fact-checker/judge; no rounding, no softening; personal source-read
+- AP-INCOMPLETE-PROPAGATION — design-doc (S10 Role 2 doc) → ≤200-line agent.md compression; §7-equivalent mechanical check is the defense
+- AP-DEFERRED-LOOP-CLOSURE — S13 IS the remediation; closing the OLDEST debt the correct way (deploy + incorporate), debt 3 → 2; falsification window held (opened with debt-closure, not forward work)
+- INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN, INV-HO-ROTATION, INV-HO-NO-STALE-HASH — standard close discipline
+
+Self-recognition pre-flight: Watching at each `/upgrade-agent` Phase 4/6 for "I verified findings like these on Role 1 in S9 already, the pattern is familiar" (familiarity ≠ source-read) and "Role 2 agent.md must hit ≤200 lines so I'll drop a safety property to fit" (token overrun is documented per S9, not compressed away at the cost of safety). Also watching for re-inheriting the kickoff brief's batched-3 framing now that the loop is corrected to one-role-per-session.
+
 ## Scope Contract — Session 12 (2026-05-28)
 
 Goal: Two work-units sequenced. **Unit A:** Fix bead `a-plus-maxing-hca` E1 class (Hook v2.5 punch-list, recurrence=3 mandatory structural fix per Rigor Framework Discipline 8) — extend `.claude/hooks/enforce-role-inlining.sh` to accept the canonical operational-slot synonyms (`## Modes` | `## Audit Protocol` | `## Task Routing`) as the 9th-section equivalent. **Unit B:** Run design-doc-protocol Phases 1–5 for Role 4 (medical-safety-reviewer) per `design/DESIGN_DOC_TEMPLATE.md`; §4 INBOUND inherits 8+5+3=16 rows from Roles 1+2+3; produce `design/medical-safety-reviewer-design.md` Status: Final. Fourth end-to-end exercise of canonical template.
