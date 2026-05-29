@@ -1,7 +1,7 @@
 ---
 title: Session Kickoff — S14 Role 3 Session B (deploy health-edge-case-reviewer)
 type: session-prep
-status: ready
+status: consumed
 created: 2026-05-29
 prepared_at: S13 close (compaction prep)
 target_session: S14 (next session after compaction)
