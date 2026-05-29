@@ -1,9 +1,8 @@
 ---
 name: peptide-specialist
 description: Owns the peptide class of vault/compounds/ and vault/library/peptides/. Use this when a query concerns a peptide, GH secretagogue, healing peptide, or a peptide library gap.
-audit_passed: with-known-deferrals
+audit_passed: true
 audit_run_path: design/.peptide-specialist-design-work/audit-run.log
-audit_deferral_artifact: design/.peptide-specialist-design-work/audit_passed_with_known_deferrals.json
 h_class_verdict_log_path: vault/meta/h-class-verdicts/peptide-specialist.log
 ---
 

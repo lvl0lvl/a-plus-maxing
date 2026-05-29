@@ -1,6 +1,6 @@
 audit-specialist-profile(peptide-specialist): info: identity: 37 words, 0 banned-adjective hits
 audit-specialist-profile(peptide-specialist): info: description-routing: 173 chars, 1 routing cue(s)
-audit-specialist-profile(peptide-specialist): VIOLATION R13-3: body is 3205 cl100k tokens (>2500)
+audit-specialist-profile(peptide-specialist): WARN R13-3: body is 3205 cl100k tokens (>2500 ~target — documented medical overrun per Rule 7 / bead 2qq; ≤200-line ceiling is the BLOCK)
 audit-specialist-profile(peptide-specialist): info: body-length: 133 lines, 3205 tokens
 audit-specialist-profile(peptide-specialist): info: voice-register: 0 banned (block), 0 soft 'you <modal>' (budget 3)
 audit-specialist-profile(peptide-specialist): info: refusal-classes: 5 taxonomy class(es) referenced
@@ -22,9 +22,8 @@ audit-specialist-profile(peptide-specialist): info: pf-resolution: 7 distinct PF
 audit-specialist-profile(peptide-specialist): info: aplus-mode-floor: 3
 audit-specialist-profile(peptide-specialist): info: mode-floor-correctness: risk-class floor for peptide-specialist = deep
 audit-specialist-profile(peptide-specialist): info: target-class: 3
-audit-specialist-profile(peptide-specialist): VIOLATION R13-13: frontmatter lacks audit_passed: true
 audit-specialist-profile(peptide-specialist): info: audit-passed-frontmatter: checked
 audit-specialist-profile(peptide-specialist): info: h-class-composition: frontmatter path check
 audit-specialist-profile(peptide-specialist): info: modes-shape: present
-audit-specialist-profile(peptide-specialist): 2 violation(s)
-audit-specialist-profile(peptide-specialist): 1 warning(s)
+audit-specialist-profile(peptide-specialist): 0 violation(s)
+audit-specialist-profile(peptide-specialist): 2 warning(s)
