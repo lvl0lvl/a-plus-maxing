@@ -30,7 +30,7 @@ This is the canonical template every Pass-2 (foundation) and Pass-4 (specialist)
 > - **Pass-1 deep-research is COMPLETE for the 4 foundation roles.** The deliverables exist at `design/.{role}-design-work/domain-research.md` for each of: health-specialist-architect, health-implementer, health-edge-case-reviewer, medical-safety-reviewer. ~49,500 words total. Cleared 99/100 rubric. Do NOT re-run Pass-1 for these roles.
 > - **Pass-2 design-doc-protocol has NOT YET RUN** for any of the 4 foundation roles. That is the work this template is for. Next session per S7 close: pick a role (recommended order: 1 → 2 → 3 → 4 per CONTINUATION_BRIEF §7) and run Phases 1–5 against this template.
 > - **The 14 specialist roles have NO Pass-1 deliverable yet.** Their deep-research happens in Pass-3, AFTER the 4 foundation roles have been deployed via `/upgrade-agent`. Specialist design docs follow this template too, with the §3 specialist-fallback content path until their own Pass-1 lands in Pass-3.
-> - **`/upgrade-agent` deployments have NOT YET RUN** for any role. Each role's deployment is Session B for that role, after its Pass-2 design doc finalizes.
+> - **`/upgrade-agent` deployments: all 4 foundation roles deployed + incorporated** — health-specialist-architect (S9), health-implementer (S13), health-edge-case-reviewer (S14), medical-safety-reviewer (S15). Each was Session B for that role, after its Pass-2 design doc finalized. The 14 specialists remain NOT YET deployed.
 
 ```
 Pass-1 deep-research → design/.{role}-design-work/domain-research.md (DONE for the 4 foundation roles; NOT YET for 14 specialists)
@@ -38,7 +38,7 @@ Pass-1 deep-research → design/.{role}-design-work/domain-research.md (DONE for
 Pass-2/Pass-4 design-doc-protocol Phases 1–5:
   Phase 1: 3 parallel drafters (architect / senior-engineer / qa). For medical design docs: architect = project-local `.claude/agents/health-specialist-architect/agent.md` (deployed S9); senior-engineer = project-local `.claude/agents/health-implementer/agent.md` (deployed + incorporated S13); qa = project-local `.claude/agents/health-edge-case-reviewer/agent.md` (deployed + incorporated S14). See CONTINUATION_BRIEF §7 for the rotation table.
   Phase 2: orchestrator synthesizes into design/{role-slug}-design.md following THIS TEMPLATE
-  Phase 3: 2 parallel red-team dispatches (/adversarial-review skill + medical-safety-reviewer once Role 4 is deployed; software security agent v1-substitute until then)
+  Phase 3: 2 parallel red-team dispatches (/adversarial-review skill + safety = project-local `.claude/agents/medical-safety-reviewer/agent.md` (deployed + incorporated S15), replacing the software-security v1-substitute. See CONTINUATION_BRIEF §7 for the rotation table.)
   Phase 4: orchestrator personally verifies each finding (PF-S3-01 guard); finding classifications documented
   Phase 5: synthesis incorporates Legitimate findings; Rejected findings → Appendix A with cited evidence; Status: Final
                               ↓
