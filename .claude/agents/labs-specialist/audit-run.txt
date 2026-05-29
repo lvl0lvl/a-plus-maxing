@@ -1,0 +1,34 @@
+# audit-specialist-profile.sh run — labs-specialist — FINAL (post Phase-6/7 corrections)
+# generated: 2026-05-29 (S-pass3 labs-specialist builder)
+
+audit-specialist-profile(labs-specialist): info: identity: 36 words, 0 banned-adjective hits
+audit-specialist-profile(labs-specialist): info: description-routing: 181 chars, 1 routing cue(s)
+audit-specialist-profile(labs-specialist): VIOLATION R13-3: body is 4355 cl100k tokens (>2500)
+audit-specialist-profile(labs-specialist): info: body-length: 151 lines, 4355 tokens
+audit-specialist-profile(labs-specialist): info: voice-register: 0 banned (block), 0 soft 'you <modal>' (budget 3)
+audit-specialist-profile(labs-specialist): info: refusal-classes: 8 taxonomy class(es) referenced
+audit-specialist-profile(labs-specialist): info: authority-framing: 5 mention(s)
+audit-specialist-profile(labs-specialist): info: grade-halt: certainty=1 strength=1 halt-pair=1
+audit-specialist-profile(labs-specialist): info: anti-sycophancy: A=1 B=1 C=1
+audit-specialist-profile(labs-specialist): info: refusal-affirmative: neg=0 aff=5
+audit-specialist-profile(labs-specialist): info: section-count: 11 level-2 headings
+audit-specialist-profile(labs-specialist): info: schema-drift: no --schema provided — skipped
+audit-specialist-profile(labs-specialist): info: operator-no-writeback: leaks=0 path-refs=4
+audit-specialist-profile(labs-specialist): info: mechanical-stubs: all sections covered
+audit-specialist-profile(labs-specialist): info: section-uniqueness: ok
+audit-specialist-profile(labs-specialist): info: identical-block: no --compare-to corpus (first specialist) — hash match skipped
+audit-specialist-profile(labs-specialist): info: differ-jaccard: no --compare-to corpus — skipped
+audit-specialist-profile(labs-specialist): info: library-index: 11 lines, 1 vault/library refs
+audit-specialist-profile(labs-specialist): info: negative-examples: 6 markers (denylist absent — content pending S-08 bead)
+audit-specialist-profile(labs-specialist): info: pf-resolution: 5 distinct PF ids
+audit-specialist-profile(labs-specialist): info: aplus-mode-floor: 6
+audit-specialist-profile(labs-specialist): info: mode-floor-correctness: risk-class floor for labs-specialist = standard
+audit-specialist-profile(labs-specialist): info: target-class: 2
+audit-specialist-profile(labs-specialist): VIOLATION R13-13: frontmatter lacks audit_passed: true
+audit-specialist-profile(labs-specialist): info: audit-passed-frontmatter: checked
+audit-specialist-profile(labs-specialist): info: h-class-composition: frontmatter path check
+audit-specialist-profile(labs-specialist): info: modes-shape: present
+audit-specialist-profile(labs-specialist): 2 violation(s)
+audit-specialist-profile(labs-specialist): 0 warning(s)
+
+# 2 violations: R13-3 token-ceiling [bead-2qq; all 4 deployed siblings breach: 3252-8110] + R13-13 [downstream of R13-3]. 0 warnings. All content/structure/safety checks PASS.
