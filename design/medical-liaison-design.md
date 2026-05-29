@@ -526,21 +526,25 @@ Both candidates require the four-step INVARIANTS change ritual (cite → evidenc
 | # | Condition | Detection |
 |---|---|---|
 | BC-1 | A real-time downstream clinician enters the loop. | The single-operator-as-last-check premise (E5, A-2) no longer holds; the override path's friction calculus and the under-witnessed flag change. Detect: `operator-profile.md`/`current-state.md` records an active clinician relationship. |
-| BC-2 | The OQ-1 R13-12 audit defect is fixed at the script layer. | The documented known-BLOCK exemption workaround becomes unnecessary. Detect: `check_aplus_mode_floor` diff shows it now reads `specialist-risk-class.yaml`; the integrator re-runs the audit and the BLOCK clears. |
-| BC-3 | The "81.8% authority-impersonation" misattribution is corrected in the frozen foundation docs. | The cited figure in the AUTHORITY_FRAMING_BYPASS rationale should track the correction (45.0%/83.3%, Ekram 2026). Detect: `grep -c "81.8%" templates/refusal-class-taxonomy.yaml` → 0; OQ-2 bead closed. |
+| BC-2 | The OQ-1 R13-12 audit defect is fixed at the script layer. | The documented known-BLOCK exemption workaround becomes unnecessary. Detect: `check_aplus_mode_floor` diff shows it now reads `specialist-risk-class.yaml`; the integrator re-runs the audit and the BLOCK clears. **[RESOLVED 2026-05-29 — PR #7 did exactly this; the deployed medical-liaison profile now re-audits 0 violations.]** |
+| ~~BC-3~~ **[VOID]** | ~~The "81.8% authority-impersonation" misattribution is corrected in the frozen foundation docs.~~ | **[WITHDRAWN 2026-05-29 by integrator — DO NOT act on this; it would delete a CORRECT citation.]** Re-verification of the Ekram full text ("Authority Impersonation … 9 of 11 successful attacks (81.8%)") confirms the foundation 81.8% is genuinely Ekram's and correct. See OQ-2 below + bead `amc` (REJECTED). |
 | BC-4 | The Role 4 `safety_finding` schema or the band→verdict mapping changes. | The liaison's adjudication keys + EC-2 auto-block logic go stale. Detect: `design/medical-safety-reviewer-design.md` §4.4 row 1/2 diff, or schema-validation failure on dispatch. |
 
 ---
 
 ## §18 — Open Questions
 
-### OQ-1 — The R13-12 audit gap (Role-2-owned script defect; integrator bead candidate)
+### OQ-1 — The R13-12 audit gap (Role-2-owned script defect; integrator bead candidate) — **[RESOLVED 2026-05-29: PR #7]**
+
+**INTEGRATOR (2026-05-29):** RESOLVED. The builder's finding was CORRECT — `check_aplus_mode_floor` was unconditional. PR #7 made it read `specialist-risk-class.yaml` and exempt collation-only `mode_floor: not_applicable`; the deployed medical-liaison profile now re-audits 0 violations. Original finding preserved below.
 
 `scripts/audit-specialist-profile.sh check_aplus_mode_floor` (R13-12, BLOCK) is unconditional and never reads the risk table, while `templates/specialist-risk-class.yaml` lists medical-liaison as `mode_floor: not_applicable` / `target_class: none` and the deployed health-implementer profile both promise the exemption. A correctly-authored collate-only profile fails R13-12. **Why unresolvable now:** the fix (mirror the WARN row-12.5 risk-table read) belongs to Role 2 / `scripts/`; medical-liaison cannot edit `scripts/`. **Who answers:** Role 2 owns the script; resolution is the BC-2 script fix OR an explicit user-adjudicated path-extension. **Blocker:** partial — blocks a clean R13-12 PASS. Per CLAUDE.md §8.5, a LIVE BLOCK is NOT waved through on standing integrator discretion (SF-08); it resolves by (a) Role 2 fixing `check_aplus_mode_floor` to honor `mode_floor: not_applicable` (BC-2) before deploy, OR (b) an explicit user-adjudicated path-extension per CLAUDE.md §8.5.
 
-### OQ-2 — The "81.8% authority-impersonation" misattribution in the frozen foundation docs (cross-role bead candidate)
+### OQ-2 — ~~The "81.8% authority-impersonation" misattribution~~ **[WITHDRAWN 2026-05-29 — finding disproven on integrator re-verification]**
 
-`templates/refusal-class-taxonomy.yaml` (AUTHORITY_FRAMING_BYPASS `statutory_anchor`), Role 1 §2.2, and Role 4 substrate cite 81.8% as the medical authority-impersonation share. Orchestrator Phase-4 verification confirmed 81.8% is JBDistill's *benchmark effectiveness* [61]; the genuine medical figures are 45.0% / 83.3% (Ekram 2026 [60]). **Why unresolvable now:** those files are frozen foundation/template artifacts owned by Role 1 / Role 4; medical-liaison cannot edit them. The AUTHORITY_FRAMING_BYPASS *mandate* is unaffected. **Who answers:** Role 1 and Role 4; CONTINUATION_BRIEF §11 already ordered Pass-3 authors to re-verify this exact figure (done). **Blocker:** non-blocking; the liaison's own rationale cites the corrected 45.0%/83.3% and footnotes the pending upstream correction.
+**INTEGRATOR CORRECTION (2026-05-29):** This finding is WITHDRAWN. Independent re-verification of the Ekram full text (medRxiv 10.64898/2026.02.26.26347212, real paper) found: *"Authority Impersonation … accounting for 9 of 11 successful attacks (81.8%)."* So **81.8% IS genuinely Ekram's** and means exactly what the foundation docs say (81.8% of *successful* jailbreaks were authority-impersonation). The error: JBDistill (arXiv:2505.22037) *coincidentally* also reports an 81.8% (benchmark effectiveness); the builder verified that and inferred misattribution, but the Ekram PDF (HTTP 403) blocked confirming Ekram's own 81.8% — so the negative was never checked. The 45.0% (category ASR 9/20) and 83.3% (educational sub-strategy 5/6) are complementary Ekram denominators, both real. **Foundation docs are CORRECT — no edit; bead `amc` REJECTED.** Original finding preserved for the record:
+
+> `templates/refusal-class-taxonomy.yaml` (AUTHORITY_FRAMING_BYPASS `statutory_anchor`), Role 1 §2.2, and Role 4 substrate cite 81.8% as the medical authority-impersonation share. Orchestrator Phase-4 verification confirmed 81.8% is JBDistill's *benchmark effectiveness* [61]; the genuine medical figures are 45.0% / 83.3% (Ekram 2026 [60]). [...] the liaison's own rationale cites the corrected 45.0%/83.3% and footnotes the pending upstream correction.
 
 ### OQ-3 — Should the override-record schema become a new INV candidate?
 
