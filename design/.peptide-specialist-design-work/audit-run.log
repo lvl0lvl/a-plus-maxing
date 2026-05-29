@@ -1,7 +1,7 @@
 audit-specialist-profile(peptide-specialist): info: identity: 37 words, 0 banned-adjective hits
 audit-specialist-profile(peptide-specialist): info: description-routing: 173 chars, 1 routing cue(s)
-audit-specialist-profile(peptide-specialist): VIOLATION R13-3: body is 3194 cl100k tokens (>2500)
-audit-specialist-profile(peptide-specialist): info: body-length: 133 lines, 3194 tokens
+audit-specialist-profile(peptide-specialist): VIOLATION R13-3: body is 3205 cl100k tokens (>2500)
+audit-specialist-profile(peptide-specialist): info: body-length: 133 lines, 3205 tokens
 audit-specialist-profile(peptide-specialist): info: voice-register: 0 banned (block), 0 soft 'you <modal>' (budget 3)
 audit-specialist-profile(peptide-specialist): info: refusal-classes: 5 taxonomy class(es) referenced
 audit-specialist-profile(peptide-specialist): info: authority-framing: 4 mention(s)
