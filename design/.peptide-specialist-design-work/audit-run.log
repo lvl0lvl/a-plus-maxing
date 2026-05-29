@@ -1,0 +1,30 @@
+audit-specialist-profile(peptide-specialist): info: identity: 37 words, 0 banned-adjective hits
+audit-specialist-profile(peptide-specialist): info: description-routing: 173 chars, 1 routing cue(s)
+audit-specialist-profile(peptide-specialist): VIOLATION R13-3: body is 3194 cl100k tokens (>2500)
+audit-specialist-profile(peptide-specialist): info: body-length: 133 lines, 3194 tokens
+audit-specialist-profile(peptide-specialist): info: voice-register: 0 banned (block), 0 soft 'you <modal>' (budget 3)
+audit-specialist-profile(peptide-specialist): info: refusal-classes: 5 taxonomy class(es) referenced
+audit-specialist-profile(peptide-specialist): info: authority-framing: 4 mention(s)
+audit-specialist-profile(peptide-specialist): info: grade-halt: certainty=2 strength=1 halt-pair=1
+audit-specialist-profile(peptide-specialist): info: anti-sycophancy: A=1 B=1 C=1
+audit-specialist-profile(peptide-specialist): WARN R13-6: 0 affirmative refusal-trigger phrasing(s) (<4)
+audit-specialist-profile(peptide-specialist): info: refusal-affirmative: neg=0 aff=0
+audit-specialist-profile(peptide-specialist): info: section-count: 11 level-2 headings
+audit-specialist-profile(peptide-specialist): info: schema-drift: no --schema provided — skipped
+audit-specialist-profile(peptide-specialist): info: operator-no-writeback: leaks=0 path-refs=4
+audit-specialist-profile(peptide-specialist): info: mechanical-stubs: all sections covered
+audit-specialist-profile(peptide-specialist): info: section-uniqueness: ok
+audit-specialist-profile(peptide-specialist): info: identical-block: no --compare-to corpus (first specialist) — hash match skipped
+audit-specialist-profile(peptide-specialist): info: differ-jaccard: no --compare-to corpus — skipped
+audit-specialist-profile(peptide-specialist): info: library-index: 11 lines, 5 vault/library refs
+audit-specialist-profile(peptide-specialist): info: negative-examples: 6 markers (denylist absent — content pending S-08 bead)
+audit-specialist-profile(peptide-specialist): info: pf-resolution: 7 distinct PF ids
+audit-specialist-profile(peptide-specialist): info: aplus-mode-floor: 3
+audit-specialist-profile(peptide-specialist): info: mode-floor-correctness: risk-class floor for peptide-specialist = deep
+audit-specialist-profile(peptide-specialist): info: target-class: 3
+audit-specialist-profile(peptide-specialist): VIOLATION R13-13: frontmatter lacks audit_passed: true
+audit-specialist-profile(peptide-specialist): info: audit-passed-frontmatter: checked
+audit-specialist-profile(peptide-specialist): info: h-class-composition: frontmatter path check
+audit-specialist-profile(peptide-specialist): info: modes-shape: present
+audit-specialist-profile(peptide-specialist): 2 violation(s)
+audit-specialist-profile(peptide-specialist): 1 warning(s)
