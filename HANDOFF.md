@@ -12,6 +12,37 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 17 (2026-05-29)
+
+Goal: Set up Pass-3 batch-2 (4 specialists) and hand Walter the launch recipe, then run as integrator through the parallel-build → serialized-merge loop, exactly as the pilots ran.
+
+Acceptance criteria:
+- [ ] AC1 — 4 kickoffs written: `coordination/kickoffs/{supplement-specialist,endocrine-specialist,nutritionist,sleep-coach}.md`, templated from the pilot kickoffs, base `0514f2d`, no-frontmatter convention baked in, medical-liaison-now-live `BLOCK_WITH_OVERRIDE_PATH` escalation contract (not the deprecated operator-self-override fallback).
+- [ ] AC2 — 4 builder outboxes seeded: `coordination/sessions/<slug>.outbox.md` (one per slug, single-writer).
+- [ ] AC3 — `coordination/BOARD.md` rewritten for batch-2: 4 assignment rows, merge order, pinned base `0514f2d`, integrator directives reset.
+- [ ] AC4 — Launch recipe delivered to Walter: 4 worktree setup commands + 4 first-message prompts to paste.
+- [ ] AC5 — Integrator loop (only after builders complete): each PR reviewed against `scripts/audit-specialist-profile.sh` (0-viol), rebase-merged to main in board order, branch+worktree torn down. (Spans builder runtime — may carry to a follow-up session; AC1–AC4 are this session's committed deliverable.)
+- [ ] AC6 — Close: 3 audits exit 0 at `--session 17`; canonical `S17 close (YYYY-MM-DD):` PF attestation; VOLATILE rotation 6-clause; feature branch only (code reaches main only via the per-pilot clean PRs).
+
+Files I WILL touch:
+- `coordination/kickoffs/*.md`, `coordination/sessions/*.outbox.md`, `coordination/BOARD.md` (all gitignored — on-disk scaffolding)
+- `HANDOFF.md` (contract + close + rotation), `.beads/*` via `bd`, `vault/meta/log.md`, `vault/sessions/session-17.md`
+- `memory/process-failures.md` (only if a PF surfaces)
+- Integrator-only at merge time: `main` via clean per-slug PRs (builders author the agent.md files in their worktrees, not me)
+
+Files I will NOT touch:
+- `.claude/agents/*` foundation profiles, the 3 deployed pilot agents on main (read-only)
+- `design/*-design.md` Status:Final bodies (defects → beads)
+- `scripts/audit-specialist-profile.sh` (calibrated at S16 — frozen unless a batch-2 false-BLOCK surfaces, which is a finding to verify first)
+- `CLAUDE.md`, `INVARIANTS.md`, `.claude/hooks/*`, `.claude/skills/*`, `vault/library|compounds|biomarkers|dna/*`
+
+NOT doing: batches 3–4 (remaining 8 incl. dermatologist); Phase-C peptide campaign; INV promotion; frozen-doc bead reconciliations (`1rm`/`p47`/`o9y`/`7is`/`1ek`); Walter pending items (23andMe, Oura, meal-template, Jan-2026).
+
+Invariants at risk:
+- AP-ORCH-SELF-ATTEST (PF-S3-01) — dominant Pass-3 risk: each builder's `/upgrade-agent` + `/review-pr` stack keeps separate+parallel fact-checker/judge + personal source-read of every finding; integrator independently re-verifies builder findings (pilots caught a real gate bug AND a false builder claim this way).
+- AP-WORKTREE-PATH-RESOLUTION (PF-S16-01) — kickoffs instruct absolute worktree paths for sub-dispatches.
+- INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN, INV-HO-ROTATION, INV-HO-NO-STALE-HASH — standard close discipline.
+
 ## Scope Contract — Session 16 (2026-05-29)
 
 Goal: Harden the mechanical gate the 14 Pass-3 specialists will be validated against — build `scripts/audit-specialist-profile.sh` (`3y6`) — and first reconcile the three cross-role contract literals that gate enforces so it keys on canonical, not self-contradictory, definitions.
