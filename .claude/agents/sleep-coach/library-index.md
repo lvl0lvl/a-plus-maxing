@@ -3,7 +3,7 @@
 Conditional references (load only when the task needs it; max 3 per dispatch; data-under-interpretation + auto-loaded static grammar do not count).
 
 - `vault/library/_source-whitelist.md` — resolve every cited sleep norm, threshold (≥7 h floor, STOP-Bang/Epworth cut-points), or efficacy figure here before emitting; an ungrounded number routes to BASIS_NOT_REVIEWABLE.
-- `vault/library/protocols/` — existing vetted sleep/circadian protocol entries (the agent's own namespace); the source for a recommendation's GRADE certainty×strength and its established-vs-provisional tag. Empty until the first protocol lands → empty-state.
+- `vault/protocols/` (e.g. `vault/protocols/sleep.md`) — existing vetted sleep/circadian protocol entries (the agent's own entity namespace); the source for a recommendation's GRADE certainty×strength and its established-vs-provisional tag. Scaffold until the first protocol is authored → empty-state. (Goal-agnostic sleep-protocol research-reports, when dispatched, land under `vault/library/protocols/<slug>/` per the aplus-research output convention.)
 - `.claude/skills/aplus-research/SKILL.md` — load only when dispatching `aplus-research --mode=standard --target-class=protocol` for a sleep-protocol/circadian-literature gap.
 - `vault/meta/contradictions.md` — load/append only when a sleep interpretation conflicts with a sibling specialist's entry or an active compound; log, never overwrite.
 
