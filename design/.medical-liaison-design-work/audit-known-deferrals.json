@@ -1,0 +1,61 @@
+{
+  "artifact": ".claude/agents/medical-liaison/agent.md",
+  "companion": ".claude/agents/medical-liaison/library-index.md",
+  "audit_script": "scripts/audit-specialist-profile.sh",
+  "audit_exit_code": 1,
+  "audit_passed": "with-known-deferrals",
+  "authored_by": "health-implementer (Role 2), dispatched within /upgrade-agent Phase 5",
+  "validated_by": {
+    "fact_checker": "ALL-VERIFIED (10/10 items; library paths resolve, 0 operator-content leaks, all 6 design load-bearing items faithfully encoded, 5 PF ids resolve)",
+    "quality_judge": "PASS — all 10 rubric dimensions >= 9 (Identity 10, Context-Efficiency 10, Behavioral-Specificity 10, Reference-Integration 9, Boundary-Enforcement 10, Communication 10, Failure-Recovery 10, Tool-Awareness 9, Anti-Pattern-Coverage 10, Freshness 10)",
+    "separate_parallel_fresh_agents": true,
+    "note": "/upgrade-agent HARD RULE honored: fact-checker + judge are SEPARATE agents run in PARALLEL; the orchestrator did not self-score."
+  },
+  "orchestrator_counter_signature": "Accepted with-known-deferrals on 2026-05-29. The two BLOCK violations are mis-calibrated-gate deferrals, NOT profile defects; both are routed to the integrator as cross-role beads. The profile passes every other LIVE BLOCK check and both validation gates at 9/10.",
+  "block_violations": [
+    {
+      "check": "R13-12 check_aplus_mode_floor",
+      "status": "ACCEPTED-KNOWN-DEFERRAL (mis-calibrated gate)",
+      "ref": "design/medical-liaison-design.md §18 OQ-1 / §13 PROPOSED-DEFECT; SF-08",
+      "rationale": "check_aplus_mode_floor is unconditional: greps for an aplus-research --mode floor and BLOCKs if absent, never reading templates/specialist-risk-class.yaml. medical-liaison is mode_floor=not_applicable / target_class=none (collation-only); the risk table + Core Rule 5 + R16 require the Tools section to declare NO --mode entry. A correctly-authored collation-only profile fails R13-12 by construction. Adding a spurious --mode would violate R16 and the risk-table exemption.",
+      "resolution_paths": [
+        "(a) Role 2 fixes check_aplus_mode_floor to honor mode_floor: not_applicable (mirror check_mode_floor_correctness's risk-table read) — BC-2, before deploy.",
+        "(b) Explicit user-adjudicated path-extension per CLAUDE.md §8.5. NOT waved through on standing integrator discretion (SF-08)."
+      ]
+    },
+    {
+      "check": "R13-3 check_body_length (token sub-check)",
+      "observed": "4591 cl100k tokens (>2500); 131 lines (<=200, PASS on the line sub-check)",
+      "status": "ACCEPTED-KNOWN-DEFERRAL (mis-calibrated gate; bead 2qq class)",
+      "ref": "deployed health-implementer profile line 15 (bead 2qq); design §0/AR-06 frames R13-3 as the line ceiling",
+      "empirical_calibration": "All 4 deployed sibling medical profiles exceed the 2500-token sub-check (health-specialist-architect 3252, health-implementer 5245, health-edge-case-reviewer 6522, medical-safety-reviewer 8110). medical-liaison at 4591 is the SECOND-LEANEST — below the deployed median — and the LINE count (131) is well under the 200 ceiling. The 2500-token ceiling was authored for the 14 thin downstream specialists (target 150-180 lines); the dense medical role-class legitimately exceeds it, tracked as bead 2qq.",
+      "load_bearing_review": "Role 2 trimmed reducible prose across 3 passes (5486 -> 4591 tokens). The residual is load-bearing: the 10 Core Rules + Binary lines, the 10-field override-record schema, the SBAR handout, the hard-adjudicator boundary, 6 anti-patterns, 3 negative examples — all required by the design doc + audit BLOCK checks (R13-5.6 three-mechanism, R13-7 every-section-Binary, R13-11 >=3 PF). Trimming to 2500 would drop load-bearing content and make medical-liaison anomalously thin vs every sibling. Per the budget-overage discipline: only reducible prose trimmed, justified residual documented, no load-bearing element cut, not blind-trimmed to a number.",
+      "resolution_paths": [
+        "(a) Accept the residual under the bead-2qq disposition (the deployed-profile precedent), via an explicit user-adjudicated path-extension per CLAUDE.md §8.5; recommended — consistent with the 4 deployed siblings.",
+        "(b) Raise/scope the R13-3 token ceiling for the dense medical role-class in scripts/audit-specialist-profile.sh (Role 2) — closes bead 2qq mechanically."
+      ]
+    }
+  ],
+  "non_block_warnings": [
+    "R13-6 (affirmative-refusal phrasing) — WARN, advisory.",
+    "R13-12.5 (mode-floor-correctness) — WARN, expected: floor is not_applicable.",
+    "R13-12.6 (target-class declaration) — WARN, expected: target_class=none, collation-only."
+  ],
+  "passing_block_checks": [
+    "R13-1 identity (27 words, 0 banned adjectives)",
+    "R13-3 line sub-check (131 <= 200)",
+    "R13-4 voice-register (0 banned-modal, 1 soft you-modal <= 3)",
+    "R13-5 refusal-classes (4 taxonomy classes)",
+    "R13-5.1 authority-framing (AUTHORITY_FRAMING_BYPASS present)",
+    "R13-5.5 grade-halt (certainty + strength + strong-with-low HALT)",
+    "R13-5.6 anti-sycophancy (Mechanism A, B, C present)",
+    "R13-6.5 section-count (11)",
+    "R13-6.7 operator-no-writeback (0 leaks, 6 path-refs)",
+    "R13-7 mechanical-stubs (all 11 sections covered)",
+    "R13-7.5 section-uniqueness (ok)",
+    "R13-9.5 library-index (9 lines, 1 vault/library ref — path corrected to vault/library/methodology/evidence-tiers.md; the fabricated vault/library/interactions/ path and the _methodology typo were removed by the orchestrator before validation)",
+    "R13-10 negative-examples (6 BAD/GOOD markers)",
+    "R13-11 pf-resolution (5 distinct PF ids: PF-S2-01, PF-S2-04, PF-S2-05, PF-S3-01, PF-S6-01 — all resolve)",
+    "R13-15 modes-shape (### Mode: present)"
+  ]
+}
