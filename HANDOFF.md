@@ -18,21 +18,29 @@ review_cadence: weekly
 
 Goal: Take over the integrator role, reconcile actual state vs. the crashed prior session, merge batch-3, file the surfaced beads, and close the bookkeeping — gating the library-population phase on `bda`.
 
-Acceptance criteria (evaluated at close):
+Acceptance criteria:
 - [x] AC1 — supplement integration-debt cleaned: OQ-1..5 filed (`5l9`/`78p`/`r7t`/`7rm`/`60f`), fabricated log bead IDs + false merge SHA corrected, dangling supplement branch pruned. **PASS.**
 - [x] AC2 — batch-3 trio INDEPENDENTLY verified (disjoint paths; deploy-gate re-run 0-BLOCK each; frameworks source-disciplined cite-or-refuse w/ 0 hardcoded facts; research provenance — gi full `verify-chain`, pt+lymphatic dispatched judges) then rebase-merged via REST one at a time → **14 agents on main @ `94496b4`**. **PASS.**
 - [x] AC3 — 10 follow-up beads filed/updated (`382` widened; new `5jr`/`9c5`/`pnl`/`2n1`/`4h1`/`smw`; `bda` escalated). **PASS.**
 - [x] AC4 — PF-S17-01 SOFT recurrence (pt+lymphatic approximated `/aplus-research`) logged under PF-S17-01 (count→2); `bda` made the HARD BLOCKER on library-population. **PASS.**
 - [x] AC5 — 3 close audits exit 0 at `--session 18` (handoff / scope-contract / pf-attestation all PASS); VOLATILE rotation done; feature branch only. **PASS.**
 
-Files touched: `vault/meta/log.md`, `memory/process-failures.md`, `.beads/*` (via `bd`), `HANDOFF.md`, `coordination/*` (gitignored scaffold); `main` only via REST merges of PRs #16/#17/#18.
+Files I WILL touch: `vault/meta/log.md`, `memory/process-failures.md`, `.beads/*` (via `bd`), `HANDOFF.md`, `coordination/*` (gitignored scaffold); `main` only via REST merges of PRs #16/#17/#18.
+
+Files I will NOT touch: `.claude/agents/*` builder-authored bodies (read-only at merge), `design/*-design.md` Status:Final bodies (defects → beads), `templates/*`, `scripts/*`, `CLAUDE.md`, `INVARIANTS.md`, `.claude/skills/*`, `vault/library|compounds|biomarkers|dna/*` (the library phase is gated on `bda`, not started this session).
+
+NOT doing: batch-4 (remaining 5 specialists); ANY library-population (hard-gated on `bda`); the OQ-1 `.yaml` reconcile (deferred, tracked `5l9`); `bda` build itself (next session); Walter pending items (23andMe, Oura, meal-template, Jan-2026).
+
+Invariants at risk: AP-ORCH-SELF-ATTEST (PF-S3-01) — integrator independently re-verified each builder finding, did not merge on trust; INV-BRANCH-NOT-MAIN, INV-HO-ROTATION, INV-PF-ATTESTATION, INV-SCOPE-CONTRACT — standard close discipline.
 
 Drift checks (S18 close):
 - **Task drift:** scope expanded from "assess status" → full batch-3 integration. Walter-directed at each step (take over integrator → cleanup → verify-only → merge on go). Documented, not silent.
 - **Architecture drift:** none — 14/15 agents is the planned roster trajectory; no invariant moved toward violation; `bda` gate ADDED as protection before the library phase.
 - **Vision drift:** none — "single-operator health agent system of gated, source-grounded specialists" unchanged.
 
-**PF attestation:** `S18 close (2026-05-30): PF-S17-01 recurred (soft form) — pt + lymphatic ran research "discipline at orchestrator level" instead of invoking the gated /aplus-research skill; logged under PF-S17-01 (recurrence_count→2), bda escalated to a hard blocker on library-population. No other new PF-class entries; the deploy-gate token-WARNs and the IDENTICAL-block divergence were filed as beads (5jr), not promoted to PF.`
+PF attestation:
+
+S18 close (2026-05-30): PF-S17-01 recurred (soft form) — pt + lymphatic ran research "discipline at orchestrator level" instead of invoking the gated /aplus-research skill; logged under PF-S17-01 (recurrence_count→2), bda escalated to a hard blocker on library-population. No other new PF-class entries; the deploy-gate token-WARNs and the IDENTICAL-block divergence were filed as beads (5jr), not promoted to PF.
 
 Invariants at risk: AP-ORCH-SELF-ATTEST (PF-S3-01) — integrator independently re-verified each builder finding, did not merge on trust; INV-BRANCH-NOT-MAIN, INV-HO-ROTATION, INV-PF-ATTESTATION, INV-SCOPE-CONTRACT — standard close discipline.
 
