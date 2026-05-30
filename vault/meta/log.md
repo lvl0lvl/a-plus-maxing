@@ -4,8 +4,8 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-23
-last_reviewed: 2026-05-23
-last_updated: 2026-05-23
+last_reviewed: 2026-05-30
+last_updated: 2026-05-30
 depends_on: []
 superseded_by: null
 review_cadence: session
@@ -107,3 +107,10 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - **PF-S17-01 SOFT RECURRENCE (window tripped, count→2):** only gi invoked the actual `/aplus-research` skill; personal-trainer + lymphatic approximated it ("discipline at orchestrator level") — real dispatched judges but no attestation chain. Accepted on the S17-recalibrated bar + cited merged-precedent. Logged to process-failures.md; **`bda` (mechanical research-provenance guard) is now a HARD BLOCKER on the library-population phase.** [[process-failures]]
 - **10 follow-up beads** filed/updated from the batch: 382 widened (biomarker ownership now spans endocrine-hormone + lymphatic-inflammation slices); new 5jr (IDENTICAL-block divergence), 9c5 (template §11 stale), pnl (redflag-floor --check), 2n1 (lymphatic target-class YAML-vs-WIKI), 4h1 (gi alarm-floor audit), smw (gi invalid-test audit); bda escalated. All P3 except 382/bda.
 - **Remaining 5 specialists:** cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist. **DO NOT start batch-4 or library-population until `bda` ships** (operator-directed gate).
+
+## 2026-05-30 (S19) — bda full audit + hfm grandfather decision; c6k unblocked
+- **bda run across all 10 deployed specialists** (`origin/main` 94496b4, audit-only, temp checkouts). Result: **9 of 9 research-dispatching specialists FAIL; medical-liaison N/A** (collation-only). None pass. Failures classified by substrate beneath the uniform EXIT=1: partial-canonical (gi — ran gate_attest.py, 2 of 5 gates), non-canonical/mimicked (supplement — research-gates/ imitates canonical output, sits on REAL research), dispatched-no-attestation (peptide/endocrine/sleep-coach/personal-trainer/lymphatic — real judges+sections, no chain), bare substrate (labs/nutritionist — domain-research.md only). Results: `/tmp/bda-s19-results.txt`.
+- **hfm DECIDED (Walter approved Option A — grandfather):** all 9 grandfathered; design-work research is build-time scaffolding that shaped frameworks, NOT library content (library pages authored by fresh goal-agnostic /aplus-research at runtime per SKILL.md §1.1 + WIKI.md "never write from memory"). Frameworks are 0-hardcoded-fact cite-or-refuse — they do not carry the research's claims. **Binding control = the library-authoring gate** (bda + INTEGRATION-CHECKLIST 1a): no vault/ page without a passing verify-chain on its OWN fresh research. ADR: [[2026-05-30-grandfather-design-work-research-provenance]]. **hfm CLOSED → epic c6k UNBLOCKED** (both deps bda+hfm satisfied).
+- **supplement carve-out:** quarantine (NOT re-run) the mimicked research-gates/ — folded into bead **0be** (scope expanded; the research beneath is real, only the attestation layer is mimicked). Do before batch-4.
+- **INV-RESEARCH-PROVENANCE-DISJOINT REGISTERED** in INVARIANTS.md via change-discipline ritual (Walter approved): register row + category breakdown + Change Log (S19). Closes the S18 dangling-ref gap where bda+CLAUDE.md referenced an unregistered invariant (bead **08d** filed + CLOSED). The S18 "register +1" attestation now matches the committed file.
+- **Next:** 0be (canonical gates/ convention + supplement quarantine) before batch-4; then batch-4 5 specialists (each clears bda at merge). No library-population work is bd-ready-blocked anymore — but it remains gated by the per-page library-authoring control.

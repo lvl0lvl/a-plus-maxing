@@ -12,6 +12,45 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 19 (2026-05-30)
+
+Goal: Run `bda` (`scripts/audit-research-provenance.sh`) across all 10 deployed specialists, produce the provenance pass/fail table, and frame the `hfm` (backfill-vs-grandfather) decision for Walter with the real gap size. Diagnostic + decision-prep — no merges, no library writes, no agent edits.
+
+Acceptance criteria:
+- [x] AC1 — `bda` run against all 10 specialists' `design-work` from `origin/main`; each EXIT code + reason captured in one table. **PASS.**
+- [x] AC2 — Each FAIL classified by type (missing-canonical-gates / non-canonical-layout / no-attestation-chain / N-A-collation) so per-agent remediation is unambiguous. **PASS** (substrate inventory).
+- [x] AC3 — `hfm` decision brief: backfill vs grandfather, cost/risk each, gap quantified. Decision is Walter's — I produce the brief, not the verdict. **PASS** → Walter chose Option A.
+- [x] AC4 — INVARIANTS dangling-ref finding (INV-RESEARCH-PROVENANCE-DISJOINT referenced by bda+CLAUDE.md but absent from the register) presented with the change-discipline path; bead filed; NOT self-registered without approval. **PASS then CHANGED (authorized)** — registered after Walter's approval.
+- [x] AC5 — Close: 3 audits exit 0 at `--session 19`; PF attestation; VOLATILE rotation; feature branch only. **PASS.**
+
+Files I WILL touch: `HANDOFF.md` (contract+close+rotation), `.beads/*` via `bd`, `vault/meta/log.md`, `vault/sessions/session-19.md`, `memory/process-failures.md` (only if a PF surfaces). Temp dirs for bda (mktemp, cleaned).
+
+Files I will NOT touch: `.claude/agents/*` (read-only), `design/*` design-work bodies, `scripts/*` (bda frozen unless a real false-result surfaces — verify first), `CLAUDE.md`, `INVARIANTS.md` (no self-registration of the invariant without change-discipline approval), `.claude/skills/*`, `vault/library|compounds|biomarkers|dna/*` (library phase hard-gated, not started).
+
+NOT doing: batch-4; any library-population; the `0be` canonical-gates-dir fix; executing any backfill (post-decision); the Current State cruft cleanup at lines 613-615; Walter pending items (23andMe, Oura, meal-template, Jan-2026).
+
+Invariants at risk: AP-PROTOCOL-FROM-MEMORY (this session-open is the falsification window — every step run with real output, contract before work); AP-ORCH-SELF-ATTEST (N/A — bda is the mechanical check, not my judgment); INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-BRANCH-NOT-MAIN, INV-HO-ROTATION, INV-HO-NO-STALE-HASH (standard close).
+
+### S19 Scope Contract Evaluation (volatile)
+
+- **AC1 — PASS.** bda run against all 10 specialists' design-work from origin/main; EXIT + reason captured (`/tmp/bda-s19-results.txt`): 9 FAIL, medical-liaison N/A. Table delivered.
+- **AC2 — PASS.** Each FAIL classified by substrate beneath the failure (partial-canonical / non-canonical-mimicked / dispatched-no-chain / bare / N-A-collation) via a per-agent substrate inventory — sharper than the contract's flatter taxonomy.
+- **AC3 — PASS.** `hfm` brief delivered (3 options, cost/risk each, gap quantified); recommendation given; verdict left to Walter, who chose Option A (grandfather).
+- **AC4 — PASS, then CHANGED (authorized).** Dangling-ref finding presented; bead `08d` filed; NOT self-registered. THEN Walter approved the change-discipline registration → I added the INVARIANTS row + Change Log (S19). This touched `INVARIANTS.md`, listed under "will NOT touch" — but that line carried the explicit carve-out "no self-registration WITHOUT change-discipline approval"; approval was given, so the edit is in-contract, not drift. Documented, not silent.
+- **AC5 — PASS.** 3 audits exit 0 at `--session 19` (see close step 8.5); PF attestation below; VOLATILE rotation done (Top-3 + Current State + What Is Next + landmark line); feature branch only.
+
+### Drift checks (S19 close)
+
+- **Task drift:** none beyond AC4's authorized CHANGED. Scope was diagnostic+decision-prep; it stayed there — the one action with side effects (registering the invariant) was Walter-approved mid-session under the contract's own carve-out. No merges, no dispatch, no library writes, no agent edits — as scoped.
+- **Architecture drift:** none — toward LESS violation. The `hfm` decision makes the library-authoring gate the binding provenance control (tightens, not loosens); the invariant registration closes a dangling-ref gap. No invariant moved toward violation.
+- **Vision drift:** none — "single-operator health-agent system of gated, source-grounded specialists" unchanged; this session reinforced the "gated" property at the library boundary.
+
+### PF attestation
+
+S19 close (2026-05-30): No new PF-class entries this session. Observed but NOT promoted: (a) the S18 "INVARIANTS register +1" attestation did not match the committed file (invariant referenced, never registered) — this is a real close-attestation defect, but it is an *instance* of the already-cataloged AP-ORCH-SELF-ATTEST class (attest-from-memory rather than against-the-artifact), filed + fixed as bead `08d`, not a new class; (b) recurring harness output-jumbling/delay on Bash (probed, all output eventually arrived intact — a tooling flake, not a process failure). The session-open protocol guard (PF-S13-01) HELD: every step run with real output, HANDOFF read in full, the INVARIANTS gap caught precisely BECAUSE I read the register instead of trusting the S18 attestation.
+
+Self-recognition pre-flight: watching for "I already ran 4 of these pre-compaction, I can extrapolate the rest" (run all 10 fresh) and "the INVARIANTS gap is just a missing row, I'll quietly add it" (that IS the change-discipline violation — surface, don't self-register).
+
 ## Scope Contract — Session 18 (2026-05-30)
 
 **Honest framing:** this session opened informally — Walter asked the new session to assess a logged-out integrator, and it became the batch-3 integration session. No scope contract was written at open; this is recorded at close (minor process drift, documented not silent).
@@ -600,53 +639,40 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3)** — open-protocol guard HELD at S16 (every Start-Protocol step run with real output; HANDOFF read in full incl. paging past both truncations; deployed-agents-vs-design-docs set difference computed via `ls`, not memory; scope contract written + confirmed before any work; no railroading widget). Standing session-lifecycle discipline. **S17 session-open is the next falsification window** — execute each step, never operate from memory; if any step is stated-from-memory or work precedes the scope contract, recurrence promotes to 4.
-2. **AP-ORCH-SELF-ATTEST (PF-S3-01)** — DOMINANT forward risk for Pass-3: each of the 14 specialist builds needs the full review stack (separate+parallel fact-checker/judge in `/upgrade-agent`; independent blind triage + blind verification in `/review-pr`; personal source-read of every finding). N/A this session (no dispatch). Sub-pattern watch "pipeline-edit introduces a local inconsistency" — observed again at S16 (my script crash-test + the test-suite first-run each caught defects in my own edits, fixed pre-commit, nothing escaped to a deliverable); **promote to a new PF only if such an edit ESCAPES the verify layer.**
-3. **AP-CROSS-ROLE-CONTRACT-DRIFT** — three literals reconciled at S16 via change discipline (`z8i` override-ack / `7m1` OUTBOUND row 8 scope / `9u6` 8-class — all CLOSED). The specialist deploy-gate `scripts/audit-specialist-profile.sh` is now LIVE-testable to catch this class mechanically at deploy time. Remaining frozen-doc defects: `f2j` (XR-S16-01 NEW — EC-10 detection-path skills_library-vs-project-local), `1rm` (XR-S15-02 `probe_floor` two-name), `p47`/`o9y`/`7is` (Role-3 design-doc self-inconsistencies; deployed agents already correct).
+1. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3)** — open-protocol guard HELD at S19 (every Start-Protocol step run with real output; HANDOFF read in full, 1224 lines, paging past both truncations; INVARIANTS dangling-ref caught by reading the register not trusting the S18 attestation; scope contract written + confirmed before any work). Standing session-lifecycle discipline. **Next session-open is the falsification window** — execute each step, never operate from memory; if any step is stated-from-memory or work precedes the scope contract, recurrence promotes to 4.
+2. **AP-ORCH-SELF-ATTEST (PF-S3-01)** — N/A this session (no research/review dispatch; bda is a mechanical check, not my judgment). Stays a forward risk for batch-4's `/upgrade-agent` + `/review-pr` stacks. **Sub-lesson reinforced at S19:** the S18 "INVARIANTS register +1" attestation did NOT match the committed file (invariant referenced but never registered) — a close-attestation that was self-asserted, not verified against the artifact. The fix is the standing one: attest against the file, never from the memory of having done the work.
+3. **PF-S17-01 read-before-invoke / unverifiable research provenance (recurrence_count=2)** — S19 quantified the gap: 9/9 research-dispatching specialists FAIL bda (none entered the canonical gated path; supplement mimicked it). **Resolved as a posture, not a backlog:** design-work research is grandfathered (build-time scaffolding, not library content); the BINDING control is now the library-authoring gate (bda + INTEGRATION-CHECKLIST 1a) — no `vault/` page ships without a passing verify-chain on its own fresh research. Forward watch: builders re-approximating the gated path at library-authoring time (the gate catches it; `0be` removes the divergence that caused it).
 
-**Demoted from prior Top-3:** AP-DEFERRED-LOOP-CLOSURE (PF-S12-01) — loop CLOSED (Session B debt 0; `ams` closed overtaken-by-events at S16 open). AP-INCOMPLETE-PROPAGATION (design-doc→agent.md compression handled across all 4 roles).
+**Demoted from prior Top-3:** AP-CROSS-ROLE-CONTRACT-DRIFT (S16 reconciliations CLOSED; deploy-gate live; only frozen-doc defects remain as beads). AP-DEFERRED-LOOP-CLOSURE + AP-INCOMPLETE-PROPAGATION (closed at S16).
 
 ## Current State (volatile)
 
-- **14 agents live** (as of 2026-05-30 S18 close; `origin/main` at `94496b4`, feature branch at `2c5b216`): 4 foundation + 10 specialists (medical-liaison, labs, peptide, endocrine, nutritionist, sleep-coach, supplement, personal-trainer, lymphatic, gi). **5 specialists outstanding** (cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist = batch-4, NOT started).
-- **S18 was an integrator-takeover session.** Prior integrator crashed in a thinking-block resume loop. This session: recovered supplement (already merged PR #15), merged batch-3 (PR #16/#17/#18 via REST rebase, independently verified), filed/corrected ~16 beads, built `bda`, closed cleanly. Board is tidy — no stale branches, no leftover worktrees (all pruned).
-- **`bda` BUILT + WIRED (this session's main deliverable).** `scripts/audit-research-provenance.sh` + `scripts/tests/test_audit_research_provenance.sh` (6/6). Asserts mode-required canonical `gates/` chain is PRESENT (closes the verify-chain vacuous-pass hole), rejects non-canonical layouts, then runs `gate_attest.py verify-chain`. Wired into INVARIANTS (`INV-RESEARCH-PROVENANCE-DISJOINT`), CLAUDE.md close 8.5, INTEGRATION-CHECKLIST step 1a. `bda` bead CLOSED.
-- **MECHANICAL FINDING — no merged specialist currently passes `bda`.** Agent reasoning frameworks are sound (cite-or-refuse, never-fabricate, 0 hardcoded facts — verified). But research provenance is below bar for ALL: gi/pt/lymphatic lack the canonical `gates/` chain; supplement is non-canonical (`research-gates/` + faked source paths — NOT produced by `gate_attest.py`; my earlier "gold-standard" call was wrong, overturned by the gate). This is the gate working as designed. Blast radius zero — no agent has authored any `vault/` library content.
-- **Library-population is HARD-GATED.** Epic `c6k` depends on `hfm` (backfill-vs-grandfather decision) which depends on bda being satisfied. No library work can be `bd ready` until resolved.
-- **INVARIANTS register +1** — `INV-RESEARCH-PROVENANCE-DISJOINT` mechanical-verification promoted from TODO to live (`audit-research-provenance.sh`).
-- **Active landmarks unchanged.** No trigger windows opened during S18 (2026-05-30).
+- **14 agents live** (as of 2026-05-30 S19 close; `origin/main` at `94496b4`, feature branch advanced this session): 4 foundation + 10 specialists. **5 outstanding** (cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist = batch-4, NOT started). No agent has authored any `vault/` library content — blast radius zero.
+- **S19 was a diagnostic + decision session** (no merges, no dispatch). Ran `bda` across all 10 specialists, framed the provenance gap, and Walter decided `hfm`.
+- **bda full result: 9/9 research-dispatching specialists FAIL; medical-liaison N/A.** None pass. Substrate beneath the uniform EXIT=1 varies: gi partial-canonical (ran gate_attest.py, 2 of 5 gates), supplement non-canonical/mimicked (real research under a faked attestation layer), peptide/endocrine/sleep-coach/personal-trainer/lymphatic dispatched-no-chain, labs/nutritionist bare. Results `/tmp/bda-s19-results.txt`.
+- **`hfm` DECIDED + CLOSED (Walter: grandfather, Option A).** All 9 grandfathered — design-work research is build-time scaffolding, NOT library content; frameworks are 0-hardcoded-fact cite-or-refuse and don't carry the research's claims. **The library-authoring gate (bda + INTEGRATION-CHECKLIST 1a) is the binding control** — no `vault/` page without a passing verify-chain on its OWN fresh research. ADR `vault/decisions/2026-05-30-grandfather-design-work-research-provenance.md`. **Epic `c6k` UNBLOCKED** (both deps bda+hfm satisfied).
+- **`INV-RESEARCH-PROVENANCE-DISJOINT` now REGISTERED** in INVARIANTS.md (row + category + Change Log, S19) via change-discipline ritual — closes the S18 dangling-ref gap (bead `08d` CLOSED). The S18 "register +1" attestation now matches the committed file.
+- **`0be` scope expanded** to own the supplement quarantine (relabel the mimicked `research-gates/`; do before batch-4).
+- **Active landmarks unchanged.** No trigger windows opened during S19 (2026-05-30).
 
-**Historical (kept for reference):** `vault/meta/log.md` S17 + S18 entries.
+**Historical (kept for reference):** `vault/meta/log.md` S18 + S19 entries.
 
 ## What Is Next (volatile)
 
-### FIRST next-session action — run `bda` across all 10 deployed specialists
+### FIRST next-session action — `0be` (canonical gates convention + supplement quarantine)
 
-**RESUMPTION POINT.** `bda` is built; the decision it forces is open (`hfm`). Concrete first step — no judgment call, it's a script:
+**RESUMPTION POINT.** The provenance question is decided (grandfather; library-authoring gate is the binding control). The next concrete work is `0be`, which must land before batch-4:
+1. Pin `gates/` as the ONE canonical layout in `aplus-research` SKILL.md + the design-doc-protocol (root cause of supplement's `research-gates/` divergence — builders had no pinned convention).
+2. Quarantine/relabel `design/.supplement-specialist-design-work/research-gates/` so no future reader mistakes the mimicked gate JSONs for canonical `gate_attest.py` output. Quarantine, NOT re-run (the research beneath — 5 judges + 6 sections — is real; library pages get fresh research regardless).
 
-```
-for s in medical-liaison labs-specialist peptide-specialist endocrine-specialist \
-         nutritionist sleep-coach supplement-specialist personal-trainer \
-         lymphatic-specialist gi-specialist; do
-  D=$(mktemp -d); git archive origin/main "design/.$s-design-work" 2>/dev/null | tar -x -C "$D" 2>/dev/null
-  if [ -d "$D/design/.$s-design-work" ]; then
-    bash scripts/audit-research-provenance.sh "$D/design/.$s-design-work" "$s"; echo "$s EXIT=$?"
-  else echo "$s: no design-work on main"; fi
-  rm -rf "$D"
-done
-```
-
-Tabulate pass/fail + reason. THEN bring `hfm` (backfill-vs-grandfather) to Walter with the real gap size. Known so far: gi/pt/lymphatic fail (missing canonical gates), supplement fails (non-canonical). Likely most/all research-dispatching specialists need re-attestation.
-
-### Sequenced after the bda audit (all gate the library phase)
-- **`0be`** (P2) — pin the canonical `gates/` dir convention in aplus-research SKILL.md + design-doc-protocol so builders stop diverging (root cause of supplement's `research-gates/`). Do BEFORE batch-4 or any backfill.
-- **`hfm`** (P1) — backfill-vs-grandfather decision; blocks `c6k`. Operator decision.
-- **batch-4** — remaining 5 specialists (cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist). Each must clear bda at merge (INTEGRATION-CHECKLIST 1a now enforces it).
+### Sequenced after `0be`
+- **batch-4** — remaining 5 specialists (cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist). Each clears bda at merge (INTEGRATION-CHECKLIST 1a enforces it). The build is the established parallel-build → serialized-REST-merge integrator loop.
+- **Library-population** is no longer bd-ready-blocked (c6k unblocked), but every `vault/` page remains gated by the per-page library-authoring control: fresh `/aplus-research` with a passing verify-chain before the page ships. This is the binding control from the `hfm` decision — do not let it erode.
 
 ### Open beads carried (not blocking the above)
-- **P2**: `382` (biomarker namespace partition — labs vs endocrine/lymphatic), `5l9`/`78p` (supplement OQ-1/5), `pmp`, `h1z`, `rc1`
+- **P2**: `382` (biomarker namespace partition — labs vs endocrine/lymphatic), `0be` (canonical gates + supplement quarantine), `w3n` (endocrine §13 --check flags), `5bd` (sleep-coach cut-points), `5l9`/`78p` (supplement OQ-1/5), `pmp`, `h1z`, `rc1`
 - **P3**: `r7t`/`7rm`/`60f` (supplement OQ-2/3/4), `5jr` (IDENTICAL-block divergence), `9c5`/`pnl`/`2n1`/`4h1`/`smw` (batch-3 follow-ups), plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`
-- **Closed S18**: `bda` (built+wired)
+- **Closed S19**: `hfm` (grandfather decided), `08d` (invariant registered)
 
 ### Open project work (unchanged)
 - Walter pending: 23andMe raw file → `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health-issue characterization.
@@ -654,7 +680,7 @@ Tabulate pass/fail + reason. THEN bring `hfm` (backfill-vs-grandfather) to Walte
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S18 (2026-05-30).
+All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S19 (2026-05-30).
 
 ## Open Issues
 
