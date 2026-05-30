@@ -1,0 +1,22 @@
+{
+  "phase": "7.5",
+  "compound_risk_tier": "experimental",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "populated"
+  },
+  "third_party_monitoring_marker_present": true,
+  "halt_reasons": [],
+  "verdict": "PASS",
+  "timestamp": "2026-05-30T00:15:36.724382+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-05-30T00:13:57.286886+00:00",
+    "attest_ts": "2026-05-30T00:15:36.724385+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "7d8a8e9cbe3b698c9179c83eceebbe844963b45eb78962b62082ee9bada76765",
+    "agent_source_mtime": "2026-05-30T00:15:20.826512+00:00"
+  }
+}
