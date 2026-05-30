@@ -20,10 +20,11 @@ Goal: Take over the integrator role, reconcile actual state vs. the crashed prio
 
 Acceptance criteria:
 - [x] AC1 — supplement integration-debt cleaned: OQ-1..5 filed (`5l9`/`78p`/`r7t`/`7rm`/`60f`), fabricated log bead IDs + false merge SHA corrected, dangling supplement branch pruned. **PASS.**
-- [x] AC2 — batch-3 trio INDEPENDENTLY verified (disjoint paths; deploy-gate re-run 0-BLOCK each; frameworks source-disciplined cite-or-refuse w/ 0 hardcoded facts; research provenance — gi full `verify-chain`, pt+lymphatic dispatched judges) then rebase-merged via REST one at a time → **14 agents on main @ `94496b4`**. **PASS.**
-- [x] AC3 — 10 follow-up beads filed/updated (`382` widened; new `5jr`/`9c5`/`pnl`/`2n1`/`4h1`/`smw`; `bda` escalated). **PASS.**
-- [x] AC4 — PF-S17-01 SOFT recurrence (pt+lymphatic approximated `/aplus-research`) logged under PF-S17-01 (count→2); `bda` made the HARD BLOCKER on library-population. **PASS.**
-- [x] AC5 — 3 close audits exit 0 at `--session 18` (handoff / scope-contract / pf-attestation all PASS); VOLATILE rotation done; feature branch only. **PASS.**
+- [x] AC2 — batch-3 trio INDEPENDENTLY verified (disjoint paths; deploy-gate re-run 0-BLOCK each; frameworks source-disciplined cite-or-refuse w/ 0 hardcoded facts) then rebase-merged via REST one at a time → **14 agents on main @ `94496b4`**. **PASS — but CHANGED:** my merge-time "research provenance OK" assessment (gi full verify-chain, pt+lymphatic dispatched judges) was later OVERTURNED by bda (AC6): gi lacks the canonical chain, supplement is non-canonical. Merges stand (frameworks sound, zero library writes); provenance is tracked as the `hfm` backfill decision. The drift is documented, not silent.
+- [x] AC3 — follow-up beads filed/updated (`382` widened; new `5jr`/`9c5`/`pnl`/`2n1`/`4h1`/`smw`; later `hfm`/`q4f`). **PASS.**
+- [x] AC4 — PF-S17-01 SOFT recurrence (pt+lymphatic approximated `/aplus-research`) logged under PF-S17-01 (count→2). **PASS.**
+- [x] AC5 — 3 close audits exit 0 at `--session 18`; VOLATILE rotation done (Top-3 + Current State + What Is Next rotated from stale S16-vintage to S18 reality); feature branch only. **PASS.**
+- [x] AC6 — **`bda` BUILT** (was "escalate the bead"; scope expanded at Walter's "build it"). `scripts/audit-research-provenance.sh` + 6/6 tests; wired into INVARIANTS/CLAUDE/INTEGRATION-CHECKLIST; bead closed. Acceptance: all merged research-dispatching agents FAIL (correctly). **PASS.**
 
 Files I WILL touch: `vault/meta/log.md`, `memory/process-failures.md`, `.beads/*` (via `bd`), `HANDOFF.md`, `coordination/*` (gitignored scaffold); `main` only via REST merges of PRs #16/#17/#18.
 
@@ -607,33 +608,45 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Current State (volatile)
 
-- **Specialist deploy-gate mechanized + tested.** `scripts/audit-specialist-profile.sh` (25 Role-2 §13 sub-checks; AQ-002 mention-aware — strips fenced + inline code before banned-modal counting; BLOCK→exit 1 / WARN→info; dependency-gated checks degrade to skip-with-info) + `scripts/tests/test_audit_specialist_profile.sh` (21/21: GOOD + one negative per BLOCK row + AQ-002 mention/control pair). NOT yet wired into CLAUDE.md step 8.5 — it runs against a *deployed* specialist; deferred until the first specialist exists.
-- **Cross-role contract literals reconciled** (`z8i` override-acknowledgment canonical literal; `7m1` OUTBOUND row 8 deploy-gate scope; `9u6` 8-class taxonomy). Frozen Status:Final docs edited under bead authorization only; deployed agents unchanged (already correct).
-- **Foundation pipeline unchanged:** 4/4 deployed (Role 1 S9, Role 2 S13, Role 3 S14, Role 4 S15); Session B debt 0. **S16 gate-hardening landed on `main` via clean code-only PR #5** (rebase; post-close, at user request, to unblock Pass-3 builders): `origin/main` `0da8788` → `c021cc1` as of 2026-05-29, now carrying `scripts/audit-specialist-profile.sh` + tests + the z8i/7m1/9u6 design-doc reconciliations. Bookkeeping (HANDOFF/vault) stays on the feature branch per topology; `.beads/issues.jsonl` rode along via bd's git integration (benign — current issue state, not narrative). **Coordination base re-pinned `0da8788` → `c021cc1`** (BOARD + 3 kickoffs + 3 outboxes). Branch topology unchanged (do NOT PR feature→main for bookkeeping; per-session code branches off `origin/main`; stash HANDOFF before the per-session checkout).
-- **Pass-3 pilot batch COMPLETE — 3 of 15 specialists DEPLOYED** (post-S16, integrator session). `medical-liaison` (Role 7 adjudicator; PR #8) + `labs-specialist` (PR #6) + `peptide-specialist` (PR #9) all rebase-merged to `main`; **7 agents live** (4 foundation + 3 pilots). All 3 pass the corrected gate 0-viol; all no-frontmatter (convention). **Gate recalibrated** (PR #7: R13-12 collation-only exempt + R13-3 token→WARN). **Dispatch-flip DONE** (PR #10; `origin/main` at `0514f2d` as of 2026-05-29): medical-liaison is now the live `BLOCK_WITH_OVERRIDE_PATH` adjudicator; the pre-Role-7 operator-self-override fallback is DEPRECATED (safety-positive; Role 4 BC-1 + Role 1 §13 row 6 carry doc-wide supersession; f2j EC-10 path fixed). **`81.8%` adjudicated CORRECT** (builder's JBDistill-misattribution claim refuted by integrator re-verification of Ekram 9/11; bead `amc` REJECTED). **Roster now 15** — `dermatologist` added to `vault/WIKI.md` Agent Consumers (Walter, 2026-05-29). Pilot worktrees + branches torn down; clean tree. Beads closed this session: ams/z8i/7m1/9u6/amc/hyi(frontmatter)/`398`(C dispatch-flip)/f2j/90r/3y6. PF-S16-01 (worktree-path hazard) + PF-S16-02 (rm-rf near-miss) logged.
-- **Beads:** closed `ams` (overtaken-by-events), `z8i`/`7m1`/`9u6` (reconciled). `3y6` advanced (script + BLOCK-row tests shipped) → OPEN at P2 (residual: per-WARN-row negatives; corpus/denylist/schema-gated checks pending those artifacts; step-8.5 wiring at first-specialist-deploy). New: `f2j` (XR-S16-01, P3).
-- **INVARIANTS register at 12 entries** unchanged; none promoted at S16. Candidates carried (INV-HARM-CLASS-COMPOSITION + INV-DEPLOY-VERDICT-BINARY — promotable; INV-DESIGN-DOC-SYMMETRY; DOCUMENT_RUBRIC Rule 7). INV-SESSION-B-INTERLEAVING MOOT.
-- **Active landmarks unchanged.** No trigger windows open today (2026-05-29).
+- **14 agents live on `origin/main` @ `ea848f6`** (feature branch; `main` itself at `94496b4`): 4 foundation + 10 specialists (medical-liaison, labs, peptide, endocrine, nutritionist, sleep-coach, supplement, personal-trainer, lymphatic, gi). **5 specialists outstanding** (cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist = batch-4, NOT started).
+- **S18 was an integrator-takeover session.** Prior integrator crashed in a thinking-block resume loop. This session: recovered supplement (already merged PR #15), merged batch-3 (PR #16/#17/#18 via REST rebase, independently verified), filed/corrected ~16 beads, built `bda`, closed cleanly. Board is tidy — no stale branches, no leftover worktrees (all pruned).
+- **`bda` BUILT + WIRED (this session's main deliverable).** `scripts/audit-research-provenance.sh` + `scripts/tests/test_audit_research_provenance.sh` (6/6). Asserts mode-required canonical `gates/` chain is PRESENT (closes the verify-chain vacuous-pass hole), rejects non-canonical layouts, then runs `gate_attest.py verify-chain`. Wired into INVARIANTS (`INV-RESEARCH-PROVENANCE-DISJOINT`), CLAUDE.md close 8.5, INTEGRATION-CHECKLIST step 1a. `bda` bead CLOSED.
+- **MECHANICAL FINDING — no merged specialist currently passes `bda`.** Agent reasoning frameworks are sound (cite-or-refuse, never-fabricate, 0 hardcoded facts — verified). But research provenance is below bar for ALL: gi/pt/lymphatic lack the canonical `gates/` chain; supplement is non-canonical (`research-gates/` + faked source paths — NOT produced by `gate_attest.py`; my earlier "gold-standard" call was wrong, overturned by the gate). This is the gate working as designed. Blast radius zero — no agent has authored any `vault/` library content.
+- **Library-population is HARD-GATED.** Epic `c6k` depends on `hfm` (backfill-vs-grandfather decision) which depends on bda being satisfied. No library work can be `bd ready` until resolved.
+- **INVARIANTS register +1** — `INV-RESEARCH-PROVENANCE-DISJOINT` mechanical-verification promoted from TODO to live (`audit-research-provenance.sh`).
+- **Active landmarks unchanged.** No trigger windows opened during S18 (2026-05-30).
 
-**Historical (kept for reference):** `vault/sessions/session-16.md`.
+**Historical (kept for reference):** `vault/meta/log.md` S17 + S18 entries.
 
 ## What Is Next (volatile)
 
-### Pass-3 specialists — pilot done; batch-2 of 4 APPROVED, NOT yet set up
+### FIRST next-session action — run `bda` across all 10 deployed specialists
 
-**RESUMPTION POINT for the next session.** 3 of 15 deployed (pilots). **Batch-2 = 4 specialists, confirmed by Walter: `supplement-specialist`, `endocrine-specialist`, `nutritionist`, `sleep-coach`.** NOT yet set up — the next session must: (1) generate the 4 kickoffs (`coordination/kickoffs/<slug>.md`) + outboxes (`coordination/sessions/<slug>.outbox.md`) + BOARD assignment rows, templated from the pilots, **base `0514f2d`** (the BOARD pinned base as of 2026-05-29), **no-frontmatter convention baked in**, medical-liaison-now-live escalation contract; (2) hand Walter the launch recipe (worktree commands + 4 first-message prompts); (3) run as integrator (parallel build → serialized merge, same as the pilots). **Remaining 8 after batch-2** (batches 3–4): personal-trainer, lymphatic-specialist, gi-specialist, cardiovascular-specialist, recovery-specialist, longevity-strategist, mental-performance-coach, **dermatologist** (new). Process is proven: gate calibrated, convention decided, contracts flipped, PROTOCOL guards added (worktree-path hazard; rm-rf). Alternative forward path: **Phase-C peptide library campaign** (`/aplus-research`).
+**RESUMPTION POINT.** `bda` is built; the decision it forces is open (`hfm`). Concrete first step — no judgment call, it's a script:
 
-### Recommended before / alongside forward work (not blocking)
-- `1ek` (§13-spec reconcile rows 3/12 + R13-13 terminal-states) + `6ln` (audit-run summary / step-8.5 automation) — the `3y6` residual folded here.
-- Frozen-doc reconciliations via change discipline: `1rm` (probe_floor two-name), `p47`/`o9y`/`7is` (Role-3 design-doc self-inconsistencies; deployed agents already correct).
-- Promote candidate INVs via change-discipline ritual (`mdv`: INV-OVERRIDE-RECORD-SCHEMA + INV-CRITICAL-NON-OVERRIDABLE; also INV-HARM-CLASS-COMPOSITION, INV-DEPLOY-VERDICT-BINARY).
-- Labs hardening (`2gs` critical-value-floors.yaml, `623` labs-numerics.py) — not safety prerequisites.
+```
+for s in medical-liaison labs-specialist peptide-specialist endocrine-specialist \
+         nutritionist sleep-coach supplement-specialist personal-trainer \
+         lymphatic-specialist gi-specialist; do
+  D=$(mktemp -d); git archive origin/main "design/.$s-design-work" 2>/dev/null | tar -x -C "$D" 2>/dev/null
+  if [ -d "$D/design/.$s-design-work" ]; then
+    bash scripts/audit-research-provenance.sh "$D/design/.$s-design-work" "$s"; echo "$s EXIT=$?"
+  else echo "$s: no design-work on main"; fi
+  rm -rf "$D"
+done
+```
 
-### Open beads (post-pilot, 2026-05-29)
-- **P1**: `c6k` (epic — July-2026 baseline)
-- **P2**: `pmp` (denylist), `h1z` (AQ-001 operator-profile field enum), `rc1` (hook E2)
-- **P3**: `1ek`, `6ln`, `mdv`, `1rm`, `2gs`, `623`, `f2r`, `yfu`, `2qq`, `p47`, `o9y`, `7is`, `mdg`, `5by`, `1ox`, `9yk`
-- **Closed this session**: `ams` `z8i` `7m1` `9u6` `amc` `hyi` `398`(C) `f2j` `90r` `3y6`
+Tabulate pass/fail + reason. THEN bring `hfm` (backfill-vs-grandfather) to Walter with the real gap size. Known so far: gi/pt/lymphatic fail (missing canonical gates), supplement fails (non-canonical). Likely most/all research-dispatching specialists need re-attestation.
+
+### Sequenced after the bda audit (all gate the library phase)
+- **`q4f`** (P2) — pin the canonical `gates/` dir convention in aplus-research SKILL.md + design-doc-protocol so builders stop diverging (root cause of supplement's `research-gates/`). Do BEFORE batch-4 or any backfill.
+- **`hfm`** (P1) — backfill-vs-grandfather decision; blocks `c6k`. Operator decision.
+- **batch-4** — remaining 5 specialists (cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist). Each must clear bda at merge (INTEGRATION-CHECKLIST 1a now enforces it).
+
+### Open beads carried (not blocking the above)
+- **P2**: `382` (biomarker namespace partition — labs vs endocrine/lymphatic), `5l9`/`78p` (supplement OQ-1/5), `pmp`, `h1z`, `rc1`
+- **P3**: `r7t`/`7rm`/`60f` (supplement OQ-2/3/4), `5jr` (IDENTICAL-block divergence), `9c5`/`pnl`/`2n1`/`4h1`/`smw` (batch-3 follow-ups), plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`
+- **Closed S18**: `bda` (built+wired)
 
 ### Open project work (unchanged)
 - Walter pending: 23andMe raw file → `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health-issue characterization.
@@ -641,7 +654,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S16.
+All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S18 (2026-05-30).
 
 ## Open Issues
 
