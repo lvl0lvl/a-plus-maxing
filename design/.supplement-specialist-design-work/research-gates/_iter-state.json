@@ -1,0 +1,85 @@
+{
+  "3.5": {
+    "phase_iterations": [
+      {
+        "iteration": 1,
+        "iter_start_ts": "2026-05-29T23:14:02.384838+00:00"
+      }
+    ],
+    "sections": {
+      "A": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-05-29T23:25:33.366345+00:00",
+          "section": "A"
+        },
+        {
+          "iteration": 2,
+          "iter_start_ts": "2026-05-29T23:33:24.594306+00:00",
+          "section": "A"
+        },
+        {
+          "iteration": 3,
+          "iter_start_ts": "2026-05-29T23:39:03.642758+00:00",
+          "section": "A"
+        }
+      ],
+      "B": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-05-29T23:25:33.437681+00:00",
+          "section": "B"
+        }
+      ],
+      "C": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-05-29T23:25:33.509427+00:00",
+          "section": "C"
+        }
+      ],
+      "D": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-05-29T23:25:33.580413+00:00",
+          "section": "D"
+        },
+        {
+          "iteration": 2,
+          "iter_start_ts": "2026-05-29T23:33:24.659236+00:00",
+          "section": "D"
+        }
+      ]
+    }
+  },
+  "4.25": [
+    {
+      "iteration": 1,
+      "iter_start_ts": "2026-05-29T23:48:03.610553+00:00"
+    }
+  ],
+  "4.75": [
+    {
+      "iteration": 1,
+      "iter_start_ts": "2026-05-29T23:51:13.786784+00:00"
+    }
+  ],
+  "6": [
+    {
+      "iteration": 1,
+      "iter_start_ts": "2026-05-30T00:07:42.324173+00:00"
+    }
+  ],
+  "7.5": [
+    {
+      "iteration": 1,
+      "iter_start_ts": "2026-05-30T00:13:57.286886+00:00"
+    }
+  ],
+  "8.5": [
+    {
+      "iteration": 1,
+      "iter_start_ts": "2026-05-30T00:15:53.580271+00:00"
+    }
+  ]
+}
