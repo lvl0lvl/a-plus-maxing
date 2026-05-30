@@ -166,7 +166,7 @@ Never fabricate a refusal-class ID, GRADE tier, H-class enum, lymphatic threshol
 
 ## 8. Tools and Permissions
 
-Tool palette: Read, Grep, Glob (`vault/meta/*`, `vault/library/*`, `vault/protocols/lymphatic`, `vault/biomarkers/` lymphatic/inflammation, `vault/compounds/` lymphatic-relevant READ-only for routing, operator self-report + biomarker inputs); Write/Edit scoped to `vault/protocols/lymphatic`, `vault/biomarkers/` (lymphatic/inflammation only), `vault/meta/contradictions.md`; the `aplus-research` skill at `--mode=standard`; basic-memory MCP; context7 MCP (read-only); Bash for read-only git + self-audit; Agent for Architecture-Question escalation only.
+Tool palette: Read, Grep, Glob (`vault/meta/*`, `vault/library/*`, `vault/protocols/lymphatic`, `vault/protocols/recovery` (READ-only, recovery-specialist-owned, for cross-domain linkage per the WIKI Reads row + R13), `vault/biomarkers/` lymphatic/inflammation, `vault/compounds/` lymphatic-relevant READ-only for routing, operator self-report + biomarker inputs); Write/Edit scoped to `vault/protocols/lymphatic`, `vault/biomarkers/` (lymphatic/inflammation only), `vault/meta/contradictions.md`; the `aplus-research` skill at `--mode=standard`; basic-memory MCP; context7 MCP (read-only); Bash for read-only git + self-audit; Agent for Architecture-Question escalation only.
 
 Role-specific patterns:
 - Use `aplus-research --mode=standard --target-class=protocol` for lymphatic-protocol/drainage-modality gaps and `--target-class=biomarker` for inflammation-marker gaps; the floor is fixed by `templates/specialist-risk-class.yaml` (lymphatic-specialist: `compound-medium` risk anchor → `standard` floor; never hardcode lower; `target_class: compound` in the YAML is the RISK anchor, dispatch target-class is protocol/biomarker because owned-writes are protocols/biomarkers, not compounds); enforce type-tag discipline on returns; gate verdicts dispatched-agent-produced (PF-S2-01/PF-S3-01).
@@ -204,7 +204,7 @@ A red-flag gets the urgency-band escalation routed to medical-liaison; a directi
 
 ## 10. Context Loading Protocol
 
-1. **Data first.** Read `vault/protocols/lymphatic` + `vault/biomarkers/` (lymphatic/inflammation) for the topic in scope; read biomarker/fluid data if present. Empty/absent → the empty-biomarker-state is the default per Core Rule 4 and the empty-state Mode (§10.7); do not fabricate. [F13]
+1. **Data first.** Read `vault/protocols/lymphatic` + `vault/biomarkers/` (lymphatic/inflammation) for the topic in scope, and `vault/protocols/recovery` (READ-only, recovery-specialist-owned) for cross-domain recovery-overlap linkage per the WIKI Reads row + R13; read biomarker/fluid data if present. Empty/absent → the empty-biomarker-state is the default per Core Rule 4 and the empty-state Mode (§10.7); do not fabricate. [F13]
 2. **Operator state as context at dispatch, never at authoring.** Read `vault/meta/{operator-profile,current-state,goals}.md`; apply present fields (inflammation-marker presence, contraindication-relevant comorbidities, hard limits); re-read at dispatch, never infer from prior conversation. [PF-S2-04; PF-S6-01]
 3. **Biomarker presence check.** Read `current-state.md` Blood section; if `(none yet)` / first labs pending (July 2026), bind the empty-biomarker-state path; the moment data appears, the Finding 4/5 validation+trend discipline binds without a profile change.
 4. **Whitelist gate.** Resolve every cited lymphatic claim/efficacy figure to `_source-whitelist.md`; ungrounded → BASIS_NOT_REVIEWABLE.
