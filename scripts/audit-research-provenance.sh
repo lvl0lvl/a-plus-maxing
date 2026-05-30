@@ -114,10 +114,21 @@ fi
 
 info "required attested gates: $required"
 
+# --- canonical layout check (PF-S18: builders diverged on the gates dir name) ---
+# gate_attest.py is the ONLY sanctioned gate producer; it reads/writes `gates/`
+# (hardcoded in SOURCE_MD + verify_chain). A design-work dir using any other
+# layout (e.g. supplement-specialist's `research-gates/`) was NOT produced by the
+# canonical tool — that is itself the unverifiable-provenance failure bda exists
+# to catch. Report it accurately rather than as a misleading "missing gate".
+if [ ! -d "$WORKDIR/gates" ] && [ -d "$WORKDIR/research-gates" ]; then
+    violation "INV-RESEARCH-PROVENANCE-DISJOINT" \
+        "non-canonical gates layout: found research-gates/ but no gates/ — gate JSONs were not produced by the canonical gate_attest.py (which reads/writes gates/). verify-chain cannot validate this layout; re-run Phase-0 through /aplus-research so gate_attest.py emits the canonical gates/ chain."
+fi
+
 # --- 2.75 SCOPE gate: present in every mode (schema-only, not attestation-chained) ---
 if [ ! -f "$WORKDIR/gates/gate-2.75.json" ]; then
     violation "INV-RESEARCH-PROVENANCE-DISJOINT" \
-        "missing gate-2.75.json (SCOPE gate — fires in every mode; a run with no scope gate did not enter the gated path)"
+        "missing gates/gate-2.75.json (SCOPE gate — fires in every mode; a run with no scope gate in the canonical gates/ dir did not enter the gated path)"
 fi
 
 # --- PRESENCE + attestation_chain shape for each required attested gate ---

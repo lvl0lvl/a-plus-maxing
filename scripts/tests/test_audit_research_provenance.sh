@@ -77,6 +77,19 @@ echo 'EDITED AFTER ATTEST' >> "$wd/gates/gate-4.75.md"
 run "$wd" personal-trainer
 [ "$RC" -eq 1 ] && ok "post-attest source edit caught by verify-chain (sha mismatch)" || bad "tamper expected rc1, got $RC"
 
+# --- Case 5: NON-CANONICAL layout (research-gates/ not gates/) → FAIL with accurate msg ---
+# Mirrors supplement-specialist's real divergence: gates exist but not where the
+# canonical gate_attest.py reads them. Must FAIL, and must say "non-canonical",
+# not "missing".
+wd="$TMP/case5/design/.gi-specialist-design-work"; mkdir -p "$wd/research-gates"
+for g in 2.75 3.5 4.25 4.75 7.5 8.5; do echo '{"verdict":"PASS","attestation_chain":{}}' > "$wd/research-gates/gate-$g.json"; done
+out="$(bash "$AUDIT" "$wd" gi-specialist 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$out" | grep -q "non-canonical"; then
+    ok "non-canonical research-gates/ layout FAILs with accurate diagnostic"
+else
+    bad "non-canonical layout: expected rc1 + 'non-canonical' msg, got rc=$RC"
+fi
+
 echo
 echo "test_audit_research_provenance: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
