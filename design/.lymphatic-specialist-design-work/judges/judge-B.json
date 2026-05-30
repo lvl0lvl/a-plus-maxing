@@ -1,0 +1,19 @@
+{
+  "section": "B",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 93,
+    "citation_fidelity": 94,
+    "type_tag_discipline": 90,
+    "population_annotation": 95,
+    "route_fidelity": 96,
+    "concentration_audit_handling": 94,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 96
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": []
+}
