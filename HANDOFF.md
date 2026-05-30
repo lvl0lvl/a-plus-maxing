@@ -608,7 +608,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Current State (volatile)
 
-- **14 agents live on `origin/main` @ `ea848f6`** (feature branch; `main` itself at `94496b4`): 4 foundation + 10 specialists (medical-liaison, labs, peptide, endocrine, nutritionist, sleep-coach, supplement, personal-trainer, lymphatic, gi). **5 specialists outstanding** (cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist = batch-4, NOT started).
+- **14 agents live** (as of 2026-05-30 S18 close; `origin/main` at `94496b4`, feature branch at `2c5b216`): 4 foundation + 10 specialists (medical-liaison, labs, peptide, endocrine, nutritionist, sleep-coach, supplement, personal-trainer, lymphatic, gi). **5 specialists outstanding** (cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist = batch-4, NOT started).
 - **S18 was an integrator-takeover session.** Prior integrator crashed in a thinking-block resume loop. This session: recovered supplement (already merged PR #15), merged batch-3 (PR #16/#17/#18 via REST rebase, independently verified), filed/corrected ~16 beads, built `bda`, closed cleanly. Board is tidy — no stale branches, no leftover worktrees (all pruned).
 - **`bda` BUILT + WIRED (this session's main deliverable).** `scripts/audit-research-provenance.sh` + `scripts/tests/test_audit_research_provenance.sh` (6/6). Asserts mode-required canonical `gates/` chain is PRESENT (closes the verify-chain vacuous-pass hole), rejects non-canonical layouts, then runs `gate_attest.py verify-chain`. Wired into INVARIANTS (`INV-RESEARCH-PROVENANCE-DISJOINT`), CLAUDE.md close 8.5, INTEGRATION-CHECKLIST step 1a. `bda` bead CLOSED.
 - **MECHANICAL FINDING — no merged specialist currently passes `bda`.** Agent reasoning frameworks are sound (cite-or-refuse, never-fabricate, 0 hardcoded facts — verified). But research provenance is below bar for ALL: gi/pt/lymphatic lack the canonical `gates/` chain; supplement is non-canonical (`research-gates/` + faked source paths — NOT produced by `gate_attest.py`; my earlier "gold-standard" call was wrong, overturned by the gate). This is the gate working as designed. Blast radius zero — no agent has authored any `vault/` library content.
@@ -639,7 +639,7 @@ done
 Tabulate pass/fail + reason. THEN bring `hfm` (backfill-vs-grandfather) to Walter with the real gap size. Known so far: gi/pt/lymphatic fail (missing canonical gates), supplement fails (non-canonical). Likely most/all research-dispatching specialists need re-attestation.
 
 ### Sequenced after the bda audit (all gate the library phase)
-- **`q4f`** (P2) — pin the canonical `gates/` dir convention in aplus-research SKILL.md + design-doc-protocol so builders stop diverging (root cause of supplement's `research-gates/`). Do BEFORE batch-4 or any backfill.
+- **`0be`** (P2) — pin the canonical `gates/` dir convention in aplus-research SKILL.md + design-doc-protocol so builders stop diverging (root cause of supplement's `research-gates/`). Do BEFORE batch-4 or any backfill.
 - **`hfm`** (P1) — backfill-vs-grandfather decision; blocks `c6k`. Operator decision.
 - **batch-4** — remaining 5 specialists (cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist). Each must clear bda at merge (INTEGRATION-CHECKLIST 1a now enforces it).
 
