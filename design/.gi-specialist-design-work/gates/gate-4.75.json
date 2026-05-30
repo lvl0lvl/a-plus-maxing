@@ -1,0 +1,87 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "timestamp": "2026-05-30T10:43:14Z",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 145,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 3,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 8,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS",
+      "findings": [
+        "Tag-discordance WARN (identifiers agree, no numeric-integrity breach): DTC analytical benchtest PMC12946161 tagged in_vitro in section-A [28] vs mechanism_review in section-C [7]; DTC-regulation analysis PMC12728816 tagged regulatory in section-A [29] vs mechanism_review in section-C [8]. All cross-section identifiers (PMCID/DOI/PMID) agree: Massier PMC8355880, Power PMC8027468, Servetas PMC12946161, USPSTF age-45 consistent."
+      ]
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "SKIP-mode"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 8,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 38,
+    "largest_cluster_name": "SBI sponsor-linked cluster (Wilson 2013 + pediatric d-IBS)",
+    "largest_cluster_count": 2,
+    "share": 0.053,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "SKIP-mode",
+    "claims_checked": 0,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-1: compound meta_analysis/rct tags in two section-B summary roll-up bundles ([2,3,4,5] and [17,18]) \u2014 language-economy only; underlying numeric claims single-tagged at first statement.",
+    "IC-10: tag-discordance on two shared DTC sources (section-A in_vitro/regulatory vs section-C mechanism_review) \u2014 identifiers agree, neither tag grounds a population-mismatch-required numeric; flagged for downstream tag-harmonization."
+  ],
+  "attestation_chain": {
+    "iter_start_ts": "2026-05-30T10:38:06.395321+00:00",
+    "attest_ts": "2026-05-30T10:45:39.165658+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "b1e0a6c2d4c6821b443a9fa17cd344a84578da1e08500fb8d1e169c4413ae23c",
+    "agent_source_mtime": "2026-05-30T10:44:33.255220+00:00"
+  }
+}
