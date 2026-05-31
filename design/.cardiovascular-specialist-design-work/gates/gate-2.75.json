@@ -1,0 +1,18 @@
+{
+  "phase": "2.75",
+  "verdict": "PASS",
+  "timestamp": "2026-05-31T11:38:28Z",
+  "context_files": [
+    {"path": "vault/meta/operator-profile.md", "sha256": "886bd2945dc940a56668c80f80638c0c51bc06b4278b9a9953ff60e431b6fa91", "loaded": true},
+    {"path": "vault/meta/current-state.md", "sha256": "7347b10ac793aacd980bcc8984c62dc2ab91f42cfd125bff8562c9f5ca7ed870", "loaded": true},
+    {"path": "vault/meta/goals.md", "sha256": "19df4d79b341923bbdff005f44841f12a7cc14b3630265ecf6f9cf0979bf4801", "loaded": true},
+    {"path": "vault/library/_source-whitelist.md", "sha256": "380b1858397e9dadccdcab7747afc2a1119719ef6fae65d72a704052b45b6efb", "loaded": true}
+  ],
+  "target": {"class": "other", "slug": "cardiovascular-specialist", "type": "reference"},
+  "output_paths": {
+    "research_report": "design/.cardiovascular-specialist-design-work/domain-research.md"
+  },
+  "update_mode": false,
+  "archive_paths": [],
+  "halt_reasons": []
+}

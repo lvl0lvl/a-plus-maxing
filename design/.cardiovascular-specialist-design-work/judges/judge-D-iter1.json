@@ -1,0 +1,35 @@
+{
+  "section": "D",
+  "brief_hash": "cardiovascular-section-D-iter1",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 82,
+    "type_tag_discipline": 98,
+    "population_annotation": null,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 95
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "medium",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "D.1 stroke paragraph + Bibliography ref 4: \"Aroor S, et al. / systematic review & meta-analysis comparing FAST and BE-FAST in acute stroke patients. 2022. Front Neurol. (PMC8837419)\" grounding the [4, meta_analysis] BE-FAST-captures-additional-strokes claim.",
+      "issue": "First-author misattribution (PF-S2-02). Web-verified against the cited PMC8837419: the article at that exact PMC ID is Chen X, Zhao X, Xu F, et al. \"A Systematic Review and Meta-Analysis Comparing FAST and BEFAST in Acute Stroke Patients,\" Front Neurol 2022 — first author is Xinjie Chen, NOT \"Aroor S.\" Aroor S is the first author of a different FAST/BE-FAST paper (Aroor 2017, Stroke). The journal, year (2022), PMC ID, and the comparative-diagnostic-value claim are all correct, so the source is real and correctly located — but the displayed first author is wrong on a load-bearing comparative claim, which is the misattributed-cite class the rubric calls out.",
+      "recommended_fix": "Change ref 4 first author from \"Aroor S, et al.\" to \"Chen X, et al.\" (Chen X, Zhao X, Xu F, et al. A Systematic Review and Meta-Analysis Comparing FAST and BEFAST in Acute Stroke Patients. Front Neurol. 2022; PMC8837419). Confirm whether the Aroor 2017 Stroke paper is also intended as a separate anchor; if so, add it as its own numbered ref rather than mislabeling ref 4."
+    },
+    {
+      "severity": "low",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "D.3 Apple Heart Study paragraph: irregular-tachogram PPV \"0.71 (95% CI 0.69–0.74) [5, cohort].\"",
+      "issue": "Confidence-level label inaccuracy. Web-verified against NEJM/Perez 2019 secondary restatements: the irregular-tachogram PPV of 0.71 is reported with a 97.5% CI (0.69–0.74), not a 95% CI. The point estimate and interval bounds (0.69–0.74) are correct; only the stated confidence level is wrong. The companion irregular-pulse PPV 0.84 (95% CI 0.76–0.92) is correctly labeled.",
+      "recommended_fix": "Change \"0.71 (95% CI 0.69–0.74)\" to \"0.71 (97.5% CI 0.69–0.74)\" to match the NEJM-reported confidence level."
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "section": "A",
+  "brief_hash": "cardiovascular-section-A-iter1",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 78,
+    "citation_fidelity": 70,
+    "type_tag_discipline": 90,
+    "population_annotation": 98,
+    "route_fidelity": 100,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 96
+  },
+  "total": 90,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "critical",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Section 1, lines 7 and 9 — ref [1] Banegas JR et al. 2018, NEJM 378:1509-1520, PMID 29669232. Grounds: 24h ambulatory SBP all-cause mortality HR 1.58 (1.56-1.60) + clinic SBP null HR 1.02 (1.00-1.04); masked-HTN HR 2.83 (2.12-3.79), sustained-HTN HR 1.80 (1.41-2.31), white-coat HR 1.79 (1.38-2.32).",
+      "issue": "This paper was RETRACTED by NEJM in 2020 (Retraction PMID 31995856; NEJM 10.1056/NEJMc2001445) because inaccuracies were identified in the analytic database and data analyses. The first author, year, journal, and PMID all match what the section cites, so this is not a misattribution — it is worse: the source itself has been withdrawn from the literature for data inaccuracy. Section A leans on it for THREE load-bearing numeric clusters that open the entire section (the BP measurement-validity payload). Per the rubric's evidence_quality and citation_fidelity dimensions, a numeric cannot rest on a retracted primary. The qualitative point (masked > sustained > white-coat, and white-coat not benign) survives because it is independently replicated, but the exact HRs (1.58, 1.02, 2.83, 1.80, 1.79) cannot be carried from this dataset.",
+      "recommended_fix": "Remove all numeric HRs sourced solely to ref [1]. Re-source the ambulatory-vs-clinic-BP prognostic superiority and the masked/white-coat HRs to a non-retracted primary (e.g., the IDACO consortium, the Banegas-replacement literature, the 2019 ESC/ESH or AHA scientific-statement underlying cohorts, or Cohen 2019 [3] for white-coat which is already cited and verified). Keep the qualitative payload but attach every retained number to a live source. Add a note that the original Banegas 2018 registry analysis is retracted."
+    },
+    {
+      "severity": "major",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Section 3, line 29 — '~10.8% [predicted] vs. ~6.0% observed events (a ~79.8% relative over-estimate)' attributed to ref [13] DeFilippis AP et al. 2017, Eur Heart J (PMID 27436865).",
+      "issue": "The cited DeFilippis 2017 paper does not report a 10.8%-vs-6.0% (~79.8%) headline figure. Its reported overestimation is expressed per race/sex subgroup (ranging ~67% in Hispanic men / ~72% in White women up to ~252-314% in Chinese participants). The specific 10.8/6.0/79.8 numbers do not match the source. The section author explicitly flags in self-check (e) that this figure 'was associated with a PREVENT-vs-PCE comparison' and is 'not independently fetch-verified' — yet the unhedged numeric still appears as a factual statement in the body prose. A body numeric attributed to a source that does not contain it is a PF-S2-02 misattribution, even though the load-bearing PCE-overestimation claim (~20%, ref [12] MESA) is separately verified and corroborates the direction.",
+      "recommended_fix": "Either (a) delete the 10.8%/6.0%/79.8% figure from the body and rely on the verified ref [12] ~20% MESA overestimation as the load-bearing PCE-miscalibration number, or (b) correct the [13] body sentence to the actual per-subgroup overestimation range DeFilippis 2017 reports (e.g., 67-314% across race/sex strata) and carry the in-body hedge that matches the self-check. Do not leave an unverified mismatched numeric stated as fact in the prose."
+    },
+    {
+      "severity": "minor",
+      "dimension": "type_tag_discipline",
+      "claim_or_location": "Section 2, line 25 — inline cite '[11, cohort/MR]' for the Copenhagen remnant-cholesterol MR (Varbo/Nordestgaard 2013).",
+      "issue": "The rubric's type_tag_discipline dimension requires exactly one tag from the _source-whitelist.md enum (rct|meta_analysis|cohort|open_label|animal|in_vitro|mechanism_review|regulatory|compounding_data_sheet|vendor_label|practitioner_protocol|anecdote_aggregate). 'cohort/MR' is a compound annotation; 'MR' is not an enum value. The bibliography entry [11] handles this correctly by tagging it [cohort] with a parenthetical '(Mendelian-randomization causal analysis)', so the inline cite is inconsistent with both the enum and its own bibliography entry.",
+      "recommended_fix": "Change the inline cite to '[11, cohort]'. Convey the MR/causal nature in the surrounding prose (which it already does) rather than splicing 'MR' into the tag slot. This also restores inline<->bibliography tag symmetry for ref [11]."
+    }
+  ]
+}

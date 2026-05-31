@@ -1,0 +1,20 @@
+{
+  "section": "D",
+  "brief_hash": "cardiovascular-section-D-iter2",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 97,
+    "type_tag_discipline": 98,
+    "population_annotation": null,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 93,
+    "completeness_vs_brief": 96
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": []
+}
