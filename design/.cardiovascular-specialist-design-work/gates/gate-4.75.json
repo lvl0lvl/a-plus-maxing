@@ -1,0 +1,86 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 110,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 7,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS",
+      "findings": [
+        "SPRINT: A[5] vs B[12] first-author/year/journal/volume/pages AGREE (PMID 26551272 = DOI NEJMoa1511939); HR 0.75 agrees",
+        "CTT-2010: A[6] vs B[1] CTT/Baigent 2010 Lancet 376:1670-1681 PMID 21067804 AGREE; RR 0.78 agrees",
+        "SCORE2/PCE and JUPITER/CANTOS/Framingham overlaps A-D are narrative cross-references, not duplicate numbered citations; no discordance"
+      ]
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "SKIP-mode"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 1,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 53,
+    "largest_cluster_name": "CTT Collaboration (Baigent/Mihaylova)",
+    "largest_cluster_count": 2,
+    "share": 0.038,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "SKIP-mode",
+    "claims_checked": 0,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [],
+  "timestamp": "2026-05-31T12:16:12.533834+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-05-31T12:10:43.739162+00:00",
+    "attest_ts": "2026-05-31T12:16:12.533836+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "08c1e6c3df47bcc6c94df7697c91a2e78733a9849ff177ab98ab774bb09e9714",
+    "agent_source_mtime": "2026-05-31T12:15:28.305693+00:00"
+  }
+}

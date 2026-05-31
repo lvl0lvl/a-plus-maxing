@@ -1,0 +1,42 @@
+{
+  "section": "C",
+  "brief_hash": "cardiovascular-section-C-iter1",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 83,
+    "type_tag_discipline": 100,
+    "population_annotation": 93,
+    "route_fidelity": 100,
+    "concentration_audit_handling": 98,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 98,
+    "completeness_vs_brief": 97
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "major",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Bibliography entry [15] (line 73) and §4 insulin-sensitivity bullet (line 44) — cited as 'Sparks LM, et al. (2023). Effect of Exercise Training on Insulin-Stimulated Glucose Disposal... International Journal of Obesity 47:348-357. PMID 36828899 / PMC10148910. doi:10.1038/s41366-023-01283-8'. Grounds the load-bearing SMD 0.52 (95% CI 0.39-0.65) insulin-sensitivity effect size.",
+      "issue": "First-author misattribution. PMID 36828899 / PMC10148910 / DOI 10.1038/s41366-023-01283-8 is a real, correct primary, and every numeric the section draws from it verifies exactly against the abstract (25 RCTs / 36 interventions / 851 participants; hyperinsulinemic-euglycemic clamp; SMD 0.52, 95% CI 0.39-0.65, P<.001). But the first author is Rebello CJ, not Sparks LM. Web-verified via PubMed 36828899 and Nature s41366-023-01283-8 (Rebello CJ et al., Int J Obes (Lond) 2023). The rubric's citation_fidelity dimension requires that 'first-author/year/PMID/DOI is correct'; the auto-fail list names 'wrong first author' as a misattributed-primary class. This is not a fabricated cite (the source exists, PMID/DOI/year/journal/numbers are all correct) and the numeric is independently sound, but the first-author element is wrong and must be corrected before wiki ingestion. The section's own self-check (line 79) repeats the misattribution by labeling the verified figure as belonging to this entry without catching the author error.",
+      "recommended_fix": "Replace 'Sparks LM, et al.' with 'Rebello CJ, et al.' in bibliography entry [15]. Keep the year (2023), journal, volume/pages, PMID, PMC, DOI, and the SMD 0.52 (0.39-0.65) numeric unchanged — all of those verify correctly. No body numeric changes. Re-run the self-check first-author line to reflect the corrected attribution."
+    },
+    {
+      "severity": "minor",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "§4 line 38 — Arem 2015 [11] '...no excess mortality appeared even at ≥10× the minimum (HR 0.68, 95% CI 0.59-0.78)'.",
+      "issue": "The JAMA Internal Medicine source (PMID 25844730 / PMC4451435) reports the ≥10x hazard ratio as 0.69 (95% CI 0.59-0.78); the section states 0.68 with an identical CI. The CI is exact and the load-bearing claim (no excess mortality / no harm ceiling at very high volume) is fully supported, so this is a 0.01 point-estimate transcription/rounding discrepancy on a non-load-bearing point value, not a directional or magnitude error.",
+      "recommended_fix": "Change the ≥10x point estimate from 0.68 to 0.69 to match the source exactly. The CI (0.59-0.78) and the surrounding 'no harm ceiling' framing are already correct and need no change."
+    },
+    {
+      "severity": "minor",
+      "dimension": "population_annotation",
+      "claim_or_location": "§2 line 20 and bibliography [3] (line 61) — Holloszy 1967 rat mitochondrial-enzyme finding ('roughly doubled mitochondrial respiratory-enzyme activity'), tagged [3, animal] with inline [population-mismatch: rat] and bibliography note '(rat)'.",
+      "issue": "The animal cite correctly carries species ([population-mismatch: rat]) inline and the mechanism is explicitly sealed off from outcomes, satisfying the core population-annotation rule. The rubric's health-research mandatory dimension specifies 'every animal cite carries species + n' — the species is annotated but the animal n is not stated in-sentence or in the bibliography entry. This is a documentation-completeness gap on the single animal numeric, not a misuse of the animal evidence (no outcome claim is built on it).",
+      "recommended_fix": "Add the rat sample size (n) at the point of use for Holloszy 1967 [3], or state n in the bibliography entry, to satisfy the 'species + n' animal-annotation requirement. If the exact n is not recoverable from the abstract, note 'n not specified in abstract' rather than omitting it silently."
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "section": "C",
+  "brief_hash": "cardiovascular-section-C-iter2",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 90,
+    "type_tag_discipline": 100,
+    "population_annotation": 98,
+    "route_fidelity": 100,
+    "concentration_audit_handling": 98,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 98,
+    "completeness_vs_brief": 97
+  },
+  "total": 97,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "minor",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Section C, section 4, line 38 -- Arem 2015 [11] '...no excess mortality appeared even at >=10x the minimum (HR 0.69, 95% CI 0.59-0.78)'. The iter-2 remediation changed this point estimate from 0.68 to 0.69 (post-fix audit table row 2, line 100), citing iter-1 judge finding #2 and claiming '0.69 matches Arem 2015 source value'.",
+      "issue": "Regression introduced by the iter-2 remediation. Independently web-verified against the primary source PMID 25844730 / PMC4451435 (three confirmations: two PMC fetches plus a search hit citing the ASCO Post coverage of '32% lower mortality' = HR 0.68): the Arem 2015 >=10x-minimum (75+ MET-h/wk) hazard ratio is 0.68 (95% CI 0.59-0.78), NOT 0.69. The iter-1 judge finding #2 ('Arem >=10x HR rounding 0.68->0.69') was itself incorrect about the source value, and the author complied, replacing a previously-correct 0.68 with an incorrect 0.69. The CI (0.59-0.78) and the load-bearing 'no harm ceiling at very high volume' framing remain fully supported; this is a 0.01 point-estimate error on a non-load-bearing value, but it is now a genuine source-mismatch where iter-1 was correct. Note the coincidental collision the author flagged on line 117: the recommended-minimum (1x, 7.5-<15 MET-h/wk) HR genuinely IS 0.69 (95% CI 0.67-0.70) per the source and is correct -- only the >=10x value is wrong.",
+      "recommended_fix": "Revert the >=10x point estimate from 0.69 back to 0.68 (95% CI 0.59-0.78) to match the Arem 2015 source. Leave the 1x recommended-minimum HR at 0.69 (0.67-0.70) -- that one is source-correct. Update the post-fix audit table (line 100) to record that iter-1 finding #2 was based on an erroneous source value and is reverted, so the audit trail does not re-encode the wrong value."
+    }
+  ]
+}
