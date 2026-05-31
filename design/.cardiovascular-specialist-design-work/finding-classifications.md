@@ -18,7 +18,7 @@ Orchestrator-PERSONAL classification of every Phase-3 red-team finding per the *
 
 ## Verdict tally
 - **LEGITIMATE (incorporated as-stated):** 1 — CV-SF-05 (bromism-class clause).
-- **LEGITIMATE-MODIFIED (incorporated with modification):** 7 — CV-COV-001, CV-COV-002, CV-COV-003, CV-COV-005, CV-SF-01, CV-SF-02, CV-SF-04, CV-SF-06. (Note: CV-COV-002/CV-SF-01/CV-SF-02/CV-SF-04 share the PROPOSED-audit-deferral root → 2 beads-to-create; no structural design change beyond framing.)
+- **LEGITIMATE-MODIFIED (incorporated with modification):** 8 — CV-COV-001, CV-COV-002, CV-COV-003, CV-COV-005, CV-SF-01, CV-SF-02, CV-SF-04, CV-SF-06. (Note: CV-COV-002/CV-SF-01/CV-SF-02/CV-SF-04 share the PROPOSED-audit-deferral root → 2 beads-to-create; no structural design change beyond framing.)
 - **REJECTED (attested):** 1 — CV-SF-03 (Role 3 report exists; parallel-dispatch timing artifact).
 - **NOT-A-DEFECT (clean verdict):** 1 — CV-COV-004 (no-compounds-write consistency confirmed).
 
