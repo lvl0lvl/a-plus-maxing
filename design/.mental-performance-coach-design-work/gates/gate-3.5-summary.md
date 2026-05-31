@@ -1,0 +1,13 @@
+# Phase 3.5 — JUDGE GATE outcome (mental-performance-coach, mode=standard, threshold 92/100)
+
+**Verdict: PASS** (all 3 sections PASS at the standard threshold 92, `findings: []` each).
+
+The authoritative artifact is the **gate_attest-produced `gates/gate-3.5.json`** (attestation_chain referencing the three per-section judge JSONs by sha256; `verify-chain` intact). The per-section dispatched-judge verdict JSONs in `judges/` are the verdict record; iteration-stamped copies are preserved at `judges/judge-{A,B,C}-iter1.json`. Unlike the gi-specialist precedent (which committed a summary-md but no attested `gate-3.5.json` because its judges were dispatched before any `start-iteration`), this build called `start-iteration --phase 3.5` BEFORE dispatching the paired judges, so the judge JSONs are fresh relative to `iter_start_ts` and a real attested `gate-3.5.json` was composable — satisfying the hardened bda (INTEGRATION-CHECKLIST step 1a: mode-required attested gates PRESENT with attestation_chain).
+
+| Section | Final verdict | Total | Iterations | Defects caught + fixed (PF-S2-02 / PF-S3-01 working as designed) |
+|---|---|---|---|---|
+| A — Cognition + stress physiology + established levers | PASS | 96 | 2 | iter-1 (95): MINOR — [16] Beerendonk/Mejías 2024 PNAS issue `121(6)`→`121(5)` (PMID 38277436); iter-2 fresh judge PASS, 6 cites re-verified incl. the `[population-mismatch: rat]` BDNF cite. |
+| B — Nootropic / cognitive-enhancer landscape | PASS | 96 | 2 | iter-1 (92): CRITICAL — [20] prescription-stimulant review wrong PMID `22574274`→`23139911` (Lakhan & Kirchgessner, DOI 10.1002/brb3.78); MINOR — [2] byline `James JE`→`James JE, Rogers PJ`; iter-2 fresh judge PASS, 7 cites re-verified. |
+| C — Mental-health safety boundary + consumer-product validity + non-English survey | PASS | 97 | 2 | iter-1 (94): CRITICAL — [8] Wastler 2023 (mandatory SI safety primary, PMID 36504400) phantom 2nd author "Lucht L" removed; MAJOR — [22] Neznamov Russian-original-vs-English-translation PMID/record reconciled; MINOR — [23] Ostrovskaya full byline restored; iter-2 fresh judge PASS, 9 cites re-verified incl. PHQ-9/GAD-7/C-SSRS/988/FTC/Moran. SI-band safety contract scored 100/100 both iterations. |
+
+Every fix round used a FRESH dispatched judge (independent re-score), and each remediation carried the mandatory POST-FIX GREP DISCIPLINE block (`## Post-fix grep audit` preserved in each section file). The judge gate caught 4 real citation-fidelity defects (1 CRITICAL in B, 1 CRITICAL + 1 MAJOR in C, plus minors) across the corpus and iterated to clean convergence with independent verifiers — not orchestrator self-attestation (PF-S2-01 / PF-S2-02 / PF-S3-01 discipline).

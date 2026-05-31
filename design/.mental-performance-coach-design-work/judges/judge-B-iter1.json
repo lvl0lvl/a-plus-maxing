@@ -1,0 +1,35 @@
+{
+  "section": "B",
+  "brief_hash": "section-B-iter1",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 60,
+    "type_tag_discipline": 95,
+    "population_annotation": 97,
+    "route_fidelity": 98,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": 95,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 96
+  },
+  "total": 92,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Bibliography ref [20] (PMID: 22574274), grounding finding 13/14 — the load-bearing prescription-stimulant risk-floor / PRESCRIPTIVE_DIRECTIVE boundary claims (Schedule II status, dependence/cardiovascular liabilities, ~1.9% nonmedical prevalence).",
+      "issue": "PMID 22574274 is MISATTRIBUTED. That PMID resolves to Pang Y et al. (2012), 'Neuron-oligodendrocyte myelination co-culture derived from embryonic rat spinal cord and cerebral cortex,' Brain Behav — an unrelated in-vitro rat methods paper. It is NOT Lakhan SE & Kirchgessner A's 'Prescription stimulants in individuals with and without ADHD: misuse, cognitive impact, and adverse effects.' The cited DOI (10.1002/brb3.78), journal (Brain and Behavior), year (2012), and byline are all correct and resolve to the intended paper; only the PMID is wrong. Per rubric, a wrong PMID on the load-bearing risk-floor citation is a CRITICAL/HALT-level citation-fidelity defect even though the underlying claim is sound and the fix is mechanical.",
+      "recommended_fix": "Correct the PMID for ref [20] from 22574274 to 23139911 (verified correct PMID for Lakhan SE & Kirchgessner A, Brain Behav 2012;2(5):661-77, DOI 10.1002/brb3.78). No change to the finding-13/14 claims is required."
+    },
+    {
+      "severity": "MINOR",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Bibliography ref [2] (PMID: 16001109), grounding caffeine finding 2 (withdrawal-reversal).",
+      "issue": "Byline is incomplete: the section cites 'James JE.' as sole author, but PubMed lists two authors — Jack E James and Peter J Rogers. The PMID, DOI, title, journal, year, and the quoted 'almost wholly attributable to reversal of adverse withdrawal effects' conclusion all verify correctly; only the byline is truncated.",
+      "recommended_fix": "Update the byline for ref [2] to 'James JE, Rogers PJ.' to match the source record."
+    }
+  ]
+}
