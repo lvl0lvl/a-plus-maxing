@@ -420,6 +420,14 @@ Surviving state under `${BASE}` (where `BASE=/tmp/aplus-research/<target_slug>/`
 
 Procedure: read `${BASE}/gates/` for highest gate with `verdict: PASS` → resume at next phase.
 
+## Canonical provenance directory layout
+
+The research-artifact subdirectories are named **exactly** `gates/`, `judges/`, `sections/` — bare, no prefix — both under the working `${BASE}` (`/tmp/aplus-research/<slug>/`) and when copied into `design/.<slug>-design-work/` for merge provenance (per the design-doc-protocol Phase-0 detail in `design/DESIGN_DOC_TEMPLATE.md`). This is the ONE canonical layout; builders MUST NOT diverge. This section is the single source of truth — other docs reference it rather than restating it.
+
+- `gates/` is the directory `lib/gate_attest.py` reads and writes, and the directory `scripts/audit-research-provenance.sh` (bda) audits for the mode-required attested gates.
+- A **prefixed variant** (e.g. `research-gates/`, `research-judges/`, `research-sections/`) is NON-CANONICAL. `gate_attest.py verify-chain` reads bare `gates/`/`judges/`/`sections/`; under a prefixed layout it finds no `gates/` and vacuously passes (checks nothing), while bda rejects the layout outright (INV-RESEARCH-PROVENANCE-DISJOINT). Even genuine `gate_attest.py` artifacts, if committed under prefixed names, are unverifiable in place — the chain only validates after the dirs are renamed canonical.
+- Documented non-canonical instance: `supplement-specialist` (PR #14) committed all three artifact dirs under `research-`-prefixed names. The gate chain is genuine `gate_attest.py` output (it validates under `verify-chain` once the dirs are renamed canonical), but the prefix defeats in-place verification and bda correctly rejects it. Grandfathered as build-time scaffolding per the S19 hfm decision; quarantined under bead `0be`. Do NOT replicate it as a build template.
+
 ## Reference Files
 
 | File | Purpose | Loaded at |

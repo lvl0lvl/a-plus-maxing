@@ -12,6 +12,39 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 20 (2026-05-30)
+
+Goal: Land bead `0be` — pin `gates/` (with `judges/`, `sections/`) as the ONE canonical research-provenance dir layout in the aplus-research SKILL.md + the design-doc-protocol (DESIGN_DOC_TEMPLATE.md), and quarantine the supplement-specialist's non-canonical mimicked `research-gates/` on main so no future reader/builder mistakes it for gate_attest.py output. Must land before batch-4. No re-run of supplement research; no batch-4; no library writes.
+
+Acceptance criteria:
+- [ ] AC1 — Part 1 (pin, feature branch): SKILL.md + DESIGN_DOC_TEMPLATE.md state the canonical committed-provenance layout (bare `gates/` `judges/` `sections/`, no prefix; `gates/` is what gate_attest.py + bda read); prefixed variants are non-canonical. `rg` confirms one canonical statement, referenced not restated across the two docs.
+- [ ] AC2 — Part 2 (quarantine, clean branch off origin/main → PR → rebase-merge): a `_QUARANTINE-NONCANONICAL.md` marker added inside supplement's `research-gates/` stating the JSONs were NOT produced by gate_attest.py (no attestation chain / non-canonical layout), are grandfathered build-time scaffolding, and that any `vault/` page needs fresh gated research. Underlying real research (research-sections/, research-judges/, domain-research.md) untouched.
+- [ ] AC3 — bda re-run on supplement post-quarantine still EXIT≠0 (quarantine does not fake a pass) AND the marker is present.
+- [ ] AC4 — `0be` closed with reason; no scope creep into gate_attest.py / schemas / batch-4.
+- [ ] AC5 — `/review-pr` run on the combined clean PR (read in full first; findings blind-triaged) before merge. Close: 3 audits exit 0 at --session 20; PF attestation; VOLATILE rotation; all commits on non-main branches only.
+
+Files I WILL touch:
+- Feature branch: `.claude/skills/aplus-research/SKILL.md`, `design/DESIGN_DOC_TEMPLATE.md` (and `design/INTEGRATION_NOTES.md`/`CONTINUATION_BRIEF.md` ONLY if they describe the layout — verify first), `HANDOFF.md`, `.beads/*` via bd, `vault/meta/log.md`, `vault/sessions/session-20.md`, `memory/process-failures.md` (only if a PF surfaces).
+- Clean branch off origin/main (Part 2): add the quarantine marker file under `design/.supplement-specialist-design-work/research-gates/`.
+
+Files I will NOT touch:
+- supplement's real research (research-sections/, research-judges/, domain-research.md, drafts, red-team, review) — quarantine the attestation layer only, never the research beneath
+- `lib/gate_attest.py`, `schemas/*` (canonical already; do not teach tooling to accept divergence)
+- `scripts/audit-research-provenance.sh` (bda frozen — verify any "false result" before touching)
+- `.claude/agents/*`, other specialists' design-work, `INVARIANTS.md`, `CLAUDE.md`, `vault/library|compounds|biomarkers|dna/*`
+- `main` directly (Part 2 via clean PR + rebase-merge only)
+
+NOT doing: batch-4; any library-population; re-running supplement research; the gate_attest.py `--gates-dir` idea from the bead (rejected — weakens canonical control); other carried beads (382, w3n, 5bd, 5l9, 78p, ...); Walter pending items (23andMe, Oura, meal-template, Jan-2026).
+
+Invariants at risk:
+- AP-ACT-BEFORE-VERIFY (PF-S6-01/S16-02) — Part 2 touches a shared design-work path on main; `git ls-files` it before any write; ADD a marker, never delete/rename the research beneath.
+- INV-BRANCH-NOT-MAIN — Part 2 is main-touching; clean branch off origin/main → PR, never direct.
+- AP-PROTOCOL-FROM-MEMORY (PF-S13-01) — read DESIGN_DOC_TEMPLATE.md + the supplement artifacts + `/review-pr` in full before editing/invoking; confirm layout-describing siblings rather than assuming.
+- INV-RESEARCH-PROVENANCE-DISJOINT — 0be removes the divergence bda flags; strengthens, not loosens.
+- INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH — standard close.
+
+Self-recognition pre-flight: watching for "the marker is just a tiny file, I can edit main directly / skip the PR" (that IS the INV-BRANCH-NOT-MAIN violation) and "the quarantine is mechanical so I can skip git ls-files first" (the AP-ACT-BEFORE-VERIFY framing — verify tracked contents before touching the shared path).
+
 ## Scope Contract — Session 19 (2026-05-30)
 
 Goal: Run `bda` (`scripts/audit-research-provenance.sh`) across all 10 deployed specialists, produce the provenance pass/fail table, and frame the `hfm` (backfill-vs-grandfather) decision for Walter with the real gap size. Diagnostic + decision-prep — no merges, no library writes, no agent edits.
