@@ -1,0 +1,100 @@
+{
+  "phase": "4.75",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 53,
+      "count_flagged": 0,
+      "findings": [
+        "WARN-grade nuance (not HALT): Section B line 49 bare-tag [practitioner_protocol] (no number) grounds a non-numeric, non-efficacy deload-convention claim; formatting blemish only; flagged for synthesis normalization."
+      ]
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0,
+      "findings": [
+        "No animal/in_vitro primaries across the 4 sections; population-mismatch tags not required (human-only corpus)."
+      ]
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS",
+      "findings": [
+        "Single-group concentration surfaced first-class: Leal-Junior cluster (photobiomodulation, Section C) and Laukkanen single-cohort (sauna, Sections C/D) both named in-body, not buried."
+      ]
+    },
+    "IC-10": {
+      "status": "PASS",
+      "findings": [
+        "Meeusen 2013 ECSS/ACSM OTS consensus shared B[1]/D[5] \u2014 PMID 23247672 + DOI + vol/pages + tag all CONCORDANT. Plews 2012(A[8]) vs Plews 2013(D[9]) and Laukkanen 2015(C[6]) vs Laukkanen 2018(D[8]) are distinct works (distinct PMID/DOI/year), not collisions. No live Bellenger cross-section collision (A re-attributed to Fennell 2023)."
+      ]
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS",
+      "findings": [
+        "Cureus (Hachem, Tier-3) former D[10] dropped before audit; claims re-grounded on whitelisted [7]/[8]. All surviving hosts Tier-1/2; MDPI/Frontiers open-access single-source flags applied in-text."
+      ]
+    },
+    "IC-13": {
+      "status": "SKIP-mode"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 0,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 31,
+    "largest_cluster_name": "Buchheit/Laursen (Auckland/AIS HRV group): Plews 2012 + Al Haddad 2011",
+    "largest_cluster_count": 2,
+    "share": 0.065,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "SKIP-mode",
+    "claims_checked": 0,
+    "claims_failed": []
+  },
+  "warnings": [
+    "IC-1: Section B line 49 bare-tag inline [practitioner_protocol] (no citation number) for the deload-convention claim \u2014 normalize to numbered cite or explicit convention/no-primary annotation in synthesis. Non-blocking (grounds no numeric, no efficacy).",
+    "IC-6: Section A [10] Cao 2022 frequency-domain r-values (r=0.42 LF, r=0.36 LF/HF; rMSSD r=0.962) are full-text stratum figures; abstract corroborates direction but not exact values. Non-blocking; recommend full-text confirmation note if these specific values become load-bearing downstream.",
+    "Open-access single-source flags (MDPI Sensors A[12]/[14]/[15], Frontiers B[5]/C[5]/C[10]/C[13]) correctly applied in-text; advisory, not a defect."
+  ],
+  "verdict": "PASS",
+  "timestamp": "2026-05-31T12:27:30.208040+00:00",
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-05-31T12:21:22.145335+00:00",
+    "attest_ts": "2026-05-31T12:27:30.208043+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "b192c0a7c80bf2d5a0cbede1bed870c2982ddc72485146081e7c4635b9db6fd3",
+    "agent_source_mtime": "2026-05-31T12:26:07.596509+00:00"
+  }
+}

@@ -1,0 +1,12 @@
+{"role":"retrieve","section":"A","iteration":1,"brief_hash":"ff790481f44c66d810ae1979df3b8f3edc2ff7151d15534b6e8eb33fb6d3a14d","timestamp":"2026-05-31T12:05:00Z"}
+{"role":"judge","section":"A","iteration":1,"brief_hash":"71947026435320b7f76df7fdcd5bb49ec6defc9b2f2efca549f7bfd5ef3a198c","judges_retrieve_section":"A","timestamp":"2026-05-31T12:15:00Z","verdict":"HALT","total":92}
+{"role":"retrieve","section":"B","iteration":1,"brief_hash":"beebc3390a79ec4316a801a9caf32688b70724ab7cb912e28a727e85dab7a755","timestamp":"2026-05-31T12:05:00Z"}
+{"role":"judge","section":"B","iteration":1,"brief_hash":"05a0851eb8ab81ec897ef89f264ba52875c19b175d1499e6fa8d2632c7f1f2f0","judges_retrieve_section":"B","timestamp":"2026-05-31T12:15:00Z","verdict":"PASS","total":96}
+{"role":"retrieve","section":"C","iteration":1,"brief_hash":"6acfea8788f6a9f31e49b551dc38705e887e346d385f0027811a397263622cea","timestamp":"2026-05-31T12:05:00Z"}
+{"role":"judge","section":"C","iteration":1,"brief_hash":"fb74a99cce8c91528e9057748bff88ea1bc64da0dc224d09d15d8b8f3ee1ee8d","judges_retrieve_section":"C","timestamp":"2026-05-31T12:15:00Z","verdict":"PASS","total":96}
+{"role":"retrieve","section":"D","iteration":1,"brief_hash":"8c519f4476179b1b52b4cec7fea0861a8355a96f0f0d9ddcc18c2181308727e1","timestamp":"2026-05-31T12:05:00Z"}
+{"role":"judge","section":"D","iteration":1,"brief_hash":"6865e218a2d88bfc9d31b9f66c0f9f449799faad3e68f4a338898df5f8fb96fd","judges_retrieve_section":"D","timestamp":"2026-05-31T12:15:00Z","verdict":"HALT","total":92}
+{"role":"retrieve","section":"A","iteration":2,"brief_hash":"7da1e3973cffb2d6ecb0ad4942d284dc796fc52202dbb8d8db8c00f7b5f41510","timestamp":"2026-05-31T12:25:00Z","note":"remediation: [11] re-attribution Fennell2023, [16] VO2max SMD 0.20, [2] year 2021"}
+{"role":"judge","section":"A","iteration":2,"brief_hash":"1f9071a2d30a8b8b64bca0e1143d62ab1651fc5ee1e30f5552fa72cf0e1cc422","judges_retrieve_section":"A","timestamp":"2026-05-31T12:35:00Z","verdict":"PASS","total":96}
+{"role":"retrieve","section":"D","iteration":2,"brief_hash":"0c8159f1775639f13f65b8c05b77d6c2ed824012d3d1bc5c45807f89ce5d7ef0","timestamp":"2026-05-31T12:25:00Z","note":"remediation: bare-tag->numbered [N,tag], dropped [10] Cureus orphan, retag reviews"}
+{"role":"judge","section":"D","iteration":2,"brief_hash":"f6acd011f5154d679d6bb129eeba0b786745a466f55a65f72013b37b4cb888f6","judges_retrieve_section":"D","timestamp":"2026-05-31T12:35:00Z","verdict":"PASS","total":95}

@@ -1,0 +1,42 @@
+{
+  "section": "A",
+  "brief_hash": "recovery-specialist-section-A-judge-standard",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 70,
+    "type_tag_discipline": 96,
+    "population_annotation": 100,
+    "route_fidelity": 95,
+    "concentration_audit_handling": 92,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 95
+  },
+  "total": 92,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "major",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "[11] bibliography entry + line 31 / Key Claim 3: 'between-day reliability of lnRMSSD ... ICCs reported from 0.37 to 0.93 with between-day CV from ~3.5% to 36.5% [11, cohort]'",
+      "issue": "Wrong attribution. [11] is cited as 'Bellenger CR, et al. ... 2024. Scientific Reports. DOI: 10.1038/s41598-024-58217-1. PMC11055755'. Verified: PMC11055755 is actually Fennell CRJ et al., 'Inter-day reliability of heart rate complexity and variability metrics in healthy highly active younger and older adults', European Journal of Applied Physiology, 2023 — not Bellenger, not Scientific Reports, not 2024. The cited DOI (10.1038/...58217-1) is a Scientific Reports article distinct from PMC11055755, so the identifier bundle is internally inconsistent. The claimed numbers (ICC 0.37-0.93, CV ~3.5-36.5%) do NOT match what PMC11055755 reports (lnRMSSD ICC 0.57-0.79, between-day CV 4.42-5.09%). The load-bearing reliability range grounding 'CV can exceed 30%' is not traceable to the cited source.",
+      "recommended_fix": "Identify the actual source of the ICC 0.37-0.93 / CV 3.5-36.5% range and cite it correctly with matching author/year/journal/PMID/DOI, OR replace with PMC11055755 (Fennell 2023, EJAP) and restate the numbers to that paper's actual values (ICC 0.57-0.79, CV 4.42-5.09%) — but note those do not support 'CV can exceed 30%', so Key Claim 3 must be re-grounded or softened."
+    },
+    {
+      "severity": "major",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Line 53 / Key Claim 9: 'VO2max SMD 0.13 (CI -0.12 to 0.39, p=0.30) [16, meta_analysis]'",
+      "issue": "Numeric mis-transcription of a published effect size. Verified against Manresa-Rocamora 2021 (PMID 34639599, IJERPH): the VO2max effect is SMD 0.20 (95% CI -0.07 to 0.47), not SMD 0.13 (CI -0.12 to 0.39). The endurance-performance figure the section gives (SMD 0.20, CI -0.09 to 0.48) is correct, and the vagal-HRV SMD 0.50 (CI 0.09-0.91) is correct, but the VO2max value is wrong. Conclusion (non-significant, modest) is unaffected, but the stated number/CI/p do not match the source.",
+      "recommended_fix": "Correct the VO2max figure to SMD 0.20 (95% CI -0.07 to 0.47) per the published meta-analysis, and confirm the associated p-value against the paper."
+    },
+    {
+      "severity": "minor",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "[2] bibliography entry: 'de Zambotti ... 2020. Sleep.'",
+      "issue": "Year mismatch: PubMed lists this article (PMID 32663278) as 2021 (epub 2020 ahead of print). Author, title, journal, PMID, DOI, and n=26 all verified correct.",
+      "recommended_fix": "Change the citation year to 2021 to match the PubMed record (or note 'epub 2020, print 2021')."
+    }
+  ]
+}
