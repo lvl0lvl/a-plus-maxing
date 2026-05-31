@@ -1,0 +1,49 @@
+{
+  "section": "D",
+  "brief_hash": "recovery-specialist-section-D-judge-standard",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 93,
+    "citation_fidelity": 84,
+    "type_tag_discipline": 86,
+    "population_annotation": 100,
+    "route_fidelity": 95,
+    "concentration_audit_handling": 90,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 95
+  },
+  "total": 92,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "major",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Entire body (lines 15-195): every inline citation is bare-tag form, e.g. '[regulatory]', '[mechanism_review]', '[cohort]'. Zero numbered '[N]' or combined '[N, tag]' citations appear anywhere in the body.",
+      "issue": "Claims are not traceable to a specific source at the point of use. Source-to-claim linkage exists ONLY via the prose Self-check (a) map (line 221-226), not at the claim site. A reader at any safety claim (e.g. 'resting HR >100 bpm always warrants medical evaluation [mechanism_review]') cannot determine which of the three mechanism_review sources ([1], [6], [10]) grounds it. For a safety-backbone section this defeats the auditability that citation_fidelity exists to guarantee.",
+      "recommended_fix": "Convert every inline tag to the combined '[N, tag]' form (e.g. '[6, mechanism_review]') so each load-bearing claim names its specific source at the claim site, matching the rubric's '[N, tag]' contract."
+    },
+    {
+      "severity": "major",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Self-check (a), lines 226-227: 'All 10 are cited inline; no inline tag lacks a bibliography entry.' vs source [10] Hachem (Cureus).",
+      "issue": "False symmetry claim. [10] Hachem is NOT cited inline anywhere in the body (verified: '[10]' occurs only in the bibliography and self-check, never in lines 15-195). The self-check asserts all 10 are cited inline; this is empirically wrong and the symmetry attestation cannot be trusted. [10] is an orphan bibliography entry grounding no claim.",
+      "recommended_fix": "Either anchor [10] to a specific body claim with '[10, mechanism_review]' or remove it from the bibliography (the sauna hemodynamics/contraindication claims are already covered by [8] Laukkanen). Correct the self-check (a) symmetry statement to reflect actual inline usage."
+    },
+    {
+      "severity": "minor",
+      "dimension": "evidence_quality",
+      "claim_or_location": "[10] Hachem GR, et al. 2025. Cureus narrative review. PMID 41426898, DOI 10.7759/cureus.98162.",
+      "issue": "Cureus is not on the Tier-1/2 admissible host whitelist. Verified to be a real 2025 Cureus narrative review on sauna in ischemic heart disease. Because it grounds no standalone body claim (see finding above), it does not corrupt any safety numeric, so severity is minor rather than critical. But its presence inflates the source count to 10 when one is a non-whitelisted host that is load-bearing for nothing.",
+      "recommended_fix": "Drop [10] or replace with a whitelisted host source if a distinct hemodynamics claim genuinely needs grounding beyond [8]."
+    },
+    {
+      "severity": "minor",
+      "dimension": "type_tag_discipline",
+      "claim_or_location": "[2] Bryde tagged 'regulatory'; [4] Dvorakova, [8] Laukkanen, [9] Plews tagged 'cohort'.",
+      "issue": "Tag-to-design imprecision. [2] is a clinical review article in Cardiology Clinics, tagged 'regulatory' (defensible as it relays guideline-derived return-to-play guidance, but it is not itself a consensus/guideline document). [4], [8], [9] are review articles synthesizing observational data, tagged 'cohort' rather than 'mechanism_review' (or a review tag); they are not single primary cohorts. No vendor/anecdote grounds any numeric, so this is not an auto-fail, but the tags do not crisply match study design.",
+      "recommended_fix": "Re-tag review articles to the tag that matches their actual design (mechanism_review / review), reserving 'cohort' for primary cohort studies and 'regulatory' for consensus/guideline bodies ([3], [5])."
+    }
+  ]
+}
