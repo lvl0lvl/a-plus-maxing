@@ -1,0 +1,28 @@
+{
+  "section": "C",
+  "brief_hash": "b3e8da43aa5cf46fd1cb5fec68fb4a0fb2192ca0056dbdc50c2e6e17ce46dc43",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 84,
+    "type_tag_discipline": 95,
+    "population_annotation": 94,
+    "route_fidelity": null,
+    "concentration_audit_handling": 93,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 96
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "medium",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "C.2.2 / C.6 — Dinnes Cochrane 2018 [2]: section reports relative DOR (in-person dermoscopy vs visual inspection) = 4.8 (95% CI 3.1-7.4); image-vs-in-person relative DOR = 4.5 (95% CI 2.3-8.5, P<0.0001); in-person datasets = 27 (23,487 lesions; 1,737 melanomas).",
+      "issue": "Verified against the PMC6517096 source record: actual in-person-vs-visual-inspection relative DOR = 4.7 (95% CI 3.0-7.5); actual image-vs-in-person relative DOR = 4.6 (95% CI 2.4-9.0, P<0.001); actual in-person studies = 26 datasets (23,169 lesions; 1,664 melanomas). Three numeric values (the two relative DORs with CIs, and the in-person dataset/lesion/melanoma counts) do not match the source the section claims to have confirmed (header line 5). The 16% sensitivity gain (92% vs 76% at 80% specificity) and the image-based counts (60 datasets, 13,475 lesions, 2,851 melanomas) DO match. The directional claim (image-based assessment empirically inferior to in-person; dermoscopy superior to naked eye) is fully supported, so harm is low, but the rubric requires cited figures to appear verbatim in the source.",
+      "recommended_fix": "Correct the four Dinnes figures to the source values: in-person-vs-visual RDOR 4.7 (95% CI 3.0-7.5); image-vs-in-person RDOR 4.6 (95% CI 2.4-9.0, P<0.001); in-person = 26 datasets, 23,169 lesions, 1,664 melanomas. Update both C.2.2 and the C.6 GRADE table row that cites the 4.5 relative DOR."
+    }
+  ]
+}

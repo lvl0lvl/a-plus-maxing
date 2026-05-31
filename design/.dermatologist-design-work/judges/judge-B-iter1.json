@@ -1,0 +1,22 @@
+{
+  "section": "B",
+  "brief_hash": "612294ef150015c49c51c77d8ccfb1e418c2e0ada039f5995702d93db996e680",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 96, "citation_fidelity": 86, "type_tag_discipline": 95,
+    "population_annotation": 95, "route_fidelity": 96, "concentration_audit_handling": 88,
+    "risk_floor_readiness": 95, "reasoning_integrity": 94, "completeness_vs_brief": 97
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "blocking",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Bibliography [18] and body B.2 'Prostate cancer signal (PCPT) + reinterpretation': 'Thompson IM, et al. PCPT — finasteride and high-grade prostate cancer (J Natl Cancer Inst 2007, PMID 17848673)'",
+      "issue": "First-author/PMID mismatch. PMID 17848673 (J Natl Cancer Inst 2007;99(18):1375-83) has first author M Scott Lucia, not Thompson IM (Thompson is the LAST author). The load-bearing biopsy-vs-prostatectomy reinterpretation figures (high-grade 42.7% vs 25.4% at biopsy shrinking to 46.4% vs 38.6% at prostatectomy) derive from this Lucia 2007 paper and are themselves verified-correct, but the surname attached to PMID 17848673 is wrong. The reference bundles three works under one 'Thompson IM' label: the index PCPT trial (Thompson 2003, NEJM, correctly Thompson) and the NEJM 2013 survival follow-up (PMID 23944298, correctly Thompson) are legitimately Thompson-authored, but the 2007 JNCI reanalysis (PMID 17848673) is Lucia. Per rubric, a wrong first-author surname on a resolvable PMID is a citation-fidelity defect → HALT, independent of total score.",
+      "recommended_fix": "Split [18] so the JNCI 2007 high-grade reanalysis is attributed to 'Lucia MS, et al. (PCPT investigators)' (PMID 17848673), keeping Thompson IM for the NEJM 2003 index trial (add PMID 12824459 for resolvability of the 'Thompson 2003' in-text cite) and the NEJM 2013 survival follow-up (PMID 23944298). The B.2 prose 'prostatectomy re-examination showed...' should point to the Lucia citation."
+    }
+  ]
+}

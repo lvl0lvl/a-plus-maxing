@@ -1,0 +1,128 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "timestamp": "2026-05-31T123110Z",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "findings": [
+        "8 distinct enum tags used inline (cohort, in_vitro, mechanism_review, meta_analysis, open_label, practitioner_protocol, rct, regulatory); no out-of-enum or missing tag on any inline numeric cite"
+      ]
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 57,
+      "count_flagged": 0,
+      "findings": [
+        "all 57 bibliography entries (A:18, B:27, C:12) carry an enum tag before (Retrieved: ...); slash-joined multi-tag [meta_analysis / regulatory] in C accepted"
+      ]
+    },
+    "IC-3": {
+      "status": "PASS",
+      "findings": [
+        "no vendor_label cite in corpus; only the legend definition line"
+      ]
+    },
+    "IC-4": {
+      "status": "WARN",
+      "findings": [
+        "section-C L69 anecdote_aggregate grounds dataset-composition numerics (~82% FST I-III, ~8% FST V/VI, ~8 melanoma images FST V) which are corpus-composition descriptors, NOT an AE-rate/dose/effect-size (IC-4 prohibited class); marked off-whitelist corroboration -> WARNING not HALT"
+      ]
+    },
+    "IC-5": {
+      "status": "PASS",
+      "findings": [
+        "practitioner_protocol cites (ROSCO management, AAAAI/EAACI do-not-use, LDOM Delphi dose/contraindication, titration) ground classification/dose/route/cycle only; no efficacy effect-size"
+      ]
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0,
+      "findings": [
+        "section-B L107 compounding tag grounds formulation/availability only; co-located efficacy/PK grounded by underlying [20, rct] Piraccini PMID 34634163"
+      ]
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 3,
+      "count_flagged": 0,
+      "findings": [
+        "rat teratogenicity B L66 carries [population-mismatch: rat]; GHK-Cu in_vitro B L95 carries [population-mismatch: human ex-vivo follicle / cultured cells] with species as explicit subject; 0 misses"
+      ]
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 4,
+      "count_flagged": 0,
+      "findings": [
+        "4 [route-extrapolation] flags present + correctly placed: oral-antihypertensive-vs-LDOM minoxidil (B L29), 5mg-prostate-vs-1mg-AGA finasteride (B L72), topical-vs-oral finasteride DHT (B L76), compounded-vs-RCT concentration (B L107); no route-unverifiable"
+      ]
+    },
+    "IC-9": {
+      "status": "PASS",
+      "findings": [
+        "largest cluster 2/57 distinct primaries (3-way tie Voorhees-Michigan / Green-Nambour / Olsen); share ~3.5%, below 70% threshold; P&G niacinamide single-sponsor already surfaced with certainty downgrade (A L56)"
+      ]
+    },
+    "IC-10": {
+      "status": "WARN",
+      "count_checked": 15,
+      "count_flagged": 0,
+      "findings": [
+        "15 load-bearing PMIDs fetched against NCBI eutils -> all resolve + match title/first-author/year (no fabrication); cross-section: no PMID/DOI spans 2 sections so no shared-entity disagreement (folded Phase-4.25); WARN: inline [SA-mech] (A L68) does not resolve to a bibliography entry but grounds a non-numeric mechanism statement (co-located numeric grounded by resolvable [15, rct]); WARN: B[26] Akiska Delphi NCBI 2025-epub vs 2024 in doc, no numeric behind it"
+      ]
+    },
+    "IC-11": {
+      "status": "PASS",
+      "findings": [
+        "grep for placeholder strings returned zero matches across all 3 sections"
+      ]
+    },
+    "IC-12": {
+      "status": "PASS",
+      "findings": [
+        "no wikipedia.org URL in any bibliography; only self-check assertion lines"
+      ]
+    },
+    "IC-13": {
+      "status": "SKIP-mode",
+      "findings": [
+        "standard mode: Phase-3.5 paired judges already grep-verified load-bearing numerics against fetched records"
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 3,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 57,
+    "largest_cluster_name": "Voorhees-Michigan / Green-Nambour / Olsen (3-way tie, 2 distinct primaries each)",
+    "largest_cluster_count": 2,
+    "share": 0.035,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "SKIP-mode",
+    "claims_checked": 0,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-10: inline identifier [SA-mech] (section-A L68) does not resolve to a bibliography entry; tag enum-valid, grounds a non-numeric textbook mechanism claim (co-located numeric grounded by resolvable [15, rct]) -> WARNING not HALT (resolve at synthesis)",
+    "IC-4: anecdote_aggregate cite (section-C L69) grounds dataset-composition numerics, not an AE-rate/dose/effect-size (IC-4 prohibited class), marked off-whitelist corroboration -> WARNING not HALT",
+    "IC-10: B[26] Akiska LDOM Delphi shown as 2025 epub by NCBI vs '2024' in bibliography; publication-date nuance, not behind any numeric claim -> WARNING"
+  ],
+  "attestation_chain": {
+    "iter_start_ts": "2026-05-31T12:26:21.750434+00:00",
+    "attest_ts": "2026-05-31T12:33:23.289973+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "3aeb355010164b336060bb485e17aaed29e7bc7011935ab0c94fb165b2d95f43",
+    "agent_source_mtime": "2026-05-31T12:31:10.282636+00:00"
+  }
+}

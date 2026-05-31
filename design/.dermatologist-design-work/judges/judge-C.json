@@ -1,0 +1,10 @@
+{
+  "section": "C",
+  "brief_hash": "276ec1653310585368d38c464c1e40c0c6716ee3d86494c798c8e757c033554f",
+  "iteration": 2,
+  "dimension_scores": {"evidence_quality":96,"citation_fidelity":95,"type_tag_discipline":95,"population_annotation":93,"route_fidelity":null,"concentration_audit_handling":93,"risk_floor_readiness":null,"reasoning_integrity":97,"completeness_vs_brief":96},
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": []
+}

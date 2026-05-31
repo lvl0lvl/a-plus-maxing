@@ -1,0 +1,28 @@
+{
+  "section": "A",
+  "brief_hash": "8e9e984f28e6e7bdaf224dc9d6747a918edb01e7371f0fa76c67027592697eb5",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 94,
+    "citation_fidelity": 72,
+    "type_tag_discipline": 95,
+    "population_annotation": 96,
+    "route_fidelity": 93,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": 90,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 95
+  },
+  "total": 92,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "major",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "[15] salicylic-acid RCT, PMID 14708455 — cited first author 'Liu H, et al.'; used to ground 'chloroxylenol 0.5% + salicylic acid 2% cream matched benzoyl peroxide 5% gel (62%/56% vs 60%/54%)' in section A.3 (Beta-hydroxy acid).",
+      "issue": "Author surname does NOT match the cited source. PMID 14708455 resolves to Boutli F, et al., 'Comparison of chloroxylenol 0.5% plus salicylic acid 2% cream and benzoyl peroxide 5% gel in the treatment of acne vulgaris: a randomized double-blind study,' Drugs Exp Clin Res 2003;29(3):101-9 — first author is BOUTLI, not 'Liu H'. The author left this as an un-fetched placeholder author and flagged it; verification confirms the surname is fabricated/incorrect. The PMID is valid and the numerical claims (62%/56% vs 60%/54%, n=37, 12-week double-blind) match the actual record, but the citation as written attributes the source to the wrong author and omits journal/year.",
+      "recommended_fix": "Replace the placeholder with the verified record: '[15] Boutli F, Zioga M, Koussidou T, Ioannides D, Bassukas ID. Comparison of chloroxylenol 0.5% plus salicylic acid 2% cream and benzoyl peroxide 5% gel in the treatment of acne vulgaris: a randomized double-blind study. Drugs Exp Clin Res 2003;29(3):101-9. PMID 14708455. [rct]'. Remove the '(comparator study)' placeholder marker and the 'Liu H, et al.' attribution."
+    }
+  ]
+}
