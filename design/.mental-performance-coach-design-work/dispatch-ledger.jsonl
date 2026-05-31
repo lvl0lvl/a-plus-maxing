@@ -1,0 +1,6 @@
+{"role": "retrieve", "agent_id": "retrieve-A-iter1", "section": "A", "scope": "cognition + stress physiology + established lifestyle levers", "timestamp": "2026-05-31T12:06:00Z"}
+{"role": "judge", "agent_id": "judge-A-iter1", "section": "A", "judges_retrieve_id": "retrieve-A-iter1", "timestamp": "2026-05-31T12:06:00Z"}
+{"role": "retrieve", "agent_id": "retrieve-B-iter1", "section": "B", "scope": "nootropic / cognitive-enhancer compound landscape (evidence-graded)", "timestamp": "2026-05-31T12:06:00Z"}
+{"role": "judge", "agent_id": "judge-B-iter1", "section": "B", "judges_retrieve_id": "retrieve-B-iter1", "timestamp": "2026-05-31T12:06:00Z"}
+{"role": "retrieve", "agent_id": "retrieve-C-iter1", "section": "C", "scope": "mental-health safety boundary + consumer-product validity + non-English survey", "timestamp": "2026-05-31T12:06:00Z"}
+{"role": "judge", "agent_id": "judge-C-iter1", "section": "C", "judges_retrieve_id": "retrieve-C-iter1", "timestamp": "2026-05-31T12:06:00Z"}

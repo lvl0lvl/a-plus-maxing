@@ -1,0 +1,20 @@
+{
+  "section": "A",
+  "brief_hash": "section-A-iter2",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 96,
+    "type_tag_discipline": 95,
+    "population_annotation": 96,
+    "route_fidelity": 98,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 95
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": []
+}

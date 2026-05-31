@@ -1,0 +1,143 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "timestamp": "2026-05-31T12:40:00Z",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 64,
+      "count_flagged": 0,
+      "findings": [
+        "Every inline [N, tag] carries exactly one enum tag (A 21 + B 22 + C 21). No untagged/out-of-enum tag."
+      ]
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 64,
+      "count_flagged": 0,
+      "findings": [
+        "Every bibliography entry ends in a single bracketed enum tag."
+      ]
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0,
+      "findings": [
+        "No vendor_label citation exists in any section."
+      ]
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0,
+      "findings": [
+        "Only anecdote_aggregate cite is C[16] (Cognitive Training Data open letter); grounds no dose/effect/AE/n claim (signatory count + year only)."
+      ]
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0,
+      "findings": [
+        "No practitioner_protocol citation in any section."
+      ]
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0,
+      "findings": [
+        "No compounding_data_sheet citation in any section."
+      ]
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 3,
+      "count_flagged": 0,
+      "findings": [
+        "3 animal-tagged numerical/mechanistic claims, each carries in-sentence [population-mismatch: <species>]: A[5] BDNF rat, C[20] Eremin mouse, C[23] Ostrovskaya rat. No in_vitro cites."
+      ]
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 2,
+      "count_flagged": 0,
+      "findings": [
+        "Intranasal Semax C[19] + Selank C[21] human data carry [route-extrapolation: intranasal]; no oral claim grounded on intranasal/IV without flag."
+      ]
+    },
+    "IC-9": {
+      "status": "PASS",
+      "count_checked": 35,
+      "count_flagged": 0,
+      "findings": [
+        "35 distinct primaries; largest single-group cluster (Russian-nootropic, 2 Moscow institutes) = 5, share 0.143 < 0.70."
+      ]
+    },
+    "IC-10": {
+      "status": "WARN",
+      "count_checked": 1,
+      "count_flagged": 0,
+      "findings": [
+        "Shahinfar 2025 omega-3 meta (PMID 40836005, DOI 10.1038/s41598-025-16129-8) shared A[10]=B[7]; identifiers + tags agree (both meta_analysis). Non-blocking; confirms Phase 4.25 PASS."
+      ]
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 3,
+      "count_flagged": 0,
+      "findings": [
+        "rg for placeholder strings (citation needed/TBD/TODO/research suggests/experts believe) across all sections: 0 hits."
+      ]
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 3,
+      "count_flagged": 0,
+      "findings": [
+        "rg for wikipedia.org across all sections: 0 hits."
+      ]
+    },
+    "IC-13": {
+      "status": "SKIP-mode",
+      "findings": [
+        "Standard mode -> per-citation corpus scoping not executed (mode policy)."
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 3,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 35,
+    "largest_cluster_name": "Russian-nootropic cluster (Moscow: Institute of Molecular Genetics RAS + V.V. Zakusov Institute of Pharmacology)",
+    "largest_cluster_count": 5,
+    "share": 0.143,
+    "threshold_triggered": false,
+    "surfaced_section_heading": "\u00a7C-5 Non-English (Russian nootropic) survey",
+    "surfaced_before_first_indication": true
+  },
+  "corpus_scoping": {
+    "verdict": "SKIP-mode",
+    "claims_checked": 0,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-10 (non-blocking): Shahinfar 2025 omega-3 meta shared A[10]=B[7]; identifiers + type-tags agree; deduped to single primary in IC-9 count.",
+    "Phase 4.25 carry-forward, all remediated + re-verified: A[16] 121(6)->121(5); B[20] PMID 22574274->23139911 + B[2] byline James JE->James JE, Rogers PJ; C[8] Wastler phantom 'Lucht L' removed; C[22] Neznamov Russian-original vs English-translation disambiguated; C[23] Ostrovskaya full byline restored. No numerical claim/tag/population/route flag altered."
+  ],
+  "attestation_chain": {
+    "iter_start_ts": "2026-05-31T12:38:25.332865+00:00",
+    "attest_ts": "2026-05-31T12:42:11.382926+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "54c22f573ff56f1ed366ef6923397e081c25e6915e9eda81e639f545c778de9a",
+    "agent_source_mtime": "2026-05-31T12:41:21.504505+00:00"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "section": "A",
+  "brief_hash": "section-A-iter1",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 90,
+    "type_tag_discipline": 95,
+    "population_annotation": 96,
+    "route_fidelity": 98,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 95
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "minor",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Bibliography entry [16] Beerendonk, Mejias et al. 2024, PNAS — cited as volume 121(6):e2312898121",
+      "issue": "Verified against PubMed (PMID 38277436) and PNAS: the article (e2312898121, DOI 10.1073/pnas.2312898121) is in issue 121(5), not 121(6). Authors, year, journal, title, article number, PMID, and DOI all match the source; only the issue number is off by one. Not a misattribution and does not affect the claim, but a strict citation-fidelity metadata slip.",
+      "recommended_fix": "Change the issue number for source [16] from 121(6) to 121(5)."
+    }
+  ]
+}

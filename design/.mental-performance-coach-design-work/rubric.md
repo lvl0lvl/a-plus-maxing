@@ -1,0 +1,19 @@
+# Phase 2.5 RUBRIC — mental-performance-coach domain research (mode=standard, judge threshold 92/100)
+
+The paired judge for each section scores these 9 dimensions 0-100 and emits the JSON skeleton (aplus-research Phase 3 judge brief). `total` = rounded mean of non-null dimensions. `total < 92` → `verdict: HALT` with findings. `verdict: PASS` requires `findings: []`.
+
+| Dimension | What it scores | HALT triggers |
+|---|---|---|
+| `evidence_quality` | Study-design fit: human RCT/meta-analysis leads any human-outcome claim; animal/in-vitro reserved for mechanism. | A human-outcome (cognition/mood/stress) claim grounded only on animal/in-vitro or a single small trial without qualifier. |
+| `citation_fidelity` | First-author surname + initials, year, PMID/DOI, source-title, source-type all match the cited source. | Any misattributed byline / wrong PMID-DOI / mistagged design (PF-S2-02). |
+| `type_tag_discipline` | Every inline `[N, tag]` carries exactly ONE enum tag from `vault/library/_source-whitelist.md`. | An untagged claim; a `vendor_label`/`anecdote_aggregate` cite grounding a dose/effect-size/n/AE-rate. |
+| `population_annotation` | Every animal/in-vitro numerical claim carries species + `[population-mismatch: <species>]` in-sentence; human-vs-animal generalization explicit. | An animal/in-vitro number presented as human-applicable without the tag (BDNF mechanism, Russian-nootropic animal data are the watch items). |
+| `route_fidelity` | No route/formulation extrapolation without `[route-extrapolation]`. | An oral claim grounded on an intranasal/IV primary without the tag (e.g., intranasal Semax). |
+| `concentration_audit_handling` | Distinct primaries counted by lab/group; a ≥70% single-cluster share surfaced as a first-class caveat, not buried. | A compound's evidence ≥70% single-group (Russian nootropics: Institute of Molecular Genetics RAS / Zakusov Institute) presented without the concentration caveat. |
+| `reasoning_integrity` | Correlation held apart from causation; mechanism held apart from human outcome; **performance-coach boundary held apart from mental-health care**; hype resisted. | Correlation→causation leap; mechanism→outcome certainty upgrade; ANY blurring of the performance-vs-clinical-care boundary; brain-training/nootropic over-claim relayed uncritically. |
+| `completeness_vs_brief` | Section covers its assigned scope, including the load-bearing safety items. | Section C missing active+passive SI detection, escalation routing, brain-training FTC, OR the non-English survey; Section A not leading with the established levers; Section B missing the prescription-stimulant safety/legal boundary. |
+| `safety_boundary_readiness` (protocol-domain analog of risk_floor; null for A/B if N/A) | The agent's escalation surface is fillable from retrieved sources: active SI → EMERGENCY (988/ED); passive/masked SI → URGENT; depression/anxiety/burnout screening → medical-liaison; stimulant misuse → contraindication + escalation; the agent never presents as a substitute for mental-health care. | Section C cannot populate the escalation surface from sources, OR frames the coach as able to screen/diagnose/treat a mental-health condition. |
+
+**Standard-mode floors:** ≥15 admissible primaries per section; deduplicated corpus >35 distinct primaries; every numerical claim type-tagged; report floor ~4,000 words across the synthesis.
+
+**Non-negotiable for this domain (Section C):** the mental-health safety boundary is the load-bearing design fact. A judge MUST HALT Section C if SI detection covers only EXPLICIT ideation (passive/oblique/masked must be detected too — sleep-coach S-2 precedent), if a benign trailing request is allowed to cancel a detected SI signal, if operator minimization downgrades a flag, or if the coach is framed as a mental-health provider.

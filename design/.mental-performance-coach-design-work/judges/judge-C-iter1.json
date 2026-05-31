@@ -1,0 +1,42 @@
+{
+  "section": "C",
+  "brief_hash": "section-C-iter1",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 70,
+    "type_tag_discipline": 98,
+    "population_annotation": 98,
+    "route_fidelity": 97,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": 100,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 96
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Bibliography [8] (line 79) and Finding 7 (line 25) — Wastler et al. (2023), the mandatory passive-vs-active SI safety primary. Section byline: 'Wastler HM, Lucht L, Khazem LR, Ammendola E, Bryan CJ, et al.'",
+      "issue": "The byline contains a non-existent author. PubMed PMID 36504400 (verified twice, incl. ?format=pubmed) gives the authoritative author list as Wastler HM, Khazem LR, Ammendola E, Baker JC, Bauder CR, Tabares J, Bryan AO, Szeto E, Bryan CJ. There is NO author named 'Lucht L' on this paper, and 'Lucht L' is inserted as the SECOND author. Per the rubric, a wrong byline on a mandatory safety citation is a CRITICAL finding and forces HALT, even though PMID 36504400, DOI 10.1111/sltb.12935, journal (Suicide Life Threat Behav), volume/issue 53(2), pages 219-226, year 2023, and all substantive claims (two correlated-but-separable factors, both passive+active raise attempt odds, greatest risk when BOTH co-occur, hopelessness as the affective correlate of passive SI) are independently verified as correct.",
+      "recommended_fix": "Correct the byline to the verified PubMed author order: 'Wastler HM, Khazem LR, Ammendola E, Baker JC, Bauder CR, Tabares J, Bryan AO, Szeto E, Bryan CJ.' Remove the fabricated 'Lucht L'. Re-verify the in-text byline in Finding 7 if any author is named there. The B=0.867 inter-factor correlation and n=6,200 / n=10,625 sample sizes should be re-checked against the paper body (consistent with the two-large-samples abstract but not byline-verifiable)."
+    },
+    {
+      "severity": "MAJOR",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Bibliography [22] (line 93) — Neznamov GG, Teleshova ES (2009) Noopept-vs-piracetam. Cited as 'Neurosci Behav Physiol 39(3):311-321 ... PMID: 18697252. DOI: 10.1007/s11055-009-9128-4'.",
+      "issue": "PMID 18697252 resolves to the RUSSIAN-LANGUAGE ORIGINAL (Zh Nevrol Psikhiatr Im S S Korsakova 2008; 108(3):33-42, no abstract), NOT to the English translation whose journal/volume/pages/DOI the section displays. The English translation (Neurosci Behav Physiol 2009; 39(3):311-321, DOI 10.1007/s11055-009-9128-4, 56-day protocol, n=53) is a genuine separate record verified via Springer. So the PMID and the displayed bibliographic metadata point to two different records of the same study. The underlying study is real and correctly characterized (10 mg BID could not be confirmed from the abstract-less Russian record; '56 days' and the vascular/traumatic mild-cognitive-disorder framing are confirmed for the English translation). This is a non-safety, non-English secondary citation, hence MAJOR not CRITICAL.",
+      "recommended_fix": "Make the identifiers internally consistent: either (a) cite the English translation with its own identifier set and DROP the PMID (PubMed indexes only the Russian original under 18697252), or (b) cite PMID 18697252 with the Russian-original journal/volume/pages (Zh Nevrol Psikhiatr 2008; 108(3):33-42) and keep the cross-reference to the English translation separate. Do not present one PMID as the identifier for a record described by the other's journal/volume/pages/DOI."
+    },
+    {
+      "severity": "MINOR",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Bibliography [23] (line 94) — Ostrovskaya RU, Gudasheva TA, Voronina TA, Seredenin SB (2001).",
+      "issue": "The byline is truncated without an 'et al.' marker. The full PubMed byline (PMID 11782792) is Ostrovskaya RU, Mirsoev TK, Romanova GA, Gudasheva TA, Kravchenko EV, Trofimov CC, Voronina TA, Seredenin SB. All four named authors are genuine and present, but four co-authors (Mirsoev, Romanova, Kravchenko, Trofimov) are silently dropped without 'et al.', which mildly misrepresents the byline. All other identifiers (PMID, DOI, journal, 132(4):959-62, rat species, oral GVS-111 antiamnestic) are correct. Non-safety animal citation, hence MINOR.",
+      "recommended_fix": "Append 'et al.' after the listed authors, or list the full author set, to signal the byline is abbreviated rather than complete."
+    }
+  ]
+}
