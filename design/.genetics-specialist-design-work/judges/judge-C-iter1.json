@@ -1,0 +1,11 @@
+{
+  "section": "C",
+  "iteration": 1,
+  "dimension_scores": {"evidence_quality":97,"citation_fidelity":90,"type_tag_discipline":100,"population_annotation":100,"route_fidelity":100,"concentration_audit_handling":100,"risk_floor_readiness":null,"reasoning_integrity":100,"completeness_vs_brief":100},
+  "total": 98,
+  "threshold": 99,
+  "verdict": "HALT",
+  "findings": [
+    {"severity":"major","dimension":"citation_fidelity","claim_or_location":"Section 1, HLA-B*58:01/Allopurinol (line 19): 'odds ratios of ~74 in Asians and ~101 in non-Asians, with individual studies reporting ORs from ~44 to over 100; a meta-analytic estimate placed the association near OR 117.6 (95% CI 70.3-196.8). Pooled test performance across ~7,500 patients indicates ~78% sensitivity, ~96% specificity, and ~99% negative predictive value.'","issue":"Two full sentences of load-bearing quantitative claims (population-stratified odds ratios, a meta-analytic point estimate with 95% CI, and pooled sensitivity/specificity/NPV across a stated N of ~7,500 patients) carry NO inline [N, tag] anchor. The [3, mechanism_review] citation is attached to the preceding CPIC-recommendation sentence only; these specific numbers float without attribution. Every other variant subsection anchors its numerical claims to a citation (e.g., abacavir 0%/2.7% [1, rct]; carbamazepine sensitivity/specificity/PPV/NPV [2, mechanism_review]; FTO 0.36 kg/m^2 [7, cohort]). This is the one location where quantitative claims are untraceable.","recommended_fix":"Append an inline citation to each quantitative sentence. If the OR/meta-analysis/test-performance figures come from the CPIC 2015 allopurinol guideline, tag them [3, mechanism_review]; if the meta-analytic OR 117.6 (CI 70.3-196.8) originates from a distinct meta-analysis (e.g., a published HLA-B*58:01 SCAR meta-analysis), add that source as a new bibliography entry tagged [meta_analysis] and cite it inline. Do not leave numeric claims without an inline [N, tag]."}
+  ]
+}

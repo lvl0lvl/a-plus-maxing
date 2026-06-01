@@ -1,0 +1,89 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "timestamp": "2026-06-01T17:40:07.889062+00:00",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "WARN"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 52,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 15,
+    "largest_cluster_name": "no group contributes >1 distinct primary",
+    "largest_cluster_count": 1,
+    "share": 0.067,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 22,
+    "claims_failed": [
+      {
+        "claim": "Somkrua subgroup ORs (Asian 74.18, non-Asian 101.45) full-text table behind auth wall; pooled ORs 79.28/96.60 confirmed verbatim",
+        "cite_key": "somkrua-2011",
+        "failure_mode": "corpus-missing"
+      },
+      {
+        "claim": "Ryu combined N cited 938,355 vs source 937,939 (delta 0.04%); load-bearing ORs 5.24/4.53 exact",
+        "cite_key": "ryu-2024",
+        "failure_mode": "paraphrase-no-token-match"
+      }
+    ]
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13:corpus-missing Somkrua subgroup ORs (pooled confirmed)",
+    "IC-13:paraphrase Ryu N 938,355 vs 937,939 (ORs exact)"
+  ],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-01T17:32:10.708944+00:00",
+    "attest_ts": "2026-06-01T17:40:08.028417+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "bff779fa5621c63c3ff733b49a5f528d5d526bcb1f5506d839e83b394ef210ee",
+    "agent_source_mtime": "2026-06-01T17:38:02.879004+00:00"
+  }
+}

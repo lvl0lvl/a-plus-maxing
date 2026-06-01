@@ -1,0 +1,24 @@
+{
+  "section": "B",
+  "iteration": 1,
+  "dimension_scores": {"evidence_quality":88,"citation_fidelity":100,"type_tag_discipline":96,"population_annotation":100,"route_fidelity":100,"concentration_audit_handling":100,"risk_floor_readiness":null,"reasoning_integrity":100,"completeness_vs_brief":95},
+  "total": 97,
+  "threshold": 99,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "critical",
+      "dimension": "evidence_quality",
+      "claim_or_location": "Section 1, paragraph beginning 'For CYP2D6, a CPIC-led modified-Delphi consensus standardized this translation: activity score 0 -> PM; >0 and <=1.25 -> IM; >1.25 and <=2.25 -> NM; >2.25 -> UM.' [2, mechanism_review]",
+      "issue": "The CYP2D6 activity-score-to-phenotype boundaries are stated incorrectly and contradict the cited source (Caudle 2020, ref [2]). The CPIC/DPWG consensus defines Intermediate Metabolizer = activity score 0.25 to 1.0 and Normal Metabolizer = 1.25 to 2.25 (verified against CPIC/DPWG consensus and NCBI Bookshelf NBK574601: 'Intermediate metabolizers (IM) have an activity score of 0.25 to 1; Normal metabolizers (NM) have an activity score of 1.25 to 2.25'). The section's 'IM = >0 and <=1.25' and 'NM = >1.25 and <=2.25' wrongly place an activity score of exactly 1.25 into the IM bin, whereas CPIC assigns 1.25 to NM (the NM floor is exactly 1.25). This is internally inconsistent with the section's very next sentence, which correctly states an activity score of exactly 1 was reassigned from NM to IM. This is a load-bearing genotype-to-phenotype translation error in canonical reference material attributed to a real cited guideline.",
+      "recommended_fix": "Correct the boundaries to match CPIC/DPWG: 'activity score 0 -> PM; 0.25 to 1.0 -> IM; 1.25 to 2.25 -> NM; >2.25 -> UM.' Note that no defined diplotype yields a score strictly between 1.0 and 1.25, so the IM upper bound is 1.0 and the NM lower bound is 1.25. Keep the existing correct statement that an activity score of exactly 1 maps to IM."
+    },
+    {
+      "severity": "minor",
+      "dimension": "type_tag_discipline",
+      "claim_or_location": "Reference [13] Gasche Y, et al. Codeine intoxication associated with ultrarapid CYP2D6 metabolism. N Engl J Med. 2004. [open_label]",
+      "issue": "Gasche 2004 is a single case report, not an open-label clinical trial. The canonical aplus-research type-tag enum has no 'case_report' value, so 'open_label' is the nearest available human-observation tag and the citation does not ground any numerical claim (used narratively), which keeps it within admissibility rules. Imprecise rather than admissibility-violating.",
+      "recommended_fix": "If the enum is later extended with a 'case_report' or equivalent single-subject tag, retag [13]. Until then, optionally add an inline parenthetical noting this is a single case report so readers do not over-weight the design, but no enum-compliance change is required."
+    }
+  ]
+}
