@@ -287,6 +287,7 @@ The wiki is queryable knowledge — agnostic to who reads or writes it. Speciali
 | recovery-specialist | sauna, cold exposure, breathwork, manual therapy, fascia | operator-profile, current-state, goals, biomarkers (recovery/inflammation) | protocols (recovery modalities), parameters (sauna/cold dose) | recovery-modality literature |
 | longevity-strategist | longevity-class interventions, biological-age tracking | operator-profile, current-state, goals, all biomarkers, all compounds | longevity-tagged biomarkers and compounds | longevity literature |
 | mental-performance-coach | focus, mood, cognitive enhancers, stress | operator-profile, current-state, compounds (cognitive class) | cognitive protocols, parameters (mental) | cognitive literature |
+| genetics-specialist | genetics & pharmacogenomics, SNP/variant interpretation, drug-gene interactions, nutrigenomics, disease-risk variants | operator-profile, current-state, goals, dna/raw, compounds, biomarkers | dna/ (analysis + variant pages), PGx annotations on compounds, contradictions | clinical genetics, pharmacogenomics (PharmGKB/CPIC), nutrigenomics |
 | medical-liaison | MD-handout queue, contraindication tracking, Rx coordination | operator-profile (Jan 2026 issue), all compounds risk_tier medium+, prescriptions | artifacts/_doctor-visit-queue, contraindications entries | none — collates only |
 
 **Cross-cutting protocol:**
