@@ -408,7 +408,7 @@ Two Phase-3 red-team dispatches: **Role 3** (health-edge-case-reviewer) coverage
 
 ---
 
-## §7 Self-Attest Checklist
+## Self-Attest Checklist (Phase 5 gate)
 
 - [x] All 18 sections + Appendix A present.
 - [x] §3.1 row count == Finding count in substrate (23); F14 + F21 verdicts updated to MODIFIED (now map to newly-added classes).
