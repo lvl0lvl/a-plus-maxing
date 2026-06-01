@@ -1,0 +1,42 @@
+{
+  "section": "A",
+  "brief_hash": "2e8f7986bab206f347a1826a08d51bb4e7ce3150f1791120d5e399aeac49ab72",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 99,
+    "citation_fidelity": 100,
+    "type_tag_discipline": 99,
+    "population_annotation": 97,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 99,
+    "completeness_vs_brief": 99
+  },
+  "total": 98,
+  "threshold": 99,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "major",
+      "dimension": "concentration_audit_handling",
+      "claim_or_location": "Evidence-landscape note, line 117: 'Tier distribution (18 distinct primary/regulatory sources): Tier-1 primary = 14 ... Tier-2 regulatory = 1'",
+      "issue": "Internal numeric inconsistency. The header asserts 18 distinct sources, but the same sentence enumerates 14 Tier-1 + 1 Tier-2 = 15, and the bibliography contains exactly 15 entries ([1]-[15]). The '18' is unsupported and contradicts the section's own count, creating a body-vs-count asymmetry in the very note whose job is to audit source distribution. The true distinct-primary count (15) still clears the AF-S4 floor (>=9), so this is an accuracy/consistency defect, not a sufficiency failure.",
+      "recommended_fix": "Change '18 distinct primary/regulatory sources' to '15 distinct primary/regulatory sources' to match the 14+1 enumeration and the 15-entry bibliography."
+    },
+    {
+      "severity": "minor",
+      "dimension": "population_annotation",
+      "claim_or_location": "Finding 10, line 85: Colman 2014 [12, animal] and Mattison 2017 [13, animal] rhesus-macaque survival claims",
+      "issue": "Animal survival claims carry the species via [population-mismatch: rhesus macaques] but do not state n inline. The rubric (lines 10 and 18) specifies animal numerical claims should carry 'species (+n)'. The rodent CR claim likewise carries species but no cohort size. The species tags are present and correct, so this is a completeness gap on the n component only.",
+      "recommended_fix": "Add cohort sizes inline for the primate studies (e.g., Wisconsin n approx 76 and NIA n approx 121 rhesus macaques) so each animal numerical claim carries species + n per the rubric."
+    },
+    {
+      "severity": "minor",
+      "dimension": "evidence_quality",
+      "claim_or_location": "Finding 3, line 27: 'adjusted HR 5.04' for lowest-fitness vs elite (Mandsager 2018)",
+      "issue": "The cited HR direction/reference category is presented as low-fitness carrying ~5-fold HIGHER mortality vs elite (HR 5.04). The source's primary reported framing is the inverse (elite vs low = HR 0.20); 5.04 is the reciprocal-equivalent. The claim is numerically faithful and not fabricated, but stating it as a directly-reported '5.04' without noting it is the inverse of the abstract's headline 0.20 could mislead a reader spot-checking the abstract. Borderline; flagged for transparency, not as an over-claim.",
+      "recommended_fix": "Note that the source reports HR 0.20 for elite vs low fitness and that 5.04 is the inverse (low vs elite), or cite the reference category explicitly."
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "phase": "6",
+  "verdict": "PASS",
+  "critique_agent_id": "phase6-critique-longevity-a342685027197c2fe",
+  "draft_path": "design/.longevity-strategist-design-work/domain-research.md",
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "findings": [
+    {
+      "category": "missing-perspective",
+      "severity": "major",
+      "description": "Per-compound monitoring/STOP rules thin: monitoring only for metformin (B12); no red-flag STOP triggers for an operator already self-experimenting.",
+      "required_fix": "Add per-compound red-flag-stop triggers + monitoring markers (rapamycin fever/infection/non-healing-wound/dyspnea + glucose/HbA1c/CBC; metformin B12/lactic-acidosis; D+Q bleeding/syncope/effusion)."
+    },
+    {
+      "category": "logical-inconsistency",
+      "severity": "major",
+      "description": "PEARL 'fewer SAEs in rapamycin arms' is an un-guarded within-HALT reassurance an adversarial operator can quote to argue the HALT down.",
+      "required_fix": "Add paired 'underpowered single n=114/48wk trial; absence of signal != established safety; does not relax the HALT' clause + anti-pattern."
+    },
+    {
+      "category": "missing-perspective",
+      "severity": "major",
+      "description": "goals.md hard-limit pointer missing: goal-agnostic library framing never tells the implementer the deployed agent must load+respect operator goals.md hard-limits at runtime.",
+      "required_fix": "Add a Context-Loading/Recommendation directive: deployed agent loads+respects goals.md hard-limits (no anabolic steroids; MD-gated experimental) at dispatch."
+    },
+    {
+      "category": "missing-perspective",
+      "severity": "major",
+      "description": "Hormesis is never named as the dose-response frame for CR/exercise (the established levers).",
+      "required_fix": "Name hormesis as the dose-response frame in Synthesis & Insights."
+    },
+    {
+      "category": "unexamined-counter-evidence",
+      "severity": "major",
+      "description": "Sex differences appear only incidentally in two scattered numbers despite a male operator context downstream.",
+      "required_fix": "Surface the sex-difference caveat explicitly (rapamycin ITP M/F divergence; geroprotector animal effects often sex-dependent) as a named limitation."
+    },
+    {
+      "category": "citation-incomplete",
+      "severity": "major",
+      "description": "Body<->bibliography asymmetry: bib [32] (duplicate of Marcangeli) and [39] (cited only inside a compound bracket) registered as orphans.",
+      "required_fix": "Remove the [32] duplicate + renumber; split [39] out of the compound bracket so it resolves; restore exact body<->bib symmetry (Lesson 3 / AF-Y4)."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "PASS-confirming notes across six axes: lead-with-established ordering honored, population-mismatch tags present, GRADE matches prose, cite-or-refuse/experimental-HALT/AUTHORITY_FRAMING_BYPASS encodable.",
+      "required_fix": "No action required; recorded for provenance."
+    }
+  ],
+  "timestamp": "2026-05-31T16:05:26.355837+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-05-31T15:17:20.425519+00:00",
+    "attest_ts": "2026-05-31T16:05:26.355840+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "a5738ed687021ff6566939f9b3e4b2d55c7c3970e0a85a0e71aed038de65f853",
+    "agent_source_mtime": "2026-05-31T15:22:25.515047+00:00"
+  }
+}
