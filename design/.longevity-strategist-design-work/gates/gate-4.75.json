@@ -1,0 +1,88 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 2,
+  "halt_reasons": [],
+  "warnings": [
+    "IC-1: two '\u2014 flagged' provenance qualifiers after valid enum tags (B preprint, B lower-trust) \u2014 permitted.",
+    "IC-13: 2 paywall corpus-missing WARN (PEARL exact CRP delta; Mannick per-arm infection rates) \u2014 directionally confirmed via abstract."
+  ],
+  "ic_checks": {
+    "IC-1": {
+      "status": "WARN",
+      "count_checked": 72,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 72,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 14,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 24,
+      "count_flagged": 0
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 14,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 58,
+    "largest_cluster_name": "Sinclair-affiliated (NAD+ founder cluster)",
+    "largest_cluster_count": 7,
+    "share": 0.12,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 24,
+    "claims_failed": []
+  },
+  "timestamp": "2026-05-31T15:07:00.543500+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-05-31T15:01:42.327788+00:00",
+    "attest_ts": "2026-05-31T15:07:00.543502+00:00",
+    "iteration": 2,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "c4671ac5a3c31db497a826142561cbafbdc7c37e7931bc2756b2517e0a19aff8",
+    "agent_source_mtime": "2026-05-31T15:06:15.521307+00:00"
+  }
+}

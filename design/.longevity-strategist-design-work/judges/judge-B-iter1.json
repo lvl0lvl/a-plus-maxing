@@ -1,0 +1,35 @@
+{
+  "section": "B",
+  "brief_hash": "2357ff2d2ab27afcf28338e96a6cec390116d7584b09867cac603474556478c5",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 99,
+    "type_tag_discipline": 97,
+    "population_annotation": 99,
+    "route_fidelity": null,
+    "concentration_audit_handling": 99,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 99,
+    "completeness_vs_brief": 98
+  },
+  "total": 98,
+  "threshold": 99,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "minor",
+      "dimension": "type_tag_discipline",
+      "claim_or_location": "Bibliography [12] Sayed 2021 iAge, tagged '[cohort; mouse/in-vitro mechanism components]'",
+      "issue": "The rubric requires every cite to carry exactly one enum type-tag. The body correctly distinguishes the two designs within this paper ('[12, cohort]' for the human immunome association and '[12, animal] [population-mismatch: mouse and human cell lines]' for the CXCL9 mechanism), but the bibliography line appends a free-text qualifier ('; mouse/in-vitro mechanism components') alongside the [cohort] enum, so the bibliography entry does not present a single clean enum type-tag.",
+      "recommended_fix": "Split [12] into two bibliography lines (one [cohort] for the human immunome cohort, one [animal] for the CXCL9 mouse/cell mechanism), or keep a single [cohort] enum on the bibliography line and move the 'mouse/in-vitro mechanism components' qualifier into the body annotation only, so each bibliography entry carries exactly one enum tag."
+    },
+    {
+      "severity": "minor",
+      "dimension": "evidence_quality",
+      "claim_or_location": "Finding 11, VO2max claim grounded in [21] Strasser & Burtscher 2018, Frontiers in Bioscience (Landmark) — bibliography self-flags '[mechanism_review; lower-trust publisher — flagged]'",
+      "issue": "Finding 11 is billed as the 'strongest, most replicated, and most modifiable' mortality links, yet the VO2max/cardiorespiratory-fitness pillar of that finding rests on a narrative review from a publisher the section itself flags as lower-trust, rather than a primary cohort or meta-analysis. The gait [18] and grip [19,20] claims in the same finding are anchored to Tier-1 primaries/meta-analyses; the VO2max claim is comparatively weakly grounded for a 'strongest evidence' designation.",
+      "recommended_fix": "Substitute or add a Tier-1/2 primary or meta-analysis for the VO2max-mortality association (e.g., a high-trust cardiorespiratory-fitness cohort or meta-analysis with a reported HR), so the strongest functional-marker finding rests uniformly on admissible-tier evidence and does not lean on a flagged-publisher review."
+    }
+  ]
+}

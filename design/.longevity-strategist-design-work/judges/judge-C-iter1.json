@@ -1,0 +1,28 @@
+{
+  "section": "C",
+  "brief_hash": "fa10f1da9b12c305e8c8a73f29ad4b1e9725b857c680831463ec0a2abb3859fb",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 99,
+    "citation_fidelity": 72,
+    "type_tag_discipline": 99,
+    "population_annotation": 99,
+    "route_fidelity": 99,
+    "concentration_audit_handling": 100,
+    "risk_floor_readiness": 99,
+    "reasoning_integrity": 100,
+    "completeness_vs_brief": 99
+  },
+  "total": 96,
+  "threshold": 99,
+  "verdict": "HALT",
+  "findings": [
+    {
+      "severity": "critical",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Finding 1 (Rapamycin), human-evidence (b): 'the pivotal Phase 3 PROTECTOR 1 (n=1,024) MISSED its primary endpoint ... resTORbio halted the program (Nov 2019) [5, rct]' and Bibliography [5] 'Mannick JB, et al. 2021. ... Lancet Healthy Longev 2:e250-e262. https://pubmed.ncbi.nlm.nih.gov/34326066/ (PMID 34326066)'",
+      "issue": "Misattributed PMID grounding a numerical/factual claim. PMID 34326066 does NOT resolve to the Mannick 2021 mTOR-inhibitor paper. Independently verified twice (NCBI E-utilities esummary + WebFetch of the pubmed record): PMID 34326066 is 'Vigor Encoding in the Ventral Pallidum', Lederman J et al., eNeuro 2021;8(4), a rat neuroscience study with no relation to RTB101, rapalogs, or respiratory illness. The n=1,024 PROTECTOR-1 failed-Phase-3 cautionary data point — explicitly flagged in the section as a load-bearing fact the agent MUST surface — is therefore anchored to an unresolvable citation. This is AF-S1 (mis-attributed citation) and triggers the judge's hard cap: any mis-attributed citation grounding a numerical claim -> citation_fidelity <=80 + critical finding. (The underlying Mannick 2021 Lancet Healthy Longevity paper does exist; only the PMID is wrong, but the document grounds the claim on the printed PMID/URL, which points elsewhere.)",
+      "recommended_fix": "Replace the incorrect PMID 34326066 / URL in citation [5] with the correct identifier PMID 33977284 (independently resolved via NCBI esearch by title, DOI, and author+journal) for Mannick JB et al. 2021, 'Targeting the biology of ageing with mTOR inhibitors to improve immune function in older adults: phase 2b and phase 3 randomised trials', Lancet Healthy Longev 2(5):e250-e262, DOI 10.1016/S2666-7568(21)00062-3, URL https://pubmed.ncbi.nlm.nih.gov/33977284/. Confirm the n=1,024 PROTECTOR-1 'did not meet primary endpoint' figure traces to this primary (the Lancet paper + resTORbio Nov-2019 release support the failed-endpoint narrative)."
+    }
+  ]
+}
