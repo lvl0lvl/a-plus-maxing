@@ -38,7 +38,24 @@ Self-recognition pre-flight: watching for "the fix is mechanical so the verdict 
 
 ### S21 Scope Contract Evaluation (volatile)
 
-_(to be filled at close)_
+- **AC1 — PASS.** bda keys 7.5/8.5 on gate-2.75 `target.type=compound`, fail-closed when unreadable; header comment updated. (`scripts/audit-research-provenance.sh`)
+- **AC2 — PASS.** 6 existing smoke tests still green + 2 new non-tautological cases (reference-landscape PASS-without-floors; compound-entry-still-FAIL) = 8/8. Non-tautology empirically PROVEN: the same Case-6 fixture FAILs under a reverted-trigger copy (requires 3.5/4.25/4.75/7.5/8.5 → 2 missing-floor violations) and PASSes patched.
+- **AC3 — PASS.** Patched bda run against the 3 real merged design-work dirs (materialized from main): 7.5/8.5 false-block cleared on cardiovascular/dermatologist/gi-specialist; genetics control still EXIT 0. The three still EXIT=1 on the orthogonal gate-3.5 grandfather (ADR 2026-06-01) — reported honestly, NOT overclaimed as a clean pass.
+- **AC4 — PASS, one CHANGED.** INVARIANTS Change Log row (S21); SKILL.md matrix footnoted; mhg closed. `5ot`: contract said "reframe (not resolve)" — reading the bead showed its stated resolution condition (bda distinguishes reference from compound-entry; NO risk-table change) is MET by the mhg fix, so it was RESOLVED+closed. CHANGED (reframe→resolve), documented not silent.
+- **AC5 — PASS, CHANGED method.** Contract said "REST-merge the existing `fix/supplement-gates-quarantine` PR." AP-ACT-BEFORE-VERIFY caught the branch was 18 commits stale (predates batch-4/genetics) — merging it would have REVERTED THE ROSTER. Method CHANGED to a fresh marker-only branch off current main → PR #25 rebase-merged (marker on main, roster verified intact = 20 agents); stale branch deleted (local+origin) as a hazard; 0be closed. Documented, not silent.
+- **AC6 — PASS.** (close audits + rotation + attestation below)
+
+**Added (beyond contract):** bead `gdw` (P2) — in-passing discovery that origin/main is ~9 sessions stale on the governance layer (bda script + INVARIANTS S13-S21 rows absent from main; deployed agents present, audit/invariants/skills layer only on the feature continuity-carrier). Filed for Walter's branch-topology decision; NOT acted on (out of scope; tied to bte).
+
+### Drift checks (S21 close)
+
+- **Task drift:** minimal + documented. Two CHANGED criteria (5ot reframe→resolve; AC5 stale-branch→fresh-branch), both forced by reading actual state vs. the contract's assumptions — the verify-before-act discipline working, not freelancing. One added bead (gdw) from a passing discovery, deferred not chased. No expansion into bte/hil/library/research.
+- **Architecture drift:** toward LESS violation. The mhg fix removes a false-positive in a frozen audit (the compound-entry path still binds 7.5/8.5 — correctness up, gate not loosened). The roster-revert hazard (stale branch) was removed. gdw surfaces a governance-sync gap but does not itself move toward violating an invariant.
+- **Vision drift:** none — "single-operator health-agent system of gated, source-grounded specialists" unchanged; this session sharpened the gate (removed a false block) and cleaned a merge hazard.
+
+### PF attestation
+
+S21 close (2026-06-02): No new PF-class entries this session. Observed but NOT promoted: (a) the S20 builder status-log claim "bda present in main" was factually wrong (conflated the `--add-dir` feature checkout with main) — an attestation-vs-reality mismatch in the AP-ORCH-SELF-ATTEST family, but a builder note that caused no harm (bda runs from the feature checkout) and the underlying divergence is now beaded (`gdw`), not a recurrence to log. (b) Near-miss caught: I almost accepted a spurious rc=1 (a scratch reverted-script copy failed on a missing `audit-helpers.sh`, not on the intended missing-floor logic) as the non-tautology proof — caught by READING the output file instead of trusting the exit code (AP-ACT-BEFORE-VERIFY at the micro level). (c) The 0be stale-branch landmine was caught by git-ls-files-before-merge — the guard working, not a failure. Recurring Bash output-buffering flake (EXIT= blanks; every result verified against authoritative output lines). The session-open protocol (PF-S13-01) HELD: baseline suite RUN, premise verified before scoping, no step stated-from-memory.
 
 ## Scope Contract — Session 20 (2026-05-30; closed 2026-06-01)
 
@@ -720,57 +737,50 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **PF-S17-01 / gate-3.5 grandfather seal — HELD (falsification window PASSED).** The batch-4 grandfather (4 slugs, gate-3.5 ordering, ADR `2026-06-01-batch4-gate35-ordering-grandfather.md`) was sealed forward by: PROTOCOL `start-iteration`-before-judges rule + retired `gate-3.5-summary.md`; new PROTOCOL step 5.5 builder SELF-GATE (builder runs bda + pastes EXIT 0 before signaling READY); INTEGRATION-CHECKLIST bda-EXIT≠0 hard-block except the 4 named slugs. **genetics-specialist was the falsification window and it HELD** — it entered the canonical gated path correctly (real attested `gate-3.5.json`, no grandfather invoked) and **bda EXIT 0 from the integrator's own run** at merge. The exception did NOT promulgate. Forward watch now shifts to library-authoring (same bda gate, per page).
-2. **AP-ORCH-SELF-ATTEST (PF-S3-01)** — held across all of batch-4 + genetics: every builder ran SEPARATE+PARALLEL fact-checker/judge + dispatched red-team; judge gates caught REAL defects (cardiovascular caught a *retracted* paper; longevity a mis-attributed PMID; genetics HALTed B/C on a CYP2D6 activity-score boundary + an unanchored allopurinol numeric). Integrator never merged on builder self-report — ran independent bda + drafter-binding + disjointness on every slug. Standing forward risk at library-authoring.
-3. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3)** — standing session-lifecycle discipline. Next session-open is the falsification window: execute each Start-Protocol step with real output, scope contract before any work; if any step is stated-from-memory, recurrence promotes to 4.
+1. **AP-ACT-BEFORE-VERIFY (PF-S6-01) — VINDICATED at S21.** `git ls-files`/diff-before-merge on the `0be` quarantine branch caught that the S20 branch was 18 commits stale and merging it would have REVERTED THE ROSTER (20 agents). Replaced with a fresh marker-only branch; stale branch deleted. The same guard fired at the micro level (rejected a spurious `rc=1` by reading output, not trusting the exit code). Standing discipline for ANY "operate on prior-session-described state" task — the next such tasks are the `bte` ingestion gate + the `gdw` governance-sync question.
+2. **AP-ORCH-SELF-ATTEST (PF-S3-01) — HELD at S21.** The bda `mhg` fix's verdict was RUN against the real merged design-work dirs (production-path validation, AC3), not asserted from the diff; the test's non-tautology was empirically demonstrated (a reverted-trigger copy FAILs the same fixture). Standing forward risk at library-authoring + when designing the `bte` mechanical gate (don't trust-attest that a gate works — exercise it).
+3. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3) — HELD at S21 open.** Every Start-Protocol step run with real output (baseline suite executed, premise verified before scoping, contract before work). Next session-open is the next falsification window; if any step is stated-from-memory, recurrence promotes to 4.
 
-**Demoted from prior Top-3:** the S19 "9/9 specialists FAIL bda" framing (resolved by hfm + batch-4 ADR); the gate-3.5 falsification window (now PASSED at genetics). AP-CROSS-ROLE-CONTRACT-DRIFT, AP-DEFERRED-LOOP-CLOSURE, AP-INCOMPLETE-PROPAGATION (closed at/by S16).
+**Demoted from prior Top-3:** PF-S17-01 / gate-3.5 grandfather seal (held; now background — forward watch is library-authoring, same bda gate per page).
 
 ## Current State (volatile)
 
-- **ROSTER COMPLETE — 20 agents live** (`origin/main` at `53b23a0`, 2026-06-02): 4 foundation + **16 specialists**. The full 16-specialist roster declared in `vault/WIKI.md` is deployed. No agent has authored any `vault/` library content yet — blast radius zero.
-- **genetics-specialist MERGED (PR #24)** as the 16th/final specialist — post-S20-close follow-up. It is the OWNER of `vault/dna/` (a gap no prior specialist held). **bda EXIT 0 from the integrator's own run, no grandfather** — the gate-3.5 seal's falsification window PASSED. The PROTOCOL step-5.5 builder self-gate (added before launch) worked: the builder ran bda itself and shipped green.
-- **batch-4 (S20) recap:** 5 specialists merged via REST (#19–#23); mental-performance-coach bda-clean, the other 4 grandfathered for gate-3.5 ordering ONLY (ADR `2026-06-01`). Containment shipped (PROTOCOL ordering rule + step-5.5 self-gate + INTEGRATION-CHECKLIST hard-block + risk-table rows). All worktrees/branches torn down.
-- **Integrator beads filed:** S20 — `mhg` (bda 7.5/8.5 reference-vs-compound-entry limitation, load-bearing), `5ot`, `3v5`, `xg4` (P2) + `ae0`/`d6g`/`4ba`/`3v6`/`dip` (P3). genetics — `t7z`/`fsr`/`8qe` (P3: design-doc numbering, dna-metadata-contract audit, 6-specialist dna-consumption conformance).
-- **Active landmarks:** no trigger windows opened. LM-03 (23andMe) now has its downstream owner deployed (genetics-specialist writes `vault/dna/`).
+- **ROSTER COMPLETE — 20 agents on `origin/main` (`7cf253b`, 2026-06-02):** 4 foundation + 16 specialists. No agent has authored any `vault/` library content yet — blast radius zero. (Unchanged from S20 except the `0be` marker merge.)
+- **bda `mhg` FIXED (S21):** `scripts/audit-research-provenance.sh` keys 7.5/8.5 on gate-2.75 `target.type=compound`, not risk-table `target_class`; fail-closed when unreadable. Change-discipline edit to INV-RESEARCH-PROVENANCE-DISJOINT (Walter-approved); smoke tests 6→8; production-validated (false-block cleared on cardiovascular/dermatologist/gi, genetics control EXIT 0). `mhg` + `5ot` closed.
+- **`0be` CLOSED:** supplement quarantine marker on main via PR #25 (rebase-merge). The S20 quarantine branch was 18 commits stale (would have reverted the roster) — deleted as a hazard; replaced by a fresh marker-only branch. Roster verified intact (20 agents) post-merge.
+- **NEW (`gdw`, P2):** origin/main is ~9 sessions stale on the governance layer — the bda script + INVARIANTS S13-S21 rows are absent from main; deployed agents are on main, but the audit/invariants/skills layer lives only on the feature continuity-carrier. Open branch-topology question for Walter; tied to `bte`.
+- **Feature branch** ahead of origin by 3 commits (mhg fix + S21 contract + close) as of 2026-06-02 S21 close — pushed at close.
+- **Active landmarks:** no trigger windows opened.
 
-**Historical (kept for reference):** `vault/meta/log.md` S19 + S20 entries.
+**Historical (kept for reference):** `vault/meta/log.md` S20 + S21 entries.
 
 ## What Is Next (volatile)
 
-### THE AGENT-BUILD PHASE IS DONE. Next-session agenda (Walter-set, ordered).
+### Agent-build phase done; bda `mhg` (item #1) done. Remaining Walter-set agenda (ordered).
 
-**RESUMPTION POINT.** 16/16 specialists + 4 foundation = 20 agents deployed on main (dated SHA in Current State). There are no more agents to build. The next work shifts from *building the factory* to *running it*. Walter set this explicit order for next session (2026-06-02):
+**RESUMPTION POINT.** Item #1 (`mhg`) is COMPLETE (S21). The two remaining Walter-set items, plus a prerequisite that surfaced this session:
 
-**1. FIRST — fix bda `mhg` (systemic, load-bearing).** 7.5/8.5 are required whenever `target_class=compound`, but those gates only fire in aplus-research when the research produces an ACTUAL compound vault entry (risk_tier fields / prescribing+non-English layers) — NOT for a goal-agnostic reference landscape (`target_type: reference`). Fix: `scripts/audit-research-provenance.sh` reads `target_type` from `gates/gate-2.75.json` and requires 7.5/8.5 only when the research targets a compound entry, not a reference landscape. Modifies a FROZEN, INVARIANTS-registered audit (INV-RESEARCH-PROVENANCE-DISJOINT) → change-discipline + re-run its 6 smoke tests (`scripts/tests/test_audit_research_provenance.sh`) + add a reference-landscape negative-case test. Without this, every compound-class library page hits a false bda block. (Author's own header comment lines 33-38 already gestures at this fix.)
+**0. PREREQUISITE (new, `gdw` P2) — resolve before `bte`.** origin/main is ~9 sessions stale on governance (bda + INVARIANTS S13-S21 absent from main). Decide WITH Walter what `main` is supposed to carry (shippable agents only, vs. the full governance/tooling layer). The `bte` gate's *location* depends on this answer — a vault-write gate keyed on bda+verify-chain must live wherever the writes/commits actually happen. Do NOT sync unilaterally.
 
-**2. THEN — make wiki ingestion mechanical (the library-authoring control, as a gate not a convention).** Today the "no `vault/` page ships without a passing bda/verify-chain on its OWN fresh research" rule (the hfm binding control) is a *documented discipline*, not a mechanical block — same shape as the gate-3.5 soft-pass that bit batch-4. Work out: a mechanical pre-write/commit gate that refuses a `vault/library|compounds|biomarkers/` page write unless a passing `gate_attest.py verify-chain` + bda EXIT 0 exists for THAT page's research (candidate: a PreToolUse/commit hook keyed on the page's provenance, mirroring `block-commit-main.sh`). Goal: ingestion can't happen from ungated research even if an agent tries — the control is structural, not trust-based.
+**1. THEN — make wiki ingestion mechanical (`bte`, P2).** Turn the "no `vault/library|compounds|biomarkers/` page ships without a passing bda/verify-chain on its OWN fresh research" rule from a documented discipline into a STRUCTURAL gate (candidate: a PreToolUse/commit hook keyed on per-page provenance, mirroring `block-commit-main.sh`). Goal: ingestion can't happen from ungated research even if an agent tries. Likely a new INVARIANT. Same soft-pass shape as the gate-3.5 issue that bit batch-4 — make it structural, not trust-based.
 
-**3. THEN — design the secure PII vault (separate from the public wiki; never sent to Anthropic).** Walter's requirement: a separate vault holding the operator's PII (DNA raw, labs, the operator-profile/current-state/goals real values, January-2026 issue, meds) that the SYSTEM can use for personalization at dispatch but is NEVER transmitted to Anthropic / never enters a model prompt. **Hard constraint to resolve at design time:** Claude Code agents run *by sending context to the Anthropic API* — so any PII an agent "reads" is by definition sent to Anthropic. The architecture must therefore separate (a) what the model reasons over from (b) where PII lives + how it's applied. Candidate patterns to evaluate (NOT yet decided): local-only deterministic pre/post-processing (PII substitution/tokenization before prompt, rehydration after), local non-LLM tooling that applies PII to model-produced templates, an air-gapped local vault the gated library NEVER imports from, encryption-at-rest + gitignore (already partial: `vault/dna/raw/`, `vault/labs/raw/` are gitignored dropzones). This is an architecture decision needing an ADR + likely an AskUserQuestion-free open discussion with Walter about the trust boundary. Tie-in: the genetics-specialist already encodes "genetic-exceptionalism/privacy" + "DTC-raw binds to a citable lab artifact, never operator say-so" — the PII vault is the storage side of that contract.
+**2. THEN — design the secure PII vault (`hil`, P1).** A separate vault holding operator PII (DNA raw, labs, the real operator-profile/current-state/goals values, January-2026 issue, meds) the system uses for personalization but NEVER sends to Anthropic. **Hard constraint:** Claude Code agents run by sending context to the Anthropic API — so any PII an agent "reads" IS sent to Anthropic. The architecture must separate (a) what the model reasons over from (b) where PII lives + how it's applied. Candidate patterns (NOT decided): local deterministic pre/post tokenization+rehydration; local non-LLM tooling stamping PII into model-produced templates; an air-gapped local vault the gated library never imports from; encryption-at-rest + gitignore (partial today: `vault/dna/raw/`, `vault/labs/raw/`). Needs an ADR + AskUserQuestion-free open discussion with Walter. Tie-in: genetics-specialist already encodes genetic-exceptionalism/privacy + "DTC-raw binds to a citable lab artifact, never operator say-so" — the PII vault is the storage side of that contract.
 
-**Operator-data preconditions** (Walter-pending, long-standing; feeds #3): real inputs the wiki's per-operator value is gated on — 23andMe raw → `vault/dna/raw/` (genetics-specialist is now its consumer), Oura purchase, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) are still `status: scaffold` — they ARE the PII surface #3 must protect.
-
-### Loose ends to close
-- **`0be` Part 2** — supplement quarantine marker is committed/pushed on `fix/supplement-gates-quarantine` but its PR is NOT merged (GraphQL was throttled). Merge via REST next session; then close `0be`.
-
-### Next-session agenda beads (the 3 items above)
-- **`mhg`** (P2) — item #1, fix bda 7.5/8.5 reference-vs-compound-entry. **Do first.**
-- **`bte`** (P2, feature) — item #2, make wiki ingestion mechanical (structural gate on vault/ page writes).
-- **`hil`** (P1, feature) — item #3, architect the secure PII vault (use operator PII without sending it to Anthropic); needs an ADR + open design discussion.
+**Operator-data preconditions** (Walter-pending; feeds #2): 23andMe raw → `vault/dna/raw/` (genetics-specialist is its consumer), Oura purchase, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) are still `status: scaffold` — they ARE the PII surface item #2 must protect.
 
 ### Open beads carried (not blocking the above)
-- **S20 + genetics (integrator)**: `5ot` (P2, cardio risk-class), `3v5` (P2, WIKI longevity Owns), `xg4` (P2, endocrine 5ARI gap); `ae0`/`d6g`/`4ba`/`3v6`/`dip` (P3); `t7z`/`fsr`/`8qe` (P3, genetics: design numbering / dna-metadata audit / 6-specialist dna-consumption)
-- **P2 carried**: `382` (biomarker namespace partition), `0be` (canonical gates — Part 1 DONE; supplement quarantine on `fix/supplement-gates-quarantine`, PR not yet merged — GraphQL was throttled), `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`
-- **P3 carried**: `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`
-- **Closed pre-S20**: `hfm`, `08d` (S19)
+- **P1:** `hil` (PII vault — item #2 above).
+- **P2:** `bte` (mechanical ingestion — item #1 above), `gdw` (governance-sync prerequisite), `3v5` (WIKI longevity Owns), `xg4` (endocrine 5ARI gap), `382` (biomarker namespace partition), `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
+- **P3:** `ae0`/`d6g`/`4ba`/`3v6`/`dip` (batch-4 PROPOSED audits/lints), `t7z`/`fsr`/`8qe` (genetics follow-ups), `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
+- **Closed S21:** `mhg`, `5ot`, `0be`.
 
 ### Open project work (unchanged)
-- Walter pending: 23andMe raw file → `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health-issue characterization.
+- Walter pending: 23andMe raw → `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health-issue characterization.
 - Vault git-tracking decision deferred. First HTML artifact deferred (LM-04).
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S20 (2026-06-01) or the 2026-06-02 genetics follow-up. LM-03 (23andMe) now has its downstream owner deployed: genetics-specialist is the `vault/dna/` writer (drop the raw file into `vault/dna/raw/` to trigger ingest).
+All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S21 (2026-06-02). LM-01's 14-day-before window depends on the still-TBD July exact date; LM-02/03/04 remain Walter-pending. No status flips due.
 
 ## Open Issues
 
