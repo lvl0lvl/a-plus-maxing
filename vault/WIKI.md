@@ -224,6 +224,7 @@ Bloodwork panels by date.
 
 ### Ingest
 When new knowledge arrives (compound researched, lab result in, protocol changed, decision made):
+0. **Provenance (gated).** A `vault/{compounds,biomarkers,library}/` page declares its research provenance in frontmatter: `provenance_dir:` (the `/aplus-research` design-work dir that holds `gates/`) and `provenance_slug:` (the bda slug) — i.e. the `audit-research-provenance.sh <design-work-dir> <slug>` pair. The commit-time gate `scripts/wiki-ingest-lint.sh` (PreToolUse hook `block-ungated-vault-write.sh`, `INV-WIKI-INGESTION-GATED`) refuses the commit unless that provenance passes `bda` + `verify-chain`, every mandatory section is present, frontmatter enums are valid, and the page is registered in `meta/index.md`. Pre-gate pages are listed in `vault/library/_ingest-grandfather.txt` (provenance-exempt ONLY — every other check still applies; each is a back-fill obligation, not a permanent waiver).
 1. Create or update the relevant entity page following the template
 2. Update meta/index.md
 3. Check for contradictions with existing pages
@@ -237,7 +238,11 @@ When asking the agent about the system:
 3. Cite wiki pages in the answer
 
 ### Lint
-Run every 5 sessions or at phase boundaries:
+Two mechanical controls enforce this (S23, bead `bte` — previously manual discipline):
+
+- **Commit-time (blocking)** — `scripts/wiki-ingest-lint.sh`, run by PreToolUse hook `block-ungated-vault-write.sh` on every staged `vault/{compounds,biomarkers,library}/` page. Deterministic per-page battery: provenance (bda + verify-chain), structural conformance (compounds/biomarkers strict per the templates above; library lighter — heterogeneous), frontmatter/enum validity, index sync. Link integrity is **advisory** here (forward-references to not-yet-authored pages are legitimate mid-buildout). A failing page cannot be committed (`INV-WIKI-INGESTION-GATED`).
+- **Periodic (whole-vault)** — `scripts/wiki-lint.sh`, run every 5 sessions / at phase boundaries. The 6 graph-level checks below. **Violations (exit 1):** dead-namespace links (typo'd folder) + unresolved (`Status: open`) contradictions. **Advisory (info):** orphan, stale, coverage, provisional, forward-ref links.
+
 1. Orphan check — pages with no inbound links
 2. Stale check — last_verified older than review_cadence
 3. Contradiction check — unresolved items in contradictions.md
@@ -317,3 +322,4 @@ The wiki is queryable knowledge — agnostic to who reads or writes it. Speciali
   - linked monitoring biomarker(s)
   - stopping criteria in Trial Status
 - Pages cite the decision matrix in `library/methodology/evidence-tiers.md` when status moves from `researching` → `planned`
+- Every `vault/{compounds,biomarkers,library}/` page declares its research provenance: `provenance_dir:` + `provenance_slug:` frontmatter pointing at the gated `/aplus-research` design-work dir (the bda `<design-work-dir> <slug>` pair). Enforced at commit by `INV-WIKI-INGESTION-GATED` (`scripts/wiki-ingest-lint.sh`); pre-gate exemptions live in `vault/library/_ingest-grandfather.txt`.

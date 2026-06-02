@@ -12,6 +12,59 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 23 (2026-06-02)
+
+Goal: Make wiki ingestion mechanical (`bte`, expanded at Walter's direction) — turn the already-written-but-unenforced wiki accuracy rules (WIKI.md Ingest/Lint/Conventions + entity templates + research provenance) into TWO mechanical controls: (a) a **commit-time blocking gate** that refuses a `vault/{library,compounds,biomarkers}/` entity-page commit unless it passes a deterministic accuracy battery, and (b) a **periodic whole-vault lint** implementing WIKI.md's 6-check Lint operation (which has never had a script). Provenance (bda + verify-chain) is ONE control among several.
+
+**Change-discipline approval (Walter, 2026-06-02): GRANTED at contract confirmation** — AC5 registers a NEW invariant `INV-WIKI-INGESTION-GATED` with the commit hook as its mechanical verification.
+
+**Integrator decisions (reversible; surfaced for redirect):**
+- **Page→provenance binding** = flat frontmatter pointers `provenance_dir:` + `provenance_slug:` on each gated page, resolving to bda's `<design-work-dir> <slug>` CLI. Chosen over location-convention/co-located-gates: explicit, lints cleanly, matches the existing `research_layer:`-style pointer convention, doesn't clutter the vault with gate JSON.
+- **Grandfather** the 4 pre-gate bpc-157 pages (`compounds/bpc-157.md` + the 3 `library/peptides/bpc-157/*` layers) from the PROVENANCE check only (still subject to the other checks) via an explicit allowlist; flagged for back-fill. Same accepted pattern as the gate-3.5 batch-4 grandfather (ADR 2026-06-01).
+- **Blocking set (Walter-confirmed)** = provenance, structural conformance (compounds/biomarkers strict; library lighter), frontmatter/enum validity, link integrity, index sync. **Periodic (folded in, non-blocking)** = WIKI.md's 6: orphan, stale, contradiction, coverage, link integrity, confidence audit.
+
+Acceptance criteria:
+- [ ] AC1 — Page→provenance binding convention documented in `vault/WIKI.md` (the ingestion-rules owner); `provenance_dir:`/`provenance_slug:` fields specified for gated entity pages; grandfather allowlist created + documented.
+- [ ] AC2 — `scripts/lib/wiki-helpers.sh` (NEW shared lib): frontmatter-field extraction, `## ` section listing, `[[wikilink]]` listing + resolution, entity-type-from-path, is-gated-entity-page (excludes `_*`, README, methodology/, _archive/). Sourced by both scripts.
+- [ ] AC3 — `scripts/wiki-ingest-lint.sh <page>` (commit-time blocking battery): provenance (bda+verify-chain via the frontmatter pointer, grandfather-aware), structural conformance, frontmatter/enum validity, link integrity, index sync; `violation` per failed check; exit 0/1; usage error exit 2.
+- [ ] AC4 — `.claude/hooks/block-ungated-vault-write.sh` (PreToolUse Bash): on a `git commit` staging a gated `vault/{library,compounds,biomarkers}/` entity page, run `wiki-ingest-lint.sh` on each; deny the commit if any fails. Mirrors `block-commit-main.sh` (deny-JSON + exit 0). Wired into `.claude/settings.json` PreToolUse Bash chain.
+- [ ] AC5 — `scripts/wiki-lint.sh` (periodic whole-vault): WIKI.md's 6 checks; `violation` for genuinely-wrong (broken link, unresolved contradiction), `info` for advisory (orphan/stale/provisional/coverage); exit 0/1. WIKI.md "Lint" section annotated blocking-vs-periodic.
+- [ ] AC6 — Non-tautological smoke tests: `scripts/tests/test_wiki_ingest_lint.sh` + `scripts/tests/test_wiki_lint.sh` + `.claude/hooks/tests/test_block_ungated_vault_write.sh`; each check has pass+fail case; the fail-cases must FAIL if the gate/check is removed (CLAUDE.md no-tautological-tests mandate); existing suites still green.
+- [ ] AC7 — `INV-WIKI-INGESTION-GATED` registered in INVARIANTS.md (register row + Change Log, change-discipline ritual); mechanical verification = the hook + ingest-lint script; close step 8.5 updated if a close-time run is wanted.
+- [ ] AC8 — Close: 4 close audits + branch-completeness green at `--session 23`; PF attestation; VOLATILE 6-clause rotation; `bte` closed; all work on `feature/wiki-ingestion-gate` off `main`, PR back (never commit to `main`).
+
+Files I WILL touch: `scripts/lib/wiki-helpers.sh` (NEW), `scripts/wiki-ingest-lint.sh` (NEW), `scripts/wiki-lint.sh` (NEW), `scripts/tests/test_wiki_ingest_lint.sh` + `test_wiki_lint.sh` (NEW), `.claude/hooks/block-ungated-vault-write.sh` (NEW) + `.claude/hooks/tests/test_block_ungated_vault_write.sh` (NEW), `.claude/settings.json` (wire hook), `INVARIANTS.md` (register + Change Log), `vault/WIKI.md` (binding convention + blocking-vs-periodic annotation), `vault/library/_ingest-grandfather.txt` (NEW allowlist), `CLAUDE.md` (close step 8.5 only IF a close-time lint run is added), `HANDOFF.md` (contract+close+rotation), `.beads/*` via `bd`, `vault/sessions/session-23.md` (NEW), `vault/meta/log.md`, `memory/process-failures.md` (only if a PF surfaces).
+
+Files I will NOT touch: `lib/gate_attest.py`, `schemas/*`, `scripts/audit-research-provenance.sh` (bda — consume, never edit), `templates/specialist-risk-class.yaml`, any `.claude/agents/*/agent.md` body, any existing `vault/{library,compounds,biomarkers}/` CONTENT pages (gate guards future writes; no back-fill of suspect bpc-157 this session — only the grandfather allowlist names them), `main` directly.
+
+NOT doing: `hil` (PII vault — separate session); the semantic commit-time checks (contradiction/coverage/confidence/stale stay in the PERIODIC lint, never a blocking hook — they're cross-page/semantic); claim-level source-admissibility re-parsing at commit (already enforced in `/aplus-research` Phase 4.75 + transitively by the provenance gate); back-filling provenance onto the suspect bpc-157 pages; any library-population / research runs; other carried beads.
+
+Invariants at risk: `INV-WIKI-INGESTION-GATED` (new — change-discipline, AC7); `INV-BRANCH-NOT-MAIN` (feature branch only; PR to main); `INV-RESEARCH-PROVENANCE-DISJOINT` (the gate CONSUMES bda — must not weaken it; no edit to the bda script); `INV-TRUNK-COMPLETENESS` + `INV-SCOPE-CONTRACT`/`INV-PF-ATTESTATION`/`INV-HO-ROTATION`/`INV-HO-NO-STALE-HASH` (standard close).
+
+Self-recognition pre-flight: watching for "add an LLM/semantic check to the commit hook" (NO — commit gates stay deterministic + fast; semantic checks live in the periodic lint + the research pipeline) and "the smoke test passes so the check works" (PF-S3-01 — each fail-case must be PROVEN to fail by removing the check, not asserted) and "library/ pages should follow the strict template" (they're heterogeneous — entry-shape vs aplus-research layers; strict sections are compounds/biomarkers only).
+
+### S23 Scope Contract Evaluation (volatile)
+
+- **AC1 — PASS.** Binding convention (`provenance_dir`/`provenance_slug` frontmatter pointer → bda `<design-work-dir> <slug>`) documented in `vault/WIKI.md` Ingest step 0 + Conventions; grandfather allowlist `vault/library/_ingest-grandfather.txt` created (4 pre-gate bpc-157 pages, provenance-exempt only) + documented.
+- **AC2 — PASS.** `scripts/lib/wiki-helpers.sh` built; smoke-validated against the real bpc-157 page (caught + fixed a `basename` PATH bug → bash parameter expansion).
+- **AC3 — PASS.** `scripts/wiki-ingest-lint.sh` — all checks; 14/14. Running against the real page caught a brittle experimental-contraindications regex false-flagging richly-populated content → replaced with format-tolerant `marker_populated` (the mhg false-positive lesson, applied to my own gate).
+- **AC4 — PASS.** `.claude/hooks/block-ungated-vault-write.sh` (6/6) + wired into `.claude/settings.json`; bash-3.2-safe; jq deny JSON. **Production-path validated** against the real repo with real bda: a staged ungated page is denied citing the invariant.
+- **AC5 — PASS.** `scripts/wiki-lint.sh` (9/9); WIKI.md "Lint" annotated blocking (commit) vs periodic (whole-vault). Running against the real vault caught a code-fence `Status: open` false contradiction → fixed (strip fenced blocks).
+- **AC6 — PASS.** 3 non-tautological suites = 29/29; non-tautology PROVEN by reverting the provenance check (REAL rc=1 / NEUTERED rc=0, with the reverted copy inside `scripts/` so `lib/` resolves — the PF-S21 near-miss avoided). All 12 existing suites still green.
+- **AC7 — PASS.** `INV-WIKI-INGESTION-GATED` registered (register row + "Wiki / ingestion" category + Change Log S23, change-discipline ritual). No close-time run added to step 8.5 — the gate is PreToolUse-enforced; the periodic lint is every-5-sessions (CLAUDE.md intentionally untouched).
+- **AC8 — PASS.** This close: 4 close audits + branch-completeness green at `--session 23`; PF attestation; VOLATILE rotation; `bte` closed; work on `feature/wiki-ingestion-gate` → PR (never direct to main).
+- **CHANGED (documented, data-forced):** link-integrity reclassified blocking→**advisory at commit** (the real bpc-157 legitimately forward-references ~12 unbuilt biomarker pages; hard-blocking would false-block buildout) — still **blocking in the periodic lint**. Surfaced when confirmed, not silent.
+
+### Drift checks (S23 close)
+
+- **Task drift:** scope EXPANDED — Walter-directed (provenance-only → full accuracy battery + folding in the periodic lint). Documented, his instruction, not orchestrator freelancing. One data-forced CHANGED (link-integrity advisory at commit). No expansion into `hil`/library/research; agent + design-doc bodies untouched; CLAUDE.md untouched.
+- **Architecture drift:** toward LESS violation — the wiki accuracy controls move from documented-discipline to mechanical; a structural gate now prevents ungated content entering the wiki (the exact PF-S17-01 risk at the library-population boundary). No invariant moved toward violation.
+- **Vision drift:** none — "single-operator health-agent system of gated, source-grounded specialists" unchanged; this session extended the "gated" property to the wiki INGESTION boundary (the library write surface).
+
+### PF attestation
+
+S23 close (2026-06-02): No new PF-class entries this session. Observed but NOT promoted: (a) two false-positives in my OWN gate (experimental-contraindications regex; code-fence `Status: open`) caught by running against real artifacts before shipping — this is the AP-ACT-BEFORE-VERIFY / mhg-false-positive lesson WORKING, not a failure; (b) the PF-S21 non-tautology near-miss replayed exactly (a `/tmp` reverted-script copy failed on a missing `lib/audit-helpers.sh` — wrong reason) — caught by reading the output, re-proven with the copy inside `scripts/` (REAL=1/NEUTERED=0); the guard held; (c) recurring tooling artifacts (zsh `nomatch` on empty globs → switched to `find`; `EXIT=` blanks through pipes → every result verified against authoritative `N violation(s)`/`passed,` lines). The session-open protocol (PF-S13-01) HELD: every Start-Protocol step run with real output including `branch-completeness-audit.sh` at OPEN; the scope contract was written and Walter-confirmed before any code.
+
 ## Scope Contract — Session 22 (2026-06-02)
 
 Goal: Resolve `gdw` — make `main` the single complete trunk (union of main's 20 agents + design provenance and feature's governance/vault/tooling), install a mechanical guard (`branch-completeness-audit.sh`) so branch-write fragmentation can't silently recur, log the root cause as a new PF class (`AP-BRANCH-WRITE-FRAGMENTATION`), and retire the long-lived feature carrier (tag-and-freeze).
@@ -788,39 +841,39 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **AP-BRANCH-WRITE-FRAGMENTATION (PF-S22-01, recurrence_count=1) — NEW, root-caused + reconciled + mechanically guarded this session.** Product (16 specialists) lived on main / governance lived on feature, no reconciliation for ~15 sessions (a prior remediation, `never-PR-feature→main`, seeded it). Resolved: single-trunk reconciliation (main = complete) + `INV-TRUNK-COMPLETENESS` (`branch-completeness-audit.sh`, open+close). **Falsification window = the first parallelized track after S22** (library-population research batches): if a batch completes without the completeness audit green at close, recurrence promotes to 2. Declare ONE merge target; verify trunk-complete after every batch.
-2. **AP-ACT-BEFORE-VERIFY (PF-S6-01) — VINDICATED again at S22.** The verified-superset pre-merge analysis (risk-class diff = +2 rows only; INVARIANTS/PF supersets) pre-empted losing a risk-class row / PF entry / bead in the union merge; the aborted dry-run de-risked the contract; `bd doctor` confirmed no merge corruption. Standing discipline for the next parallel work.
-3. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3) — standing.** Next session-open is the falsification window: run each Start-Protocol step with real output AND (new this session) run `branch-completeness-audit.sh` at OPEN; if any step is stated-from-memory, recurrence promotes to 4.
+1. **PF-S22-01 falsification window — NOW DOUBLE-GUARDED, still the #1 forward risk.** The first parallelized track after S22 = the library-population research batches. As of S23 it is guarded by BOTH `INV-TRUNK-COMPLETENESS` (`branch-completeness-audit.sh`, open+close) AND the new `INV-WIKI-INGESTION-GATED` commit gate. At each library batch close: declare ONE merge target, run `branch-completeness-audit.sh` AND `scripts/wiki-lint.sh`; an ungated page is now structurally un-committable. If a batch closes without these green, recurrence promotes to 2.
+2. **mhg-false-positive / AP-ORCH-SELF-ATTEST family (PF-S3-01) — VINDICATED twice at S23.** A deterministic gate is only correct if validated against REAL artifacts, not just fixtures: the new wiki gate had two false-positives (experimental-contraindications regex; code-fence contradiction) that ONLY surfaced by running against the real bpc-157 page + real vault. Standing discipline for any new gate AND at library-authoring (the gate must not false-block good content, nor vacuously pass bad).
+3. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3) — standing.** Next session-open is the falsification window: run each Start-Protocol step with real output AND run `branch-completeness-audit.sh` at OPEN; if any step is stated-from-memory, recurrence promotes to 4.
 
-**Demoted from prior Top-3:** AP-ORCH-SELF-ATTEST (PF-S3-01, held at S21, background — standing risk at library-authoring); PF-S17-01 / gate-3.5 grandfather (background).
+**Demoted from prior Top-3:** AP-BRANCH-WRITE-FRAGMENTATION (PF-S22-01 — folded into #1's falsification window; reconciled+guarded S22); AP-ACT-BEFORE-VERIFY (PF-S6-01 — folded into #2, the verify-against-real-artifacts discipline).
 
 ## Current State (volatile)
 
-- **SINGLE TRUNK — `main` is now the complete project (as of 2026-06-02 S22 close):** the 20 agents (4 foundation + 16 specialists) AND the governance/tooling/vault/skills layer, reconciled via a verified union merge (S22 reconciliation PR, REST). The ~15-session product/process branch split (PF-S22-01) is RESOLVED. No agent has authored any `vault/` library content yet — blast radius zero.
-- **Feature carrier RETIRED:** `feature/wiki-bpc157-aplus-research` tag-and-frozen as `archive/feature-wiki-bpc157-aplus-research` (history reachable, branch ref gone). The working checkout is now `main`. Going forward: short-lived `feature/*`/`fix/*` branches off `main`, deleted after merge (ADR `2026-06-02-single-trunk-reconciliation`; CLAUDE.md convention updated).
-- **`INV-TRUNK-COMPLETENESS` live:** `branch-completeness-audit.sh` (3/3 smoke) runs at session open + close (step 8.5); asserts the checkout holds every deployed agent on `origin/main` + the governance layer. Would have caught the split at S16.
-- **`gdw` CLOSED** (this session's work). `mhg`/`5ot`/`0be` closed S21; bda `mhg` fix (7.5/8.5 on `target.type`) is on the trunk.
+- **SINGLE TRUNK — `main` is the complete project** (since S22 close, 2026-06-02): 20 agents + governance/tooling/vault/skills. This session's work is on `feature/wiki-ingestion-gate` (off `main`), PR'd back. No agent has authored any `vault/` library content yet — the new gate guards the first writes.
+- **WIKI INGESTION IS NOW MECHANICALLY GATED (S23, `bte` CLOSED).** Commit-time blocking battery `scripts/wiki-ingest-lint.sh` + PreToolUse hook `.claude/hooks/block-ungated-vault-write.sh` (wired into `.claude/settings.json`) refuses a `vault/{compounds,biomarkers,library}/` page commit that fails provenance (bda+verify-chain via `provenance_dir`/`provenance_slug` frontmatter, grandfather-aware) / structural / frontmatter-enum / index-sync. Periodic whole-vault `scripts/wiki-lint.sh` (WIKI.md's 6-check Lint) for every-5-session/phase-boundary runs. `INV-WIKI-INGESTION-GATED` live; 29/29 new smoke + all 12 existing suites green; production-path validated. Shared lib `scripts/lib/wiki-helpers.sh`. Grandfather allowlist `vault/library/_ingest-grandfather.txt` (4 pre-gate bpc-157 pages, provenance-exempt only — back-fill obligation).
+- **`INV-TRUNK-COMPLETENESS` live** (S22): `branch-completeness-audit.sh` at open + close (step 8.5). Green at S23 open (20 agents, 0 absent).
+- **Closed S23:** `bte`. (S22: `gdw`; S21: `mhg`/`5ot`/`0be`.)
 - **Active landmarks:** no trigger windows opened.
 
-**Historical (kept for reference):** `vault/meta/log.md` S21 + S22 entries.
+**Historical (kept for reference):** `vault/meta/log.md` S22 + S23 entries.
 
 ## What Is Next (volatile)
 
-### Trunk is sane (gdw done). Remaining Walter-set agenda (ordered).
+### bte done — wiki ingestion is gated. Remaining Walter-set agenda.
 
-**RESUMPTION POINT.** `gdw` is COMPLETE (S22) — `main` is the single complete trunk, the carrier is retired, and `INV-TRUNK-COMPLETENESS` guards against re-fragmentation. **Open the next session on `main`** (run the Start Protocol + `branch-completeness-audit.sh` at open). The two remaining Walter-set items:
+**RESUMPTION POINT.** `bte` is COMPLETE (S23) — wiki ingestion is mechanically gated (commit-time + periodic), `INV-WIKI-INGESTION-GATED` registered. **Open the next session on `main`** (run the Start Protocol + `branch-completeness-audit.sh` at open; this session's PR merges first). Two forward tracks:
 
-**1. Make wiki ingestion mechanical (`bte`, P2).** Now UNBLOCKED — the trunk-location question `gdw` raised is answered: `main` is the single trunk and the working checkout is off it, so a vault-write provenance gate lives where the writes/commits happen. Turn the "no `vault/library|compounds|biomarkers/` page ships without a passing bda/verify-chain on its OWN fresh research" rule from a documented discipline into a STRUCTURAL gate (candidate: a PreToolUse/commit hook keyed on per-page provenance, mirroring `block-commit-main.sh`). Likely a new INVARIANT. Same soft-pass shape as the gate-3.5 issue that bit batch-4 — make it structural, not trust-based. NB: the FIRST library-population batch is also PF-S22-01's falsification window — declare one merge target + run branch-completeness at the batch's close.
+**1. Design the secure PII vault (`hil`, P1) — the remaining Walter-set item.** A separate vault holding operator PII (DNA raw, labs, the real operator-profile/current-state/goals values, January-2026 issue, meds) the system uses for personalization but NEVER sends to Anthropic. **Hard constraint:** Claude Code agents run by sending context to the Anthropic API — so any PII an agent "reads" IS sent to Anthropic. The architecture must separate (a) what the model reasons over from (b) where PII lives + how it's applied. Candidate patterns (NOT decided): local deterministic pre/post tokenization+rehydration; local non-LLM tooling stamping PII into model-produced templates; an air-gapped local vault the gated library never imports from; encryption-at-rest + gitignore (partial today: `vault/dna/raw/`, `vault/labs/raw/`). Needs an ADR + **AskUserQuestion-free** open discussion with Walter. Tie-in: genetics-specialist already encodes genetic-exceptionalism/privacy.
 
-**2. Design the secure PII vault (`hil`, P1).** A separate vault holding operator PII (DNA raw, labs, the real operator-profile/current-state/goals values, January-2026 issue, meds) the system uses for personalization but NEVER sends to Anthropic. **Hard constraint:** Claude Code agents run by sending context to the Anthropic API — so any PII an agent "reads" IS sent to Anthropic. The architecture must separate (a) what the model reasons over from (b) where PII lives + how it's applied. Candidate patterns (NOT decided): local deterministic pre/post tokenization+rehydration; local non-LLM tooling stamping PII into model-produced templates; an air-gapped local vault the gated library never imports from; encryption-at-rest + gitignore (partial today: `vault/dna/raw/`, `vault/labs/raw/`). Needs an ADR + AskUserQuestion-free open discussion with Walter. Tie-in: genetics-specialist already encodes genetic-exceptionalism/privacy + "DTC-raw binds to a citable lab artifact, never operator say-so".
+**2. Library-population phase (now UNBLOCKED + GATED).** The actual product work — agents authoring `vault/{compounds,biomarkers,library}/` pages from fresh `/aplus-research` runs. Each page now needs `provenance_dir`/`provenance_slug` frontmatter + must pass `wiki-ingest-lint.sh` to commit. This is ALSO PF-S22-01's falsification window: declare ONE merge target, run `branch-completeness-audit.sh` + `wiki-lint.sh` at each batch close. The 4 grandfathered bpc-157 pages are back-fill obligations (re-run on the gated path, then remove from `_ingest-grandfather.txt`).
 
-**Operator-data preconditions** (Walter-pending; feeds #2): 23andMe raw → `vault/dna/raw/` (genetics-specialist is its consumer), Oura purchase, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) are still `status: scaffold` — they ARE the PII surface item #2 must protect.
+**Operator-data preconditions** (Walter-pending; feeds #1): 23andMe raw → `vault/dna/raw/`, Oura purchase, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) are still `status: scaffold` — they ARE the PII surface item #1 must protect.
 
 ### Open beads carried (not blocking the above)
-- **P1:** `hil` (PII vault — item #2 above).
-- **P2:** `bte` (mechanical ingestion — item #1 above), `3v5` (WIKI longevity Owns), `xg4` (endocrine 5ARI gap), `382` (biomarker namespace partition), `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
+- **P1:** `hil` (PII vault — item #1 above).
+- **P2:** `3v5` (WIKI longevity Owns), `xg4` (endocrine 5ARI gap), `382` (biomarker namespace partition), `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
 - **P3:** `ae0`/`d6g`/`4ba`/`3v6`/`dip` (batch-4 PROPOSED audits/lints), `t7z`/`fsr`/`8qe` (genetics follow-ups), `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
-- **Closed S22:** `gdw`. **Closed S21:** `mhg`, `5ot`, `0be`.
+- **Closed S23:** `bte`. **S22:** `gdw`. **S21:** `mhg`, `5ot`, `0be`.
 
 ### Open project work (unchanged)
 - Walter pending: 23andMe raw → `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health-issue characterization.
@@ -828,7 +881,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S22 (2026-06-02). LM-01's 14-day-before window depends on the still-TBD July exact date; LM-02/03/04 remain Walter-pending. No status flips due.
+All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S23 (2026-06-02). LM-01's 14-day-before window depends on the still-TBD July exact date; LM-02/03/04 remain Walter-pending. No status flips due.
 
 ## Open Issues
 
