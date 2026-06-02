@@ -88,3 +88,21 @@ slot, **genetics-specialist**.
 - **Library-population** (epic `c6k`) — the first actual product (operator-facing
   wiki); each page gated by fresh `/aplus-research` + passing bda. Resolve `mhg`
   (systemic 7.5/8.5 limitation) before heavy authoring.
+
+## Follow-up (2026-06-02): genetics-specialist MERGED → roster COMPLETE
+
+genetics-specialist built + integrated (PR #24, main `53b23a0`). **16/16 specialists +
+4 foundation = 20 agents deployed.** The agent-build phase is DONE.
+
+- **bda EXIT 0 from the integrator's own run — NO grandfather invoked.** This was the
+  falsification window for the batch-4 gate-3.5 grandfather seal ([[2026-06-01-batch4-gate35-ordering-grandfather]]):
+  it HELD. genetics entered the canonical gated path correctly (real attested
+  `gate-3.5.json`; `start-iteration` before judges).
+- The PROTOCOL step-5.5 builder SELF-GATE (added before launch) worked as designed: the
+  builder ran bda itself and shipped green; integrator independently re-verified.
+- Drafter-binding clean (deployed medical agents); disjointness clean.
+- Beads filed: `t7z` (design §5/§15.2 numbering), `fsr` (dna-metadata-contract audit),
+  `8qe` (6 dna-reading specialists' consumption conformance). Bead #1 (rebase precondition)
+  resolved at merge — risk-table row + bda + INV all present, bda re-run EXIT 0.
+- Next: library-population (epic `c6k`) — first actual product. Fix systemic bda 7.5/8.5
+  limitation (`mhg`) before heavy compound-page authoring.

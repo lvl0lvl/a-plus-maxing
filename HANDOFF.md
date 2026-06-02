@@ -692,38 +692,37 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **PF-S17-01 / gate-3.5 attestation-ordering soft-pass (BOUNDED at S20)** — 4 of 5 batch-4 builders recorded the judge gate as `gate-3.5-summary.md` instead of an attested `gate-3.5.json` (judges dispatched before `start-iteration`), inheriting the gi/peptide precedent → bda FAIL. Merged under a **one-time, batch-4-only** grandfather (ADR `2026-06-01-batch4-gate35-ordering-grandfather.md`). **The forward seal is the live risk to guard:** PROTOCOL now mandates `start-iteration` before judge dispatch + retires `gate-3.5-summary.md`; INTEGRATION-CHECKLIST makes bda EXIT≠0 a hard block except the 4 named slugs. **Falsification window: genetics-specialist** — its bda MUST EXIT 0. A non-zero bda merged anyway = the exception promulgated = PF-class failure.
-2. **AP-ORCH-SELF-ATTEST (PF-S3-01)** — held across batch-4: every builder ran SEPARATE+PARALLEL fact-checker/judge at `/upgrade-agent` Phase 4 + dispatched red-team at design Phase 3; judge gates caught REAL defects (cardiovascular caught a *retracted* paper grounding live BP numbers; longevity caught a mis-attributed PMID). Integrator did NOT merge on builder self-report — ran independent bda + drafter-binding + disjointness on all 5. Standing forward risk at library-authoring.
+1. **PF-S17-01 / gate-3.5 grandfather seal — HELD (falsification window PASSED).** The batch-4 grandfather (4 slugs, gate-3.5 ordering, ADR `2026-06-01-batch4-gate35-ordering-grandfather.md`) was sealed forward by: PROTOCOL `start-iteration`-before-judges rule + retired `gate-3.5-summary.md`; new PROTOCOL step 5.5 builder SELF-GATE (builder runs bda + pastes EXIT 0 before signaling READY); INTEGRATION-CHECKLIST bda-EXIT≠0 hard-block except the 4 named slugs. **genetics-specialist was the falsification window and it HELD** — it entered the canonical gated path correctly (real attested `gate-3.5.json`, no grandfather invoked) and **bda EXIT 0 from the integrator's own run** at merge. The exception did NOT promulgate. Forward watch now shifts to library-authoring (same bda gate, per page).
+2. **AP-ORCH-SELF-ATTEST (PF-S3-01)** — held across all of batch-4 + genetics: every builder ran SEPARATE+PARALLEL fact-checker/judge + dispatched red-team; judge gates caught REAL defects (cardiovascular caught a *retracted* paper; longevity a mis-attributed PMID; genetics HALTed B/C on a CYP2D6 activity-score boundary + an unanchored allopurinol numeric). Integrator never merged on builder self-report — ran independent bda + drafter-binding + disjointness on every slug. Standing forward risk at library-authoring.
 3. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3)** — standing session-lifecycle discipline. Next session-open is the falsification window: execute each Start-Protocol step with real output, scope contract before any work; if any step is stated-from-memory, recurrence promotes to 4.
 
-**Demoted from prior Top-3:** the S19 "9/9 specialists FAIL bda" framing — resolved by the hfm grandfather (design-work ≠ library content) + the batch-4 ADR. AP-CROSS-ROLE-CONTRACT-DRIFT, AP-DEFERRED-LOOP-CLOSURE, AP-INCOMPLETE-PROPAGATION (closed at/by S16).
+**Demoted from prior Top-3:** the S19 "9/9 specialists FAIL bda" framing (resolved by hfm + batch-4 ADR); the gate-3.5 falsification window (now PASSED at genetics). AP-CROSS-ROLE-CONTRACT-DRIFT, AP-DEFERRED-LOOP-CLOSURE, AP-INCOMPLETE-PROPAGATION (closed at/by S16).
 
 ## Current State (volatile)
 
-- **19 agents live** (as of 2026-06-01 S20 close; `origin/main` at `a0a3fa9`): 4 foundation + **15 specialists**. Batch-4's 5 (cardiovascular, recovery, longevity-strategist, mental-performance-coach, dermatologist) merged this session. **Only `genetics-specialist` (16th roster slot) remains.** No agent has authored any `vault/` library content — blast radius zero.
-- **Roster expanded 15 → 16** — `genetics-specialist` added (genetics/pharmacogenomics; becomes OWNER of `vault/dna/`, a gap no prior specialist held). Kickoff + outbox + WIKI row + risk-table row (`mode_floor: deep`) all set up; build NOT yet started. Worktree NOT created (launch recipe in `coordination/launch-batch4.md` Builder 6).
-- **batch-4 merged via REST** (PRs #19/#20/#21/#22/#23 rebase-merged one at a time; GraphQL throttled, REST `gh api .../merges`). **mental-performance-coach passed bda clean**; the other 4 grandfathered for the gate-3.5 ordering defect ONLY (ADR `2026-06-01-batch4-gate35-ordering-grandfather.md`). Integrator gates run on all 5: drafter-binding (deployed medical agents — VERIFIED from drafts on all 5; no PF-S12-01), disjointness (clean), bda (1 pass / 4 grandfathered).
-- **Grandfather containment shipped** (the condition on the exception): PROTOCOL mandates `start-iteration` before judge dispatch (retires `gate-3.5-summary.md`); INTEGRATION-CHECKLIST hard-blocks bda EXIT≠0 except the 4 named slugs; risk-table gains dermatologist + genetics rows.
-- **5 worktrees + branches torn down** (local + remote); MERGED posted to each outbox.
-- **9 integrator beads filed** — load-bearing: `mhg` (bda 7.5/8.5 reference-vs-compound-entry limitation, systemic), `5ot` (cardio risk-class target_class), `3v5` (WIKI longevity Owns overstates writes), `xg4` (endocrine doesn't enumerate 5ARI that dermatologist routes to it). Non-blocking: `ae0`/`d6g`/`4ba`/`3v6`/`dip` (PROPOSED audits + cosmetics).
-- **Active landmarks unchanged.** No trigger windows opened during S20 (2026-06-01).
+- **ROSTER COMPLETE — 20 agents live** (`origin/main` at `53b23a0`, 2026-06-02): 4 foundation + **16 specialists**. The full 16-specialist roster declared in `vault/WIKI.md` is deployed. No agent has authored any `vault/` library content yet — blast radius zero.
+- **genetics-specialist MERGED (PR #24)** as the 16th/final specialist — post-S20-close follow-up. It is the OWNER of `vault/dna/` (a gap no prior specialist held). **bda EXIT 0 from the integrator's own run, no grandfather** — the gate-3.5 seal's falsification window PASSED. The PROTOCOL step-5.5 builder self-gate (added before launch) worked: the builder ran bda itself and shipped green.
+- **batch-4 (S20) recap:** 5 specialists merged via REST (#19–#23); mental-performance-coach bda-clean, the other 4 grandfathered for gate-3.5 ordering ONLY (ADR `2026-06-01`). Containment shipped (PROTOCOL ordering rule + step-5.5 self-gate + INTEGRATION-CHECKLIST hard-block + risk-table rows). All worktrees/branches torn down.
+- **Integrator beads filed:** S20 — `mhg` (bda 7.5/8.5 reference-vs-compound-entry limitation, load-bearing), `5ot`, `3v5`, `xg4` (P2) + `ae0`/`d6g`/`4ba`/`3v6`/`dip` (P3). genetics — `t7z`/`fsr`/`8qe` (P3: design-doc numbering, dna-metadata-contract audit, 6-specialist dna-consumption conformance).
+- **Active landmarks:** no trigger windows opened. LM-03 (23andMe) now has its downstream owner deployed (genetics-specialist writes `vault/dna/`).
 
 **Historical (kept for reference):** `vault/meta/log.md` S19 + S20 entries.
 
 ## What Is Next (volatile)
 
-### FIRST next-session action — launch + integrate `genetics-specialist` (completes the 16-roster)
+### THE AGENT-BUILD PHASE IS DONE. Next = library-population (the actual product).
 
-**RESUMPTION POINT.** 15/16 specialists deployed; only genetics-specialist remains. Everything is staged:
-1. **Launch the builder** — `coordination/launch-batch4.md` "Builder 6" block (worktree off `94496b4` + first message). The first message names the deployed medical drafters explicitly (PF-S12-01 seal) + the bda-EXIT-0 requirement (NO grandfather — ADR `2026-06-01` seals the exception to the 4 batch-4 slugs).
-2. **Integrate at READY-TO-MERGE** — run the integrator gates: bda (MUST EXIT 0 — this is the falsification window for the grandfather seal), drafter-binding, disjointness; REST rebase-merge; bookkeeping; tear down. On merge → **16/16 roster complete.**
+**RESUMPTION POINT.** 16/16 specialists + 4 foundation = 20 agents deployed on main (dated SHA in Current State). There are no more agents to build. The next work shifts from *building the factory* to *running it* — populating the operator-facing wiki.
 
-### Sequenced after genetics-specialist
-- **Library-population** (epic `c6k`, unblocked): every `vault/` page gated by the per-page library-authoring control — fresh `/aplus-research` with a passing bda/verify-chain on its OWN research before the page ships (the binding control from the hfm decision; do not let it erode). **This is the first work that produces actual product** (the operator-facing wiki), distinct from agent-building.
-- **Resolve the systemic bda limitation `mhg`** before heavy library-authoring (7.5/8.5 required for reference-landscape research that never produces a compound entry — affects every compound-class page dispatch).
+1. **Library-population** (epic `c6k`, unblocked): the first work that produces actual product Walter can use. Every `vault/` page is gated per-page by the library-authoring control — a fresh `/aplus-research` run whose bda/verify-chain passes on its OWN research before the page ships (the binding control from the hfm decision; the genetics falsification-window pass confirms the gate works). Pick a high-leverage first target (e.g. the July-doctor-visit handout per epic `c6k`, or a compound/biomarker the operator actually needs).
+2. **Resolve the systemic bda limitation `mhg` FIRST** — 7.5/8.5 are required for reference-landscape research that never produces a compound entry; this affects every compound-class library page dispatch. Fix bda (read `target_type` from gate-2.75) + re-run its 6 smoke tests before heavy authoring, else every compound page hits a false bda block.
+3. **Operator-data preconditions** (Walter-pending, long-standing): the wiki's per-operator value is gated on real inputs — 23andMe raw → `vault/dna/raw/` (now has genetics-specialist as its consumer), Oura purchase, meal-template content, and the January-2026 health-issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) are still `status: scaffold`.
+
+### Loose ends to close
+- **`0be` Part 2** — supplement quarantine marker is committed/pushed on `fix/supplement-gates-quarantine` but its PR is NOT merged (GraphQL was throttled). Merge via REST next session; then close `0be`.
 
 ### Open beads carried (not blocking the above)
-- **S20-filed (integrator)**: `mhg` (P2, bda 7.5/8.5 limitation — load-bearing), `5ot` (P2, cardio risk-class), `3v5` (P2, WIKI longevity Owns), `xg4` (P2, endocrine 5ARI gap); `ae0`/`d6g`/`4ba`/`3v6`/`dip` (P3, PROPOSED audits + cosmetics)
+- **S20 + genetics (integrator)**: `mhg` (P2, bda 7.5/8.5 limitation — load-bearing, fix before library-pop), `5ot` (P2, cardio risk-class), `3v5` (P2, WIKI longevity Owns), `xg4` (P2, endocrine 5ARI gap); `ae0`/`d6g`/`4ba`/`3v6`/`dip` (P3); `t7z`/`fsr`/`8qe` (P3, genetics: design numbering / dna-metadata audit / 6-specialist dna-consumption)
 - **P2 carried**: `382` (biomarker namespace partition), `0be` (canonical gates — Part 1 DONE; supplement quarantine on `fix/supplement-gates-quarantine`, PR not yet merged — GraphQL was throttled), `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`
 - **P3 carried**: `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`
 - **Closed pre-S20**: `hfm`, `08d` (S19)
@@ -734,7 +733,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S20 (2026-06-01). Note: LM-03 (23andMe) gains a downstream owner once genetics-specialist deploys (it becomes the `vault/dna/` writer).
+All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S20 (2026-06-01) or the 2026-06-02 genetics follow-up. LM-03 (23andMe) now has its downstream owner deployed: genetics-specialist is the `vault/dna/` writer (drop the raw file into `vault/dna/raw/` to trigger ingest).
 
 ## Open Issues
 
