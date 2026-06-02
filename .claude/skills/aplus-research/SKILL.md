@@ -93,6 +93,8 @@ Phase 8.5 LAYERS GATE      [BLOCKING for standard+ compound research]
 | 7.5 RISK-FLOOR (compounds only) | **skipped** | ✓ | ✓ | ✓ |
 | 8.5 LAYERS (standard+ compounds only) | **skipped** | ✓ | ✓ | ✓ |
 
+> **"compounds only" = a compound ENTRY**, i.e. `target.type=compound` in `gate-2.75.json` (risk_tier fields + prescribing/non-English layers) — NOT a goal-agnostic reference landscape (`target.type=reference`) nor the slug's coarse risk-table `target_class`. A reference-landscape dispatch skips 7.5/8.5, and the `bda` merge audit (`scripts/audit-research-provenance.sh`) keys its 7.5/8.5 requirement on the same `target.type` signal (bead `mhg`; INV-RESEARCH-PROVENANCE-DISJOINT change-discipline S21, 2026-06-02).
+
 **Quick-mode rationale:** quick exists for triage scans (e.g., "scan a peptide class to pick which candidate to deep-research"). At triage, the integrity gate's cost (corpus retrieval + grep + paraphrase checks) exceeds its value — the orchestrator is judging "is this candidate worth a real research run," not "is this citable in the wiki." The scope + judge gates remain mandatory because they catch context-load failures and judge-fakery that would invalidate even triage output.
 
 **Standard/deep/ultradeep:** all gates fire. Output is wiki-canonical and must be defensible.
@@ -419,6 +421,14 @@ Surviving state under `${BASE}` (where `BASE=/tmp/aplus-research/<target_slug>/`
 - `phase-5-tool-log.jsonl`
 
 Procedure: read `${BASE}/gates/` for highest gate with `verdict: PASS` → resume at next phase.
+
+## Canonical provenance directory layout
+
+The research-artifact subdirectories are named **exactly** `gates/`, `judges/`, `sections/` — bare, no prefix — both under the working `${BASE}` (`/tmp/aplus-research/<slug>/`) and when copied into `design/.<slug>-design-work/` for merge provenance (per the design-doc-protocol Phase-0 detail in `design/DESIGN_DOC_TEMPLATE.md`). This is the ONE canonical layout; builders MUST NOT diverge. This section is the single source of truth — other docs reference it rather than restating it.
+
+- `gates/` is the directory `lib/gate_attest.py` reads and writes, and the directory `scripts/audit-research-provenance.sh` (bda) audits for the mode-required attested gates.
+- A **prefixed variant** (e.g. `research-gates/`, `research-judges/`, `research-sections/`) is NON-CANONICAL. `gate_attest.py verify-chain` reads bare `gates/`/`judges/`/`sections/`; under a prefixed layout it finds no `gates/` and vacuously passes (checks nothing), while bda rejects the layout outright (INV-RESEARCH-PROVENANCE-DISJOINT). Even genuine `gate_attest.py` artifacts, if committed under prefixed names, are unverifiable in place — the chain only validates after the dirs are renamed canonical.
+- Documented non-canonical instance: `supplement-specialist` (PR #14) committed all three artifact dirs under `research-`-prefixed names. The gate chain is genuine `gate_attest.py` output (it validates under `verify-chain` once the dirs are renamed canonical), but the prefix defeats in-place verification and bda correctly rejects it. Grandfathered as build-time scaffolding per the S19 hfm decision; quarantined under bead `0be`. Do NOT replicate it as a build template.
 
 ## Reference Files
 

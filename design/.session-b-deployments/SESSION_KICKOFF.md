@@ -1,7 +1,7 @@
 ---
 title: Session Kickoff — S13 Sessions B (deploy Roles 2, 3, 4 as agents)
 type: session-prep
-status: ready
+status: consumed
 created: 2026-05-28
 prepared_at: S12 close (compaction prep)
 target_session: S13 (next session after compaction)

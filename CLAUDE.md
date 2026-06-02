@@ -82,14 +82,15 @@ Before saying "done" or "complete":
 6. **Update memory** -- Write vault notes for any decisions, patterns, or open questions.
 7. **Update beads** -- `bd close` completed issues, `bd sync --flush-only`.
 8. **Review documents** -- Run the Document Freshness Rubric (see DOCUMENT_RUBRIC.md). Flag or archive stale docs.
-8.5. **Run audit scripts** -- For every invariant in INVARIANTS.md with a Mechanical Verification entry, run that script. On non-zero exit: do NOT commit until fixed or explicit user-adjudicated path-extension granted. Run all three at every close:
+8.5. **Run audit scripts** -- For every invariant in INVARIANTS.md with a Mechanical Verification entry, run that script. On non-zero exit: do NOT commit until fixed or explicit user-adjudicated path-extension granted. Run all four at every close (and run `branch-completeness-audit.sh` at session OPEN too):
    - `scripts/handoff-audit.sh` — INV-HO-ROTATION + INV-HO-NO-STALE-HASH
    - `scripts/scope-contract-audit.sh --session <N>` — INV-SCOPE-CONTRACT (asserts latest contract matches current session)
    - `scripts/pf-attestation-audit.sh --session <N>` — INV-PF-ATTESTATION (asserts close attestation dated current session)
+   - `scripts/branch-completeness-audit.sh` — INV-TRUNK-COMPLETENESS (asserts the checkout holds every deployed agent on `origin/main` + the governance layer; catches branch-write fragmentation, PF-S22-01)
 
-   Conditional: for any aplus-research dispatch this session also run `python3 .claude/skills/aplus-research/lib/gate_attest.py verify-chain --base <BASE>`.
+   Conditional: for any aplus-research dispatch this session run `scripts/audit-research-provenance.sh <design-work-dir> <slug>` (bda — asserts the mode-required attested gates are PRESENT, then runs `gate_attest.py verify-chain`; closes the vacuous-pass hole where verify-chain alone skips ABSENT gates). This is the INV-RESEARCH-PROVENANCE-DISJOINT enforcement and is mandatory before any specialist's research feeds a wiki write.
 8.7. **Landmark window check** -- Re-read `vault/meta/landmarks.md`. For each `active` landmark whose trigger window opened during this session, verify the corresponding action was performed.
-9. **Commit and push** to feature branch. Open PR if ready.
+9. **Commit and push** to your short-lived working branch (`feature/*` or `fix/*` off `main`). Open a PR to `main` if ready; never commit to `main` directly.
 
 ## Cross-Document Ownership Matrix
 
@@ -132,7 +133,7 @@ Two project-level hooks are installed (`.claude/settings.json`):
 
 ## Conventions
 
-- Branch naming: `feature/<short-description>`, `fix/<short-description>`
+- **Branch topology (since S22, ADR `2026-06-02-single-trunk-reconciliation`):** `main` is the single complete trunk (full roster + governance/tooling/vault). Work on **short-lived** `feature/<short-description>` / `fix/<short-description>` branches cut off `main`, PR back to `main`, delete after merge. No long-lived continuity-carrier branch (the old `feature/wiki-bpc157-aplus-research` model caused PF-S22-01 branch-write fragmentation and is retired). `INV-TRUNK-COMPLETENESS` (`branch-completeness-audit.sh`, open+close) guards against a branch ever again holding agents/governance the trunk lacks.
 - Commit format: `{type}[({scope})]: brief description`
 - All beads issues use priority 0-4 (not high/medium/low)
 - Documents follow the freshness rubric in DOCUMENT_RUBRIC.md

@@ -90,6 +90,18 @@ specialists:
     mode_floor: standard
     target_class: protocol
 
+  dermatologist:
+    risk_class: compound-medium
+    mode_floor: standard
+    target_class: compound
+    rationale: Derm topicals/systemics span OTC cosmeceuticals (risk_tier=low/medium) and Rx actives (tretinoin, oral isotretinoin — medium). Standard mode adequate; the Rx-grade actives route to medical-liaison rather than driving the research floor up. Added 2026-06-01 (roster gap from S-pilot batch-4 addition).
+
+  genetics-specialist:
+    risk_class: genetic-pgx-high
+    mode_floor: deep
+    target_class: reference
+    rationale: Pharmacogenomics + disease-risk variant interpretation carry life-threatening drug-gene stakes (e.g. DPYD/5-FU, HLA-B*57:01/abacavir, TPMT/thiopurines) and BRCA/Lynch-class findings. Deep mode enforces paired judges + critique. target_class=reference (clinical-genetics knowledge; not a compound/biomarker/protocol entry). Added 2026-06-01 (16th roster slot).
+
   medical-liaison:
     risk_class: collation-only
     mode_floor: not_applicable
