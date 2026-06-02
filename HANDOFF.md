@@ -12,6 +12,34 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 21 (2026-06-02)
+
+Goal: Fix bead `mhg` — make `bda` (`scripts/audit-research-provenance.sh`) gate 7.5/8.5 on the dispatch's `target.type=compound` (read from `gates/gate-2.75.json`), not the slug's risk-table `target_class=compound`, so goal-agnostic reference research stops hitting a false block — via the change-discipline ritual on the frozen INVARIANTS-registered audit. Then close the carried `0be` Part-2 loose end (REST-merge the already-pushed supplement quarantine PR).
+
+**Change-discipline approval (Walter, 2026-06-02): GRANTED at contract confirmation.** `mhg` edits the mechanical verification for `INV-RESEARCH-PROVENANCE-DISJOINT` (S19, frozen). Ritual: cite invariant → evidence (bead `mhg` + verified table: 3 of 7 specialists false-blocked [cardiovascular/dermatologist/gi], all 7 are `target.type=reference`, gi already merged+accepted with this gap + author's header lines 33-38 flagging the revisit) → explicit approval (this) → Change Log row. The change NARROWS a false-positive; it does not loosen the gate (a `target.type=compound` entry still requires 7.5/8.5).
+
+Acceptance criteria:
+- [ ] AC1 — `bda` requires 7.5/8.5 iff gate-2.75.json `target.type=compound`, with fail-closed fallback to the old `target_class` behavior when `target.type` is unreadable. Header comment (lines 29-38) updated to match.
+- [ ] AC2 — Existing 6 smoke tests still pass; two new NON-tautological cases added (CLAUDE.md mandate): (a) compound-class slug + `target.type=reference` → PASS without 7.5/8.5 (fails if fix reverted); (b) `target.type=compound` + missing 7.5/8.5 → still FAILs.
+- [ ] AC3 — Production-path validation (not diff-reading): patched `bda` run against the 3 real merged design-work dirs (cardiovascular/dermatologist/gi, materialized from `main`) → each flips off the 7.5/8.5 false-block; genetics still EXIT 0.
+- [ ] AC4 — `INVARIANTS.md` Change Log row (S21); SKILL.md gate-by-mode matrix note for 7.5/8.5 clarified to compound-ENTRY (gate-2.75 target.type) not compound-class slug, iff it carries that matrix. Bead `mhg` closed; `5ot` reframed (not resolved) with a note that bda no longer reads `target_class` for this decision.
+- [ ] AC5 — `0be` Part-2: `git ls-files` the quarantine branch first, REST-merge the existing `fix/supplement-gates-quarantine` PR, close `0be`. If throttled, stays carried (not forced).
+- [ ] AC6 — Close: 3 audits exit 0 at `--session 21`; canonical PF attestation; VOLATILE 6-clause rotation; feature/fix branches only (main only via the 0be REST merge).
+
+Files I WILL touch: `scripts/audit-research-provenance.sh`, `scripts/tests/test_audit_research_provenance.sh`, `INVARIANTS.md` (Change Log + maybe smoke-count cell), `.claude/skills/aplus-research/SKILL.md` (matrix note, conditional), `HANDOFF.md` (contract+close+rotation), `.beads/*` via bd, `vault/sessions/session-21.md` (new), `vault/meta/log.md`, `memory/process-failures.md` (only if a PF surfaces). Temp dir for AC3 (mktemp, cleaned).
+
+Files I will NOT touch: `lib/gate_attest.py`, `schemas/*` (attestation mechanism + schema correct — `target.type` already exists, no schema change), `templates/specialist-risk-class.yaml` (do NOT change `target_class` values — desyncs deployed agents; the S20 cardiovascular trap), the real `design/.*-design-work/` bodies on main (read-only validation), `.claude/agents/*`, `CLAUDE.md`, `.claude/hooks/*`, `vault/library|compounds|biomarkers|dna/*`, `main` directly.
+
+NOT doing: item #2 `bte` (mechanical wiki ingestion — next session); item #3 `hil` (PII vault — its own open design discussion + ADR); changing risk-table `target_class` (5ot); re-running any research / library-population; other carried beads; Walter pending items (23andMe, Oura, meal-template, Jan-2026).
+
+Invariants at risk: INV-RESEARCH-PROVENANCE-DISJOINT (change-discipline edit — narrows false-positive, strengthens correctness); AP-PROTOCOL-FROM-MEMORY / AP-ACT-BEFORE-VERIFY (held at open; will git-ls-files before the 0be merge); No-Tautological-Tests; INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN (standard close).
+
+Self-recognition pre-flight: watching for "the fix is mechanical so the verdict is mechanical" (PF-S3-01) — RUN bda against real dirs (AC3), don't assert from diff; and "approval is implied by the contract" — invariant-change approval made explicit above, not buried.
+
+### S21 Scope Contract Evaluation (volatile)
+
+_(to be filled at close)_
+
 ## Scope Contract — Session 20 (2026-05-30; closed 2026-06-01)
 
 Goal: Land bead `0be` — pin `gates/` (with `judges/`, `sections/`) as the ONE canonical research-provenance dir layout in the aplus-research SKILL.md + the design-doc-protocol (DESIGN_DOC_TEMPLATE.md), and quarantine the supplement-specialist's non-canonical mimicked `research-gates/` on main so no future reader/builder mistakes it for gate_attest.py output. Must land before batch-4. No re-run of supplement research; no batch-4; no library writes.
