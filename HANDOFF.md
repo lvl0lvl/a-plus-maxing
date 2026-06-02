@@ -43,7 +43,25 @@ Self-recognition pre-flight: "most files auto-merged so resolution is mechanical
 
 ### S22 Scope Contract Evaluation (volatile)
 
-_(to be filled at close)_
+- **AC1 — PASS.** `AP-BRANCH-WRITE-FRAGMENTATION` / PF-S22-01 logged with git-evidenced root cause (merge-base S5/S6; the `never-PR-feature→main` guard seeded it).
+- **AC2 — PASS.** `branch-completeness-audit.sh` + 3/3 non-tautological smoke tests; validated by detecting the LIVE fragmentation on feature (20 on origin/main, 16 absent).
+- **AC3 — PASS.** Pre-merge analysis proved feature is a content-superset for all 7 conflict files (risk-class.yaml diff = only +dermatologist +genetics, 14 shared rows byte-identical; INVARIANTS/process-failures superset by ID; log.md only stale-frontmatter diff). Resolution = take feature for all 7, zero loss.
+- **AC4 — PASS.** Union merge on `fix/single-trunk-reconciliation` off origin/main; 7 conflicts resolved to feature; ALL green before main touched: 20 agents, branch-completeness 0 violations, bda smoke 8/8, completeness smoke 3/3, `bd doctor` no corruption/no dup IDs, handoff + scope-contract(S22) audits 0.
+- **AC5 — PASS (via this PR).** Reconciliation delivered to `main` via the verified PR (REST merge); post-merge origin/main verified complete (20 agents + bda + S21 INVARIANTS + vault + skills).
+- **AC6 — PASS.** ADR `vault/decisions/2026-06-02-single-trunk-reconciliation.md`.
+- **AC7 — PASS.** `INV-TRUNK-COMPLETENESS` registered (change-discipline, Change Log S22); CLAUDE.md branch-topology convention rewritten (single trunk) + close step 8.5 adds the audit + step 9 updated.
+- **AC8 — PASS.** Working checkout re-pointed to `main`; `feature/wiki-bpc157-aplus-research` tag-and-frozen (`archive/feature-wiki-bpc157-aplus-research`), branch ref retired.
+- **AC9 — PASS.** This close: audits green at --session 22; PF attestation; VOLATILE rotation; reconciliation reached main only via the verified PR; `gdw` closed.
+
+### Drift checks (S22 close)
+
+- **Task drift:** none beyond the planned unit. The reconciliation matched the contract; the 7-conflict resolution was verified (feature-superset) rather than assumed. No expansion into bte/hil/library/research; agent + design-doc bodies untouched (merge preserved them).
+- **Architecture drift:** toward LESS violation — the dual-branch fragmentation (the root enabler of PF-S22-01) is eliminated; a mechanical guard (INV-TRUNK-COMPLETENESS) now prevents recurrence. The topology is now a single complete trunk + normal short-lived branches.
+- **Vision drift:** none — "single-operator health-agent system of gated, source-grounded specialists" unchanged; this session made the system *runnable from one branch* for the first time.
+
+### PF attestation
+
+S22 close (2026-06-02): One new PF-class entry — **PF-S22-01 (`AP-BRANCH-WRITE-FRAGMENTATION`)**, the root-cause analysis that motivated this session's reconciliation (product on main / governance on feature, no reconciliation for ~15 sessions; a prior remediation seeded it). It is logged in full with a mechanical recurrence guard (`branch-completeness-audit.sh`) + retirement of the dual-branch model. No other PF-class entries: the union merge's near-miss surface (losing a risk-class row / a PF entry / a bead) was pre-empted by the verified-superset analysis before resolving, and `bd doctor` confirmed no merge corruption — verify-before-act working, not a failure.
 
 ## Scope Contract — Session 21 (2026-06-02)
 
@@ -770,42 +788,39 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **AP-ACT-BEFORE-VERIFY (PF-S6-01) — VINDICATED at S21.** `git ls-files`/diff-before-merge on the `0be` quarantine branch caught that the S20 branch was 18 commits stale and merging it would have REVERTED THE ROSTER (20 agents). Replaced with a fresh marker-only branch; stale branch deleted. The same guard fired at the micro level (rejected a spurious `rc=1` by reading output, not trusting the exit code). Standing discipline for ANY "operate on prior-session-described state" task — the next such tasks are the `bte` ingestion gate + the `gdw` governance-sync question.
-2. **AP-ORCH-SELF-ATTEST (PF-S3-01) — HELD at S21.** The bda `mhg` fix's verdict was RUN against the real merged design-work dirs (production-path validation, AC3), not asserted from the diff; the test's non-tautology was empirically demonstrated (a reverted-trigger copy FAILs the same fixture). Standing forward risk at library-authoring + when designing the `bte` mechanical gate (don't trust-attest that a gate works — exercise it).
-3. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3) — HELD at S21 open.** Every Start-Protocol step run with real output (baseline suite executed, premise verified before scoping, contract before work). Next session-open is the next falsification window; if any step is stated-from-memory, recurrence promotes to 4.
+1. **AP-BRANCH-WRITE-FRAGMENTATION (PF-S22-01, recurrence_count=1) — NEW, root-caused + reconciled + mechanically guarded this session.** Product (16 specialists) lived on main / governance lived on feature, no reconciliation for ~15 sessions (a prior remediation, `never-PR-feature→main`, seeded it). Resolved: single-trunk reconciliation (main = complete) + `INV-TRUNK-COMPLETENESS` (`branch-completeness-audit.sh`, open+close). **Falsification window = the first parallelized track after S22** (library-population research batches): if a batch completes without the completeness audit green at close, recurrence promotes to 2. Declare ONE merge target; verify trunk-complete after every batch.
+2. **AP-ACT-BEFORE-VERIFY (PF-S6-01) — VINDICATED again at S22.** The verified-superset pre-merge analysis (risk-class diff = +2 rows only; INVARIANTS/PF supersets) pre-empted losing a risk-class row / PF entry / bead in the union merge; the aborted dry-run de-risked the contract; `bd doctor` confirmed no merge corruption. Standing discipline for the next parallel work.
+3. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3) — standing.** Next session-open is the falsification window: run each Start-Protocol step with real output AND (new this session) run `branch-completeness-audit.sh` at OPEN; if any step is stated-from-memory, recurrence promotes to 4.
 
-**Demoted from prior Top-3:** PF-S17-01 / gate-3.5 grandfather seal (held; now background — forward watch is library-authoring, same bda gate per page).
+**Demoted from prior Top-3:** AP-ORCH-SELF-ATTEST (PF-S3-01, held at S21, background — standing risk at library-authoring); PF-S17-01 / gate-3.5 grandfather (background).
 
 ## Current State (volatile)
 
-- **ROSTER COMPLETE — 20 agents on `origin/main` (`7cf253b`, 2026-06-02):** 4 foundation + 16 specialists. No agent has authored any `vault/` library content yet — blast radius zero. (Unchanged from S20 except the `0be` marker merge.)
-- **bda `mhg` FIXED (S21):** `scripts/audit-research-provenance.sh` keys 7.5/8.5 on gate-2.75 `target.type=compound`, not risk-table `target_class`; fail-closed when unreadable. Change-discipline edit to INV-RESEARCH-PROVENANCE-DISJOINT (Walter-approved); smoke tests 6→8; production-validated (false-block cleared on cardiovascular/dermatologist/gi, genetics control EXIT 0). `mhg` + `5ot` closed.
-- **`0be` CLOSED:** supplement quarantine marker on main via PR #25 (rebase-merge). The S20 quarantine branch was 18 commits stale (would have reverted the roster) — deleted as a hazard; replaced by a fresh marker-only branch. Roster verified intact (20 agents) post-merge.
-- **NEW (`gdw`, P2):** origin/main is ~9 sessions stale on the governance layer — the bda script + INVARIANTS S13-S21 rows are absent from main; deployed agents are on main, but the audit/invariants/skills layer lives only on the feature continuity-carrier. Open branch-topology question for Walter; tied to `bte`.
-- **Feature branch** ahead of origin by 3 commits (mhg fix + S21 contract + close) as of 2026-06-02 S21 close — pushed at close.
+- **SINGLE TRUNK — `main` is now the complete project (as of 2026-06-02 S22 close):** the 20 agents (4 foundation + 16 specialists) AND the governance/tooling/vault/skills layer, reconciled via a verified union merge (S22 reconciliation PR, REST). The ~15-session product/process branch split (PF-S22-01) is RESOLVED. No agent has authored any `vault/` library content yet — blast radius zero.
+- **Feature carrier RETIRED:** `feature/wiki-bpc157-aplus-research` tag-and-frozen as `archive/feature-wiki-bpc157-aplus-research` (history reachable, branch ref gone). The working checkout is now `main`. Going forward: short-lived `feature/*`/`fix/*` branches off `main`, deleted after merge (ADR `2026-06-02-single-trunk-reconciliation`; CLAUDE.md convention updated).
+- **`INV-TRUNK-COMPLETENESS` live:** `branch-completeness-audit.sh` (3/3 smoke) runs at session open + close (step 8.5); asserts the checkout holds every deployed agent on `origin/main` + the governance layer. Would have caught the split at S16.
+- **`gdw` CLOSED** (this session's work). `mhg`/`5ot`/`0be` closed S21; bda `mhg` fix (7.5/8.5 on `target.type`) is on the trunk.
 - **Active landmarks:** no trigger windows opened.
 
-**Historical (kept for reference):** `vault/meta/log.md` S20 + S21 entries.
+**Historical (kept for reference):** `vault/meta/log.md` S21 + S22 entries.
 
 ## What Is Next (volatile)
 
-### Agent-build phase done; bda `mhg` (item #1) done. Remaining Walter-set agenda (ordered).
+### Trunk is sane (gdw done). Remaining Walter-set agenda (ordered).
 
-**RESUMPTION POINT.** Item #1 (`mhg`) is COMPLETE (S21). The two remaining Walter-set items, plus a prerequisite that surfaced this session:
+**RESUMPTION POINT.** `gdw` is COMPLETE (S22) — `main` is the single complete trunk, the carrier is retired, and `INV-TRUNK-COMPLETENESS` guards against re-fragmentation. **Open the next session on `main`** (run the Start Protocol + `branch-completeness-audit.sh` at open). The two remaining Walter-set items:
 
-**0. PREREQUISITE (new, `gdw` P2) — resolve before `bte`.** origin/main is ~9 sessions stale on governance (bda + INVARIANTS S13-S21 absent from main). Decide WITH Walter what `main` is supposed to carry (shippable agents only, vs. the full governance/tooling layer). The `bte` gate's *location* depends on this answer — a vault-write gate keyed on bda+verify-chain must live wherever the writes/commits actually happen. Do NOT sync unilaterally.
+**1. Make wiki ingestion mechanical (`bte`, P2).** Now UNBLOCKED — the trunk-location question `gdw` raised is answered: `main` is the single trunk and the working checkout is off it, so a vault-write provenance gate lives where the writes/commits happen. Turn the "no `vault/library|compounds|biomarkers/` page ships without a passing bda/verify-chain on its OWN fresh research" rule from a documented discipline into a STRUCTURAL gate (candidate: a PreToolUse/commit hook keyed on per-page provenance, mirroring `block-commit-main.sh`). Likely a new INVARIANT. Same soft-pass shape as the gate-3.5 issue that bit batch-4 — make it structural, not trust-based. NB: the FIRST library-population batch is also PF-S22-01's falsification window — declare one merge target + run branch-completeness at the batch's close.
 
-**1. THEN — make wiki ingestion mechanical (`bte`, P2).** Turn the "no `vault/library|compounds|biomarkers/` page ships without a passing bda/verify-chain on its OWN fresh research" rule from a documented discipline into a STRUCTURAL gate (candidate: a PreToolUse/commit hook keyed on per-page provenance, mirroring `block-commit-main.sh`). Goal: ingestion can't happen from ungated research even if an agent tries. Likely a new INVARIANT. Same soft-pass shape as the gate-3.5 issue that bit batch-4 — make it structural, not trust-based.
-
-**2. THEN — design the secure PII vault (`hil`, P1).** A separate vault holding operator PII (DNA raw, labs, the real operator-profile/current-state/goals values, January-2026 issue, meds) the system uses for personalization but NEVER sends to Anthropic. **Hard constraint:** Claude Code agents run by sending context to the Anthropic API — so any PII an agent "reads" IS sent to Anthropic. The architecture must separate (a) what the model reasons over from (b) where PII lives + how it's applied. Candidate patterns (NOT decided): local deterministic pre/post tokenization+rehydration; local non-LLM tooling stamping PII into model-produced templates; an air-gapped local vault the gated library never imports from; encryption-at-rest + gitignore (partial today: `vault/dna/raw/`, `vault/labs/raw/`). Needs an ADR + AskUserQuestion-free open discussion with Walter. Tie-in: genetics-specialist already encodes genetic-exceptionalism/privacy + "DTC-raw binds to a citable lab artifact, never operator say-so" — the PII vault is the storage side of that contract.
+**2. Design the secure PII vault (`hil`, P1).** A separate vault holding operator PII (DNA raw, labs, the real operator-profile/current-state/goals values, January-2026 issue, meds) the system uses for personalization but NEVER sends to Anthropic. **Hard constraint:** Claude Code agents run by sending context to the Anthropic API — so any PII an agent "reads" IS sent to Anthropic. The architecture must separate (a) what the model reasons over from (b) where PII lives + how it's applied. Candidate patterns (NOT decided): local deterministic pre/post tokenization+rehydration; local non-LLM tooling stamping PII into model-produced templates; an air-gapped local vault the gated library never imports from; encryption-at-rest + gitignore (partial today: `vault/dna/raw/`, `vault/labs/raw/`). Needs an ADR + AskUserQuestion-free open discussion with Walter. Tie-in: genetics-specialist already encodes genetic-exceptionalism/privacy + "DTC-raw binds to a citable lab artifact, never operator say-so".
 
 **Operator-data preconditions** (Walter-pending; feeds #2): 23andMe raw → `vault/dna/raw/` (genetics-specialist is its consumer), Oura purchase, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) are still `status: scaffold` — they ARE the PII surface item #2 must protect.
 
 ### Open beads carried (not blocking the above)
 - **P1:** `hil` (PII vault — item #2 above).
-- **P2:** `bte` (mechanical ingestion — item #1 above), `gdw` (governance-sync prerequisite), `3v5` (WIKI longevity Owns), `xg4` (endocrine 5ARI gap), `382` (biomarker namespace partition), `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
+- **P2:** `bte` (mechanical ingestion — item #1 above), `3v5` (WIKI longevity Owns), `xg4` (endocrine 5ARI gap), `382` (biomarker namespace partition), `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
 - **P3:** `ae0`/`d6g`/`4ba`/`3v6`/`dip` (batch-4 PROPOSED audits/lints), `t7z`/`fsr`/`8qe` (genetics follow-ups), `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
-- **Closed S21:** `mhg`, `5ot`, `0be`.
+- **Closed S22:** `gdw`. **Closed S21:** `mhg`, `5ot`, `0be`.
 
 ### Open project work (unchanged)
 - Walter pending: 23andMe raw → `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health-issue characterization.
@@ -813,7 +828,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S21 (2026-06-02). LM-01's 14-day-before window depends on the still-TBD July exact date; LM-02/03/04 remain Walter-pending. No status flips due.
+All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S22 (2026-06-02). LM-01's 14-day-before window depends on the still-TBD July exact date; LM-02/03/04 remain Walter-pending. No status flips due.
 
 ## Open Issues
 
