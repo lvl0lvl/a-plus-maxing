@@ -12,6 +12,39 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 22 (2026-06-02)
+
+Goal: Resolve `gdw` — make `main` the single complete trunk (union of main's 20 agents + design provenance and feature's governance/vault/tooling), install a mechanical guard (`branch-completeness-audit.sh`) so branch-write fragmentation can't silently recur, log the root cause as a new PF class (`AP-BRANCH-WRITE-FRAGMENTATION`), and retire the long-lived feature carrier (tag-and-freeze).
+
+**Change-discipline approval (Walter, 2026-06-02): GRANTED at contract confirmation** — AC7 registers a NEW invariant (trunk-completeness) with `branch-completeness-audit.sh` as its mechanical verification.
+
+**Grounding (verified via aborted dry-run merge):** union merge keeps all 20 agents, brings bda + S21 INVARIANTS; exactly 7 files conflict (HANDOFF, INVARIANTS, process-failures, risk-class.yaml, log.md, SESSION_KICKOFF, DESIGN_DOC_TEMPLATE); other 5 differing files auto-merge.
+
+Acceptance criteria:
+- [ ] AC1 — PF `AP-BRANCH-WRITE-FRAGMENTATION` logged: merge-base froze S5/S6; bidirectional neglect (specialists→main / governance→feature; feature never merged main; the `never-PR-feature→main` guard forbade one reconciliation direction without mandating the inverse). Recurrence vector = parallel research/build tracks.
+- [ ] AC2 — `scripts/branch-completeness-audit.sh` + tests: asserts trunk contains every `.claude/agents/*/agent.md` on a reference branch + governance presence (bda + INV-RESEARCH-PROVENANCE-DISJOINT); non-tautological smoke tests; built before the merge.
+- [ ] AC3 — 7-conflict resolution plan documented before resolving: risk-class.yaml UNION all rows (highest risk); process-failures.md + log.md UNION; INVARIANTS.md feature-authoritative + verify no main-only invariant; HANDOFF/SESSION_KICKOFF/DESIGN_DOC_TEMPLATE feature-authoritative.
+- [ ] AC4 — Reconciliation on a branch OFF origin/main (never main directly); 7 conflicts resolved; ALL green before main touched: branch-completeness EXIT 0 (20 agents) + bda + INVARIANTS S21 row + risk-class row per deployed agent + `bd doctor` clean + 3 close audits.
+- [ ] AC5 — PR → main via REST; post-merge verification against origin/main (completeness EXIT 0; 20 agents + bda + S21 INVARIANTS + vault + skills; nothing lost). Safe stopping point.
+- [ ] AC6 — ADR `vault/decisions/2026-06-02-single-trunk-reconciliation.md` (decision, PF cross-link, 7-file resolutions, go-forward flow).
+- [ ] AC7 — New invariant registered (change-discipline): trunk-completeness; mechanical verification = branch-completeness-audit.sh; wired into close step 8.5; CLAUDE.md topology convention updated.
+- [ ] AC8 — Working checkout re-pointed to main; carrier `feature/wiki-bpc157-aplus-research` tag-and-frozen (history reachable, branch ref retired).
+- [ ] AC9 — Close: audits green at --session 22; PF attestation; VOLATILE rotation; reconciliation reached main only via verified PR; `gdw` closed.
+
+Files I WILL touch: `memory/process-failures.md`, `scripts/branch-completeness-audit.sh` + `scripts/tests/*` (NEW), the 7 conflict files (during merge resolution), `vault/decisions/2026-06-02-single-trunk-reconciliation.md` (NEW), `INVARIANTS.md` (new row + Change Log), `CLAUDE.md` (topology + close step 8.5), `HANDOFF.md`, `.beads/*` via bd, `vault/sessions/session-22.md`. `main` only via the verified reconciliation PR.
+
+Files I will NOT touch: any `.claude/agents/*/agent.md` body or specialist design-work (merge brings them in unchanged), `lib/gate_attest.py`, `schemas/*`, `vault/library|compounds|biomarkers|dna` content, `main` directly.
+
+NOT doing: `bte`, `hil`, research/library-population, editing agent/design-doc bodies.
+
+Invariants at risk: INV-BRANCH-NOT-MAIN (reconciliation → main only via PR); AP-ACT-BEFORE-VERIFY / roster-revert hazard (gated: all audits + bd doctor green on the branch before main touched); new trunk-completeness invariant (change-discipline, AC7); INV-SCOPE-CONTRACT/PF-ATTESTATION/HO-ROTATION/HO-NO-STALE-HASH (standard close).
+
+Self-recognition pre-flight: "most files auto-merged so resolution is mechanical" (PF-S3-01 — each of the 7, esp. risk-class.yaml, gets a deliberate union/pick + post-merge per-agent verification); "the dry-run proved it works so merge straight to main" (NO — branch off main, all-green gated, PR'd, never direct).
+
+### S22 Scope Contract Evaluation (volatile)
+
+_(to be filled at close)_
+
 ## Scope Contract — Session 21 (2026-06-02)
 
 Goal: Fix bead `mhg` — make `bda` (`scripts/audit-research-provenance.sh`) gate 7.5/8.5 on the dispatch's `target.type=compound` (read from `gates/gate-2.75.json`), not the slug's risk-table `target_class=compound`, so goal-agnostic reference research stops hitting a false block — via the change-discipline ritual on the frozen INVARIANTS-registered audit. Then close the carried `0be` Part-2 loose end (REST-merge the already-pushed supplement quarantine PR).
