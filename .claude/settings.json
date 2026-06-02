@@ -15,6 +15,10 @@
           {
             "type": "command",
             "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/block-commit-main.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/block-ungated-vault-write.sh"
           }
         ]
       },

@@ -1,0 +1,19 @@
+# Wiki ingestion-gate PROVENANCE grandfather allowlist (bead bte, S23, 2026-06-02)
+#
+# Pages listed here are exempt from the PROVENANCE check in
+# scripts/wiki-ingest-lint.sh ONLY. They remain subject to every other check
+# (structural conformance, frontmatter/enum validity, index sync, link advisory).
+#
+# Rationale: these pages predate the ingestion gate. They carry no
+# provenance_dir/provenance_slug pointer and their /aplus-research gate
+# provenance lives under a layout the gate does not resolve. Same accepted
+# pattern as the gate-3.5 batch-4 grandfather (ADR 2026-06-01). Each entry is a
+# back-fill obligation, NOT a permanent exemption — re-running the suspect
+# bpc-157 research on the gated path and adding the pointer removes it here.
+#
+# Format: one repo-relative page path per line. Blank lines + #-comments ignored.
+
+vault/compounds/bpc-157.md
+vault/library/peptides/bpc-157/research-report.md
+vault/library/peptides/bpc-157/practitioner-layer.md
+vault/library/peptides/bpc-157/non-english-layer.md
