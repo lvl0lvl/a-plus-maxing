@@ -93,6 +93,8 @@ Phase 8.5 LAYERS GATE      [BLOCKING for standard+ compound research]
 | 7.5 RISK-FLOOR (compounds only) | **skipped** | ✓ | ✓ | ✓ |
 | 8.5 LAYERS (standard+ compounds only) | **skipped** | ✓ | ✓ | ✓ |
 
+> **"compounds only" = a compound ENTRY**, i.e. `target.type=compound` in `gate-2.75.json` (risk_tier fields + prescribing/non-English layers) — NOT a goal-agnostic reference landscape (`target.type=reference`) nor the slug's coarse risk-table `target_class`. A reference-landscape dispatch skips 7.5/8.5, and the `bda` merge audit (`scripts/audit-research-provenance.sh`) keys its 7.5/8.5 requirement on the same `target.type` signal (bead `mhg`; INV-RESEARCH-PROVENANCE-DISJOINT change-discipline S21, 2026-06-02).
+
 **Quick-mode rationale:** quick exists for triage scans (e.g., "scan a peptide class to pick which candidate to deep-research"). At triage, the integrity gate's cost (corpus retrieval + grep + paraphrase checks) exceeds its value — the orchestrator is judging "is this candidate worth a real research run," not "is this citable in the wiki." The scope + judge gates remain mandatory because they catch context-load failures and judge-fakery that would invalidate even triage output.
 
 **Standard/deep/ultradeep:** all gates fire. Output is wiki-canonical and must be defensible.

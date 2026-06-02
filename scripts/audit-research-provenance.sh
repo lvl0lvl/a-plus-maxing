@@ -26,16 +26,18 @@
 #     4.25 ID-RECONCILE  -       ✓        ✓      ✓
 #     4.75 INTEGRITY     -       ✓        ✓      ✓
 #     6    CRITIQUE      -       -        ✓      ✓
-#     7.5  RISK-FLOOR    -       ✓        ✓      ✓     (compounds only)
-#     8.5  LAYERS        -       ✓        ✓      ✓     (standard+ compounds only)
+#     7.5  RISK-FLOOR    -       ✓        ✓      ✓     (compound ENTRY only — see below)
+#     8.5  LAYERS        -       ✓        ✓      ✓     (compound ENTRY, standard+ — see below)
 #
 #   ATTESTED_GATES (gate_attest.py) = 3.5 4.25 4.75 6 7.5 8.5  (2.75 is schema-only).
-#   7.5 + 8.5 are compound-target-only; gated on target_class==compound from the
-#   risk table. (The phase-7.5 docstring further narrows risk-floor to
-#   risk_tier=experimental; bda takes the matrix's stricter "compounds at standard+"
-#   reading — a compound specialist that legitimately ran no experimental risk-floor
-#   should record that as a PASS gate-7.5.json, not omit it. Documented; revisit via
-#   change-discipline if it proves over-strict.)
+#   7.5 + 8.5 protect a compound ENTRY (risk_tier fields + prescribing/non-English
+#   layers). The authoritative trigger is the per-dispatch gate-2.75.json `target.type`
+#   (compound|biomarker|protocol|reference) — NOT the slug's coarse risk-table
+#   target_class. A compound-class specialist whose goal-agnostic Phase-0 design-work
+#   is a reference landscape (target.type=reference) never produces those layers, so
+#   7.5/8.5 do not apply (bead mhg; INV-RESEARCH-PROVENANCE-DISJOINT change-discipline
+#   S21, 2026-06-02). Fail-closed: an unreadable target.type falls back to the strict
+#   target_class==compound behavior so an unverifiable scope gate never drops a floor.
 #
 # USAGE:
 #   audit-research-provenance.sh <design-work-dir> <slug>
@@ -107,11 +109,35 @@ case "$MODE_FLOOR" in
     *) die "unknown mode_floor '$MODE_FLOOR' for $SLUG (expected quick|standard|deep|ultradeep)" ;;
 esac
 
-# Compound-target-only gates (7.5 risk-floor, 8.5 layers) fire at standard+.
-if [ "$TARGET_CLASS" = "compound" ] && [ "$MODE_FLOOR" != "quick" ]; then
-    required="$required 7.5 8.5"
+# Compound-ENTRY-only gates (7.5 risk-floor, 8.5 layers) fire at standard+. The
+# authoritative per-dispatch signal is gate-2.75.json `target.type` (compound means an
+# actual entry with risk_tier + prescribing/non-English layers), NOT the slug's coarse
+# risk-table target_class (bead mhg; change-discipline S21). A goal-agnostic reference
+# landscape (target.type=reference) never produces those layers, so 7.5/8.5 do not apply.
+# Fail-closed: if target.type is unreadable (missing/malformed scope gate) fall back to
+# the strict target_class==compound behavior so an unverifiable scope gate never silently
+# drops a safety floor. (gate-2.75.json presence is independently required at line ~129.)
+TARGET_TYPE=""
+if [ -f "$WORKDIR/gates/gate-2.75.json" ]; then
+    TARGET_TYPE="$(python3 -c "
+import json
+try:
+    d = json.load(open('$WORKDIR/gates/gate-2.75.json'))
+    print((d.get('target') or {}).get('type', ''))
+except Exception:
+    print('')
+" 2>/dev/null)"
 fi
 
+if [ "$MODE_FLOOR" != "quick" ]; then
+    if [ "$TARGET_TYPE" = "compound" ]; then
+        required="$required 7.5 8.5"   # this dispatch targets a compound entry
+    elif [ -z "$TARGET_TYPE" ] && [ "$TARGET_CLASS" = "compound" ]; then
+        required="$required 7.5 8.5"   # fail-closed: unreadable target.type + compound-class slug
+    fi
+fi
+
+info "gate-2.75 target.type=${TARGET_TYPE:-<unreadable>} (risk-table target_class=${TARGET_CLASS:-<unset>})"
 info "required attested gates: $required"
 
 # --- canonical layout check (PF-S18: builders diverged on the gates dir name) ---
