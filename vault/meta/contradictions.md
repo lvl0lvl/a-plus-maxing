@@ -32,7 +32,9 @@ One section per contradiction. Close out when resolved with the resolution path 
 
 ## Open
 
-_(none)_
+### 2026-06-03 — ADR/doc home: pipeline `docs/adr/` + `docs/prd/` vs project `vault/decisions/`
+- **Status:** open
+- The `prd-development` pipeline writes to `docs/prd/` (and the ADR stage will write to `docs/adr/`), but the project's Cross-Document Ownership Matrix homes architectural decisions in `vault/decisions/`. Two doc families now diverge from the `vault/` home pattern. To be reconciled at the ADR stage (bead `fm4`).
 
 ## Resolved
 
