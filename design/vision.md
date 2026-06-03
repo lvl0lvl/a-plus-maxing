@@ -73,3 +73,4 @@ V1 = the single-operator engine + outcome tracking + a simple HTML report/plan s
 - `bd show hil` — the PII trust-boundary decision (threat-model B), formal ADR pending the pipeline's ADR phase
 - `vault/meta/landmarks.md` — LM-01 (MD visit, first consumer), LM-04 (first HTML artifact)
 - `.claude/agents/genetics-specialist/` — genetic-exceptionalism / privacy floor (ties into the PII boundary)
+- `vault/decisions/2026-05-16-system-architecture.md` — **partially superseded by this pivot.** That ADR's original decisions ("LLM-driven agent, *not* a tracker"; "no diet app"; defer a custom interface to phase C until friction-log evidence) are reversed by the Walter-directed product trajectory here. Formal supersession ADR pending at the ADR stage (`bd show fm4`).

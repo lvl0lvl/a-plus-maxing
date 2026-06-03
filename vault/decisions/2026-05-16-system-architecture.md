@@ -13,6 +13,8 @@ permalink: a-plus-maxing/decisions/2026-05-16-system-architecture
 
 # Decision: System Architecture
 
+> **⚠ Partially superseded — S24 product pivot (2026-06-03).** a-plus-maxing was redirected onto a product trajectory: it is now a local-first health **tracking + planning** system (see `design/vision.md` + `docs/prd/PRD-v1-local-first-health-tracking-planning.md`). This reverses, by Walter-directed decision, the three calls below — "not a tracker" (Context), "No diet app" (Decision 2), and the defer-the-interface-until-friction phased model (Decision 3). The formal supersession ADR is pending at the ADR stage (bead `fm4`), where `status` / `superseded_by` flip.
+
 ## Context
 Initial scoping conversation for a-plus-maxing. The fork in the road: build as SaaS-style tracker, build as LLM-driven agent, or hybrid. Walter explicitly chose "LLM-driven personal health agent, not a tracker."
 
