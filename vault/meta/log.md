@@ -135,3 +135,10 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - **`INV-WIKI-INGESTION-GATED` registered** (change-discipline, Walter-approved at contract). WIKI.md Ingest/Lint/Conventions updated; grandfather allowlist `vault/library/_ingest-grandfather.txt` seeded with the 4 pre-gate bpc-157 pages (provenance-exempt only; back-fill obligation). 29/29 new smoke + all 12 existing suites green.
 - **Two real bugs caught only by running against real artifacts** (brittle experimental-contraindications regex false-flagging good content; a code-fence `Status: open` false contradiction) — the mhg false-positive lesson applied to my own gate. The PF-S21 non-tautology near-miss replayed (reverted copy failed on missing lib path) — caught, re-proven REAL=1/NEUTERED=0.
 - **Next:** `hil` (architect secure PII vault, P1). First real exercise of these gates = the library-population phase (also PF-S22-01's falsification window — run `wiki-lint.sh` + branch-completeness at each batch close). [[sessions/session-23]]
+
+## 2026-06-03 — S24 (product pivot; no wiki page changes)
+
+- **Product pivot.** a-plus-maxing reframed as a local-first health tracking + planning system (V1 single-operator clonable app → GP North Star). Authored `design/vision.md` (vision anchor) + the **Approved** V1 PRD `docs/prd/PRD-v1-local-first-health-tracking-planning.md` via the `prd-development` 7-phase pipeline (Validate 10/2/0; Judge all-10).
+- **No vault wiki page changes this session** — design/product docs only; the gated wiki was READ (operator-profile/goals/current-state/artifact-design-protocol) for PRD grounding, not modified.
+- **PII boundary settled = threat-model B** (`hil`): individual commercial no-train API for PII-bearing plan reasoning; local store/ingestion/generation model-independent. Formal ADR → `fm4`.
+- **Next:** ADR stage (`fm4` — `/create-adr` on the PRD; read adr-development in full first). Pipeline arc `fm4`→`rg2`→`hv6`→`mo4`. Library-population runs in parallel (gated). [[sessions/session-24]]
