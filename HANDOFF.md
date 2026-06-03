@@ -12,6 +12,49 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 24 (2026-06-03)
+
+> **Supersedes** the initial S24 hil-ADR-only framing. Walter redirected to a product pivot before hil-ADR execution: the system is to become physician-shareable now and a GP-facing product later, which needs the Rigor-Framework vision doc the project never had + the product PRD. The `hil` PII decision (threat-model B; individual commercial API, no-train — settled in-session) is preserved as a settled input; its formal ADR moves to the pipeline's ADR phase. PII retention posture locked at **(i) individual commercial API** for the MVP.
+
+Goal: Pivot a-plus-maxing onto a product trajectory — author `design/vision.md` (the Rigor-Framework vision anchor the project never had: single-operator V1 → GP-product North Star) and the V1 PRD via the skills-library `prd-development` pipeline (read in full before invoking, per PF-S17-01) — recording the settled PII trust boundary (threat-model B; individual commercial API, no-train) as a product constraint and the HIPAA/BAA/multi-tenant path as the documented North-Star upgrade.
+
+Acceptance criteria:
+- [ ] AC1 — `design/vision.md` authored: first sentence states what the system IS (the framework's vision-drift anchor); explicit V1/North-Star boundary (V1 single-operator share-with-doctor; North Star = GP-facing multi-tenant patient product); enduring principles (gated wiki, PII trust boundary, physician-credible output); records the settled PII posture + the HIPAA/BAA ceiling. Walter-confirmed before the PRD builds on it.
+- [ ] AC2 — `prd-development` SKILL.md + `create-prd.md` read in full before invocation (PF-S17-01 read-before-invoke); `AskUserQuestion` calls substituted with prose (Walter standing override); PRD content produced by dispatched worker agents (create-prd Hard Rule 1), not freelanced.
+- [ ] AC3 — V1 PRD produced via the 7-phase pipeline at `docs/prd/PRD-*.md`: problem (Walter + physician), V1 user stories + FR/NFR (MoSCoW), non-goals (multi-tenant/hosting/login deferred to North Star), measurable success criteria, the PII NFR (threat-model B / no-train API), discovery evidence; passes the 12 gates + judge ≥9/dim; no Blocking OQ at finalize.
+- [ ] AC4 — `hil` decision recorded as a settled constraint (vision + PRD NFR); formal `hil` ADR filed to follow the PRD (ADR phase) — `hil` bead updated (not closed); pipeline-arc beads filed (ADR, spec, build-plan, task-plan).
+- [ ] AC5 — Consistency: `feedback_evidence_driven_product_design.md` memory updated to reflect the product-justified V1 interface (documented evolution, not silent contradiction).
+- [ ] AC6 — Close: 4 close audits + `branch-completeness-audit.sh` green at `--session 24`; PF attestation; VOLATILE 6-clause rotation; work on `feature/product-vision-prd` off `main` → PR back (never direct to `main`); new `docs/prd/` tree + `docs/prd/.gitignore` (`.pipeline/`) honored.
+
+Files I WILL touch: `design/vision.md` (NEW), `docs/prd/PRD-*.md` + `docs/prd/.pipeline/*` (gitignored) + `docs/prd/.gitignore` (NEW), `HANDOFF.md` (contract+close+rotation), `.beads/*` via `bd`, `vault/sessions/session-24.md` (NEW), `vault/meta/log.md`, `memory/.../feedback_evidence_driven_product_design.md` + `MEMORY.md` index, `memory/process-failures.md` (only if a PF surfaces).
+
+Files I will NOT touch: any `.claude/agents/*/agent.md` body or the deployed roster; `lib/gate_attest.py`, `schemas/*`, `scripts/audit-research-provenance.sh`, the wiki-ingest gate; `vault/{compounds,biomarkers,library}/` content; **the real operator-PII values** (design only, no migration this session); `INVARIANTS.md` unless Walter approves a change-discipline registration (surface, don't self-register); the formal `hil` ADR body (moves to the ADR phase — not written this session); `main` directly.
+
+NOT doing: the ADR/spec/build-plan/task-plan/execute stages (filed as beads, run later); building any product mechanism, interface, or PII tooling; migrating operator data; library-population; other carried beads.
+
+Invariants at risk: INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS (standard close); a candidate new invariant may surface (PII-never-in-prompt / pipeline-stage discipline) — surfaced for change-discipline, not self-registered.
+
+Self-recognition pre-flight: watching for "I've read the PRD skill, I'll just write the PRD myself" (violates create-prd Hard Rule 1 — orchestrator coordinates, workers produce) and "the vision doc is obvious, skip Walter's confirmation" (it's the drift anchor the whole pipeline inherits — confirm it) and "use AskUserQuestion to run intake faster" (Walter standing override — prose only).
+
+### S24 Scope Contract Evaluation (volatile)
+
+- **AC1 — PASS.** `design/vision.md` authored (first sentence = the vision-drift anchor; V1/North-Star boundary table; physician-ready 5-point definition; PII threat-model-B posture + HIPAA/BAA ceiling); Walter-confirmed + refined in-session (physician-ready definition; closed-loop outcome tracking).
+- **AC2 — PASS.** `prd-development` SKILL.md + `create-prd.md` read in FULL before invocation (PF-S17-01 read-before-invoke); `AskUserQuestion` substituted with prose throughout (Walter override); all PRD content produced by dispatched worker agents (create-prd Hard Rule 1), never freelanced.
+- **AC3 — PASS (with documented CHANGED).** V1 PRD produced via the 7-phase pipeline → `docs/prd/PRD-v1-local-first-health-tracking-planning.md` (status: Approved). Validate 10 Pass/2 Warning/0 Fail (COMPLETE); Judge ACCEPT (final V2.0 = straight 10s on all 8 dims); 0 Blocking OQ. CHANGED: V1 scope expanded twice via Walter clarifications (multi-domain + operator-agnostic/clonable; then local-first tracking app via on-demand templates + a local time-series store) — each surfaced at a pipeline gate, the draft revised, and re-Validated + re-Judged. Documented, not silent.
+- **AC4 — PASS.** `hil` PII decision recorded as settled constraint (vision principle 2 + PRD NFR-1/Dependencies/OQ-1); pipeline-arc beads filed `fm4`(ADR)→`rg2`(spec)→`hv6`(build-plan)→`mo4`(task-plan), dep-chained; `hil` updated (decision settled; formal ADR produced in `fm4`) + made dependent on `fm4`, kept OPEN.
+- **AC5 — PASS.** `feedback_evidence_driven_product_design.md` updated (product trajectory supersedes "wait for friction" for the V1 interface — documented evolution); `project_overview.md` corrected (stale "NOT a tracker or SaaS" → the local-first tracking+planning pivot); MEMORY.md index lines updated.
+- **AC6 — PASS.** This close: 4 close audits + branch-completeness green at `--session 24`; PF attestation; VOLATILE rotation; work on `feature/product-vision-prd` → PR (never direct to main); `docs/prd/` tree + `.gitignore` honored.
+
+### Drift checks (S24 close)
+
+- **Task drift:** the SESSION's contracted deliverables (vision.md + V1 PRD via the pipeline) were delivered exactly. The PRD's CONTENT scope expanded materially (V1 became a local-first tracking app), but that is product scope inside the PRD, Walter-directed at each step, surfaced and re-validated — not a drift of the session's scope. The initial S24 framing (hil-ADR-only) was superseded at Walter's redirect, documented at the top of the S24 contract. Design-only as scoped; nothing built.
+- **Architecture drift:** none — toward LESS violation. Documents + beads + memory only; no code, no invariant-touching change. INV-BRANCH-NOT-MAIN held (feature branch); INV-TRUNK-COMPLETENESS green open + close. The PRD reinforces the gated-knowledge + PII-boundary disciplines rather than weakening them.
+- **Vision drift:** INTENTIONAL vision evolution, authored not drifted. The project pivoted from "single-operator agent of gated specialists" to "a local-first health tracking + planning system (V1) → GP product (North Star)." `design/vision.md` was authored THIS session to be the new anchor; what the system IS after S24 matches its first sentence verbatim. Future sessions compare against `design/vision.md`.
+
+### PF attestation
+
+S24 close (2026-06-03): No new PF-class entries this session. Observed but NOT promoted: (a) the V1 PRD scope expanded twice via Walter clarifications (multi-domain/clonable; then local-first tracking app) — each surfaced at a pipeline gate, the draft faithfully revised, re-Validated + re-Judged; the PRD pipeline's multi-gate review working as designed, not drift. (b) My initial "lightweight tracking" (D2) default under-scoped Walter's actual intent — but it was offered AS a flagged default at the intake gate and corrected at the review gate; requirements-elicitation iteration, not a process failure. (c) Read-before-invoke (PF-S17-01 — full PRD pipeline read before running), session-open (PF-S13-01 — every Start-Protocol step run with real output incl. `branch-completeness-audit.sh` at OPEN), AskUserQuestion-override, and create-prd Hard-Rule-1 (orchestrator coordinates, workers produce) all HELD.
+
 ## Scope Contract — Session 23 (2026-06-02)
 
 Goal: Make wiki ingestion mechanical (`bte`, expanded at Walter's direction) — turn the already-written-but-unenforced wiki accuracy rules (WIKI.md Ingest/Lint/Conventions + entity templates + research provenance) into TWO mechanical controls: (a) a **commit-time blocking gate** that refuses a `vault/{library,compounds,biomarkers}/` entity-page commit unless it passes a deterministic accuracy battery, and (b) a **periodic whole-vault lint** implementing WIKI.md's 6-check Lint operation (which has never had a script). Provenance (bda + verify-chain) is ONE control among several.
@@ -841,47 +884,49 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **PF-S22-01 falsification window — NOW DOUBLE-GUARDED, still the #1 forward risk.** The first parallelized track after S22 = the library-population research batches. As of S23 it is guarded by BOTH `INV-TRUNK-COMPLETENESS` (`branch-completeness-audit.sh`, open+close) AND the new `INV-WIKI-INGESTION-GATED` commit gate. At each library batch close: declare ONE merge target, run `branch-completeness-audit.sh` AND `scripts/wiki-lint.sh`; an ungated page is now structurally un-committable. If a batch closes without these green, recurrence promotes to 2.
-2. **mhg-false-positive / AP-ORCH-SELF-ATTEST family (PF-S3-01) — VINDICATED twice at S23.** A deterministic gate is only correct if validated against REAL artifacts, not just fixtures: the new wiki gate had two false-positives (experimental-contraindications regex; code-fence contradiction) that ONLY surfaced by running against the real bpc-157 page + real vault. Standing discipline for any new gate AND at library-authoring (the gate must not false-block good content, nor vacuously pass bad).
-3. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3) — standing.** Next session-open is the falsification window: run each Start-Protocol step with real output AND run `branch-completeness-audit.sh` at OPEN; if any step is stated-from-memory, recurrence promotes to 4.
+1. **A-6 / `hil` dependency is the V1 critical path — the highest-risk PRD assumption.** PRD-v1 NFR-1 + A-6 + OQ-1 all rest on the no-train PII path (threat-model B) being BUILT; it is decided, not built. The ADR stage (`fm4`) must produce the `hil` ADR before V1 plan-reasoning can run on real operator data — don't let the personalization path proceed downstream (spec/build) until `fm4` resolves it.
+2. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3) — standing, and the pipeline raises the stakes.** Each pipeline stage (ADR/spec/build-plan/task-plan) is a gated skill in skills_library — READ each in FULL before invoking (read-before-invoke held for create-prd this session; it must hold for create-adr next). Run a stage from memory and the class recurrence promotes.
+3. **PF-S22-01 falsification window — still live for the parallel library-population track.** Library-population (research-only `/aplus-research` sessions) runs in parallel with the V1 build; it remains the first parallelized track after S22. At each batch close: ONE merge target, `branch-completeness-audit.sh` + `wiki-lint.sh` green. Unchanged by the pivot.
 
-**Demoted from prior Top-3:** AP-BRANCH-WRITE-FRAGMENTATION (PF-S22-01 — folded into #1's falsification window; reconciled+guarded S22); AP-ACT-BEFORE-VERIFY (PF-S6-01 — folded into #2, the verify-against-real-artifacts discipline).
+**Demoted from prior Top-3:** mhg-false-positive / verify-against-real-artifacts (PF-S3-01 — no new gate built this session); the bte/wiki-gate items (shipped S23, stable).
 
 ## Current State (volatile)
 
-- **SINGLE TRUNK — `main` is the complete project** (since S22 close, 2026-06-02): 20 agents + governance/tooling/vault/skills. This session's work is on `feature/wiki-ingestion-gate` (off `main`), PR'd back. No agent has authored any `vault/` library content yet — the new gate guards the first writes.
-- **WIKI INGESTION IS NOW MECHANICALLY GATED (S23, `bte` CLOSED).** Commit-time blocking battery `scripts/wiki-ingest-lint.sh` + PreToolUse hook `.claude/hooks/block-ungated-vault-write.sh` (wired into `.claude/settings.json`) refuses a `vault/{compounds,biomarkers,library}/` page commit that fails provenance (bda+verify-chain via `provenance_dir`/`provenance_slug` frontmatter, grandfather-aware) / structural / frontmatter-enum / index-sync. Periodic whole-vault `scripts/wiki-lint.sh` (WIKI.md's 6-check Lint) for every-5-session/phase-boundary runs. `INV-WIKI-INGESTION-GATED` live; 29/29 new smoke + all 12 existing suites green; production-path validated. Shared lib `scripts/lib/wiki-helpers.sh`. Grandfather allowlist `vault/library/_ingest-grandfather.txt` (4 pre-gate bpc-157 pages, provenance-exempt only — back-fill obligation).
-- **`INV-TRUNK-COMPLETENESS` live** (S22): `branch-completeness-audit.sh` at open + close (step 8.5). Green at S23 open (20 agents, 0 absent).
-- **Closed S23:** `bte`. (S22: `gdw`; S21: `mhg`/`5ot`/`0be`.)
+- **PROJECT PIVOTED TO A PRODUCT (S24, 2026-06-03).** a-plus-maxing is now a **local-first health tracking + planning system**: V1 = a single-operator, clonable, no-server app (multi-domain plans + local time-series tracking + on-demand template-generated dashboards/reports + projections, PII-private); North Star = a GP-facing product. Anchors: `design/vision.md` (vision) + `docs/prd/PRD-v1-local-first-health-tracking-planning.md` (V1 PRD, **Approved** S24).
+- **The Rigor Framework is confirmed already-adopted** (the project IS an instantiation of `skills_library/frameworks/rigor`); the NEW machinery is the **product pipeline** PRD→ADR→spec→build-plan→task-plan→execute. PRD stage DONE; next = ADR (`fm4`).
+- **PII boundary settled = threat-model B** (`hil`): private data transiently processed, never retained/trained; V1 uses an individual commercial **no-train API** for PII-bearing plan reasoning; store/ingestion/generation run local + model-independent. Formal ADR pending in `fm4`.
+- **SINGLE TRUNK** unchanged (since S22): `main` = complete project (20 agents + governance). This session on `feature/product-vision-prd` (off `main`), PR'd back. No code built — design only.
+- **Closed S24:** none (deliverables are vision + PRD; `hil` stays OPEN, blocked on `fm4`). Filed: `fm4`/`rg2`/`hv6`/`mo4` (pipeline arc) + the S23 wiki-ingestion ADR-backfill bead (P2).
 - **Active landmarks:** no trigger windows opened.
 
-**Historical (kept for reference):** `vault/meta/log.md` S22 + S23 entries.
+**Historical (kept for reference):** `vault/sessions/session-24.md` + `vault/meta/log.md` S24 entry.
 
 ## What Is Next (volatile)
 
-### bte done — wiki ingestion is gated. Remaining Walter-set agenda.
+### S24 delivered the product pivot. Next = the product pipeline (ADR stage).
 
-**RESUMPTION POINT.** `bte` is COMPLETE (S23) — wiki ingestion is mechanically gated (commit-time + periodic), `INV-WIKI-INGESTION-GATED` registered. **Open the next session on `main`** (run the Start Protocol + `branch-completeness-audit.sh` at open; this session's PR merges first). Two forward tracks:
+**RESUMPTION POINT.** S24 delivered `design/vision.md` + the **Approved** V1 PRD (`docs/prd/PRD-v1-local-first-health-tracking-planning.md`; Validate 10/2/0, Judge all-10). The project is now a local-first health tracking + planning system on the PRD→ADR→spec→build-plan→task-plan pipeline. **Open the next session on `main`** (Start Protocol + `branch-completeness-audit.sh` at open; this session's PR merges first).
 
-**1. Design the secure PII vault (`hil`, P1) — the remaining Walter-set item.** A separate vault holding operator PII (DNA raw, labs, the real operator-profile/current-state/goals values, January-2026 issue, meds) the system uses for personalization but NEVER sends to Anthropic. **Hard constraint:** Claude Code agents run by sending context to the Anthropic API — so any PII an agent "reads" IS sent to Anthropic. The architecture must separate (a) what the model reasons over from (b) where PII lives + how it's applied. Candidate patterns (NOT decided): local deterministic pre/post tokenization+rehydration; local non-LLM tooling stamping PII into model-produced templates; an air-gapped local vault the gated library never imports from; encryption-at-rest + gitignore (partial today: `vault/dna/raw/`, `vault/labs/raw/`). Needs an ADR + **AskUserQuestion-free** open discussion with Walter. Tie-in: genetics-specialist already encodes genetic-exceptionalism/privacy.
+**Next pipeline stage = ADR (`fm4`, P2, READY).** Run `/create-adr` on the V1 PRD — **READ the adr-development skill IN FULL first** (PF-S17-01). Decision triggers the PRD hands off: the no-train PII path (`hil` — its formal ADR is produced here; also reconcile the ADR home — the pipeline expects `docs/adr/`, the project uses `vault/decisions/`), the local time-series store, on-demand template generation, source-extensible ingestion. `hil` (P1) is blocked on `fm4` and closes when its ADR lands.
 
-**2. Library-population phase (now UNBLOCKED + GATED).** The actual product work — agents authoring `vault/{compounds,biomarkers,library}/` pages from fresh `/aplus-research` runs. Each page now needs `provenance_dir`/`provenance_slug` frontmatter + must pass `wiki-ingest-lint.sh` to commit. This is ALSO PF-S22-01's falsification window: declare ONE merge target, run `branch-completeness-audit.sh` + `wiki-lint.sh` at each batch close. The 4 grandfathered bpc-157 pages are back-fill obligations (re-run on the gated path, then remove from `_ingest-grandfather.txt`).
+**Then:** `rg2` (spec) → `hv6` (build-plan) → `mo4` (task-plan) → execute. Each a gated skills_library stage; read-before-invoke each.
 
-**Operator-data preconditions** (Walter-pending; feeds #1): 23andMe raw → `vault/dna/raw/`, Oura purchase, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) are still `status: scaffold` — they ARE the PII surface item #1 must protect.
+**Parallel track (unblocked + gated):** library-population via research-only `/aplus-research` sessions grows the wiki — PF-S22-01 window: ONE merge target + `branch-completeness-audit.sh` + `wiki-lint.sh` at each batch close. V1 is a thin-library MVP and does not block on it. The 4 grandfathered bpc-157 pages remain back-fill obligations.
 
-### Open beads carried (not blocking the above)
-- **P1:** `hil` (PII vault — item #1 above).
-- **P2:** `3v5` (WIKI longevity Owns), `xg4` (endocrine 5ARI gap), `382` (biomarker namespace partition), `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
-- **P3:** `ae0`/`d6g`/`4ba`/`3v6`/`dip` (batch-4 PROPOSED audits/lints), `t7z`/`fsr`/`8qe` (genetics follow-ups), `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
-- **Closed S23:** `bte`. **S22:** `gdw`. **S21:** `mhg`, `5ot`, `0be`.
+**Operator-data preconditions** (Walter-pending; feed personalization): 23andMe raw → `vault/dna/raw/`, Oura/wearable purchase + export, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) remain `status: scaffold` — they are both the PII surface and the personalization inputs.
+
+### Open beads carried (not blocking the pipeline)
+- **P1:** `hil` (PII vault — formal ADR produced in `fm4`).
+- **P2:** `fm4` (ADR stage — READY/next), wiki-ingestion ADR-backfill, `3v5`, `xg4`, `382`, `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
+- **P3:** `rg2`/`hv6`/`mo4` (pipeline arc, dep-chained), `ae0`/`d6g`/`4ba`/`3v6`/`dip`, `t7z`/`fsr`/`8qe`, `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
+- **Closed:** S24 none. S23: `bte`. S22: `gdw`. S21: `mhg`/`5ot`/`0be`.
 
 ### Open project work (unchanged)
-- Walter pending: 23andMe raw → `vault/dna/raw/`; Oura purchase; meal-template content; January 2026 health-issue characterization.
-- Vault git-tracking decision deferred. First HTML artifact deferred (LM-04).
+- Vault git-tracking decision deferred. First HTML artifact (LM-04) is now a V1 PRD deliverable, not an indefinite deferral.
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S23 (2026-06-02). LM-01's 14-day-before window depends on the still-TBD July exact date; LM-02/03/04 remain Walter-pending. No status flips due.
+All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura/wearable, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S24 (2026-06-03). LM-04 (first HTML artifact) is now scoped INTO the V1 PRD, so it stops being an indefinite deferral once V1 builds. LM-01's 14-day-before window still depends on the TBD July exact date; LM-02/03 remain Walter-pending. No status flips due.
 
 ## Open Issues
 
