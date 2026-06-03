@@ -4,7 +4,7 @@
 |-------|-------|
 | Owner | Walter McGivney |
 | Status | Approved |
-| Version | 2.0 |
+| Doc revision | 2.0 |
 | Date | 2026-06-03 |
 | Approved | 2026-06-03 |
 | Upstream | design/vision.md |
@@ -247,7 +247,7 @@ Acceptance Criteria:
 - **Traces to:** US-6, US-7, Goal 1, Goal 2 (artifact-design-protocol, Finding 4)
 - **Acceptance Criteria:**
   - [ ] Each generated file is a single file with 0 external asset requests and renders fully with the network disabled.
-  - [ ] Each generated file is ≤ 500KB.
+  - [ ] Each generated file is < 500KB.
   - [ ] Each generated file passes WCAG-AA contrast and is colorblind-safe and print-safe.
 
 **NFR-5:** Every claim in a generated dashboard or report is sourced, and every recommendation carries a confidence tier and a reversibility note.
@@ -277,7 +277,7 @@ Acceptance Criteria:
 - **NG-1:** No multi-tenancy, shared hosting, accounts, or login. Each instance is one local operator; an architect should eliminate any hosted-service, per-account, or shared-database design. (Bounds Goal 3 / US-8.)
 - **NG-2:** No regulated-PHI (HIPAA/BAA) trust model. V1's trust boundary is threat-model B (individual no-train API + local PII); designs presupposing a Business Associate Agreement, per-tenant isolation, or HIPAA controls are out of scope. (Bounds Goal 3 / NFR-1.)
 - **NG-3:** No cross-operator data sharing, aggregation, or comparison. Each clone is isolated; an architect should eliminate any design that reads, pools, or benchmarks across operators' stores. (Bounds Goal 3 / US-8.)
-- **NG-4:** No hosted, live, always-on web application or server. V1 generates dashboards and reports on demand (and optionally on a schedule) as single-file local artifacts; a *local* time-series store IS in scope, but a running web app/server that serves it live is deferred to v2+. (Bounds Goal 2 / FR-7.) **[Reversed from V1.0: a local time-series store is now IN scope; only the hosted/live surface is deferred.]**
+- **NG-4:** No hosted, live, always-on web application or server. V1 generates dashboards and reports on demand (and optionally on a schedule) as single-file local artifacts; a *local* time-series store IS in scope, but a running web app/server that serves it live is deferred to v2+. (Bounds Goal 2 / FR-7.) **[Reversed from the prior PRD draft: a local time-series store is now IN scope; only the hosted/live surface is deferred.]**
 - **NG-5:** No native device sync. V1 ingests via import/export routines (device/app exports, CSVs); native live-sync integrations that pull from a device directly are deferred to v2+. (Bounds FR-4.)
 - **NG-6:** No automated watch-out tracking. V1's watch-out loop is a check-in questionnaire the operator answers; automated detection of watch-out signals from sensor data is deferred to v2+. (Bounds FR-10.)
 - **NG-7:** No doctor login or clinician-facing hosted surface. V1 delivers reports to the physician by email or at the visit as single-file artifacts; a doctor login or hosted report surface is deferred to v2+. (Bounds FR-7 / FR-12.)
@@ -364,7 +364,7 @@ Acceptance Criteria:
 
 8. **[CODEBASE] Landmarks frame the timeline, the lab loop, and the device-ingestion source.** `vault/meta/landmarks.md`: LM-01 (July-2026 MD visit) is V1's first physician touchpoint and natural deadline, with trigger windows for baseline-panel/lab-order and a generated MD-handoff artifact — grounding the lab loop (FR-9) and doctor report (US-7); LM-04 (first HTML artifact) is what V1 delivers; LM-02 (Oura ring purchase + first 30-day wearable baseline) is the operator-named wearable that feeds device ingestion. This grounds the Goal attribution windows, FR-9 (lab loop), and FR-4 (import ingestion). [Finding 8]
 
-9. **[SCAFFOLD/INTAKE] Operator-agnostic + clonable distribution, the multi-domain plan, and the local-first tracking layer (2026-06-03 corrected scope, intake.md "Tracking scope CORRECTED").** The intake's corrected scope establishes: the repo ships engine + scaffolds + templates + ingestion + governance with no operator PII; friends clone and run independent local single-operator instances; the deliverable is a multi-domain operating plan (peptides/training/nutrition/etc.) each driven by the matching roster specialist; and a *local* time-series store + import/export ingestion + on-demand-and-cron template generation + lab-results matrix + watch-out questionnaire + projections are all IN v1, with the hosted/live web app, native device sync, automated watch-out tracking, and doctor login deferred to v2+. This grounds US-8 (clone), US-1 (multi-domain plan), US-2/US-3/US-4/US-5/US-6 (store/ingestion/lab/watch-out/dashboard loops), FR-1/FR-3/FR-4/FR-6/FR-7/FR-8/FR-9/FR-10/FR-11, NFR-2/NFR-3/NFR-7, Goal 2/Goal 3, and NG-1 through NG-10. [Intake corrected scope]
+9. **[SCAFFOLD/INTAKE] Operator-agnostic + clonable distribution, the multi-domain plan, and the local-first tracking layer (2026-06-03 corrected scope, intake.md "Tracking scope CORRECTED").** The intake's corrected scope establishes: the repo ships engine + scaffolds + templates + ingestion + governance with no operator PII; friends clone and run independent local single-operator instances; the deliverable is a multi-domain operating plan (peptides/training/nutrition/etc.) each driven by the matching roster specialist; and a *local* time-series store + import/export ingestion + on-demand-and-cron template generation + lab-results matrix + watch-out questionnaire + projections are all IN v1, with the hosted/live web app, native device sync, automated watch-out tracking, and doctor login deferred to v2+. This grounds US-8 (clone), US-1 (multi-domain plan), US-2/US-3/US-4/US-5/US-6 (store/ingestion/lab/watch-out/dashboard loops), FR-1/FR-3/FR-4/FR-6/FR-7/FR-8/FR-9/FR-10/FR-11, NFR-2/NFR-3/NFR-7, Goal 2/Goal 3, and NG-1 through NG-10. [Finding 9]
 
 10. **[CODEBASE] Post-visit feedback ingestion is a modeled, anticipated surface.** `vault/meta/landmarks.md` LM-01 makes inbound visit-outcome capture a first-class trigger window: "**0–7 days after:** ingest visit outcomes — new prescriptions, lab orders, diagnoses, follow-up schedule" (line 45). `vault/meta/goals.md` makes the same loop a goals-update trigger: "Doctor visit close-outs (goals shift on new diagnosis or all-clear)" (line 23). Together these establish that physician feedback flows back in after a visit and changes the next generation's inputs. This grounds FR-12 (capture physician feedback and carry it into the next generation). [Finding 10]
 
