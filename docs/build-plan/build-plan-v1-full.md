@@ -207,7 +207,7 @@ Every build task is a software task. The three `[Spike]` reports are design-leve
 | ADR-0007-T1 | SE | Core implementation: lab-loop / watch-out / physician-feedback store schemas writing through the store API, with question derivation and no signal automation. |
 | ADR-0007-T2 | SE | Core implementation: render-time matrix + projection view builders reading the loop-schema state and applying the render cap. |
 
-**Tally:** SE — 11 (ADR-0002-T1, ADR-0003-T1, ADR-0004-T1, ADR-0003-T2, ADR-0004-T2, ADR-0004-T3, ADR-0005-T2, ADR-0003-T3, ADR-0007-T1, ADR-0007-T2 = 10 plain SE; plus the SE-primary of the 4 review-paired tasks). Architect — 4 (the four spikes; ADR-0006-T0 is the spike, Architect-owned, not a builder). SE + Security review — 4 (ADR-0001-T1, ADR-0005-T1, ADR-0006-T1, ADR-0006-T2). QA — verifier at every wave checkpoint (no standalone QA-owned build task; both specs fold integration/E2E assertions into each task's own test file, which the SE author writes and QA verifies at the checkpoint). Net: 14 SE-primary build tasks (10 plain + 4 Security-paired) + 4 Architect spikes = 18.
+**Tally:** SE — 14 (SE-primary: 10 plain + 4 Security-paired) (ADR-0002-T1, ADR-0003-T1, ADR-0004-T1, ADR-0003-T2, ADR-0004-T2, ADR-0004-T3, ADR-0005-T2, ADR-0003-T3, ADR-0007-T1, ADR-0007-T2 = 10 plain SE; plus the SE-primary of the 4 review-paired tasks). Architect — 4 (the four spikes; ADR-0006-T0 is the spike, Architect-owned, not a builder). SE + Security review — 4 (ADR-0001-T1, ADR-0005-T1, ADR-0006-T1, ADR-0006-T2). QA — verifier at every wave checkpoint (no standalone QA-owned build task; both specs fold integration/E2E assertions into each task's own test file, which the SE author writes and QA verifies at the checkpoint). Net: 14 SE-primary build tasks (10 plain + 4 Security-paired) + 4 Architect spikes = 18.
 
 ## Checkpoint Protocol
 
@@ -283,7 +283,7 @@ A checkpoint sits at every wave boundary. Each names the test command(s), the ac
 
 ## Critical Path
 
-Computed via CPM forward/backward pass (wave-scheduling §2) over the merged DAG with files × criteria upper-bound durations (spikes +0.5). The analysis §3 named a node-count-7 seed (`ADR-0001-T0 → ADR-0001-T1 → ADR-0006-T0 → ADR-0006-T1 → ADR-0006-T2 → ADR-0007-T1 → ADR-0007-T2`); independent verification finds that chain is NOT the duration-critical path — it carries positive slack at `ADR-0001-T1`, `ADR-0006-T0`, and `ADR-0006-T1` (each 0.5 day). The duration-critical path runs through the store→generation→assembly spine, where `ADR-0002-T1` (3 days), `ADR-0004-T1` (3 days), and `ADR-0006-T2` (2.5 days) dominate. Two tied zero-slack paths converge at `ADR-0002-T1`:
+Computed via CPM forward/backward pass (wave-scheduling §2) over the merged DAG with files × criteria upper-bound durations (spikes +0.5). The CPM critical-path length is 13.0 task-days (the longest dependency chain), whereas the frontmatter `estimated-effort` (16 task-days) is the sum of per-wave wall-clock maxima; the 3-day delta is the cost of the Wave-4 checkpoint barrier, which serializes the off-critical-path Wave-4 long pole (ADR-0003-T2) between the critical-path tasks in Waves 3 and 5. The analysis §3 named a node-count-7 seed (`ADR-0001-T0 → ADR-0001-T1 → ADR-0006-T0 → ADR-0006-T1 → ADR-0006-T2 → ADR-0007-T1 → ADR-0007-T2`); independent verification finds that chain is NOT the duration-critical path — it carries positive slack at `ADR-0001-T1`, `ADR-0006-T0`, and `ADR-0006-T1` (each 0.5 day). The duration-critical path runs through the store→generation→assembly spine, where `ADR-0002-T1` (3 days), `ADR-0004-T1` (3 days), and `ADR-0006-T2` (2.5 days) dominate. Two tied zero-slack paths converge at `ADR-0002-T1`:
 
 ```
 Path A: ADR-0001-T0 → ADR-0002-T1 → ADR-0004-T1 → ADR-0006-T2 → ADR-0007-T1 → ADR-0007-T2
@@ -305,7 +305,7 @@ Both span 6 tasks and 13.0 task-days. They diverge only at the Wave-1 entry spik
   - ADR-0004-T3: 4.5 days slack (Wave 4; isolated cron entry leaf).
   - ADR-0005-T1: 5.0 days slack (Wave 3; the gitignore-boundary spine is the shortest).
   - ADR-0005-T2: 5.0 days slack (Wave 4; leaf of the gitignore spine).
-  - ADR-0004-T0: 10.0 days slack (Wave 1; its cap is consumed late, in Waves 4 and 7, so it has the most float).
+  - ADR-0004-T0: 9.5 days slack (Wave 1; its cap is consumed late, in Waves 4 and 7, so it has the most float) (bounded by ADR-0004-T2 LS 11.0; 11.0 − 1.5 = 9.5).
 
 ## Risk Schedule
 
@@ -355,7 +355,7 @@ This is a two-spec plan (data-in tier 3 + data-out tier 5). The data-out spec's 
 
 | Conflict | Spec A Task | Spec B Task | Resolution |
 |----------|------------|------------|------------|
-| `.gitignore` | ADR-0002-T1 (Wave 2, **adds** `vault/store/`) | ADR-0005-T1 (Wave 3, **extends** with filled-scaffold-value exclusions) | Ordered create-then-extend, NOT a BP-07 collision. The cross-spec edge `ADR-0002-T1 → ADR-0005-T1` already sequences them (Wave 2 before Wave 3); Spec B `ADR-0005-T1` text says "extending the data-in entry." No same-wave overlap, no conflict. |
+| `.gitignore` | ADR-0002-T1 (Wave 2, **adds** `vault/store/`) | ADR-0005-T1 (Wave 3, **extends** with filled-scaffold-value exclusions) | Ordered create-then-extend, NOT a BP-07 collision. The plan-added superset edge `ADR-0002-T1 → ADR-0005-T1` (recorded in the Merged cross-spec dependency edges subsection, not a literal edge in Spec B's Dependency Map) sequences them (Wave 2 before Wave 3); the ordering holds regardless via Wave 2 < Wave 3 plus `ADR-0005-T1`'s real cross-spec dependency on `ADR-0001-T1` (Wave 2) and Spec B `ADR-0005-T1`'s own "extending the data-in entry" criterion. No same-wave overlap, no conflict. |
 
 No other cross-spec file overlap. `scripts/store/loop_schema.py` (ADR-0007-T1) is a new file in the shared `scripts/store/` directory, distinct from `store.py`/`keying.py`. `scripts/generate/render.py` appears in `ADR-0004-T1` (create, Wave 3) and `ADR-0004-T2` (modify, Wave 4), but that is intra-Spec-B and already ordered by the `ADR-0004-T1 → ADR-0004-T2` edge.
 
@@ -396,7 +396,7 @@ At every boundary where a data-out task consumes a data-in artifact, the checkpo
 
 ### Wave Integrity
 - [x] Every task appears in exactly one wave — all 18 tasks placed across 7 waves (3+2+4+5+2+1+1 = 18), 0 duplicates, 0 omissions, verified against the Kahn sort.
-- [x] No task is scheduled in a wave before its dependency's wave — every edge in the merged edge list points from an earlier wave to a later wave (CPM forward pass confirms ES(successor) ≥ EF(predecessor) for all 40 edges).
+- [x] No task is scheduled in a wave before its dependency's wave — every edge in the merged edge list points from an earlier wave to a later wave (CPM forward pass confirms ES(successor) ≥ EF(predecessor) for all 41 edges (11 Spec-A intra + 12 Spec-B intra + 18 cross-spec)).
 - [x] Topological ordering respected across all waves — the wave schedule is the Kahn result of the merged 18-node graph, independently re-derived.
 
 ### Checkpoint Quality
