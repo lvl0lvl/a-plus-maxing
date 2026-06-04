@@ -149,3 +149,11 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - **No vault wiki page changes this session** — product-pipeline docs (`docs/adr/`) + two governance edits only. Vault-decision edit: `decisions/2026-05-16-system-architecture.md` formally SUPERSEDED (status:superseded; superseded_by [ADR-0002,0004,0006]). Vault-meta edit: `meta/contradictions.md` ADR-home entry resolved.
 - **Rubric governance refined (Walter):** judge threshold 99% → ≥95%/no-dim-<9; word-count ceiling → review-trigger + individual length exception (never cut load-bearing content for a count).
 - **Next:** spec stage (`rg2` — read the spec skill in full first). `fm4` + `hil` closed. [[sessions/session-25]]
+
+## 2026-06-04 — S26 (V1 spec stage, foundational data-in half; no wiki page changes)
+
+- **Spec stage, foundational-first SPLIT (Walter-confirmed).** Ran the `spec-development` 7-phase `/create-spec` pipeline (orchestrator coordinates + runs mechanical checks, workers produce — Hard Rule 1 held); authored the data-in spec `docs/spec/adr-0001-adr-0003-spec.md` (ADR-0001/0002/0003) — 7 tasks, 2 prerequisite spikes (PII-boundary-enforcement + store-keying), 49 binary AC, 3 fresh-judge iterations → ACCEPT all-dims-≥9. The data-out cut (ADR-0004/0005/0006/0007 + D4↔D7) is DEFERRED to a follow-up spec session.
+- **No vault wiki page changes this session** — product-pipeline docs (`docs/spec/`) + governance/handoff only.
+- **Concrete first-cut wired adapters (Walter):** HealthKit (Apple Watch) + Oura (Walter), Garmin (the friend / second cloning operator); Whoop pluggable-unwired; labs/food/weight manual/CSV.
+- **Discipline:** anti-self-attestation held (Phase-4 worker's "passes" re-verified mechanically; 3 fresh judges — iter-2 caught a forward-reference iter-1 missed). Role-inlining hook false-fired on the worker's `#`-header style (skill-internal worker, no role profile); fixed by `##` headers — observed, not a PF.
+- **Next:** the DATA-OUT spec (`rg2` remaining half) → `hv6` (build-plan, blocked on the full spec) → `mo4`. `rg2` updated PARTIAL, kept OPEN. [[sessions/session-26]]
