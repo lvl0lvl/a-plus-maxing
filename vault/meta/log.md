@@ -166,3 +166,13 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - **Reviewed + merged.** `/review-pr` #35 (3 docs-PR agents, full profiles) → 2 legitimate findings FIXED + blind-verified (API-001 personalization+HALT; QUAL-002 `pii_scan` reuse), 2 NOT_A_BUG; 0 suppressed (matrix priority-only, PF-S26-01). Rebase-merged to `main` via REST (GraphQL throttled).
 - **Discipline:** anti-self-attestation held (mechanical Phase-5 + fresh judge + blind triage + blind verification). PF-S25-01 window tripped-clean (close sequenced after the merge). No new PF-class entries.
 - **Next:** `hv6` (build-plan, UNBLOCKED — consumes the full 18-task spec) → `mo4` (task-plan) → execute. `rg2` CLOSED. [[sessions/session-27]]
+
+## 2026-06-04 — S28 (V1 build-plan stage; no wiki page changes)
+
+- **Build-plan stage COMPLETE.** Ran the `build-planning` 8-phase `/create-build-plan` pipeline (Hard Rule 1 held); authored `docs/build-plan/build-plan-v1-full.md` (status approved) — the full 18-task spec (data-in 7 + data-out 11) scheduled into 7 waves, critical path 6 tasks / 13.0 task-days, estimated-effort 16 task-days, fresh-judge ACCEPT 100/100 all-dims-10.
+- **No vault wiki page changes this session** — product-pipeline docs (`docs/build-plan/`) + governance/handoff only.
+- **PII critical path now SCHEDULED enforcement-first:** `ADR-0006-T0` router spike (W3) → `ADR-0006-T1` impl (W4) before plan-assembly `ADR-0006-T2` (W5); egress guard `ADR-0001-T1` (W2) before all 8 data-out 0-egress consumers. 0 BP-01 violations / 41 merged edges.
+- **Cross-spec merge handled:** the data-out spec's cross-spec references became real intra-plan edges; `ADR-0006-T0` spike placed in W3 (not W1) as a documented justified exception (it genuinely depends on the data-in PII foundation). The `.gitignore` is the sole cross-spec file overlap (ordered create-then-extend). Surfaced 1 non-blocking Spec-B dep-map inconsistency → bead `0oy`.
+- **Reviewed + merged.** `/review-pr` #38 (3 docs-PR agents, full profiles) → 5 legitimate findings FIXED + blind-verified (agent-tally number, CPM slack column, edge count, two clarity/precision notes), 0 suppressed (matrix priority-only, PF-S26-01). Rebase-merged to `main` via REST (GraphQL throttled).
+- **Discipline:** anti-self-attestation held (mechanical Phase-2/6 + fresh judge + blind triage + blind verification; the judge independently disproved the orchestrator's critical-path seed). PF-S25-01 window tripped-clean (close sequenced after the merge on `fix/s28-close`). No new PF-class entries.
+- **Next:** `mo4` (task-plan, READY — consumes the 18-task build plan) → execute. `hv6` CLOSED. [[sessions/session-28]]
