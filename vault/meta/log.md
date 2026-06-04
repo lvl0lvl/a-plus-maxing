@@ -157,3 +157,12 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - **Concrete first-cut wired adapters (Walter):** HealthKit (Apple Watch) + Oura (Walter), Garmin (the friend / second cloning operator); Whoop pluggable-unwired; labs/food/weight manual/CSV.
 - **Discipline:** anti-self-attestation held (Phase-4 worker's "passes" re-verified mechanically; 3 fresh judges — iter-2 caught a forward-reference iter-1 missed). Role-inlining hook false-fired on the worker's `#`-header style (skill-internal worker, no role profile); fixed by `##` headers — observed, not a PF.
 - **Next:** the DATA-OUT spec (`rg2` remaining half) → `hv6` (build-plan, blocked on the full spec) → `mo4`. `rg2` updated PARTIAL, kept OPEN. [[sessions/session-26]]
+
+## 2026-06-04 — S27 (V1 spec stage, data-out half; no wiki page changes)
+
+- **Spec stage COMPLETE (full data-out cut, Walter-confirmed).** Ran the `spec-development` 7-phase `/create-spec` pipeline (Hard Rule 1 held); authored the data-out spec `docs/spec/adr-0004-adr-0007-spec.md` (ADR-0004/0005/0006/0007) — 11 tasks, 5 topological groups, 2 prerequisite spikes (`ADR-0004-T0` D4↔D7 render-size + `ADR-0006-T0` plan-reasoning router/summary, enforcement-first), fresh-judge ACCEPT 99/100 all-dims-≥9.
+- **No vault wiki page changes this session** — product-pipeline docs (`docs/spec/`) + governance/handoff only.
+- **PII critical path now specced END-TO-END + enforcement-first:** `ADR-0006-T0` router blocks every plan-reasoning-over-PII task; `ADR-0005-T1` content-scan trunk guard; `ADR-0006-T2` HALT-rule safety criterion (added at review).
+- **Reviewed + merged.** `/review-pr` #35 (3 docs-PR agents, full profiles) → 2 legitimate findings FIXED + blind-verified (API-001 personalization+HALT; QUAL-002 `pii_scan` reuse), 2 NOT_A_BUG; 0 suppressed (matrix priority-only, PF-S26-01). Rebase-merged to `main` via REST (GraphQL throttled).
+- **Discipline:** anti-self-attestation held (mechanical Phase-5 + fresh judge + blind triage + blind verification). PF-S25-01 window tripped-clean (close sequenced after the merge). No new PF-class entries.
+- **Next:** `hv6` (build-plan, UNBLOCKED — consumes the full 18-task spec) → `mo4` (task-plan) → execute. `rg2` CLOSED. [[sessions/session-27]]
