@@ -12,6 +12,30 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 27 (2026-06-04)
+
+> Confirmed by Walter at session open ("proceed with the full data-out" → "proceed"). **Pacing = the full data-out cut in one spec** (not a further split): ADR-0004 (generation) / 0005 (PII-free trunk) / 0006 (plan-assembly + plan-reasoning ROUTER enforcement) / 0007 (lab-flow), carrying the D4↔D7 render-size tension as a measurement spike. Closes `rg2`. Artifact shape (one unified data-out spec vs per-tier) settled by re-reading `spec-development` SKILL.md, reported before authoring.
+
+Goal: Run the remaining half of the spec stage (`rg2`) — decompose the data-out ADR cut (0004/0005/0006/0007) into one implementation spec via `/create-spec`, carrying the D4↔D7 render-size tension as a measurement spike. Orchestrator coordinates; worker agents produce all spec content (Hard Rule 1). The data-in spec is consumed as the upstream interface, not re-specced.
+
+Acceptance criteria:
+- [ ] AC1 — Read-before-invoke: `spec-development` SKILL.md + `create-spec.md` + all 3 references + the worked example read IN FULL before invocation (PF-S17-01 — per-invocation, not "I read it in S26"); `AskUserQuestion` substituted with prose (standing override); all spec content worker-produced (Hard Rule 1), never freelanced; no `Workflow`/hand-rolled-fan-out substitution for the gated skill.
+- [ ] AC2 — Built via the gated 7-phase pipeline, homed at `docs/spec/` (ADR-home convention; `.pipeline/` gitignored). Each data-out ADR's Validation Approach → spec acceptance criteria; the DAG sub-order → build phases. The data-in spec's interface (store read model + wired-adapter store + data-in PII guard) is consumed as upstream, not re-specced.
+- [ ] AC3 — The plan-reasoning ROUTER enforcement (ADR-0006 / the ADR-0001 OQ-1 PII-bearing facet) is specced as an enforcement-first task that must land before any plan-reasoning-over-PII implementation task — the V1 critical-path guard (Top-3 #2). The PII-free vs PII-bearing dispatch split is mechanically enforced in the spec's acceptance criteria.
+- [ ] AC4 — The D4↔D7 render-size tension is specced as a measurement spike (T0), not silently resolved; its resolution gates the dependent generation + data-flow tasks.
+- [ ] AC5 — Passes the skill's gates + judge (all-dims ≥9, fresh agent per iteration, max 3); no Blocking Open Question at finalize for the data-out cut; any residual surfaced explicitly, not buried.
+- [ ] AC6 — Close: 4 close audits + `branch-completeness-audit.sh` green at `--session 27`; PF attestation; VOLATILE 6-clause rotation; all work on `feature/v1-spec-dataout` off `main` → PR back (never direct to `main`); review via `/review-pr` with the threshold matrix PRIORITY-ONLY (PF-S26-01); `rg2` CLOSED (both halves delivered); `hv6` UNBLOCKED.
+
+Files I WILL touch: `docs/spec/*` (the data-out spec) + `docs/spec/.pipeline/*` (gitignored working artifacts); `HANDOFF.md` (contract + close + rotation); `.beads/*` via `bd`; `vault/sessions/session-27.md` (NEW); `vault/meta/log.md`; `memory/process-failures.md` (only if a PF surfaces).
+
+Files I will NOT touch: the 7 ADRs themselves (read-only — surface defects for ADR revision, never silently edit); **the data-in spec** `docs/spec/adr-0001-adr-0003-spec.md` (consumed as upstream interface — edited only if an integration mismatch forces a surfaced change, never silently); any `.claude/agents/*/agent.md` body or the deployed roster; `lib/gate_attest.py`, `schemas/*`, bda, the wiki-ingest gate; `vault/{compounds,biomarkers,library}/` content; **the real operator-PII values** (design only — no PII tooling built, no data migration); `INVARIANTS.md` unless Walter approves a change-discipline registration (surface, don't self-register); the build-plan/task-plan/execute stages; `main` directly.
+
+NOT doing: build-plan (`hv6`) / task-plan (`mo4`) / execute; building any generation/distribution/router/data-flow mechanism or PII tooling; migrating operator data; library-population; editing the ADRs or the data-in spec; other carried beads.
+
+Invariants at risk: INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS (standard close). A candidate new invariant (PII-router enforcement spec discipline) may surface — surfaced for change-discipline, not self-registered.
+
+Self-recognition pre-flight: watching for "I read the spec skill in S26, I can skip re-reading" (NO — read-before-invoke is per-invocation); "I've read the skill, I'll just write the spec myself" (Hard Rule 1 — workers produce, I coordinate); "fan out with `Workflow` instead of the gated skill" (PF-S17-01 — read+run the actual skill); "the ADRs already decided it, the spec is just transcription" (NO — the spec resolves the data-out OQs + the D4↔D7 tension + the router enforcement mechanism); "the router is just another task" (NO — it's the PII critical-path guard, enforcement-first); PF-S26-01 at review (threshold matrix = priority-only, never suppression).
+
 ## Scope Contract — Session 26 (2026-06-04)
 
 > Confirmed by Walter at session open ("let's do the split pacing. please proceed"). **Pacing = foundational-first split:** spec the "data-in" foundation only — ADR-0001 (PII trust boundary) → ADR-0002 (local store) → ADR-0003 (ingestion). The "data-out" tiers (ADR-0004 generation / 0005 distribution / 0006 plan-assembly / 0007 data-flow) DEFER to a follow-up spec session. Exact artifact shape (one unified spec vs per-tier) settled by reading `spec-development` SKILL.md, reported before authoring.
