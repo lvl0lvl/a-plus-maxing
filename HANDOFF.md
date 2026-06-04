@@ -54,7 +54,7 @@ Self-recognition pre-flight: watching for "I've read the ADR skill, I'll just wr
 
 ### PF attestation
 
-S25 close (2026-06-04): No new PF-class entries this session. Observed but NOT promoted: (a) the rubric's 99%-threshold + hard word-count-ceiling mis-calibration surfaced on ADR-0001 (a depth-justified single-9 false-failing 99%; a load-bearing ADR exceeding the 2-page heuristic) — caught by the verify+judge gates and corrected via a Walter-approved rubric change; the multi-gate pipeline working as designed, not a failure. (b) Read-before-invoke (PF-S17-01) HELD — `adr-development` SKILL.md + `create-adr.md` read in FULL before invoking; all ADR content worker-produced per create-adr Hard Rule 1 (orchestrator never authored an ADR; resisted the "I've read the skill, I'll write it" temptation at every tier). (c) The whole-set Red Team caught two cross-ADR defects (inconsistent supersession cross-links + an unplaced FR-12) the per-ADR judges structurally could not see — the systemic review working as designed. (d) Session-open protocol (PF-S13-01) HELD — every Start-Protocol step run with real output incl. `branch-completeness-audit.sh` at OPEN; scope contract written + Walter-confirmed before any work.
+S25 close (2026-06-04): One new PF-class entry — **PF-S25-01** (`AP-CLOSE-BEFORE-LIFECYCLE-COMPLETE`): I ran the session close BEFORE the `/review-pr 29` → `/merge 29` lifecycle finished, then rationalized the resulting stale HANDOFF ("this session's PR merges first" + the missing `75t` bead) as "immaterial… not worth a branch+PR cycle" — a self-recognition-flag bypass ("minor accretion") that Walter caught. Reconciled on `fix/s25-handoff-postmerge` (this update): RESUMPTION line corrected, `75t` added, #29 review+merge recorded. Recurrence guard: sequence the close AFTER the PR lifecycle when a session merges its own PR, or make "reconcile HANDOFF to merged state" a mandatory post-merge sub-step. Observed but NOT promoted: (a) the rubric's 99%-threshold + hard word-count-ceiling mis-calibration surfaced on ADR-0001 (a depth-justified single-9 false-failing 99%; a load-bearing ADR exceeding the 2-page heuristic) — caught by the verify+judge gates and corrected via a Walter-approved rubric change; the multi-gate pipeline working as designed, not a failure. (b) Read-before-invoke (PF-S17-01) HELD — `adr-development` SKILL.md + `create-adr.md` read in FULL before invoking; all ADR content worker-produced per create-adr Hard Rule 1 (orchestrator never authored an ADR; resisted the "I've read the skill, I'll write it" temptation at every tier). (c) The whole-set Red Team caught two cross-ADR defects (inconsistent supersession cross-links + an unplaced FR-12) the per-ADR judges structurally could not see — the systemic review working as designed. (d) Session-open protocol (PF-S13-01) HELD — every Start-Protocol step run with real output incl. `branch-completeness-audit.sh` at OPEN; scope contract written + Walter-confirmed before any work.
 
 ## Scope Contract — Session 24 (2026-06-03)
 
@@ -942,6 +942,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 - **Rubric governance refined (Walter S25):** judge threshold ≥95%/no-dim-<9; word-count ceiling = review-trigger + individual length exception (never cut load-bearing content for a count).
 - **SINGLE TRUNK** unchanged (since S22): `main` = complete project. This session on `feature/v1-adr-stage` (off `main`), PR'd back. No code built — design only.
 - **Closed S25:** `fm4` (ADR stage), `hil` (PII vault — its ADR landed = ADR-0001).
+- **PR #29 (the ADR set) reviewed + merged:** `/review-pr` Gate PASS — 4 findings, all Suggestion (2 LEGITIMATE fixed+verified: ADR-0005 citation, ADR-0007 table header; 1 DECISION: gitignored `.pipeline/`; 1 OUT_OF_SCOPE → bead `75t`); rebase-merged to `main`. Filed S25: `75t` (P3).
 - **Active landmarks:** no trigger windows opened.
 
 **Historical (kept for reference):** `vault/sessions/session-25.md` + `vault/meta/log.md` S25 entry.
@@ -950,7 +951,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ### S25 delivered the V1 ADR set. Next = the spec stage.
 
-**RESUMPTION POINT.** S25 delivered the 7-ADR V1 architecture set (`docs/adr/ADR-0001…0007`, all ACCEPTED) + the governance flips (2026-05-16 superseded; ADR-home convention). **Open the next session on `main`** (Start Protocol + `branch-completeness-audit.sh` at open; this session's PR merges first).
+**RESUMPTION POINT.** S25 delivered the 7-ADR V1 architecture set (`docs/adr/ADR-0001…0007`, all ACCEPTED) + the governance flips (2026-05-16 superseded; ADR-home convention). PR #29 was reviewed (`/review-pr` Gate PASS — 2 suggestion fixes applied) and rebase-merged to `main`, so the trunk already carries the ADR set. **Open the next session on `main`** (Start Protocol + `branch-completeness-audit.sh` at open).
 
 **Next pipeline stage = SPEC (`rg2`, READY).** Run the spec stage on the ADR set — **READ the spec skill IN FULL first** (PF-S17-01). What the ADRs hand off: each ADR's **Validation criteria → acceptance criteria**; **Open Questions → spec questions / spikes** — especially ADR-0001 OQ-1 (the PII enforcement-mechanism shape: which dispatches route to the no-train path, how the split is enforced) and the **D4↔D7 render-size measurement** (a build-plan prerequisite task); the **DAG tiers → build phases** (Tier 1 = ADR-0001 first). Then `hv6` (build-plan) → `mo4` (task-plan) → execute. Each a gated skills_library stage; read-before-invoke each.
 
@@ -962,7 +963,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ### Open beads carried (not blocking the pipeline)
 - **P2:** wiki-ingestion ADR-backfill (`dke`), `3v5`, `xg4`, `382`, `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
-- **P3:** `rg2` (spec — READY/next) → `hv6` (build-plan) → `mo4` (task-plan) (dep-chained), `ae0`/`d6g`/`4ba`/`3v6`/`dip`, `t7z`/`fsr`/`8qe`, `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
+- **P3:** `rg2` (spec — READY/next) → `hv6` (build-plan) → `mo4` (task-plan) (dep-chained), `75t` (wiki-schema/source-whitelist `depends_on` freshness after the 2026-05-16 supersession — from the #29 review), `ae0`/`d6g`/`4ba`/`3v6`/`dip`, `t7z`/`fsr`/`8qe`, `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
 - **Closed:** S25: `fm4`, `hil`. S24: none. S23: `bte`. S22: `gdw`. S21: `mhg`/`5ot`/`0be`.
 
 ### Open project work (unchanged)
