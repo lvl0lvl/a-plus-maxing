@@ -71,8 +71,8 @@ Build a single "tracking" component that owns the store schemas, the matrix, the
 
 ### Related Decisions
 
-| ADR | Relationship | Description |
-|-----|-------------|-------------|
+| Decision | Relationship | Description |
+|----------|-------------|-------------|
 | [ADR-0001 (No-Train PII Trust-Boundary Routing)](ADR-0001-pii-trust-boundary-no-train-routing.md) | constrained-by | Lab values and symptom answers are operator PII; ADR-0001's no-egress rule forces them onto the local-store side and off any model-egress projection or analysis step. |
 | [ADR-0002 (Local-First Time-Series Store Substrate)](ADR-0002-local-first-time-series-store.md) | depends-on | The lab loop and watch-out answers are store schemas; the pending / not-yet-answered / no-prior state is store state, so the store substrate must be decided before these schemas can be placed. |
 | [ADR-0004 (On-Demand Single-File Artifact Generation)](ADR-0004-on-demand-single-file-artifact-generation.md) | depends-on | The biomarker matrix and projections are render-time views with a render-time guardrail; the artifact generation model must be decided before those views are placed. |
