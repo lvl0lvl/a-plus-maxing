@@ -1,0 +1,120 @@
+## ADR-0002: Local-First Time-Series Store Substrate
+
+> **Y-Statement:** In the context of a local-first single-operator health system whose data model is point-in-time today (latest value + a `trend` field, no history) and which must accumulate readings keyed by item and timepoint, facing the tension between an LLM-/git-legible substrate consistent with the project's existing markdown precedent and a queryable indexed substrate that scales better, we decided to store the time series as append-only NDJSON files in a gitignored per-item `vault/store/` directory rather than SQLite or extending the readable vault pages in place, to achieve idempotent appends, offline/clonable operation, and human/LLM legibility, accepting that whole-file reads and the absence of an index will not scale to large-row counts and that NDJSON enforces no schema.
+
+```yaml
+id: ADR-0002
+title: "Local-First Time-Series Store Substrate"
+status: accepted
+date: 2026-06-04
+decision-makers: [Walter McGivney]
+tags: [store, time-series, persistence, local-first, foundation]
+```
+
+### Context
+
+The system reasons over and renders the operator's health data, but its data model is point-in-time, not longitudinal. `current-state.md` holds latest values plus a `trend` field and a rolling 4-week change log; the biomarker page template holds a single `Current Value` block (value + trend + history pointer) and a `last_verified` date ([current-state.md, L28-29, L93-97](../../vault/meta/current-state.md) [VERIFIED]; [biomarkers/_template.md, L11, L30-33](../../vault/biomarkers/_template.md) [VERIFIED]; [PRD-v1, Finding 5 L359](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]). Nothing in the project accumulates a series from which to tell whether last month's intervention moved a marker — the store is the missing accumulation layer ([PRD-v1, Goal 2 L31-36, US-2 L55](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+
+Several forces pull against each other in choosing the on-disk substrate. The PRD fixes hard boundaries: the store is local and file-based with no hosted backend, holds readings across timepoints, and must support at least two timepoints for an item distinguished by time, operating entirely from local files with no read or write to a shared or hosted service ([PRD-v1, FR-3 L138, L142-144](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]). It is additive: it reads the existing scaffolded vault data in place and accumulates beside it locally, and is explicitly NOT a migration of the vault into a separate datastore ([PRD-v1, NG-10 L286, A-7 L322](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]). Each clone is an independent local instance with no shared service, and there is no cross-operator path ([PRD-v1, NFR-3 L238, NG-1 L277, NG-3 L279](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+
+Within those boundaries the substrate is genuinely undecided, and it pulls multiple stakeholders. The operator (and the LLM specialists reasoning over the data) benefit from a substrate that is human- and model-legible and diffable; the engine that performs idempotent imports needs a substrate where re-runs add only new readings and never duplicate ([PRD-v1, FR-4 L151-152](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]); the generation path needs a read model keyed by item+timepoint to render trends and projections ([PRD-v1, FR-11 L212, Goal 2 measurement L35](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]); and the PII posture inherited from ADR-0001 forces the store onto the local/no-egress side and out of version control ([ADR-0001, Decision + Related Decisions](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]). The existing project precedent — "all canonical state lives in markdown in the vault" ([2026-05-16-system-architecture.md, Decision 1 L23-27](../../vault/decisions/2026-05-16-system-architecture.md) [VERIFIED]) — favors a text substrate, but that precedent framed state as point-in-time and never specified an accumulation format, so it constrains the choice without resolving it.
+
+### Decision
+
+Store the operator time series as append-only newline-delimited JSON (NDJSON) files in a `vault/store/` directory excluded from version control (a `.gitignore` entry added per ADR-0005's enforcement OQ), one file per tracked item, each line one reading keyed by item identifier and timepoint. Choose this substrate over an embedded database (SQLite) and over extending the readable vault pages in place. The store reads the existing scaffolded vault data in place and accumulates beside it; it does not migrate the vault into itself.
+
+### Rationale
+
+The three substrates were evaluated against four criteria the PRD and the project precedent make load-bearing: legibility (human + LLM), idempotent-append cost, diff/version-control behavior, and fit with the markdown-substrate precedent and the no-migration constraint.
+
+On **legibility**, NDJSON is plain text a human and an LLM read directly, extending the project's "all canonical state lives in markdown" precedent into a line-oriented text accumulation layer rather than replacing it with an opaque binary ([2026-05-16-system-architecture.md, Decision 1 L23-27](../../vault/decisions/2026-05-16-system-architecture.md) [VERIFIED]). SQLite is a binary file requiring a tool to inspect, breaking the read-it-directly property the rest of the vault has. On **idempotent-append cost**, the per-item NDJSON layout makes the FR-4 contract — re-runs add only new readings, never duplicate ([PRD-v1, FR-4 L151-152](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]) — a dedupe-then-append over a single small file keyed by (item, timepoint); D3 finalizes the exact key, but the substrate keeps the operation trivial and atomic. SQLite would give this via a primary key and `INSERT OR IGNORE`, which is genuinely cleaner at the transaction level — an advantage NDJSON does not match (see Alternatives A). On **diff/version-control behavior**, the store is gitignored so neither substrate is diffed in history; but the store is operator-inspectable, and NDJSON's one-reading-per-line layout means an append touches only new trailing lines, which a `git diff` (were the operator to track a local copy) or a manual review reads cleanly, whereas a SQLite file shows as an unreadable binary blob. On **precedent + no-migration fit**, NDJSON satisfies NG-10 directly: the existing vault pages stay markdown and are read in place, and the store is purely additive local files beside them, with no schema migration of the vault ([PRD-v1, NG-10 L286, A-7 L322](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+
+The accepted trade-off is at scale. NDJSON has no index: reading an item's history is a whole-file scan, and a cross-item query is a scan across files — fine at V1 volumes (a single operator, a handful of biomarkers and wearable streams over months), but a substrate SQLite handles with indexed lookups. We accept the scan cost because V1's read pattern is "load one item's series and render it," the row counts are small, and the legibility/precedent/no-migration wins are load-bearing for V1 while the index is not. Long-term, if row counts or query complexity grow past what whole-file scans serve, the per-item NDJSON files are a clean import source for a later SQLite or columnar store — the substrate choice is reversible by re-ingest, unlike a hosted-backend choice, which NG-1/NG-3 forbid outright ([PRD-v1, NG-1 L277, NG-3 L279](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+
+### Consequences
+
+**Positive:**
+- A reading appended at one timepoint persists and stays retrievable when a later reading for the same item is added, and an item's file holds ≥2 timepoints distinguished by their timestamp — satisfying the FR-3 persistence + multi-timepoint criteria directly from a flat file ([PRD-v1, FR-3 L142-143](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- The store operates with 0 network calls and 0 login — a per-item file read/write needs no service, so a fresh clone's store is operable offline and independently ([PRD-v1, FR-3 L144, NFR-3 L238](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- NDJSON is human- and LLM-legible, so the operator and the specialist reasoning can inspect the raw series directly, preserving the read-it-directly property the markdown vault already has ([2026-05-16-system-architecture.md, Decision 1 L23-27](../../vault/decisions/2026-05-16-system-architecture.md) [VERIFIED]).
+- Per-item append is atomic and idempotent-friendly: the FR-4 no-duplicate contract reduces to a dedupe-then-append over one small file ([PRD-v1, FR-4 L151-152](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+
+**Negative:**
+- No index, whole-file scans: retrieving an item's history reads the entire file and a cross-item query scans multiple files; with no index this does not scale to large row counts the way SQLite's indexed lookups would, so a future high-volume or complex-query workload (1+ year horizon, e.g. multi-year multi-stream wearable data) forces either a substrate migration or a layered index ([PRD-v1, Goal 2 measurement L35](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]; scale claim [UNVERIFIED] — no benchmark exists pre-build).
+- NDJSON enforces no schema: nothing in the substrate guarantees every line carries the keying fields or consistent units, so the keying/validation discipline must live in the ingestion (D3) and read (D4) layers rather than the store, and a malformed appended line is not rejected by the substrate itself.
+- It imposes a constraint on every downstream reader: D3 ingestion must write only to these local files, D4 generation must read trends/projections by scanning them, and D7 lab/watch-out schemas must fit the same per-item line model — narrowing those designs to the flat-file read/write contract rather than a query interface ([dag.md §8 constraint-propagation](.pipeline/dag.md) [VERIFIED]).
+- The store is gitignored, so it is excluded from version-control history and is not backed up by the repository: an operator who loses the working copy loses the series unless they keep a separate local backup (a constraint D6's distribution policy inherits) ([PRD-v1, NFR-2 L236](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+
+**Neutral:**
+- The `vault/store/` directory is to be excluded from version control by a new `.gitignore` entry alongside the existing `vault/dna/raw/` and `vault/labs/raw/` dropzones — pending the enforcement work ADR-0005 carries as its OQ-1; the entry does not exist in `.gitignore` yet ([.gitignore](../../.gitignore) [VERIFIED]).
+- "One reading per line, keyed by item+timepoint" becomes a shared contract the ingestion side (D3) and the generation side (D4) must both agree on; the exact key field is D3's to fix.
+
+### Alternatives Considered
+
+#### Alternative A: Embedded local database (SQLite)
+Store readings in a single local SQLite file — one table keyed by (item, timepoint) — queried via SQL, with no server process.
+- **Supporting evidence:** A genuine, serverless, single-file local store that satisfies the no-hosted-backend constraint. Indexed lookups and SQL make per-item history retrieval and cross-item queries fast and scale to large row counts; a primary key with `INSERT OR IGNORE` gives the FR-4 no-duplicate contract transactionally and atomically, cleaner than a flat-file dedupe ([PRD-v1, FR-4 L151-152](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]). SQLite is ubiquitous, well-tested, and offline.
+- **Trade-offs:** The file is binary — a human or LLM cannot read or diff it directly, breaking the read-it-directly property the rest of the vault has and departing from the markdown-substrate precedent ([2026-05-16-system-architecture.md, Decision 1 L23-27](../../vault/decisions/2026-05-16-system-architecture.md) [VERIFIED]). Inspection and any manual correction require a SQL tool rather than a text editor. At V1's small single-operator volumes the index/query advantages are unneeded, so SQLite pays a legibility cost for a scale benefit V1 does not yet need.
+- **When this becomes the right choice:** When row counts or query complexity outgrow whole-file scans (multi-year, multi-stream wearable data, or cross-item analytical queries) — at which point the per-item NDJSON files are a clean import source for a SQLite migration. This is the documented long-term upgrade path, not a V1 need.
+
+#### Alternative B: Extend the existing vault markdown pages in place
+Append each new timepoint into `current-state.md` and the per-biomarker pages — growing the readable pages into the time series, with no separate store.
+- **Supporting evidence:** Zero new substrate and maximal legibility — the data lives in the same markdown the operator and specialists already read, and it is trivially additive in the most literal sense (just append rows).
+- **Trade-offs:** It conflates point-in-time canonical state with the time series. The biomarker page and `current-state.md` are designed as latest-value snapshots (single `Current Value`, a `trend` field, a 4-week rolling log) read for "where is the operator right now" ([current-state.md, L28-29, L93-97](../../vault/meta/current-state.md) [VERIFIED]; [biomarkers/_template.md, L30-33](../../vault/biomarkers/_template.md) [VERIFIED]); accumulating every historical reading into them bloats the readable page and destroys the snapshot's skimmability. It also violates NG-10's intent: the existing pages are meant to be read in place, not turned into the accumulation store ([PRD-v1, NG-10 L286, A-7 L322](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]). And these pages are tracked (only raw dropzones are gitignored), so accumulating operator readings into them would commit PII to version control, violating ADR-0001's no-committed-PII rule and NFR-2 ([.gitignore](../../.gitignore) [VERIFIED]; [PRD-v1, NFR-2 L236](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- **When this becomes the right choice:** Only for the latest-value snapshot the pages already hold — which they keep. As the *accumulation* substrate it is rejected; the store and the snapshot pages stay distinct, the store feeding the snapshot, not replacing it.
+
+#### Alternative C: Per-item Markdown tables (instead of NDJSON) in the gitignored store
+Use the same gitignored per-item store directory, but format each item's series as a Markdown table (one row per reading) rather than NDJSON.
+- **Supporting evidence:** Maximally legible — renders as a readable table in any Markdown viewer, the most LLM-native of all options, and stays fully consistent with the markdown-substrate precedent ([2026-05-16-system-architecture.md, Decision 1 L23-27](../../vault/decisions/2026-05-16-system-architecture.md) [VERIFIED]). Append is still line-oriented (add a row).
+- **Trade-offs:** Markdown tables have no typed values — every cell is a string, so units, numbers, and the keying fields are unenforced and must be parsed positionally, which is more brittle to read back programmatically than NDJSON's per-line key/value objects. A ragged or reordered column breaks the parse silently. NDJSON keeps the same gitignored-local-file and line-append properties while giving each reading explicit named fields the generation path can read without positional parsing. Rejected because the programmatic read-back the trend/projection render needs ([PRD-v1, FR-11 L212](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]) is more robust over structured NDJSON than over positional table cells, at a small legibility cost NDJSON still largely preserves.
+- **When this becomes the right choice:** If the store were read only by humans/LLMs and never parsed programmatically for rendering — i.e. if generation (D4) did not need a robust machine read of the series.
+
+### Related Decisions
+
+| Decision | Relationship | Description |
+|----------|-------------|-------------|
+| [ADR-0001 (No-Train PII Trust-Boundary Routing)](ADR-0001-pii-trust-boundary-no-train-routing.md) | constrained-by | ADR-0001 forbids any store option with a hosted/egress surface; the store holds PII and must sit on the local/no-egress side, eliminating cloud/DB-backend substrates and narrowing this choice to local gitignored files. |
+| [ADR-0003 (Source-Extensible Ingestion Interface)](ADR-0003-source-extensible-ingestion-interface.md) | constrains | The store's per-item keying fixes the idempotency-key surface and write target; ADR-0003's dedupe + manual-entry fallback must fit the (item, timepoint) line model. |
+| [ADR-0005 (Operator-Agnostic Clonable PII-Free Trunk)](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) | constrains | The store's file locations (`vault/store/`) and the scaffold-vs-value split fix where ADR-0005's gitignore exclusion boundary is drawn. |
+| [ADR-0004 (On-Demand Single-File Artifact Generation)](ADR-0004-on-demand-single-file-artifact-generation.md) | is-prerequisite-of | Generation reads the store's keyed history to render trends and projections; this store's read model must exist first. |
+| [ADR-0006 (Multi-Domain Plan Assembly via Roster Specialists)](ADR-0006-multi-domain-plan-assembly-via-roster.md) | is-prerequisite-of | Plan assembly reads current state from the store to personalize; this read contract must exist first. |
+| [ADR-0007 (Lab-Loop / Biomarker-Matrix / Projection Data-Flow)](ADR-0007-lab-loop-biomarker-matrix-projection-data-flow.md) | is-prerequisite-of | Lab loop + watch-out answers are store schemas (pending panels, answers-over-time); the substrate must be decided before those schemas are placed. |
+| [2026-05-16-system-architecture.md](../../vault/decisions/2026-05-16-system-architecture.md) | supersedes | That decision framed all canonical state as point-in-time ("all canonical state lives in markdown… HTML on demand"); this ADR (with ADR-0006) reverses that Context framing by adding a deliberate time-series accumulation layer the prior framing lacked. Orchestrator handles its status flip per the discovery Supersession map. |
+
+Cross-reference authority: [.pipeline/dag.md §6](.pipeline/dag.md) is the canonical bidirectional reference map for the V1-DAG edges above.
+
+### Validation Approach
+
+**Confirmation criteria:**
+- A reading written at timepoint T1 for an item is still present and retrievable after a reading at timepoint T2 for the same item is appended — verified by reading the item's store file and finding both lines (expected: ≥2 lines, distinguishable by timepoint) ([PRD-v1, FR-3 L142-143](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- An item's store file holds ≥2 timepoints distinguished by time, and a generated view renders the value over time, not only the latest value (expected: trend rendered across stored timepoints, not a single snapshot) ([PRD-v1, Goal 2 measurement L35](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- A store read and a store write each complete with 0 network calls and 0 login — verified by a network-egress check during a store operation (expected: 0 outbound calls) ([PRD-v1, FR-3 L144, NFR-3 L238](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- Re-running an import that includes already-stored readings appends 0 duplicate lines for those readings (expected: file line count unchanged for already-present readings) ([PRD-v1, FR-4 L152](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+
+**Falsification criteria:**
+- If a reading present at T1 is lost or unretrievable after a T2 append for the same item (≥1 lost reading on re-read), the append is not preserving history — halt and repair the append/read path before any generation reads the store.
+- If a store read or write requires a network call or a login (≥1 network call or auth step observed), the substrate has acquired a hosted/egress surface — a direct NG-1/FR-3 violation; revert to a purely local file path before release.
+- If any operator reading appears in a tracked (committed) file (≥1 PII hit in a tracked file on a fresh-clone scan), the store has leaked into version control — release-blocking, as history cannot be cleanly scrubbed (also a D6/ADR-0001 concern) ([PRD-v1, NFR-2 L236](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- If a re-run import duplicates ≥1 already-stored reading, the idempotency contract the substrate is meant to make trivial has failed — block scheduled re-runs and repair the dedupe before unattended import is enabled ([PRD-v1, FR-4 L152](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- Time horizon: run all four checks at the first store-and-render cycle (before the July-2026 visit) and at every release thereafter.
+
+**Review triggers:**
+- The store's per-item read latency or file size exceeds what whole-file scans serve acceptably (a measured read regression, or any single item file growing past a size where a scan is slow) — re-evaluate against the SQLite alternative per the documented migration path.
+- Cross-item analytical queries (not single-item series reads) become a required read pattern — the no-index trade-off no longer holds; reconsider an indexed substrate.
+- A second operator's clone is initialized — re-run the tracked-file PII scan to confirm the store stayed gitignored on a fresh clone.
+- D3 finalizes the idempotency key — re-confirm the (item, timepoint) line model still serves the chosen dedupe key without a substrate change.
+
+### Open Questions
+
+| # | Question | Owner | Target Date | Impact on This Decision |
+|---|----------|-------|-------------|------------------------|
+| OQ-1 | What is the exact per-item file layout and keying scheme — one file per biomarker/wearable-stream vs. one per category; the precise timepoint key (timestamp granularity, source tag) and the line field set? | Walter McGivney | 2026-06-30 | A layout/keying detail downstream of D3's idempotency-key decision; it refines how the NDJSON lines are structured but does not change the substrate choice (NDJSON files in a gitignored per-item store). Until D3 fixes the key, the dedupe operation's exact form is unsettled. |
+| OQ-2 | At what stored-row volume do whole-file scans stop serving the trend/projection read acceptably for this single-operator workload? | Walter McGivney | TBD (measured post-build) | Quantifies the scale negative consequence and sets the concrete review trigger for the SQLite migration; no realistic multi-month dataset exists pre-build to measure against, so the threshold is empirical, not assumable. |
+
+### Revision History
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2026-06-04 | Initial draft (v1.0) — accepted | Walter McGivney |
+| 2026-06-04 | v1.1 — backfilled cross-references to the completed ADR set. | Walter McGivney |
+| 2026-06-04 | v1.2 — Phase-8 red-team fixes (RT-01, RT-04). | Walter McGivney |

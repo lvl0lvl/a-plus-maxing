@@ -142,3 +142,10 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - **No vault wiki page changes this session** — design/product docs only; the gated wiki was READ (operator-profile/goals/current-state/artifact-design-protocol) for PRD grounding, not modified.
 - **PII boundary settled = threat-model B** (`hil`): individual commercial no-train API for PII-bearing plan reasoning; local store/ingestion/generation model-independent. Formal ADR → `fm4`.
 - **Next:** ADR stage (`fm4` — `/create-adr` on the PRD; read adr-development in full first). Pipeline arc `fm4`→`rg2`→`hv6`→`mo4`. Library-population runs in parallel (gated). [[sessions/session-24]]
+
+## 2026-06-04 — S25 (V1 ADR stage; no wiki page changes)
+
+- **ADR stage complete.** Ran the `adr-development` 8-phase `/create-adr` pipeline (orchestrator coordinates, workers produce — Hard Rule 1 held); authored 7 V1 architecture ADRs in `docs/adr/` (ADR-0001 PII trust boundary `hil` → ADR-0007 lab/matrix/watch-out/projection data-flow placement), all judged-ACCEPTED + whole-set red-teamed (0 blocking).
+- **No vault wiki page changes this session** — product-pipeline docs (`docs/adr/`) + two governance edits only. Vault-decision edit: `decisions/2026-05-16-system-architecture.md` formally SUPERSEDED (status:superseded; superseded_by [ADR-0002,0004,0006]). Vault-meta edit: `meta/contradictions.md` ADR-home entry resolved.
+- **Rubric governance refined (Walter):** judge threshold 99% → ≥95%/no-dim-<9; word-count ceiling → review-trigger + individual length exception (never cut load-bearing content for a count).
+- **Next:** spec stage (`rg2` — read the spec skill in full first). `fm4` + `hil` closed. [[sessions/session-25]]

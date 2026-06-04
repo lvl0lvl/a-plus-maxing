@@ -12,6 +12,50 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 25 (2026-06-03)
+
+> Confirmed by Walter at session open ("confirmed, proceed"). Pacing = the FULL ADR stage this session (not the foundational-tier-only option). `dke` (wiki-ingestion-gate ADR backfill) NOT folded — stays its own P2 item. **CLAUDE.md added to scope** for the AC1 ownership-matrix update (entailed by resolving the ADR-home convention).
+
+Goal: Run the ADR stage (`fm4`) of the product pipeline — author the V1 architecture decision records the Approved PRD defers, via `/create-adr` (read `adr-development` SKILL.md + `create-adr.md` IN FULL first, PF-S17-01 — done at open). Build the decision DAG, author tier-by-tier, one decision per ADR (no AP-08 Mega-ADR). Orchestrator coordinates; worker agents produce all ADR content (create-adr Hard Rule 1).
+
+Acceptance criteria:
+- [ ] AC1 — ADR-home resolved: product-pipeline ADRs land in `docs/adr/` (alongside `docs/prd/`); `vault/decisions/` stays the home for vault-native knowledge-graph decisions. Close the `2026-06-03` entry in `vault/meta/contradictions.md`; update the Cross-Document Ownership Matrix row in `CLAUDE.md`.
+- [ ] AC2 — Decision DAG built from the PRD (closed 5-relationship vocab), topologically tiered, before authoring; cross-refs validated bidirectionally.
+- [ ] AC3 — Foundational `hil` PII-path ADR authored (threat-model B / individual no-train API; store/ingestion/generation local + model-independent; HIPAA/BAA/multi-tenant as North-Star ceiling). `hil` (P1) closes when it lands.
+- [ ] AC4 — Remaining V1 architecture ADRs authored (local-first time-series store, on-demand template generation, source-extensible ingestion) — each 1–2 pages, mandatory negative consequences (no AP-03), substantive rejected alternatives (no AP-04/06), pass the 99% judge gate + red-team.
+- [ ] AC5 — `vault/decisions/2026-05-16-system-architecture.md` formally superseded (`status: superseded` + `superseded_by:` the new ADR(s)); S24 interim note becomes the formal flip.
+- [ ] AC6 — Close: 4 close audits + `branch-completeness-audit.sh` green at `--session 25`; PF attestation; VOLATILE 6-clause rotation; all work on `feature/v1-adr-stage` off `main` → PR back (never direct to `main`); `fm4` closed, `rg2` (spec) left READY.
+
+Files I WILL touch: `docs/adr/*` (NEW) + `docs/adr/.pipeline/*` (gitignored) + `docs/adr/.gitignore` (NEW), `vault/decisions/2026-05-16-system-architecture.md` (status flip), `vault/meta/contradictions.md` (close ADR-home entry), `CLAUDE.md` (ownership-matrix row — AC1), `HANDOFF.md` (contract+close+rotation), `.beads/*` via `bd`, `vault/sessions/session-25.md` (NEW), `vault/meta/log.md`, `memory/process-failures.md` (only if a PF surfaces).
+
+Files I will NOT touch: any `.claude/agents/*/agent.md` or the deployed roster; `lib/gate_attest.py`, `schemas/*`, bda, the wiki-ingest gate; `vault/{compounds,biomarkers,library}/` content; the real operator-PII values (design only — no PII tooling built, no data migration); `INVARIANTS.md` unless Walter approves a change-discipline registration (surface, don't self-register); the V1 spec/build itself (`rg2`/`hv6` — later stages); `main` directly.
+
+NOT doing: spec / build-plan / task-plan / execute (later beads); building any PII store/tooling/interface; migrating operator data; library-population; `dke` (not folded); other carried beads.
+
+Invariants at risk: INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS (standard close). Candidate new invariant (ADR-home convention) may surface — for change-discipline, not self-registered.
+
+Self-recognition pre-flight: watching for "I've read the ADR skill, I'll just write the ADRs myself" (create-adr Hard Rule 1 — workers produce, I coordinate), "bundle the decisions into one big ADR to save time" (= AP-08 Mega-ADR — one decision per record), "default the ADR-home silently" (it's a logged contradiction — resolve + document).
+
+### S25 Scope Contract Evaluation (volatile)
+
+- **AC1 — PASS.** ADR-home resolved: product-pipeline ADRs → `docs/adr/` (+ `docs/prd/`), vault-native decisions → `vault/decisions/`. `vault/meta/contradictions.md` ADR-home entry closed (resolved 2026-06-04); CLAUDE.md Cross-Document Ownership Matrix split into product-pipeline + vault-native ADR rows.
+- **AC2 — PASS.** Decision DAG built (16 edges, closed 5-type vocab, topologically tiered into 5 tiers, 1 tension D4↔D7), bidirectionally validated; Walter-gated at Phase 3.
+- **AC3 — PASS.** Foundational `hil` PII-path ADR authored = **ADR-0001** (threat-model B / individual no-train API; store/ingestion/generation local + model-independent; HIPAA/BAA/multi-tenant North-Star ceiling); judged 90/90. `hil` closed this session.
+- **AC4 — PASS.** Remaining 6 ADRs authored + verified + judged ACCEPTED (0002=89, 0003=90, 0004=89, 0005=89, 0006=89, 0007=90; all ≥95%/no-dim-<9). Whole-set Red Team 0 BLOCKING; Phase-8 fixes applied + final-verified PASS.
+- **AC5 — PASS.** `2026-05-16-system-architecture.md` formally superseded (`status:superseded` + `superseded_by:[ADR-0002,0004,0006]`); S24 interim note → formal supersession note (markdown-substrate + July-visit goal carried forward, NOT reversed).
+- **AC6 — PASS (this close).** 4 close audits + branch-completeness green at `--session 25`; PF attestation; VOLATILE rotation; work on `feature/v1-adr-stage` → PR (never direct to main); `fm4` + `hil` closed; `rg2` (spec) left READY.
+- **CHANGED (documented, Walter-directed):** (a) rubric judge threshold relaxed 99% → **≥95%/no-dim-<9** (the 99% on 9 dims forced all-10s and false-failed a depth-justified single-9); (b) the word-count ceiling converted from a blocking Dim-2 penalty to a **review-trigger + individual length exception** (never cut load-bearing content to hit a count) — both in `rubric.md` + the `feedback_budget_overage…` memory; (c) CLAUDE.md added to scope for the AC1 matrix split (entailed by AC1, surfaced not silent).
+
+### Drift checks (S25 close)
+
+- **Task drift:** the contracted deliverable (the V1 ADR set via the 8-phase `/create-adr` pipeline) was delivered exactly — 7 ADRs (D8 folded into D6 at the Phase-1 gate, a documented scope refinement). The two governance CHANGED items refined HOW quality is graded, not WHAT was built. No expansion into spec/build/library/agent-bodies. CLAUDE.md addition entailed by AC1.
+- **Architecture drift:** toward LESS violation — the pivot's architecture is now recorded as 7 source-grounded ADRs; the dangling "active" superseded-foundational-ADR contradiction is closed; the highest-risk assumption (the PII boundary) has a foundational decision record. INV-BRANCH-NOT-MAIN held; INV-TRUNK-COMPLETENESS green open+close. No invariant moved toward violation.
+- **Vision drift:** none — the ADRs encode the S24 vision into architecture. What the system IS after S25: "a local-first health tracking + planning system with a recorded V1 architecture (PII boundary, local NDJSON store, pluggable ingestion, single-file generation, clonable PII-free distribution, roster-routed plan assembly, store-schema/render-view data flow)" — matches `design/vision.md`'s first sentence.
+
+### PF attestation
+
+S25 close (2026-06-04): No new PF-class entries this session. Observed but NOT promoted: (a) the rubric's 99%-threshold + hard word-count-ceiling mis-calibration surfaced on ADR-0001 (a depth-justified single-9 false-failing 99%; a load-bearing ADR exceeding the 2-page heuristic) — caught by the verify+judge gates and corrected via a Walter-approved rubric change; the multi-gate pipeline working as designed, not a failure. (b) Read-before-invoke (PF-S17-01) HELD — `adr-development` SKILL.md + `create-adr.md` read in FULL before invoking; all ADR content worker-produced per create-adr Hard Rule 1 (orchestrator never authored an ADR; resisted the "I've read the skill, I'll write it" temptation at every tier). (c) The whole-set Red Team caught two cross-ADR defects (inconsistent supersession cross-links + an unplaced FR-12) the per-ADR judges structurally could not see — the systemic review working as designed. (d) Session-open protocol (PF-S13-01) HELD — every Start-Protocol step run with real output incl. `branch-completeness-audit.sh` at OPEN; scope contract written + Walter-confirmed before any work.
+
 ## Scope Contract — Session 24 (2026-06-03)
 
 > **Supersedes** the initial S24 hil-ADR-only framing. Walter redirected to a product pivot before hil-ADR execution: the system is to become physician-shareable now and a GP-facing product later, which needs the Rigor-Framework vision doc the project never had + the product PRD. The `hil` PII decision (threat-model B; individual commercial API, no-train — settled in-session) is preserved as a settled input; its formal ADR moves to the pipeline's ADR phase. PII retention posture locked at **(i) individual commercial API** for the MVP.
@@ -884,49 +928,49 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **A-6 / `hil` dependency is the V1 critical path — the highest-risk PRD assumption.** PRD-v1 NFR-1 + A-6 + OQ-1 all rest on the no-train PII path (threat-model B) being BUILT; it is decided, not built. The ADR stage (`fm4`) must produce the `hil` ADR before V1 plan-reasoning can run on real operator data — don't let the personalization path proceed downstream (spec/build) until `fm4` resolves it.
-2. **AP-PROTOCOL-FROM-MEMORY (PF-S13-01, recurrence_count=3) — standing, and the pipeline raises the stakes.** Each pipeline stage (ADR/spec/build-plan/task-plan) is a gated skill in skills_library — READ each in FULL before invoking (read-before-invoke held for create-prd this session; it must hold for create-adr next). Run a stage from memory and the class recurrence promotes.
-3. **PF-S22-01 falsification window — still live for the parallel library-population track.** Library-population (research-only `/aplus-research` sessions) runs in parallel with the V1 build; it remains the first parallelized track after S22. At each batch close: ONE merge target, `branch-completeness-audit.sh` + `wiki-lint.sh` green. Unchanged by the pivot.
+1. **AP-PROTOCOL-FROM-MEMORY / read-before-invoke (PF-S13-01 + PF-S17-01) — STANDING; the next stage is spec (`rg2`).** The spec stage is a gated skills_library skill — READ it IN FULL before invoking (read-before-invoke HELD for create-prd S24 + create-adr S25; it must hold for spec). Run a stage from memory and the class recurrence promotes.
+2. **A-6 / `hil` is the V1 critical path — now DECIDED (ADR-0001) but still UNBUILT.** The spec/build stages must NOT let the personalization path (FR-2/NFR-1 plan reasoning on real PII) reach implementation before ADR-0001's enforcement mechanism is specced — its OQ-1: which dispatches route to the no-train path, how the PII-free/PII-bearing split is mechanically enforced. Store/ingestion/generation are model-independent and unblocked.
+3. **PF-S22-01 falsification window — still live for the parallel library-population track.** Research-only `/aplus-research` sessions remain the first parallelized track after S22. At each batch close: ONE merge target, `branch-completeness-audit.sh` + `wiki-lint.sh` green. Unchanged by the ADR stage.
 
-**Demoted from prior Top-3:** mhg-false-positive / verify-against-real-artifacts (PF-S3-01 — no new gate built this session); the bte/wiki-gate items (shipped S23, stable).
+**Demoted from prior Top-3:** the `fm4`/`hil` ADR-stage item (delivered this session — ADR-0001 + the full set).
 
 ## Current State (volatile)
 
-- **PROJECT PIVOTED TO A PRODUCT (S24, 2026-06-03).** a-plus-maxing is now a **local-first health tracking + planning system**: V1 = a single-operator, clonable, no-server app (multi-domain plans + local time-series tracking + on-demand template-generated dashboards/reports + projections, PII-private); North Star = a GP-facing product. Anchors: `design/vision.md` (vision) + `docs/prd/PRD-v1-local-first-health-tracking-planning.md` (V1 PRD, **Approved** S24).
-- **The Rigor Framework is confirmed already-adopted** (the project IS an instantiation of `skills_library/frameworks/rigor`); the NEW machinery is the **product pipeline** PRD→ADR→spec→build-plan→task-plan→execute. PRD stage DONE; next = ADR (`fm4`).
-- **PII boundary settled = threat-model B** (`hil`): private data transiently processed, never retained/trained; V1 uses an individual commercial **no-train API** for PII-bearing plan reasoning; store/ingestion/generation run local + model-independent. Formal ADR pending in `fm4`.
-- **SINGLE TRUNK** unchanged (since S22): `main` = complete project (20 agents + governance). This session on `feature/product-vision-prd` (off `main`), PR'd back. No code built — design only.
-- **Closed S24:** none (deliverables are vision + PRD; `hil` stays OPEN, blocked on `fm4`). Filed: `fm4`/`rg2`/`hv6`/`mo4` (pipeline arc) + the S23 wiki-ingestion ADR-backfill bead (P2).
+- **THE V1 ARCHITECTURE IS RECORDED (S25, 2026-06-04).** The product pipeline's ADR stage is complete: **7 source-grounded ADRs in `docs/adr/`** (ADR-0001 PII trust boundary → ADR-0007 lab/matrix/watch-out/projection data-flow placement), all judged-ACCEPTED + whole-set red-teamed (0 blocking). Pipeline position: PRD (S24, Approved) → **ADR (S25, complete)** → next = spec (`rg2`).
+- **Key V1 architecture decisions recorded:** threat-model-B PII boundary (no-train path, decided-not-built; ADR-0001); local **append-only NDJSON per-item gitignored store** (0002); **pluggable ingestion adapter** interface (0003); **on-demand single-file (no-server) generation** (0004); **PII-free trunk + scaffold/value split** (0005); **route-to-roster plan assembly** (0006); **store-schema-vs-render-view** data-flow split (0007).
+- **Governance:** `2026-05-16-system-architecture.md` formally SUPERSEDED by ADR-0002/0004/0006 (markdown-substrate + July-visit goal carried forward, not reversed). ADR-home convention recorded (product-pipeline → `docs/`; vault-native → `vault/decisions/`); CLAUDE.md matrix split; contradiction closed.
+- **Rubric governance refined (Walter S25):** judge threshold ≥95%/no-dim-<9; word-count ceiling = review-trigger + individual length exception (never cut load-bearing content for a count).
+- **SINGLE TRUNK** unchanged (since S22): `main` = complete project. This session on `feature/v1-adr-stage` (off `main`), PR'd back. No code built — design only.
+- **Closed S25:** `fm4` (ADR stage), `hil` (PII vault — its ADR landed = ADR-0001).
 - **Active landmarks:** no trigger windows opened.
 
-**Historical (kept for reference):** `vault/sessions/session-24.md` + `vault/meta/log.md` S24 entry.
+**Historical (kept for reference):** `vault/sessions/session-25.md` + `vault/meta/log.md` S25 entry.
 
 ## What Is Next (volatile)
 
-### S24 delivered the product pivot. Next = the product pipeline (ADR stage).
+### S25 delivered the V1 ADR set. Next = the spec stage.
 
-**RESUMPTION POINT.** S24 delivered `design/vision.md` + the **Approved** V1 PRD (`docs/prd/PRD-v1-local-first-health-tracking-planning.md`; Validate 10/2/0, Judge all-10). The project is now a local-first health tracking + planning system on the PRD→ADR→spec→build-plan→task-plan pipeline. **Open the next session on `main`** (Start Protocol + `branch-completeness-audit.sh` at open; this session's PR merges first).
+**RESUMPTION POINT.** S25 delivered the 7-ADR V1 architecture set (`docs/adr/ADR-0001…0007`, all ACCEPTED) + the governance flips (2026-05-16 superseded; ADR-home convention). **Open the next session on `main`** (Start Protocol + `branch-completeness-audit.sh` at open; this session's PR merges first).
 
-**Next pipeline stage = ADR (`fm4`, P2, READY).** Run `/create-adr` on the V1 PRD — **READ the adr-development skill IN FULL first** (PF-S17-01). Decision triggers the PRD hands off: the no-train PII path (`hil` — its formal ADR is produced here; also reconcile the ADR home — the pipeline expects `docs/adr/`, the project uses `vault/decisions/`), the local time-series store, on-demand template generation, source-extensible ingestion. `hil` (P1) is blocked on `fm4` and closes when its ADR lands.
+**Next pipeline stage = SPEC (`rg2`, READY).** Run the spec stage on the ADR set — **READ the spec skill IN FULL first** (PF-S17-01). What the ADRs hand off: each ADR's **Validation criteria → acceptance criteria**; **Open Questions → spec questions / spikes** — especially ADR-0001 OQ-1 (the PII enforcement-mechanism shape: which dispatches route to the no-train path, how the split is enforced) and the **D4↔D7 render-size measurement** (a build-plan prerequisite task); the **DAG tiers → build phases** (Tier 1 = ADR-0001 first). Then `hv6` (build-plan) → `mo4` (task-plan) → execute. Each a gated skills_library stage; read-before-invoke each.
 
-**Then:** `rg2` (spec) → `hv6` (build-plan) → `mo4` (task-plan) → execute. Each a gated skills_library stage; read-before-invoke each.
+**Provenance note:** the ADR `.pipeline/` working artifacts (dag.md tiers, rubric, red-team-report, exceptions, verify/judge reports) are gitignored per the create-adr skill; the durable handoff (tiers, OQs, substantive decisions) lives in `vault/sessions/session-25.md` + the committed ADRs.
 
-**Parallel track (unblocked + gated):** library-population via research-only `/aplus-research` sessions grows the wiki — PF-S22-01 window: ONE merge target + `branch-completeness-audit.sh` + `wiki-lint.sh` at each batch close. V1 is a thin-library MVP and does not block on it. The 4 grandfathered bpc-157 pages remain back-fill obligations.
+**Parallel track (unblocked + gated):** library-population via research-only `/aplus-research` sessions — PF-S22-01 window: ONE merge target + `branch-completeness-audit.sh` + `wiki-lint.sh` at each batch close. V1 is a thin-library MVP and does not block on it. The 4 grandfathered bpc-157 pages remain back-fill obligations.
 
-**Operator-data preconditions** (Walter-pending; feed personalization): 23andMe raw → `vault/dna/raw/`, Oura/wearable purchase + export, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) remain `status: scaffold` — they are both the PII surface and the personalization inputs.
+**Operator-data preconditions** (Walter-pending; feed personalization): 23andMe raw → `vault/dna/raw/`, Oura/wearable purchase + export, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) remain `status: scaffold` — both the PII surface and the personalization inputs.
 
 ### Open beads carried (not blocking the pipeline)
-- **P1:** `hil` (PII vault — formal ADR produced in `fm4`).
-- **P2:** `fm4` (ADR stage — READY/next), wiki-ingestion ADR-backfill, `3v5`, `xg4`, `382`, `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
-- **P3:** `rg2`/`hv6`/`mo4` (pipeline arc, dep-chained), `ae0`/`d6g`/`4ba`/`3v6`/`dip`, `t7z`/`fsr`/`8qe`, `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
-- **Closed:** S24 none. S23: `bte`. S22: `gdw`. S21: `mhg`/`5ot`/`0be`.
+- **P2:** wiki-ingestion ADR-backfill (`dke`), `3v5`, `xg4`, `382`, `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
+- **P3:** `rg2` (spec — READY/next) → `hv6` (build-plan) → `mo4` (task-plan) (dep-chained), `ae0`/`d6g`/`4ba`/`3v6`/`dip`, `t7z`/`fsr`/`8qe`, `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
+- **Closed:** S25: `fm4`, `hil`. S24: none. S23: `bte`. S22: `gdw`. S21: `mhg`/`5ot`/`0be`.
 
 ### Open project work (unchanged)
-- Vault git-tracking decision deferred. First HTML artifact (LM-04) is now a V1 PRD deliverable, not an indefinite deferral.
+- Vault git-tracking decision deferred. First HTML artifact (LM-04) is now architecturally placed by ADR-0004 (on-demand single-file generation) — built when V1 reaches that phase.
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura/wearable, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S24 (2026-06-03). LM-04 (first HTML artifact) is now scoped INTO the V1 PRD, so it stops being an indefinite deferral once V1 builds. LM-01's 14-day-before window still depends on the TBD July exact date; LM-02/03 remain Walter-pending. No status flips due.
+All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura/wearable, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S25 (2026-06-04). LM-04 (first HTML artifact) is now architecturally placed by ADR-0004 (on-demand single-file generation), built when V1 reaches that phase. LM-01's 14-day-before window still depends on the TBD July exact date (not yet within window as of 2026-06-04); LM-02/03 remain Walter-pending. No status flips due.
 
 ## Open Issues
 
