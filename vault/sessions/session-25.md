@@ -51,8 +51,8 @@ Run the ADR stage (`fm4`) of the product pipeline — author the V1 architecture
 
 ## State at close
 
-- 7 ADRs in `docs/adr/` + governance flips, on `feature/v1-adr-stage` → PR to `main`. No code built — design only.
+- 7 ADRs in `docs/adr/` + governance flips. PR #29 `/review-pr`'d (Gate PASS; 2 suggestion fixes) and rebase-merged to `main`; a follow-up `fix/s25-handoff-postmerge` PR reconciled the HANDOFF to the merged state (PF-S25-01). No code built — design only.
 - Pipeline: PRD (S24) → **ADR (S25, done)** → next = spec (`rg2`).
-- `fm4` + `hil` closed. The PII boundary is DECIDED (ADR-0001) but UNBUILT — the spec stage must place its enforcement mechanism before the personalization path reaches implementation.
+- `fm4` + `hil` closed; `75t` filed (P3, wiki-schema `depends_on` freshness, from the #29 review). The PII boundary is DECIDED (ADR-0001) but UNBUILT — the spec stage must place its enforcement mechanism before the personalization path reaches implementation.
 
 See [[design/vision]], `docs/adr/ADR-0001…0007`, `docs/adr/.pipeline/` (gitignored working artifacts), HANDOFF S25 (contract + evaluation + What Is Next).
