@@ -51,7 +51,7 @@ Run the spec stage (`rg2`) of the product pipeline — **foundational-first spli
 
 ## State at close
 
-- Foundational data-in spec in `docs/spec/` + the `docs/spec/.gitignore`. Committed on `feature/v1-spec-stage`; PR to `main`. No code built — design only.
+- Foundational data-in spec in `docs/spec/` + the `docs/spec/.gitignore`. Reviewed (`/review-pr` PR #31 — Gate PASS, 0 required changes: 1 finding NOT_A_BUG, 3 below-threshold) and rebase-merged to `main`. No code built — design only.
 - Pipeline: PRD (S24) → ADR (S25) → **spec [data-in half] (S26, done)** → data-out spec (next) → `hv6` → `mo4` → execute.
 - `rg2` updated PARTIAL (data-in delivered; data-out remaining, OPEN). `hv6` stays blocked on the full spec.
 
