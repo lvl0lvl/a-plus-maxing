@@ -32,11 +32,14 @@ One section per contradiction. Close out when resolved with the resolution path 
 
 ## Open
 
-### 2026-06-03 — ADR/doc home: pipeline `docs/adr/` + `docs/prd/` vs project `vault/decisions/`
-- **Status:** open
-- The `prd-development` pipeline writes to `docs/prd/` (and the ADR stage will write to `docs/adr/`), but the project's Cross-Document Ownership Matrix homes architectural decisions in `vault/decisions/`. Two doc families now diverge from the `vault/` home pattern. To be reconciled at the ADR stage (bead `fm4`).
+_(none open)_
 
 ## Resolved
+
+### 2026-06-04 — ADR/doc home: pipeline `docs/adr/` + `docs/prd/` vs project `vault/decisions/`
+- **Status:** resolved 2026-06-04 (S25, bead `fm4`)
+- **Was:** the `prd-development` + `adr-development` pipelines write to `docs/prd/` + `docs/adr/`, but the Cross-Document Ownership Matrix homed architectural decisions in `vault/decisions/`.
+- **Resolution:** product-pipeline artifacts (PRD / ADR / spec / build-plan / task-plan) live under `docs/` (`docs/prd/`, `docs/adr/` — numbered ADRs from `/create-adr`); vault-native knowledge-graph / governance decisions stay in `vault/decisions/` (date-named). The CLAUDE.md Cross-Document Ownership Matrix was split to record this. The V1 ADR set (ADR-0001…0007) lands in `docs/adr/`; the vault-native `2026-05-16-system-architecture.md` was formally superseded by ADR-0002/0004/0006.
 
 ### 2026-05-24 — BPC-157 He L 2022 species misattribution (canonical S2 fabrication caught and corrected)
 - **Pages involved:** [[library/peptides/bpc-157/research-report]] §6, §13.2; [[compounds/bpc-157]]

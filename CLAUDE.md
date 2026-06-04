@@ -105,7 +105,8 @@ Each fact lives in exactly one document. If you find duplication, the table belo
 | Scope contract for current session | HANDOFF.md | VOLATILE |
 | Step-12 context-package pointer | HANDOFF.md | VOLATILE; rotation rule applies |
 | What Did NOT Work (failed approaches) | `memory/process-failures.md` | HANDOFF.md carries pointer only |
-| Architectural decisions (ADRs) | `vault/decisions/` | HANDOFF.md does NOT carry decision rationale |
+| Architectural decisions — product pipeline | `docs/adr/` (+ `docs/prd/`) | Numbered ADRs from `/create-adr` (V1 set: ADR-0001…0007); HANDOFF.md does NOT carry decision rationale |
+| Architectural decisions — vault-native (governance / knowledge graph) | `vault/decisions/` | Date-named vault decisions; HANDOFF.md does NOT carry decision rationale |
 | Component interfaces / parameters | `vault/components/`, `vault/parameters/` | Read source first, never write from memory |
 | Phase-state facts (e.g., milestone status) | `vault/meta/overview.md` | NOT in HANDOFF.md (would accrue) |
 | Cross-session research findings | `vault/research/` | HANDOFF.md cites by filename |
