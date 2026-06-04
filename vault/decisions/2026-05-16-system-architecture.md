@@ -1,19 +1,19 @@
 ---
 title: System Architecture — Markdown Substrate + HTML Artifacts + Phased Interface
 type: decision
-status: active
+status: superseded
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-05-16
+last_reviewed: 2026-06-04
 depends_on: []
-superseded_by: null
+superseded_by: [docs/adr/ADR-0002-local-first-time-series-store.md, docs/adr/ADR-0004-on-demand-single-file-artifact-generation.md, docs/adr/ADR-0006-multi-domain-plan-assembly-via-roster.md]
 review_cadence: phase
 permalink: a-plus-maxing/decisions/2026-05-16-system-architecture
 ---
 
 # Decision: System Architecture
 
-> **⚠ Partially superseded — S24 product pivot (2026-06-03).** a-plus-maxing was redirected onto a product trajectory: it is now a local-first health **tracking + planning** system (see `design/vision.md` + `docs/prd/PRD-v1-local-first-health-tracking-planning.md`). This reverses, by Walter-directed decision, the three calls below — "not a tracker" (Context), "No diet app" (Decision 2), and the defer-the-interface-until-friction phased model (Decision 3). The formal supersession ADR is pending at the ADR stage (bead `fm4`), where `status` / `superseded_by` flip.
+> **⚠ SUPERSEDED — S25 (2026-06-04, bead `fm4`).** Formally superseded by the V1 product ADR set (`docs/adr/`): **ADR-0006** (multi-domain plan assembly) reverses the Context "LLM-driven agent, not a tracker" + Decision 2 "No diet app" (nutrition is now one routed plan domain, not a separate diet-app build); **ADR-0002** (local-first time-series store) reverses Decision 1's point-in-time framing by adding the accumulation layer; **ADR-0004** (on-demand single-file generation) reverses Decision 3 (the defer-the-interface-until-friction phased A→B→C model — LM-04 makes the single-file artifact the first deliverable). **ADR-0001** (PII trust boundary) reframes the conversational-only threat posture this ADR assumed (a new decision, not a reversal). NOT reversed and carried forward into the V1 ADRs: Decision 1's markdown-substrate + HTML-on-demand call (the ADRs build on it) and Decision 4 (the July-2026 doctor-visit goal, still the V1 LM-01 deadline).
 
 ## Context
 Initial scoping conversation for a-plus-maxing. The fork in the road: build as SaaS-style tracker, build as LLM-driven agent, or hybrid. Walter explicitly chose "LLM-driven personal health agent, not a tracker."
