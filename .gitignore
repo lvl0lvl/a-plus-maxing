@@ -1,12 +1,17 @@
 # Vault: tracked, except raw personal data dropzones
 vault/dna/raw/
 vault/labs/raw/
+vault/store/
 
 # Environment
 .env
 .env.local
 .env.*.local
 .venv/
+
+# Python
+__pycache__/
+*.pyc
 
 # OS
 .DS_Store
