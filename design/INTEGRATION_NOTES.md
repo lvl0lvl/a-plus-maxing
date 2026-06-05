@@ -22,7 +22,7 @@ A parallel session running in this repo at the same time is building mechanical-
 | This (S5 design) | `design/`, `HANDOFF.md`, `vault/sessions/session-5.md`, `memory/process-failures.md` (if PF), `.beads/*` |
 | Parallel (S5 audit-scripts) | `scripts/`, `INVARIANTS.md`, `CLAUDE.md`, `.claude/hooks/`, `.claude/settings.json` |
 
-Both contracts coexist in `HANDOFF.md` under separate `## Scope Contract — Session 5` headers (the audit script accepts the highest-N contract; both are dated 2026-05-25).
+Both contracts originally coexisted in `HANDOFF.md` under separate `## Scope Contract — Session 5` headers (the audit script accepts the highest-N contract; both are dated 2026-05-25); they were archived to `vault/sessions/scope-contract-archive.md` at S32 (2026-06-05) along with the rest of the Sessions 5-31 contracts.
 
 ## What this folder contains
 
