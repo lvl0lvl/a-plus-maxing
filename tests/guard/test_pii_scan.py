@@ -14,6 +14,7 @@ in both directions. A no-op scanner (always 0) must fail the plant tests.
 
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -147,8 +148,18 @@ def test_tracked_source_carries_no_operator_identity(tmp_path):
     literal must live only in the gitignored config, never in tracked source.
     """
     src = open(pii_scan.__file__, encoding="utf-8").read()
-    assert "Walter" not in src
-    assert "McGivney" not in src
+    config = Path(pii_scan.__file__).resolve().parents[2] / "vault" / "meta" / "operator-identity.txt"
+    if not config.exists():
+        pytest.skip("no operator-identity config on this instance")
+    tokens = [
+        piece
+        for line in config.read_text().splitlines()
+        if line.strip() and not line.startswith("#")
+        for piece in line.strip().split("|")
+    ]
+    assert tokens, "operator-identity config is empty"
+    for token in tokens:
+        assert token not in src
 
 
 @pytest.mark.parametrize("pii_class", sorted(PLANTS))

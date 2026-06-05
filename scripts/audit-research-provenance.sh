@@ -18,7 +18,7 @@
 #   PRESENT (with an attestation_chain) BEFORE delegating chain-integrity to
 #   verify-chain. Presence-then-integrity.
 #
-# AUTHORITATIVE GATE SET: the SKILL.md gate-by-mode matrix (Walter, S18 decision).
+# AUTHORITATIVE GATE SET: the SKILL.md gate-by-mode matrix (operator decision, S18).
 #   .claude/skills/aplus-research/SKILL.md "Gate-by-mode matrix":
 #     Gate              quick  standard  deep  ultradeep
 #     2.75 SCOPE         ✓       ✓        ✓      ✓     (schema-only; not attestation-chained)

@@ -162,7 +162,7 @@ mutate "neg_section_count" \
 
 # R13-6.7 operator-bound content leak
 mutate "neg_operator_writeback" \
-  's/Default to refusal beyond scope\./Default to refusal beyond scope for Walter./' \
+  's/Default to refusal beyond scope\./Default to refusal beyond scope in January 2026./' \
   "R13-6.7"
 
 # R13-7 mechanical-check stub missing in a section
