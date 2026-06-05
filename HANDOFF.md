@@ -12,6 +12,29 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 29 (2026-06-04)
+
+> Confirmed by Walter at session open ("one session is approved, proceed"). **Unit = the task-plan stage (`mo4`)** via `/create-task-plan` over the merged build plan `docs/build-plan/build-plan-v1-full.md` → per-task implementation recipes + the executable per-task beads (this stage owns them, intentionally deferred from S26/S27/S28). Full 18-task plan in ONE pass (not paced — splitting would fragment the bead DAG this stage owns). Read the task-plan skill IN FULL first (PF-S17-01, per-invocation). Orchestrator coordinates; worker agents produce all plan content. Preserve the enforcement-first wave ordering.
+
+Goal: Decompose the 18-task, 7-wave V1 build plan into per-task implementation recipes + the dependency-ordered executable bead DAG via `/create-task-plan`, homed per the `docs/` per-stage convention. The build plan + the two specs are consumed read-only as the upstream contract; nothing upstream is re-authored.
+
+Acceptance criteria:
+- [ ] AC1 — Read-before-invoke: `/create-task-plan` SKILL.md + command + all references + the worked example read IN FULL before invoking (PF-S17-01, per-invocation); `AskUserQuestion` substituted with prose; all plan content worker-produced (Hard Rule 1); no `Workflow`/hand-rolled-fan-out substitution; `/review-pr` + `/merge` also read in full before invoking.
+- [ ] AC2 — Built via the skill's gated pipeline over the FULL 18-task build plan; each task → an implementation recipe + an executable bead, the dependency edges from the 41-edge build-plan DAG preserved as bead deps.
+- [ ] AC3 — Enforcement-first wave ordering preserved end-to-end: no plan-reasoning-over-PII recipe/bead (`ADR-0006-T2`) buildable before the router spike+impl (`ADR-0006-T0`→`T1`); egress guard `ADR-0001-T1` precedes all 8 data-out 0-egress consumers. Mechanically visible in the bead dep graph.
+- [ ] AC4 — Passes the skill's gates + judge (all dims ≥9, fresh agent, ≤3 iters); no Blocking Open Question at finalize; output home reported before authoring.
+- [ ] AC5 — Close: 4 close audits + `branch-completeness-audit.sh` green at `--session 29`; PF attestation; VOLATILE 6-clause rotation; work on `feature/v1-task-plan` off `main` → `/review-pr` (matrix PRIORITY-ONLY, PF-S26-01) → `/merge`, sequenced so the close reflects merged reality (PF-S25-01); `mo4` CLOSED; execute stage UNBLOCKED.
+
+Files I WILL touch: `docs/task-plan/*` (NEW tree) + `docs/task-plan/.pipeline/*` (gitignored) + `docs/task-plan/.gitignore` (NEW); `HANDOFF.md` (contract + close + rotation); `.beads/*` via `bd` (this stage CREATES the executable per-task beads); `vault/sessions/session-29.md` (NEW); `vault/meta/log.md`; `memory/process-failures.md` (only if a PF surfaces).
+
+Files I will NOT touch: the build plan `docs/build-plan/*` (consumed read-only — surface a defect for a build-plan revision, never silently edit); the two spec files + the 7 ADRs; any `.claude/agents/*/agent.md` or the deployed roster; `lib/gate_attest.py`, `schemas/*`, bda, the wiki-ingest gate; `vault/{compounds,biomarkers,library}/` content; the real operator-PII values (design only — no code built); `INVARIANTS.md` unless Walter approves a registration; the execute stage; `main` directly.
+
+NOT doing: execute / building any generation/router/store/PII mechanism; migrating operator data; library-population; editing the build plan/specs/ADRs; other carried beads.
+
+Invariants at risk: INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS (standard close).
+
+Self-recognition pre-flight: watching for "I ran build-plan, task-plan is similar, skip the read" (NO — per-invocation, per-skill); "I'll sketch the recipes/beads myself" (Hard Rule 1 — workers produce); "fan out with `Workflow`" (PF-S17-01); "the build plan already ordered the tasks, the task-plan is transcription" (NO — it resolves per-task implementation recipes + the executable bead DAG the stage owns); PF-S26-01 at review (priority-only, never suppression).
+
 ## Scope Contract — Session 28 (2026-06-04)
 
 > Confirmed by Walter at session open ("proceed"). **Unit = the build-plan stage (`hv6`)** via `/create-build-plan`: schedule the full 18-task V1 spec (data-in `adr-0001-adr-0003-spec.md` [7] + data-out `adr-0004-adr-0007-spec.md` [11]) into dependency-ordered build waves. Read the build-plan skill IN FULL first (PF-S17-01, per-invocation). Orchestrator coordinates; worker agents produce all plan content (Hard Rule 1). Keep `ADR-0006-T0` plan-reasoning router enforcement-first.
