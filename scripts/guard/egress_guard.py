@@ -1,6 +1,6 @@
 """OS-level no-network egress guard (ADR-0001-T0 selected mechanism).
 
-`run(callable)` executes a zero-arg callable under an OS-enforced no-network
+`run(operation)` executes a zero-arg operation under an OS-enforced no-network
 sandbox covering the whole process tree, and returns a value that is truthy when
 no outbound network call was observed anywhere in the invocation, falsy when an
 outbound call surfaced or the isolation could not be established (fail-closed /
@@ -13,8 +13,8 @@ dispatched — not an implementer menu):
 - Linux: an offline network namespace (`unshare(CLONE_NEWUSER|CLONE_NEWNET)`).
 
 A Python closure cannot be transported into a `sandbox-exec` subprocess, so the
-isolation is applied in-process inside a forked child that then calls `callable`:
-child exits clean under deny-network -> truthy; the callable raised (its blocked
+isolation is applied in-process inside a forked child that then calls `operation`:
+child exits clean under deny-network -> truthy; the operation raised (its blocked
 network op surfaced) or the isolation could not be applied -> falsy.
 """
 
@@ -32,8 +32,8 @@ _DARWIN_PROFILE = b"(version 1)(allow default)(deny network*)"
 _CLONE_NEWUSER = 0x10000000
 _CLONE_NEWNET = 0x40000000
 
-_CHILD_CLEAN = 0  # callable completed with no egress -> pass
-_CHILD_RAISED = 17  # callable raised (blocked egress surfaced) -> fail
+_CHILD_CLEAN = 0  # operation completed with no egress -> pass
+_CHILD_RAISED = 17  # operation raised (blocked egress surfaced) -> fail
 
 
 def _apply_isolation():
@@ -79,26 +79,37 @@ def _apply_linux_namespace():
         raise RuntimeError(f"unshare failed (errno={err})")
 
 
-def run(callable):
-    """Run a zero-arg callable under an OS-level no-network sandbox.
+def run(operation):
+    """Run a zero-arg operation under an OS-level no-network sandbox.
 
     Args:
-        callable (Callable): The complete operation to observe (zero-arg). It may
-            wrap a multi-step sequence in one closure; egress anywhere within the
+        operation (Callable): The operation to run (zero-arg). It may wrap a
+            multi-step sequence in one closure; egress anywhere within the
             invocation, in-process or from a spawned child, surfaces as a fail.
 
     Returns:
-        (bool) True when the callable completed with no outbound network call
+        (bool) True when the operation completed with no outbound network call
         observed across the whole invocation; False when an outbound call
         surfaced or the OS isolation could not be established (fail-closed).
+
+    Notes:
+        The truthy/falsy result reflects whether the operation surfaced an error;
+        the OS sandbox blocks the actual egress regardless, so an operation that
+        catches its own blocked-egress error is reported clean but no data left
+        the host.
     """
-    pid = os.fork()
+    try:
+        pid = os.fork()
+    except OSError:
+        return False
     if pid == 0:
         code = _CHILD_RAISED
         try:
             _apply_isolation()
-            callable()
+            operation()
             code = _CHILD_CLEAN
+        except SystemExit as exc:
+            code = _CHILD_CLEAN if exc.code in (0, None) else _CHILD_RAISED
         except BaseException:
             code = _CHILD_RAISED
         finally:

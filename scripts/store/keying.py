@@ -10,15 +10,21 @@ module — there is no second key definition in the codebase.
 # store line carries: item identifier, timepoint, source tag, value.
 LINE_FIELDS = ("item", "timepoint", "source", "value")
 
-# Dedupe tuple (ADR-0003 OQ-2): a subset of LINE_FIELDS, excluding `value`.
-DEDUPE_FIELDS = ("item", "timepoint", "source")
+# Dedupe tuple (ADR-0003 OQ-2): LINE_FIELDS minus the excluded field(s),
+# preserving LINE_FIELDS order — derived, not hand-retyped.
+_DEDUPE_EXCLUDED = ("value",)
+DEDUPE_FIELDS = tuple(f for f in LINE_FIELDS if f not in _DEDUPE_EXCLUDED)
 
 
 def dedupe_key(reading):
     """Derive a reading's dedupe identity from the (item, timepoint, source) tuple.
 
+    The caller must pass a conformant reading carrying every dedupe field; a
+    non-conformant reading raises `KeyError`. The store path calls `is_conformant`
+    before this, so the precondition holds there.
+
     Args:
-        reading (dict): A store reading carrying the dedupe fields.
+        reading (dict): A store reading carrying every dedupe field.
 
     Returns:
         (tuple) The (item, timepoint, source) identity.
