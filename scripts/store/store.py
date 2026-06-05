@@ -7,6 +7,9 @@ login, or model step (ADR-0001 D1->D2).
 """
 
 import json
+import os
+import sys
+import tempfile
 from pathlib import Path
 
 from scripts.store import keying
@@ -19,14 +22,23 @@ def _item_path(item, root):
 
 
 def _read_lines(path):
-    """Parse an item file into a list of reading dicts (empty if absent)."""
+    """Parse an item file into a list of well-formed reading dicts (empty if absent).
+
+    A malformed (torn/partial) line is skipped, not raised on: each skip emits one
+    `STORE-SKIP: <path>:<1-based-line-number>` warning to stderr so a downstream
+    consumer can detect dropped lines. The rest of the file still parses.
+    """
     if not path.exists():
         return []
-    return [
-        json.loads(line)
-        for line in path.read_text().splitlines()
-        if line.strip()
-    ]
+    readings = []
+    for lineno, line in enumerate(path.read_text().splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            readings.append(json.loads(line))
+        except json.JSONDecodeError:
+            print(f"STORE-SKIP: {path}:{lineno}", file=sys.stderr)
+    return readings
 
 
 def append(item, reading, root=DEFAULT_ROOT):
@@ -46,13 +58,25 @@ def append(item, reading, root=DEFAULT_ROOT):
         )
 
     path = _item_path(item, root)
-    existing = {keying.dedupe_key(r) for r in _read_lines(path)}
-    if keying.dedupe_key(reading) in existing:
+    well_formed = _read_lines(path)
+    if keying.dedupe_key(reading) in {keying.dedupe_key(r) for r in well_formed}:
         return
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as fh:
-        fh.write(json.dumps(reading) + "\n")
+    lines = [json.dumps(r) + "\n" for r in (*well_formed, reading)]
+
+    # Write the full file to a temp sibling, then os.replace — atomic on POSIX, so
+    # a crash leaves either the complete old file or the complete new one, never a
+    # torn line. This also self-heals: malformed lines were dropped by _read_lines.
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write("".join(lines))
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 
 
 def read(item, root=DEFAULT_ROOT):
