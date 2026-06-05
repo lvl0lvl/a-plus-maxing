@@ -58,6 +58,10 @@ def append(item, reading, root=DEFAULT_ROOT):
 def read(item, root=DEFAULT_ROOT):
     """Return the item's readings ordered ascending by timepoint.
 
+    The ordering is lexicographic on the `timepoint` string and assumes the
+    spike's UTC-offset producer obligation; a non-UTC-offset timepoint would
+    sort wrong.
+
     Args:
         item (str): The item identifier.
         root (str | Path, optional): Store root. Defaults to `vault/store/`.

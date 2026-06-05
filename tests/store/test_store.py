@@ -1,5 +1,6 @@
 """Tests for scripts/store/store.py — local NDJSON append/read library."""
 
+import socket
 import subprocess
 import sys
 import textwrap
@@ -76,7 +77,7 @@ def test_append_missing_field_raises_no_line(tmp_path, missing):
     del reading[missing]
 
     before = _line_count(tmp_path)
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         store.append("rhr", reading, root=tmp_path)
     assert _line_count(tmp_path) == before
 
@@ -95,6 +96,29 @@ def test_append_read_zero_egress(tmp_path):
         capture_output=True,
     ).returncode != 0:
         pytest.fail("sandbox-exec not invocable — AC-4 BLOCKED, not skipped")
+
+    # Network-presence precondition: a direct unguarded connect must SUCCEED, else
+    # the deny-direction control below is not exercisable (attribute exit-0 to the
+    # sandbox, not to an offline host).
+    try:
+        socket.create_connection(("1.1.1.1", 53), timeout=3).close()
+    except OSError:
+        pytest.skip("no network — AC-4 deny-direction not exercisable")
+
+    profile = "(version 1)(allow default)(deny network*)"
+
+    # Fail-direction control: an outbound connect under the SAME deny profile must
+    # exit NON-zero — proving the deny is load-bearing, not a vacuous pass.
+    fail_driver = tmp_path / "fail_driver.py"
+    fail_driver.write_text(
+        "import socket; socket.create_connection(('1.1.1.1', 53), timeout=3)\n"
+    )
+    fail_result = subprocess.run(
+        ["/usr/bin/sandbox-exec", "-p", profile, sys.executable, str(fail_driver)],
+        capture_output=True,
+        text=True,
+    )
+    assert fail_result.returncode != 0, (fail_result.stdout, fail_result.stderr)
 
     store_root = tmp_path / "store"
     driver = tmp_path / "driver.py"
@@ -119,7 +143,6 @@ def test_append_read_zero_egress(tmp_path):
         )
     )
 
-    profile = "(version 1)(allow default)(deny network*)"
     result = subprocess.run(
         ["/usr/bin/sandbox-exec", "-p", profile, sys.executable, str(driver)],
         capture_output=True,

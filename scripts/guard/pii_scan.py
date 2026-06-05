@@ -27,14 +27,16 @@ TOKEN_PATTERNS = {
     "identity": r"Walter|McGivney",
     "contact": r"[A-Za-z0-9._%+-]+@gmail\.com",
     "health-data-item-then-tp": (
-        r'("item"|"value").*"timepoint"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}'
+        r'("item"|"value")[\s\S]{0,400}?"timepoint"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}'
     ),
     "health-data-tp-then-item": (
-        r'"timepoint"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*("item"|"value")'
+        r'"timepoint"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}[\s\S]{0,400}?("item"|"value")'
     ),
 }
 
-_COMPILED = [re.compile(p) for p in TOKEN_PATTERNS.values()]
+# Structural store-line patterns match across newlines (a pretty-printed reading
+# spans lines); identity/contact stay single-line.
+_COMPILED = [re.compile(p, re.DOTALL) for p in TOKEN_PATTERNS.values()]
 
 
 def scan(tracked_files):
@@ -51,8 +53,9 @@ def scan(tracked_files):
     total = 0
     for path in tracked_files:
         try:
-            text = open(path, encoding="utf-8", errors="ignore").read()
-        except (FileNotFoundError, IsADirectoryError):
+            with open(path, encoding="utf-8", errors="ignore") as fh:
+                text = fh.read()
+        except OSError:
             continue
         hits = sum(len(pattern.findall(text)) for pattern in _COMPILED)
         if hits:

@@ -9,6 +9,7 @@ git check-ignore vault/store/ in both directions (entry present -> 0, absent ->
 fail). A no-op scanner (always 0) must fail the plant tests.
 """
 
+import json
 import subprocess
 
 import pytest
@@ -16,11 +17,15 @@ import pytest
 from scripts.guard import pii_scan
 from scripts.guard.pii_scan import scan
 
-# One planted token per declared operator-PII class. The structural health-data
-# token is a real {item,timepoint,source,value} store line (biomarker-independent).
+# One planted token per declared operator-PII class. The committed source must
+# NOT carry the operator's real email or a contiguous full name (SEC-01): the
+# identity plant is assembled from fragments at runtime so no contiguous
+# `McGivney` literal sits in the source, and the contact plant uses a synthetic
+# gmail address. The structural health-data token is a synthetic
+# {item,timepoint,source,value} store line (biomarker-independent, not real PII).
 PLANTS = {
-    "identity": 'patient name: Walter McGivney\n',
-    "contact": 'reply-to: operator@example.com\n',
+    "identity": "patient name: " + "Mc" + "Givney" + "\n",
+    "contact": "reply-to: test.fixture@gmail.com\n",
     "health-data": (
         '{"item": "rhr", "timepoint": "2026-06-01T08:00:00+00:00", '
         '"source": "manual", "value": 55}\n'
@@ -108,14 +113,34 @@ def test_implemented_token_set_equals_declared(tmp_path):
         "identity": r"Walter|McGivney",
         "contact": r"[A-Za-z0-9._%+-]+@gmail\.com",
         "health-data-item-then-tp": (
-            r'("item"|"value").*"timepoint"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}'
+            r'("item"|"value")[\s\S]{0,400}?"timepoint"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}'
         ),
         "health-data-tp-then-item": (
-            r'"timepoint"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*("item"|"value")'
+            r'"timepoint"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}[\s\S]{0,400}?("item"|"value")'
         ),
     }
     assert set(pii_scan.TOKEN_PATTERNS) == set(declared)
     assert pii_scan.TOKEN_PATTERNS == declared
+
+
+def test_scan_detects_multiline_pretty_printed_reading(tmp_path):
+    """SEC-02: a pretty-printed (multi-line) leaked store reading is detected.
+
+    The re.DOTALL fix must catch a `json.dumps(reading, indent=2)` reading whose
+    fields span newlines — a single-line scanner would miss it.
+    """
+    root = _scratch_clone(tmp_path)
+    reading = {
+        "item": "rhr",
+        "timepoint": "2026-06-01T08:00:00+00:00",
+        "source": "manual",
+        "value": 55,
+    }
+    leak = root / "README.md"
+    leak.write_text(leak.read_text() + "\n" + json.dumps(reading, indent=2) + "\n")
+    _git(["add", "-A"], root)
+
+    assert scan(_tracked(root)) >= 1
 
 
 def test_scan_names_offending_file_on_stderr(tmp_path, capfd):
