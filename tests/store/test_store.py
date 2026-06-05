@@ -1,5 +1,7 @@
 """Tests for scripts/store/store.py — local NDJSON append/read library."""
 
+import json
+import os
 import socket
 import subprocess
 import sys
@@ -162,3 +164,92 @@ def test_append_read_zero_egress(tmp_path):
         assert f"from {client}" not in src
     for call in (".login(", ".authenticate(", ".auth("):
         assert call not in src
+
+
+def test_read_skips_malformed_line_and_warns(tmp_path, capfd):
+    """Read tolerates a torn line: skip it, warn on STORE-SKIP:, return the rest."""
+    path = _item_file(tmp_path)
+    good = _reading("2026-06-01T08:00:00+00:00", 55)
+    # Line 1 good, line 2 torn (truncated JSON object).
+    path.write_text(json.dumps(good) + "\n" + '{"item": "rhr"\n')
+
+    readings = store.read("rhr", root=tmp_path)
+    assert len(readings) == 1
+    assert readings[0]["timepoint"] == "2026-06-01T08:00:00+00:00"
+
+    err = capfd.readouterr().err
+    assert f"STORE-SKIP: {path}:2" in err
+
+
+def test_append_survives_preexisting_malformed_line(tmp_path):
+    """A pre-existing torn line no longer bricks append; both good readings survive."""
+    path = _item_file(tmp_path)
+    good = _reading("2026-06-01T08:00:00+00:00", 55)
+    path.write_text(json.dumps(good) + "\n" + "not json\n")
+
+    new = _reading("2026-06-02T08:00:00+00:00", 58)
+    store.append("rhr", new, root=tmp_path)  # must not raise
+
+    timepoints = {r["timepoint"] for r in store.read("rhr", root=tmp_path)}
+    assert timepoints == {
+        "2026-06-01T08:00:00+00:00",
+        "2026-06-02T08:00:00+00:00",
+    }
+
+
+def test_append_is_atomic_on_write_failure(tmp_path, monkeypatch):
+    """A crash mid-write leaves the prior file intact — no torn line.
+
+    Proves atomicity by simulating a crash *after* some bytes have been written but
+    before the write completes. File writes are not atomic, so we wrap the file
+    handle's `write` to land a partial line and then raise. We wrap whichever open
+    the production code uses for writing — `Path.open` (old "a"-mode append) and
+    `os.fdopen` (temp+replace) — and only for write modes, so the dedupe read
+    (`Path.open("r")` via read_text) is untouched. Under the old append the partial
+    bytes hit the real item file directly, tearing it (RED). Under temp+replace the
+    partial bytes hit a temp file that is never os.replace'd onto the original, so
+    the item file is byte-for-byte unchanged (GREEN).
+    """
+    prior = _reading("2026-06-01T08:00:00+00:00", 55)
+    store.append("rhr", prior, root=tmp_path)
+    before = _item_file(tmp_path).read_text()
+
+    def _tear(fh):
+        real_write = fh.write
+
+        def _partial_then_raise(data):
+            real_write(data[: len(data) // 2 or 1])  # land a partial line
+            raise OSError("simulated crash mid-write")
+
+        fh.write = _partial_then_raise
+        return fh
+
+    orig_path_open = type(tmp_path).open
+    orig_fdopen = os.fdopen
+
+    def _torn_path_open(self, mode="r", *a, **k):
+        fh = orig_path_open(self, mode, *a, **k)
+        return _tear(fh) if any(c in mode for c in "aw+x") else fh
+
+    def _torn_fdopen(fd, mode="r", *a, **k):
+        fh = orig_fdopen(fd, mode, *a, **k)
+        return _tear(fh) if any(c in mode for c in "aw+x") else fh
+
+    # Patch only across the append; post-assertions need a working read/write path.
+    # The old "a"-mode append writes via Path.open; temp+replace writes via
+    # os.fdopen — wrapping both makes one test red the old path and green the new.
+    with monkeypatch.context() as mp:
+        mp.setattr(type(tmp_path), "open", _torn_path_open)
+        mp.setattr(os, "fdopen", _torn_fdopen)
+        with pytest.raises(OSError):
+            store.append("rhr", _reading("2026-06-02T08:00:00+00:00", 58), root=tmp_path)
+
+    # File unchanged: same bytes, exactly one prior reading, no torn line.
+    after = _item_file(tmp_path).read_text()
+    assert after == before
+    readings = store.read("rhr", root=tmp_path)
+    assert len(readings) == 1
+    assert readings[0]["timepoint"] == "2026-06-01T08:00:00+00:00"
+    for ln in after.splitlines():
+        if ln.strip():
+            json.loads(ln)  # every non-blank line parses — no partial line
