@@ -18,7 +18,15 @@ DEFAULT_ROOT = Path("vault/store")
 
 
 def _item_path(item, root):
-    return Path(root) / f"{item}.ndjson"
+    # SEC: an untrusted ingestion `item` (CSV row / manual entry) must not escape
+    # the gitignored store root. Reject any item whose resolved store path is not a
+    # direct child of the root ("../x", absolute paths, "a/b" all escape; "" maps to
+    # root/.ndjson which stays inside the root, so it is allowed, not an escape).
+    base = Path(root).resolve()
+    target = (base / f"{item}.ndjson").resolve()
+    if target.parent != base:
+        raise ValueError(f"unsafe item {item!r}: store path escapes the root")
+    return target
 
 
 def _read_lines(path):

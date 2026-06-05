@@ -25,8 +25,12 @@ class Adapter(Protocol):
     """The per-source export contract: source identity + readings iterable.
 
     Attributes:
-        source_tag: Zero-arg accessor returning the source tag string carried
-            into each store reading per `keying.LINE_FIELDS`.
+        source_tag: Zero-arg accessor returning the adapter's source-identity
+            declaration — the per-adapter source string consumed by the
+            `ADR-0003-T2` adapter-conformance check and any future routing or
+            registry consumer. `ingest.run` does NOT call it: readings self-carry
+            their `source` field, so an adapter author both exposes `source_tag`
+            AND emits readings carrying a matching `source` per `keying.LINE_FIELDS`.
         read_readings: One-arg method taking the export file (path) and returning
             an iterable of readings; each reading carries every Line Field Set
             field in the store reading shape (an iterable of readings — not a
