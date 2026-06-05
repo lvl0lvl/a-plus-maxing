@@ -13,7 +13,7 @@ Every session begins with these steps in order:
 3. **Check git status** -- `git status && git log --oneline -5`. Right branch? Uncommitted changes? Resolve before starting.
 4. **Read memory/process-failures.md** -- Every session start regardless of task simplicity. The point of the log is the next session doesn't re-make the mistake.
 5. **Read vault/meta/landmarks.md** -- Active landmarks + trigger windows for any landmark within window today.
-6. **Run test baseline** -- `echo "No test runner configured -- add one to CLAUDE.md"`. If tests fail before you changed anything, fix that first.
+6. **Run test baseline** -- `.venv/bin/python -m pytest -q` (the V1 Python suite, since S31/Wave 2; `.venv` is the per-instance pytest runtime — Python 3.14 + pytest, gitignored). If tests fail before you changed anything, fix that first. Non-Python sessions: the shell audit suites under `scripts/tests/*.sh` are the baseline for governance/tooling work.
 7. **Write the Scope Contract** -- Before writing any code, state in plain text and obtain user confirmation:
 
    ```markdown
@@ -48,7 +48,7 @@ Per Rigor Framework Discipline 7 + PF-S3-01. When you catch yourself producing o
 
 Before saying "done" or "complete":
 
-1. **Run full test suite** -- `echo "No test runner configured -- add one to CLAUDE.md"`
+1. **Run full test suite** -- `.venv/bin/python -m pytest -q` (the V1 Python suite, since S31/Wave 2). For governance/tooling-only sessions, run the relevant `scripts/tests/*.sh` shell suites.
 2. **Scope check** -- `git diff --name-only`. Every file not in your original scope needs a justification.
 3. **Drift detection (3 checks):**
    - **Task drift:** Re-read the scope contract from session start. Evaluate each acceptance criterion: PASS, FAIL, or CHANGED. If any criterion was silently changed during the session, that is drift. Document what changed and why.
