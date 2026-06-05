@@ -4,8 +4,8 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-23
-last_reviewed: 2026-05-30
-last_updated: 2026-05-30
+last_reviewed: 2026-06-05
+last_updated: 2026-06-05
 depends_on: []
 superseded_by: null
 review_cadence: session
@@ -213,3 +213,13 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - **Recipe↔built drifts surfaced (not silently followed):** `egress_guard.run(operation)` (recipe said `callable`); pure-Python static scans (`rg` is a non-exec shim) with committed positive-controls proving failing-capability; `/write-tests` not worker-invocable (RED tests authored directly); additive `root=` kwarg mirroring `store`.
 - **Discipline:** read-before-invoke held (both recipes + `/review-pr` ×2 + `/merge` ×2 in full per-invocation); anti-self-attestation held (orchestrator independently RED-verified every fix — stashing fixes, reproducing the SEC-001 escape, proving the static-scan controls); no `Workflow` substitution. PF-S25-01 window tripped-clean (close on `fix/s32-close` after both merges). No new PF-class entries. Beads `8s6`/`6be` CLOSED → `6be` unblocked `n9h`; 1 new bead `1vi` (P3 value-correction gap). Suite 72 passed / 2 skipped.
 - **Next:** Wave-3 continuation — `n9h` (ADR-0003-T2 wired adapters, implement the `Adapter` Protocol) + `oaf` (ADR-0003-T3 scheduler); parallel `gu4`/`xlu`/`br1`. [[sessions/session-32]]
+
+## 2026-06-05 — S33 (Wave-3 wired adapters `ADR-0003-T2`; no wiki page changes)
+
+- **One deliverable, one PR, rebase-merged to `main` (`aab93cc`).** PR #50 (`n9h`/`ADR-0003-T2`): four per-source adapters `scripts/ingest/adapters/{healthkit,oura,garmin,whoop}.py` implementing the frozen `ADR-0003-T1` `Adapter` Protocol (`source_tag()` + `read_readings(export_file)`), run through the UNCHANGED `ingest.run`. HealthKit/Oura/Garmin wired; Whoop = registered-but-unwired scaffold (Risk N2 → `manual_entry` until wired). The two distinct-baseline 0-shared-routine-edit `git diff --numstat` extensibility proofs (Garmin `pre-garmin` AC-3 + format-rename `pre-format-rename` AC-6); `ingest.py`+`adapter.py` byte-untouched.
+- **Orchestrator independent verification caught a TAUTOLOGY before review (PF-S3-01).** The SE's first 0-edit baseline (`commit-tree` over HEAD's tree) was tautological — a HEAD-relative baseline cannot detect a *committed* shared-routine edit (proven empirically). Fixed to a baseline built over the FORK-POINT tree (`git merge-base HEAD origin/main`), which reds on a committed edit. A committed-probe falsifiability test was added + teeth-checked (RED under a neutered `_baseline_ref`).
+- **6-agent `/review-pr` + blind triage + blind verify earned its keep on the single-SE build (0 suppressed, PF-S26-01):** 7 legitimate findings fixed + 7/7 blind-verified RESOLVED — HIST-001 (adapter path is a new untrusted-`item` sink with no SEC-001 traversal regression test), TEST-001 (the falsifiability proof exercised `git diff --no-index`, not the real `_numstat_rows(_baseline_ref())` gate path), TEST-002 (Whoop unwired-gate regex missed `import …whoop as w`), TEST-004 (cross-source non-dedupe), 3 QUAL docstring/import. 5 findings correctly no-action (failed the 6-condition legitimacy test, NOT severity-suppressed).
+- **Orchestrator near-miss, caught by the verification discipline (no defective artifact shipped):** the orchestrator's first TEST-001 fix steer (a working-tree-edit probe) couldn't distinguish a tautological baseline; re-caught on independent re-verification, proven empirically, corrected to the committed-probe form. Lesson logged in the S33 PF attestation.
+- **Recipe↔built drifts surfaced (not silently followed):** baseline mechanism `git stash create` tags → `commit-tree` over the fork-point tree (portability + correctness); AC-5 `rg "whoop" scheduler.py` deferred to the Wave 4→5 boundary (`scheduler.py` is `ADR-0003-T3`'s file); pure-Python in-test scans; `/write-tests` not worker-invocable; namespace-package import w/o `__init__.py`.
+- **Discipline:** read-before-invoke held (recipe + `/review-pr` + `/merge` in full); anti-self-attestation held (orchestrator independently re-RED — adapters-aside import-fail + the committed-edit gate demo + the teeth-check); no `Workflow` substitution. PF-S25-01 window tripped-clean (close on `fix/s33-close` after the merge). No new PF-class entries. Bead `n9h` CLOSED → `oaf` unblocked. Suite 88 passed / 2 skipped.
+- **Next:** Wave-3 completion — `oaf` (ADR-0003-T3 scheduler over the wired adapter set); parallel `gu4` (render, unblocks the most downstream)/`xlu`/`br1`. [[sessions/session-33]]
