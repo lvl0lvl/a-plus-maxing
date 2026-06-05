@@ -87,16 +87,20 @@ def test_adapter_interface_conformance(tmp_path):
 # different mechanism). Drift #2 in the task brief.
 
 
+def _scan_text(text, pattern):
+    """Count regex matches in a single string (the scan's core, testable in isolation)."""
+    return len(re.compile(pattern).findall(text))
+
+
 def _scan_ingest(pattern):
     """Count regex matches across every *.py file under scripts/ingest/.
 
     Pure-Python stand-in for `rg <pattern> scripts/ingest/` (rg is a non-exec
     shim here). Returns the total match count over file contents.
     """
-    rx = re.compile(pattern)
     total = 0
     for py in sorted(INGEST_DIR.glob("*.py")):
-        total += len(rx.findall(py.read_text()))
+        total += _scan_text(py.read_text(), pattern)
     return total
 
 
@@ -117,6 +121,31 @@ _MODEL_TOKEN_PATTERN = (
 def _model_token_count():
     """crit-5 Half-B scan: count model/API-client tokens under scripts/ingest/."""
     return _scan_ingest(_MODEL_TOKEN_PATTERN)
+
+
+# --- TEST-001/002: positive controls — prove the scan mechanisms can turn red ---
+
+
+def test_key_def_scan_detects_planted_token():
+    """TEST-001: the `def .*key` scan returns >0 against a planted key def.
+
+    Proves the crit-3 `_key_def_count() == 0` assertion is not vacuous: the same
+    regex applied to a fixture string carrying `def make_key` detects it. If the
+    regex could never match, the `=0` assertion over scripts/ingest/ would be
+    meaningless.
+    """
+    assert _scan_text("def make_key(reading):\n    return ()", r"def .*key") > 0
+
+
+def test_model_token_scan_detects_planted_token():
+    """TEST-002: the model/API-client scan returns >0 against planted tokens.
+
+    Proves the crit-5 Half-B `_model_token_count() == 0` assertion is not vacuous:
+    the same token pattern applied to a fixture string carrying `import openai`
+    and a `.messages.create` call shape detects them.
+    """
+    planted = "import openai\nclient.messages.create(model='x')\n"
+    assert _scan_text(planted, _MODEL_TOKEN_PATTERN) > 0
 
 
 # --- Cycle 2: shared routine — import, idempotent re-run, single-shared-key dedupe ---
@@ -291,8 +320,21 @@ def test_ingest_run_zero_egress(tmp_path):
     + OS-isolates the child, runs the closure there, and returns truthy iff 0
     outbound calls surfaced across the whole invocation.
     """
+    import subprocess
+
     from scripts.guard import egress_guard
     from scripts.ingest import ingest
+
+    # Sandbox-availability precondition: egress_guard.run is fail-closed (returns
+    # falsy when OS isolation cannot be applied), so where sandbox-exec is not
+    # invocable the truthy assertion would FAIL, not skip. Mirror the store AC-4
+    # precondition (tests/store/test_store.py::test_append_read_zero_egress) and
+    # skip when isolation can't be set up — keep the truthy assertion where it can.
+    if subprocess.run(
+        ["/usr/bin/sandbox-exec", "-p", "(version 1)(allow default)", "/usr/bin/true"],
+        capture_output=True,
+    ).returncode != 0:
+        pytest.skip("sandbox-exec not invocable — zero-egress isolation unavailable")
 
     export = tmp_path / "export.ndjson"
     _write_export(export, [_reading("hrv", "2026-01-01T08:00", "oura", 55)])
@@ -313,3 +355,233 @@ def test_no_model_step_static_scan():
     proven by the crit-5 Half-B negative control in the report.
     """
     assert _model_token_count() == 0
+
+
+# --- TEST-003: AC-6 delta — distinguish "deduped at store" from "pre-filtered" ---
+
+
+def test_run_routes_every_reading_store_dedupes(tmp_path, store_root, monkeypatch):
+    """TEST-003: run issues exactly len(export) append calls; the store dedupes.
+
+    A store.append call-count spy proves run does NOT pre-filter duplicates: it
+    routes EVERY reading (including the two same-identity duplicates) to the
+    store, and the store is what collapses them to one line. RED if run grew a
+    private pre-dedupe (call count would drop below len(export)).
+    """
+    from scripts.ingest import ingest
+
+    export_rows = [
+        _reading("hrv", "2026-01-01T08:00", "oura", 55),
+        _reading("hrv", "2026-01-01T08:00", "oura", 99),  # same identity, dropped at store
+        _reading("hrv", "2026-01-02T08:00", "oura", 58),
+    ]
+    export = tmp_path / "export.ndjson"
+    _write_export(export, export_rows)
+
+    real_append = store.append
+    calls = {"n": 0}
+
+    def _spy(item, reading, root=store.DEFAULT_ROOT):
+        calls["n"] += 1
+        return real_append(item, reading, root=root)
+
+    monkeypatch.setattr(store, "append", _spy)
+    ingest.run(_ListAdapter("oura"), export, root=store_root)
+
+    # Every reading routed to the store (no ingest pre-filter)...
+    assert calls["n"] == len(export_rows)
+    # ...and the STORE deduped the same-identity pair to one stored line.
+    assert len(store.read("hrv", root=store_root)) == 2
+
+
+# --- TEST-005: import_csv input validation ---
+
+
+def test_import_csv_missing_required_column_raises_nothing_written(tmp_path, store_root):
+    """TEST-005: a row missing a required column raises ValueError, writes nothing.
+
+    The header omits `source`, so every row is missing it. import_csv validates
+    before any write, so it raises and the store stays empty (no partial import).
+    """
+    from scripts.ingest import ingest
+
+    csv_path = tmp_path / "bad.csv"
+    csv_path.write_text("item,timepoint,value\nhrv,2026-01-01T08:00,55\n")
+
+    with pytest.raises(ValueError):
+        ingest.import_csv(csv_path, root=store_root)
+    assert store.read("hrv", root=store_root) == []
+
+
+def test_import_csv_extra_column_row_rejected_no_null_field(tmp_path, store_root):
+    """TEST-005: an extra-column (ragged) row is rejected, not stored with a "null" field.
+
+    csv.DictReader groups surplus columns under the None key; import_csv rejects
+    that row with ValueError instead of silently storing a `"null"` field. Nothing
+    is written.
+    """
+    from scripts.ingest import ingest
+
+    csv_path = tmp_path / "ragged.csv"
+    # Header has 4 columns; the row has 5 -> surplus lands under the None key.
+    csv_path.write_text(
+        "item,timepoint,source,value\n"
+        "hrv,2026-01-01T08:00,csv,55,EXTRA\n"
+    )
+
+    with pytest.raises(ValueError):
+        ingest.import_csv(csv_path, root=store_root)
+    stored = store.read("hrv", root=store_root)
+    assert stored == []
+    # The surplus value never became a stored field (no "null"/None key leaked).
+    for r in stored:
+        assert "null" not in r and None not in r
+
+
+def test_import_csv_header_only_writes_nothing(tmp_path, store_root):
+    """TEST-005: a header-only / empty CSV leaves the store empty without crashing."""
+    from scripts.ingest import ingest
+
+    csv_path = tmp_path / "empty.csv"
+    csv_path.write_text("item,timepoint,source,value\n")
+
+    ingest.import_csv(csv_path, root=store_root)  # must not raise
+    assert store.read("hrv", root=store_root) == []
+
+
+# --- TEST-006: cross-mechanism same-identity dedupe (value excluded from key) ---
+
+
+def test_cross_mechanism_same_identity_first_write_wins(tmp_path, store_root):
+    """TEST-006: adapter then CSV, same (item,timepoint,source), different value.
+
+    The FIRST write (adapter, value 55) wins; the CSV value-correction (62) is
+    dropped because the dedupe key is (item, timepoint, source) only — value is
+    excluded (ADR-0002 keying property). This pins the documented dedupe-on-
+    identity behavior across the two write mechanisms.
+    """
+    from scripts.ingest import ingest
+
+    export = tmp_path / "export.ndjson"
+    _write_export(export, [_reading("hrv", "2026-01-01T08:00", "oura", 55)])
+    ingest.run(_ListAdapter("oura"), export, root=store_root)
+
+    # SAME identity, different value, via the OTHER mechanism (CSV).
+    csv_path = tmp_path / "correction.csv"
+    csv_path.write_text(
+        "item,timepoint,source,value\n"
+        "hrv,2026-01-01T08:00,oura,62\n"
+    )
+    ingest.import_csv(csv_path, root=store_root)
+
+    stored = store.read("hrv", root=store_root)
+    assert len(stored) == 1
+    # value 55 (the first write) survived; the CSV "62" correction was dropped —
+    # the known ADR-0002 keying property: value is excluded from the dedupe key.
+    assert stored[0]["value"] == 55
+
+
+# --- TEST-007: uniform ValueError for a non-conformant adapter reading ---
+
+
+@pytest.mark.parametrize("missing", sorted(keying.LINE_FIELDS))
+def test_run_non_conformant_reading_raises_value_error(tmp_path, store_root, missing):
+    """TEST-007: a reading missing ANY field (incl. item) raises ValueError from run.
+
+    Per fix C, the missing-field failure is uniform: a missing `item` raises
+    ValueError just like every other missing field (not a bare KeyError).
+    """
+    from scripts.ingest import ingest
+
+    reading = _reading("hrv", "2026-01-01T08:00", "oura", 55)
+    del reading[missing]
+    export = tmp_path / "export.ndjson"
+    _write_export(export, [reading])
+
+    with pytest.raises(ValueError):
+        ingest.run(_ListAdapter("oura"), export, root=store_root)
+
+
+# --- TEST-008: persisted source matches the adapter's emitted reading source ---
+
+
+def test_persisted_source_matches_emitted_reading_source(tmp_path, store_root):
+    """TEST-008: the stored `source` is the reading's own `source`, not source_tag.
+
+    run does NOT stamp source from the adapter's source_tag identity declaration —
+    readings self-carry `source`. Here the adapter's source_tag ("oura-tag")
+    differs from the reading's source field ("oura-reading"); the persisted line
+    carries the READING's source, proving run reads it off the reading, not the
+    adapter accessor.
+    """
+    from scripts.ingest import ingest
+
+    class _DivergentAdapter(_ListAdapter):
+        def source_tag(self):
+            return "oura-tag"  # identity declaration, NOT stamped onto readings
+
+    export = tmp_path / "export.ndjson"
+    _write_export(export, [_reading("hrv", "2026-01-01T08:00", "oura-reading", 55)])
+    ingest.run(_DivergentAdapter("oura-tag"), export, root=store_root)
+
+    stored = store.read("hrv", root=store_root)
+    assert len(stored) == 1
+    assert stored[0]["source"] == "oura-reading"
+
+
+# --- SEC-001: a traversing/absolute item writes NOTHING outside the store root ---
+
+
+@pytest.mark.parametrize("bad_item", ["../escaped/x", "/tmp/abs", "a/b"])
+def test_store_append_rejects_unsafe_item(tmp_path, bad_item):
+    """SEC-001: store.append rejects a traversing/absolute/multi-segment item.
+
+    The defended boundary is "the resolved store path escapes the root": a `..`
+    traversal, an absolute path, or a multi-segment `a/b` all resolve outside the
+    root's direct children and are rejected. (An empty item resolves to
+    `root/.ndjson` — a hidden file INSIDE the root, not an escape — so it is not in
+    this set; SEC-001 is path-escape, not degenerate-name, validation.)
+    """
+    reading = {
+        "item": bad_item,
+        "timepoint": "2026-01-01T08:00",
+        "source": "manual",
+        "value": 1,
+    }
+    with pytest.raises(ValueError):
+        store.append(bad_item, reading, root=tmp_path / "store")
+
+
+def test_import_csv_rejects_traversing_item_writes_nothing(tmp_path):
+    """SEC-001: a traversing CSV `item` raises and writes nothing outside the root."""
+    from scripts.ingest import ingest
+
+    root = tmp_path / "store"
+    outside = tmp_path / "escaped"  # sibling of the store root the item targets
+    csv_path = tmp_path / "evil.csv"
+    csv_path.write_text(
+        "item,timepoint,source,value\n"
+        "../escaped/pwn,2026-01-01T08:00,csv,1\n"
+    )
+
+    with pytest.raises(ValueError):
+        ingest.import_csv(csv_path, root=root)
+    # Nothing was written anywhere outside the store root.
+    assert not outside.exists()
+    assert not (tmp_path / "escaped").exists()
+
+
+def test_manual_entry_rejects_traversing_item_writes_nothing(tmp_path):
+    """SEC-001: a traversing manual_entry `item` raises and writes nothing outside."""
+    from scripts.ingest import ingest
+
+    root = tmp_path / "store"
+    reading = {
+        "item": "../escaped/pwn",
+        "timepoint": "2026-01-01T08:00",
+        "source": "manual",
+        "value": 1,
+    }
+    with pytest.raises(ValueError):
+        ingest.manual_entry("../escaped/pwn", reading, root=root)
+    assert not (tmp_path / "escaped").exists()
