@@ -6,6 +6,7 @@ vault/labs/raw/
 .env
 .env.local
 .env.*.local
+.venv/
 
 # OS
 .DS_Store
