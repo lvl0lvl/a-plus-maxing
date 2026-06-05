@@ -197,6 +197,121 @@ def test_append_survives_preexisting_malformed_line(tmp_path):
     }
 
 
+def test_read_skips_non_conformant_lines_and_warns(tmp_path, capfd):
+    """TEST-001a: read skips a dict-missing-timepoint line AND a bare 42 line.
+
+    Both are valid JSON but not conformant readings. read must return only the
+    good reading and emit one STORE-SKIP per bad line. RED if the
+    isinstance/is_conformant filter is removed from _read_lines: read's
+    `sorted(..., key=lambda r: r["timepoint"])` then raises KeyError on the
+    dict-missing-timepoint line instead of returning a single reading.
+    """
+    path = _item_file(tmp_path)
+    good = _reading("2026-06-01T08:00:00+00:00", 55)
+    # Line 1 good, line 2 dict missing timepoint, line 3 bare int.
+    path.write_text(
+        json.dumps(good) + "\n"
+        + json.dumps({"item": "rhr", "source": "manual", "value": 1}) + "\n"
+        + "42\n"
+    )
+
+    readings = store.read("rhr", root=tmp_path)
+    assert len(readings) == 1
+    assert readings[0]["timepoint"] == "2026-06-01T08:00:00+00:00"
+
+    err = capfd.readouterr().err
+    assert f"STORE-SKIP: {path}:2" in err
+    assert f"STORE-SKIP: {path}:3" in err
+
+
+def test_append_survives_preexisting_non_conformant_line(tmp_path):
+    """TEST-001b: append over a non-conformant line does not raise; both goods live.
+
+    RED if the filter is removed: append builds its dedupe set via
+    keying.dedupe_key(r) over the raw lines, which raises TypeError on the bare
+    42 (int is not subscriptable) instead of completing the append.
+    """
+    path = _item_file(tmp_path)
+    good = _reading("2026-06-01T08:00:00+00:00", 55)
+    path.write_text(json.dumps(good) + "\n" + "42\n")
+
+    new = _reading("2026-06-02T08:00:00+00:00", 58)
+    store.append("rhr", new, root=tmp_path)  # must not raise
+
+    timepoints = {r["timepoint"] for r in store.read("rhr", root=tmp_path)}
+    assert timepoints == {
+        "2026-06-01T08:00:00+00:00",
+        "2026-06-02T08:00:00+00:00",
+    }
+
+
+def test_read_per_line_numbering_survives_blank_line(tmp_path, capfd):
+    """TEST-002: malformed lines on non-adjacent post-blank line numbers.
+
+    Layout good / torn / blank / good / torn puts bad lines at 2 and 5. read must
+    return exactly the two good readings in timepoint order and emit one
+    STORE-SKIP per malformed line at its correct 1-based number (proves the
+    blank-line `continue` does not desync the enumerate counter).
+    """
+    path = _item_file(tmp_path)
+    g1 = _reading("2026-06-01T08:00:00+00:00", 55)
+    g2 = _reading("2026-06-02T08:00:00+00:00", 58)
+    path.write_text(
+        json.dumps(g1) + "\n"      # line 1 good
+        + '{"item": "rhr"\n'        # line 2 torn
+        + "\n"                      # line 3 blank
+        + json.dumps(g2) + "\n"     # line 4 good
+        + "not json\n"              # line 5 torn
+    )
+
+    got = [r["timepoint"] for r in store.read("rhr", root=tmp_path)]
+    assert got == [
+        "2026-06-01T08:00:00+00:00",
+        "2026-06-02T08:00:00+00:00",
+    ]
+
+    err = capfd.readouterr().err
+    assert f"STORE-SKIP: {path}:2" in err
+    assert f"STORE-SKIP: {path}:5" in err
+    assert err.count("STORE-SKIP:") == 2
+
+
+def test_append_leaves_no_temp_sibling(tmp_path):
+    """TEST-003a: a successful append leaves no *.tmp sibling behind."""
+    store.append("rhr", _reading("2026-06-01T08:00:00+00:00", 55), root=tmp_path)
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_append_self_heal_preserves_order_and_idempotency(tmp_path):
+    """TEST-004: whole-file rewrite preserves order + idempotency through self-heal.
+
+    Fixture good(T2) / malformed / good(T1); append good(T3). read must return
+    ascending [T1, T2, T3] with the malformed line gone. Re-appending good(T3)
+    leaves the line count unchanged (idempotent) and the malformed line stays
+    gone.
+    """
+    path = _item_file(tmp_path)
+    t1 = "2026-06-01T08:00:00+00:00"
+    t2 = "2026-06-02T08:00:00+00:00"
+    t3 = "2026-06-03T08:00:00+00:00"
+    path.write_text(
+        json.dumps(_reading(t2, 58)) + "\n"
+        + "not json\n"
+        + json.dumps(_reading(t1, 55)) + "\n"
+    )
+
+    store.append("rhr", _reading(t3, 60), root=tmp_path)
+
+    got = [r["timepoint"] for r in store.read("rhr", root=tmp_path)]
+    assert got == [t1, t2, t3]
+    assert "not json" not in path.read_text()
+
+    count_after_heal = _line_count(tmp_path)
+    store.append("rhr", _reading(t3, 60), root=tmp_path)  # idempotent re-append
+    assert _line_count(tmp_path) == count_after_heal
+    assert "not json" not in path.read_text()
+
+
 def test_append_is_atomic_on_write_failure(tmp_path, monkeypatch):
     """A crash mid-write leaves the prior file intact — no torn line.
 
@@ -247,6 +362,8 @@ def test_append_is_atomic_on_write_failure(tmp_path, monkeypatch):
     # File unchanged: same bytes, exactly one prior reading, no torn line.
     after = _item_file(tmp_path).read_text()
     assert after == before
+    # TEST-003b: the failure-path cleanup unlinked the temp — no stray sibling.
+    assert list(tmp_path.glob("*.tmp")) == []
     readings = store.read("rhr", root=tmp_path)
     assert len(readings) == 1
     assert readings[0]["timepoint"] == "2026-06-01T08:00:00+00:00"
