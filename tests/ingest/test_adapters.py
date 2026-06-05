@@ -7,22 +7,13 @@ re-validation 0-edit proof on a distinct baseline (AC-6). Every store write
 goes to a tmp_path-based root via the `store_root` fixture so no test touches
 the real `vault/store/`.
 
-The two 0-edit proofs (AC-3, AC-6) diff `scripts/ingest/ingest.py` +
-`scripts/ingest/adapter.py` against two DISTINCT committed-tree baselines. Each
-baseline is a fresh `git commit-tree` over the FORK-POINT tree (`git merge-base
-HEAD origin/main`, via `_baseline_ref`), so it carries the PRE-TASK shared-
-routine blobs — the diff vs the working tree reds the moment any task commit
-touched either path, which is the COMMITTED-edit case a HEAD-relative baseline
-would tautologically miss. It is REGENERATED deterministically in any checkout
-(origin/main is everywhere — the re-RED and `/review-pr` runs share this
-checkout), so it depends on no transient local tag. The two baselines are
-distinct git objects (a baseline-specific marker in each commit message) so
-neither diff rides the other's ref. Each proof is additionally backed by a
-co-located negative-control test that runs the SAME numstat logic against a
-one-line probe added to a copy of the shared-routine file and confirms the row
-count goes non-zero — extra teeth, without ever editing the real files.
+The two 0-edit proofs (AC-3, AC-6) diff the shared routine
+(`scripts/ingest/ingest.py` + `scripts/ingest/adapter.py`) against two DISTINCT
+committed-tree baselines built by `_baseline_ref`; see that function for the
+fork-point/distinctness rationale.
 """
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -208,12 +199,11 @@ def test_garmin_addition_zero_shared_routine_edits():
     """AC-3: adding Garmin after HealthKit+Oura changes 0 lines in the routine.
 
     Asserts `git diff --numstat <pre-garmin> -- ingest.py adapter.py` emits 0 rows
-    (empty output). `pre-garmin` is a DISTINCT committed-tree object holding both
-    paths in their FINAL-committed state — the diff is against a fixed git object,
-    not the working index. An unchanged path emits NO numstat row, so the pass
-    condition is an EMPTY row list, NOT a literal "0" token. The Garmin source was
-    added by creating ONE adapter module; ingest.py + adapter.py are untouched, so
-    the diff is empty. The gate's teeth are proven by
+    (empty output). `pre-garmin` is the `_baseline_ref` baseline (see that function
+    for the fork-point/distinctness rationale). An unchanged path emits NO numstat
+    row, so the pass condition is an EMPTY row list, NOT a literal "0" token. The
+    Garmin source was added by creating ONE adapter module; ingest.py + adapter.py
+    are untouched, so the diff is empty. The gate's teeth are proven by
     `test_garmin_zero_edit_gate_is_falsifiable`; its distinctness from the
     format-rename baseline by `test_two_zero_edit_baselines_are_distinct`.
     """
@@ -254,6 +244,31 @@ def test_garmin_zero_edit_gate_is_falsifiable(tmp_path):
     assert rows[0].split("\t")[0] == "1"
 
 
+def test_zero_edit_gate_reds_on_committed_routine_edit(tmp_path):
+    """The MAIN 0-edit gate (_numstat_rows over the real _baseline_ref) turns RED on a
+    COMMITTED shared-routine edit. A _baseline_ref that resolved to HEAD's tree would
+    report EMPTY here (HEAD == working tree both carry the edit) and this test would
+    FAIL — so it catches the exact tautology a HEAD-relative baseline would reintroduce.
+    Uses a committed probe (an uncommitted working-tree edit is caught by any baseline
+    and would not distinguish a tautological baseline)."""
+    ingest = REPO_ROOT / "scripts" / "ingest" / "ingest.py"
+    original = ingest.read_text()
+    committed = False
+    try:
+        ingest.write_text(original + "\n# falsifiability probe\n")
+        subprocess.run(["git", "add", str(ingest)], cwd=REPO_ROOT, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "test probe: 0-edit falsifiability"],
+                       cwd=REPO_ROOT, check=True)
+        committed = True
+        rows = _numstat_rows(_baseline_ref("committed-falsifiability-probe"), SHARED_ROUTINE_PATHS)
+        assert any(r.endswith("scripts/ingest/ingest.py") for r in rows), rows
+    finally:
+        if committed:
+            subprocess.run(["git", "reset", "-q", "--mixed", "HEAD^"], cwd=REPO_ROOT, check=True)
+        ingest.write_text(original)
+        subprocess.run(["git", "checkout", "--", str(ingest)], cwd=REPO_ROOT, check=True)
+
+
 # --- Cycle 3: Whoop registered-but-unwired scaffold (AC-5) ---
 
 # The PRODUCTION modules THIS task creates, EXCLUDING whoop.py itself. The
@@ -269,12 +284,12 @@ WIRING_SCAN_FILES = (
     "scripts/ingest/adapters/garmin.py",
 )
 
-# A "Whoop wiring/invocation" reference: importing the whoop adapter module or
-# naming its adapter class — i.e. registering it into a wired/scheduler set.
-import re as _re
-
-_WHOOP_WIRING_PATTERN = _re.compile(
-    r"import\s+whoop\b|adapters\s+import\s+(?:[^\n]*\b)?whoop\b|WhoopAdapter"
+# A "Whoop wiring/invocation" reference: importing the whoop adapter module
+# (bare `import whoop`, dotted `import scripts.ingest.adapters.whoop as w`, or
+# `from ... import whoop`) or naming its adapter class — i.e. registering it into
+# a wired/scheduler set.
+_WHOOP_WIRING_PATTERN = re.compile(
+    r"import\s+[\w.]*\bwhoop\b|adapters\s+import\s+(?:[^\n]*\b)?whoop\b|WhoopAdapter"
 )
 
 
@@ -340,17 +355,25 @@ def test_whoop_unwired_no_scheduler_reference():
 def test_whoop_unwired_gate_is_falsifiable():
     """Negative control for AC-5 half (b): the no-wiring scan turns RED on real wiring.
 
-    Runs the SAME `_whoop_wiring_count` scan against a simulated scheduler/wired
-    -set entry point this task COULD create, and asserts it counts the planted
-    reference. This proves the unwired gate catches actual wiring, not merely the
-    absence of a file: were a Whoop import/registration to land in one of this
+    Runs the SAME `_whoop_wiring_count` scan against the distinct wiring forms a
+    scheduler/wired-set entry point this task COULD create — the dotted-module
+    `import scripts.ingest.adapters.whoop as w`, the `from ... import whoop`, and a
+    `WhoopAdapter()` registry line — and asserts each is counted. This proves the
+    unwired gate catches actual wiring (in every import shape), not merely the
+    absence of a file: were any Whoop import/registration to land in one of this
     task's files, `test_whoop_unwired_no_scheduler_reference` would turn RED.
     """
+    # Each form is a real wiring shape; the broadened pattern must count every one.
+    assert _whoop_wiring_count("import scripts.ingest.adapters.whoop as w\n") > 0
+    assert _whoop_wiring_count("from scripts.ingest.adapters import whoop\n") > 0
+    assert _whoop_wiring_count("WIRED = [WhoopAdapter()]\n") > 0
+    # And the combined scheduler entry point counts all of them together.
     planted_scheduler = (
+        "import scripts.ingest.adapters.whoop as w\n"
         "from scripts.ingest.adapters import whoop\n"
         "WIRED = [whoop.WhoopAdapter()]\n"
     )
-    assert _whoop_wiring_count(planted_scheduler) > 0
+    assert _whoop_wiring_count(planted_scheduler) >= 3
 
 
 # --- Cycle 4: simulated format-rename re-validation 0-edit proof (AC-6) ---
@@ -383,11 +406,11 @@ def test_format_rename_zero_shared_routine_edits(tmp_path, store_root):
     (b) still dedupe on the unchanged (item, timepoint, source) key — the dedupe
     key is re-derived through the adapter's mapping, NOT through a shared-routine
     edit. AND `git diff --numstat <pre-format-rename> -- ingest.py adapter.py`
-    emits 0 rows: the rename touched only garmin.py. `pre-format-rename` is a
-    DISTINCT committed-tree object from `pre-garmin` (a different commit object,
-    for a different proof) — this diff does NOT ride the pre-garmin baseline. Gate
-    teeth proven by `test_format_rename_zero_edit_gate_is_falsifiable`;
-    distinctness from pre-garmin by `test_two_zero_edit_baselines_are_distinct`.
+    emits 0 rows: the rename touched only garmin.py. `pre-format-rename` is the
+    `_baseline_ref` baseline, distinct from `pre-garmin` (see that function for the
+    fork-point/distinctness rationale). Gate teeth proven by
+    `test_format_rename_zero_edit_gate_is_falsifiable`; distinctness from
+    pre-garmin by `test_two_zero_edit_baselines_are_distinct`.
     """
     from scripts.ingest import ingest
     from scripts.ingest.adapters import garmin
@@ -465,3 +488,64 @@ def test_two_zero_edit_baselines_are_distinct():
     # Both baselines are evaluable and both report 0 edits (unedited shared routine).
     assert _numstat_rows(pre_garmin, SHARED_ROUTINE_PATHS) == []
     assert _numstat_rows(pre_format_rename, SHARED_ROUTINE_PATHS) == []
+
+
+# --- Cross-source dedupe complement (keying.DEDUPE_FIELDS includes source) ---
+
+
+def test_cross_source_same_item_timepoint_does_not_dedupe(tmp_path, store_root):
+    """Two readings with the SAME item+timepoint but DIFFERENT source do NOT dedupe.
+
+    The dedupe identity is (item, timepoint, source) — `source` is part of
+    `keying.DEDUPE_FIELDS` and is the field each adapter uniquely supplies. Running
+    HealthKit (`hrv@T`) then Oura (`hrv@T`) through the SAME store_root keeps BOTH
+    readings: the differing source gives them distinct identities. This is the
+    complement of the same-source dedupe proof and reds if `source` were dropped
+    from the dedupe key (the two would then collapse to one).
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit, oura
+
+    hk_export = tmp_path / "healthkit.json"
+    _write_json_export(hk_export, [{"type": "hrv", "startDate": "2026-01-06T08:00", "qty": 55}])
+    oura_export = tmp_path / "oura.json"
+    _write_json_export(oura_export, [{"metric": "hrv", "day": "2026-01-06T08:00", "average": 58}])
+
+    ingest.run(healthkit.HealthKitAdapter(), hk_export, root=store_root)
+    ingest.run(oura.OuraAdapter(), oura_export, root=store_root)
+
+    hrv = store.read("hrv", root=store_root)
+    # Both readings survive: same item+timepoint, distinct source -> distinct identity.
+    assert len(hrv) == 2
+    assert {r["source"] for r in hrv} == {"healthkit", "oura"}
+
+
+# --- SEC-001 over the adapter path: an unsafe mapped item writes nothing outside ---
+
+
+@pytest.mark.parametrize("bad_item", ["../escaped/pwn", "/tmp/abs-pwn", "a/b"])
+def test_garmin_traversing_item_raises_writes_nothing(tmp_path, bad_item):
+    """SEC-001 on the adapter path: an unsafe `summaryType` raises, writes nothing.
+
+    The adapter maps an export field into `reading["item"]`, so an untrusted
+    `summaryType` flows item -> ingest.run -> store.append -> store._item_path,
+    which carries the S32 SEC-001 containment guard (resolved store path must be a
+    direct child of the root; `..` traversal, an absolute path, and a multi-segment
+    `a/b` all escape). Running such an export raises ValueError and leaves nothing
+    outside the tmp store_root.
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import garmin
+
+    root = tmp_path / "store"
+    outside = tmp_path / "escaped"  # sibling of the store root the "../escaped" item targets
+    export = tmp_path / "garmin_evil.json"
+    _write_json_export(
+        export,
+        [{"summaryType": bad_item, "calendarDate": "2026-01-07T08:00", "value": 1}],
+    )
+
+    with pytest.raises(ValueError):
+        ingest.run(garmin.GarminAdapter(), export, root=root)
+    # Nothing was written outside the store root (the escape target does not exist).
+    assert not outside.exists()
