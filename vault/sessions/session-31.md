@@ -10,7 +10,7 @@ permalink: a-plus-maxing/sessions/session-31
 
 First **production-code** session. Built the two dependency-free Wave-2 modules
 through their recipes' real-`pytest` TDD cycles, ran a full 6-agent `/review-pr`
-(15 legitimate findings fixed, 5 beaded, 0 suppressed), made the PII scanner +
+(15 legitimate findings — 13 fixed, 2 beaded; 5 beaded total, 0 suppressed), made the PII scanner +
 governance tooling **shareable** (operator name externalized to a gitignored
 config, Walter-directed), and merged via PR #44 (`4efe907`). Closed `89a` + `e9m`.
 
@@ -51,7 +51,7 @@ The 6-agent `/review-pr` + blind triage + blind verify caught REAL defects the o
 - the SE planted the operator's **real email + name** in test fixtures (removed → synthetic);
 - the egress fail-direction tests were **vacuous on offline hosts** and **Darwin-only** (→ network-presence preconditions + a Linux fail test + a load-bearing AC-4 deny control — the failing-capable floor is now genuine);
 - `os.fork()` failure wasn't fail-closed; `PermissionError` aborted the whole scan; the structural scan missed multi-line JSON.
-15 legitimate fixed + blind-verified RESOLVED; 5 beaded (`8s6`/`1ww`/`qwj`/`ivt`/`z2u`); 0 suppressed (PF-S26-01).
+13 of 15 legitimate fixed + blind-verified RESOLVED (2 legitimate beaded); 5 beaded total (`8s6`/`1ww`/`qwj`/`ivt`/`z2u`); 0 suppressed (PF-S26-01).
 
 ## Shareability (V1 will be shared)
 Walter flagged the hardcoded operator name as a sharing blocker. Externalized the
