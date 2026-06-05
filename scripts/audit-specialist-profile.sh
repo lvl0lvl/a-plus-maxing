@@ -49,6 +49,19 @@ TAXONOMY="$REPO_ROOT/templates/refusal-class-taxonomy.yaml"
 RISK_TABLE="$REPO_ROOT/templates/specialist-risk-class.yaml"
 PF_LOG="$REPO_ROOT/memory/process-failures.md"
 DENYLIST=""
+
+# Operator-bound content markers for R13-6.7 (check_operator_no_writeback).
+# Identity tokens load from the gitignored per-instance config so this tracked
+# script carries no operator name; the health-timeline date markers are the
+# audit's generic detection vocabulary.
+OPERATOR_ID_CONFIG="$REPO_ROOT/vault/meta/operator-identity.txt"
+OPERATOR_MARKERS='2026-01|January 2026'
+if [[ -f "$OPERATOR_ID_CONFIG" ]]; then
+    while IFS= read -r _id_line; do
+        [[ -z "$_id_line" || "$_id_line" == \#* ]] && continue
+        OPERATOR_MARKERS="$OPERATOR_MARKERS|$_id_line"
+    done < "$OPERATOR_ID_CONFIG"
+fi
 COMPARE_TO=""
 SCHEMA=""
 ONLY_CHECK=""
@@ -219,7 +232,7 @@ check_refusal_classes() { # row 5 — BLOCK (taxonomy-gated)
 check_authority_framing() { # row 5.1 — BLOCK
     local hits
     hits="$(grep -c 'AUTHORITY_FRAMING_BYPASS' "$BODY" || true)"
-    [[ "$hits" -lt 1 ]] && violation "R13-5.1" "AUTHORITY_FRAMING_BYPASS not present (mandatory; Walter is A3)"
+    [[ "$hits" -lt 1 ]] && violation "R13-5.1" "AUTHORITY_FRAMING_BYPASS not present (mandatory; the operator is A3)"
     info "authority-framing: $hits mention(s)"
 }
 
@@ -275,9 +288,9 @@ check_schema_drift() { # row 6.6 — WARN (schema-gated)
 
 check_operator_no_writeback() { # row 6.7 — BLOCK
     local leak ref
-    leak="$(grep -cE '(Walter|2026-01|January 2026)' "$BODY" || true)"
+    leak="$(grep -cE "($OPERATOR_MARKERS)" "$BODY" || true)"
     ref="$(grep -cE 'operator.profile' "$BODY" || true)"
-    [[ "$leak" -gt 0 ]] && violation "R13-6.7" "$leak operator-bound content leak(s) (Walter|2026-01|January 2026) — reference by path, not content"
+    [[ "$leak" -gt 0 ]] && violation "R13-6.7" "$leak operator-bound content leak(s) — reference operator-profile by path, not content"
     [[ "$ref" -lt 1 ]] && warn "R13-6.7" "no operator-profile path reference found"
     info "operator-no-writeback: leaks=$leak path-refs=$ref"
 }
