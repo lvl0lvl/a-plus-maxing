@@ -46,6 +46,12 @@ def test_dedupe_key_excludes_value():
     assert keying.dedupe_key(a) == keying.dedupe_key(b)
 
 
+def test_dedupe_fields_is_value_excluded_subset():
+    """DEDUPE_FIELDS is a LINE_FIELDS subset with value excluded (now structural)."""
+    assert set(keying.DEDUPE_FIELDS).issubset(set(keying.LINE_FIELDS))
+    assert "value" not in keying.DEDUPE_FIELDS
+
+
 def test_complete_reading_is_conformant():
     """A reading with every required field reports conformant."""
     assert keying.is_conformant(_reading()) is True

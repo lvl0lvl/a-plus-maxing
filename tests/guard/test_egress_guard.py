@@ -35,6 +35,18 @@ def _local_only(tmp_path):
     return op
 
 
+def _require_network():
+    """Skip unless a direct unguarded connect succeeds — so a falsy run result.
+
+    Attributes the egress-deny fail direction to the sandbox, not to an offline
+    host.
+    """
+    try:
+        socket.create_connection(("1.1.1.1", 53), timeout=3).close()
+    except OSError:
+        pytest.skip("no network — egress deny not exercisable")
+
+
 @DARWIN_ONLY
 def test_run_passes_on_local_only(tmp_path):
     """AC-1 pass: run is truthy when the callable only reads a temp file."""
@@ -44,6 +56,7 @@ def test_run_passes_on_local_only(tmp_path):
 @DARWIN_ONLY
 def test_run_fails_on_in_process_egress():
     """AC-1 in-process fail: an outbound socket connect surfaces as falsy."""
+    _require_network()
 
     def egress():
         socket.create_connection(("1.1.1.1", 53), timeout=3)
@@ -58,6 +71,7 @@ def test_run_fails_on_subprocess_egress():
     The child inherits the parent's network deny, so check=True raises and run
     is falsy — proving the sandbox covers spawned children, not just the parent.
     """
+    _require_network()
 
     def child_egress():
         subprocess.run(
@@ -96,6 +110,7 @@ def test_run_observes_egress_anywhere_in_multistep_closure(tmp_path):
     operations in sequence where the second egresses. run must be falsy because
     observation spans the entire callable invocation, not a single call.
     """
+    _require_network()
     target = tmp_path / "scratch.txt"
 
     def two_steps():
@@ -129,3 +144,21 @@ def test_run_linux_binding_smoke(tmp_path):
     has coverage without failing the suite on macOS.
     """
     assert run(_local_only(tmp_path))
+
+
+@pytest.mark.skipif(
+    platform.system() != "Linux",
+    reason="Linux offline-namespace egress-deny only executes on Linux",
+)
+def test_run_fails_on_in_process_egress_linux():
+    """Linux fail-direction floor: an outbound connect under unshare is falsy.
+
+    Mirrors the Darwin in-process fail so the Linux unshare binding has
+    fail-direction coverage on a Linux clone. Skips on Darwin (this host).
+    """
+    _require_network()
+
+    def egress():
+        socket.create_connection(("1.1.1.1", 53), timeout=3)
+
+    assert not run(egress)
