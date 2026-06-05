@@ -1,0 +1,11 @@
+# Operator-identity tokens for the tracked-file PII scanner.
+#
+# Copy this file to `operator-identity.txt` (same directory) and fill in your
+# own identity tokens. `operator-identity.txt` is GITIGNORED so your real name
+# never lands in tracked source — the trunk stays shareable.
+#
+# Format: one regex token per line. Blank lines and `#`-comment lines are
+# ignored. Each line is compiled as a Python regex (re.DOTALL).
+#
+# Example (replace with your own name):
+# YourFirstName|YourLastName
