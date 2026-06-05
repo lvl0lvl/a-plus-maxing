@@ -22,11 +22,23 @@ def _item_path(item, root):
 
 
 def _read_lines(path):
-    """Parse an item file into a list of well-formed reading dicts (empty if absent).
+    """Parse an item file into its well-formed, conformant reading dicts.
 
-    A malformed (torn/partial) line is skipped, not raised on: each skip emits one
-    `STORE-SKIP: <path>:<1-based-line-number>` warning to stderr so a downstream
-    consumer can detect dropped lines. The rest of the file still parses.
+    Returns an empty list if the file is absent. A line is kept only if it is
+    valid JSON, a `dict`, and carries every Line Field Set field
+    (`keying.is_conformant`). Every other line — torn/partial JSON, a non-dict
+    JSON value, or a dict missing a required field — is skipped, not raised on,
+    and emits one `STORE-SKIP: <path>:<1-based-line-number>` warning to stderr.
+    That channel is the store's corruption-detection signal (it parallels
+    `pii_scan`'s `PII-HIT:` channel) and a consumer may depend on its format.
+    Filtering here means both `read` (sort by timepoint) and `append` (dedupe)
+    only ever see conformant dict readings.
+
+    Args:
+        path (Path): The item's `.ndjson` file.
+
+    Returns:
+        (list) The file's well-formed, conformant reading dicts, in file order.
     """
     if not path.exists():
         return []
@@ -35,14 +47,27 @@ def _read_lines(path):
         if not line.strip():
             continue
         try:
-            readings.append(json.loads(line))
+            obj = json.loads(line)
         except json.JSONDecodeError:
             print(f"STORE-SKIP: {path}:{lineno}", file=sys.stderr)
+            continue
+        if not isinstance(obj, dict) or not keying.is_conformant(obj):
+            print(f"STORE-SKIP: {path}:{lineno}", file=sys.stderr)
+            continue
+        readings.append(obj)
     return readings
 
 
 def append(item, reading, root=DEFAULT_ROOT):
-    """Append one NDJSON line for a reading to its item file, idempotently.
+    """Append one reading to its item file by rewriting the file atomically.
+
+    Rewrites the item file as its well-formed prior lines plus the new line
+    (write temp sibling -> fsync -> `os.replace`). Idempotent on the dedupe
+    identity: re-appending a reading with the same `(item, timepoint, source)`
+    is a no-op. Self-heals: pre-existing malformed or non-conformant lines are
+    dropped on write (`_read_lines` filters them). Prior lines' logical content
+    is preserved, but their exact on-disk byte form is not guaranteed stable
+    across appends (they are re-serialized).
 
     Args:
         item (str): The item identifier (names the item's `.ndjson` file).
@@ -65,33 +90,49 @@ def append(item, reading, root=DEFAULT_ROOT):
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [json.dumps(r) + "\n" for r in (*well_formed, reading)]
 
-    # Write the full file to a temp sibling, then os.replace — atomic on POSIX, so
-    # a crash leaves either the complete old file or the complete new one, never a
-    # torn line. This also self-heals: malformed lines were dropped by _read_lines.
+    # Write the full file to a temp sibling, then os.replace. os.replace is atomic
+    # on POSIX, so a reader never sees a torn line — it sees either the complete old
+    # file or the complete new one. fsync before the replace makes the new bytes
+    # durable on disk first, so a crash after the rename cannot expose empty/short
+    # content. Self-heals: malformed lines were already dropped by _read_lines.
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.", suffix=".tmp")
     try:
-        with os.fdopen(fd, "w") as fh:
+        # os.fdopen takes ownership of fd; close fd directly only if it raises first.
+        try:
+            fh = os.fdopen(fd, "w")
+        except BaseException:
+            os.close(fd)
+            raise
+        with fh:
             fh.write("".join(lines))
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp, path)
     except BaseException:
+        # Broader than Exception on purpose: an interrupt (e.g. KeyboardInterrupt)
+        # mid-write must still unlink the orphan temp so no stray sibling is left.
         if os.path.exists(tmp):
             os.unlink(tmp)
         raise
 
 
 def read(item, root=DEFAULT_ROOT):
-    """Return the item's readings ordered ascending by timepoint.
+    """Return the item's well-formed, conformant readings ordered by timepoint.
 
-    The ordering is lexicographic on the `timepoint` string and assumes the
-    spike's UTC-offset producer obligation; a non-UTC-offset timepoint would
-    sort wrong.
+    Returns only lines that are valid JSON, a `dict`, and carry every Line Field
+    Set field. Malformed or non-conformant lines are skipped (not raised on) and
+    each emits one `STORE-SKIP: <path>:<1-based-line-number>` line on stderr, so
+    the returned list may be a proper subset of the readings ever appended if the
+    file was corrupted. The ordering is lexicographic on the `timepoint` string
+    and assumes the spike's UTC-offset producer obligation; a non-UTC-offset
+    timepoint would sort wrong.
 
     Args:
         item (str): The item identifier.
         root (str | Path, optional): Store root. Defaults to `vault/store/`.
 
     Returns:
-        (list) The item's readings, sorted by their `timepoint` field.
+        (list) The item's well-formed readings, sorted by their `timepoint` field.
     """
     readings = _read_lines(_item_path(item, root))
     return sorted(readings, key=lambda r: r["timepoint"])
