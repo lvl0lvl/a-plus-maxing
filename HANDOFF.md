@@ -3,7 +3,7 @@ title: Session Handoff
 type: note
 owner: Walter McGivney
 created: 2026-05-16
-last_reviewed: 2026-06-05
+last_reviewed: 2026-06-06
 status: active
 depends_on: []
 superseded_by: null
@@ -32,53 +32,27 @@ NOT doing: building any V1 task / running `/execute-plan` (Phase C); hand-scrubb
 
 Invariants at risk: INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS, INV-ROLE-INLINING. Governing principle for qwj: ADR-0005 PII-free trunk — the gitignored-config approach must keep the trunk operator-name-free.
 
-## Scope Contract — Session 36 (2026-06-06)
+### S37 Scope Contract Evaluation (2026-06-06, volatile)
 
-> Confirmed by Walter ("scope phase A and then proceed" — after Walter caught at S36 open that the V1 execute stage was hand-rolled per-task instead of run through the sanctioned `/execute-plan`, and that the build-plan wave order was abandoned from S32; PF-S36-01 logged). **Unit = Phase A of the execute-plan re-entry: governance + bookkeeping only, NO new code.** Get the V1 build back onto the `/execute-plan` rails by documenting it as the execute-stage path, adding the wave + checkpoint convention to v1-build scope contracts, reconciling the wave-naming drift, and banking the S36 damage-assessment (all runnable build-plan checkpoints green) as the verified baseline. Phase B (unblock `5wo`/`qwj`) + Phase C (run `/execute-plan` in wave mode) are explicitly NOT this session.
+- **AC1 (`5wo`) — PASS.** Architect (full profile inlined) arbitrated the `render.emit` T1->T2 path-return conflict; the (a)/(b) fork was surfaced to Walter, who chose **(b) caller-orchestrated pagination**. `emit(template, store_read) -> Path` preserved verbatim (zero built-code change); the >=2-path list is owned by the caller-side render path above `emit`. Recorded in `vault/decisions/2026-06-06-render-emit-pagination-caller-orchestrated.md` + 2 `[AMENDED]` reconciliations in `docs/task-plan/ADR-0004-T2.md`. `5wo` CLOSED.
+- **AC2 (`qwj`) — PASS (with CHANGED note).** The scanner was ALREADY operator-agnostic (verified before acting, PF-S6-01 — a prior W2 commit externalized the identity tokens to the gitignored `vault/meta/operator-identity.txt`), so that half of AC2 was pre-done. The policy fork was surfaced; Walter chose **(iii)** — ADR-0005 clarified (PII-free = operator-health-DATA-free, not name-in-prose) + the `xlu`/ADR-0005-T1 hook recipe scoped the identity check to data-bearing paths. `qwj` CLOSED; `ko5` CLOSED (same clarification ratifies the vault-as-tracked-trunk policy).
+- **AC3 — PASS.** Suite 120 passed / 2 skipped throughout (docs-only; no production code touched).
+- **AC4 — PASS (this close).** Docs-subset `/review-pr` on PR #60 -> 9 findings (4 LEGITIMATE fixed + blind-verified, 1 DEFERRED + 1 out-of-scope beaded, 2 NOT_A_BUG, 2 NOT_ACTIONABLE), 0 suppressed -> rebase-merged (PR #60, as of 2026-06-06 S37 close); close on `fix/s37-close` AFTER the merge (PF-S25-01).
+- **CHANGED:** (a) AC2's scanner-genericization half was already complete from a prior W2 commit — the bead premise ("hard-codes operator name") was stale; flagged at the time (not silent), reducing the session's qwj work to the policy decision + recording. (b) `5wo`'s blast radius narrowed from the contract's candidate set (T1/T3/ADR-0006-T2/ADR-0007-T2) to just the T2 recipe — option (b) touches zero built code, the GOOD outcome.
 
-Goal: Adopt `/execute-plan` as the documented, sole sanctioned V1 execute-stage path and stop the out-of-order-build drift — via CLAUDE.md governance, the v1-build wave-attestation convention, wave-naming reconciliation, and a recorded verified baseline — with no production code built.
+### Drift checks (S37 close)
 
-Acceptance criteria:
-- [ ] AC1 — PF-S36-01 logged in `memory/process-failures.md` (the execute-stage skill-substitution failure + the clean damage assessment). [DONE — commit `21d7241`]
-- [ ] AC2 — CLAUDE.md gains a "V1 Build Execution" section naming `/execute-plan` as the ONLY sanctioned path to build `docs/task-plan/` recipes, with the project path-mapping (recipes=`docs/task-plan/`, build plan=`docs/build-plan/build-plan-v1-full.md`, roles=`skills_library/roles/`), the wave-order + per-wave-checkpoint-gate rule, and read-in-full-before-invoke (PF-S17-01).
-- [ ] AC3 — CLAUDE.md Session-Start step 7 gains the v1-build convention: a v1-build scope contract cites its build-plan wave AND attests the prior wave's checkpoint Go/No-Go passed (documented convention; mechanical enforcement BEADED, not an INV-SCOPE-CONTRACT change this session).
-- [ ] AC4 — Wave-naming reconciled: HANDOFF volatile sections + `vault/sessions/session-36.md` use the build-plan topological wave numbers (W1..W7) with per-wave done/open state stated; bead `orl` closed.
-- [ ] AC5 — Damage-assessment baseline recorded: `vault/meta/overview.md` phase-state updated to the current build wave-state (9/18 leaves; W1-2 complete, W3-4 partial, W5-7 open; all runnable build-plan checkpoints green as of S36) + `vault/sessions/session-36.md` captures the checkpoint-gate evidence.
-- [ ] AC6 — The mechanical enforcement of the v1-build wave-attestation field (extend `scope-contract-audit.sh` + the INVARIANTS change-discipline ritual) is filed as a bead (deferred — needs Walter approval).
-- [ ] AC7 — Lifecycle + close: docs-subset `/review-pr` (Code Quality + Contracts + Historical) on the Phase-A PR → fix every legitimate finding (priority-only, never suppress — PF-S26-01) → `/merge`; then the session close (suite/governance-suites green, 4 close audits + branch-completeness green at `--session 36`, PF attestation, VOLATILE 6-clause rotation) sequenced AFTER the merge (PF-S25-01).
-
-Files I WILL touch: `memory/process-failures.md` (PF — done); `CLAUDE.md` (V1 Build Execution section + step-7 v1-build convention); `HANDOFF.md` (S36 contract + close rotation + wave-naming reconciliation + baseline pointer); `vault/meta/overview.md` (phase-state baseline — matrix owner of milestone status); `vault/sessions/session-36.md` (NEW); `vault/meta/log.md` (append S36); `.beads/issues.jsonl` via `bd` (close `orl`; file the scope-contract-audit mechanization bead).
-
-Files I will NOT touch: `scripts/**` production code + `tests/**` (NO building this session); `docs/task-plan/*`, `docs/spec/*`, `docs/adr/*`, `docs/build-plan/*` (read-only upstream — the build plan is the canonical wave source); `INVARIANTS.md` + `scripts/scope-contract-audit.sh` (no unilateral invariant/mechanical change — AC6 BEADS it); `.claude/agents/*` + the deployed roster; `lib/gate_attest.py`, `schemas/*`, bda, the wiki-ingest gate; `vault/{compounds,biomarkers,library}/` content; the real operator-PII values; `main` directly.
-
-NOT doing: building any `v1-build` task (`br1`/`xlu`/`ml1`/`ftm`/`yo6`/`oaf`/`8cv`/`1aa`/`1ih` — Phase C); resolving `5wo` or `qwj` (Phase B); invoking `/execute-plan` against a real recipe (Phase C); mechanizing the wave-attestation field / editing `scope-contract-audit.sh` / changing `INV-SCOPE-CONTRACT` (AC6 beads it); editing the build plan / specs / ADRs / recipes; library-population.
-
-Invariants at risk: INV-SCOPE-CONTRACT (Phase A documents a CONVENTION adjacent to it; does NOT change the six audited fields), INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS, INV-ROLE-INLINING.
-
-### S36 Scope Contract Evaluation (2026-06-06, volatile)
-
-- **AC1 — PASS.** PF-S36-01 logged (`memory/process-failures.md`, commit `30749e4`).
-- **AC2 — PASS.** CLAUDE.md "V1 Build Execution" section names `/execute-plan` the sole sanctioned execute path + project path-mapping + wave-order + checkpoint-gate rule + read-in-full.
-- **AC3 — PASS.** CLAUDE.md step-7 carries the `v1-build` wave+checkpoint convention (documented; mechanization beaded `vvs`, NOT an INV-SCOPE-CONTRACT change — the six audited fields are untouched, audit green at `--session 36`).
-- **AC4 — PASS.** Wave-naming reconciled to build-plan topological waves (CLAUDE.md + overview.md + this HANDOFF rotation use W1-W7); `orl` CLOSED.
-- **AC5 — PASS.** `vault/meta/overview.md` carries the S36 build wave-state baseline (9/18; W1-2 complete, W3-4 partial, W5-7 open; runnable checkpoints green); `session-36.md` records the checkpoint evidence.
-- **AC6 — PASS.** `vvs` filed (P2) — mechanize the wave-attestation field in `scope-contract-audit.sh` (needs INV change-discipline + Walter approval).
-- **AC7 — PASS (this close).** Docs-subset `/review-pr` (Code Quality + Contracts + Historical) on PR #57 → 9 findings (8 LEGITIMATE fixed, 1 NOT_A_BUG), 0 suppressed → rebase-merged at `6da2d4c` (as of 2026-06-06 S36 close); close on `fix/s36-close` AFTER the merge (PF-S25-01).
-- **CHANGED:** none silent. The 8 review fixes (QUAL-001..004, API-001, HIST-001..003) STRENGTHENED the docs — removed a volatile-phase-state accrual from the static CLAUDE.md, a misleading roles-path note, a resurrected retired class label, and a narrative-vs-tracker `orl` drift. NO production code touched (Phase B/C deferred).
-
-### Drift checks (S36 close)
-
-- **Task drift:** the contracted unit (Phase A governance — adopt `/execute-plan`, bank the verified baseline, reconcile wave-naming; NO code) delivered exactly. The damage assessment (read-only, surfaced by Walter's question) confirmed the built outputs sound. No expansion into building tasks / Phase B / Phase C; the review fixes were in-scope doc corrections.
-- **Architecture drift:** toward LESS violation — the execute stage now has a documented sanctioned path + wave-checkpoint discipline (closing the PF-S36-01 root); the ownership-matrix violation (phase-state in the static CLAUDE.md) introduced mid-session was caught by the review + removed; INV-SCOPE-CONTRACT unchanged (convention documented, mechanization beaded); INV-BRANCH-NOT-MAIN held; INV-TRUNK-COMPLETENESS green; INV-ROLE-INLINING held (the 3 reviewers dispatched by registered type).
-- **Vision drift:** none. What the system IS after S36: "a local-first health tracking + planning system whose V1 build (9/18, data spine built) is now back on the sanctioned `/execute-plan` wave-gated rails, with the prior out-of-order builds verified undamaged." Matches `design/vision.md`.
+- **Task drift:** the contracted unit (Phase B — resolve `5wo`+`qwj` via design/remediation, surface both forks to Walter, no code) delivered exactly. The qwj scanner-already-done finding REDUCED scope, did not expand it. The review fixes were in-scope doc corrections. No V1 task built, no `/execute-plan` invocation (Phase C deferred).
+- **Architecture drift:** toward LESS violation. The two W3/W4 interface conflicts are resolved cleanly: the `emit -> Path` contract PRESERVED (5wo option b, change-control honored); the ADR-0005 PII boundary clarified + the `xlu` recipe corrected so it builds the scoped (not block-everything) check. INV-BRANCH-NOT-MAIN held; INV-TRUNK-COMPLETENESS green; INV-ROLE-INLINING held (2 Architect dispatches full-profile-inlined + 3 reviewers by registered type + independent blind triage/verify). INV-SCOPE-CONTRACT / INV-HO-ROTATION / INV-PF-ATTESTATION satisfied this close. Amending ADR-0005 (docs/adr) was the recording mechanism for the Walter-chosen option (iii) — a scope refinement, flagged not silent.
+- **Vision drift:** none. What the system IS after S37: "a local-first health tracking + planning system whose V1 build (9/18) has its two W3/W4 design blockers resolved and is ready for Phase C — the `/execute-plan` wave-mode build of W3 onward." Matches `design/vision.md`.
 
 ### PF attestation
 
-S36 close (2026-06-06): **One new PF promoted this session — PF-S36-01 (`AP-STAGE-SKILL-SUBSTITUTION`)**, at Walter's challenge: the entire V1 execute stage was hand-rolled per-task instead of run through the sanctioned `/execute-plan` skill, and from S32 the build-plan wave order was abandoned. Logged with the full damage assessment — the built OUTPUTS are SOUND (verified via the build plan's own checkpoint gates: full suite 120/2, 0 dangling refs, runnable Wave 2→3 + 3→4/4→5 gates green); the gap is process-only, the residual being the checkpoint gates that cover skipped tasks (the Wave 3→4 PII-commit boundary, needs `xlu`) + the never-run Tier-2 wave review. Mitigation: adopted `/execute-plan` in CLAUDE.md (Structural-1), added the `v1-build` wave-attestation convention (Structural-2, mechanization beaded `vvs`), reconciled wave-naming (`orl` closed, Structural-3). Observed + held: (a) **PF-S26-01** — the docs-subset review's 9 findings: 8 LEGITIMATE all fixed, 1 NOT_A_BUG (the agent's own verdict), 0 suppressed; the matrix stayed priority-only. (b) **PF-S25-01 TRIPPED-CLEAN** — the close sequenced AFTER the PR #57 merge on `fix/s36-close`; the review even caught a nascent instance (HIST-002: an "`orl` closed" claim ahead of the tracker) and it was fixed before merge. (c) **PF-S17-01** — `/review-pr` + `/merge` read in full; no `Workflow` substitution. (d) **PF-S13-01** — full session-open protocol run with real output + `branch-completeness-audit.sh` at open. (e) GraphQL throttled all session → REST for PR create + merge (full-40-char-SHA guard); the readiness check confirmed the PR head matched the pushed fix before merge.
+S37 close (2026-06-06): **No new PF-class entries this session.** Observed + held: (a) **PF-S6-01** (verify-before-acting) held strongly — the `qwj` bead's "scanner hard-codes operator name" premise was verified stale BEFORE acting, redirecting the work to the real remaining policy decision. (b) **PF-S26-01** (never-suppress) held — the review's 9 findings were all triaged + dispositioned (4 fixed, 2 beaded, 3 no-action-with-cited-evidence); 0 suppressed by severity. (c) **PF-S25-01** (close-after-merge) held — this close runs on `fix/s37-close` AFTER PR #60 merged. (d) **PF-S17-01** (read-before-invoke) held — `/review-pr` + `/merge` run as gated skills, merge-methodology read; no `Workflow` substitution. (e) **PF-S3-01** (no self-attest) held — 2 Architect dispatches (full-profile) + an independent blind-triage agent + an independent blind-verification agent produced the verdicts. (f) **PF-S36-01** N/A-but-respected — Phase B built no task and did not invoke `/execute-plan` (design/remediation only); its falsification window (next `v1-build` session) is S38. (g) Observed-not-promoted: the review caught a real defect the orchestrator introduced (T2 — copied the Architect's "empty/absent `identity_config`" phrasing, which is wrong: only a non-existent path returns `[]`; an empty string raises and fail-closes to always-DENY) — caught + fixed + blind-verified before merge by the layered review; recurrence_count=1 for "faithfully-copied-agent-text carried a latent defect," watch not promote.
 
 ## Historical Scope Contracts (archived)
 
-Scope contracts for Sessions 5-35 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; S34 archived S33; S35 archived S34; S36 archived S35) to keep this handoff lean. The current (S36) scope contract is above; the archive holds the prior-session archaeology.
+Scope contracts for Sessions 5-36 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; S34 archived S33; S35 archived S34; S36 archived S35; S37 archived S36) to keep this handoff lean. The current (S37) scope contract is above; the archive holds the prior-session archaeology.
 
 ## Session 4 close — 2026-05-25
 
@@ -280,65 +254,57 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **`/execute-plan` is the sanctioned execute path (PF-S36-01) — NEW + STANDING.** Build V1 tasks via `/execute-plan` in WAVE mode against `docs/build-plan/build-plan-v1-full.md`; complete build-plan waves IN ORDER and gate on the per-wave checkpoint Go/No-Go — never hand-roll a per-task SE-dispatch substitute. A `v1-build` scope contract cites its wave + attests the prior wave's checkpoint passed (CLAUDE.md "V1 Build Execution" + step 7). The hand-rolled per-task build (S30-S35) left Waves 3-4 partial; re-entry completes them in order. Read `/execute-plan`'s SKILL.md + references IN FULL before the first wave run.
-2. **read-before-invoke (PF-S13-01 + PF-S17-01) — STANDING.** Read each skill/recipe/protocol IN FULL before invoking — `/execute-plan`, `/review-pr`, `/merge`, the task recipe. No `Workflow`/hand-rolled substitution for a gated skill (the PF-S36-01 family root). `.venv/bin/python -m pytest`, never from memory.
-3. **PF-S3-01 layered-review is load-bearing on single-builder tasks (3rd consecutive: `n9h`/`gu4`/`3gp`).** For any single-SE build (Phase C), the full `/review-pr` + blind triage + blind verify is non-optional; when self-verifying a falsifiability gate, test EVERY failure mode including the cross-process one.
+1. **`/execute-plan` WAVE mode is the next action (PF-S36-01) — STANDING.** S38 is Phase C: build V1 tasks via `/execute-plan` in WAVE mode against `docs/build-plan/build-plan-v1-full.md` — complete build-plan waves IN ORDER, gate on the per-wave checkpoint Go/No-Go, never hand-roll a per-task SE-dispatch substitute. The `v1-build` scope contract cites its wave + attests the prior wave's checkpoint passed (CLAUDE.md "V1 Build Execution" + step 7). **Read `/execute-plan`'s SKILL.md + references IN FULL before the first wave run.** W3 (`br1`+`xlu`) is the next wave; its blockers (`5wo`/`qwj`) are now cleared.
+2. **read-before-invoke (PF-S13-01 + PF-S17-01) — STANDING.** Read each skill/recipe/protocol IN FULL before invoking — `/execute-plan`, `/review-pr`, `/merge`, the task recipe. No `Workflow`/hand-rolled substitution for a gated skill. `.venv/bin/python -m pytest`, never from memory.
+3. **PF-S3-01 layered-review is load-bearing on single-builder tasks.** For any single-SE build (Phase C `br1`/`xlu`), the full `/review-pr` + blind triage + blind verify is non-optional; when self-verifying a falsifiability gate, test EVERY failure mode including the cross-process one.
 
-**Demoted from prior Top-3:** the S35 "generation entry point published / AC-3 child-process falsifiability" framing (that gate is merged + falsifiable across the process tree; the forward risk is now the execute-plan/wave discipline).
+**Demoted from prior Top-3:** the "Phase-B design forks (`5wo`/`qwj`)" framing — both resolved at S37 (`5wo` -> caller-orchestrated pagination; `qwj`/`ko5` -> ADR-0005 health-data-free clarification); the forward risk is now the W3 `/execute-plan` wave run.
 
 ## Current State (volatile)
 
-- **S36 (2026-06-06) put the V1 build back on the `/execute-plan` rails — governance only, no code.** Walter caught that the execute stage had been hand-rolled per-task (not via `/execute-plan`) and that the build-plan wave order was abandoned from S32. PF-S36-01 logged; the built outputs verified SOUND (the build plan's own checkpoint gates pass — full suite 120/2, 0 dangling refs, Wave 2→3 + 3→4/4→5 gates green). PR #57 (PF + CLAUDE.md `/execute-plan` adoption + step-7 wave convention + overview baseline + session-36) → docs-subset `/review-pr` (9 findings; 8 fixed, 1 NOT_A_BUG, 0 suppressed) → rebase-merged at `6da2d4c` (as of 2026-06-06 S36 close).
-- **`/execute-plan` is now the documented sole execute-stage path** (CLAUDE.md "V1 Build Execution" + the step-7 `v1-build` wave/checkpoint convention). Wave-naming reconciled to build-plan topological waves (`orl` CLOSED). `vvs` filed (P2 — mechanize the wave-attestation field).
-- **Build: 9/18 leaves.** W1-2 complete; W3 2/4 (`xlu` needs `qwj`, `br1` open); W4 2/5 (`yo6` blocked-on-`5wo`, `ml1`, `ftm` open); W5-7 open. Live per-wave state in `vault/meta/overview.md`.
+- **S37 (2026-06-06) cleared the two Phase-B blockers via design/remediation — no code built.** `5wo` -> option (b) caller-orchestrated pagination (`render.emit(template, store_read) -> Path` PRESERVED verbatim; the >=2-path list is owned by the caller-side render path above `emit`; zero built-code change). `qwj` + `ko5` -> option (iii): ADR-0005 clarified that "PII-free trunk" = operator-health-DATA-free, NOT operator-name-in-prose; the `xlu`/ADR-0005-T1 hook recipe scoped its identity check to data-bearing paths. Both forks were Architect-arbitrated + Walter-adjudicated.
+- **PR #60** (the 5wo + qwj/ko5 doc/recipe/ADR amendments + the 5wo `vault/decisions/` note) -> docs-subset `/review-pr` (9 findings: 4 LEGITIMATE fixed + blind-verified, 1 DEFERRED + 1 out-of-scope beaded, 2 NOT_A_BUG, 2 NOT_ACTIONABLE; 0 suppressed) -> rebase-merged (PR #60, as of 2026-06-06 S37 close).
+- **`qwj` scanner premise was stale:** `scripts/guard/pii_scan.py` was ALREADY operator-agnostic (tokens load from the gitignored `vault/meta/operator-identity.txt`) — verified before acting (PF-S6-01). No `pii_scan.py` change; the remaining qwj work was the policy decision.
+- **Build: 9/18 leaves (unchanged — Phase B built no task).** W3 (`br1`+`xlu`) now UNBLOCKED (`qwj` resolved); W4 `yo6` now UNBLOCKED (`5wo` resolved). Live per-wave state in `vault/meta/overview.md`.
 - **SINGLE TRUNK** unchanged (since S22). Suite **120 passed / 2 skipped** (Linux-only egress).
 - **Active landmarks:** no trigger windows opened. LM-04 still pending (the `generate.run` producer is live but unfed).
 
-**Historical (kept for reference):** `vault/sessions/session-36.md` + `vault/meta/log.md` S36 entry.
+**Historical (kept for reference):** `vault/sessions/session-37.md` + `vault/meta/log.md` S37 entry.
 
 ## What Is Next (volatile)
 
-### Resume checklist — next session (S37) open
+### Resume checklist — next session (S38) open
 
-**Clean slate — nothing dangling from S36.** No pending PR cycle, no un-run audit, no uncommitted state: `main` @ `a5fc5fb` (as of 2026-06-06 S36 close), tree clean, 0 open PRs, both S36 PRs (#57 content, #58 close) merged. The next session opens normally:
+**Clean slate — nothing dangling from S37.** No pending PR cycle, no un-run audit, no uncommitted state: `main` is at the S37-close merge (this close PR), tree clean, 0 open PRs, PR #60 (Phase-B content) merged (2026-06-06). The next session opens normally:
 
 1. Run the Session Start Protocol (steps 1-6) + `branch-completeness-audit.sh` at OPEN. Baseline suite = 120 passed / 2 skipped.
-2. Cut a `fix/`-branch off `main` for Phase B; write + confirm the S37 scope contract (Phase B unblocks the W3/W4 leaves; cite that context).
-3. **Phase B is DESIGN / REMEDIATION — NOT a `/execute-plan` wave yet** (execute-plan wave mode begins at Phase C):
-   - **`5wo`** — `bd show 5wo`; read `docs/adr/ADR-0004-on-demand-single-file-artifact-generation.md`, the T1 Interface Contract in `docs/spec/adr-0004-adr-0007-spec.md`, and `scripts/generate/render.py`. Dispatch Architect; the fork (amend `render.emit` to return ≥2 paths vs caller-orchestrated pagination) is an Interface-Contract decision — **surface the options to Walter for adjudication, don't pick silently.**
-   - **`qwj`** — `bd show qwj`; read `scripts/guard/pii_scan.py`. Make the scanner operator-agnostic (config/parameter-driven, not a hard-coded name) per the ADR-0005 clonable PII-free trunk. Resolve before `xlu` (now a wired dependency).
-4. **Phase C** (after B): `/execute-plan` in WAVE mode — read its SKILL.md + references IN FULL first (PF-S17-01) — complete W3 (`br1`+`xlu`) → W4 → W5 → W6 → W7, gating on each per-wave checkpoint + a wave PR.
+2. **S38 is Phase C — the FIRST `/execute-plan` WAVE (Wave 3).** Cut a `feature/`-branch off `main`. Write + confirm a **`v1-build` scope contract** that (per the S36 step-7 convention) cites the build-plan wave (**W3**) AND attests the prior wave's checkpoint passed (W2->W3 Go/No-Go: `tests/store`+`tests/guard` green, `git check-ignore vault/store/x.ndjson` exit 0, `pii_scan.scan([])` returns int).
+3. **Read `/execute-plan`'s SKILL.md + references IN FULL first** (PF-S17-01). Project path-mapping (CLAUDE.md "V1 Build Execution"): recipes=`docs/task-plan/<task>.md`, build plan=`docs/build-plan/build-plan-v1-full.md`, roles=`~/Documents/Projects/skills_library/roles/<role>/agent.md` (inlined in full). Run via `/execute-plan` in WAVE mode — never a hand-rolled per-task SE dispatch (PF-S36-01).
+4. **Complete Wave 3** — `br1` (ADR-0006-T0 router spike) + `xlu` (ADR-0005-T1 pre-commit hook, now unblocked: build the SCOPED identity check per the amended recipe — two `pii_scan.scan` calls, identity over data-bearing paths only, agnostic patterns trunk-wide; use a NON-EXISTENT `identity_config` for the agnostic call, never `""`). Then run the **Wave 3->4 checkpoint AS A GATE** (incl. the PII-commit boundary `tests/hooks/test_block_pii_commit.sh` + SEC-01(b), now runnable once `xlu` exists) -> wave PR -> `/review-pr` -> `/merge`.
+5. **Then Wave 4** (`yo6` now unblocked + `ml1` + `ftm`) -> **W5** (`oaf`+`8cv`) -> **W6** (`1aa`) -> **W7** (`1ih`). One wave ~= one session.
 
-### S36 banked the `/execute-plan` re-entry baseline. Next: Phase B (unblock `5wo`/`qwj`) → Phase C (`/execute-plan` wave mode, complete W3→W7 in order).
+**The first ARTIFACT (LM-04)** lands when `generate.run` is invoked with real operator data (Walter-pending exports) — the producer is live; only the data is missing.
 
-**RESUMPTION POINT.** S36 was Phase A (governance: adopt `/execute-plan`, bank the verified baseline, reconcile wave-naming — no code). **Open the next session on `main`** (Start Protocol + `branch-completeness-audit.sh` at open). The re-entry continues:
+**Published surfaces the next waves consume:** `generate.run(artifact_name) -> Path` · `render.emit(template, store_read) -> Path` + `component_set.py` (path-return SETTLED at S37 — a single `Path` per call; T2 pagination is a caller-side loop above `emit`, decision `vault/decisions/2026-06-06-render-emit-pagination-caller-orchestrated.md`) · the `Adapter` Protocol + 4 adapters (`oaf` assembles the wired set) · `ingest.run(adapter, export_file, root=…)` · `store.append`/`read` (cross-item `read_all`/`items` pending `4yk`) · `keying.py` (never redefine) · `egress_guard.run` · `pii_scan.scan(tracked_files, identity_config=…)` (operator-agnostic; `xlu` consumes it with the scoped two-call pattern). Enforcement-first holds: no plan-reasoning-over-PII task buildable until the router (`br1`/`ftm`, W3/W4).
 
-1. **Phase B — clear the wave-completion blockers (do first):**
-   - **`5wo` (P2)** — the `render.emit` single-`Path` vs `ADR-0004-T2` ≥2-path pagination Architect amendment (gates `yo6`/W4). An Interface-Contract/ADR decision; do NOT resolve silently inside T2.
-   - **`qwj` (P2)** — the PII scanner hard-codes the operator name + ≈924 `scan` hits across tracked vault prose (now a WIRED dependency of `xlu`/W3). Resolve before `xlu`.
-2. **Phase C — resume `/execute-plan` in WAVE mode** (read its SKILL.md + references in full first, PF-S17-01; project path-mapping in CLAUDE.md "V1 Build Execution"): complete **Wave 3** (`br1` spike + `xlu`) → run the Wave 3→4 checkpoint AS A GATE (incl. the PII-commit boundary `tests/hooks/test_block_pii_commit.sh` + SEC-01(b), runnable once `xlu` exists) → wave PR. Then **Wave 4** (`ml1` + `ftm` + `yo6`) → **Wave 5** (`oaf` + `8cv`) → **Wave 6** (`1aa`) → **Wave 7** (`1ih`). One wave ≈ one session.
-3. **The first ARTIFACT (LM-04)** lands when `generate.run` is invoked with real operator data (Walter-pending exports) — the producer is live; only the data is missing.
-
-**Published surfaces the next waves consume:** `generate.run(artifact_name) -> Path` (S35) · `render.emit(template, store_read) -> Path` + `component_set.py` (S34; path-return is the `5wo` open question for T2) · the `Adapter` Protocol + 4 adapters (`oaf` assembles the wired set) · `ingest.run(adapter, export_file, root=…)` · `store.append`/`read` (cross-item `read_all`/`items` pending `4yk`) · `keying.py` (never redefine) · `egress_guard.run` · `pii_scan.scan` (for `xlu` — resolve `qwj` first). Enforcement-first holds: no plan-reasoning-over-PII task buildable until the router (`br1`/`ftm`, W3/W4).
-
-**Operator-data preconditions** (Walter-pending): 23andMe raw → `vault/dna/raw/`, the Oura/Apple-Watch/Garmin exports, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) remain `status: scaffold`.
+**Operator-data preconditions** (Walter-pending): 23andMe raw -> `vault/dna/raw/`, the Oura/Apple-Watch/Garmin exports, meal-template content, January-2026 issue characterization. The three meta files (`operator-profile`/`current-state`/`goals`) remain `status: scaffold`.
 
 **Parallel track (unblocked + gated):** library-population via research-only `/aplus-research` sessions — PF-S22-01 window: ONE merge target + `branch-completeness-audit.sh` + `wiki-lint.sh` at each batch close. V1 is a thin-library MVP and does not block on it.
 
 ### Open beads carried
-- **V1 build execution (label `v1-build`):** **9 closed** (W1 `394`/`bez`/`qbb`; W2 `89a`/`e9m`; W3 `6be`/`gu4`; W4 `n9h`/`3gp`). OPEN: W3 `xlu`(needs `qwj`)/`br1`; W4 `yo6`(needs `5wo`)/`ml1`/`ftm`; W5 `oaf`/`8cv`; W6 `1aa`; W7 `1ih`. Plus `e3d` (recipe doc-consistency, non-blocking).
-- **PR review beads open:** `1ww`/`qwj`/`ivt`/`z2u` (PR #44), `1vi` (PR #47), `5wo` (PR #53), `4yk` P2 + `u8u` P3 (PR #55). S36: `vvs` P2 filed; `orl` CLOSED.
+- **V1 build execution (label `v1-build`):** **9 closed** (W1 `394`/`bez`/`qbb`; W2 `89a`/`e9m`; W3 `6be`/`gu4`; W4 `n9h`/`3gp`). OPEN: W3 `xlu`(now unblocked)/`br1`; W4 `yo6`(now unblocked)/`ml1`/`ftm`; W5 `oaf`/`8cv`; W6 `1aa`; W7 `1ih`. Plus `e3d` (recipe doc-consistency, non-blocking).
+- **PR review beads open:** `1ww`/`ivt`/`z2u` (PR #44), `1vi` (PR #47), `4yk` P2 + `u8u` P3 (PR #55). S37 filed: T5-PRD-align (P3), T9-changelog-v1.1 (P3). S36: `vvs` P2.
 - **V1 spec/build-plan gaps (S29):** `kz6`, `12p`, `434`, `bpu`, `dv3`, `4xe`.
 - **P2:** `dke`, `3v5`, `xg4`, `382`, `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
-- **P3:** `0oy`, `ko5`, `75t`, `ae0`/`d6g`/`4ba`/`3v6`/`dip`, `t7z`/`fsr`/`8qe`, `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, `mxo`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
-- **Closed:** S36: `orl`. S35: `3gp` (PR #55). S34: `gu4` (PR #53). S33: `n9h` (PR #50). S32: `8s6`/`6be`. S31: `89a`/`e9m`. S30: `394`/`bez`/`qbb`.
+- **P3:** `0oy`, `75t`, `ae0`/`d6g`/`4ba`/`3v6`/`dip`, `t7z`/`fsr`/`8qe`, `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, `mxo`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
+- **Closed:** S37: `5wo`, `qwj`, `ko5`. S36: `orl`. S35: `3gp` (PR #55). S34: `gu4` (PR #53). S33: `n9h` (PR #50). S32: `8s6`/`6be`. S31: `89a`/`e9m`. S30: `394`/`bez`/`qbb`.
 
 ### Open project work (unchanged)
-- Vault git-tracking decision deferred (`ko5`). First HTML artifact (LM-04) is recipe-pinned (`ADR-0004-T1`/`T2`/`T3`, `ADR-0007-T2`); lands when execute reaches W4/W7 + real operator data.
+- First HTML artifact (LM-04) is recipe-pinned (`ADR-0004-T1`/`T2`/`T3`, `ADR-0007-T2`); lands when execute reaches W4/W7 + real operator data. (`ko5` vault-git-tracking policy was ratified + closed at S37 via the ADR-0005 clarification.)
 
 ## Landmark window check (close step 8.7)
 
-All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura/wearable, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S36 (2026-06-06; governance-only session). LM-04 still pending: the `generate.run` producer is live but no artifact generates until it's fed real operator data (Walter-pending). LM-01's 14-day-before window still depends on the TBD July exact date (not within window as of 2026-06-06); LM-02/03 remain Walter-pending. No status flips due.
+All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura/wearable, LM-03 23andMe, LM-04 first HTML artifact) — no trigger windows opened during S37 (2026-06-06; design/remediation session). LM-04 still pending: the `generate.run` producer is live but no artifact generates until it's fed real operator data (Walter-pending). LM-01's 14-day-before window still depends on the TBD July exact date (not within window as of 2026-06-06); LM-02/03 remain Walter-pending. No status flips due.
 
 ## Open Issues
 
