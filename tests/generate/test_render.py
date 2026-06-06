@@ -850,6 +850,9 @@ def test_matrix_projection_over_cap_paginates(tmp_path):
     )
     for p in paths:
         assert p.stat().st_size < SIZE_BUDGET, f"paginated file {p} {p.stat().st_size} >= {SIZE_BUDGET}"
+        # PLACEMENT, not just size: every page is within the series cap (size alone
+        # can never red on a cap breach — the worst case is ~34KB).
+        assert len(_page_series_from_html(p.read_text())) <= render.MAX_SERIES_PER_VIEW
 
 
 def test_matrix_projection_over_cap_timepoints_paginates(tmp_path):
@@ -864,3 +867,125 @@ def test_matrix_projection_over_cap_timepoints_paginates(tmp_path):
     )
     for p in paths:
         assert p.stat().st_size < SIZE_BUDGET
+        # PLACEMENT, not just size: every rendered series on every page is within
+        # the timepoint cap (a 13-timepoint page would stay under budget but breach).
+        for item, n in _page_series_from_html(p.read_text()).items():
+            assert n <= render.MAX_TIMEPOINTS_PER_VIEW, (
+                f"{p.name} series {item} has {n} > cap {render.MAX_TIMEPOINTS_PER_VIEW}"
+            )
+
+
+def _page_series_from_html(html):
+    """Parse an emitted matrix/projection page into {item: matrix_timepoint_count}.
+
+    Each rendered series is one `kpi-row`: a KPI card carrying the item name, then a
+    MATRIX sparkline (first svg, exactly one polyline point per stored timepoint) and
+    a PROJECTION sparkline (one extra point). Counting the matrix sparkline's points
+    recovers the REAL per-series timepoint count actually rendered onto the page — so
+    a phantom empty-series row (0 points) or a dropped timepoint is detectable.
+
+    Splits rows on the `kpi-row` boundary (the marker opening each series block) so
+    nested `</div>` inside a row never mis-splits it.
+
+    Returns:
+        (dict) item name -> count of timepoints rendered in its matrix sparkline.
+    """
+    counts = {}
+    rows = html.split("<div class='kpi-row'>")[1:]  # drop the head/legend prefix
+    for row in rows:
+        label = re.search(r"<div class='label'>([^<]*)</div>", row)
+        first_points = re.search(r"points='([^']*)'", row)  # the matrix (first) sparkline
+        if not label:
+            continue
+        pts = first_points.group(1).strip() if first_points else ""
+        counts[label.group(1)] = len(pts.split()) if pts else 0
+    return counts
+
+
+def _ragged_store(specs):
+    """Build a store read with per-item timepoint counts from {item: n_timepoints}."""
+    rows = []
+    for item, n in specs.items():
+        for t in range(n):
+            rows.append({
+                "item": item,
+                "timepoint": f"2026-{(t % 12) + 1:02d}-01T00:00:00+00:00",
+                "source": "lab",
+                "value": 100 + t,
+            })
+    return rows
+
+
+def test_matrix_projection_ragged_series_no_phantom_rows(tmp_path):
+    """F4: ragged-length series spanning >1 timepoint-page emit NO phantom empty row.
+
+    A long series (spans 2 timepoint-pages) and a short series (fits page 1) must NOT
+    put the short series on the long series's overflow page as a 0-value '—' row.
+    Asserts no emitted page renders any series with 0 timepoints.
+    """
+    long_n = render.MAX_TIMEPOINTS_PER_VIEW + 5  # spans 2 timepoint-pages
+    short_n = 3                                  # fits page 1 only
+    sr = _ragged_store({"long_series": long_n, "short_series": short_n})
+
+    paths = render.emit_matrix_projection(sr, _out_dir=tmp_path)
+    assert len(paths) >= 2, "ragged dataset over the timepoint cap must paginate"
+
+    for p in paths:
+        counts = _page_series_from_html(p.read_text())
+        for item, n in counts.items():
+            assert n > 0, f"phantom empty row: {item} rendered with 0 timepoints on {p.name}"
+
+
+def test_matrix_projection_pages_within_cap_bounds(tmp_path):
+    """F11: EVERY emitted page is within the cap bounds (placement, not just count/size).
+
+    Parses each emitted page and asserts per-page series count <= MAX_SERIES_PER_VIEW
+    AND each rendered series's timepoint count <= MAX_TIMEPOINTS_PER_VIEW — so a cap
+    breach (e.g. a 13-timepoint page) turns the test red even though it stays well
+    under the 500000-byte budget.
+    """
+    # over BOTH bounds at once: more series than the series cap, more timepoints than
+    # the timepoint cap, so pages split on both axes.
+    sr = _matrix_store(render.MAX_SERIES_PER_VIEW + 4, render.MAX_TIMEPOINTS_PER_VIEW + 3)
+    paths = render.emit_matrix_projection(sr, _out_dir=tmp_path)
+
+    for p in paths:
+        counts = _page_series_from_html(p.read_text())
+        assert len(counts) <= render.MAX_SERIES_PER_VIEW, (
+            f"page {p.name} has {len(counts)} series > cap {render.MAX_SERIES_PER_VIEW}"
+        )
+        for item, n in counts.items():
+            assert n <= render.MAX_TIMEPOINTS_PER_VIEW, (
+                f"page {p.name} series {item} has {n} timepoints "
+                f"> cap {render.MAX_TIMEPOINTS_PER_VIEW}"
+            )
+
+
+def test_matrix_projection_pagination_preserves_all_data(tmp_path):
+    """F12: pagination preserves ALL series and ALL timepoints across the pages.
+
+    The union over every returned page must reconstruct the input's series set and
+    per-series timepoint counts (counting REAL rendered data points, so a dropped
+    last slice OR a phantom empty row both turn the test red). Uses ragged series so
+    a uniform-length shortcut cannot pass it.
+    """
+    spec = {
+        "alpha": render.MAX_TIMEPOINTS_PER_VIEW + 7,   # spans 2 timepoint-pages
+        "beta": render.MAX_TIMEPOINTS_PER_VIEW,        # exactly one page
+        "gamma": 4,                                    # short
+    }
+    sr = _ragged_store(spec)
+    paths = render.emit_matrix_projection(sr, _out_dir=tmp_path)
+
+    rendered = {}
+    for p in paths:
+        for item, n in _page_series_from_html(p.read_text()).items():
+            rendered[item] = rendered.get(item, 0) + n
+
+    assert set(rendered) == set(spec), (
+        f"series set not preserved: rendered {set(rendered)} != input {set(spec)}"
+    )
+    for item, n in spec.items():
+        assert rendered[item] == n, (
+            f"timepoints for {item} not preserved: rendered {rendered[item]} != input {n}"
+        )
