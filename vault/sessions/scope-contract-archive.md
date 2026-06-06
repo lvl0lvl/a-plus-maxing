@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-35)
+title: Scope Contract Archive (Sessions 5-36)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,53 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-35. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-36. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 36 (2026-06-06)
+
+> Confirmed by Walter ("scope phase A and then proceed" — after Walter caught at S36 open that the V1 execute stage was hand-rolled per-task instead of run through the sanctioned `/execute-plan`, and that the build-plan wave order was abandoned from S32; PF-S36-01 logged). **Unit = Phase A of the execute-plan re-entry: governance + bookkeeping only, NO new code.** Get the V1 build back onto the `/execute-plan` rails by documenting it as the execute-stage path, adding the wave + checkpoint convention to v1-build scope contracts, reconciling the wave-naming drift, and banking the S36 damage-assessment (all runnable build-plan checkpoints green) as the verified baseline. Phase B (unblock `5wo`/`qwj`) + Phase C (run `/execute-plan` in wave mode) are explicitly NOT this session.
+
+Goal: Adopt `/execute-plan` as the documented, sole sanctioned V1 execute-stage path and stop the out-of-order-build drift — via CLAUDE.md governance, the v1-build wave-attestation convention, wave-naming reconciliation, and a recorded verified baseline — with no production code built.
+
+Acceptance criteria:
+- [ ] AC1 — PF-S36-01 logged in `memory/process-failures.md` (the execute-stage skill-substitution failure + the clean damage assessment). [DONE — commit `21d7241`]
+- [ ] AC2 — CLAUDE.md gains a "V1 Build Execution" section naming `/execute-plan` as the ONLY sanctioned path to build `docs/task-plan/` recipes, with the project path-mapping (recipes=`docs/task-plan/`, build plan=`docs/build-plan/build-plan-v1-full.md`, roles=`skills_library/roles/`), the wave-order + per-wave-checkpoint-gate rule, and read-in-full-before-invoke (PF-S17-01).
+- [ ] AC3 — CLAUDE.md Session-Start step 7 gains the v1-build convention: a v1-build scope contract cites its build-plan wave AND attests the prior wave's checkpoint Go/No-Go passed (documented convention; mechanical enforcement BEADED, not an INV-SCOPE-CONTRACT change this session).
+- [ ] AC4 — Wave-naming reconciled: HANDOFF volatile sections + `vault/sessions/session-36.md` use the build-plan topological wave numbers (W1..W7) with per-wave done/open state stated; bead `orl` closed.
+- [ ] AC5 — Damage-assessment baseline recorded: `vault/meta/overview.md` phase-state updated to the current build wave-state (9/18 leaves; W1-2 complete, W3-4 partial, W5-7 open; all runnable build-plan checkpoints green as of S36) + `vault/sessions/session-36.md` captures the checkpoint-gate evidence.
+- [ ] AC6 — The mechanical enforcement of the v1-build wave-attestation field (extend `scope-contract-audit.sh` + the INVARIANTS change-discipline ritual) is filed as a bead (deferred — needs Walter approval).
+- [ ] AC7 — Lifecycle + close: docs-subset `/review-pr` (Code Quality + Contracts + Historical) on the Phase-A PR → fix every legitimate finding (priority-only, never suppress — PF-S26-01) → `/merge`; then the session close (suite/governance-suites green, 4 close audits + branch-completeness green at `--session 36`, PF attestation, VOLATILE 6-clause rotation) sequenced AFTER the merge (PF-S25-01).
+
+Files I WILL touch: `memory/process-failures.md` (PF — done); `CLAUDE.md` (V1 Build Execution section + step-7 v1-build convention); `HANDOFF.md` (S36 contract + close rotation + wave-naming reconciliation + baseline pointer); `vault/meta/overview.md` (phase-state baseline — matrix owner of milestone status); `vault/sessions/session-36.md` (NEW); `vault/meta/log.md` (append S36); `.beads/issues.jsonl` via `bd` (close `orl`; file the scope-contract-audit mechanization bead).
+
+Files I will NOT touch: `scripts/**` production code + `tests/**` (NO building this session); `docs/task-plan/*`, `docs/spec/*`, `docs/adr/*`, `docs/build-plan/*` (read-only upstream — the build plan is the canonical wave source); `INVARIANTS.md` + `scripts/scope-contract-audit.sh` (no unilateral invariant/mechanical change — AC6 BEADS it); `.claude/agents/*` + the deployed roster; `lib/gate_attest.py`, `schemas/*`, bda, the wiki-ingest gate; `vault/{compounds,biomarkers,library}/` content; the real operator-PII values; `main` directly.
+
+NOT doing: building any `v1-build` task (`br1`/`xlu`/`ml1`/`ftm`/`yo6`/`oaf`/`8cv`/`1aa`/`1ih` — Phase C); resolving `5wo` or `qwj` (Phase B); invoking `/execute-plan` against a real recipe (Phase C); mechanizing the wave-attestation field / editing `scope-contract-audit.sh` / changing `INV-SCOPE-CONTRACT` (AC6 beads it); editing the build plan / specs / ADRs / recipes; library-population.
+
+Invariants at risk: INV-SCOPE-CONTRACT (Phase A documents a CONVENTION adjacent to it; does NOT change the six audited fields), INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS, INV-ROLE-INLINING.
+
+### S36 Scope Contract Evaluation (2026-06-06, volatile)
+
+- **AC1 — PASS.** PF-S36-01 logged (`memory/process-failures.md`, commit `30749e4`).
+- **AC2 — PASS.** CLAUDE.md "V1 Build Execution" section names `/execute-plan` the sole sanctioned execute path + project path-mapping + wave-order + checkpoint-gate rule + read-in-full.
+- **AC3 — PASS.** CLAUDE.md step-7 carries the `v1-build` wave+checkpoint convention (documented; mechanization beaded `vvs`, NOT an INV-SCOPE-CONTRACT change — the six audited fields are untouched, audit green at `--session 36`).
+- **AC4 — PASS.** Wave-naming reconciled to build-plan topological waves (CLAUDE.md + overview.md + this HANDOFF rotation use W1-W7); `orl` CLOSED.
+- **AC5 — PASS.** `vault/meta/overview.md` carries the S36 build wave-state baseline (9/18; W1-2 complete, W3-4 partial, W5-7 open; runnable checkpoints green); `session-36.md` records the checkpoint evidence.
+- **AC6 — PASS.** `vvs` filed (P2) — mechanize the wave-attestation field in `scope-contract-audit.sh` (needs INV change-discipline + Walter approval).
+- **AC7 — PASS (this close).** Docs-subset `/review-pr` (Code Quality + Contracts + Historical) on PR #57 → 9 findings (8 LEGITIMATE fixed, 1 NOT_A_BUG), 0 suppressed → rebase-merged at `6da2d4c` (as of 2026-06-06 S36 close); close on `fix/s36-close` AFTER the merge (PF-S25-01).
+- **CHANGED:** none silent. The 8 review fixes (QUAL-001..004, API-001, HIST-001..003) STRENGTHENED the docs — removed a volatile-phase-state accrual from the static CLAUDE.md, a misleading roles-path note, a resurrected retired class label, and a narrative-vs-tracker `orl` drift. NO production code touched (Phase B/C deferred).
+
+### Drift checks (S36 close)
+
+- **Task drift:** the contracted unit (Phase A governance — adopt `/execute-plan`, bank the verified baseline, reconcile wave-naming; NO code) delivered exactly. The damage assessment (read-only, surfaced by Walter's question) confirmed the built outputs sound. No expansion into building tasks / Phase B / Phase C; the review fixes were in-scope doc corrections.
+- **Architecture drift:** toward LESS violation — the execute stage now has a documented sanctioned path + wave-checkpoint discipline (closing the PF-S36-01 root); the ownership-matrix violation (phase-state in the static CLAUDE.md) introduced mid-session was caught by the review + removed; INV-SCOPE-CONTRACT unchanged (convention documented, mechanization beaded); INV-BRANCH-NOT-MAIN held; INV-TRUNK-COMPLETENESS green; INV-ROLE-INLINING held (the 3 reviewers dispatched by registered type).
+- **Vision drift:** none. What the system IS after S36: "a local-first health tracking + planning system whose V1 build (9/18, data spine built) is now back on the sanctioned `/execute-plan` wave-gated rails, with the prior out-of-order builds verified undamaged." Matches `design/vision.md`.
+
+### PF attestation
+
+S36 close (2026-06-06): **One new PF promoted this session — PF-S36-01 (`AP-STAGE-SKILL-SUBSTITUTION`)**, at Walter's challenge: the entire V1 execute stage was hand-rolled per-task instead of run through the sanctioned `/execute-plan` skill, and from S32 the build-plan wave order was abandoned. Logged with the full damage assessment — the built OUTPUTS are SOUND (verified via the build plan's own checkpoint gates: full suite 120/2, 0 dangling refs, runnable Wave 2→3 + 3→4/4→5 gates green); the gap is process-only, the residual being the checkpoint gates that cover skipped tasks (the Wave 3→4 PII-commit boundary, needs `xlu`) + the never-run Tier-2 wave review. Mitigation: adopted `/execute-plan` in CLAUDE.md (Structural-1), added the `v1-build` wave-attestation convention (Structural-2, mechanization beaded `vvs`), reconciled wave-naming (`orl` closed, Structural-3). Observed + held: (a) **PF-S26-01** — the docs-subset review's 9 findings: 8 LEGITIMATE all fixed, 1 NOT_A_BUG (the agent's own verdict), 0 suppressed; the matrix stayed priority-only. (b) **PF-S25-01 TRIPPED-CLEAN** — the close sequenced AFTER the PR #57 merge on `fix/s36-close`; the review even caught a nascent instance (HIST-002: an "`orl` closed" claim ahead of the tracker) and it was fixed before merge. (c) **PF-S17-01** — `/review-pr` + `/merge` read in full; no `Workflow` substitution. (d) **PF-S13-01** — full session-open protocol run with real output + `branch-completeness-audit.sh` at open. (e) GraphQL throttled all session → REST for PR create + merge (full-40-char-SHA guard); the readiness check confirmed the PR head matched the pushed fix before merge.
 
 ## Scope Contract — Session 35 (2026-06-05)
 
