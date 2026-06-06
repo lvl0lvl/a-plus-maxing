@@ -308,9 +308,6 @@ All 4 active landmarks (LM-01 doctor visit July 2026, LM-02 Oura/wearable, LM-03
 
 ## Open Issues
 
-### Vault git-tracking policy — now tracked as bead `ko5` (S27)
-The vault knowledge graph is git-tracked de-facto (since S2, per user instruction); `.gitignore` excludes only the operator-PII raw dropzones (`vault/dna/raw/`, `vault/labs/raw/`). The S1 "decision deferred" note is now a tracked decision: **`ko5`** — ratify the vault-git-tracking policy against ADR-0005 (PII-free trunk), which largely answers it (the PII-free vault content IS the tracked trunk; filled-scaffold values + the store are gitignored), and close/supersede the S1 deferral. Filed S27 when the question was raised.
-
 ### `agent-verdict-halt` sentinel inconsistency (gate_attest.py vs schemas)
 S6 observation: when an agent emits `verdict: HALT` and the orchestrator's scaffold has empty `halt_reasons`, `gate_attest.py attest` injects `"agent-verdict-halt"` as a fallback. That string is not in any gate schema's `halt_reasons` enum, so schema validation fails. Workaround: orchestrator must pre-populate `halt_reasons` with a valid enum value in the scaffold before attest. Either (a) extend every gate schema's halt_reasons enum to include `agent-verdict-halt`, or (b) change the script's fallback to be phase-aware. Defer to v2.5 cleanup.
 
