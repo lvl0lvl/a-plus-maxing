@@ -30,6 +30,8 @@ Every session begins with these steps in order:
 
    The contract is appended into HANDOFF.md after user confirmation. At session close, each AC is evaluated PASS / FAIL / CHANGED / N/A in writing. A criterion silently changed during the session is drift.
 
+   **For `v1-build` tasks (executing a `docs/task-plan/` recipe):** the contract additionally cites the build-plan wave the task belongs to (per `docs/build-plan/build-plan-v1-full.md`) and attests the prior wave's checkpoint Go/No-Go passed before the task is built. Build via `/execute-plan` (see V1 Build Execution), never a hand-rolled per-task dispatch — PF-S36-01. (Mechanical enforcement of this field is a tracked follow-up, not yet in `scope-contract-audit.sh`.)
+
 ### Self-recognition flags (catch yourself BEFORE acting on these)
 
 Per Rigor Framework Discipline 7 + PF-S3-01. When you catch yourself producing one of these framings, pause and explicitly call it out, then default to the thorough option:
@@ -138,6 +140,16 @@ Two project-level hooks are installed (`.claude/settings.json`):
 - Commit format: `{type}[({scope})]: brief description`
 - All beads issues use priority 0-4 (not high/medium/low)
 - Documents follow the freshness rubric in DOCUMENT_RUBRIC.md
+
+## V1 Build Execution
+
+The V1 build executes the approved 7-wave plan `docs/build-plan/build-plan-v1-full.md` (18 dependency-ordered tasks; recipes in `docs/task-plan/`). The terminal pipeline stage (`ADR → Spec → Build Plan → Task Plan → Execute Plan`) is run with the global **`/execute-plan`** skill (`~/.claude/skills/execute-plan/`) — read it IN FULL before invoking (PF-S17-01); never hand-roll a per-task SE-dispatch substitute (PF-S36-01).
+
+- **Project path-mapping** (the skill's defaults differ): recipes = `docs/task-plan/<task-id>.md` (not `specs/recipes/`); build plan = `docs/build-plan/build-plan-v1-full.md` (not `specs/build-plans/`); role profiles = `~/Documents/Projects/skills_library/roles/<role>/agent.md` (not `~/.claude/roles/`), inlined in full per INV-ROLE-INLINING.
+- **The wave is the unit.** Build in build-plan wave order; a wave is not done until ALL its tasks are built, its per-wave **checkpoint Go/No-Go ran green** (the cross-spec integration gates in the build plan), AND its PR merged. "Wave N" everywhere means the build-plan topological wave, NOT an ADR-family label (reconciled S36; bead `orl`).
+- **Three-tier review** (per execute-plan): Tier-1 SE self-check (recipe verification checklist) → Tier-2 wave review (QA always; Architect/Security conditional, over the whole-wave diff) → Tier-3 `/review-pr` (6-agent) before merge. No tier is skippable.
+- **Per session:** one wave (or the remaining tasks of an open wave) → checkpoint → `/review-pr` → `/merge` → close. Each wave is a natural session boundary.
+- **Status (as of S36):** 9/18 built (W1-2 complete; W3-4 partial; W5-7 open), verified sound against every runnable checkpoint. Out-of-order builds (S32-S35, PF-S36-01) left W3-4 partial — re-entry completes the open waves in order. See `vault/meta/overview.md` for the live wave-state.
 
 ## Project-local skills
 
