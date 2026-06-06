@@ -108,13 +108,113 @@ def test_summarize_emits_no_raw_value_in_any_token():
 
 
 def test_summarize_reads_through_store():
-    """AC-5: summarize sources state via the passed store.read and no other path."""
+    """AC-5 + F15: summarize sources state via store.read AND the token data-flows.
+
+    Asserts both call-occurrence AND that a token VALUE derives from the fake
+    records — a hardcoded-return `summarize` (ignoring its input) would fail the
+    data-flow leg.
+    """
     store_read = _clean_store_read()
     summary = router.summarize(store_read)
     # The read callable was the state source: it was invoked.
     assert store_read.calls, "summarize did not invoke the store read model"
-    # A field-set token reflects state that only the fake read supplied.
-    assert summary  # non-empty, sourced from the fake read
+    # F15: a token VALUE derives from the supplied records (1986 DOB → born-1980s).
+    assert summary["training-age-band"] == "born-1980s"
+    # And it tracks the input: a different DOB year produces a different band.
+    other = _store_read_factory([
+        {"item": "date-of-birth", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "1972-08-09"},
+    ])
+    assert router.summarize(other)["training-age-band"] == "born-1970s"
+
+
+def _reading(value):
+    """One readings-series record carrying `value` (the derivation input shape)."""
+    return [{"item": "x", "timepoint": "2026-01-01T00:00:00+00:00",
+             "source": "intake", "value": value}]
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("1986-04-12", "born-1980s"),
+    ("1972-08-09", "born-1970s"),
+    ("2001-12-31", "born-2000s"),
+    ("not-a-date", "age-band-unknown"),
+])
+def test_age_band_token_value(value, expected):
+    """F17: _age_band emits the correct birth-decade band (exact token value)."""
+    assert router._age_band(_reading(value)) == expected
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("tweaked my back", "back-region"),
+    ("lumbar spine ache", "back-region"),
+    ("sore knee", "lower-limb-region"),
+    ("hip flexor strain", "lower-limb-region"),
+    ("shoulder impingement", "upper-limb-region"),
+    ("general fatigue", "general-issue"),
+])
+def test_issue_class_token_value(value, expected):
+    """F17: _issue_class maps free-text to the correct body-region class."""
+    assert router._issue_class(_reading(value)) == expected
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("123 Main St", "region-present"),
+    ("   ", "region-absent"),
+    ("", "region-absent"),
+])
+def test_region_class_token_value(value, expected):
+    """F17: _region_class maps an address to presence/region class."""
+    assert router._region_class(_reading(value)) == expected
+
+
+def test_trend_token_flat_on_no_change():
+    """F17/F3: equal latest-vs-prior → `flat` (a determinable no-change)."""
+    series = _reading("10") + [{"item": "x", "timepoint": "2026-02-01T00:00:00+00:00",
+                                "source": "lab", "value": "10"}]
+    assert router._trend_token(series) == "flat"
+
+
+@pytest.mark.parametrize("series_values", [
+    [],            # no readings
+    ["10"],        # single reading — insufficient series
+    [None, None],  # missing data — must NOT be a false affirmative
+    ["x", "y"],    # non-numeric — no determinable direction
+])
+def test_trend_token_flat_on_insufficient_or_missing(series_values):
+    """F3: insufficient/missing series → `flat`, never a false `improving`."""
+    series = [{"item": "x", "timepoint": f"2026-0{i + 1}-01T00:00:00+00:00",
+               "source": "lab", "value": v} for i, v in enumerate(series_values)]
+    token = router._trend_token(series) if series else router._trend_token(
+        [{"item": "x", "timepoint": "2026-01-01T00:00:00+00:00",
+          "source": "lab", "value": "10"}])
+    # The empty-series case is unreachable via summarize (guarded by `if readings`),
+    # so exercise the single-reading insufficient case for it.
+    assert token == "flat"
+    assert token != "improving"
+
+
+def test_trend_token_uses_spike_vocabulary_only():
+    """F3: every _trend_token output is in the closed spike vocabulary."""
+    assert set(router.TREND_DIRECTIONS) == {"improving", "flat", "regressing"}
+    # The old wrong vocabulary is gone.
+    series = _reading("10") + [{"item": "x", "timepoint": "2026-02-01T00:00:00+00:00",
+                                "source": "lab", "value": "10"}]
+    assert router._trend_token(series) in router.TREND_DIRECTIONS
+
+
+def test_trend_token_raises_on_unlabellable_directional_change():
+    """F3 blocked-gap: a real numeric change with unknown polarity RAISES.
+
+    improving vs regressing needs per-item good-direction polarity, absent from the
+    Line Field Set. Rather than fabricate or erase the change, the derivation
+    raises — surfacing the spec/metadata gap at the boundary (fail-closed).
+    """
+    series = _reading("10") + [{"item": "x", "timepoint": "2026-02-01T00:00:00+00:00",
+                                "source": "lab", "value": "20"}]
+    with pytest.raises(ValueError) as exc:
+        router._trend_token(series)
+    assert "polarity" in str(exc.value)
 
 
 # --- Cycle 2: dispatch ---------------------------------------------------------
