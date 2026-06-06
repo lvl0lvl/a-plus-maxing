@@ -614,3 +614,248 @@ def test_contrast_and_colorblind(tmp_path):
 
     # --- @media print present (print-safe)
     assert "@media print" in html, "emitted file must carry an @media print block"
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0004-T2 — matrix/projection render path under the ADR-0004-T0 spike cap
+# (AC-1 worst-case <500KB, AC-2 over-cap paginates to >=2 files, AC-3 at-cap
+#  single-file + 0-external + offline-open-0-outbound, AC-4 shared-defs-once,
+#  AC-5 egress-0 + 0-model + SEC-03 failing-capable). The cap (16 series-per-view
+#  AND 12 timepoints-per-view) is the ADR-0004-T0 parameter re-validated against
+#  the real component_set.py render (vault/decisions/2026-06-06-adr-0004-t0-cap-
+#  revalidation.md: worst-case 16x12 = 34117 bytes, cap UNCHANGED).
+# --------------------------------------------------------------------------- #
+
+# The shared chart-component style def (the component_set <style>/:root block) is
+# the single shared-defs source both the matrix and projection sections draw from.
+# It must appear EXACTLY ONCE in an emitted view, referenced per series (not
+# re-emitted per series). `:root {` is its falsifiable occurrence marker.
+_SHARED_DEFS_MARKER = ":root {"
+
+
+def _matrix_store(n_series, n_timepoints):
+    """Build a matrix/projection store read: `n_series` items x `n_timepoints` each.
+
+    The list-of-readings shape `store.read` returns, in timepoint order per series,
+    with realistic long biomarker names + multi-digit lab magnitudes so the rendered
+    bytes are representative of the worst case the cap bounds.
+    """
+    names = [
+        "total_cholesterol", "ldl_cholesterol", "hdl_cholesterol", "triglycerides",
+        "fasting_glucose", "hba1c", "hs_crp", "alt", "ferritin", "vitamin_d_25oh",
+        "tsh", "free_t4", "creatinine", "egfr", "alkaline_phosphatase", "albumin",
+        "sodium", "potassium", "calcium", "magnesium",
+    ]
+    rows = []
+    for s in range(n_series):
+        item = names[s % len(names)] + (f"_{s}" if s >= len(names) else "")
+        for t in range(n_timepoints):
+            rows.append({
+                "item": item,
+                "timepoint": f"2026-{(t % 12) + 1:02d}-01T00:00:00+00:00",
+                "source": "lab",
+                "value": 100 + s * 7 + t * 3,
+            })
+    return rows
+
+
+def test_matrix_projection_worst_case_under_budget(tmp_path):
+    """AC-1: worst-case matrix+projection over the spike dataset is < 500000 bytes.
+
+    Renders the most asset-heavy combined view (the spike's 10 biomarkers x 4
+    timepoints worst case) through the matrix/projection path and asserts the
+    measured byte count of the returned file < 500000 — a real render, not an
+    estimate. At/below the cap this is a single file.
+    """
+    paths = render.emit_matrix_projection(_matrix_store(10, 4), _out_dir=tmp_path)
+    assert len(paths) == 1, f"a cap-or-below dataset emits one file, got {len(paths)}"
+    size = paths[0].stat().st_size
+    assert size < SIZE_BUDGET, f"worst-case matrix+projection {size} bytes >= {SIZE_BUDGET}"
+
+
+def test_matrix_projection_at_cap_single_file(tmp_path):
+    """AC-3: a dataset AT the cap (16 series x 12 timepoints) emits exactly one file.
+
+    The render at the cap's max bounds stays a single self-contained file (the
+    over-cap split direction is AC-2's job, not this one).
+    """
+    paths = render.emit_matrix_projection(_matrix_store(16, 12), _out_dir=tmp_path)
+    assert len(paths) == 1, f"a dataset AT the cap emits exactly one file, got {len(paths)}"
+    assert paths[0].stat().st_size < SIZE_BUDGET
+
+
+def test_matrix_projection_zero_external_references(tmp_path):
+    """AC-3: the emitted matrix/projection file carries 0 off-file references."""
+    paths = render.emit_matrix_projection(_matrix_store(6, 4), _out_dir=tmp_path)
+    refs = _external_refs(paths[0].read_text())
+    assert refs == [], f"expected 0 external references, found {refs}"
+
+
+def test_matrix_projection_offline_open_zero_outbound(tmp_path):
+    """AC-3: opening every asset in the emitted file under the guard observes 0 outbound.
+
+    Parses the emitted file for EVERY asset reference and actually OPENs each target
+    under the egress guard — an off-host reference would attempt a socket connect the
+    guard would surface. All-inline render keeps the captured outbound count at 0.
+    """
+    import urllib.request
+
+    from scripts.guard.egress_guard import run
+
+    paths = render.emit_matrix_projection(_matrix_store(4, 4), _out_dir=tmp_path)
+    path = paths[0]
+
+    def open_and_walk_assets():
+        for target in _all_asset_refs(path.read_text()):
+            with urllib.request.urlopen(target) as resp:
+                resp.read()
+
+    assert run(open_and_walk_assets)
+
+
+def test_matrix_projection_shared_defs_appears_once(tmp_path):
+    """AC-4: the shared chart-component style def appears exactly once, referenced per view.
+
+    The component_set shared-defs block (:root { ... }) is emitted ONCE and the
+    per-series sparklines reference it (one per series), proving the markup is shared
+    from component_set.py, not re-emitted per series. A per-series re-emit of the
+    shared def would push the count above 1; per-series duplication of the def is 0.
+    """
+    n_series = 8
+    paths = render.emit_matrix_projection(_matrix_store(n_series, 4), _out_dir=tmp_path)
+    html = paths[0].read_text()
+
+    shared_defs_count = html.count(_SHARED_DEFS_MARKER)
+    assert shared_defs_count == 1, (
+        f"shared chart-component def must appear exactly once, found {shared_defs_count}"
+    )
+
+    # the def is REFERENCED per series (one sparkline stroke per rendered series),
+    # not re-declared per series: per-series duplication of the shared def is 0.
+    per_series_def_duplication = shared_defs_count - 1
+    assert per_series_def_duplication == 0
+    series_refs = html.count("<svg ")
+    assert series_refs >= n_series, (
+        f"each series must reference the shared def via its own chart, "
+        f"got {series_refs} charts for {n_series} series"
+    )
+
+
+def test_matrix_projection_egress_zero_call(tmp_path):
+    """AC-5: a real matrix/projection emit under the egress guard is truthy (0 outbound).
+
+    Wraps a real emit_matrix_projection call in ONE zero-arg closure under the guard
+    and asserts truthy — 0 outbound across the whole render. The render path reads
+    only the store_read it is passed and makes no model step (no lab value / symptom
+    answer is dispatched anywhere — it reads the store and writes a local file).
+    """
+    from scripts.guard.egress_guard import run
+
+    sr = _matrix_store(6, 4)
+    out = tmp_path / "mp-under-guard"
+    out.mkdir()
+
+    def do_emit():
+        render.emit_matrix_projection(sr, _out_dir=out)
+
+    assert run(do_emit)
+
+
+def test_matrix_projection_reads_only_store_argument(tmp_path, monkeypatch):
+    """AC-5: the render takes its data from store_read, not independent discovery.
+
+    Forcing store.read to raise proves the render path never calls it — the matrix/
+    projection recompute consumes the read model it was handed (no model step, no
+    re-parse of NDJSON).
+    """
+    from scripts.store import store
+
+    def forbidden(*a, **k):
+        raise AssertionError("matrix/projection render must consume store_read, not call store.read")
+
+    monkeypatch.setattr(store, "read", forbidden)
+    paths = render.emit_matrix_projection(_matrix_store(4, 4), _out_dir=tmp_path)
+    assert paths and paths[0].exists()
+
+
+def test_matrix_projection_egress_failing_capable(tmp_path, monkeypatch):
+    """AC-5 (SEC-03, W4->5 boundary): an outbound call injected into the render path
+    drives egress_guard.run to FAIL/falsy.
+
+    Proves the guard actually intercepts THIS new render code path — not merely that
+    a clean run makes 0 calls, and not merely because the function is absent. First
+    asserts the (existing) render path runs clean under the guard (truthy), then
+    injects a synthetic outbound socket connect into the matrix/projection assembly
+    (via the shared-component sparkline it calls per series) and asserts the guard
+    turns falsy. The connect is BLOCKED by the OS deny-network sandbox and that
+    blocked-egress error surfaces (uncaught), which is how the guard reports the
+    intercept — so the test can only pass once the production path exists AND is
+    wrapped by the guard.
+    """
+    import socket
+
+    from scripts.guard.egress_guard import run
+    from vault.design.templates import component_set
+
+    sr = _matrix_store(3, 4)
+    out = tmp_path / "mp-leak"
+    out.mkdir()
+
+    # The render path must exist and run clean under the guard (truthy) — this turns
+    # red in RED (no emit_matrix_projection yet), so the test is not a pass-on-absence.
+    assert run(lambda: render.emit_matrix_projection(sr, _out_dir=out / "clean")), (
+        "the matrix/projection render path must run clean (0 outbound) under the guard"
+    )
+
+    real_sparkline = component_set.sparkline
+
+    def leaking_sparkline(values, state):
+        # A synthetic outbound from inside the render. Under the guard's OS deny-
+        # network sandbox the connect is blocked and raises; we let it surface so the
+        # guard reports the intercept (falsy). Outside the guard this would connect.
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.connect(("93.184.216.34", 80))
+        finally:
+            s.close()
+        return real_sparkline(values, state)
+
+    monkeypatch.setattr(component_set, "sparkline", leaking_sparkline)
+
+    def do_emit():
+        render.emit_matrix_projection(sr, _out_dir=out / "leak")
+
+    assert not run(do_emit), "guard must FAIL when the render path makes an outbound call"
+
+
+def test_matrix_projection_over_cap_paginates(tmp_path):
+    """AC-2: a dataset ABOVE the ADR-0004-T0 cap paginates to >=2 files, each <500KB.
+
+    Feeds a dataset exceeding the cap's max-series-per-view (16) so the render must
+    split across artifacts rather than emit one over-cap file: >=2 returned paths,
+    each strictly < 500000 bytes. A single (over-budget or over-cap) file fails.
+    """
+    over_cap_series = render.MAX_SERIES_PER_VIEW + 4
+    paths = render.emit_matrix_projection(
+        _matrix_store(over_cap_series, 4), _out_dir=tmp_path
+    )
+    assert len(paths) >= 2, (
+        f"over-cap dataset ({over_cap_series} series > cap {render.MAX_SERIES_PER_VIEW}) "
+        f"must paginate to >=2 files, got {len(paths)}"
+    )
+    for p in paths:
+        assert p.stat().st_size < SIZE_BUDGET, f"paginated file {p} {p.stat().st_size} >= {SIZE_BUDGET}"
+
+
+def test_matrix_projection_over_cap_timepoints_paginates(tmp_path):
+    """AC-2: exceeding the max-timepoints-per-view bound also paginates to >=2 files."""
+    over_cap_tp = render.MAX_TIMEPOINTS_PER_VIEW + 3
+    paths = render.emit_matrix_projection(
+        _matrix_store(4, over_cap_tp), _out_dir=tmp_path
+    )
+    assert len(paths) >= 2, (
+        f"over-cap timepoints ({over_cap_tp} > cap {render.MAX_TIMEPOINTS_PER_VIEW}) "
+        f"must paginate to >=2 files, got {len(paths)}"
+    )
+    for p in paths:
+        assert p.stat().st_size < SIZE_BUDGET
