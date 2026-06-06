@@ -255,10 +255,15 @@ def _page_slices(store_read):
         series_page = series[s_start:s_start + MAX_SERIES_PER_VIEW]
         max_tp = max((len(v) for _, v in series_page), default=0)
         for t_start in range(0, max(max_tp, 1), MAX_TIMEPOINTS_PER_VIEW):
-            pages.append([
-                (item, values[t_start:t_start + MAX_TIMEPOINTS_PER_VIEW])
+            # A series shorter than max_tp has no data in a later timepoint-window;
+            # drop its empty slice so it is not rendered as a phantom "—" row.
+            page = [
+                (item, window)
                 for item, values in series_page
-            ])
+                if (window := values[t_start:t_start + MAX_TIMEPOINTS_PER_VIEW])
+            ]
+            if page:
+                pages.append(page)
     return pages
 
 
@@ -272,8 +277,11 @@ def emit_matrix_projection(store_read, *, _out_dir=None):
     carries a distinct name so `_name_for` derives a distinct basename), and returns
     the list of written paths. A cap-or-below dataset yields exactly one path; an
     over-cap dataset paginates to >=2 paths. Each page routes through the SAME `emit`
-    inline + external-asset + size discipline, so each is self-contained and within
-    the budget. Reads operator data only from `store_read`; makes no model step.
+    inline + external-asset discipline, so each is self-contained. The <500000-byte
+    budget is guaranteed by the cap (<=MAX_SERIES_PER_VIEW series and
+    <=MAX_TIMEPOINTS_PER_VIEW timepoints per page) against the ADR-0004-T0 spike's
+    worst-case bound, NOT by a runtime byte check. Reads operator data only from
+    `store_read`; makes no model step.
 
     Args:
         store_read (list): The store read model (the data `store.read` returns).
