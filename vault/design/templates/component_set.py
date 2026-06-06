@@ -34,6 +34,22 @@ PALETTE = {
 SERIES = ("good", "watch", "concern")
 
 
+def state_for(item):
+    """Pick the semantic series state for an item by name (single source of truth).
+
+    Cycles through SERIES so a multi-item artifact exercises all three colors;
+    deterministic on the item name so two generations are structurally identical.
+    Shared by both the dashboard and report templates.
+
+    Args:
+        item (str): The tracked-item name.
+
+    Returns:
+        (str) One of SERIES (good / watch / concern).
+    """
+    return SERIES[sum(ord(c) for c in item) % len(SERIES)]
+
+
 def _style_block():
     """Return the single inline `<style>` block both templates inherit.
 
