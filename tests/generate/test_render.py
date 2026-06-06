@@ -30,7 +30,13 @@ _REF_RE = re.compile(r"""(?:src|href)\s*=\s*['"]([^'"]*)['"]|url\(\s*['"]?([^'")
 
 
 def _store_read():
-    """A fixture store read model: the list-of-readings shape store.read returns."""
+    """A fixture store read model: the list-of-readings shape store.read returns.
+
+    Carries three items that map to the three distinct semantic states under the
+    state-selection hash (rhr->concern, hrv->good, spo2->watch), so every semantic
+    series renders as a data-driven sparkline stroke and the AC-3 gate walks each
+    adjacent pair over real rendered output.
+    """
     return [
         {"item": "rhr", "timepoint": "2026-05-01T00:00:00+00:00", "source": "whoop", "value": 52},
         {"item": "rhr", "timepoint": "2026-05-02T00:00:00+00:00", "source": "whoop", "value": 54},
@@ -38,6 +44,30 @@ def _store_read():
         {"item": "hrv", "timepoint": "2026-05-01T00:00:00+00:00", "source": "whoop", "value": 71},
         {"item": "hrv", "timepoint": "2026-05-02T00:00:00+00:00", "source": "whoop", "value": 88},
         {"item": "hrv", "timepoint": "2026-05-03T00:00:00+00:00", "source": "whoop", "value": 63},
+        {"item": "spo2", "timepoint": "2026-05-01T00:00:00+00:00", "source": "whoop", "value": 97},
+        {"item": "spo2", "timepoint": "2026-05-02T00:00:00+00:00", "source": "whoop", "value": 95},
+        {"item": "spo2", "timepoint": "2026-05-03T00:00:00+00:00", "source": "whoop", "value": 98},
+    ]
+
+
+def _store_read_variant():
+    """A second read: SAME items/structure as `_store_read`, DIFFERENT values + order.
+
+    Same three items, same per-item reading count, identical non-data text (source
+    'whoop'), so it is structurally equivalent — but every value differs and the
+    readings are reordered. Two generations from `_store_read` vs this one are
+    byte-different pre-mask, so the masked-structure equality is load-bearing.
+    """
+    return [
+        {"item": "spo2", "timepoint": "2026-06-03T00:00:00+00:00", "source": "whoop", "value": 99},
+        {"item": "spo2", "timepoint": "2026-06-01T00:00:00+00:00", "source": "whoop", "value": 94},
+        {"item": "spo2", "timepoint": "2026-06-02T00:00:00+00:00", "source": "whoop", "value": 96},
+        {"item": "hrv", "timepoint": "2026-06-02T00:00:00+00:00", "source": "whoop", "value": 80},
+        {"item": "hrv", "timepoint": "2026-06-01T00:00:00+00:00", "source": "whoop", "value": 65},
+        {"item": "hrv", "timepoint": "2026-06-03T00:00:00+00:00", "source": "whoop", "value": 92},
+        {"item": "rhr", "timepoint": "2026-06-01T00:00:00+00:00", "source": "whoop", "value": 60},
+        {"item": "rhr", "timepoint": "2026-06-03T00:00:00+00:00", "source": "whoop", "value": 47},
+        {"item": "rhr", "timepoint": "2026-06-02T00:00:00+00:00", "source": "whoop", "value": 58},
     ]
 
 
@@ -47,6 +77,21 @@ def _external_refs(html):
     for m in _REF_RE.finditer(html):
         target = (m.group(1) or m.group(2) or "").strip()
         if not target or target.startswith("data:") or target.startswith("#"):
+            continue
+        out.append(target)
+    return out
+
+
+def _all_asset_refs(html):
+    """Return every src/href/url() target in the file, INCLUDING inline data: URIs.
+
+    Unlike `_external_refs`, this keeps data: targets so the offline-open walk has
+    a real asset to resolve. Same-document `#fragment` hrefs (no asset) are dropped.
+    """
+    out = []
+    for m in _REF_RE.finditer(html):
+        target = (m.group(1) or m.group(2) or "").strip()
+        if not target or target.startswith("#"):
             continue
         out.append(target)
     return out
@@ -90,22 +135,45 @@ def test_emit_zero_external_asset_references(tmp_path):
     assert refs == [], f"expected 0 external references, found {refs}"
 
 
-def test_emit_offline_open_zero_outbound(tmp_path):
-    """AC-1: opening the emitted file under the egress guard observes 0 outbound.
+def _inline_data_asset_template(store_read):
+    """A template carrying one inline `data:` image asset (resolves locally, no net)."""
+    pixel = "data:image/gif;base64,R0lGODlhAQABAAAAACw="
+    body = (
+        "<div class='wrap'>"
+        f"{component_set.tldr_banner('offline-open fixture')}"
+        f"<img src='{pixel}'>"
+        f"{component_set.sparkline([r['value'] for r in store_read], 'good')}"
+        "</div>"
+    )
+    return f"<!doctype html><html lang='en'>{component_set.head('fixture')}<body>{body}</body></html>"
 
-    The capture wraps the file-OPEN (not emit). run is truthy == 0 outbound
-    requests when the file is opened/parsed offline.
+
+def test_emit_offline_open_zero_outbound(tmp_path):
+    """AC-1: resolving the emitted file's assets under the egress guard observes 0 outbound.
+
+    The closure parses the emitted file for EVERY asset reference and actually
+    attempts to OPEN each target — so the egress guard would observe a network
+    attempt if any reference resolved off-host. With all-inline `data:` assets the
+    captured outbound count stays 0 (urlopen resolves data: URIs in-process). This
+    proves something distinct from the static `_external_refs(html) == []` check.
     """
+    import urllib.request
+
     from scripts.guard.egress_guard import run
 
-    path = emit(_inline_template, _store_read(), _out_dir=tmp_path)
+    path = emit(_inline_data_asset_template, _store_read(), _out_dir=tmp_path)
 
-    def open_file():
-        # Parsing the saved HTML must not reach the network for any asset.
+    def open_and_walk_assets():
         html = path.read_text()
-        assert _external_refs(html) == []
+        refs = _all_asset_refs(html)
+        assert refs, "fixture must carry at least one asset ref to make the walk meaningful"
+        for target in refs:
+            # A data: URI resolves in-process; an off-host URL would attempt a
+            # socket connect here, which the OS egress guard would surface.
+            with urllib.request.urlopen(target) as resp:
+                resp.read()
 
-    assert run(open_file)
+    assert run(open_and_walk_assets)
 
 
 def test_emit_egress_zero_call(tmp_path):
@@ -142,20 +210,80 @@ def test_emit_reads_only_store_argument(tmp_path, monkeypatch):
     assert path.exists()
 
 
-def test_emit_raises_on_external_asset(tmp_path):
-    """AC-6: emit RAISES and writes no file when an asset resolves to an external URL."""
-    sr = _store_read()
+# Each fragment, embedded in a minimal document, references an off-file asset
+# through a distinct syntactic vector. emit MUST raise + write 0 files for each.
+_EXTERNAL_BODIES = {
+    "img-https": "<body><img src='https://example.com/logo.png'></body>",
+    "css-url": "<head><style>.h{background:url(https://cdn.example/bg.png)}</style></head><body></body>",
+    "protocol-relative-src": "<body><img src='//cdn.example/logo.png'></body>",
+    "link-href": "<head><link rel='stylesheet' href='https://cdn.example/site.css'></head><body></body>",
+    "css-import": "<head><style>@import \"https://cdn.example/theme.css\";</style></head><body></body>",
+    "srcset": "<body><img srcset='https://cdn.example/logo@2x.png 2x'></body>",
+    "video-poster": "<body><video poster='https://cdn.example/frame.jpg'></video></body>",
+    "meta-refresh": "<head><meta http-equiv='refresh' content='0;url=https://evil.example/'></head><body></body>",
+}
+
+
+@pytest.mark.parametrize("name", sorted(_EXTERNAL_BODIES))
+def test_emit_raises_on_external_asset(tmp_path, name):
+    """AC-6: emit RAISES and writes 0 files for each external-asset vector.
+
+    Covers img/src https, CSS url(), protocol-relative src, off-file <link href>,
+    CSS @import, srcset, <video poster>, and a meta-refresh redirect URL.
+    """
+    body = _EXTERNAL_BODIES[name]
     out = tmp_path / "external"
     out.mkdir()
 
-    # A template whose assembled output references an off-file asset.
     def bad_template(store_read):
-        return "<html><head></head><body>"\
-            "<img src='https://example.com/logo.png'></body></html>"
+        return f"<!doctype html><html>{body}</html>"
 
     with pytest.raises(ValueError):
-        emit(bad_template, sr, _out_dir=out)
+        emit(bad_template, _store_read(), _out_dir=out)
     assert list(out.iterdir()) == [], "emit must write 0 files when it refuses"
+
+
+def test_emit_allows_inline_data_and_fragment_assets(tmp_path):
+    """AC-6 positive control: data: URI assets and #fragment hrefs do NOT raise.
+
+    A template referencing only inline `data:` assets and same-document `#frag`
+    hrefs is fully self-contained, so emit writes the file without raising.
+    """
+    out = tmp_path / "inline"
+    out.mkdir()
+    pixel = "data:image/gif;base64,R0lGODlhAQABAAAAACw="
+
+    def inline_template(store_read):
+        return (
+            "<!doctype html><html><head>"
+            "<style>.h{background:url('" + pixel + "')}</style></head><body>"
+            f"<img src='{pixel}'><a href='#section'>jump</a>"
+            "</body></html>"
+        )
+
+    path = emit(inline_template, _store_read(), _out_dir=out)
+    assert path.exists()
+
+
+def test_emit_allows_operator_text_containing_url(tmp_path):
+    """F4 regression: a store-read data field carrying `url(http://...)` does NOT raise.
+
+    The scan reads asset references at their syntactic positions, so benign
+    operator text that happens to contain `url(http://...)` (escaped into text
+    content) is not an asset reference — the report generates.
+    """
+    from vault.design.templates import report
+
+    out = tmp_path / "operator-text"
+    out.mkdir()
+    sr = [
+        {"item": "note", "timepoint": "2026-05-01T00:00:00+00:00",
+         "source": "see url(http://lab.example/x)", "value": 1},
+        {"item": "note", "timepoint": "2026-05-02T00:00:00+00:00",
+         "source": "ref http://lab.example/y", "value": 2},
+    ]
+    path = emit(report, sr, _out_dir=out)
+    assert path.exists()
 
 
 # --------------------------------------------------------------------------- #
@@ -197,17 +325,18 @@ def test_report_size_under_budget(tmp_path):
 
 
 def test_two_generation_structural_identity(tmp_path):
-    """AC-4: two dashboard generations from the same store read have 0 structural diff.
+    """AC-4: two dashboard generations from DIFFERENT-data reads share 0 structural diff.
 
-    A data-masked structural diff of the two outputs returns 0 differences,
-    proving the template/component markup is deterministic and not
-    data-order-dependent.
+    The two reads carry the same items/structure but different VALUES and reordered
+    readings, so the raw outputs are byte-different; the data-masked structural diff
+    returns 0, proving the markup is structurally identical DESPITE different data
+    (the masking — not shared input — is load-bearing).
     """
     from vault.design.templates import dashboard
 
-    sr = _store_read()
-    a = emit(dashboard, sr, _out_dir=tmp_path / "gen-a").read_text()
-    b = emit(dashboard, sr, _out_dir=tmp_path / "gen-b").read_text()
+    a = emit(dashboard, _store_read(), _out_dir=tmp_path / "gen-a").read_text()
+    b = emit(dashboard, _store_read_variant(), _out_dir=tmp_path / "gen-b").read_text()
+    assert a != b, "different-data reads must produce byte-different output pre-mask"
     diff = [
         (i, x, y)
         for i, (x, y) in enumerate(zip(_mask_data(a).splitlines(), _mask_data(b).splitlines()))
@@ -217,12 +346,16 @@ def test_two_generation_structural_identity(tmp_path):
 
 
 def test_report_structural_identity(tmp_path):
-    """AC-4: the report shares the structural-identity property (0 masked diff)."""
+    """AC-4: the report shares the structural-identity property (0 masked diff).
+
+    Fed two DIFFERENT-data but structurally-equivalent reads, so the masked-structure
+    equality — not identical input — carries the assertion.
+    """
     from vault.design.templates import report
 
-    sr = _store_read()
-    a = emit(report, sr, _out_dir=tmp_path / "gen-a").read_text()
-    b = emit(report, sr, _out_dir=tmp_path / "gen-b").read_text()
+    a = emit(report, _store_read(), _out_dir=tmp_path / "gen-a").read_text()
+    b = emit(report, _store_read_variant(), _out_dir=tmp_path / "gen-b").read_text()
+    assert a != b, "different-data reads must produce byte-different output pre-mask"
     assert _mask_data(a) == _mask_data(b)
 
 
@@ -392,18 +525,15 @@ def _root_vars(html):
     return dict(re.findall(r"--([a-z]+)\s*:\s*(#[0-9A-Fa-f]{6})", html))
 
 
-def _rendered_series_hexes(html):
-    """Collect the series/category hex colors actually used in the rendered output.
+def _rendered_series_strokes(html):
+    """Collect the data-driven sparkline stroke hexes actually rendered.
 
-    Reads the stroke colors on the inline-SVG sparklines (the per-series colors)
-    plus the swatch backgrounds — the colors that distinguish categories.
+    Reads the stroke colors on the inline-SVG sparklines — the per-series colors
+    chosen from the store-read data, NOT the always-present legend swatches (which
+    are self-satisfying). A semantic series only appears here if a store-read item
+    rendered it.
     """
-    strokes = set(re.findall(r"stroke='(#[0-9A-Fa-f]{6})'", html))
-    vars_used = _root_vars(html)
-    # swatches reference var(--good/--watch/--concern); resolve to their hexes
-    sw = re.findall(r"background:var\(--(good|watch|concern)\)", html)
-    swatch_hexes = {vars_used[name] for name in sw if name in vars_used}
-    return strokes | swatch_hexes
+    return {h.lower() for h in re.findall(r"stroke='(#[0-9A-Fa-f]{6})'", html)}
 
 
 def test_contrast_and_colorblind(tmp_path):
@@ -435,26 +565,46 @@ def test_contrast_and_colorblind(tmp_path):
     print(f"AC-3 contrast ratio muted/paper = {muted_ratio:.2f} (need >= 3.0)")
     assert muted_ratio >= 3.0, f"muted contrast {muted_ratio:.2f} < 3.0"
 
-    # --- palette membership: every series color RENDERED is a member of the
-    # recorded good/watch/concern hex set (read from the decision, not the module)
-    expected_set = {v.lower() for v in expected.values()}
-    rendered = {h.lower() for h in _rendered_series_hexes(html)}
-    assert rendered, "no series colors found in rendered output"
-    assert rendered <= expected_set, (
-        f"rendered series colors {rendered} not all in recorded palette {expected_set}"
+    roles = ("good", "watch", "concern")
+
+    # --- rendered semantic hexes by role, parsed from the emitted :root block —
+    # the colors ACTUALLY rendered into the HTML, not the decision-vs-decision set.
+    rendered_by_role = {role: root[role].lower() for role in roles}
+
+    # --- role->hex EQUALITY against the recorded decision: each rendered role hex
+    # must EQUAL the decision hex for that role (a member-collision, e.g. good
+    # taking watch's hex, is now caught — subset membership would have shipped it).
+    for role in roles:
+        assert rendered_by_role[role] == expected[role].lower(), (
+            f"rendered {role}={rendered_by_role[role]} != decision {expected[role].lower()}"
+        )
+
+    # --- the three rendered semantic colors must be mutually DISTINCT (a collision
+    # -> identical hex -> ΔE 0 -> fail).
+    distinct = set(rendered_by_role.values())
+    assert len(distinct) == len(roles), (
+        f"rendered semantic colors not mutually distinct: {rendered_by_role}"
+    )
+
+    # --- the data-driven sparkline strokes (NOT the legend swatches) must be
+    # exactly the three rendered semantic hexes — every series is exercised over
+    # real store-read data.
+    strokes = _rendered_series_strokes(html)
+    assert strokes == distinct, (
+        f"data-driven strokes {strokes} != rendered semantic palette {distinct}"
     )
 
     # --- never red-only: no semantic state distinguished by red alone (the
     # concern state pairs a glyph with its color, and the legend carries glyphs)
     assert "&#9632;" in html or "&#9650;" in html, "semantic states must carry glyphs, not color alone"
 
-    # --- measured CIEDE2000 deltaE for EVERY adjacent-series pair, under EACH
-    # recorded simulation, above the recorded floor (computed number vs recorded)
-    roles = ("good", "watch", "concern")
+    # --- measured CIEDE2000 deltaE for EVERY adjacent-series pair, computed over
+    # the RENDERED hexes (not the decision set), under EACH recorded simulation,
+    # above the recorded floor.
     sims = decision["simulation"].split("+")
     for i in range(len(roles) - 1):
-        c1 = _hex_to_rgb(expected[roles[i]])
-        c2 = _hex_to_rgb(expected[roles[i + 1]])
+        c1 = _hex_to_rgb(rendered_by_role[roles[i]])
+        c2 = _hex_to_rgb(rendered_by_role[roles[i + 1]])
         for sim in sims:
             s1 = _simulate(c1, sim)
             s2 = _simulate(c2, sim)

@@ -9,7 +9,6 @@ sourced and the `@media print` block is inherited. A template is a callable
 """
 
 from vault.design.templates import component_set as cs
-from vault.design.templates import dashboard
 
 
 def _readings_by_item(store_read):
@@ -51,7 +50,7 @@ def render(store_read):
     for item in sorted(by_item):
         readings = by_item[item]
         values = [r["value"] for r in readings]
-        state = dashboard._state_for(item, values)
+        state = cs.state_for(item)
         latest = values[-1] if values else "—"
         sections.append(
             "<section>"

@@ -26,18 +26,6 @@ def _series_by_item(store_read):
     return series
 
 
-def _state_for(item, values):
-    """Pick the semantic series state for an item's series (palette membership)."""
-    # Cycle through the semantic series so a dashboard exercises all three colors;
-    # deterministic on item name so two generations are structurally identical.
-    return cs.SERIES[hash_index(item)]
-
-
-def hash_index(item):
-    """Map an item name to a stable SERIES index (deterministic, data-independent)."""
-    return sum(ord(c) for c in item) % len(cs.SERIES)
-
-
 def render(store_read):
     """Assemble the dashboard HTML from the shared component set.
 
@@ -51,7 +39,7 @@ def render(store_read):
     cards = []
     for item in sorted(series):
         values = series[item]
-        state = _state_for(item, values)
+        state = cs.state_for(item)
         latest = values[-1] if values else "—"
         cards.append(
             "<div class='kpi-row'>"

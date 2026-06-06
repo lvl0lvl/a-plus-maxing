@@ -2,6 +2,7 @@
 vault/dna/raw/
 vault/labs/raw/
 vault/store/
+vault/artifacts/generated/
 # Operator-identity tokens for the PII scanner (per-instance; .example is tracked)
 vault/meta/operator-identity.txt
 
