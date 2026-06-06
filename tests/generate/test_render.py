@@ -660,15 +660,20 @@ def _matrix_store(n_series, n_timepoints):
 
 
 def test_matrix_projection_worst_case_under_budget(tmp_path):
-    """AC-1: worst-case matrix+projection over the spike dataset is < 500000 bytes.
+    """AC-1: worst-case matrix+projection at the cap maximum is < 500000 bytes.
 
-    Renders the most asset-heavy combined view (the spike's 10 biomarkers x 4
-    timepoints worst case) through the matrix/projection path and asserts the
-    measured byte count of the returned file < 500000 — a real render, not an
-    estimate. At/below the cap this is a single file.
+    Renders the most asset-heavy SINGLE page — the cap maximum 16 series x 12
+    timepoints, the heaviest a single emitted page holds before pagination triggers
+    — through the matrix/projection path and asserts the measured byte count of the
+    returned file < 500000 (a real render, not an estimate). This is the true
+    single-page worst case the crit-1 gate names; a lighter input (e.g. the 10x4
+    spike-measured shape) would under-shoot it.
     """
-    paths = render.emit_matrix_projection(_matrix_store(10, 4), _out_dir=tmp_path)
-    assert len(paths) == 1, f"a cap-or-below dataset emits one file, got {len(paths)}"
+    paths = render.emit_matrix_projection(
+        _matrix_store(render.MAX_SERIES_PER_VIEW, render.MAX_TIMEPOINTS_PER_VIEW),
+        _out_dir=tmp_path,
+    )
+    assert len(paths) == 1, f"the at-cap maximum emits one file, got {len(paths)}"
     size = paths[0].stat().st_size
     assert size < SIZE_BUDGET, f"worst-case matrix+projection {size} bytes >= {SIZE_BUDGET}"
 
