@@ -3,11 +3,11 @@ permalink: a-plus-maxing/sessions/session-36
 ---
 
 ---
+permalink: a-plus-maxing/sessions/session-36
 title: Session 36 — execute-plan re-entry (Phase A: governance + verified baseline)
 type: session
 created: 2026-06-06
 status: complete
-permalink: a-plus-maxing/sessions/session-36
 ---
 
 # Session 36 (2026-06-06) — `/execute-plan` re-entry, Phase A
