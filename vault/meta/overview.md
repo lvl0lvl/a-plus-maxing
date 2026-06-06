@@ -86,7 +86,7 @@ The V1 build executes `docs/build-plan/build-plan-v1-full.md` (18 tasks across 7
 - **Wave 6** — lab-loop store schemas — open: `1aa`
 - **Wave 7** — biomarker matrix/projection views — open: `1ih`
 
-Execute-stage protocol: `/execute-plan` in wave mode, adopted S36 after **PF-S36-01** (the build had been hand-rolled per-task off the wave schedule from S32 — outputs verified undamaged, but the wave-checkpoint discipline lapsed). Re-entry completes the open waves in order; Phase B unblocks `5wo`/`qwj` first. No actual artifact generates until `generate.run` is fed real operator data (LM-04 pending). The S2/S1 snapshots below are historical.
+Execute-stage protocol: `/execute-plan` in wave mode, adopted S36 after **PF-S36-01** (the build had been hand-rolled per-task off the wave schedule from S32 — outputs verified undamaged, but the wave-checkpoint discipline lapsed). Re-entry completes the open waves in order; Phase B unblocks `5wo`/`qwj` first. No actual artifact generates until `generate.run` is fed real operator data (LM-04 pending). Prior session titles (S32-S35) use the old ADR-family wave labels and are NOT retro-corrected — cross-reference the build-plan wave numbers here, not the archived session titles. The S2/S1 snapshots below are historical.
 
 ## Status as of 2026-05-23 (S2 close)
 - Wiki schema layered onto operational vault (`vault/WIKI.md`)

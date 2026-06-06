@@ -331,7 +331,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 - **PR review beads open:** `1ww`/`qwj`/`ivt`/`z2u` (PR #44), `1vi` (PR #47), `5wo` (PR #53), `4yk` P2 + `u8u` P3 (PR #55). **`3gp` CLOSED** (PR #55).
 - **V1 spec/build-plan gaps (S29):** `kz6` (pytest bootstrap in task manifests — runtime exists via `.venv`+`conftest`, manifests not updated), `12p`, `434`, `bpu`, `dv3`, `4xe`.
 - **P2:** wiki-ingestion ADR-backfill (`dke`), `3v5`, `xg4`, `382`, `w3n`, `5bd`, `5l9`/`78p`, `pmp`, `h1z`, `rc1`.
-- **P3:** `orl` (narrative-vs-DAG wave-naming), `0oy`, `ko5` (vault-git-tracking vs ADR-0005), `75t`, `ae0`/`d6g`/`4ba`/`3v6`/`dip`, `t7z`/`fsr`/`8qe`, `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
+- **P3:** `0oy`, `ko5` (vault-git-tracking vs ADR-0005), `75t`, `ae0`/`d6g`/`4ba`/`3v6`/`dip`, `t7z`/`fsr`/`8qe`, `r7t`/`7rm`/`60f`, `5jr`, `9c5`/`pnl`/`2n1`/`4h1`/`smw`, plus pre-existing `1ek`/`6ln`/`mdv`/`1rm`/`2gs`/`623`/`f2r`/`yfu`/`2qq`/`p47`/`o9y`/`7is`/`mdg`/`5by`/`1ox`/`9yk`.
 - **Closed:** S35: `3gp` (PR #55). S34: `gu4` (PR #53). S33: `n9h` (PR #50). S32: `8s6` (PR #46), `6be` (PR #47). S31: `89a`/`e9m` (PR #44). S30: `394`/`bez`/`qbb`. S29: `mo4` (PR #40). S28: `hv6` (PR #38). S27: `rg2`. S25: `fm4`/`hil`. S23: `bte`. S22: `gdw`. S21: `mhg`/`5ot`/`0be`.
 
 ### Open project work (unchanged)
