@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-34)
+title: Scope Contract Archive (Sessions 5-35)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,55 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-34. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-35. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 35 (2026-06-05)
+
+> Confirmed by Walter ("scope 3gp/ADR-0004-T3, output the contract and ... proceed all the way through, including the full pr-review cycle ... Only stop if something comes up that requires my adjudication"). **Unit = one Wave-4 deliverable, one PR:** build `3gp` (`ADR-0004-T3`) — the on-demand + unattended-cron generation entry point `generate.run(artifact_name)` over the merged `render.emit`, through the recipe's 2-cycle/8-step TDD. AUTHORED by a dispatched SE worker (full 11-section profile inlined, INV-ROLE-INLINING); the orchestrator runs only mechanical RED/independent re-verify (esp. the falsifiability gates by mutation); a FRESH 6-agent `/review-pr` + blind triage + blind verify (PF-S3-01) — load-bearing because ONE SE built everything. No `Workflow` substitution; `/review-pr` + `/merge` read in full per-invocation (PF-S17-01).
+
+Goal: Build `3gp` / `ADR-0004-T3` (the thin `generate.run` cron/on-demand entry over `render.emit` + the falsifiable AC-3 NG-4 + AC-5 single-render-path gates) on the merged render engine, through the recipe's TDD + a full `/review-pr` -> `/merge`, and close `3gp`.
+
+Acceptance criteria:
+- [ ] AC1 — Read-before-invoke + no-self-author (PF-S17-01 + PF-S3-01): recipe `ADR-0004-T3` + consumed surfaces (`render.emit`/`store.read`/`egress_guard`/templates) read in full before executing; the entry point AUTHORED by a dispatched SE worker (full 11-section profile inlined verbatim — INV-ROLE-INLINING); orchestrator runs only mechanical RED/independent re-verify (the two falsifiability gates by mutation); a FRESH 6-agent `/review-pr` + blind triage + blind verify; `/review-pr` + `/merge` read in full. No `Workflow`; no `AskUserQuestion`.
+- [ ] AC2 (recipe AC-1) — `generate.run(artifact_name)` writes the named artifact + exits 0; the file exists on disk after the call (via the path `render.emit` returned).
+- [ ] AC3 (recipe AC-2) — unattended run, stdin closed, 0 prompts, exits 0.
+- [ ] AC4 (recipe AC-3, NG-4 go/no-go) — measured 0-listening-socket count over the REAL `generate.run` call + a mandatory POSITIVE CONTROL; no boolean/stub.
+- [ ] AC5 (recipe AC-5) — emit-SPY proof both modes drive ONE shared `render.emit`; structural-identity corroborating-only.
+- [ ] AC6 (recipe AC-4) — produced file opens offline with 0 outbound over the REAL produced file via the ADR-0001-T0 capture.
+- [ ] AC7 (recipe AC-6 + regression + manifest) — `pytest tests/generate/test_generate.py` green as a discrete run + full-suite regression green; the `feat(generate):` commit stages ONLY `generate.py` + `test_generate.py` (`render.py` NOT modified).
+- [ ] AC8 (drift + record + close) — surfaced drifts captured; `3gp` closed; 4 close audits + branch-completeness green at `--session 35`; PF attestation; VOLATILE 6-clause rotation; PR on `feature/generate-cron-entry` -> `/review-pr` (PRIORITY-ONLY, PF-S26-01) -> `/merge`; the close on `fix/s35-close` AFTER the merge (PF-S25-01).
+
+Files I WILL touch: `scripts/generate/generate.py` + `tests/generate/test_generate.py` (NEW 2-file manifest); `HANDOFF.md` (contract + close + rotation); `vault/sessions/session-35.md` (NEW); `vault/meta/log.md` (append); `.beads/issues.jsonl` via `bd` (close `3gp`, file `4yk`/`u8u`); `memory/process-failures.md` (only if a PF surfaces).
+
+Files I will NOT touch: `scripts/generate/render.py` (read-only consumed — TP-06 + ADR-0004-T2 collision); `vault/design/templates/*` (consumed via `emit`); `scripts/store/store.py` + `keying.py` (cross-spec; the cross-item enumeration lives in `generate.py`, NOT in store.py); `scripts/guard/*`; `scripts/ingest/*` + adapters (ADR-0003-T1 is a COMPLEMENT); the ADRs/spec/build-plan/recipes; `INVARIANTS.md` unless approved; `main` directly.
+
+NOT doing: ADR-0004-T2 (blocked on `5wo`); the scheduler `oaf`; modifying `render.emit`'s signature/path-return/PII boundary (Architect-gated); adding a published store cross-item surface to `store.py` (beaded `4yk`, not built here); generating real operator-PII artifacts into the trunk; library-population.
+
+Invariants at risk: INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS, INV-ROLE-INLINING.
+
+### S35 Scope Contract Evaluation (2026-06-06, volatile)
+
+- **AC1 — PASS.** Recipe + consumed surfaces read in full; the entry point AUTHORED by a dispatched SE worker (full 11-section profile inlined — INV-ROLE-INLINING held across the SE builder + 6 review agents + blind triage + SE fix + blind verify); orchestrator ran only mechanical RED/independent re-verify (the falsifiability mutation battery). FRESH 6-agent `/review-pr` + blind triage + blind verify. No `Workflow`; no `AskUserQuestion`; `/review-pr` + `/merge` read in full.
+- **AC2 — PASS.** `generate.run(artifact_name) -> Path` writes the named artifact + exits 0; file exists after the call.
+- **AC3 — PASS.** Unattended subprocess run with stdin=DEVNULL exits 0, 0 prompts.
+- **AC4 (NG-4 gate) — PASS (after a CHANGED/strengthened fix).** Measured 0-listening-socket over the real call + positive control. The ORIGINAL gate was NON-falsifiable for a CHILD-PROCESS listener (the realistic server breach); the 6-agent review caught it (the orchestrator's own probe tested only in-process), it was reworked (a sitecustomize process-tree listen-recorder + 3 positive controls + a negative control) and the orchestrator independently re-verified by mutation (os.fork child + subprocess child both -> RED).
+- **AC5 — PASS.** Emit-spy proof; both modes drive one shared `render.emit`; structural-identity corroborating-only.
+- **AC6 — PASS (strengthened).** Offline-open over the REAL produced file; a positive control (off-host ref -> FALSY) closed the vacuous-walk the review surfaced.
+- **AC7 — PASS.** Suite 120 passed / 2 skipped; SE authored RED directly; feat commit (`2f47ae8`) = the 2 manifest files; the review fixes (`9cfb607`). `render.py` unmodified.
+- **AC8 (close) — PASS (this close).** `3gp` CLOSED. PR #55 (`feature/generate-cron-entry`, 9 legitimate review findings fixed + 9/9 blind-verified, 2 beaded, 0 suppressed) rebase-merged at `9cfb607` (as of 2026-06-06 S35 close); the close on `fix/s35-close` AFTER the merge (PF-S25-01). 4 close audits + branch-completeness green at `--session 35`.
+- **CHANGED (documented, surfaced not silent):** (a) the AC-3 NG-4 gate required a falsifiability FIX surfaced by the review — the original observed only the parent interpreter and was blind to a child-process listener; reworked to a process-tree-spanning sitecustomize recorder with 3 positive controls + a negative control. (b) the AC-4 offline-open gained a positive control (off-host ref -> FALSY) closing a vacuous walk (the real artifact carries 0 asset refs). (c) the store cross-item read coupling (`generate._read_store` enumerates the store on-disk layout — no published read-all surface) BEADED `4yk` not fixed (ADR-0002 amendment; Contracts review independently bead-and-proceed'd per the `5wo` precedent). (d) `u8u` P3 (pre-existing store.py dir-edge) beaded. All within the contracted owned files + justified review-surfaced beads; no expansion into T2/store.py/specs/ADRs.
+
+### Drift checks (S35 close)
+
+- **Task drift:** the contracted deliverable (the thin `generate.run` cron/on-demand entry + the falsifiable NG-4 + single-render-path gates) delivered exactly; the review-driven changes (the AC-3 child-process falsifiability rework, the AC-4 positive control, the tightened assertions) STRENGTHENED it; no expansion into `oaf`/T2/store.py/specs/ADRs. The 2 beads (`4yk`/`u8u`) are review-surfaced + justified.
+- **Architecture drift:** toward LESS violation — the V1 generation entry point is PUBLISHED, the NG-4 no-live-server boundary is MECHANICALLY FALSIFIABLE across the process tree, the PII no-egress + gitignored-output boundaries hold (Security PASS). The store on-disk coupling is contained in one helper + beaded for a clean published surface (`4yk`), not silently crossed. INV-BRANCH-NOT-MAIN held (all work on feature/fix branches); INV-TRUNK-COMPLETENESS green open+close; INV-ROLE-INLINING held across all dispatches; `render.py` unmodified (no ADR-0004-T2 collision).
+- **Vision drift:** none. What the system IS after S35: "a local-first health tracking + planning system whose V1 now has a published, PII-boundaried generation entry point (`generate.run`) over the accessibility-gated render engine, on top of the wired data-IN layer." Matches `design/vision.md`.
+
+### PF attestation
+
+S35 close (2026-06-06): **No new PF-class entries this session.** Observed but NOT promoted: (a) **PF-S3-01 anti-self-attestation HELD + EARNED ITS KEEP (3rd consecutive — n9h S33, gu4 S34, 3gp S35)** — the 6-agent `/review-pr` + blind triage caught a REAL NG-4 falsifiability hole (the AC-3 go/no-go gate was blind to a CHILD-PROCESS listening socket — the realistic server/daemon breach shape) that the orchestrator's OWN pre-review mutation probe MISSED (the probe injected only an in-process listener, which the parent-interpreter monkeypatch caught -> false confidence). The Test-Coverage agent injected a subprocess listener that stayed GREEN; the orchestrator independently reproduced it, the SE reworked the gate to a process-tree-spanning observer, and the orchestrator independently re-verified by mutation (both os.fork + subprocess child shapes now -> RED) before accepting. Lesson (carried to Top-3): when self-verifying a falsifiability gate, test EVERY failure mode INCLUDING the cross-process one — same class as the S34 AC-3 member-collision near-miss. (b) **PF-S26-01 falsification window TRIPPED-CLEAN** — 9 legitimate fixed; 2 beaded (`4yk` store-surface = an ADR-0002 amendment editing a frozen cross-spec file; `u8u` pre-existing store.py); 1 NOT_ACTIONABLE (F10 test-duplication — fails the actionability condition, NOT severity suppression); 0 suppressed; the matrix stayed priority-only. (c) **PF-S17-01 read-before-invoke HELD** — recipe + consumed surfaces + `/review-pr` + `/merge` read in full; no `Workflow` substitution; the `/write-tests`-not-invocable-from-worker drift surfaced (SE authored RED directly). (d) **PF-S13-01 session-open HELD** — every Start-Protocol step run with real output incl. `branch-completeness-audit.sh` at OPEN; scope contract Walter-confirmed before work. (e) **PF-S25-01 window TRIPPED-CLEAN** — the close sequenced AFTER the `/review-pr`->`/merge` lifecycle on `fix/s35-close`, reflecting merged reality (`3gp` closed post-merge, `4yk`/`u8u` filed during review). (f) GraphQL throttled (limit 0) all session -> REST for PR-create + merge (full-40-char-SHA guard); the readiness check caught the fix commit was unpushed BEFORE merge (would otherwise have merged the unfixed head) — the methodology working, not a PF.
 
 ## Scope Contract — Session 34 (2026-06-05)
 
