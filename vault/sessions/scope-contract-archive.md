@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-36)
+title: Scope Contract Archive (Sessions 5-37)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,23 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-36. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-37. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 37 (2026-06-06)
+
+> Confirmed by Walter ("proceed with the contract path"). **Unit = Phase B of the `/execute-plan` re-entry: design/remediation only.** Clear the two blockers that gate W3/W4 (`5wo`, `qwj`) so Phase C can run `/execute-plan` in wave mode. NO V1 task built, NO `/execute-plan` invocation. Both blockers carried a decision-fork surfaced to Walter for adjudication.
+
+Goal: Resolve `5wo` and `qwj` (the two W3/W4 design/remediation blockers), each via dispatched-Architect analysis with the fork surfaced to Walter, then the chosen resolution applied and the bead closed/split — no production V1 task built.
+
+Acceptance criteria: AC1 (`5wo` render.emit return contract — Architect arbitrates, fork to Walter, recorded), AC2 (`qwj` scanner-agnostic + vault-prose policy decided + recorded), AC3 (baseline stays green), AC4 (lifecycle: `/review-pr` → fix legitimate → `/merge` → close after merge).
+
+**S37 evaluation:** AC1 PASS (option b caller-orchestrated pagination; `emit -> Path` preserved; recorded in `vault/decisions/2026-06-06-render-emit-pagination-caller-orchestrated.md` + 2 `[AMENDED]` in `docs/task-plan/ADR-0004-T2.md`; `5wo` CLOSED). AC2 PASS-with-CHANGED (scanner was already agnostic — bead premise stale, verified before acting PF-S6-01; policy option iii — ADR-0005 PII-free=health-data-free + `xlu` recipe scoped identity check; `qwj`+`ko5` CLOSED). AC3 PASS (120/2 throughout, docs-only). AC4 PASS (PR #60 docs-subset `/review-pr` 9 findings → 4 fixed+blind-verified, 2 beaded, 3 no-action; 0 suppressed; rebase-merged; close on `fix/s37-close`).
+
+**Drift (S37):** Task — Phase B delivered exactly; qwj finding REDUCED scope. Architecture — toward LESS violation (both W3/W4 interface conflicts resolved; `emit -> Path` preserved; ADR-0005 boundary clarified). Vision — none.
+
+**PF attestation (S37):** One PF promoted POST-close at Walter's challenge — **PF-S37-01** (`AP-PROTOCOL-FROM-MEMORY`, close-step-8): the close was declared complete while step 8 (DOCUMENT_RUBRIC) was run from memory, leaving two stale-doc items (log.md `last_reviewed`; closed-`ko5` in HANDOFF Open Issues) — fixed PR #62, attestation flipped to cite it PR #63. Recurrence 3+ of the operate-from-protocol-memory family (PF-S2-05/PF-S13-01). Structural fix `scripts/session-close-audit.sh` beaded. Falsification windows otherwise HELD (PF-S6-01, PF-S26-01, PF-S25-01, PF-S17-01, PF-S3-01).
 
 ## Scope Contract — Session 36 (2026-06-06)
 
