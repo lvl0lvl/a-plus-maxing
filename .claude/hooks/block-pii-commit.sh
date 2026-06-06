@@ -41,9 +41,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${BLOCK_PII_COMMIT_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 PII_SCAN_ROOT="${BLOCK_PII_COMMIT_PII_SCAN_ROOT:-$PROJECT_ROOT}"
 
-# ONE shared path/glob constant (Fix 4): the filled-scaffold-value prefix that the
-# repo-root .gitignore excludes, condition 1 matches, and the test's representative
-# value lives under. Conditions 1 & 2 + the data-bearing partition all key off this.
+# SCAFFOLD_PREFIX (Fix 4 single-source for the scaffold path): the filled-scaffold-value
+# prefix the repo-root .gitignore excludes, condition 1's matcher keys off, and the
+# test's representative value lives under. Condition 2 keys off STORE_PREFIX; both
+# prefixes also seed the data-bearing partition below.
 SCAFFOLD_PREFIX="vault/scaffold/filled/"
 STORE_PREFIX="vault/store/"
 # Data-bearing dropzones (gitignored health-data paths) the identity scan also covers.
@@ -56,6 +57,14 @@ deny() {  # $1 = reason string
 }
 
 COMMAND=$(jq -r '.tool_input.command // empty' < /dev/stdin)
+JQ_RC=$?
+# Fail-closed (F-BUG1): jq rc != 0 means stdin was not valid JSON — deny. The empty-
+# COMMAND early-exit below must NOT swallow that case (it would ALLOW on a parse fail).
+# After this guard, an empty COMMAND can only be the legitimate valid-JSON-but-no-
+# command-field case -> allow.
+if [[ $JQ_RC -ne 0 ]]; then
+    deny "PII-FREE-TRUNK: hook stdin was not valid JSON (jq parse failed, rc=$JQ_RC). Failing closed — commit blocked."
+fi
 [[ -z "$COMMAND" ]] && exit 0
 
 NORM=$(echo "$COMMAND" | tr -s '[:space:]' ' ')
@@ -65,11 +74,15 @@ if ! echo "$NORM" | grep -qE '(^|[;&|] *)git +([^|&;]*\s)?commit( |$)'; then
     exit 0
 fi
 
-# Staged set git will actually commit (added/copied/modified) — NOT git ls-files
-# (the HEAD/tracked set), so a git add-ed file absent from HEAD is scanned (Fix 3).
+# Staged set git will actually commit — NOT git ls-files (the HEAD/tracked set), so a
+# git add-ed file absent from HEAD is scanned (Fix 3). Filter ACMRT covers Added,
+# Copied, Modified, Renamed, Type-changed: R/T must be included or a high-similarity
+# rename (or a type change) into a data path injects PII while being dropped from the
+# staged set -> silent allow (F-SEC1). For an R entry --name-only emits the DESTINATION
+# path, correct for both the path checks and the content scan.
 # Capture the git rc explicitly: a process-substitution while-loop would discard it
 # and let a broken `git diff --cached` read as an empty staged set -> a silent allow.
-GIT_OUT=$(git -C "$PROJECT_ROOT" diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+GIT_OUT=$(git -C "$PROJECT_ROOT" diff --cached --name-only --diff-filter=ACMRT 2>/dev/null)
 GIT_RC=$?
 
 # Fail-closed: git-plumbing failure (rc != 0) denies. Distinct from the legitimate
