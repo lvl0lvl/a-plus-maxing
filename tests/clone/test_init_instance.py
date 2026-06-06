@@ -78,34 +78,35 @@ def _reading(timepoint="2026-06-01T08:00:00+00:00", value=55, item="rhr", source
 
 
 class _OpenTrace:
-    """Record every filesystem path opened during a traced region.
+    """Record every filesystem path the traced code reads/writes via pathlib.Path.
 
-    Wraps `builtins.open` and `os.open` so the test can assert which paths a call
-    touched. Resolves each path so symlink/relative forms collapse to a real path.
-    The recorded paths are compared against the clone root to prove 0 opens outside
-    it (Gate B / Gate C the 0-cross-clone-read / 0-outside-root-read property).
+    `init_instance.run` and the dashboard generation touch the filesystem through
+    `Path.read_text` / `Path.write_text` / `Path.open` / `Path.glob` / `Path.exists`
+    (and `store.read` reads via `Path.read_text` / `Path.exists`) — NOT through
+    `builtins.open` / `os.open`. So the trace patches those `Path` methods (the real
+    I/O surface the code uses); a `builtins.open` patch would never fire and the
+    Gate B/C assertions would pass vacuously. Each accessed path is resolved and
+    compared against the clone root to prove 0 reads/writes outside it
+    (Gate B 0-cross-clone-read / Gate C 0-outside-root-read property). The trace's
+    own detection capability is proven by `test_open_trace_reds_on_out_of_root_read`.
     """
+
+    _PATH_METHODS = ("read_text", "write_text", "open", "glob", "exists", "is_dir", "is_file")
 
     def __init__(self, monkeypatch):
         self.paths = []
         self._monkeypatch = monkeypatch
 
     def __enter__(self):
-        import builtins
+        trace = self
+        for name in self._PATH_METHODS:
+            real = getattr(Path, name)
 
-        real_open = builtins.open
-        real_os_open = os.open
+            def traced(self, *args, __real=real, **kwargs):
+                trace._record(self)
+                return __real(self, *args, **kwargs)
 
-        def traced_open(file, *args, **kwargs):
-            self._record(file)
-            return real_open(file, *args, **kwargs)
-
-        def traced_os_open(path, *args, **kwargs):
-            self._record(path)
-            return real_os_open(path, *args, **kwargs)
-
-        self._monkeypatch.setattr(builtins, "open", traced_open)
-        self._monkeypatch.setattr(os, "open", traced_os_open)
+            self._monkeypatch.setattr(Path, name, traced)
         return self
 
     def __exit__(self, *exc):
@@ -115,10 +116,10 @@ class _OpenTrace:
         try:
             self.paths.append(Path(path).resolve())
         except (TypeError, ValueError):
-            pass  # file descriptors / non-path targets are not cross-clone reads
+            pass  # non-path targets are not cross-clone reads
 
     def opens_outside(self, root):
-        """Return recorded opens that resolve outside `root` (cross-clone / off-root)."""
+        """Return recorded accesses that resolve outside `root` (cross-clone / off-root)."""
         root = Path(root).resolve()
         outside = []
         for p in self.paths:
@@ -127,6 +128,35 @@ class _OpenTrace:
             except ValueError:
                 outside.append(p)
         return outside
+
+
+def test_open_trace_reds_on_out_of_root_read(tmp_path, monkeypatch):
+    """Self-check: the read-trace REPORTS a deliberate read outside the clone root.
+
+    Proves the trace's RED-capability (mirrors the SEC-03 clean-then-injected
+    pattern). Without this, the Gate B/C `assert opens_outside == []` checks could
+    pass vacuously (the original `builtins.open`/`os.open` trace never fired because
+    the code reads via `Path.read_text`/`Path.exists`). A clean local read records 0
+    off-root accesses; a deliberate read of a store OUTSIDE the clone root is flagged.
+    """
+    clone = _make_scratch_clone(tmp_path)
+    run(clone)
+    store_root = clone / "vault/store"
+
+    # Sibling store OUTSIDE the clone root, carrying another operator's reading.
+    sibling_store = tmp_path / "sibling-clone" / "vault/store"
+    sibling_store.mkdir(parents=True)
+    store.append("rhr", _reading(value=999, source="sibling"), root=sibling_store)
+
+    # Clean direction: a local-only read records 0 off-root accesses.
+    with _OpenTrace(monkeypatch) as clean:
+        store.read("rhr", root=store_root)
+    assert clean.opens_outside(clone) == [], "local read must not flag off-root"
+
+    # Detection direction: an out-of-root read IS reported (trace turns red).
+    with _OpenTrace(monkeypatch) as leaking:
+        store.read("rhr", root=sibling_store)
+    assert leaking.opens_outside(clone), "trace failed to report an out-of-root read"
 
 
 # --------------------------------------------------------------------------- #
