@@ -12,6 +12,29 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 38 (2026-06-06)
+
+> Confirmed by Walter ("proceed"). **Unit = Phase C, the FIRST `/execute-plan` WAVE run: complete build-plan Wave 3.** Wave 3's other two tasks (`6be`/ADR-0003-T1, `gu4`/ADR-0004-T1) are already built+green; the remaining open tasks are `xlu`/ADR-0005-T1 (PII-free-trunk gitignore boundary + pre-commit content-scan hook) + `br1`/ADR-0006-T0 (no-train router spike). Built via `/execute-plan` in WAVE mode (read SKILL.md + references IN FULL first, PF-S17-01; never a hand-rolled per-task SE dispatch, PF-S36-01).
+
+**`v1-build` wave attestation:** Build-plan **Wave 3** (`docs/build-plan/build-plan-v1-full.md`). Prior-wave checkpoint **W2→W3 Go/No-Go attested PASS (run this session, not recited):** `tests/store tests/guard` 46 passed/2 skipped · `git check-ignore vault/store/x.ndjson` exit 0 · `pii_scan.scan([]) → 0 (int)` (SEC-01(a)). Both open tasks' entry-state prereqs verified present (ADR-0001-T0 spike report on disk; `egress_guard.run` importable; `.gitignore` carries `vault/store/`+raw dropzones; both mirror hooks + their test harnesses; `conftest.py` bootstrap).
+
+Goal: Complete Wave 3 by building `xlu` + `br1` via `/execute-plan`, gate on the Wave 3→4 checkpoint, and merge the wave PR.
+
+Acceptance criteria:
+- [ ] AC1 (`br1`/ADR-0006-T0 spike) — `/execute-plan` produces `docs/spec/.pipeline/spike-ADR-0006-T0-summary-router.md` passing all 6 AC assertions (six named sections; field-set names concrete fields + a non-empty named excluded-raw-PII list, no "relevant fields"; derivation names `store.py`+`keying.py`+the transformation; routing-enforcement names `egress_guard.py` AND a payload-field-level discriminator distinct from the guard's call-occurrence signal + fail-on-out-of-field-set; Falsifiable Check returns pass/fail + fails because a planted raw-PII field is in the payload; Recommendation = exactly one mechanism + Follow-up names T1+T2). Architect verifies. Deliverable is gitignored → no tracked commit (expected).
+- [ ] AC2 (`xlu`/ADR-0005-T1 hook) — `bash tests/hooks/test_block_pii_commit.sh` passes with every gate green (AC-1…AC-7, SEC-01(b) deterministic-stub+sentinel reuse proof, fail-closed, staged-set TOCTOU, single-path-constant, scoped-identity both directions, negative-placement). Hook consumes `pii_scan.scan` via the two scoped calls (agnostic trunk-wide with a NON-EXISTENT sentinel `identity_config` — never `""`; identity over the data-bearing subset with `DEFAULT_IDENTITY_CONFIG`); zero bash token-scan reimplementation; `scripts/guard/pii_scan.py` UNCHANGED. Security signs off.
+- [ ] AC3 (Wave 3→4 checkpoint AS A GATE) — the full W3→W4 boundary runs green (`pytest tests/ingest/test_ingest.py tests/generate/test_render.py` + `bash tests/hooks/test_block_pii_commit.sh` + `rg "def .*key" scripts/ingest/`=0 + `git check-ignore <filled-scaffold path>` + `test -f …spike-ADR-0006-T0…md` + the `test_contrast_and_colorblind` measured-value gate + the SEC-01(b) adversarial reuse check + cross-spec integration checks). No-go blocks "done".
+- [ ] AC4 (no regression) — full `.venv/bin/python -m pytest` stays ≥120 passed/2 skipped; existing `.claude/hooks/tests/*.sh` stay green.
+- [ ] AC5 (three-tier review + lifecycle) — Tier-1 SE self-check → Tier-2 whole-wave review (QA always; Architect for the br1 spike; Security for the xlu trust boundary) → Tier-3 `/review-pr` (6-agent) on the wave PR → fix every legitimate finding (priority-only, never suppress — PF-S26-01) → `/merge`. The S38 close is sequenced AFTER the merge (PF-S25-01).
+
+Files I WILL touch: `.gitignore` (xlu MODIFY); `.claude/hooks/block-pii-commit.sh` (xlu CREATE); `tests/hooks/test_block_pii_commit.sh` (xlu CREATE; creates `tests/hooks/`); `docs/spec/.pipeline/spike-ADR-0006-T0-summary-router.md` (br1 CREATE — gitignored working artifact, not committed); `HANDOFF.md` (contract + close rotation); `vault/sessions/session-38.md` (NEW); `vault/meta/overview.md` (wave-state); `vault/meta/log.md` (append); `vault/sessions/scope-contract-archive.md` (archive S37 contract); `.beads/issues.jsonl` via `bd`.
+
+Files I will NOT touch: `scripts/guard/pii_scan.py` (consumed read-only — ADR-0001-T1's; editing it breaks SEC-01(b)); `scripts/store/*`, `scripts/ingest/*`, `scripts/generate/*`; the deployed roster `.claude/agents/*`; `INVARIANTS.md` + the audit scripts; any Wave 4+ module (`yo6`/`ml1`/`ftm`/`oaf`/`8cv`/`1aa`/`1ih`); the ADRs/specs/build-plan/recipes (read-only inputs); `.claude/settings.json` (hook registration deferred to a bead — see NOT doing); `main` directly; real operator-PII values.
+
+NOT doing: building any Wave 4+ task; editing `pii_scan.py` or any consumed interface; `git add -f`-ing the gitignored br1 spike into tracked history (violates the `.pipeline/` convention); hand-rolling a per-task dispatch instead of `/execute-plan` WAVE mode (PF-S36-01); registering the hook in `.claude/settings.json` (default: bead the registration + the recipe's CI/pre-push backstop as follow-ups).
+
+Invariants at risk: INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS, INV-ROLE-INLINING. Governing: the xlu hook must preserve the ADR-0005 "PII-free = health-data-free" boundary (scoped identity check, not block-everything) + the SEC-01(a)/(b) reuse contract.
+
 ## Scope Contract — Session 37 (2026-06-06)
 
 > Confirmed by Walter ("proceed with the contract path"). **Unit = Phase B of the `/execute-plan` re-entry: design/remediation only.** Clear the two blockers that gate W3/W4 (`5wo`, `qwj`) so Phase C can run `/execute-plan` in wave mode uninterrupted. NO V1 task built, NO `/execute-plan` invocation this session. Both blockers carry a decision-fork surfaced to Walter for adjudication — neither is resolved silently.
