@@ -83,7 +83,7 @@ def run(artifact_name, *, _root=None, _out_dir=None):
 
 
 def main(argv=None):
-    """Run the named artifact and print its path; the cron-/operator-invocable surface.
+    """Run the named artifact, print its path, and return 0.
 
     Args:
         argv (list, optional): Argument vector; defaults to `sys.argv[1:]`.

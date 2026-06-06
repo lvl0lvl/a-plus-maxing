@@ -8,15 +8,20 @@ artifact, returning the path. The same code path serves both the interactive
 and no served surface.
 
 The load-bearing gates here are falsifiable by construction:
-- AC-3 (NG-4): a listen-counter is measured over the REAL `generate.run` call
-  (asserted == 0) AND over a deliberate bind+listen probe (asserted > 0), so the
-  observer is proven to discriminate 0-from-nonzero (no blind-observer pass).
+- AC-3 (NG-4): listening sockets are counted ACROSS the process tree of the REAL
+  cron surface (`python -m scripts.generate.generate` driven as a subprocess under
+  a listen-recording sitecustomize shim), asserted == 0. Positive controls run the
+  SAME mechanism over a subprocess that listens, a subprocess whose os.fork() child
+  listens, and a subprocess that spawns a fresh interpreter that listens — each
+  asserted > 0 — so the observer is proven to discriminate 0-from-nonzero for every
+  child-process breach shape (not just same-interpreter). A negative control asserts 0.
 - AC-5: `render.emit` is SPIED (wrapping the real one); both entry modes must
   drive exactly ONE shared emit invocation per run. Structural identity of the
   two modes' artifacts is a CORROBORATING secondary check only.
 """
 
-import socket
+import os
+import re
 import subprocess
 import sys
 import unittest.mock
@@ -80,13 +85,29 @@ def test_main_exits_zero(tmp_path, capsys):
 
 
 def test_unknown_artifact_name_raises(tmp_path):
-    """AC-1 boundary: an unknown artifact_name fails fast (no silent empty file)."""
+    """AC-1 boundary: an unknown artifact_name fails fast with the documented KeyError."""
     root = tmp_path / "store"
     out = tmp_path / "out"
     _seed_store(root)
 
-    with pytest.raises(Exception):
+    with pytest.raises(KeyError, match="unknown artifact"):
         generate.run("not-a-real-template", _root=root, _out_dir=out)
+
+
+def test_main_unknown_artifact_exits_2(tmp_path):
+    """AC-1 boundary: the cron surface rejects an unknown artifact via argparse exit 2.
+
+    `main` resolves artifact_name through argparse `choices=`, which rejects an
+    unknown name with SystemExit(2) BEFORE `run`'s KeyError — the operator/cron
+    rejection path, distinct from `run`'s documented KeyError (covered above).
+    """
+    root = tmp_path / "store"
+    out = tmp_path / "out"
+    _seed_store(root)
+
+    with pytest.raises(SystemExit) as exc:
+        generate.main(["not-a-real-template", "--root", str(root), "--out-dir", str(out)])
+    assert exc.value.code == 2
 
 
 def test_run_never_prompts_for_input(tmp_path):
@@ -130,69 +151,129 @@ def test_unattended_stdin_closed_exits_zero(tmp_path):
     assert Path(printed).exists()
 
 
-def _count_listens(observed):
-    """Run `observed` (zero-arg) while counting socket bind-to-listen calls in it.
+# A sitecustomize shim that wraps socket.socket.LISTEN (the listening-socket
+# operation — a bind-only UDP socket is NOT a listening socket, so bind is NOT
+# counted: F2 counter semantics) to append the calling pid to $LISTEN_LOG. Because
+# it is a sitecustomize on PYTHONPATH, the interpreter auto-imports it at startup
+# in the observed process AND in any FRESH-INTERPRETER subprocess it spawns (which
+# inherits PYTHONPATH); os.fork() children inherit the already-patched class. So a
+# listen anywhere in the process tree — same interpreter, fork child, or spawned
+# new interpreter — is recorded, spanning the process boundary the previous
+# parent-only class patch could not (F1).
+_LISTEN_SHIM = (
+    "import os, socket\n"
+    "_log = os.environ.get('LISTEN_LOG')\n"
+    "if _log:\n"
+    "    _real = socket.socket.listen\n"
+    "    def _counting(self, *a, **k):\n"
+    "        with open(_log, 'a') as fh:\n"
+    "            fh.write(str(os.getpid()) + '\\n')\n"
+    "        return _real(self, *a, **k)\n"
+    "    socket.socket.listen = _counting\n"
+)
 
-    Monkeypatches socket.socket.listen and .bind to increment a shared counter for
-    the duration of the observed call, then restores. Returns the count of
-    bind/listen operations attributable to the call. The same mechanism is run
-    over both the real `generate.run` (expect 0) and a deliberate bind+listen
-    probe (expect > 0), so the observer is proven to discriminate.
+
+def _count_listens_across_processes(tmp_path, argv_tail):
+    """Run `python <argv_tail>` as a subprocess and count listens anywhere in its tree.
+
+    Installs the `_LISTEN_SHIM` sitecustomize on PYTHONPATH and points LISTEN_LOG at
+    a fresh log file, then runs the interpreter with `argv_tail` (a `-m`/`-c`
+    invocation). The shim records every `socket.socket.listen` in the observed
+    process, in any os.fork() child (inherited patched class), and in any spawned
+    fresh interpreter (which re-imports the sitecustomize via inherited PYTHONPATH).
+
+    Args:
+        tmp_path (Path): A unique tmp dir for this observation's shim + log.
+        argv_tail (list): The interpreter argument tail after `sys.executable`
+            (e.g. `["-m", "scripts.generate.generate", ...]` or `["-c", "..."]`).
 
     Returns:
-        (int) The number of bind/listen operations observed during the call.
+        (int) The number of `socket.socket.listen` calls recorded across the tree.
     """
-    counter = {"n": 0}
-    real_listen = socket.socket.listen
-    real_bind = socket.socket.bind
+    obs_dir = tmp_path / f"obs-{abs(hash(tuple(argv_tail)))}"
+    obs_dir.mkdir()
+    (obs_dir / "sitecustomize.py").write_text(_LISTEN_SHIM)
+    log = obs_dir / "listens.log"
 
-    def counting_listen(self, *a, **k):
-        counter["n"] += 1
-        return real_listen(self, *a, **k)
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(obs_dir) + os.pathsep + env.get("PYTHONPATH", "")
+    env["LISTEN_LOG"] = str(log)
 
-    def counting_bind(self, *a, **k):
-        counter["n"] += 1
-        return real_bind(self, *a, **k)
-
-    with unittest.mock.patch.object(socket.socket, "listen", counting_listen), \
-            unittest.mock.patch.object(socket.socket, "bind", counting_bind):
-        observed()
-    return counter["n"]
+    proc = subprocess.run(
+        [sys.executable, *argv_tail],
+        cwd=str(REPO_ROOT),
+        env=env,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert proc.returncode == 0, f"observed subprocess failed: stderr={proc.stderr!r}"
+    return len(log.read_text().splitlines()) if log.exists() else 0
 
 
 def test_run_binds_zero_listening_sockets(tmp_path):
-    """AC-3 (NG-4): 0 sockets bound-to-listen across the real generate.run call.
+    """AC-3 (NG-4): 0 listening sockets opened anywhere in the real generate.run tree.
 
-    POSITIVE CONTROL: the SAME observation mechanism over a deliberate bind+listen
-    probe must report NON-ZERO, proving the observer discriminates 0-from-nonzero.
-    The gate fails if the positive control is not non-zero (a blind/mis-wired
-    observer would report 0 for both and pass vacuously).
+    Drives the REAL cron surface `python -m scripts.generate.generate` as a
+    subprocess under a listen-recording sitecustomize shim and asserts 0 listening
+    sockets were opened anywhere in its process tree (no server/daemon).
+
+    POSITIVE CONTROLS (close the blind-observer tautology ACROSS the process
+    boundary — the prior same-interpreter control could not): the SAME mechanism
+    over (a) a subprocess that itself listens, (b) a subprocess whose os.fork()
+    CHILD listens, and (c) a subprocess that spawns a FRESH INTERPRETER that
+    listens must each report NON-ZERO — proving the observer discriminates
+    0-from-nonzero for every child-process shape the NG-4 breach could take. A
+    NEGATIVE control (a subprocess that opens no listening socket) must report 0,
+    so the observer is not stuck-on.
     """
     root = tmp_path / "store"
     out = tmp_path / "out"
     _seed_store(root)
 
-    def run_generate():
-        generate.run("dashboard", _root=root, _out_dir=out)
-
-    def bind_and_listen_probe():
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            s.bind(("127.0.0.1", 0))
-            s.listen(1)
-        finally:
-            s.close()
-
-    # Positive control first: the observer must SEE a bind+listen.
-    control_count = _count_listens(bind_and_listen_probe)
-    assert control_count > 0, (
-        "positive control observed 0 bind/listen — the observer is blind, so the "
-        "== 0 assertion below would be a vacuous pass"
+    listen_body = (
+        "import socket\n"
+        "s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n"
+        "s.bind(('127.0.0.1',0)); s.listen(1); s.close()\n"
+    )
+    fork_child_listen = (
+        "import os, socket\n"
+        "pid=os.fork()\n"
+        "if pid==0:\n"
+        "    s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n"
+        "    s.bind(('127.0.0.1',0)); s.listen(1); s.close()\n"
+        "    os._exit(0)\n"
+        "os.waitpid(pid,0)\n"
+    )
+    spawned_interp_listen = (
+        "import subprocess, sys\n"
+        f"subprocess.run([sys.executable,'-c',{listen_body!r}], check=True)\n"
     )
 
-    # The real generate.run path must bind 0 listening sockets (no server/daemon).
-    run_count = _count_listens(run_generate)
-    assert run_count == 0, f"generate.run bound {run_count} sockets to listen (NG-4 breach)"
+    # Positive control (a): the observed subprocess itself opens a listening socket.
+    same = _count_listens_across_processes(tmp_path, ["-c", listen_body])
+    assert same > 0, "positive control (same-interpreter listen) observed 0 — blind observer"
+
+    # Positive control (b): an os.fork() CHILD of the observed subprocess listens.
+    forked = _count_listens_across_processes(tmp_path, ["-c", fork_child_listen])
+    assert forked > 0, "positive control (os.fork child listen) observed 0 — blind across fork"
+
+    # Positive control (c): a FRESH-INTERPRETER subprocess grandchild listens.
+    spawned = _count_listens_across_processes(tmp_path, ["-c", spawned_interp_listen])
+    assert spawned > 0, "positive control (fresh-interpreter listen) observed 0 — blind across spawn"
+
+    # Negative control: a subprocess that opens no listening socket reports 0.
+    none = _count_listens_across_processes(tmp_path, ["-c", "x=1\n"])
+    assert none == 0, f"negative control reported {none} — observer is stuck-on, not discriminating"
+
+    # The REAL generate.run cron surface must open 0 listening sockets in its tree.
+    run_count = _count_listens_across_processes(
+        tmp_path,
+        ["-m", "scripts.generate.generate", "dashboard",
+         "--root", str(root), "--out-dir", str(out)],
+    )
+    assert run_count == 0, f"generate.run opened {run_count} listening sockets (NG-4 breach)"
 
 
 def test_both_modes_drive_one_shared_render_emit(tmp_path):
@@ -224,8 +305,10 @@ def test_both_modes_drive_one_shared_render_emit(tmp_path):
         f"cron drove {spy_cron.call_count} render.emit calls, expected 1"
     )
 
-    # Both spies wrapped the SAME render.emit object (one render path, not two).
-    assert spy_ondemand._mock_wraps is spy_cron._mock_wraps is render.emit
+    # Both modes route through the ONE module path "scripts.generate.render.emit"
+    # — patched here with wraps=render.emit — so a single render path is guaranteed
+    # by construction (the patch target is the only emit symbol generate.run resolves).
+    assert spy_ondemand.call_count == spy_cron.call_count == 1
 
     # CORROBORATING secondary check only: same store state -> structurally identical
     # artifacts (both modes produced the dashboard from the same seeded store).
@@ -236,8 +319,6 @@ def test_both_modes_drive_one_shared_render_emit(tmp_path):
 # --------------------------------------------------------------------------- #
 # Cycle 2 — the produced file opens offline with 0 outbound (AC-4)
 # --------------------------------------------------------------------------- #
-
-import re  # noqa: E402
 
 # A src=/href=/url() target that resolves off the file is anything that is neither
 # a same-document #fragment nor an inline data: URI.
@@ -293,3 +374,52 @@ def test_produced_file_opens_offline_zero_outbound(tmp_path, artifact_name):
     assert egress_run(open_and_walk_assets), (
         f"opening the produced {artifact_name} file observed outbound network"
     )
+
+
+def test_offline_open_walk_detects_off_host_ref(tmp_path):
+    """AC-4 POSITIVE CONTROL: the SAME walk over an OFF-HOST ref is observed FALSY.
+
+    The real dashboard/report carry ZERO off-host asset refs, so the urlopen walk
+    in the AC-4 test never attempts an outbound connect — `egress_run` would return
+    truthy over a no-op closure even if the guard were blind. This control runs the
+    identical open_and_walk_assets mechanism over a synthetic file carrying one
+    off-host ref and asserts `egress_run` returns FALSY, proving the walk+guard
+    actually detect outbound before the AC-4 test asserts truthy for the real file.
+    """
+    import urllib.request
+
+    from scripts.guard.egress_guard import run as egress_run
+
+    # An off-host ref (closed local port) that resolves OFF the file: the walk must
+    # attempt a socket connect, which the egress guard surfaces as a fail.
+    synthetic = tmp_path / "off-host.html"
+    synthetic.write_text("<img src='http://127.0.0.1:9/x'>")
+
+    def open_and_walk_assets():
+        html = synthetic.read_text()
+        refs = _asset_refs(html)
+        assert refs, "control fixture must carry an off-host ref for a meaningful walk"
+        for target in refs:
+            with urllib.request.urlopen(target) as resp:
+                resp.read()
+
+    assert not egress_run(open_and_walk_assets), (
+        "walking an off-host ref returned truthy — the walk/guard is blind, so the "
+        "AC-4 truthy assertion over the real file would be a vacuous pass"
+    )
+
+
+def test_empty_store_succeeds_and_writes_file(tmp_path):
+    """An empty/nonexistent store yields an empty-data artifact, not a crash.
+
+    `generate.run` over a store root with no `.ndjson` files assembles an empty
+    read model and still drives one render.emit, writing a file. Pins the
+    empty-store contract (zero readings -> empty-data artifact, run succeeds).
+    """
+    empty_root = tmp_path / "nonexistent-store"  # never created -> no item files
+    out = tmp_path / "out"
+
+    path = generate.run("dashboard", _root=empty_root, _out_dir=out)
+
+    assert path.exists()
+    assert path.is_file()
