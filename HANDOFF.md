@@ -12,6 +12,26 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 37 (2026-06-06)
+
+> Confirmed by Walter ("proceed with the contract path"). **Unit = Phase B of the `/execute-plan` re-entry: design/remediation only.** Clear the two blockers that gate W3/W4 (`5wo`, `qwj`) so Phase C can run `/execute-plan` in wave mode uninterrupted. NO V1 task built, NO `/execute-plan` invocation this session. Both blockers carry a decision-fork surfaced to Walter for adjudication — neither is resolved silently.
+
+Goal: Resolve `5wo` and `qwj` (the two W3/W4 design/remediation blockers), each via dispatched-Architect/SE analysis with the decision-fork surfaced to Walter, then the chosen resolution applied and the bead closed/split — no production V1 task built.
+
+Acceptance criteria:
+- [ ] AC1 (`5wo`) — Architect (full profile inlined, INV-ROLE-INLINING) analyzes the `render.emit` single-`Path` vs ADR-0004-T2 pagination conflict against ADR-0004 + the T1 Interface Contract + `render.py`; the (a) amend-T1-return-contract vs (b) caller-orchestrated-pagination fork is presented to Walter in prose with a recommendation; Walter's choice is recorded + documented in the owning artifact (ADR/spec/recipe per the ownership matrix) with the downstream single-path assumptions (T3/ADR-0006-T2/ADR-0007-T2) reconciled; `5wo` closed (or left open with a precise residual if Walter defers the doc-amendment into the W4 build).
+- [ ] AC2 (`qwj`) — `scripts/guard/pii_scan.py` made operator-agnostic (operator-identity tokens sourced from a gitignored operator config, sane no-config default; tests updated/added); the vault-prose-hit policy (~924/~150 tracked-prose hits vs the ADR-0005-T1 pre-commit hook) decided with Walter (allowlist/scope vs clone-init sanitization) and recorded; `qwj` closed or split (residual sanitization beaded if it is clone-init territory).
+- [ ] AC3 — baseline stays green: full suite (was 120/2) + governance audits unaffected; no regression.
+- [ ] AC4 — lifecycle + close: `/review-pr` on the Phase-B PR → fix every legitimate finding (priority-only, never suppress — PF-S26-01) → `/merge`; then the S37 close (suite + 4 close audits + branch-completeness green at `--session 37`, PF attestation, VOLATILE 6-clause rotation) sequenced AFTER the merge (PF-S25-01).
+
+Files I WILL touch: `scripts/guard/pii_scan.py` + `tests/guard/*` (qwj); a new gitignored operator-config file + `.gitignore` entry (qwj); the artifact owning the emit-return contract — candidate set `docs/task-plan/ADR-0004-T1.md`, `docs/spec/adr-0004-adr-0007-spec.md`, and the single-path assumptions in the T3/ADR-0006-T2/ADR-0007-T2 recipes (5wo — exact set depends on Walter's fork choice); `vault/decisions/` (dated decision note if 5wo amends the contract); `HANDOFF.md` (contract + close rotation); `vault/sessions/session-37.md` (NEW); `vault/meta/log.md` (append); `.beads/issues.jsonl` via `bd`.
+
+Files I will NOT touch: any `v1-build` task module (`br1`/`xlu`/`ml1`/`ftm`/`yo6`/`oaf`/`8cv`/`1aa`/`1ih` — Phase C); `/execute-plan` invocation (Phase C); other `scripts/**` production code beyond `pii_scan.py`; the deployed roster `.claude/agents/*`; `lib/gate_attest.py`, schemas, bda, the wiki-ingest gate; `INVARIANTS.md` + the audit scripts (no unilateral invariant/mechanical change); real operator-PII values (live only in the gitignored config, never tracked); `vault/{compounds,biomarkers,library}/` content; `main` directly.
+
+NOT doing: building any V1 task / running `/execute-plan` (Phase C); hand-scrubbing the ~150 vault-prose operator-name files (clone-init/ADR-0005 sanitization — beaded if residual, not done inline); silently resolving either fork; mechanizing the wave-attestation field (`vvs`); editing the build-plan wave structure.
+
+Invariants at risk: INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS, INV-ROLE-INLINING. Governing principle for qwj: ADR-0005 PII-free trunk — the gitignored-config approach must keep the trunk operator-name-free.
+
 ## Scope Contract — Session 36 (2026-06-06)
 
 > Confirmed by Walter ("scope phase A and then proceed" — after Walter caught at S36 open that the V1 execute stage was hand-rolled per-task instead of run through the sanctioned `/execute-plan`, and that the build-plan wave order was abandoned from S32; PF-S36-01 logged). **Unit = Phase A of the execute-plan re-entry: governance + bookkeeping only, NO new code.** Get the V1 build back onto the `/execute-plan` rails by documenting it as the execute-stage path, adding the wave + checkpoint convention to v1-build scope contracts, reconciling the wave-naming drift, and banking the S36 damage-assessment (all runnable build-plan checkpoints green) as the verified baseline. Phase B (unblock `5wo`/`qwj`) + Phase C (run `/execute-plan` in wave mode) are explicitly NOT this session.
