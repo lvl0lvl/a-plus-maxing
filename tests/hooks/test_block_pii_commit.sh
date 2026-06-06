@@ -37,7 +37,7 @@ REAL_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # hook + real .gitignore carry, the hook's condition-1 matcher, and AC-1/AC-3/AC-4 all use
 # this same representative value. The glob the .gitignore excludes is its parent dir.
 SCAFFOLD_VALUE="vault/scaffold/filled/value-001.json"
-SCAFFOLD_GLOB="vault/scaffold/filled/"   # the .gitignore exclusion pattern
+SCAFFOLD_PREFIX="vault/scaffold/filled/"   # the .gitignore exclusion pattern (matches the hook's identifier)
 STORE_FILE="vault/store/entries.ndjson"
 
 PASS=0; FAIL=0
@@ -56,7 +56,7 @@ git init -q; git config user.email t@t.t; git config user.name t; git checkout -
 # driven by the one shared constant.
 cat > "$REPO/.gitignore" <<EOF
 vault/store/
-$SCAFFOLD_GLOB
+$SCAFFOLD_PREFIX
 vault/dna/raw/
 vault/meta/operator-identity.txt
 EOF
@@ -241,6 +241,71 @@ OUT=$(printf '{"tool_input":{"command":%s}}' \
 [[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
     && ok "git-plumbing fail-closed: non-git PROJECT_ROOT -> DENY (not silent allow)" \
     || bad "git-plumbing fail-open: non-git PROJECT_ROOT allowed, got: $OUT"
+
+# ── F-SEC1: high-similarity rename injecting PII -> deny (--diff-filter=ACMRT) ───
+# A rename above git's similarity threshold is classified R, which --diff-filter=ACM
+# DROPS from the staged set -> empty set -> silent ALLOW even though the destination
+# carries injected PII. The filter must include R (and T) so the destination path is
+# enumerated; git diff --name-only emits the DESTINATION for an R entry, which is
+# correct for both the path checks and the content scan.
+yes "lorem ipsum dolor sit amet padding line" | head -200 > "$REPO/big.txt"
+git -C "$REPO" add big.txt; git -C "$REPO" commit -q -m "seed big"
+git -C "$REPO" mv big.txt renamed.txt
+printf '\ncontact erin@gmail.com\n' >> "$REPO/renamed.txt"
+git -C "$REPO" add renamed.txt
+OUT=$(invoke "git commit -m 'rename inject'")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"renamed.txt"* ]]; } \
+    && ok "F-SEC1 high-similarity rename with injected PII DENIED + destination named" \
+    || bad "F-SEC1 rename-bypass: injected-PII rename NOT denied, got: $OUT"
+git -C "$REPO" reset -q --soft HEAD~1; git -C "$REPO" reset -q
+rm -f "$REPO/big.txt" "$REPO/renamed.txt"
+
+# ── F-BUG1: malformed (non-JSON) stdin -> deny (jq parse fail-closed) ───────────
+# jq exits non-zero on non-JSON stdin with empty stdout. The hook must capture jq's
+# rc and DENY on parse failure, not fall through the empty-COMMAND early-exit (which
+# only legitimately handles valid JSON with no command field -> allow).
+OUT=$(printf 'not-json-at-all' \
+      | BLOCK_PII_COMMIT_PROJECT_ROOT="$REPO" BLOCK_PII_COMMIT_PII_SCAN_ROOT="$REAL_ROOT" bash "$HOOK")
+[[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
+    && ok "F-BUG1 malformed stdin -> DENY (jq parse fail-closed)" \
+    || bad "F-BUG1 jq fail-open: malformed stdin allowed, got: $OUT"
+
+# ── F-TEST1: CHARACTERIZATION — non-canonical-case token ALONE -> currently allow ─
+# PINS the inherited pii_scan case-sensitivity gap (bead 2x1): scan()'s contact
+# pattern is case-sensitive on the `@gmail.com` literal, so a token whose domain is
+# upper/mixed case (`Op.User@Gmail.COM`) scores 0 hits. With ONLY that token staged
+# (no canonical token, no other PII) the hook does NOT deny. pii_scan.py is read-only,
+# so this characterizes the gap rather than fixing it. WHEN the upstream gap is closed
+# (case-insensitive match) this turns RED and MUST be updated to assert deny.
+mkfile "docs/noncanon.md" "Reach out to Op.User@Gmail.COM for details."
+git -C "$REPO" add docs/noncanon.md
+OUT=$(invoke "git commit -m 'noncanon only'")
+[[ "$OUT" != *'"deny"'* ]] \
+    && ok "F-TEST1 non-canonical token alone -> allow (PINS pii_scan case gap, bead 2x1)" \
+    || bad "F-TEST1 case gap closed upstream? non-canonical token now denied — update this case: $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/noncanon.md"
+
+# ── F-TEST2: non-numeric rc-0 scan output -> deny (^[0-9]+$ fail-closed clause) ──
+# A stub scan that prints a NON-NUMERIC string and returns rc 0 must be caught by the
+# `! [[ "$SCAN_OUT" =~ ^[0-9]+$ ]]` clause -> deny, BEFORE the `-ge 1` arithmetic
+# (which is false on non-numeric -> would ALLOW). Exercises that clause in isolation.
+mkfile "docs/leak5.md" "contact frank@gmail.com"
+git -C "$REPO" add docs/leak5.md
+NUMSTUB="$TMP/numstub"; mkdir -p "$NUMSTUB/scripts/guard"
+cat > "$NUMSTUB/scripts/guard/pii_scan.py" <<PY
+from pathlib import Path
+DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
+def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG):
+    print("not-a-number")
+    return 0
+PY
+OUT=$(printf '{"tool_input":{"command":%s}}' \
+        "$(printf '%s' "git commit -m 'x'" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+      | BLOCK_PII_COMMIT_PROJECT_ROOT="$REPO" BLOCK_PII_COMMIT_PII_SCAN_ROOT="$NUMSTUB" bash "$HOOK")
+[[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
+    && ok "F-TEST2 non-numeric rc-0 scan output -> DENY (^[0-9]+\$ fail-closed clause)" \
+    || bad "F-TEST2 non-numeric output fell through to -ge 1 -> ALLOW, got: $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/leak5.md"
 
 echo
 echo "test_block_pii_commit: ${PASS} passed, ${FAIL} failed"
