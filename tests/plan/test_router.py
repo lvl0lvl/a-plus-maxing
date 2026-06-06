@@ -74,6 +74,39 @@ def test_summarize_excludes_named_raw_pii_field():
     assert "date-of-birth" not in summary
 
 
+def test_summarize_emits_no_raw_value_in_any_token():
+    """4-1: no raw input VALUE leaks into any summary token (not just the name).
+
+    Plants a distinctive sentinel into each raw-PII source item and asserts the
+    sentinel substring is absent from EVERY summary token value — the derivation
+    must emit a band/class token, never the raw value. Reds if `_band_token`-style
+    passthrough returns the raw value embedded in a whitelisted field.
+    """
+    sentinels = {
+        "date-of-birth": "1986-04-12-SENTINEL",
+        "postal-address": "123-SECRET-STREET",
+        "raw-lab-values": "ALT-9999-SENTINEL",
+        "raw-symptom-free-text": "back-SENTINEL-tweak",
+        "clinical-notes": "clinical-SENTINEL-note",
+    }
+    records = [
+        {"item": item, "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": val}
+        for item, val in sentinels.items()
+    ]
+    # Plus clean state for the pass-through field-set fields.
+    records += [
+        {"item": "goal-targets", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "return to pre-Jan-2026 loading"},
+    ]
+    summary = router.summarize(_store_read_factory(records))
+    token_blob = " ".join(str(v) for v in summary.values())
+    for raw_value in sentinels.values():
+        assert raw_value not in token_blob, (
+            f"raw value {raw_value!r} leaked into a summary token: {summary}"
+        )
+
+
 def test_summarize_reads_through_store():
     """AC-5: summarize sources state via the passed store.read and no other path."""
     store_read = _clean_store_read()
@@ -117,6 +150,38 @@ def test_dispatch_clean_path_zero_non_model_egress():
     assert run(lambda: router.dispatch(summary, sink=lambda p: None))
 
 
+def test_dispatch_injected_non_model_egress_flips_guard_to_fail():
+    """4-3 SEC-03 failing-capable: an outbound call on a dispatch side path -> FAIL.
+
+    Asserts the CLEAN direction truthy FIRST, then injects a synthetic outbound
+    call on a non-model side path within the same guarded closure and asserts the
+    guard returns falsy — proving the egress complement is failing-capable for the
+    router, not merely that a clean dispatch makes 0 calls. Requires network so the
+    deny is attributed to the sandbox, not an offline host (mirrors the clone /
+    egress_guard suites' precheck discipline).
+    """
+    import socket
+
+    from scripts.guard.egress_guard import run
+
+    try:
+        socket.create_connection(("1.1.1.1", 53), timeout=3).close()
+    except OSError:
+        pytest.skip("no network — egress deny not exercisable")
+
+    summary = router.summarize(_clean_store_read())
+    # Clean direction first: a plain dispatch closure observes 0 egress.
+    assert run(lambda: router.dispatch(summary, sink=lambda p: None))
+
+    def dispatch_with_side_egress():
+        router.dispatch(summary, sink=lambda p: None)
+        socket.create_connection(("1.1.1.1", 53), timeout=3)
+
+    assert not run(dispatch_with_side_egress), (
+        "an outbound call on a dispatch side path must flip the guard to FAIL"
+    )
+
+
 def test_dispatch_clean_control_does_not_raise():
     """AC-4 control: a payload of only field-set tokens does NOT raise."""
     summary = router.summarize(_clean_store_read())
@@ -158,6 +223,21 @@ def test_dispatch_raise_is_field_set_membership_not_call_occurrence():
     with pytest.raises(Exception):
         router.dispatch(summary, sink=lambda p: sink_calls.append(p))
     assert not sink_calls, "raise must precede the model send (not a call-occurrence)"
+
+
+def test_dispatch_raise_message_names_key_not_value():
+    """4-3-LOW: the rejection message carries the field NAME but NOT its value.
+
+    Reds if a future debug-edit appends the offending field's value to the error.
+    """
+    summary = router.summarize(_clean_store_read())
+    secret_value = "PHONE-VALUE-SENTINEL-555"
+    summary["phone-number"] = secret_value
+    with pytest.raises(Exception) as exc:
+        router.dispatch(summary, sink=lambda p: None)
+    message = str(exc.value)
+    assert "phone-number" in message
+    assert secret_value not in message
 
 
 def test_dispatch_fail_closed_on_raising_summarize():

@@ -81,9 +81,60 @@ class Dispatch:
         self.payload = payload
 
 
-def _band_token(field, value):
-    """De-identify a raw value into its field-set band/class token."""
-    return f"{field}:{value}"
+def _age_band(value):
+    """Bucket a raw date-of-birth into a coarse training-age band.
+
+    Buckets by birth-decade (minimal sensible boundaries — the spike pins the
+    band SHAPE, not exact cutoffs); the raw date never appears in the token.
+    """
+    year = str(value)[:4]
+    return f"born-{year[:3]}0s" if year.isdigit() else "age-band-unknown"
+
+
+def _trend_token(value):
+    """Map a raw lab/reading value to a coarse direction token (no raw value)."""
+    text = str(value).lower()
+    if any(w in text for w in ("rising", "up", "increase", "high", "out-of-range")):
+        return "out-of-range"
+    if any(w in text for w in ("falling", "down", "decrease", "low")):
+        return "out-of-range"
+    return "within-range"
+
+
+def _issue_class(value):
+    """Map raw symptom/clinical free-text to a coarse body-region issue class."""
+    text = str(value).lower()
+    if any(w in text for w in ("back", "spine", "lumbar")):
+        return "back-region"
+    if any(w in text for w in ("knee", "leg", "hip", "ankle")):
+        return "lower-limb-region"
+    if any(w in text for w in ("shoulder", "arm", "elbow", "wrist")):
+        return "upper-limb-region"
+    return "general-issue"
+
+
+def _region_class(value):
+    """Map a raw postal-address to a coarse presence/region class (no raw value)."""
+    return "region-present" if str(value).strip() else "region-absent"
+
+
+# Per-field-set-field de-identifying derivations for fields backed by a raw-PII
+# source item. Each MUST emit a derived band/class token only — the raw value
+# never appears in the emitted token (Finding 4-1).
+_FIELD_DERIVATION = {
+    "training-age-band": _age_band,
+    "recent-trend-direction": _trend_token,
+    "active-issue-class": _issue_class,
+    "equipment-access-class": _region_class,
+}
+
+# §5b change-control tripwire (Finding 4-2): every raw source item must be a
+# named-excluded raw-PII field, and the field-set must stay disjoint from the
+# excluded list. A future edit that adds a raw-PII item to neither structure —
+# which would then read through `summarize`'s else-branch under its own name —
+# trips this at module load.
+assert set(_RAW_TO_FIELD) <= set(EXCLUDED_RAW_PII)
+assert set(SUMMARY_FIELD_SET).isdisjoint(set(EXCLUDED_RAW_PII))
 
 
 def summarize(store_read):
@@ -111,7 +162,7 @@ def summarize(store_read):
             for raw in source_items:
                 readings.extend(store_read(raw))
             if readings:
-                summary[field] = _band_token(field, readings[-1]["value"])
+                summary[field] = _FIELD_DERIVATION[field](readings[-1]["value"])
         else:
             # ...otherwise the field reads from a store item of its own name.
             readings = store_read(field)
