@@ -278,6 +278,17 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## What Is Next (volatile)
 
+### Resume checklist — next session (S37) open
+
+**Clean slate — nothing dangling from S36.** No pending PR cycle, no un-run audit, no uncommitted state: `main` @ `a5fc5fb` (as of 2026-06-06 S36 close), tree clean, 0 open PRs, both S36 PRs (#57 content, #58 close) merged. The next session opens normally:
+
+1. Run the Session Start Protocol (steps 1-6) + `branch-completeness-audit.sh` at OPEN. Baseline suite = 120 passed / 2 skipped.
+2. Cut a `fix/`-branch off `main` for Phase B; write + confirm the S37 scope contract (Phase B unblocks the W3/W4 leaves; cite that context).
+3. **Phase B is DESIGN / REMEDIATION — NOT a `/execute-plan` wave yet** (execute-plan wave mode begins at Phase C):
+   - **`5wo`** — `bd show 5wo`; read `docs/adr/ADR-0004-on-demand-single-file-artifact-generation.md`, the T1 Interface Contract in `docs/spec/adr-0004-adr-0007-spec.md`, and `scripts/generate/render.py`. Dispatch Architect; the fork (amend `render.emit` to return ≥2 paths vs caller-orchestrated pagination) is an Interface-Contract decision — **surface the options to Walter for adjudication, don't pick silently.**
+   - **`qwj`** — `bd show qwj`; read `scripts/guard/pii_scan.py`. Make the scanner operator-agnostic (config/parameter-driven, not a hard-coded name) per the ADR-0005 clonable PII-free trunk. Resolve before `xlu` (now a wired dependency).
+4. **Phase C** (after B): `/execute-plan` in WAVE mode — read its SKILL.md + references IN FULL first (PF-S17-01) — complete W3 (`br1`+`xlu`) → W4 → W5 → W6 → W7, gating on each per-wave checkpoint + a wave PR.
+
 ### S36 banked the `/execute-plan` re-entry baseline. Next: Phase B (unblock `5wo`/`qwj`) → Phase C (`/execute-plan` wave mode, complete W3→W7 in order).
 
 **RESUMPTION POINT.** S36 was Phase A (governance: adopt `/execute-plan`, bank the verified baseline, reconcile wave-naming — no code). **Open the next session on `main`** (Start Protocol + `branch-completeness-audit.sh` at open). The re-entry continues:
