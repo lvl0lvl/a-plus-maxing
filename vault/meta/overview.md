@@ -74,19 +74,19 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
-## Status as of 2026-06-06 (S36) — V1 build execution wave-state
+## Status as of 2026-06-06 (S38) — V1 build execution wave-state
 
-The V1 build executes `docs/build-plan/build-plan-v1-full.md` (18 tasks across 7 topological waves). Built **9/18** leaves; verified sound at S36 against every runnable build-plan checkpoint (full suite 120 passed / 2 skipped; Wave 2→3 + Wave 3→4/4→5 checkpoint gates green; 0 dangling references to unbuilt modules).
+The V1 build executes `docs/build-plan/build-plan-v1-full.md` (18 tasks across 7 topological waves). Built **11/18** leaves; verified sound against every runnable build-plan checkpoint (full suite 120 passed / 2 skipped; Wave 2→3 + Wave 3→4 checkpoint gates green; 0 dangling references to unbuilt modules). S38 ran the FIRST `/execute-plan` WAVE (Phase C) and completed Wave 3 via the three-tier review + checkpoint gate.
 
 - **Wave 1** — PII-boundary / store-keying / render-size spikes — ✅ complete (`394`, `bez`, `qbb`)
 - **Wave 2** — NDJSON store + egress/PII guard — ✅ complete (`89a`, `e9m`)
-- **Wave 3** — ingest routine, render engine, gitignore-hook, router spike — ⚠️ 2/4: `6be`+`gu4` done; **`xlu` (0005-T1, unblocked S37 — `qwj` resolved), `br1` (0006-T0) open**
-- **Wave 4** — adapters, matrix render, cron entry, clone-init, router impl — ⚠️ 2/5: `n9h`+`3gp` done; **`yo6` (0004-T2, unblocked S37 — `5wo` resolved), `ml1` (0005-T2), `ftm` (0006-T1) open**
+- **Wave 3** — ingest routine, render engine, gitignore-hook, router spike — ✅ complete: `6be`+`gu4` (prior) + `xlu` (0005-T1) + `br1` (0006-T0 spike) built S38
+- **Wave 4** — adapters, matrix render, cron entry, clone-init, router impl — ⚠️ 2/5 (NEXT WAVE): `n9h`+`3gp` done; **`yo6` (0004-T2, unblocked S37 — `5wo` resolved), `ml1` (0005-T2), `ftm` (0006-T1) open**
 - **Wave 5** — scheduler + plan assembly — open: `oaf`, `8cv`
 - **Wave 6** — lab-loop store schemas — open: `1aa`
 - **Wave 7** — biomarker matrix/projection views — open: `1ih`
 
-Execute-stage protocol: `/execute-plan` in wave mode, adopted S36 after **PF-S36-01** (the build had been hand-rolled per-task off the wave schedule from S32 — outputs verified undamaged, but the wave-checkpoint discipline lapsed). Re-entry completes the open waves in order; Phase B (S37) cleared `5wo`/`qwj` (the W3/W4 design blockers — `5wo`→caller-orchestrated pagination preserving `emit -> Path`, `qwj`/`ko5`→ADR-0005 "PII-free = health-data-free" clarification); Phase C resumes at W3 (`br1`+`xlu`). No actual artifact generates until `generate.run` is fed real operator data (LM-04 pending). Prior session titles (S32-S35) use the old ADR-family wave labels and are NOT retro-corrected — cross-reference the build-plan wave numbers here, not the archived session titles. The S2/S1 snapshots below are historical.
+Execute-stage protocol: `/execute-plan` in wave mode, adopted S36 after **PF-S36-01** (the build had been hand-rolled per-task off the wave schedule from S32 — outputs verified undamaged, but the wave-checkpoint discipline lapsed). Re-entry completes the open waves in order; Phase B (S37) cleared `5wo`/`qwj` (the W3/W4 design blockers — `5wo`→caller-orchestrated pagination preserving `emit -> Path`, `qwj`/`ko5`→ADR-0005 "PII-free = health-data-free" clarification); Phase C built W3 (`br1`+`xlu`) at S38 via the first `/execute-plan` wave run (three-tier review + checkpoint gate), and resumes at W4 (`yo6`+`ml1`+`ftm`). No actual artifact generates until `generate.run` is fed real operator data (LM-04 pending). Prior session titles (S32-S35) use the old ADR-family wave labels and are NOT retro-corrected — cross-reference the build-plan wave numbers here, not the archived session titles. The S2/S1 snapshots below are historical.
 
 ## Status as of 2026-05-23 (S2 close)
 - Wiki schema layered onto operational vault (`vault/WIKI.md`)
