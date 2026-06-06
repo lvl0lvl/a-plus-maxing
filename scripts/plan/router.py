@@ -81,29 +81,63 @@ class Dispatch:
         self.payload = payload
 
 
-def _age_band(value):
+# Closed `recent-trend-direction` vocabulary (ADR-0006-T0 spike lines 32-33).
+TREND_DIRECTIONS = ("improving", "flat", "regressing")
+
+
+def _age_band(readings):
     """Bucket a raw date-of-birth into a coarse training-age band.
 
     Buckets by birth-decade (minimal sensible boundaries — the spike pins the
     band SHAPE, not exact cutoffs); the raw date never appears in the token.
     """
-    year = str(value)[:4]
+    year = str(readings[-1]["value"])[:4]
     return f"born-{year[:3]}0s" if year.isdigit() else "age-band-unknown"
 
 
-def _trend_token(value):
-    """Map a raw lab/reading value to a coarse direction token (no raw value)."""
-    text = str(value).lower()
-    if any(w in text for w in ("rising", "up", "increase", "high", "out-of-range")):
-        return "out-of-range"
-    if any(w in text for w in ("falling", "down", "decrease", "low")):
-        return "out-of-range"
-    return "within-range"
+def _to_number(value):
+    """Parse `value` to a float, or None if it is missing/non-numeric."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
-def _issue_class(value):
+def _trend_token(readings):
+    """Derive a `recent-trend-direction` token from the readings SERIES.
+
+    The spike (lines 32-33) locks the closed vocabulary `improving`/`flat`/
+    `regressing` — a direction over time, derived here from the latest vs prior
+    reading, never a single value or a range-membership.
+
+    BLOCKED — improving/regressing requires per-biomarker good-direction polarity
+    (rising ALT regresses; rising HDL improves). The Line Field Set
+    (`scripts/store/keying.py`: item, timepoint, source, value) carries NO
+    good-direction metadata, so a real numeric change cannot be faithfully labelled
+    improving vs regressing here. Minimal faithful correction (F3): emit `flat`
+    ONLY for genuine no-change / insufficient series, and NEVER a false affirmative
+    for missing/non-numeric data (missing → `flat`, the no-signal token, not
+    `improving`). A determinable directional change with unknown polarity RAISES
+    rather than fabricate a value-judgment — the spec/metadata gap surfaces at the
+    boundary instead of silently mislabelling. See report: escalate to add
+    per-item good-direction polarity to the data model.
+    """
+    nums = [_to_number(r["value"]) for r in readings]
+    nums = [n for n in nums if n is not None]
+    if len(nums) < 2:
+        return "flat"  # insufficient series / missing data — no false affirmative
+    if nums[-1] == nums[-2]:
+        return "flat"  # genuine no-change
+    raise ValueError(
+        "recent-trend-direction: a directional change is not faithfully "
+        "labellable improving/regressing without per-item good-direction "
+        "polarity (absent from the Line Field Set) — spec/metadata gap"
+    )
+
+
+def _issue_class(readings):
     """Map raw symptom/clinical free-text to a coarse body-region issue class."""
-    text = str(value).lower()
+    text = str(readings[-1]["value"]).lower()
     if any(w in text for w in ("back", "spine", "lumbar")):
         return "back-region"
     if any(w in text for w in ("knee", "leg", "hip", "ankle")):
@@ -113,14 +147,14 @@ def _issue_class(value):
     return "general-issue"
 
 
-def _region_class(value):
+def _region_class(readings):
     """Map a raw postal-address to a coarse presence/region class (no raw value)."""
-    return "region-present" if str(value).strip() else "region-absent"
+    return "region-present" if str(readings[-1]["value"]).strip() else "region-absent"
 
 
 # Per-field-set-field de-identifying derivations for fields backed by a raw-PII
-# source item. Each MUST emit a derived band/class token only — the raw value
-# never appears in the emitted token (Finding 4-1).
+# source item. Each takes the readings SERIES and MUST emit a derived band/class
+# token only — the raw value never appears in the emitted token (Finding 4-1).
 _FIELD_DERIVATION = {
     "training-age-band": _age_band,
     "recent-trend-direction": _trend_token,
@@ -162,7 +196,7 @@ def summarize(store_read):
             for raw in source_items:
                 readings.extend(store_read(raw))
             if readings:
-                summary[field] = _FIELD_DERIVATION[field](readings[-1]["value"])
+                summary[field] = _FIELD_DERIVATION[field](readings)
         else:
             # ...otherwise the field reads from a store item of its own name.
             readings = store_read(field)
