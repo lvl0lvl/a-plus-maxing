@@ -214,6 +214,34 @@ OUT=$(printf '{"tool_input":{"command":%s}}' \
     || bad "SEC-01(b) NO-GO: deny-while-stub-0 or sentinel absent (sentinel=$([[ -f "$SENTINEL" ]] && echo yes || echo no)); out: $OUT"
 git -C "$REPO" reset -q; rm -f "$REPO/docs/leak3.md"
 
+# ── cwd fail-open (Finding 1): hook run from a SUBDIRECTORY of PROJECT_ROOT ─────
+# pii_scan.scan does open(path) relative to the PROCESS cwd. If the hook does not
+# cd into PROJECT_ROOT before invoking the scan subprocess, the repo-relative staged
+# paths fail to open (OSError swallowed), scan returns 0, and the planted token
+# commits unscanned (ALLOW). The block must hold regardless of the agent's cwd.
+mkfile "docs/leak4.md" "contact dave@gmail.com"
+git -C "$REPO" add docs/leak4.md
+SUBDIR="$REPO/docs/sub"; mkdir -p "$SUBDIR"
+OUT=$(cd "$SUBDIR" && printf '{"tool_input":{"command":%s}}' \
+        "$(printf '%s' "git commit -m 'x'" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+      | BLOCK_PII_COMMIT_PROJECT_ROOT="$REPO" BLOCK_PII_COMMIT_PII_SCAN_ROOT="$REAL_ROOT" bash "$HOOK")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"docs/leak4.md"* ]]; } \
+    && ok "cwd-independent scan: planted token DENIED from a subdirectory cwd" \
+    || bad "cwd fail-open: token NOT denied when hook run from subdir, got: $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/leak4.md"
+
+# ── git-plumbing fail-open (Finding 2): PROJECT_ROOT is a NON-git directory ─────
+# `git diff --cached` fails (not a repo); the staged set must NOT silently read as
+# empty -> allow. A git-plumbing failure (rc != 0) is fail-closed -> deny, distinct
+# from the legitimate empty-staged-set case (rc == 0, nothing staged -> allow).
+NONGIT="$TMP/nongit"; mkdir -p "$NONGIT"
+OUT=$(printf '{"tool_input":{"command":%s}}' \
+        "$(printf '%s' "git commit -m 'x'" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+      | BLOCK_PII_COMMIT_PROJECT_ROOT="$NONGIT" BLOCK_PII_COMMIT_PII_SCAN_ROOT="$REAL_ROOT" bash "$HOOK")
+[[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
+    && ok "git-plumbing fail-closed: non-git PROJECT_ROOT -> DENY (not silent allow)" \
+    || bad "git-plumbing fail-open: non-git PROJECT_ROOT allowed, got: $OUT"
+
 echo
 echo "test_block_pii_commit: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

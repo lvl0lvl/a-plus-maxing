@@ -67,12 +67,23 @@ fi
 
 # Staged set git will actually commit (added/copied/modified) — NOT git ls-files
 # (the HEAD/tracked set), so a git add-ed file absent from HEAD is scanned (Fix 3).
-# A git-plumbing failure here is fail-closed: empty staged set on error -> deny.
+# Capture the git rc explicitly: a process-substitution while-loop would discard it
+# and let a broken `git diff --cached` read as an empty staged set -> a silent allow.
+GIT_OUT=$(git -C "$PROJECT_ROOT" diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+GIT_RC=$?
+
+# Fail-closed: git-plumbing failure (rc != 0) denies. Distinct from the legitimate
+# empty-staged-set case (rc == 0, nothing staged -> the normal "nothing to commit"
+# allow path below).
+if [[ $GIT_RC -ne 0 ]]; then
+    deny "PII-FREE-TRUNK: git-plumbing failure enumerating the staged set (git diff --cached rc=$GIT_RC). Failing closed — commit blocked."
+fi
+
 STAGED=()
 while IFS= read -r f; do
     [[ -z "$f" ]] && continue
     STAGED+=("$f")
-done < <(git -C "$PROJECT_ROOT" diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+done <<< "$GIT_OUT"
 
 [[ ${#STAGED[@]} -eq 0 ]] && exit 0
 
@@ -108,6 +119,7 @@ done
 # stdout = combined hit count; stderr carries scan's `PII-HIT: <path>` lines.
 SCAN_ERR_FILE=$(mktemp)
 SCAN_OUT=$(
+    cd "$PROJECT_ROOT" && \
     BPC_SCAN_ROOT="$PII_SCAN_ROOT" \
     python3 - "${#STAGED[@]}" "${STAGED[@]}" ${DATA_BEARING[@]+"${DATA_BEARING[@]}"} <<'PY' 2>"$SCAN_ERR_FILE"
 import os
