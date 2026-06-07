@@ -56,7 +56,7 @@ def _wired_adapters():
         if _UNWIRED_MARKER in (module.__doc__ or "").lower():
             continue
         for _, obj in inspect.getmembers(module, inspect.isclass):
-            if obj.__module__ == module.__name__ and isinstance(obj(), Adapter):
+            if obj.__module__ == module.__name__ and issubclass(obj, Adapter):
                 wired.append(obj())
                 break
     return wired

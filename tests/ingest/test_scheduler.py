@@ -350,6 +350,81 @@ def test_unwired_marker_governs_wired_set_membership():
                 cached.unlink()
 
 
+# --- SEC-2 / BUG-1: discovery tests conformance via issubclass, never by constructing ---
+# A class with a required-arg __init__ living alongside the conformant adapter (a
+# future helper class in an adapter module) must NOT abort the unattended run. The
+# discovery tests the Protocol on the CLASS (issubclass, @runtime_checkable) BEFORE
+# constructing, and only instantiates the class that actually conforms.
+
+
+def test_discovery_ignores_non_adapter_helper_with_required_init(tmp_path):
+    """SEC-2/BUG-1: a helper class with a required-arg __init__ does not abort discovery.
+
+    Drops a transient conformant adapter module that ALSO defines a non-Adapter
+    helper class whose `__init__(self, x)` takes a required arg, with the helper's
+    class name sorting BEFORE the adapter's (so a construct-to-test discovery hits
+    the helper first). Against a construct-then-isinstance discovery this raises
+    TypeError and aborts `_wired_adapters()`; against the issubclass-before-construct
+    fix the helper is ignored and the conformant adapter is discovered. Uses the
+    same in-package fixture + cleanup pattern as the AC-6 fixture.
+    """
+    import importlib
+
+    from scripts.ingest import scheduler
+
+    probe_mod = ADAPTERS_DIR / "secprobe.py"
+    probe_mod.write_text(
+        '"""Probe adapter module (helper + conformant adapter)."""\n'
+        "from typing import Iterable\n\n\n"
+        "class AaaHelper:\n"  # sorts before the adapter -> constructed first by getmembers
+        "    def __init__(self, x):\n"
+        "        self.x = x\n\n\n"
+        "class ZzzProbeAdapter:\n"
+        "    def source_tag(self) -> str:\n"
+        '        return "secprobe"\n\n'
+        "    def read_readings(self, export_file) -> Iterable[dict]:\n"
+        "        return iter(())\n"
+    )
+    try:
+        importlib.invalidate_caches()
+        wired = scheduler._wired_adapters()  # the REAL discovery predicate
+        tags = {a.source_tag() for a in wired}
+
+        assert "secprobe" in tags  # conformant adapter discovered, helper ignored
+    finally:
+        cache = ADAPTERS_DIR / "__pycache__"
+        if probe_mod.exists():
+            probe_mod.unlink()
+        for cached in cache.glob("secprobe.*"):
+            cached.unlink()
+
+
+# --- TEST-4: a wired adapter with NO export entry is skipped; run still exits 0 ---
+
+
+def test_missing_export_adapter_is_skipped(tmp_path):
+    """TEST-4: an `exports` subset skips the export-less wired adapters; run exits 0.
+
+    Runs scheduler.run() with an `exports` dict covering ONLY oura — a strict
+    subset of the wired set. Asserts rc == 0, the oura reading landed in the store
+    (placement), AND the healthkit/garmin readings are ABSENT (negative — the
+    missing-export adapters contributed nothing). Pins the `if export_file is not
+    None` skip branch with placement + negative, not incidentally.
+    """
+    from scripts.ingest import scheduler
+
+    store_root = tmp_path / "store"
+    ou = tmp_path / "oura.json"
+    _write_json_export(ou, [_ou("hrv", "2026-01-01", 55)])
+
+    rc = scheduler.run(exports={"oura": ou}, root=store_root)
+
+    assert rc == 0
+    assert len(store.read("hrv", root=store_root)) == 1  # oura ran
+    assert store.read("steps", root=store_root) == []  # healthkit skipped (no export)
+    assert store.read("stress", root=store_root) == []  # garmin skipped (no export)
+
+
 # --- AC-5 / Constraint D1->D3: egress 0 over a REAL scheduler.run() ---
 
 
