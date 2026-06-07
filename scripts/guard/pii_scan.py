@@ -43,8 +43,15 @@ AGNOSTIC_PATTERNS = {
 }
 
 # Structural store-line patterns match across newlines (a pretty-printed reading
-# spans lines); the contact pattern is single-line either way.
-_COMPILED_AGNOSTIC = [re.compile(p, re.DOTALL) for p in AGNOSTIC_PATTERNS.values()]
+# spans lines); the contact pattern is single-line either way. The contact pattern
+# matches case-INSENSITIVELY (2x1): a non-canonical-case email (Op.User@Gmail.COM)
+# is the same contact and must score a hit, not pass. The structural store-line
+# patterns stay DOTALL-only (store keys are canonical lowercase JSON).
+_CONTACT_COMPILED = re.compile(AGNOSTIC_PATTERNS["contact"], re.DOTALL | re.IGNORECASE)
+_STRUCTURAL_COMPILED = [
+    re.compile(p, re.DOTALL) for name, p in AGNOSTIC_PATTERNS.items() if name != "contact"
+]
+_COMPILED_AGNOSTIC = [_CONTACT_COMPILED] + _STRUCTURAL_COMPILED
 
 # Operator-identity tokens load from this GITIGNORED file (one regex per line);
 # absent on a fresh clone -> empty identity set. Keeps operator PII out of tracked
@@ -70,7 +77,8 @@ def _load_identity_patterns(config_path):
     for line in path.read_text(encoding="utf-8").splitlines():
         token = line.strip()
         if token and not token.startswith("#"):
-            patterns.append(re.compile(token, re.DOTALL))
+            # Case-INSENSITIVE (2x1): an operator name matches in any casing.
+            patterns.append(re.compile(token, re.DOTALL | re.IGNORECASE))
     return patterns
 
 
@@ -100,6 +108,28 @@ def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG):
             total += hits
             print(f"PII-HIT: {path}", file=sys.stderr)
     return total
+
+
+def scan_text(text, identity_config=DEFAULT_IDENTITY_CONFIG):
+    """Count operator-PII matches in a single in-memory string.
+
+    The value-level counterpart to `scan` (which reads file CONTENTS for the
+    file-distribution boundary). Applies the operator-IDENTITY tokens + the generic
+    contact pattern — the "who is this person" tokens — and NOT the structural
+    store-line patterns (those detect a leaked store NDJSON FILE, not personal data
+    inside a scalar token). Used by the router summary boundary (bead 8j6) to
+    fail-closed on raw PII in a pass-through field value.
+
+    Args:
+        text (str): The value to scan.
+        identity_config (str | Path, optional): The gitignored operator-identity
+            token file; absent -> identity detection is empty (contact still runs).
+
+    Returns:
+        (int) Total operator-PII (contact + identity) matches in `text`.
+    """
+    patterns = [_CONTACT_COMPILED] + _load_identity_patterns(identity_config)
+    return sum(len(pattern.findall(text)) for pattern in patterns)
 
 
 def store_is_gitignored(repo_root):
