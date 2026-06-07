@@ -191,6 +191,10 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
 
     Returns:
         (dict) A name-addressable summary keyed by the Summary Field-Set fields.
+
+    Raises:
+        ValueError: When a pass-through field value carries raw operator PII (the
+            8j6 fail-closed gate) — surfaced at the boundary, never leaked downstream.
     """
     summary = {}
     for field in SUMMARY_FIELD_SET:
@@ -231,7 +235,9 @@ def dispatch(summary, sink=None):
     field-set field whose membership cannot be affirmatively established) RAISES
     before the model send — the sink is never reached. The whitelist check then
     rejects any payload field outside the closed Summary Field-Set (named-excluded
-    raw-PII OR a novel field): `set(payload) ⊆ SUMMARY_FIELD_SET` must hold.
+    raw-PII OR a novel field): `set(payload) ⊆ SUMMARY_FIELD_SET` must hold. A
+    non-scalar payload value (a container under an allowlisted key) likewise RAISES
+    before the send (fga) — payload values must be scalar (None or str/int/float/bool).
 
     Args:
         summary (dict): A `summarize`-built name-addressable summary.
@@ -266,12 +272,14 @@ def dispatch(summary, sink=None):
     # fga (SEC-2) runtime scalar gate: the field-set whitelist checks NAMES; this
     # checks VALUE SHAPE. The payload is scalar-by-derivation, but a future nested-
     # summary change could smuggle a raw-PII field inside a container under an
-    # allowlisted key, past the shallow name check. Reject any non-scalar value at
-    # RUNTIME (a runtime guarantee, not only the test-only flat-payload pin). Names
-    # the field, never the value.
+    # allowlisted key, past the shallow name check. Fail-closed via a positive
+    # ALLOWLIST of scalar types (None or str/int/float/bool): reject anything else —
+    # closing bytes/bytearray/frozenset/memoryview and any future opaque type, not
+    # only the four enumerated containers. A runtime guarantee, not only the
+    # test-only flat-payload pin. Names the field, never the value.
     nonscalar = sorted(
         field for field, value in payload.items()
-        if isinstance(value, (dict, list, tuple, set))
+        if value is not None and not isinstance(value, (str, int, float, bool))
     )
     if nonscalar:
         raise ValueError(

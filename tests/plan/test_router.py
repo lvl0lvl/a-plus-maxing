@@ -388,8 +388,42 @@ def test_dispatch_raises_on_nonscalar_payload_value():
     with pytest.raises(ValueError) as exc:
         router.dispatch(summary, sink=lambda p: sink_calls.append(p))
     assert "goal-domains" in str(exc.value)
+    # Pin that the raise came from the fga scalar gate (not some other check that
+    # happens to fire on goal-domains) — reds if the scalar gate is removed (TEST-3).
+    assert "non-scalar" in str(exc.value)
     assert not sink_calls, "the scalar gate must raise before the model send"
     assert "op.user@gmail.com" not in str(exc.value)
+
+
+def test_dispatch_raises_on_bytes_payload_value():
+    """fga allowlist (SEC-2): a bytes value (a non-scalar opaque type NOT in the old
+    dict/list/tuple/set blacklist) is rejected by the positive scalar allowlist.
+
+    Reds on the old blacklist gate (bytes passed); green on the allowlist (None or
+    str/int/float/bool permitted, everything else rejected).
+    """
+    summary = router.summarize(_clean_store_read())
+    summary["goal-targets"] = b"op.user@gmail.com"
+    sink_calls = []
+    with pytest.raises(ValueError) as exc:
+        router.dispatch(summary, sink=lambda p: sink_calls.append(p))
+    assert "goal-targets" in str(exc.value)
+    assert "non-scalar" in str(exc.value)
+    assert not sink_calls
+
+
+def test_dispatch_allows_none_and_numeric_scalar_values():
+    """fga allowlist (SEC-2): None and numeric scalars are permitted (not rejected).
+
+    The positive allowlist must not over-reject legitimate scalar payload values.
+    """
+    summary = router.summarize(_clean_store_read())
+    summary["bodyweight-band"] = 85          # int scalar
+    summary["recovery-status-band"] = None    # None permitted
+    captured = {}
+    router.dispatch(summary, sink=lambda p: captured.update({"p": p}))
+    assert captured["p"]["bodyweight-band"] == 85
+    assert captured["p"]["recovery-status-band"] is None
 
 
 # --- 8j6: in-summary pass-through PII value-gate --------------------------------
@@ -435,3 +469,73 @@ def test_summarize_pii_gate_is_config_driven_identity(tmp_path):
     assert "hard-limits" in str(exc.value)
     # Same token, no config -> not detected -> no raise (config-driven).
     router.summarize(_store_read_factory(leaky), identity_config="/nonexistent/x.txt")
+
+
+def test_summarize_passthrough_accepts_clean_non_str_values():
+    """8j6 boundary (TEST-2): a clean non-str pass-through value (int/None) flows
+    through verbatim.
+
+    str(80)/str(None) carry no PII, so the gate passes them; pins the
+    pass-through-of-non-str contract so a future change that coerced or rejected
+    non-str values would be caught.
+    """
+    store_read = _store_read_factory([
+        {"item": "bodyweight-band", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": 80},
+        {"item": "recovery-status-band", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": None},
+    ])
+    summary = router.summarize(store_read)
+    assert summary["bodyweight-band"] == 80
+    assert summary["recovery-status-band"] is None
+
+
+def test_summarize_raises_on_container_value_with_embedded_pii():
+    """8j6 (TEST-2): a container pass-through value with embedded contact PII RAISES
+    at summarize.
+
+    str(list) keeps a whole-token contact in one element visible to scan_text, so the
+    8j6 gate catches it at the summary boundary BEFORE dispatch's fga scalar gate
+    would reject the container shape — pinning the 8j6/fga interaction.
+    """
+    leaky = _store_read_factory([
+        {"item": "goal-priority-order", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": ["recovery", "email op.user@gmail.com"]},
+    ])
+    with pytest.raises(ValueError) as exc:
+        router.summarize(leaky)
+    assert "goal-priority-order" in str(exc.value)
+
+
+def test_summarize_multi_pii_field_raises_naming_first_in_field_set_order():
+    """8j6 (TEST-2): with multiple PII-bearing pass-through fields, the raise names the
+    FIRST in SUMMARY_FIELD_SET order (goal-targets precedes hard-limits) — pinning the
+    first-raise contract so a reorder/batched-report refactor is caught.
+    """
+    leaky = _store_read_factory([
+        {"item": "goal-targets", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "reach me op.user@gmail.com"},
+        {"item": "hard-limits", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "ask coach@gmail.com"},
+    ])
+    with pytest.raises(ValueError) as exc:
+        router.summarize(leaky)
+    msg = str(exc.value)
+    assert "goal-targets" in msg            # first in SUMMARY_FIELD_SET order
+    assert "hard-limits" not in msg         # short-circuits on the first hit
+
+
+def test_summarize_does_not_gate_derived_fields():
+    """8j6 boundary (TEST-4): the gate covers PASS-THROUGH fields only. A derived field
+    whose raw source carries contact PII still emits a clean band/class token and does
+    NOT raise — the derivation strips the raw value; the gate is on the else-branch
+    only. Pins the derived/pass-through branch boundary against silent relocation.
+    """
+    store_read = _store_read_factory([
+        {"item": "raw-symptom-free-text", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "tweaked back; email me op.user@gmail.com"},
+    ])
+    summary = router.summarize(store_read)
+    # active-issue-class is DERIVED from raw-symptom-free-text -> band/class token.
+    assert summary["active-issue-class"] == "back-region"
+    assert "op.user@gmail.com" not in str(summary)
