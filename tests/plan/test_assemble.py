@@ -207,17 +207,12 @@ def test_no_unsourced_cross_domain_claim():
 
 
 def _count_incomplete(plan):
-    """Count recommendations missing source / tier / reversibility / units+range."""
-    incomplete = 0
-    for rec in _all_recs(plan):
-        if not (rec.get("source") and rec.get("confidence_tier") and rec.get("reversibility")):
-            incomplete += 1
-            continue
-        for number in rec.get("numbers", []):
-            if not (number.get("units") and number.get("reference_range")):
-                incomplete += 1
-                break
-    return incomplete
+    """Count incomplete recommendations using production's `_is_complete` predicate.
+
+    One source of truth: re-deriving the field list here would let the test and
+    production drift apart (QUAL-2).
+    """
+    return sum(1 for rec in _all_recs(plan) if not assemble_mod._is_complete(rec))
 
 
 def test_recommendations_fully_sourced():
@@ -383,6 +378,41 @@ def test_specialist_all_recs_incomplete_renders_gap():
     assert section.get("disclosure")
 
 
+def test_malformed_specialist_output_none_renders_gap():
+    """BUG-4: a specialist returning None must route through the empty-output
+    coverage-gap path, never crash with AttributeError."""
+    plan = assemble(["broken"], _summary(), {"broken": lambda d, s: None})
+    section = _section_for(plan, "broken")
+    assert section["recommendations"] == []
+    assert section.get("coverage_gap"), "a None specialist output must render a coverage gap"
+
+
+def test_malformed_specialist_recommendations_none_renders_gap():
+    """BUG-4: `{"recommendations": None}` (key present but None) must route through the
+    empty-output gap path, never `for rec in None` TypeError."""
+    plan = assemble(
+        ["broken"], _summary(),
+        {"broken": lambda d, s: {"specialist": "S", "recommendations": None}},
+    )
+    section = _section_for(plan, "broken")
+    assert section["recommendations"] == []
+    assert section.get("coverage_gap"), "recommendations=None must render a coverage gap"
+
+
+def test_malformed_non_dict_rec_entry_skipped():
+    """BUG-4: a non-dict recommendation entry must be skipped/gapped, never crash with
+    AttributeError on `.get`."""
+    good = _rec("progressive overload")
+    plan = assemble(
+        ["strength"], _summary(),
+        {"strength": lambda d, s: {"specialist": "S", "recommendations": ["not-a-dict", good]}},
+    )
+    section = _section_for(plan, "strength")
+    claims = {r["claim"] for r in section.get("recommendations", [])}
+    assert "progressive overload" in claims, "the valid rec must survive"
+    assert "not-a-dict" not in claims
+
+
 # --- Cycle 3: PII boundary, personalization, HALT filter (AC-7..AC-10) ----------
 
 
@@ -434,6 +464,43 @@ def test_assemble_reasons_only_over_router_summary_egress():
     }
     assert run(lambda: assemble(goal_set, _summary(), roster)), (
         "egress guard over a real assemble invocation must observe 0 raw-PII sends"
+    )
+
+
+def test_assemble_injected_egress_flips_guard_to_fail():
+    """TEST-5/HIST-1 (FAILING-CAPABLE): an outbound call on an assemble side path ->
+    FAIL.
+
+    Mirrors test_router.py::test_dispatch_injected_non_model_egress_flips_guard_to_fail:
+    assert the CLEAN assemble closure truthy FIRST, then inject a synthetic outbound
+    call inside the guarded closure and assert the guard returns falsy — proving the
+    egress complement is failing-capable, not merely that a clean assemble makes 0
+    calls. Requires network so the deny is attributed to the sandbox, not an offline
+    host (same precheck/skip discipline as the router/egress_guard suites).
+    """
+    import socket
+
+    from scripts.guard.egress_guard import run
+
+    try:
+        socket.create_connection(("1.1.1.1", 53), timeout=3).close()
+    except OSError:
+        pytest.skip("no network — egress deny not exercisable")
+
+    goal_set = ["strength", "recovery"]
+    roster = {
+        "strength": _specialist("S", [_rec("progressive overload")]),
+        "recovery": _specialist("R", [_rec("deload week")]),
+    }
+    # Clean direction first: a plain assemble closure observes 0 egress.
+    assert run(lambda: assemble(goal_set, _summary(), roster))
+
+    def assemble_with_side_egress():
+        assemble(goal_set, _summary(), roster)
+        socket.create_connection(("1.1.1.1", 53), timeout=3)
+
+    assert not run(assemble_with_side_egress), (
+        "an outbound call on an assemble side path must flip the guard to FAIL"
     )
 
 
@@ -545,6 +612,23 @@ def test_section_surfaces_operator_input():
     )
 
 
+def test_gap_section_surfaces_operator_input():
+    """TEST-3 (FAILING-CAPABLE): a COVERAGE-GAP section (no-specialist) also surfaces
+    the planted distinguishing operator input — personalization is not limited to
+    covered sections (mirrors test_section_surfaces_operator_input)."""
+    distinguishing = "return-to-Jan-2026-deadlift-SENTINEL"
+    summary = _summary(**{"goal-targets": distinguishing})
+    roster = {}  # 'orphan' absent -> a no-specialist coverage-gap section
+    plan = assemble(["orphan"], summary, roster)
+
+    section = _section_for(plan, "orphan")
+    assert section.get("coverage_gap"), "the orphan domain must render a coverage gap"
+    assert section.get("personalization"), "a gap section reflects 0 operator inputs (anti-target)"
+    assert distinguishing in _plan_text(section), (
+        "a gap section must also surface the planted distinguishing operator input"
+    )
+
+
 def test_hard_limit_literal_contradiction_struck():
     """AC-9 (i) — DIRECT/literal contradiction: a rec restating the hard limit has its
     ACTIONABLE content struck (default OMIT-with-disclosure), naming the violated limit.
@@ -592,6 +676,119 @@ def test_hard_limit_class_aware_contradiction_struck():
     # The non-violating supplement rec is NOT struck.
     creatine = [r for r in _all_recs(plan) if r.get("claim", "").startswith("creatine")]
     assert creatine and not creatine[0].get("actionable_content_struck")
+
+
+def test_hard_limit_literal_path_isolated_struck():
+    """TEST-1 (literal-path isolation, FAILING-CAPABLE): a rec whose category is a
+    benign, recognized, NON-prohibited class but whose CLAIM TEXT asserts the
+    prohibited subject must be struck via the LITERAL branch alone.
+
+    The earlier literal test let the rec's category sit in the prohibited set, so the
+    class-aware branch also fired and deleting the literal path kept the test green.
+    Here the category ('training') is recognized and not prohibited, so only the
+    literal subject-match can strike the rec — removing the literal branch reds this.
+    """
+    summary = _summary(**{"hard-limits": "no overhead pressing"})
+    # category is benign/non-prohibited; ONLY the claim text restates the subject.
+    violating = _rec("overhead pressing 5x5", category="training")
+    roster = {"strength": _specialist("S", [violating])}
+    plan = assemble(["strength"], summary, roster)
+
+    struck = [r for r in _all_recs(plan) if "overhead pressing" in r.get("claim", "")]
+    assert struck and struck[0].get("actionable_content_struck") is True, (
+        "a rec whose category is non-prohibited but whose claim asserts the prohibited "
+        "subject must be struck via the literal path"
+    )
+    assert not struck[0].get("numbers")
+    assert "no overhead pressing" in (struck[0].get("contradiction_disposition") or "")
+
+
+def test_compound_hard_limit_second_clause_struck():
+    """SEC-1 (FAILING-CAPABLE): a COMPOUND hard limit ('no stimulants and no fasting')
+    must strike a rec violating the SECOND clause even when that rec is honestly
+    categorized into a non-prohibited class.
+
+    Before: the literal subject was built with replace('no ','',1), stripping only the
+    first 'no ' — so the 2nd clause subject never matched, and a fasting rec
+    categorized 'nutrition' escaped the class-aware path -> shipped actionable. The
+    per-clause fix strikes it.
+    """
+    summary = _summary(**{"hard-limits": "no stimulants and no fasting"})
+    # honestly categorized 'nutrition' (not in the prohibited class set); the SECOND
+    # clause ('no fasting') is the only thing that can catch it.
+    fasting = _rec("intermittent fasting 16:8", category="nutrition")
+    roster = {"nutrition": _specialist("N", [fasting])}
+    plan = assemble(["nutrition"], summary, roster)
+
+    struck = [r for r in _all_recs(plan) if "fasting" in r.get("claim", "")]
+    assert struck, "the 2nd-clause-violating rec must appear (omit-with-disclosure)"
+    assert struck[0].get("actionable_content_struck") is True, (
+        "a rec violating the 2nd clause of a compound limit must be struck"
+    )
+    assert not struck[0].get("numbers")
+
+
+def test_compound_limit_unrecognized_clause_suppresses_fail_closed():
+    """SEC-1 fail-closed: a compound limit with one UNRECOGNIZED clause must suppress
+    a rec touching that clause's subject (INDETERMINATE -> fail-closed)."""
+    summary = _summary(**{"hard-limits": "no stimulants and no exotic-research-peptides"})
+    # category recognized + non-prohibited, but the claim asserts the unrecognized
+    # clause's subject -> indeterminate -> suppress.
+    rec = _rec("exotic-research-peptides 250mcg", category="supplement")
+    roster = {"perf": _specialist("P", [rec])}
+    plan = assemble(["perf"], summary, roster)
+
+    emitted = [r for r in _all_recs(plan) if "exotic-research-peptides" in r.get("claim", "")]
+    assert emitted, "the rec must still appear (suppress-with-disclosure)"
+    assert emitted[0].get("actionable_content_struck") is True, (
+        "a rec touching an unrecognized compound-limit clause must be suppressed fail-closed"
+    )
+    assert emitted[0].get("indeterminate_class_suppressed") is True
+
+
+def test_hard_limit_respecting_rec_not_struck():
+    """BUG-2 (FAILING-CAPABLE): a rec that RESPECTS the limit (asserts AVOIDING the
+    subject) must NOT be struck or mislabeled 'contradicts'.
+
+    Before: the substring literal match over-struck 'continue to avoid overhead
+    pressing; substitute landmine press' under 'no overhead pressing'. The
+    negation-context exclusion (a preceding avoid/no/without/not/skip before the
+    subject) recognizes the rec respects the limit.
+    """
+    summary = _summary(**{"hard-limits": "no overhead pressing"})
+    respecting = _rec(
+        "continue to avoid overhead pressing; substitute landmine press",
+        category="training",
+    )
+    roster = {"strength": _specialist("S", [respecting])}
+    plan = assemble(["strength"], summary, roster)
+
+    emitted = [r for r in _all_recs(plan) if "landmine" in r.get("claim", "")]
+    assert emitted, "a limit-respecting rec must survive"
+    assert not emitted[0].get("actionable_content_struck"), (
+        "a rec that respects the limit (avoids the subject) must NOT be struck"
+    )
+    assert not emitted[0].get("contradiction_disposition")
+    assert emitted[0].get("numbers"), "a respecting rec keeps its actionable content"
+
+
+def test_prohibited_class_map_pinned_against_desync():
+    """HIST-2: pin the limit-phrase -> class map so a future desync reds.
+
+    Mirrors router.py:170-171's module-load tripwire spirit: the classes the HALT
+    logic recognizes (via _prohibited_classes over each phrase token) must equal the
+    declared map's class set. A class added to the logic but omitted from the map (or
+    vice-versa) reds here.
+    """
+    # Every phrase token maps to exactly its declared class.
+    for token, klass in assemble_mod._LIMIT_PHRASE_CLASSES:
+        assert assemble_mod._prohibited_classes({"hard-limits": token}) == {klass}, (
+            f"phrase token {token!r} must derive class {klass!r}"
+        )
+    # The full declared class set is exactly what the logic recognizes — no orphans.
+    declared = {klass for _, klass in assemble_mod._LIMIT_PHRASE_CLASSES}
+    all_tokens = " ".join(t for t, _ in assemble_mod._LIMIT_PHRASE_CLASSES)
+    assert assemble_mod._prohibited_classes({"hard-limits": all_tokens}) == declared
 
 
 def test_flag_branch_never_ships_actionable_regimen():
@@ -715,8 +912,10 @@ def test_every_claim_transits_all_filters():
     after a filter) fails this property.
     """
     summary = _summary(**{"hard-limits": "no stimulants"})
+    # Plant a cross-domain claim so the joint property covers the composition-bug path.
+    cross = _rec("merge strength + perf cycling", cross_domain=["strength", "perf"])
     roster = {
-        "strength": _specialist("S", [_rec("progressive overload")]),
+        "strength": _specialist("S", [_rec("progressive overload"), cross]),
         "longevity": _specialist("L", [_rec("rapamycin", grounding="animal")]),
         "perf": _specialist("P", [_rec("amphetamine 10mg", category="stimulant")]),
     }
@@ -728,4 +927,8 @@ def test_every_claim_transits_all_filters():
         assert transited is not None, f"claim {rec.get('claim')!r} carries no transit marker"
         assert set(transited) == {"attribution", "sourcing", "population-mismatch", "halt"}, (
             f"claim {rec.get('claim')!r} did not transit all four filters: {transited}"
+        )
+        # The cross-domain plant must not surface among the transited claims.
+        assert not rec.get("cross_domain"), (
+            f"cross-domain claim {rec.get('claim')!r} reached the emitted set"
         )

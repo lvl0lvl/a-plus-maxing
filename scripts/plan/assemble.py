@@ -7,8 +7,9 @@ into one attributed document, running EVERY emitted claim through the SAME four 
 over ONE canonical claim set (the single-composition-pass guarantee, Security MED-3):
 attribution, sourcing-completeness, population-mismatch (metadata-keyed off the rec's
 evidence-grounding category), and the FAIL-CLOSED, CLASS-AWARE HALT filter (metadata-
-keyed off the rec's intervention-class). Each section also surfaces >=1 operator-
-specific input read BY FIELD NAME from the summary (per-section personalization).
+keyed off the rec's intervention-class). Every section surfaces the same summary-
+derived operator-input set (>=1 operator-specific input read BY FIELD NAME from the
+summary), so each section reflects the operator's stated goals / state / hard limits.
 
 The roster seam is injectable so tests supply a stubbed registry: a dict
 `{domain: specialist}` where each specialist is a callable
@@ -18,6 +19,8 @@ the no-specialist coverage-gap-by-absence case. `assemble` calls no `store.read`
 no operator NDJSON, and imports no live specialist deployment — its only operator-state
 source is the summary.
 """
+
+import re
 
 # Evidence-grounding categories that require a population-mismatch flag (crit 3).
 GROUNDING_NEEDS_FLAG = ("animal", "in-vitro")
@@ -33,8 +36,31 @@ EMPTY_OUTPUT_GAP = "no-recommendations"
 # (Security MED-3 single-claim-set transit invariant).
 FILTERS = ("attribution", "sourcing", "population-mismatch", "halt")
 
-# Operator-state field names surfaced for per-section personalization (crit 8). Read
-# BY FIELD NAME from the name-addressable summary — never raw PII.
+# HALT dispositions, the value `_halt_disposition` returns.
+HALT_CLEAR = "clear"                       # no contradiction; the rec is emitted actionable
+HALT_VIOLATION = "violation"               # determinate contradiction; strike
+HALT_INDETERMINATE = "indeterminate"       # status cannot be established; strike fail-closed
+
+# The operator-stated-limit-phrase -> prohibited intervention-class binding (the
+# single source of truth shared by `_prohibited_classes` and clause recognition).
+# Each entry is (phrase token searched in the limit text, prohibited class).
+_LIMIT_PHRASE_CLASSES = (
+    ("stimulant", "stimulant"),
+    ("overhead", "overhead-pressing"),
+    ("pressing", "overhead-pressing"),
+    ("fasting", "fasting"),
+)
+
+# Prohibition prefixes stripped from each limit clause to recover its bare subject.
+_LIMIT_PREFIXES = ("no ", "avoid ", "never ", "without ")
+
+# Negation words that, immediately before a subject in a CLAIM, mean the rec
+# RESPECTS the limit (asserts avoiding the subject) rather than asserting it.
+_CLAIM_NEGATIONS = ("avoid", "no", "without", "not", "skip")
+
+# Operator-state field names surfaced in every section (crit 8). Read BY FIELD NAME
+# from the name-addressable summary — never raw PII. The set is summary-global
+# (computed once, identical across sections), not a per-section selection.
 _PERSONALIZATION_FIELDS = (
     "goal-targets",
     "goal-priority-order",
@@ -45,9 +71,10 @@ _PERSONALIZATION_FIELDS = (
 
 
 def _personalize(summary):
-    """Surface >=1 operator-specific input from the summary for a section (crit 8).
+    """Build the summary-derived operator-input set surfaced in every section (crit 8).
 
-    Reads operator inputs BY FIELD NAME from the name-addressable summary so each
+    Reads operator inputs BY FIELD NAME from the name-addressable summary. The result
+    is summary-global — computed once and identical across every section — so each
     section reflects the operator's stated goals / current state / hard limits. A
     section reflecting 0 operator inputs is the crit-8 failing-capable anti-target.
     """
@@ -61,7 +88,7 @@ def _coverage_gap(domain, kind, personalization, specialist_name=None):
     Args:
         domain (str): The in-scope goal-domain rendered as a gap.
         kind (str): THIN_LIBRARY_GAP or NO_SPECIALIST_GAP.
-        personalization (dict): The per-section operator inputs surfaced from the summary.
+        personalization (dict): The summary-derived operator-input set surfaced in every section.
         specialist_name (str, optional): The thin-library specialist, if any.
 
     Returns:
@@ -97,38 +124,49 @@ def _is_complete(rec):
     return True
 
 
-# HALT dispositions, the value `_halt_disposition` returns.
-HALT_CLEAR = "clear"                       # no contradiction; the rec is emitted actionable
-HALT_VIOLATION = "violation"               # determinate contradiction; strike
-HALT_INDETERMINATE = "indeterminate"       # status cannot be established; strike fail-closed
-
-
 def _prohibited_classes(summary):
     """Derive the prohibited intervention-classes from the operator's hard limit(s).
 
     Class-aware (Security HIGH-2): keys off the limit's prohibited CLASS so a member
     expressed in different terms than the limit text is caught, not only a literal
-    restatement. The map is the operator-stated-limit → intervention-class binding.
+    restatement. Reads the `_LIMIT_PHRASE_CLASSES` binding (the single source of truth).
     """
     raw = (summary.get("hard-limits") or "").lower()
-    classes = set()
-    if "stimulant" in raw:
-        classes.add("stimulant")
-    if "overhead" in raw or "pressing" in raw:
-        classes.add("overhead-pressing")
-    if "fasting" in raw:
-        classes.add("fasting")
-    return classes
+    return {klass for token, klass in _LIMIT_PHRASE_CLASSES if token in raw}
 
 
-def _limit_is_recognized(summary, prohibited_classes):
-    """Whether the stated hard-limit phrase maps to at least one known prohibited class.
+def _limit_clauses(limit_text):
+    """Split a (possibly compound) hard-limit into bare prohibited subjects.
 
-    An UNrecognized phrase (a limit present but mapping to no known class) makes every
-    rec's prohibited-class status indeterminate — the fail-closed trigger (Security
-    MED 5-2(b)). No hard limit at all is NOT indeterminate (nothing to clear against).
+    Splits on ' and ', commas, and semicolons, then strips a leading prohibition
+    prefix ('no '/'avoid '/'never '/'without ') from EACH clause so a compound limit
+    ('no stimulants and no fasting') yields every clause subject, not just the first.
     """
-    return bool(prohibited_classes)
+    subjects = []
+    for clause in re.split(r"\s+and\s+|,|;", limit_text.lower()):
+        clause = clause.strip()
+        for prefix in _LIMIT_PREFIXES:
+            if clause.startswith(prefix):
+                clause = clause[len(prefix):].strip()
+                break
+        if clause:
+            subjects.append(clause)
+    return subjects
+
+
+def _claim_asserts_subject(claim, subject):
+    """Whether the claim ASSERTS doing the subject (vs. asserting avoiding it).
+
+    A literal subject hit is a violation only when the rec asserts DOING the subject.
+    A negation word ('avoid'/'no'/'without'/'not'/'skip') immediately before the
+    subject means the rec RESPECTS the limit (BUG-2) — not a violation.
+    """
+    for match in re.finditer(re.escape(subject), claim):
+        words = re.findall(r"[a-z]+", claim[: match.start()])
+        if words and words[-1] in _CLAIM_NEGATIONS:
+            continue  # negation-context: the rec avoids the subject, respecting the limit
+        return True
+    return False
 
 
 def _halt_disposition(rec, summary, prohibited_classes):
@@ -137,31 +175,48 @@ def _halt_disposition(rec, summary, prohibited_classes):
     Returns HALT_CLEAR / HALT_VIOLATION / HALT_INDETERMINATE.
 
     Detection forms, all load-bearing:
-      (i)  DIRECT/literal — the rec's claim restates the limit's subject text.
+      (i)  DIRECT/literal — the rec's claim asserts DOING a limit clause's subject
+           (negation-context, where the claim asserts AVOIDING the subject, is not a
+           violation — the rec respects the limit, BUG-2).
       (ii) CLASS-AWARE — the rec's `category` metadata is a member of the limit's
            prohibited class, even in different terms (a string-match HALT misses this).
       (iii) FAIL-CLOSED (Security MED 5-2) — when a hard limit is PRESENT and the rec's
             prohibited-class status is INDETERMINATE — the rec's `category` is
-            missing/None (a), OR the limit phrase maps to no known prohibited class
-            (b) — default to SUPPRESS, not emit. Determinacy, not default-allow.
+            missing/None (a), the limit maps to no known prohibited class (b), OR a
+            limit clause maps to no known class yet the claim touches its subject and
+            the rec is not determinately cleared — default to SUPPRESS, not emit.
     """
     limit_text = (summary.get("hard-limits") or "").strip()
     if not limit_text:
         return HALT_CLEAR  # no stated limit — nothing to clear against
 
     claim = (rec.get("claim") or "").lower()
-    # (i) literal/direct contradiction: the rec restates the hard-limit subject.
-    subject = limit_text.lower().replace("no ", "", 1).strip()
-    if subject and subject in claim:
-        return HALT_VIOLATION
-    # (ii) class-aware: the rec's intervention-class is in the prohibited set.
     category = rec.get("category")
+    clauses = _limit_clauses(limit_text)
+
+    # (i) literal/direct contradiction: the rec asserts doing a clause's subject.
+    for subject in clauses:
+        if _claim_asserts_subject(claim, subject):
+            recognized = bool(_prohibited_classes({"hard-limits": subject}))
+            # A determinate-class violation strikes; a clause that maps to no known
+            # class but is asserted by the claim is indeterminate -> fail-closed.
+            return HALT_VIOLATION if recognized else HALT_INDETERMINATE
+    # (ii) class-aware: the rec's intervention-class is in the prohibited set.
     if category in prohibited_classes:
         return HALT_VIOLATION
     # (iii) fail-closed on indeterminate status: missing category OR unrecognized limit.
-    if category is None or not _limit_is_recognized(summary, prohibited_classes):
+    if category is None or not prohibited_classes:
         return HALT_INDETERMINATE
     return HALT_CLEAR
+
+
+# HIST-2 change-control tripwire (mirrors router.py:170-171): every declared
+# phrase token must derive exactly its declared class, so a future desync between
+# the HALT logic and the phrase->class map trips at module load.
+for _token, _klass in _LIMIT_PHRASE_CLASSES:
+    assert _prohibited_classes({"hard-limits": _token}) == {_klass}, (
+        f"_LIMIT_PHRASE_CLASSES desync: {_token!r} does not derive {_klass!r}"
+    )
 
 
 def _strike(claim, summary, indeterminate=False):
@@ -258,7 +313,11 @@ def assemble(goal_set, summary, roster):
             sections.append(_coverage_gap(domain, NO_SPECIALIST_GAP, personalization))
             continue
 
+        # BUG-4: a None/non-dict specialist output normalizes to {} so it routes
+        # through the empty-output coverage-gap path rather than crashing.
         output = specialist(domain, summary)
+        if not isinstance(output, dict):
+            output = {}
         specialist_name = output.get("specialist")
 
         # crit 4: thin-library coverage renders the shared gap, never a fabricated regimen.
@@ -269,7 +328,12 @@ def assemble(goal_set, summary, roster):
             continue
 
         emitted = []
-        for rec in output.get("recommendations", []):
+        # BUG-4: a present-but-None recommendations value (the `.get` default is
+        # skipped when the key exists) normalizes to [] — never `for rec in None`.
+        for rec in (output.get("recommendations") or []):
+            # BUG-4: a non-dict rec entry is skipped, never crashes on `.get`.
+            if not isinstance(rec, dict):
+                continue
             # crit 6: a cross-domain claim sourced by no single specialist is rejected.
             if _is_cross_domain(rec):
                 continue
