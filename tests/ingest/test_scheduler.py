@@ -263,6 +263,93 @@ def test_scheduler_whoop_scan_is_falsifiable():
     assert _whoop_count("WhoopAdapter()") > 0  # case-insensitive matches the class too
 
 
+# --- AC-4 mechanism guards: the unwired-marker exclusion, not just today's roster ---
+# Tier-2 review (a-plus-maxing-7lt): the docstring `_UNWIRED_MARKER` substring is
+# load-bearing for AC-4 (Whoop must NEVER be invoked) but its FAILURE MODES were
+# untested — test_whoop_not_invoked pins the {healthkit,oura,garmin} roster, not
+# the mechanism (membership = ABSENCE of the marker). These two guards pin the
+# mechanism so a future edit that breaks it REDs here, not silently in production.
+
+
+def test_whoop_doc_carries_unwired_marker():
+    """Guard: whoop.py's module docstring carries scheduler._UNWIRED_MARKER.
+
+    The scheduler excludes the Whoop scaffold ONLY because whoop.py's module
+    docstring declares the unwired marker. If a future edit removes or rewords the
+    marker out of whoop.py's __doc__, the scheduler would silently re-include
+    Whoop in the wired set (the DANGEROUS direction AC-4 exists to prevent) while
+    test_whoop_not_invoked might still pass against a stale roster — this test
+    REDs first. Guard value: were whoop.py's __doc__ missing the marker, the
+    `in` assertion below turns RED.
+    """
+    from scripts.ingest import scheduler
+    from scripts.ingest.adapters import whoop
+
+    assert scheduler._UNWIRED_MARKER in (whoop.__doc__ or "").lower()
+
+
+def test_unwired_marker_governs_wired_set_membership():
+    """Guard: membership = ABSENCE of the marker, run through the real discovery.
+
+    Drops two transient, otherwise-identical conformant adapter modules into the
+    real adapters/ package — one WITHOUT the unwired marker, one WITH it in its
+    module docstring — and runs the scheduler's ACTUAL `_wired_adapters()`
+    discovery unchanged. Asserts the no-marker adapter IS wired and the marked one
+    is EXCLUDED, pinning the include/exclude MECHANISM (membership = absence of the
+    marker), not the current {healthkit,oura,garmin} roster. Uses the same
+    in-package fixture + cleanup pattern as test_adapter_add_zero_scheduler_edits,
+    so the predicate exercised is the production discovery, verbatim.
+    """
+    import importlib
+
+    from scripts.ingest import scheduler
+
+    marker = scheduler._UNWIRED_MARKER
+    # Non-underscore stems: the discovery skips `_`-prefixed modules by design, so
+    # the fixtures must use plain names to flow through the real glob + import.
+    wired_mod = ADAPTERS_DIR / "guardwired.py"
+    unwired_mod = ADAPTERS_DIR / "guardunwired.py"
+
+    def _adapter_module_src(doc, source_tag, class_name):
+        return (
+            f'"""{doc}"""\n'
+            "from typing import Iterable\n\n\n"
+            f"class {class_name}:\n"
+            "    def source_tag(self) -> str:\n"
+            f'        return "{source_tag}"\n\n'
+            "    def read_readings(self, export_file) -> Iterable[dict]:\n"
+            "        return iter(())\n"
+        )
+
+    # Identical adapters except the unwired marker in the WITH-marker module's doc.
+    wired_mod.write_text(
+        _adapter_module_src(
+            "Guard fixture adapter (wired).", "guardwired", "GuardWiredAdapter"
+        )
+    )
+    unwired_mod.write_text(
+        _adapter_module_src(
+            f"Guard fixture adapter ({marker} scaffold).",
+            "guardunwired",
+            "GuardUnwiredAdapter",
+        )
+    )
+    try:
+        importlib.invalidate_caches()
+        wired = scheduler._wired_adapters()  # the REAL discovery predicate
+        tags = {a.source_tag() for a in wired}
+
+        assert "guardwired" in tags  # no marker -> WIRED
+        assert "guardunwired" not in tags  # marker present -> EXCLUDED
+    finally:
+        cache = ADAPTERS_DIR / "__pycache__"
+        for p in (wired_mod, unwired_mod):
+            if p.exists():
+                p.unlink()
+            for cached in cache.glob(f"{p.stem}.*"):
+                cached.unlink()
+
+
 # --- AC-5 / Constraint D1->D3: egress 0 over a REAL scheduler.run() ---
 
 
