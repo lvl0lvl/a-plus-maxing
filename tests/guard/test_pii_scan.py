@@ -299,8 +299,11 @@ def test_scan_text_counts_contact_and_identity(tmp_path):
     from scripts.guard.pii_scan import scan_text
 
     cfg = _identity_config(tmp_path)  # synthetic 'Testperson|Examplename'
-    assert scan_text("hello world, no pii here") == 0
-    assert scan_text("mail me at Test.Fixture@Gmail.COM") >= 1  # case-insensitive too
+    # Pin the agnostic assertions to NO_CONFIG so they do not bind to the real
+    # gitignored operator-identity file (present on dev, absent on a fresh clone):
+    # contact detection is config-independent (TEST-1).
+    assert scan_text("hello world, no pii here", identity_config=NO_CONFIG) == 0
+    assert scan_text("mail me at Test.Fixture@Gmail.COM", identity_config=NO_CONFIG) >= 1  # case-insensitive too
     assert scan_text("ask Examplename first", identity_config=cfg) >= 1
     assert scan_text("ask Examplename first", identity_config=NO_CONFIG) == 0
 
