@@ -117,6 +117,16 @@ git reset -q; git add vault/compounds/_template.md
 OUT=$(invoke "git commit -m 'template'")
 [[ "$OUT" != *'"deny"'* ]] && ok "commit of non-gated _template allowed" || { bad "case6 unexpected deny: $OUT"; }
 
+# Cases 7-9 (cvr): bypass-form commits of an INVALID (ungated) page -> DENY.
+# Env-var/path/trailing-separator forms must be recognized so the gate still runs.
+for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commit;"; do
+    git reset -q; git add vault/compounds/ungated.md
+    OUT=$(invoke "$bypass")
+    [[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
+        && ok "cvr bypass-form commit recognized -> DENY: $bypass" \
+        || bad "cvr bypass NOT recognized: '$bypass' got: $OUT"
+done
+
 echo
 echo "test_block_ungated_vault_write: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

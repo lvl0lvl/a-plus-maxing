@@ -173,6 +173,19 @@ else
     FAIL=$((FAIL + 1))
 fi
 
+# ── T22-T24 (cvr): hardened matcher catches bypass-form commits on master ──────
+# Env-var-prefixed, path-prefixed, and trailing-separator commit forms must still
+# be recognized as commits (-> deny on this master temp repo). The prior matcher
+# let these bypass the branch guard.
+for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commit;"; do
+    out=$(invoke_with_override "$bypass")
+    if [[ "$out" == *'"permissionDecision":"deny"'* ]]; then
+        echo "  PASS: cvr bypass form recognized -> deny: $bypass"; PASS=$((PASS + 1))
+    else
+        echo "  FAIL: cvr bypass NOT recognized: '$bypass' got: $out"; FAIL=$((FAIL + 1))
+    fi
+done
+
 rm -rf "$TMP_REPO"
 
 # ── Summary ───────────────────────────────────────────────────────────

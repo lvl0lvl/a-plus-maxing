@@ -31,8 +31,11 @@ COMMAND=$(jq -r '.tool_input.command // empty' < /dev/stdin)
 
 NORM=$(echo "$COMMAND" | tr -s '[:space:]' ' ')
 
-# Only a git commit is our concern (same matcher as block-commit-main.sh).
-if ! echo "$NORM" | grep -qE '(^|[;&|] *)git +([^|&;]*\s)?commit( |$)'; then
+# Only a git commit is our concern. cvr: hardened matcher — KEEP IN SYNC across
+# block-pii-commit.sh / block-commit-main.sh / block-ungated-vault-write.sh. Also
+# catches env-var-prefixed (EDITOR=vim git commit), path-prefixed (/usr/bin/git
+# commit), and trailing-separator (git commit; / git commit&) forms the prior missed.
+if ! echo "$NORM" | grep -qE '(^|[;&|] *)([A-Za-z_][A-Za-z0-9_]*=[^ ;&|]* +)*([^ ;&|]*/)?git +([^|&;]*\s)?commit( |[;&|]|$)'; then
     exit 0
 fi
 
