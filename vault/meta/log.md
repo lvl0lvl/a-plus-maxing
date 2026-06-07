@@ -4,8 +4,8 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-23
-last_reviewed: 2026-06-06
-last_updated: 2026-06-06
+last_reviewed: 2026-06-07
+last_updated: 2026-06-07
 depends_on: []
 superseded_by: null
 review_cadence: session
@@ -292,3 +292,13 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - **Discipline:** read-before-invoke HELD (PF-S39-01 window held — `/execute-plan` + `/review-pr` invoked via the Skill tool, `merge-methodology.md` read fresh). BUT **`PF-S40-01`** (`AP-SKILL-METHODOLOGY-SUBSTITUTION`) promoted mid-session at user challenge — ran `/review-pr` Phases 0-2 then improvised the fix step (self-triaged + bundled, skipping the mandated blind triage + blind verification); course-corrected, and the blind triage then caught 3 findings I'd have wrongly fixed (concrete evidence the phase was load-bearing). No code damage. PF-S25-01 tripped-clean (close on `fix/s40-close`). No `Workflow`/`AskUserQuestion`.
 - **New beads:** `8j6`→P1 (in-summary PII value-gate), `10h` (mislabeled-category HALT integrity), `20d` (adapter import isolation — DEFENSIVE, needs approval), `7lt` (typed wired-set marker). **Closed:** `oaf`, `8cv`.
 - **Next:** Wave 6 via `/execute-plan` (`1aa` lab-loop / watch-out / physician-feedback store schemas) → W7 (`1ih`). [[sessions/session-40]]
+
+## Session 41 (2026-06-07) — Wave 6 built (lab-loop / watch-out / physician-feedback store schemas)
+
+- **`/execute-plan` WAVE run — Wave 6.** Built the single open task via `/execute-plan` WAVE mode (SKILL.md + 4 references read fresh; `/review-pr` + `/merge` invoked via the Skill tool, `merge-methodology.md` read fresh — **PF-S39-01 HELD**); W6→W7 checkpoint as the gate; PR #71 merged. **PF-S36-01 HELD; PF-S40-01 HELD** (full `/review-pr` methodology incl. dispatched profile-less blind triage + blind verify). Build **17/18** (Wave 6 COMPLETE).
+- **`1aa` / ADR-0007-T1 (SE; QA+Architect+Security at Tier-2):** `scripts/store/loop_schema.py` — lab-loop / watch-out / physician-feedback store schemas writing THROUGH `store.append`/`store.read` + `keying.LINE_FIELDS` (no second key, no second NDJSON I/O); 0 model-bound send (egress guard + SEC-03 failing-capable injection); 0 automated signal detection (NG-6 floor); no-fabrication state semantics. Publishes the 4+1-state contract (`pending`/`not-yet-answered`/`no-prior`/`answered-over-time`/`no-data`) W7 reads 1:1.
+- **Three-tier review caught + fixed defects the builder's tests + all of Tier-2 missed (0 suppressed, PF-S26-01):** Tier-2 (QA+Architect+Security PASS) found 2 non-blocking (value-pin FIXED; ≥2-tp sentinel beaded W7); Tier-3 `/review-pr` #71 (6-agent) caught a **cross-stream namespace collision** (`read_panel` returned a fabricated biomarker value) + a **same-timepoint carry-forward dedupe-drop** (dropped contraindication answer — safety surface) + a 0-timepoint `None`-overload + weak AC-5 assertions → blind triage **9 LEGITIMATE / 3 OUT_OF_SCOPE / 1 NOT_ACTIONABLE / 1 NOT_A_BUG / 1 by-design** → 9 fixed (stream namespacing + content-hashed carry-forward keys + `no-data` marker + hardened tests) + blind-verified **9/9 RESOLVED**. FIFTH consecutive wave a safety/PII surface hid in a builder-blessed path; layered review caught it before `main`.
+- **Merge:** PR #71 rebase-merged via REST (GraphQL throttled to 0 all session). `main` @ the Wave-6 merge. Branch deleted, refs pruned. Suite **247/2**; branch-completeness 0 violations (20 agents).
+- **Discipline:** read-before-invoke HELD; **no new PF** (clean lifecycle, no user-caught failure). PF-S40-01 falsification window HELD (full `/review-pr` methodology ran). PF-S25-01 tripped-clean (close on `fix/s41-close`). No `Workflow`/`AskUserQuestion`.
+- **New beads:** `s38` P2 (panel result-writer), `r5l` P3 (derive(None) caller-contract), `pka` P2 (builder/Tier-2 adversarial-coverage process improvement), W7 None-sentinel flag. **Closed:** `1aa`.
+- **Next:** Wave 7 via `/execute-plan` (`1ih` biomarker matrix/projection views — the last leaf → V1 18/18). [[sessions/session-41]]

@@ -4,7 +4,7 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-05-23
+last_reviewed: 2026-06-07
 depends_on: []
 superseded_by: null
 review_cadence: session
@@ -366,3 +366,5 @@ The pilots surfaced two false-BLOCKs in the S16 deploy-gate (`scripts/audit-spec
 - **Recurrence guard.** (a) **A gated skill is its WHOLE phase list, not its first few phases.** When a skill defines numbered phases, execute every one as specified; for `/review-pr` specifically, Phase 3 blind triage and Phase 7 blind verification are independence layers that MUST be dispatched as separate profile-less agents — never substitute the orchestrator's own synthesis/judgment. (b) **A user-facing synthesis is not a triage.** Presenting findings to the user for a decision does NOT discharge Phase 3; the blind triage still runs. (c) **Self-recognition flag:** "the findings are obviously legitimate, I can just route the fixes" / "I already triaged these in my head" → NO — dispatch the blind triage agent; it exists precisely to catch the findings that are obvious-but-wrong. (d) **Structural candidate (family past N=2, watch for N=3):** a close-audit assertion that, for any PR merged this session, the `/review-pr` blind-triage + blind-verify sub-agents were actually dispatched (a trace check) — the same missing mechanical gate PF-S17-01/PF-S39-01 flagged, now spanning the skill's internal phases too. Surfaced for adjudication, not built unilaterally.
 
 - **Anti-recurrence falsification window.** S41 (Wave 6) is the test. If Tier-3 `/review-pr` runs ALL its phases — a dispatched blind triage agent (not orchestrator self-triage) and a dispatched blind verification agent — for the Wave-6 PR, the guard held. If the fix step is again improvised (self-triage, bundled fix, skipped blind verify), the family recurrence promotes to N=3 → mandatory structural fix (the dispatch-trace close-audit).
+
+- **S41 OUTCOME (2026-06-07): HELD.** Tier-3 `/review-pr` #71 (Wave 6) ran its WHOLE phase list — a dispatched profile-less **blind triage** agent (no orchestrator self-triage; classified 9 LEGITIMATE / 3 OUT_OF_SCOPE / 1 NOT_ACTIONABLE / 1 NOT_A_BUG / 1 by-design, scoping out the panel-result-writer cluster + a defensive-code finding a self-triage might have wrongly fixed) AND a dispatched profile-less **blind verification** agent (9/9 RESOLVED, independently reproduced). The guard held; family recurrence stays at 2 (S39/S40), did not promote.
