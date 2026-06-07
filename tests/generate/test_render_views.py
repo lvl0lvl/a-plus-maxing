@@ -365,6 +365,42 @@ def test_unanswered_watchout_renders_not_yet_answered(tmp_path):
     )
 
 
+def test_answered_watchout_renders_answer(tmp_path):
+    """AC-4 (5th state): an answered watch-out renders its stored answer, not the marker.
+
+    Records an operator answer via the loop_schema API so read_watchout returns the
+    published ANSWERED_OVER_TIME state (its live render branch). The rendered row must
+    carry the stored answer value AND must NOT be the not-yet-answered marker — keyed on
+    the published markers, never hand-spelled literals. A regression that collapses
+    answered->not-yet-answered, or drops the stored answer from the render, turns red.
+    """
+    assert loop_schema.read_watchout("sleep_quality", root=tmp_path) == (
+        loop_schema.NOT_YET_ANSWERED
+    ), "precondition: an unrecorded watch-out reads not-yet-answered"
+    loop_schema.record_watchout_answer(
+        "sleep_quality", "good", "2026-06-01T00:00:00+00:00", root=tmp_path
+    )
+    assert loop_schema.read_watchout("sleep_quality", root=tmp_path) == (
+        loop_schema.ANSWERED_OVER_TIME
+    ), "the recorded answer must put the watch-out in the answered-over-time state"
+
+    paths = render_views.render_views(
+        tmp_path, watchouts=("sleep_quality",), _out_dir=tmp_path / "out"
+    )
+    html = _read_all(paths)
+    row = _row_for(html, "sleep_quality")
+    assert row, "the answered watch-out must render its row"
+    # The stored answer value renders (drop-the-answer regression turns this red).
+    assert "good" in row, "the answered watch-out must render its stored answer value"
+    # NOT the not-yet-answered marker (collapse-to-not-yet-answered regression turns red).
+    assert _display_for(loop_schema.NOT_YET_ANSWERED) not in _state_markers(html), (
+        "an answered watch-out must NOT render the 'not yet answered' state marker"
+    )
+    assert _state_marker_in(row) == "", (
+        "an answered watch-out renders its answer, not a state marker"
+    )
+
+
 def test_no_prior_biomarker_renders_marker_no_fabricated_trend(tmp_path):
     """AC-4: a single-timepoint biomarker renders the "no prior" marker, no fabricated trend.
 
