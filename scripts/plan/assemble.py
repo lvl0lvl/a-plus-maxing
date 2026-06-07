@@ -22,10 +22,12 @@ source is the summary.
 # Evidence-grounding categories that require a population-mismatch flag (crit 3).
 GROUNDING_NEEDS_FLAG = ("animal", "in-vitro")
 
-# The single shared coverage-gap disclosure shape — used by BOTH the thin-library
-# (crit 4) and the no-specialist (crit 5) paths. One definition, never two copies.
+# The single shared coverage-gap disclosure shape — used by the thin-library (crit 4),
+# the no-specialist (crit 5), and the empty-output (Security LOW 5-4) paths. One
+# definition, never divergent copies.
 THIN_LIBRARY_GAP = "thin-library"
 NO_SPECIALIST_GAP = "no-specialist"
+EMPTY_OUTPUT_GAP = "no-recommendations"
 
 # The four filters every emitted claim transits over the one canonical claim set
 # (Security MED-3 single-claim-set transit invariant).
@@ -95,6 +97,12 @@ def _is_complete(rec):
     return True
 
 
+# HALT dispositions, the value `_halt_disposition` returns.
+HALT_CLEAR = "clear"                       # no contradiction; the rec is emitted actionable
+HALT_VIOLATION = "violation"               # determinate contradiction; strike
+HALT_INDETERMINATE = "indeterminate"       # status cannot be established; strike fail-closed
+
+
 def _prohibited_classes(summary):
     """Derive the prohibited intervention-classes from the operator's hard limit(s).
 
@@ -113,43 +121,74 @@ def _prohibited_classes(summary):
     return classes
 
 
-def _violates_hard_limit(rec, summary, prohibited_classes):
-    """crit 9: does this recommendation contradict a stated hard limit?
+def _limit_is_recognized(summary, prohibited_classes):
+    """Whether the stated hard-limit phrase maps to at least one known prohibited class.
 
-    Two detection forms, both load-bearing:
-      (i)  DIRECT/literal — the rec's claim restates the limit's subject text.
-      (ii) CLASS-AWARE (the falsifying target) — the rec's `category` metadata is a
-           member of the limit's prohibited class, even in different terms. A
-           string-match HALT misses this; class-aware catches it.
+    An UNrecognized phrase (a limit present but mapping to no known class) makes every
+    rec's prohibited-class status indeterminate — the fail-closed trigger (Security
+    MED 5-2(b)). No hard limit at all is NOT indeterminate (nothing to clear against).
     """
-    limit_text = (summary.get("hard-limits") or "").lower()
+    return bool(prohibited_classes)
+
+
+def _halt_disposition(rec, summary, prohibited_classes):
+    """crit 9 (fail-closed): classify a rec against the operator's hard limit(s).
+
+    Returns HALT_CLEAR / HALT_VIOLATION / HALT_INDETERMINATE.
+
+    Detection forms, all load-bearing:
+      (i)  DIRECT/literal — the rec's claim restates the limit's subject text.
+      (ii) CLASS-AWARE — the rec's `category` metadata is a member of the limit's
+           prohibited class, even in different terms (a string-match HALT misses this).
+      (iii) FAIL-CLOSED (Security MED 5-2) — when a hard limit is PRESENT and the rec's
+            prohibited-class status is INDETERMINATE — the rec's `category` is
+            missing/None (a), OR the limit phrase maps to no known prohibited class
+            (b) — default to SUPPRESS, not emit. Determinacy, not default-allow.
+    """
+    limit_text = (summary.get("hard-limits") or "").strip()
+    if not limit_text:
+        return HALT_CLEAR  # no stated limit — nothing to clear against
+
     claim = (rec.get("claim") or "").lower()
     # (i) literal/direct contradiction: the rec restates the hard-limit subject.
-    if limit_text:
-        subject = limit_text.replace("no ", "", 1).strip()
-        if subject and subject in claim:
-            return True
+    subject = limit_text.lower().replace("no ", "", 1).strip()
+    if subject and subject in claim:
+        return HALT_VIOLATION
     # (ii) class-aware: the rec's intervention-class is in the prohibited set.
-    if rec.get("category") in prohibited_classes:
-        return True
-    return False
+    category = rec.get("category")
+    if category in prohibited_classes:
+        return HALT_VIOLATION
+    # (iii) fail-closed on indeterminate status: missing category OR unrecognized limit.
+    if category is None or not _limit_is_recognized(summary, prohibited_classes):
+        return HALT_INDETERMINATE
+    return HALT_CLEAR
 
 
-def _strike(claim, summary):
+def _strike(claim, summary, indeterminate=False):
     """Fail-closed HALT disposition: strike the actionable regimen, never ship it.
 
     Default OMIT-with-disclosure — the violating rec's actionable content is
     SUPPRESSED/STRUCK (not merely annotated): its actionable numbers/dosing are
     removed and an explicit contradiction disposition names the violated hard limit.
     The constrained FLAG exception likewise strikes the actionable content; it is
-    never shipped actionable.
+    never shipped actionable. When `indeterminate`, the rec is suppressed because its
+    prohibited-class status could not be established (fail-closed for safety), not
+    because a determinate contradiction was proven.
     """
     claim["actionable_content_struck"] = True
     claim.pop("numbers", None)  # the actionable regimen content is removed
-    claim["contradiction_disposition"] = (
-        f"Struck: contradicts the stated hard limit "
-        f"({summary.get('hard-limits')!r}). Actionable content suppressed."
-    )
+    if indeterminate:
+        claim["indeterminate_class_suppressed"] = True
+        claim["contradiction_disposition"] = (
+            f"Suppressed (fail-closed): prohibited-class status against the stated "
+            f"hard limit ({summary.get('hard-limits')!r}) is indeterminate. "
+            f"Actionable content suppressed for safety."
+        )
+    else:
+        claim["contradiction_disposition"] = (
+            f"Struck: contradicts the stated hard limit "
+            f"({summary.get('hard-limits')!r}). Actionable content suppressed."
+        )
     return claim
 
 
@@ -169,9 +208,13 @@ def _compose_claim(rec, specialist_name, summary, prohibited_classes):
     # Filter — population-mismatch, metadata-keyed off the grounding category (crit 3).
     if claim.get("grounding") in GROUNDING_NEEDS_FLAG:
         claim["population_mismatch_flag"] = True
-    # Filter — fail-closed class-aware HALT (crit 9): strike a hard-limit violator.
-    if _violates_hard_limit(claim, summary, prohibited_classes):
+    # Filter — fail-closed class-aware HALT (crit 9): strike on a determinate violation
+    # OR on indeterminate prohibited-class status (default-deny, not default-allow).
+    disposition = _halt_disposition(claim, summary, prohibited_classes)
+    if disposition == HALT_VIOLATION:
         _strike(claim, summary)
+    elif disposition == HALT_INDETERMINATE:
+        _strike(claim, summary, indeterminate=True)
     # Transit marker: this claim passed all four filters over the canonical set.
     claim["filters_transited"] = FILTERS
     return claim
@@ -233,6 +276,15 @@ def assemble(goal_set, summary, roster):
             claim = _compose_claim(rec, specialist_name, summary, prohibited_classes)
             if claim is not None:
                 emitted.append(claim)
+
+        # Security LOW 5-4: a section with no surviving recommendations (none supplied,
+        # or all dropped by the sourcing filter) renders the shared coverage-gap
+        # disclosure rather than a silent empty section.
+        if not emitted:
+            sections.append(
+                _coverage_gap(domain, EMPTY_OUTPUT_GAP, personalization, specialist_name)
+            )
+            continue
 
         sections.append({
             "domain": domain,

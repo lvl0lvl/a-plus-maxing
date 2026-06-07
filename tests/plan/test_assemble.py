@@ -352,6 +352,37 @@ def test_thin_library_and_no_specialist_share_one_gap_shape():
     assert thin["recommendations"] == [] and orphan["recommendations"] == []
 
 
+def test_specialist_with_no_recommendations_renders_gap(tmp_path):
+    """Security LOW 5-4: a specialist output yielding NO recommendations and NO
+    thin-library signal must NOT produce a silent empty section.
+
+    Before: such output produced a section with specialist=None-ish, empty
+    recommendations, and NO disclosure — a silent empty section. Every section must
+    carry either recommendations OR an explicit coverage-gap disclosure.
+    """
+    def empty_specialist(domain, summary):
+        return {"specialist": "Empty-Specialist", "recommendations": []}
+
+    plan = assemble(["barren"], _summary(), {"barren": empty_specialist})
+    section = _section_for(plan, "barren")
+    assert section["recommendations"] == []
+    # The fix: an empty-output section carries an explicit gap disclosure, not silence.
+    assert section.get("coverage_gap"), "an empty-output section must render a coverage gap"
+    assert section.get("disclosure"), "an empty-output section must carry the shared disclosure"
+
+
+def test_specialist_all_recs_incomplete_renders_gap():
+    """Security LOW 5-4: if a specialist's recs all drop out as incomplete (crit-2),
+    the resulting empty section must still carry a gap disclosure, not be silent.
+    """
+    incomplete = _rec("vague rec", reversibility=None)  # dropped by the sourcing filter
+    plan = assemble(["thin-out"], _summary(), {"thin-out": _specialist("S", [incomplete])})
+    section = _section_for(plan, "thin-out")
+    assert section["recommendations"] == []
+    assert section.get("coverage_gap"), "a section emptied by the sourcing filter must render a gap"
+    assert section.get("disclosure")
+
+
 # --- Cycle 3: PII boundary, personalization, HALT filter (AC-7..AC-10) ----------
 
 
@@ -408,28 +439,48 @@ def test_assemble_reasons_only_over_router_summary_egress():
 
 def test_raw_pii_token_absent_from_plan_and_render(tmp_path):
     """AC-7 (c) — NEGATIVE CONTENT (Security MED-2): a raw-PII token present in the
-    store/source layer but ABSENT from the router summary must be ABSENT from the
+    RAW-STORE source layer but ABSENT from the router summary must be ABSENT from the
     returned plan AND from the rendered output.
 
-    The leak vector this guards is a raw-PII value reaching the plan through a roster
-    fixture / goal-set seam (not through `store.read`, which `assemble` never calls).
-    We plant a raw-PII sentinel in the SOURCE layer (a specialist that closes over a
-    raw-PII value the operator never put in the summary) and assert the token never
-    surfaces — `assemble` reasons over the summary by field name, so a value not in
-    the summary cannot legitimately appear in the plan.
+    The boundary crit-7(c) specifies: `assemble` reasons ONLY over the summary, never
+    the raw store. To exercise it genuinely (Security HIGH 5-1a — the prior version
+    planted the sentinel on no path into the plan, so its absence was trivially true),
+    we build a raw-store source carrying the sentinel and a DERIVED summary that does
+    NOT carry it (the band/class summary token, not the raw value — mirroring how
+    `router.summarize` strips raw PII). `assemble` is handed ONLY the summary. If
+    `assemble` ever reached past the summary into the raw store (the failing-capable
+    direction), the sentinel would surface; the boundary holds it absent.
     """
     from scripts.generate.render import emit
 
-    raw_pii = "555-87-6309-SSN-SENTINEL"  # a raw-PII token NOT in the summary
-    summary = _summary()
+    raw_pii = "555-87-6309-SSN-SENTINEL"  # a raw-PII value living "in the store"
+
+    # The raw-store source layer: the operator's raw record carrying the SSN. This is
+    # the surface `router.summarize` reads and DERIVES the summary from — `assemble`
+    # is never given it. A specialist that (wrongly) reached into it would leak.
+    raw_store = {
+        "government-id": raw_pii,
+        "goal-targets": "return to pre-Jan-2026 loading",
+    }
+
+    # The DERIVED summary `assemble` actually consumes: band/class tokens only, with
+    # the raw government-id field-name absent entirely (named-excluded raw PII).
+    summary = _summary(**{"goal-targets": raw_store["goal-targets"]})
+    assert "government-id" not in summary, "the named-excluded raw-PII field must not be in the summary"
     assert raw_pii not in _plan_text({"s": summary}), "sentinel must not be in the summary"
 
-    # A specialist that ignores the raw-PII value (it reasons over the summary tokens).
-    leaky_specialist = _specialist("S", [_rec("progressive overload")])
+    # A specialist that reasons over the summary it is handed (the correct contract).
+    # The raw_store is in scope of the test but NOT passed to assemble — assemble's
+    # only operator-state source is the summary.
+    def summary_only_specialist(domain, summary_arg):
+        # surfaces a summary token, never the raw store (which it is not given).
+        return {"specialist": "S", "recommendations": [
+            _rec(f"loading toward {summary_arg.get('goal-targets')}"),
+        ]}
 
-    plan = assemble(["strength"], summary, {"strength": leaky_specialist})
+    plan = assemble(["strength"], summary, {"strength": summary_only_specialist})
 
-    # (c-i) ABSENT from the returned plan document.
+    # (c-i) ABSENT from the returned plan document — the raw store value never enters.
     assert raw_pii not in _plan_text(plan), "raw-PII token leaked into the returned plan"
 
     # (c-ii) ABSENT from the rendered output (real render path; a test-fixture template
@@ -445,6 +496,29 @@ def test_raw_pii_token_absent_from_plan_and_render(tmp_path):
     out = emit(plan_template, {}, _out_dir=tmp_path)
     rendered = out.read_text()
     assert raw_pii not in rendered, "raw-PII token leaked into the rendered output"
+
+
+def test_passthrough_summary_field_is_surfaced_verbatim_KNOWN_RESIDUAL_8j6():
+    """Characterization: the 7 pass-through summary fields are surfaced VERBATIM.
+
+    Documents bead a-plus-maxing-8j6 (P1): the pass-through summary fields
+    (goal-targets, goal-priority-order, hard-limits, ...) are surfaced verbatim by
+    `_personalize`; value-level PII rejection is a deferred design decision (closed-
+    vocab store schema at the router vs an assemble-side PII-scan), LM-04-gated. This
+    test PINS the current behavior so the residual is VISIBLE, not invisible — it is
+    NOT an assertion that the behavior is desired. Do NOT implement a value-level gate
+    here; that is the beaded design decision, out of this fix's scope.
+    """
+    planted = "RAW-PII-IN-FREE-TEXT-GOAL-SENTINEL"
+    summary = _summary(**{"goal-targets": planted})
+    roster = {"strength": _specialist("S", [_rec("progressive overload")])}
+    plan = assemble(["strength"], summary, roster)
+    section = _section_for(plan, "strength")
+    # CURRENT behavior: a free-text summary field value passes through verbatim.
+    assert planted in _plan_text(section), (
+        "KNOWN RESIDUAL (bead 8j6): a value placed in a free-text summary field is "
+        "surfaced verbatim — assemble trusts the router's summary as already PII-bounded"
+    )
 
 
 def test_section_surfaces_operator_input():
@@ -556,6 +630,80 @@ def test_no_hard_limit_control_does_not_strike():
     roster = {"strength": _specialist("S", [_rec("progressive overload")])}
     plan = assemble(["strength"], summary, roster)
     assert not any(r.get("actionable_content_struck") for r in _all_recs(plan))
+
+
+def test_halt_fail_closed_unrecognized_limit_phrase(tmp_path):
+    """AC-9 fail-closed (Security MED 5-2)(i): a violating rec under an UNRECOGNIZED
+    hard-limit phrase is SUPPRESSED, not emitted.
+
+    The prior HALT defaulted to ALLOW on an indeterminate limit (an unrecognized
+    phrase yielded an empty prohibited set, so the filter never fired). Fail-closed:
+    a hard limit is PRESENT but maps to no known prohibited class -> the rec's
+    prohibited-class status is INDETERMINATE -> SUPPRESS-with-disclosure. A composer
+    that emits the rec's actionable regimen under an unrecognized limit turns this RED.
+    """
+    summary = _summary(**{"hard-limits": "no exotic-research-peptides"})  # unrecognized phrase
+    rec = _rec("BPC-157 250mcg BID", category="peptide")
+    roster = {"recovery": _specialist("R", [rec])}
+    plan = assemble(["recovery"], summary, roster)
+
+    emitted = [r for r in _all_recs(plan) if "BPC-157" in r.get("claim", "")]
+    assert emitted, "the rec must still appear (suppress-with-disclosure, not silently dropped)"
+    r = emitted[0]
+    assert r.get("actionable_content_struck") is True, (
+        "an indeterminate-limit rec must be suppressed fail-closed, not emitted actionable"
+    )
+    assert not r.get("numbers"), "the actionable regimen must be removed"
+    assert "no exotic-research-peptides" in (r.get("contradiction_disposition") or ""), (
+        "the disposition must NAME the violated/uncleared hard limit"
+    )
+    assert r.get("indeterminate_class_suppressed") is True, (
+        "an indeterminate-class suppression must be marked as such (fail-closed for safety)"
+    )
+
+
+def test_halt_fail_closed_missing_category_under_recognized_limit():
+    """AC-9 fail-closed (Security MED 5-2)(ii): a rec with MISSING/None category under a
+    RECOGNIZED limit is SUPPRESSED — a prohibited-class member with no category metadata
+    escaped the class check before (default-allow). Fail-closed catches it.
+    """
+    summary = _summary(**{"hard-limits": "no stimulants"})
+    # category missing entirely (None) — could be a mislabeled/uncategorized stimulant.
+    rec = _rec("unlabeled pre-workout compound", category=None)
+    roster = {"perf": _specialist("P", [rec])}
+    plan = assemble(["perf"], summary, roster)
+
+    emitted = [r for r in _all_recs(plan) if "unlabeled pre-workout" in r.get("claim", "")]
+    assert emitted, "the rec must still appear (suppress-with-disclosure)"
+    r = emitted[0]
+    assert r.get("actionable_content_struck") is True, (
+        "a rec with no category metadata under a recognized limit must be suppressed "
+        "fail-closed (its prohibited-class status is indeterminate)"
+    )
+    assert not r.get("numbers"), "the actionable regimen must be removed"
+    assert "no stimulants" in (r.get("contradiction_disposition") or ""), (
+        "the disposition must NAME the violated/uncleared hard limit"
+    )
+    assert r.get("indeterminate_class_suppressed") is True
+
+
+def test_halt_fail_closed_does_not_overfire_when_determinate():
+    """AC-9 fail-closed control: a rec with a PRESENT, recognized, NON-prohibited
+    category under a RECOGNIZED limit is NOT suppressed.
+
+    Guards against the fail-closed change overfiring — only INDETERMINATE status
+    triggers suppression, not every rec under a hard limit. This is the falsifying
+    baseline: a HALT that strikes everything passes the strike tests but fails this.
+    """
+    summary = _summary(**{"hard-limits": "no stimulants"})
+    safe = _rec("creatine monohydrate 5g", category="supplement")  # determinate, non-prohibited
+    roster = {"perf": _specialist("P", [safe])}
+    plan = assemble(["perf"], summary, roster)
+    emitted = [r for r in _all_recs(plan) if r.get("claim", "").startswith("creatine")]
+    assert emitted and not emitted[0].get("actionable_content_struck"), (
+        "a determinate non-prohibited rec under a recognized limit must NOT be struck"
+    )
+    assert not emitted[0].get("indeterminate_class_suppressed")
 
 
 def test_every_claim_transits_all_filters():
