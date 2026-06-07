@@ -264,3 +264,55 @@ def test_scan_returns_int_on_nonempty(tmp_path):
     """SEC-01(a): the -> int return-type shape holds on a real set too."""
     root = _scratch_clone(tmp_path)
     assert isinstance(scan(_tracked(root), identity_config=NO_CONFIG), int)
+
+
+def test_scan_contact_is_case_insensitive(tmp_path):
+    """2x1: a non-canonical-case gmail (Op.User@Gmail.COM) is detected (>=1).
+
+    The contact literal `@gmail.com` was case-sensitive, so an upper/mixed-case
+    email scored 0 and PASSED the content scan. Case-insensitive matching must
+    catch it. Reds on the old case-sensitive pattern.
+    """
+    root = _scratch_clone(tmp_path)
+    leak = root / "README.md"
+    leak.write_text(leak.read_text() + "reply-to: Op.User@Gmail.COM\n")
+    _git(["add", "-A"], root)
+    assert scan(_tracked(root), identity_config=NO_CONFIG) >= 1
+
+
+def test_identity_match_is_case_insensitive(tmp_path):
+    """2x1: an operator-identity token matches case-insensitively (config-driven)."""
+    root = _scratch_clone(tmp_path)
+    cfg = _identity_config(tmp_path, token="Examplename")
+    leak = root / "code.py"
+    leak.write_text(leak.read_text() + "contact EXAMPLENAME today\n")
+    _git(["add", "-A"], root)
+    assert scan(_tracked(root), identity_config=cfg) >= 1
+
+
+def test_scan_text_counts_contact_and_identity(tmp_path):
+    """scan_text (8j6 helper): counts contact + identity tokens in an in-memory string.
+
+    The value-level counterpart to `scan` (which reads file CONTENTS). Contact is
+    agnostic; identity is config-driven (the same token is undetected with no config).
+    """
+    from scripts.guard.pii_scan import scan_text
+
+    cfg = _identity_config(tmp_path)  # synthetic 'Testperson|Examplename'
+    assert scan_text("hello world, no pii here") == 0
+    assert scan_text("mail me at Test.Fixture@Gmail.COM") >= 1  # case-insensitive too
+    assert scan_text("ask Examplename first", identity_config=cfg) >= 1
+    assert scan_text("ask Examplename first", identity_config=NO_CONFIG) == 0
+
+
+def test_scan_text_scopes_out_structural_store_pattern():
+    """scan_text targets personal-identity tokens (name/contact), NOT the file-
+    structural store-line patterns (those detect a leaked store NDJSON FILE, not raw
+    PII inside a scalar summary token). A bare store line carries no personal data."""
+    from scripts.guard.pii_scan import scan_text
+
+    store_line = (
+        '{"item": "rhr", "timepoint": "2026-06-01T08:00:00+00:00", '
+        '"source": "manual", "value": 55}'
+    )
+    assert scan_text(store_line, identity_config=NO_CONFIG) == 0
