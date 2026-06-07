@@ -9,17 +9,21 @@ answer against a cutoff and raises no automated signal: it stores only
 operator-entered answers and derives the watch-out question SET from the operator's
 active protocols. All persistence is local file I/O; 0 model-bound send.
 
-The four published states are read 1:1 by ADR-0007-T2's render views:
+The five published states are read 1:1 by ADR-0007-T2's render views:
     pending             a recommended-but-undrawn panel; persists until a result lands
     not-yet-answered    a watch-out check-in with no stored operator answer
+    no-data             a biomarker never recorded (zero stored timepoints)
     no-prior            a biomarker with exactly one stored timepoint
     answered-over-time  an answer / feedback entry carried into the next generation
 """
+
+import hashlib
 
 from scripts.store import keying, store
 
 PENDING = "pending"
 NOT_YET_ANSWERED = "not-yet-answered"
+NO_DATA = "no-data"
 NO_PRIOR = "no-prior"
 ANSWERED_OVER_TIME = "answered-over-time"
 
@@ -27,9 +31,31 @@ ANSWERED_OVER_TIME = "answered-over-time"
 _TAG_PANEL = "plan-recommendation"
 _TAG_WATCHOUT = "watch-out"
 _TAG_FEEDBACK = "physician-feedback"
+_TAG_BIOMARKER = "manual"
+
+# Per-stream item-id prefixes. The four streams occupy disjoint store-item namespaces
+# so a name shared across streams (e.g. "ferritin" as both panel and biomarker) does
+# not cross-read. The "::" separator is not a path separator, so the prefixed id stays
+# a direct child of the store root (store._item_path guard).
+_PREFIX_PANEL = "panel::"
+_PREFIX_WATCHOUT = "watch-out::"
+_PREFIX_BIOMARKER = "biomarker::"
 
 # The fixed item id under which all physician-feedback entries accrue as one stream.
-_FEEDBACK_ITEM = "physician-feedback"
+_FEEDBACK_ITEM = "feedback::physician-feedback"
+
+
+def _content_tag(prefix, value):
+    """Fold a stable content discriminator of a value into a stream's source tag.
+
+    The store dedupe identity is (item, timepoint, source) and EXCLUDES value, so two
+    distinct entries at the same timepoint under a constant source would collide and
+    the second would be dropped. Folding a short hash of the value into the source tag
+    gives distinct values distinct keys (both persist) while an identical re-entry
+    keeps the same key (idempotent no-op). Reads match by the `prefix`, not an exact tag.
+    """
+    digest = hashlib.sha256(repr(value).encode()).hexdigest()[:16]
+    return f"{prefix}{digest}"
 
 # Watch-out questions implied by an active protocol/compound. The deriver returns the
 # question SET to ASK the operator — it stores no answer and compares no value.
@@ -39,7 +65,13 @@ _PROTOCOL_WATCHOUTS = {
 
 
 def _reading(item, timepoint, source, value):
-    """Build a reading carrying every keying.LINE_FIELDS field."""
+    """Build a reading carrying every keying.LINE_FIELDS field.
+
+    keying derives the store dedupe identity from (item, timepoint, source) and
+    EXCLUDES value, so two appends with the same tuple are idempotent no-ops (the
+    second is dropped). Distinct same-timepoint entries in a constant-source stream
+    therefore need a varying source — see `_content_tag`.
+    """
     return {field: None for field in keying.LINE_FIELDS} | {
         "item": item,
         "timepoint": timepoint,
@@ -50,14 +82,15 @@ def _reading(item, timepoint, source, value):
 
 def record_pending_panel(panel, timepoint, root):
     """Record a plan-recommended-but-undrawn panel as state "pending"."""
+    item = f"{_PREFIX_PANEL}{panel}"
     store.append(
-        panel, _reading(panel, timepoint, _TAG_PANEL, PENDING), root=root
+        item, _reading(item, timepoint, _TAG_PANEL, PENDING), root=root
     )
 
 
 def read_panel(panel, root):
     """Return a panel's stored state verbatim — "pending" until a result is appended."""
-    readings = store.read(panel, root=root)
+    readings = store.read(f"{_PREFIX_PANEL}{panel}", root=root)
     if not readings:
         return PENDING
     return readings[-1]["value"]
@@ -65,8 +98,11 @@ def read_panel(panel, root):
 
 def record_watchout_answer(watchout, answer, timepoint, root):
     """Record an operator's watch-out check-in answer."""
+    item = f"{_PREFIX_WATCHOUT}{watchout}"
     store.append(
-        watchout, _reading(watchout, timepoint, _TAG_WATCHOUT, answer), root=root
+        item,
+        _reading(item, timepoint, _content_tag(_TAG_WATCHOUT, answer), answer),
+        root=root,
     )
 
 
@@ -84,24 +120,30 @@ def read_watchout_answers(watchout, root):
     returned by any later generation's read because ``store.read`` returns all
     appended readings. No stored answer is dropped, expired, or overwritten.
     """
-    return store.read(watchout, root=root)
+    return store.read(f"{_PREFIX_WATCHOUT}{watchout}", root=root)
 
 
 def record_biomarker(item, timepoint, value, root):
     """Record one biomarker timepoint."""
+    stored = f"{_PREFIX_BIOMARKER}{item}"
     store.append(
-        item, _reading(item, timepoint, "manual", value), root=root
+        stored, _reading(stored, timepoint, _TAG_BIOMARKER, value), root=root
     )
 
 
 def read_biomarker(item, root):
-    """Return a biomarker's stored timepoints; one timepoint reads "no-prior".
+    """Return a biomarker's stored timepoints; zero reads "no-data", one reads "no-prior".
 
-    A single stored timepoint returns the no-prior marker plus that one timepoint —
-    it synthesizes no trend, delta, or projection over a single point. Two or more
-    timepoints return the stored readings as-is (the render view owns any projection).
+    No stored timepoint returns the no-data marker (never-recorded) with an empty
+    timepoint list — distinct from the single-timepoint no-prior case and from the
+    ≥2-timepoint trend case. A single stored timepoint returns the no-prior marker
+    plus that one timepoint — it synthesizes no trend, delta, or projection over a
+    single point. Two or more timepoints return the stored readings as-is (the render
+    view owns any projection).
     """
-    readings = store.read(item, root=root)
+    readings = store.read(f"{_PREFIX_BIOMARKER}{item}", root=root)
+    if not readings:
+        return {"state": NO_DATA, "timepoints": []}
     if len(readings) == 1:
         return {"state": NO_PRIOR, "timepoints": readings}
     return {"state": None, "timepoints": readings}
@@ -123,7 +165,9 @@ def record_physician_feedback(content, timepoint, root):
     """Record a post-visit physician-feedback entry."""
     store.append(
         _FEEDBACK_ITEM,
-        _reading(_FEEDBACK_ITEM, timepoint, _TAG_FEEDBACK, content),
+        _reading(
+            _FEEDBACK_ITEM, timepoint, _content_tag(_TAG_FEEDBACK, content), content
+        ),
         root=root,
     )
 

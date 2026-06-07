@@ -94,18 +94,44 @@ def test_two_timepoints_not_no_prior(tmp_path):
     assert len(result["timepoints"]) == 2
 
 
+def test_never_recorded_biomarker_reads_no_data(tmp_path):
+    """F5: a never-recorded biomarker (0 timepoints) reads a DISTINCT "no-data" marker.
+
+    The 0-timepoint case must be distinguishable from both no-prior (1 timepoint) and
+    the ≥2-timepoint trend case (state=None) — overloading the same None hides
+    never-recorded from has-trend on the published surface.
+    """
+    result = loop_schema.read_biomarker("never_recorded", root=tmp_path)
+    assert result["state"] == loop_schema.NO_DATA
+    assert result["timepoints"] == []
+    assert loop_schema.NO_DATA != loop_schema.NO_PRIOR
+    assert loop_schema.NO_DATA is not None
+
+
 def test_question_set_derived_from_active_protocols(tmp_path):
     """AC-5(a): the watch-out question set is DERIVED from active protocols/compounds.
 
-    The derived set must cover the watch-outs the supplied protocol implies — it is
-    keyed off the operator's active protocols, not a fixed/empty list.
+    The derived set EQUALS the exact watch-outs the supplied protocol implies — not a
+    fixed non-empty set returned for any input. A different protocol derives a
+    different covering set, so a fixed-set deriver turns this RED.
     """
-    questions = loop_schema.derive_watchout_questions(["bpc-157"])
-    assert len(questions) >= 1
-    # Derivation is protocol-keyed: a different active protocol derives a
-    # different (or differently-covering) set, not the same fixed list.
-    other = loop_schema.derive_watchout_questions([])
-    assert questions != other
+    bpc_set = loop_schema.derive_watchout_questions(["bpc-157"])
+    assert bpc_set == {"injection_site_reaction", "appetite_change"}
+
+    # A different active protocol derives a different covering set — a deriver that
+    # returns the same fixed list for any input fails here.
+    other = loop_schema.derive_watchout_questions(["unknown-compound"])
+    assert other != bpc_set
+
+
+def test_empty_or_unknown_protocols_derive_empty_set():
+    """F9 / AC-5(a): no active (or only unknown) protocols fabricate no watch-out.
+
+    An operator with no active protocols, or only protocols the map does not cover,
+    gets an EMPTY question set — never a fabricated watch-out.
+    """
+    assert loop_schema.derive_watchout_questions([]) == set()
+    assert loop_schema.derive_watchout_questions(["unknown-compound"]) == set()
 
 
 def test_zero_automated_detection_floor():
@@ -118,7 +144,7 @@ def test_zero_automated_detection_floor():
 
 
 def test_published_state_marker_literal_values():
-    """Pin the four published state markers to their literal values (ADR-0007-T2 contract).
+    """Pin the published state markers to their literal values (ADR-0007-T2 contract).
 
     The markers are read 1:1 by ADR-0007-T2's render views. Pinning the LITERAL
     strings (not just the constant names) turns a silent value change RED before T2
@@ -126,8 +152,107 @@ def test_published_state_marker_literal_values():
     """
     assert loop_schema.PENDING == "pending"
     assert loop_schema.NOT_YET_ANSWERED == "not-yet-answered"
+    assert loop_schema.NO_DATA == "no-data"
     assert loop_schema.NO_PRIOR == "no-prior"
     assert loop_schema.ANSWERED_OVER_TIME == "answered-over-time"
+
+
+# --- Stream isolation (F1): the four streams occupy disjoint item namespaces ---
+
+
+def test_streams_disjoint_under_shared_name(tmp_path):
+    """F1: a panel and a biomarker sharing a name do NOT cross-read.
+
+    Adversarial: if the streams shared an item namespace, read_panel would merge a
+    biomarker value (a fabricated panel result) and read_biomarker would merge the
+    panel's pending row. Each read must return ONLY its own stream's state.
+    """
+    loop_schema.record_pending_panel(
+        "ferritin", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_biomarker(
+        "ferritin", "2026-06-01T08:00:00+00:00", 45, root=tmp_path
+    )
+
+    assert loop_schema.read_panel("ferritin", root=tmp_path) == loop_schema.PENDING
+
+    biomarker = loop_schema.read_biomarker("ferritin", root=tmp_path)
+    assert biomarker["state"] == loop_schema.NO_PRIOR
+    assert len(biomarker["timepoints"]) == 1
+    assert biomarker["timepoints"][0]["value"] == 45
+
+
+def test_feedback_does_not_collide_with_panel(tmp_path):
+    """F1: the fixed feedback item does not cross-read a same-named panel."""
+    loop_schema.record_pending_panel(
+        "physician-feedback", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_physician_feedback(
+        "increase dose", "2026-06-01T09:00:00+00:00", root=tmp_path
+    )
+
+    assert (
+        loop_schema.read_panel("physician-feedback", root=tmp_path)
+        == loop_schema.PENDING
+    )
+    entries = [r["value"] for r in loop_schema.read_physician_feedback(root=tmp_path)]
+    assert entries == ["increase dose"]
+
+
+# --- Same-timepoint carry-forward (F2): distinct entries survive, re-entry dedups ---
+
+
+def test_distinct_same_timepoint_watchout_answers_both_persist(tmp_path):
+    """F2: two DISTINCT same-timepoint watch-out answers both survive the next read.
+
+    Failing-capable: a dedupe identity that excludes the value drops the second
+    answer at the same timepoint (a dropped contraindication answer — a safety
+    surface). Both must persist.
+    """
+    tp = "2026-06-01T08:00:00+00:00"
+    loop_schema.record_watchout_answer("sleep_quality", "slept 8h", tp, root=tmp_path)
+    loop_schema.record_watchout_answer("sleep_quality", "woke at 3am", tp, root=tmp_path)
+
+    answers = [
+        r["value"]
+        for r in loop_schema.read_watchout_answers("sleep_quality", root=tmp_path)
+    ]
+    assert "slept 8h" in answers
+    assert "woke at 3am" in answers
+
+
+def test_same_watchout_answer_reentered_dedups(tmp_path):
+    """F2: the SAME watch-out answer re-recorded at the same timepoint appears ONCE."""
+    tp = "2026-06-01T08:00:00+00:00"
+    loop_schema.record_watchout_answer("sleep_quality", "slept 8h", tp, root=tmp_path)
+    loop_schema.record_watchout_answer("sleep_quality", "slept 8h", tp, root=tmp_path)
+
+    answers = [
+        r["value"]
+        for r in loop_schema.read_watchout_answers("sleep_quality", root=tmp_path)
+    ]
+    assert answers == ["slept 8h"]
+
+
+def test_distinct_same_timepoint_feedback_both_persist(tmp_path):
+    """F2: two DISTINCT same-timepoint physician-feedback entries both survive."""
+    tp = "2026-06-01T08:00:00+00:00"
+    loop_schema.record_physician_feedback("increase dose", tp, root=tmp_path)
+    loop_schema.record_physician_feedback("recheck in 6 weeks", tp, root=tmp_path)
+
+    entries = [r["value"] for r in loop_schema.read_physician_feedback(root=tmp_path)]
+    assert "increase dose" in entries
+    assert "recheck in 6 weeks" in entries
+
+
+def test_same_feedback_reentered_dedups(tmp_path):
+    """F2: the SAME physician-feedback entry re-recorded at the same timepoint appears ONCE."""
+    tp = "2026-06-01T08:00:00+00:00"
+    loop_schema.record_physician_feedback("increase dose", tp, root=tmp_path)
+    loop_schema.record_physician_feedback("increase dose", tp, root=tmp_path)
+
+    entries = [r["value"] for r in loop_schema.read_physician_feedback(root=tmp_path)]
+    assert entries == ["increase dose"]
 
 
 # --- Cycle 2: watch-out answer carry-to-next-generation ---
@@ -152,6 +277,27 @@ def test_watchout_answer_read_next_generation(tmp_path):
     carried = loop_schema.read_watchout_answers("sleep_quality", root=tmp_path)
     answers = [r["value"] for r in carried]
     assert "slept 8h" in answers  # dropped answer turns this RED
+
+
+def test_watchout_state_transitions_on_answer(tmp_path):
+    """F10: one watch-out key transitions not-yet-answered -> answered-over-time.
+
+    Before any answer the read is not-yet-answered; after recording an answer the
+    SAME key reads answered-over-time. A read stuck on either marker turns this RED.
+    """
+    assert (
+        loop_schema.read_watchout("sleep_quality", root=tmp_path)
+        == loop_schema.NOT_YET_ANSWERED
+    )
+
+    loop_schema.record_watchout_answer(
+        "sleep_quality", "slept 8h", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+
+    assert (
+        loop_schema.read_watchout("sleep_quality", root=tmp_path)
+        == loop_schema.ANSWERED_OVER_TIME
+    )
 
 
 # --- Cycle 3: physician-feedback carry-forward ---
@@ -204,6 +350,10 @@ def test_sec03_injected_outbound_fails_guard(tmp_path):
     no-go. A local backlog listener makes the connect complete (kernel handshake)
     without external network dependency or an accept thread.
     """
+    # Deliberate loopback-listener (not the sibling egress suites' off-host-connect +
+    # network-skip idiom): a local backlog listener completes the connect handshake
+    # with no network dependency, so there is no offline-skip flakiness; the deny-
+    # network sandbox blocks loopback, so the injected connect still trips the guard.
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.bind(("127.0.0.1", 0))
     srv.listen(1)
