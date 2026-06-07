@@ -270,19 +270,17 @@ OUT=$(printf 'not-json-at-all' \
     && ok "F-BUG1 malformed stdin -> DENY (jq parse fail-closed)" \
     || bad "F-BUG1 jq fail-open: malformed stdin allowed, got: $OUT"
 
-# ── F-TEST1: CHARACTERIZATION — non-canonical-case token ALONE -> currently allow ─
-# PINS the inherited pii_scan case-sensitivity gap (bead 2x1): scan()'s contact
-# pattern is case-sensitive on the `@gmail.com` literal, so a token whose domain is
-# upper/mixed case (`Op.User@Gmail.COM`) scores 0 hits. With ONLY that token staged
-# (no canonical token, no other PII) the hook does NOT deny. pii_scan.py is read-only,
-# so this characterizes the gap rather than fixing it. WHEN the upstream gap is closed
-# (case-insensitive match) this turns RED and MUST be updated to assert deny.
+# ── F-TEST1: non-canonical-case token ALONE -> DENY (bead 2x1 case gap CLOSED) ──
+# The inherited pii_scan case gap is now closed (bead 2x1, PR #75): scan()'s contact
+# + identity patterns compile re.IGNORECASE, so an upper/mixed-case token
+# (`Op.User@Gmail.COM`) scores >=1. With ONLY that token staged the hook DENIES via
+# the scan and names the file — the case-insensitive boundary holds end-to-end.
 mkfile "docs/noncanon.md" "Reach out to Op.User@Gmail.COM for details."
 git -C "$REPO" add docs/noncanon.md
 OUT=$(invoke "git commit -m 'noncanon only'")
-[[ "$OUT" != *'"deny"'* ]] \
-    && ok "F-TEST1 non-canonical token alone -> allow (PINS pii_scan case gap, bead 2x1)" \
-    || bad "F-TEST1 case gap closed upstream? non-canonical token now denied — update this case: $OUT"
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"docs/noncanon.md"* ]]; } \
+    && ok "F-TEST1 non-canonical token alone -> DENY (bead 2x1 case gap closed)" \
+    || bad "F-TEST1 expected deny on non-canonical token (2x1 closed), got: $OUT"
 git -C "$REPO" reset -q; rm -f "$REPO/docs/noncanon.md"
 
 # ── F-TEST2: non-numeric rc-0 scan output -> deny (^[0-9]+$ fail-closed clause) ──
@@ -306,6 +304,20 @@ OUT=$(printf '{"tool_input":{"command":%s}}' \
     && ok "F-TEST2 non-numeric rc-0 scan output -> DENY (^[0-9]+\$ fail-closed clause)" \
     || bad "F-TEST2 non-numeric output fell through to -ge 1 -> ALLOW, got: $OUT"
 git -C "$REPO" reset -q; rm -f "$REPO/docs/leak5.md"
+
+# ── cvr: hardened matcher catches bypass-form commits (env/path/trailing-sep) ───
+# With a PII file staged, the hook must DENY even when the commit command uses an
+# env-var prefix, an absolute git path, or a trailing separator — forms the prior
+# matcher let bypass (a silent PII-distribution hole now this hook is registered).
+mkfile "docs/leak6.md" "contact gwen@gmail.com"
+git -C "$REPO" add docs/leak6.md
+for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commit;"; do
+    OUT=$(invoke "$bypass")
+    [[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
+        && ok "cvr bypass-form commit DENIED: $bypass" \
+        || bad "cvr bypass NOT denied (matcher gap): '$bypass' got: $OUT"
+done
+git -C "$REPO" reset -q; rm -f "$REPO/docs/leak6.md"
 
 echo
 echo "test_block_pii_commit: ${PASS} passed, ${FAIL} failed"
