@@ -80,7 +80,7 @@ def _projection_block(values, dates, state):
     # A widening uncertainty band: a faint marker spanning the projected step, drawn
     # once as a distinct element so a missing band is detectable. Inline-only.
     band = (
-        f"<span class='proj-band' aria-label='widening uncertainty band'>± widening</span>"
+        "<span class='proj-band' aria-label='widening uncertainty band'>± widening</span>"
     )
     axis = " ".join(cs._escape(d) for d in dates)
     return (
@@ -94,25 +94,16 @@ def _projection_block(values, dates, state):
     )
 
 
-def _biomarker_row(item, marker, values, dates):
-    """Render one biomarker row, mapping its store-state 1:1 to its rendered state.
+def _biomarker_row(item, values, dates, projection=""):
+    """Render one trend biomarker window: its matrix sparkline plus an optional projection.
 
-    A no-data (0-timepoint) or no-prior (1-timepoint) biomarker renders its distinct
-    state marker only — no matrix sparkline, no fabricated trend/delta/projection over
-    too few points. A >=2-timepoint biomarker (marker is None) renders its matrix
-    sparkline (every stored timepoint side-by-side, recomputed from the store sequence)
-    plus, at >=PROJECTION_MIN_TIMEPOINTS, a naive projection. Draws ALL markup from the
-    shared `component_set` def (referenced, never re-declared).
+    Renders the window's matrix sparkline (every point in `values` side-by-side,
+    recomputed from the store sequence). The caller owns projection placement — it
+    passes the pre-rendered `projection` block ONLY on the final window (at most one per
+    biomarker), so a non-final window renders the matrix points with no projection.
+    Draws ALL markup from the shared `component_set` def (referenced, never re-declared).
     """
-    if marker is not None:
-        # no-data / no-prior: render the distinct state marker, never a fabricated trend.
-        return _state_row(item, marker)
     state = cs.state_for(item)
-    projection = (
-        _projection_block(values, dates, state)
-        if len(values) >= PROJECTION_MIN_TIMEPOINTS
-        else ""
-    )
     return (
         "<div class='kpi-row'>"
         f"{cs.kpi(item, values[-1])}"
@@ -184,7 +175,7 @@ def _matrix_units(root, biomarkers):
         result = loop_schema.read_biomarker(item, root=root)
         marker = result["state"]
         if marker is not None:
-            units.append(("marker", item, _biomarker_row(item, marker, [], [])))
+            units.append(("marker", item, _state_row(item, marker)))
         else:
             values = [r["value"] for r in result["timepoints"]]
             dates = [r["timepoint"][:10] for r in result["timepoints"]]
@@ -210,27 +201,54 @@ def _units(root, panels, watchouts, biomarkers):
     return units
 
 
+def _window_bounds(n, cap):
+    """Split `n` points into consecutive window slices within `cap`, none under 2 points.
+
+    Consecutive [start, end) slices covering all `n` points, each at most `cap`. When the
+    trailing slice would carry a single point (n ≡ 1 mod cap), the prior boundary moves
+    one point earlier so the trailing window carries 2 — every window keeps >=2 plotted
+    points while the union still represents every point exactly once.
+
+    Returns:
+        (list) (start, end) index pairs covering [0, n).
+    """
+    bounds = [(s, min(s + cap, n)) for s in range(0, n, cap)]
+    if len(bounds) > 1 and bounds[-1][1] - bounds[-1][0] < 2:
+        (ps, _pe), (_ls, le) = bounds[-2], bounds[-1]
+        bounds[-2:] = [(ps, le - 2), (le - 2, le)]
+    return bounds
+
+
 def _windowed_rows(unit):
-    """Expand one unit into (row_html, n_timepoints) sub-rows within the timepoint cap.
+    """Expand one unit into sub-row HTML strings within the timepoint cap.
 
     A marker unit yields its single 0-timepoint row. A trend unit with more than
     MAX_TIMEPOINTS_PER_VIEW stored points is split into consecutive timepoint windows,
     each a self-contained matrix row, so every emitted row stays within the timepoint
     bound while the union preserves every stored point (no dropped slice, no phantom
-    empty row). The cap is the single per-view bound (reused from `render`).
+    empty row, no degenerate <2-point window). AT MOST ONE projection is rendered per
+    biomarker — computed from the SERIES' actual last two stored points (the true recent
+    trend) and attached ONLY to the final window; non-final windows render the matrix
+    points with no projection. The cap is the single per-view bound (reused from `render`).
 
     Returns:
-        (list) (row_html, n_timepoints) pairs for this unit.
+        (list) row_html strings for this unit.
     """
     if unit[0] == "marker":
-        return [(unit[2], 0)]
+        return [unit[2]]
     _kind, item, values, dates = unit
-    cap = render.MAX_TIMEPOINTS_PER_VIEW
+    state = cs.state_for(item)
+    bounds = _window_bounds(len(values), render.MAX_TIMEPOINTS_PER_VIEW)
     rows = []
-    for start in range(0, len(values), cap):
-        v = values[start:start + cap]
-        d = dates[start:start + cap]
-        rows.append((_biomarker_row(item, None, v, d), len(v)))
+    for i, (start, end) in enumerate(bounds):
+        v, d = values[start:end], dates[start:end]
+        final = i == len(bounds) - 1
+        projection = (
+            _projection_block(v, d, state)
+            if final and len(values) >= PROJECTION_MIN_TIMEPOINTS
+            else ""
+        )
+        rows.append(_biomarker_row(item, v, d, projection))
     return rows
 
 
@@ -246,7 +264,7 @@ def _pages(units):
     Returns:
         (list) Pages, each a list of row_html within both cap bounds (>=1 page).
     """
-    flat = [row for unit in units for row, _n in _windowed_rows(unit)]
+    flat = [row for unit in units for row in _windowed_rows(unit)]
     pages = [
         flat[start:start + render.MAX_SERIES_PER_VIEW]
         for start in range(0, len(flat), render.MAX_SERIES_PER_VIEW)
