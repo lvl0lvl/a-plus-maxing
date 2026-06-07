@@ -10,6 +10,8 @@ version-controlled source-of-truth for the PII boundary (Security MEDIUM-2); the
 field NAMES were supplied by the spike at build time.
 """
 
+from scripts.guard import pii_scan
+
 # Closed Summary Field-Set (ADR-0006-T0). The single definition of the allowlist
 # both `summarize` and `dispatch`'s whitelist check reference — no second copy.
 SUMMARY_FIELD_SET = (
@@ -171,7 +173,7 @@ assert set(_RAW_TO_FIELD) <= set(EXCLUDED_RAW_PII)
 assert set(SUMMARY_FIELD_SET).isdisjoint(set(EXCLUDED_RAW_PII))
 
 
-def summarize(store_read):
+def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
     """Derive the plan-reasoning summary from store-read state.
 
     Reads operator state through the store read model (`store_read`, the
@@ -183,6 +185,9 @@ def summarize(store_read):
     Args:
         store_read (Callable): The store read surface (`store.read`), called per
             field-set field to source its backing state.
+        identity_config (str | Path, optional): The gitignored operator-identity
+            token file for the pass-through PII gate (bead 8j6); absent -> identity
+            detection is empty (the agnostic contact pattern still runs).
 
     Returns:
         (dict) A name-addressable summary keyed by the Summary Field-Set fields.
@@ -201,7 +206,21 @@ def summarize(store_read):
             # ...otherwise the field reads from a store item of its own name.
             readings = store_read(field)
             if readings:
-                summary[field] = readings[-1]["value"]
+                value = readings[-1]["value"]
+                # 8j6 fail-closed: a pass-through field is contracted as a de-identified
+                # STATED TOKEN (PII-free by store schema). That assumption is unenforced
+                # upstream, so enforce it HERE — the summary IS the 0-raw-PII boundary.
+                # Raw PII (operator identity / contact) in the value cannot be faithfully
+                # passed through; surface the gap at the boundary rather than leak it to
+                # the model (via dispatch) or the render (via assemble). Names the field,
+                # never the value (no PII echo).
+                if pii_scan.scan_text(str(value), identity_config=identity_config):
+                    raise ValueError(
+                        f"summarize: pass-through field {field!r} carries raw operator "
+                        f"PII; the PII-free-by-store-schema assumption is violated "
+                        f"(fail-closed)"
+                    )
+                summary[field] = value
     return summary
 
 
@@ -242,6 +261,21 @@ def dispatch(summary, sink=None):
         out_of_set = set(payload) - set(SUMMARY_FIELD_SET)
         raise ValueError(
             f"dispatch: out-of-field-set field(s) {sorted(out_of_set)} rejected"
+        )
+
+    # fga (SEC-2) runtime scalar gate: the field-set whitelist checks NAMES; this
+    # checks VALUE SHAPE. The payload is scalar-by-derivation, but a future nested-
+    # summary change could smuggle a raw-PII field inside a container under an
+    # allowlisted key, past the shallow name check. Reject any non-scalar value at
+    # RUNTIME (a runtime guarantee, not only the test-only flat-payload pin). Names
+    # the field, never the value.
+    nonscalar = sorted(
+        field for field, value in payload.items()
+        if isinstance(value, (dict, list, tuple, set))
+    )
+    if nonscalar:
+        raise ValueError(
+            f"dispatch: non-scalar payload value(s) {nonscalar} rejected (fga)"
         )
 
     if sink is not None:

@@ -371,3 +371,67 @@ def test_dispatch_payload_is_flat_scalar(  # fga: N/A-FLAT pin
     router.dispatch(summary, sink=lambda p: captured.update({"p": p}))
     for value in captured["p"].values():
         assert not isinstance(value, (dict, list, tuple, set))
+
+
+def test_dispatch_raises_on_nonscalar_payload_value():
+    """fga runtime gate: a container value under an allowlisted field RAISES.
+
+    The shallow field-set whitelist checks NAMES; a raw-PII field smuggled inside a
+    nested container under an allowlisted key would pass that name check. The runtime
+    scalar gate rejects any non-scalar payload value — a runtime guarantee, not only
+    the test-only flat-payload pin. Names the field, never the value; fires before the
+    model send.
+    """
+    summary = router.summarize(_clean_store_read())
+    summary["goal-domains"] = ["strength", {"smuggled": "op.user@gmail.com"}]
+    sink_calls = []
+    with pytest.raises(ValueError) as exc:
+        router.dispatch(summary, sink=lambda p: sink_calls.append(p))
+    assert "goal-domains" in str(exc.value)
+    assert not sink_calls, "the scalar gate must raise before the model send"
+    assert "op.user@gmail.com" not in str(exc.value)
+
+
+# --- 8j6: in-summary pass-through PII value-gate --------------------------------
+
+
+def test_summarize_raises_on_raw_pii_in_passthrough_field():
+    """8j6 fail-closed: raw operator PII in a pass-through field -> summarize RAISES.
+
+    The 7 non-derived field-set fields are read VERBATIM (else-branch). A contact
+    token (@gmail.com) typed into a free-text pass-through field (goal-targets) must
+    be caught at the summary boundary — the defined 0-raw-PII trust boundary — never
+    reaching the model (via dispatch) or the render (via assemble). Names the field,
+    not the value (no PII echo in the error).
+    """
+    # Control: the all-clean baseline does NOT raise (the falsifying baseline).
+    router.summarize(_clean_store_read())
+
+    leaky = _store_read_factory([
+        {"item": "goal-targets", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "ping me: op.user@gmail.com"},
+    ])
+    with pytest.raises(ValueError) as exc:
+        router.summarize(leaky)
+    assert "goal-targets" in str(exc.value)
+    assert "op.user@gmail.com" not in str(exc.value)
+
+
+def test_summarize_pii_gate_is_config_driven_identity(tmp_path):
+    """8j6: the gate catches the IDENTITY class too (config-driven), not only contact.
+
+    An operator-identity token in a pass-through value RAISES when the identity
+    config supplies it, and does NOT raise without the config (proving the gate is
+    config-driven, mirroring pii_scan's identity model).
+    """
+    cfg = tmp_path / "operator-identity.txt"
+    cfg.write_text("# synthetic\nExamplename\n")
+    leaky = [
+        {"item": "hard-limits", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "ask Examplename before changes"},
+    ]
+    with pytest.raises(ValueError) as exc:
+        router.summarize(_store_read_factory(leaky), identity_config=str(cfg))
+    assert "hard-limits" in str(exc.value)
+    # Same token, no config -> not detected -> no raise (config-driven).
+    router.summarize(_store_read_factory(leaky), identity_config="/nonexistent/x.txt")
