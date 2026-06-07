@@ -4,7 +4,7 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-06-06
+last_reviewed: 2026-06-07
 depends_on: []
 superseded_by: null
 review_cadence: monthly
@@ -74,19 +74,19 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
-## Status as of 2026-06-06 (S39) — V1 build execution wave-state
+## Status as of 2026-06-07 (S40) — V1 build execution wave-state
 
-The V1 build executes `docs/build-plan/build-plan-v1-full.md` (18 tasks across 7 topological waves). Built **14/18** leaves; verified sound against every runnable build-plan checkpoint (full suite 180 passed / 2 skipped; Wave 2→3 + 3→4 + 4→5 checkpoint gates green; 0 dangling references to unbuilt modules). S39 completed Wave 4 via `/execute-plan` WAVE mode (Phase C) — the three-tier review caught + fixed two raw-PII-value-leak holes the builder's tests missed (Tier-2 `_band_token`, Tier-3 trend-vocabulary) before the W4→W5 checkpoint gate.
+The V1 build executes `docs/build-plan/build-plan-v1-full.md` (18 tasks across 7 topological waves). Built **16/18** leaves; verified sound against every runnable build-plan checkpoint (full suite 227 passed / 2 skipped; Wave 2→3 + 3→4 + 4→5 + 5→6 checkpoint gates green; 0 dangling references to unbuilt modules). S40 completed Wave 5 via `/execute-plan` WAVE mode (Phase C) — the three-tier review caught + fixed a **Critical HALT compound-hard-limit fail-open** the builder's 227 tests + Tier-2 both missed (Tier-3 SEC-1: a rec contradicting the 2nd clause of a compound limit shipped actionable) before the W5→W6 checkpoint gate.
 
 - **Wave 1** — PII-boundary / store-keying / render-size spikes — ✅ complete (`394`, `bez`, `qbb`)
 - **Wave 2** — NDJSON store + egress/PII guard — ✅ complete (`89a`, `e9m`)
 - **Wave 3** — ingest routine, render engine, gitignore-hook, router spike — ✅ complete: `6be`+`gu4` (prior) + `xlu` (0005-T1) + `br1` (0006-T0 spike) built S38
 - **Wave 4** — adapters, matrix render, cron entry, clone-init, router impl — ✅ complete: `n9h`+`3gp` (prior) + `yo6` (0004-T2 matrix render) + `ml1` (0005-T2 clone-init) + `ftm` (0006-T1 no-train router) built S39 (PR #66)
-- **Wave 5** — scheduler + plan assembly — ⏭ NEXT WAVE — open: `oaf` (0003-T3 scheduler), `8cv` (0006-T2 plan assembly — consumes the `ftm` router summary; gated by router beads `juc`/`e3b`/`8j6`)
-- **Wave 6** — lab-loop store schemas — open: `1aa`
+- **Wave 5** — scheduler + plan assembly — ✅ complete: `oaf` (0003-T3 scheduler) + `8cv` (0006-T2 multi-domain plan assembly — reasons over the `ftm` router summary; fail-closed class-aware HALT) built S40 (PR #69). Tier-3 caught + fixed a Critical HALT compound-limit fail-open; residuals `8j6` P1 / `10h` / `7lt` / `e3b` / `20d` beaded (LM-04-gated)
+- **Wave 6** — lab-loop store schemas — ⏭ NEXT WAVE — open: `1aa` (0007-T1)
 - **Wave 7** — biomarker matrix/projection views — open: `1ih`
 
-Execute-stage protocol: `/execute-plan` in wave mode, adopted S36 after **PF-S36-01** (the build had been hand-rolled per-task off the wave schedule from S32 — outputs verified undamaged, but the wave-checkpoint discipline lapsed). Re-entry completes the open waves in order; Phase B (S37) cleared `5wo`/`qwj` (the W3/W4 design blockers — `5wo`→caller-orchestrated pagination preserving `emit -> Path`, `qwj`/`ko5`→ADR-0005 "PII-free = health-data-free" clarification); Phase C built W3 (`br1`+`xlu`) at S38 and W4 (`yo6`+`ml1`+`ftm`) at S39 via `/execute-plan` wave runs (three-tier review + checkpoint gate each), and resumes at W5 (`oaf`+`8cv`). The no-train router PII boundary (`ftm`) is now BUILT + value-level enforced before any plan-reasoning-over-PII task (`8cv`, W5). No actual artifact generates until `generate.run` is fed real operator data (LM-04 pending). Prior session titles (S32-S35) use the old ADR-family wave labels and are NOT retro-corrected — cross-reference the build-plan wave numbers here, not the archived session titles. The S2/S1 snapshots below are historical.
+Execute-stage protocol: `/execute-plan` in wave mode, adopted S36 after **PF-S36-01** (the build had been hand-rolled per-task off the wave schedule from S32 — outputs verified undamaged, but the wave-checkpoint discipline lapsed). Re-entry completes the open waves in order; Phase B (S37) cleared `5wo`/`qwj` (the W3/W4 design blockers — `5wo`→caller-orchestrated pagination preserving `emit -> Path`, `qwj`/`ko5`→ADR-0005 "PII-free = health-data-free" clarification); Phase C built W3 (`br1`+`xlu`) at S38, W4 (`yo6`+`ml1`+`ftm`) at S39, and W5 (`oaf`+`8cv`) at S40 via `/execute-plan` wave runs (three-tier review + checkpoint gate each), and resumes at W6 (`1aa`). The no-train router PII boundary (`ftm`) AND the multi-domain plan assembly (`8cv`, the V1 PII-trust + fail-closed class-aware HALT task) are now BUILT before any further plan-reasoning task; the in-summary pass-through PII value-gate (`8j6` P1) is the tracked LM-04-gated residual. No actual artifact generates until `generate.run` is fed real operator data (LM-04 pending). Prior session titles (S32-S35) use the old ADR-family wave labels and are NOT retro-corrected — cross-reference the build-plan wave numbers here, not the archived session titles. The S2/S1 snapshots below are historical.
 
 ## Status as of 2026-05-23 (S2 close)
 - Wiki schema layered onto operational vault (`vault/WIKI.md`)
