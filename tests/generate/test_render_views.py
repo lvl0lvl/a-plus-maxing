@@ -31,6 +31,14 @@ _REF_RE = re.compile(
 
 SIZE_BUDGET = 500000
 
+# A tight, MEASURED per-page byte ceiling. The worst case — a full-cap page of
+# MAX_SERIES_PER_VIEW series x MAX_TIMEPOINTS_PER_VIEW timepoints, every series
+# carrying a projection — measured ~19859 bytes (S/2026-06). The 24000 ceiling adds a
+# ~20% margin: it RIDES the real worst-case bytes so a materially-inflated page (a
+# double-render, a per-window projection regression, a cap breach that lands more rows
+# on a page) turns it red, unlike the 25x-headroom SIZE_BUDGET ceiling which cannot.
+MEASURED_PAGE_CEILING = 24000
+
 
 def _external_refs(html):
     """Return every src/href/url() target that resolves off the file (not data:/#frag)."""
@@ -104,26 +112,14 @@ def _matrix_points_for(html, item):
 
 
 def test_matrix_recompute_reads_only_store(tmp_path, monkeypatch):
-    """AC-5: the recompute reads operator timepoints via the store read model only.
+    """AC-5: the recompute sources operator timepoints through the store read model.
 
-    Forcing store.read to raise proves the render path goes through the published
-    store read model (no re-parse of NDJSON, no second key, no independent discovery).
+    Patches store.read to a counting spy (delegating to the real read) and asserts the
+    render path invoked it — proving timepoints come through the published read model,
+    not an out-of-band NDJSON re-parse or a second key.
     """
     _record_biomarker_series("ferritin", [45, 52, 60], tmp_path)
     real_read = store.read
-
-    def forbidden(*a, **k):
-        raise AssertionError(
-            "render_views must read operator data through the store read model"
-        )
-
-    # Capture the recorded data first, then force any later store.read to fail; if the
-    # render path bypassed the read model it would still succeed -> the test cannot
-    # turn red. We instead assert it DOES go through store.read by letting it through
-    # once recorded and forbidding an out-of-band re-parse: the simplest falsifiable
-    # form is to assert the render succeeds via the read model (below) and separately
-    # that no NDJSON file is re-opened. Here: prove read-through by patching store.read
-    # to a counting spy and asserting it was called.
     calls = []
 
     def spy(item, *a, **k):
@@ -486,11 +482,13 @@ def _matrix_store_biomarkers(n_series, n_timepoints, root):
 
 
 def test_worst_case_paginates_each_under_budget(tmp_path):
-    """AC-6: an over-cap worst-case view paginates so each artifact is wc -c < 500000.
+    """AC-6: an over-cap worst-case view paginates, each page within the MEASURED ceiling.
 
     Feeds more series than the ADR-0004-T0 cap (MAX_SERIES_PER_VIEW) so the render must
-    split: >=2 returned paths, each strictly < 500000 bytes (measured st_size == wc -c).
-    A single unpaginated over-cap file fails.
+    split: >=2 returned paths. Each page must be under the tight MEASURED per-page ceiling
+    (the failing-capable bound — reds on material byte inflation), with the 25x-headroom
+    SIZE_BUDGET kept only as a secondary sanity ceiling. A single unpaginated over-cap
+    file fails the page count.
     """
     over_cap = render.MAX_SERIES_PER_VIEW + 4
     items = _matrix_store_biomarkers(over_cap, render.MAX_TIMEPOINTS_PER_VIEW, tmp_path)
@@ -504,7 +502,12 @@ def test_worst_case_paginates_each_under_budget(tmp_path):
     )
     for p in paths:
         size = p.stat().st_size
-        assert size < SIZE_BUDGET, f"{p.name}: {size} bytes >= {SIZE_BUDGET}"
+        # the failing-capable bound: a full-cap page rides ~19859 bytes; this reds if a
+        # page inflates materially past the measured worst case.
+        assert size < MEASURED_PAGE_CEILING, (
+            f"{p.name}: {size} bytes >= measured ceiling {MEASURED_PAGE_CEILING}"
+        )
+        assert size < SIZE_BUDGET, f"{p.name}: {size} bytes >= sanity ceiling {SIZE_BUDGET}"
 
 
 def test_pagination_keeps_each_page_within_series_cap(tmp_path):
@@ -582,3 +585,205 @@ def _all_matrix_windows_for(html, item):
         first_points = re.search(r"points='([^']*)'", row)
         pts = first_points.group(1).strip() if first_points else ""
         yield len(pts.split()) if pts else 0
+
+
+# --------------------------------------------------------------------------- #
+# Cycle 4 — single-projection windowing + projection value + escaping (F2-F10)
+# --------------------------------------------------------------------------- #
+
+
+def _projection_blocks(html, item):
+    """Return every `<div class='projection'>...</div>` block in `item`'s row(s)."""
+    blocks = []
+    for window in re.findall(
+        r"<div class='kpi-row'>.*?(?=<div class='kpi-row'>|</div></div></body>|$)",
+        html,
+        re.S,
+    ):
+        label = re.search(r"<div class='label'>([^<]*)</div>", window)
+        if not label or label.group(1) != item:
+            continue
+        blocks.extend(re.findall(r"<div class='projection'>.*?</div></div>", window, re.S))
+    return blocks
+
+
+def test_over_cap_renders_exactly_one_projection_from_true_last_two(tmp_path):
+    """F2: a >12-timepoint biomarker renders ONE projection, from the SERIES' last two points.
+
+    The over-cap windowing must NOT re-run the projection guard per window (that emits
+    one projection per >=3-point window, the leading one a MID-SERIES segment mislabeled
+    as a forward forecast). Exactly one projection is emitted, on the FINAL window, and
+    its projected point reflects the true last-two-stored-points slope. Current code
+    emits two projections -> red.
+    """
+    # 15 points, last two = [70, 78] (slope +8 -> projected 86); a mid-series segment
+    # (e.g. points 11..12) has a different slope, so a mid-series projection differs.
+    values = [10, 18, 24, 31, 37, 44, 50, 57, 63, 50, 40, 55, 62, 70, 78]
+    _record_biomarker_series("ferritin", values, tmp_path)
+
+    paths = render_views.render_views(
+        tmp_path, biomarkers=("ferritin",), _out_dir=tmp_path / "out"
+    )
+    html = _read_all(paths)
+    blocks = _projection_blocks(html, "ferritin")
+    assert len(blocks) == 1, f"expected exactly ONE projection, got {len(blocks)}"
+
+    # The single projection extrapolates the TRUE last two stored points (78 + (78-70))
+    # = 86, NOT a mid-series segment. The final window is [62, 70, 78]; the projection
+    # plot is [62, 70, 78, 86]. Recover the projected value off the two known points
+    # (70 -> ys[1], 78 -> ys[2]) and assert ~86 (the true +8 forward slope).
+    ys = [float(p.split(",")[1]) for p in re.search(r"points='([^']*)'", blocks[0]).group(1).split()]
+    assert len(ys) == 4, "the final-window projection plots its 3 points plus ONE projected"
+    px_per_unit = (ys[2] - ys[1]) / (78 - 70)
+    projected = 78 + (ys[3] - ys[2]) / px_per_unit
+    assert abs(projected - 86) < 0.5, (
+        f"projection must use the SERIES' true last two points (slope +8 -> 86); "
+        f"recovered {projected:.2f} (a mid-series segment slope -> a different value)"
+    )
+
+
+def test_thirteen_timepoints_no_degenerate_row_all_points_preserved(tmp_path):
+    """F3: a 13-timepoint biomarker emits no 1-point window; all 13 points are preserved.
+
+    13 = cap(12) + 1, so a naive split yields a final 1-point window — a degenerate
+    contextless matrix row (a 1-point sparkline draws nothing). The final sub-2-point
+    window must fold into the previous (carry the boundary point) so every window has
+    >=2 plotted points, while the union still represents all 13 stored points. Current
+    code emits a 1-point window -> red.
+    """
+    values = list(range(40, 53))  # 13 points
+    assert len(values) == render.MAX_TIMEPOINTS_PER_VIEW + 1
+    _record_biomarker_series("ferritin", values, tmp_path)
+
+    paths = render_views.render_views(
+        tmp_path, biomarkers=("ferritin",), _out_dir=tmp_path / "out"
+    )
+    html = _read_all(paths)
+    windows = list(_all_matrix_windows_for(html, "ferritin"))
+    assert windows, "the over-cap biomarker must render at least one matrix window"
+    assert all(w >= 2 for w in windows), (
+        f"no window may be a degenerate <2-point row, got window sizes {windows}"
+    )
+    assert all(w <= render.MAX_TIMEPOINTS_PER_VIEW for w in windows), (
+        f"every window must stay within the cap, got {windows}"
+    )
+    assert sum(windows) == len(values), (
+        f"all {len(values)} points must be preserved exactly once, got total {sum(windows)}"
+    )
+
+
+def test_projection_value_is_naive_extrapolation(tmp_path):
+    """F5: the projection's plotted point IS the naive extrapolation (last + (last-prev)).
+
+    A known-slope series [45, 52, 60] (slope +8) projects to 68. The projection
+    sparkline plots [45, 52, 60, 68]; recovering the projected point's VALUE from the
+    SVG y-axis (calibrated off two known plotted points) must yield 68 — a flat (60),
+    reversed, or fabricated projection reds.
+    """
+    _record_biomarker_series("ferritin", [45, 52, 60], tmp_path)
+
+    paths = render_views.render_views(
+        tmp_path, biomarkers=("ferritin",), _out_dir=tmp_path / "out"
+    )
+    html = _read_all(paths)
+    block = _projection_blocks(html, "ferritin")[0]
+    pts = re.search(r"points='([^']*)'", block).group(1).split()
+    ys = [float(p.split(",")[1]) for p in pts]
+    assert len(ys) == 4, "the projection plots the stored points plus ONE projected"
+    # Calibrate the y-axis off the two known plotted stored points (52 -> ys[1],
+    # 60 -> ys[2]) — slope is pixels-per-unit — then invert ys[3] to its value. This is
+    # independent of the plot's own lo/hi, so a flat projection (60 again) reads back 60.
+    px_per_unit = (ys[2] - ys[1]) / (60 - 52)
+    projected = 60 + (ys[3] - ys[2]) / px_per_unit
+    assert abs(projected - 68) < 0.5, (
+        f"projected point must encode 68 (naive +8 extrapolation); recovered {projected:.2f} "
+        f"(flat -> 60, reversed/fabricated -> elsewhere)"
+    )
+
+
+def test_matrix_multi_series_independent_per_series_recompute(tmp_path):
+    """F6: two biomarkers with DIFFERENT timepoint counts each recompute independently.
+
+    ferritin=[45,52] (2tp, trend-only) and hba1c=[5.1,5.4,5.6,5.5] (4tp, projects).
+    Each renders its OWN point count (2 and 4) with no length-alignment, and only
+    hba1c (>=3tp) carries a projection — proving per-series recompute with no
+    cross-contamination.
+    """
+    _record_biomarker_series("ferritin", [45, 52], tmp_path)
+    _record_biomarker_series("hba1c", [5.1, 5.4, 5.6, 5.5], tmp_path)
+
+    paths = render_views.render_views(
+        tmp_path, biomarkers=("ferritin", "hba1c"), _out_dir=tmp_path / "out"
+    )
+    html = _read_all(paths)
+    assert _matrix_points_for(html, "ferritin") == 2
+    assert _matrix_points_for(html, "hba1c") == 4
+    assert not _projection_blocks(html, "ferritin"), (
+        "the 2-timepoint series must NOT carry a projection"
+    )
+    assert len(_projection_blocks(html, "hba1c")) == 1, (
+        "the 4-timepoint series must carry exactly one projection"
+    )
+
+
+def test_answered_watchout_renders_all_answers_over_time(tmp_path):
+    """F7: an answered-over-time watch-out renders BOTH stored answers, not latest-only.
+
+    Two answers recorded at successive timepoints ("good" then "poor") must both appear
+    in the rendered row, so a latest-only regression that drops the earlier answer reds.
+    """
+    loop_schema.record_watchout_answer(
+        "sleep_quality", "good", "2026-06-01T00:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_watchout_answer(
+        "sleep_quality", "poor", "2026-07-01T00:00:00+00:00", root=tmp_path
+    )
+
+    paths = render_views.render_views(
+        tmp_path, watchouts=("sleep_quality",), _out_dir=tmp_path / "out"
+    )
+    row = _row_for(_read_all(paths), "sleep_quality")
+    assert "good" in row and "poor" in row, (
+        "both answers over time must render; a latest-only render drops the earlier one"
+    )
+
+
+def test_empty_input_renders_one_valid_page_zero_refs(tmp_path):
+    """F9: render_views with no panels/watchouts/biomarkers emits exactly 1 valid page.
+
+    The page must be a valid document (doctype present) carrying 0 external references.
+    """
+    paths = render_views.render_views(tmp_path, _out_dir=tmp_path / "out")
+    assert len(paths) == 1, f"empty input must emit exactly 1 page, got {len(paths)}"
+    html = paths[0].read_text()
+    assert html.lstrip().lower().startswith("<!doctype html>"), "page must carry the doctype"
+    assert _external_refs(html) == [], "the empty page must carry 0 external references"
+
+
+def test_operator_text_is_escaped_no_injection(tmp_path):
+    """F10: operator data carrying HTML/script/url() is escaped, not injected, and emits.
+
+    render_views renders raw operator data (a terminal PII sink); escaping is delegated
+    to component_set. A watch-out answer containing <script>, a quote, and a url(...)
+    substring must (a) still emit (the emit external-asset scan is not tripped by the
+    ESCAPED text) and (b) appear escaped — no live <script> tag, the raw < and > are
+    entity-encoded. Pins the delegated-escaping contract in render_views' own suite.
+    """
+    payload = "good<script>alert('x')</script> url(http://lab.example/x) \"q\""
+    loop_schema.record_watchout_answer(
+        "sleep_quality", payload, "2026-06-01T00:00:00+00:00", root=tmp_path
+    )
+
+    # (a) emits (render.emit's external-asset scan parses by syntactic position and is
+    # NOT tripped by the escaped operator url() carried as text content — a raise here
+    # would surface as render_views propagating ValueError instead of returning a path).
+    paths = render_views.render_views(
+        tmp_path, watchouts=("sleep_quality",), _out_dir=tmp_path / "out"
+    )
+    assert len(paths) == 1 and paths[0].exists(), (
+        "the page must emit; the escaped operator url() must not trip the egress scan"
+    )
+    html = paths[0].read_text()
+    # (b) no live tag injected; the raw markup is entity-encoded.
+    assert "<script>" not in html, "raw <script> must not be injected into the output"
+    assert "&lt;script&gt;" in html, "the operator <script> text must render escaped"
