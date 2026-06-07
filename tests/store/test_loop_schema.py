@@ -117,6 +117,19 @@ def test_zero_automated_detection_floor():
     assert _ng6_match_count() == 0
 
 
+def test_published_state_marker_literal_values():
+    """Pin the four published state markers to their literal values (ADR-0007-T2 contract).
+
+    The markers are read 1:1 by ADR-0007-T2's render views. Pinning the LITERAL
+    strings (not just the constant names) turns a silent value change RED before T2
+    consumes them.
+    """
+    assert loop_schema.PENDING == "pending"
+    assert loop_schema.NOT_YET_ANSWERED == "not-yet-answered"
+    assert loop_schema.NO_PRIOR == "no-prior"
+    assert loop_schema.ANSWERED_OVER_TIME == "answered-over-time"
+
+
 # --- Cycle 2: watch-out answer carry-to-next-generation ---
 
 
