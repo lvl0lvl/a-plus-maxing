@@ -319,3 +319,83 @@ def test_scan_text_scopes_out_structural_store_pattern():
         '"source": "manual", "value": 55}'
     )
     assert scan_text(store_line, identity_config=NO_CONFIG) == 0
+
+
+# --- g5x: widen scan_text to the full EXCLUDED_RAW_PII value classes ------------
+# scan_text is the runtime VALUE boundary feeding router.summarize. Before g5x it
+# matched only the @gmail.com contact + identity tokens, so a non-gmail email /
+# phone / postal address typed into a free-text pass-through field scored 0 and
+# leaked to both sinks. These reds the gmail-only scan_text; greens once the value
+# boundary covers the full contact classes. NO_CONFIG so they bind to the agnostic
+# value patterns, not the gitignored operator-identity file.
+
+@pytest.mark.parametrize("value, label", [
+    ("reach me at op.user@protonmail.com", "non-gmail email"),
+    ("mail op.user@googlemail.com", "googlemail"),
+    ("OP.USER@PROTONMAIL.COM", "email case-insensitive"),
+    ("call +1 415 555 0199", "phone E.164 spaced"),
+    ("call +14155550199 now", "phone E.164 contiguous"),
+    ("ring (415) 555-0199", "phone NANP parens"),
+    ("ring 415-555-0199", "phone NANP dashes"),
+    ("ring 415.555.0199", "phone NANP dots"),
+    ("mail to 123 Main St", "postal street-suffix abbrev"),
+    ("at 1600 Amphitheatre Pkwy, Mountain View", "postal full"),
+])
+def test_scan_text_detects_value_pii_classes(value, label):
+    """g5x AC1: scan_text catches each EXCLUDED_RAW_PII contact class in a value.
+
+    Each class (generic/non-gmail email, googlemail, phone E.164/NANP, US postal)
+    typed into a free-text value scores >=1 — reds on the gmail-only scan_text.
+    """
+    assert pii_scan.scan_text(value, identity_config=NO_CONFIG) >= 1, label
+
+
+def test_scan_text_detects_compatibility_homograph_email():
+    """g5x AC1: an NFKC compatibility-homograph email (fullwidth @) is caught.
+
+    A fullwidth commercial-at (U+FF20) folds to '@' under NFKC, so 'op<FF20>gmail.com'
+    is the same contact and must score >=1 — reds without the NFKC fold. (Cross-script
+    confusables, e.g. Cyrillic, are out of scope for the single-operator value boundary.)
+    """
+    homograph = "reach me op＠gmail.com"
+    assert pii_scan.scan_text(homograph, identity_config=NO_CONFIG) >= 1
+
+
+@pytest.mark.parametrize("value", [
+    "10 St John's Wort capsules daily",   # 'St' as Saint, not Street (no street name)
+    "run 5 miles at zone 2",
+    "weight 185 lbs this week",
+    "3 sets of 10 reps",
+    "BP 120 over 80",
+    "sleep 7-8 hours",
+    "return to pre-Jan-2026 loading",     # the clean goal-targets baseline value
+])
+def test_scan_text_value_boundary_negative_controls(value):
+    """g5x AC2: health free-text does NOT trip the widened value patterns (== 0).
+
+    Pins the false-positive boundary: street-suffix abbreviations without a street
+    name, rep/distance/weight/BP numerics, and date fragments must not register as
+    PII. A scan_text that over-matches free-text health values reds here.
+    """
+    assert pii_scan.scan_text(value, identity_config=NO_CONFIG) == 0
+
+
+def test_trunk_scan_stays_gmail_conservative(tmp_path):
+    """g5x AC2: the trunk-wide `scan` is NOT widened — clonability is preserved.
+
+    The widened classes (non-gmail email / phone / postal) are scoped to the value
+    boundary (scan_text) only. The trunk commit-scanner `scan` must still ignore them
+    (its gmail-only contact choice keeps a fresh clone from flooding on docs/test
+    fixtures — see bead 3lv). Reds if a future edit widens `scan` to the value classes.
+    """
+    root = _scratch_clone(tmp_path)
+    leak = root / "code.py"
+    # Only the WIDENED classes — no @gmail.com, no structural store line, no identity.
+    leak.write_text(
+        leak.read_text()
+        + "contact x@protonmail.com\n"
+        + "phone +1 415 555 0199\n"
+        + "addr 123 Main St\n"
+    )
+    _git(["add", "-A"], root)
+    assert scan(_tracked(root), identity_config=NO_CONFIG) == 0
