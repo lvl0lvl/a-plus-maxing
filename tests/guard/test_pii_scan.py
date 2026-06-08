@@ -338,14 +338,13 @@ def test_scan_text_scopes_out_structural_store_pattern():
     ("ring (415) 555-0199", "phone NANP parens"),
     ("ring 415-555-0199", "phone NANP dashes"),
     ("ring 415.555.0199", "phone NANP dots"),
-    ("mail to 123 Main St", "postal street-suffix abbrev"),
-    ("at 1600 Amphitheatre Pkwy, Mountain View", "postal full"),
 ])
 def test_scan_text_detects_value_pii_classes(value, label):
-    """g5x AC1: scan_text catches each EXCLUDED_RAW_PII contact class in a value.
+    """g5x AC1: scan_text catches each tractable EXCLUDED_RAW_PII contact class.
 
-    Each class (generic/non-gmail email, googlemail, phone E.164/NANP, US postal)
-    typed into a free-text value scores >=1 — reds on the gmail-only scan_text.
+    Each class (generic/non-gmail email, googlemail, phone E.164/NANP) typed into a
+    free-text value scores >=1 — reds on the gmail-only scan_text. Postal is NOT a
+    value-boundary class (PR#78 BUG-1/HIST-1; deferred to a precise-detector bead).
     """
     assert pii_scan.scan_text(value, identity_config=NO_CONFIG) >= 1, label
 
@@ -362,40 +361,60 @@ def test_scan_text_detects_compatibility_homograph_email():
 
 
 @pytest.mark.parametrize("value", [
-    "10 St John's Wort capsules daily",   # 'St' as Saint, not Street (no street name)
+    "train at 5 Star Gym Way",             # Title-case gym name, not a street (BUG-1)
+    "30 min Dr Patel followup",            # 'Dr' as Doctor honorific, not Drive (BUG-1)
+    "1 Rep Max St progression",            # 'St' Title-cased in training text (BUG-1)
     "run 5 miles at zone 2",
     "weight 185 lbs this week",
     "3 sets of 10 reps",
     "BP 120 over 80",
     "sleep 7-8 hours",
-    "return to pre-Jan-2026 loading",     # the clean goal-targets baseline value
+    "call 4155550199",                     # bare contiguous 10-digit — out of scope (numeric-ID flood)
+    "return to pre-Jan-2026 loading",      # the clean goal-targets baseline value
 ])
 def test_scan_text_value_boundary_negative_controls(value):
-    """g5x AC2: health free-text does NOT trip the widened value patterns (== 0).
+    """g5x AC2: health free-text does NOT trip the value patterns (== 0).
 
-    Pins the false-positive boundary: street-suffix abbreviations without a street
-    name, rep/distance/weight/BP numerics, and date fragments must not register as
-    PII. A scan_text that over-matches free-text health values reds here.
+    Pins the false-positive boundary: Title-cased gym/training text (which a
+    case-sensitive postal regex would have wrongly raised on — PR#78 BUG-1),
+    rep/distance/weight/BP numerics, bare contiguous phone digits (numeric-ID flood —
+    F-TEST2 honest boundary), and date fragments must not register as PII. The leading
+    liveness assert proves _VALUE_COMPILED is ACTIVE, so a regression that disabled the
+    patterns reds here too (not only in the positive-detection test — F-TEST1).
     """
+    assert pii_scan.scan_text("x@protonmail.com", identity_config=NO_CONFIG) >= 1  # patterns live
     assert pii_scan.scan_text(value, identity_config=NO_CONFIG) == 0
+
+
+def test_scan_text_caps_input_length():
+    """SEC-1: scan_text bounds match cost by capping input at _MAX_SCAN_TEXT_LEN.
+
+    The unanchored email local-part makes `findall` O(n^2); the cap bounds the worst
+    case. A pass-through value is a short stated token, so PII beyond the cap is not
+    scanned. Reds if the cap is removed (the trailing email would then be found).
+    """
+    filler = "a" * pii_scan._MAX_SCAN_TEXT_LEN
+    # PII past the cap is truncated away -> not found.
+    assert pii_scan.scan_text(filler + " x@protonmail.com", identity_config=NO_CONFIG) == 0
+    # Control: the same email within the cap IS found.
+    assert pii_scan.scan_text("x@protonmail.com " + filler, identity_config=NO_CONFIG) >= 1
 
 
 def test_trunk_scan_stays_gmail_conservative(tmp_path):
     """g5x AC2: the trunk-wide `scan` is NOT widened — clonability is preserved.
 
-    The widened classes (non-gmail email / phone / postal) are scoped to the value
+    The widened value classes (non-gmail email / phone) are scoped to the value
     boundary (scan_text) only. The trunk commit-scanner `scan` must still ignore them
     (its gmail-only contact choice keeps a fresh clone from flooding on docs/test
     fixtures — see bead 3lv). Reds if a future edit widens `scan` to the value classes.
     """
     root = _scratch_clone(tmp_path)
     leak = root / "code.py"
-    # Only the WIDENED classes — no @gmail.com, no structural store line, no identity.
+    # Only the WIDENED value classes — no @gmail.com, no structural store line, no identity.
     leak.write_text(
         leak.read_text()
         + "contact x@protonmail.com\n"
         + "phone +1 415 555 0199\n"
-        + "addr 123 Main St\n"
     )
     _git(["add", "-A"], root)
     assert scan(_tracked(root), identity_config=NO_CONFIG) == 0

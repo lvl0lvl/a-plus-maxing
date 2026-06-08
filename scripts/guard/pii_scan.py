@@ -54,22 +54,36 @@ _STRUCTURAL_COMPILED = [
 ]
 _COMPILED_AGNOSTIC = [_CONTACT_COMPILED] + _STRUCTURAL_COMPILED
 
-# Value-boundary PII patterns (bead g5x): the FULL EXCLUDED_RAW_PII contact classes
-# the router names — generic email (ANY domain, so @gmail.com / @googlemail.com / a
-# non-gmail provider all hit), phone (E.164 + NANP), and a conservative US street
-# address. Applied by `scan_text` (the runtime VALUE boundary feeding
-# `router.summarize`) ONLY — NOT by `scan`. The trunk-wide commit scanner stays
-# gmail-conservative on purpose: a generic-email / phone / postal pattern run across
-# the whole tracked tree floods on docs + test fixtures, breaking clonability (the
+# Value-boundary PII patterns (bead g5x): the EXCLUDED_RAW_PII contact classes the
+# router names that are tractable for a free-text value scan — generic dotted-domain
+# email (ANY provider, so @gmail.com / @googlemail.com / a non-gmail provider all
+# hit) and phone (E.164 + NANP). Applied by `scan_text` (the runtime VALUE boundary
+# feeding `router.summarize`) ONLY — NOT by `scan`. The trunk-wide commit scanner
+# stays gmail-conservative on purpose: a generic-email / phone pattern run across the
+# whole tracked tree floods on docs + test fixtures, breaking clonability (the
 # operator-specific commit-hook redesign is bead 3lv). Each entry point therefore
 # carries its own pattern set; the identity loader is shared.
 #
+# Shape note: this dict is name -> (pattern, flags) so each entry's flags travel with
+# it (email is IGNORECASE; phone is not). AGNOSTIC_PATTERNS above is name -> string
+# with flags applied at its compile site — a deliberate shape difference. The `email`
+# value pattern is a strict SUPERSET of AGNOSTIC_PATTERNS["contact"] (any-domain vs
+# gmail-only); they are intentionally nested, not independent.
+#
 # Phone patterns anchor on `(?<!\d)`/`(?!\d)` and a digit-count floor so ISO
-# timestamps (`08:00:00+00:00`) and bare numeric runs do not register. Postal
-# requires >=1 street-NAME word between the number and the suffix (so "10 St John's
-# Wort" — St as Saint — does not match) and matches the suffix CASE-SENSITIVELY in
-# Title-case (so lowercase common words like "way"/"st"/"dr" in free text do not
-# trip it; real addresses are conventionally capitalised).
+# timestamps (`08:00:00+00:00`) and bare numeric runs do not register; the separated
+# form requires separators so a contiguous numeric ID does not match.
+#
+# POSTAL address is NOT detected at this boundary: a number+words+suffix regex over
+# free-text health values either fail-closes on legitimate Title-case text ("5 Star
+# Gym Way", "Dr Patel followup") or misses non-Title-case addresses — case is the
+# wrong discriminator (PR#78 BUG-1/HIST-1). A precise (ZIP/state-anchored,
+# case-insensitive) postal detector is deferred to its own bead; structured
+# `postal-address` store data is already stripped via the router's _RAW_TO_FIELD
+# derivation, so the residual value-boundary gap is narrow. Likewise out of scope
+# here: cross-script (Cyrillic) homographs, TLD-less local addresses (name@localhost),
+# and bare contiguous phone digits (which flood on numeric IDs) — single-operator
+# accidental-leakage threat model.
 _VALUE_PII_PATTERNS = {
     "email": (r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", re.IGNORECASE),
     "phone-e164": (r"(?<!\d)\+\d{8,15}(?!\d)", 0),
@@ -77,14 +91,16 @@ _VALUE_PII_PATTERNS = {
         r"(?<!\d)(?:\+?\d{1,3}[\s.\-])?\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}(?!\d)",
         0,
     ),
-    "postal-us": (
-        r"(?<!\d)\d{1,6}\s+(?:[A-Za-z0-9.'\-]+\s+){1,4}"
-        r"(?:St|Street|Ave|Avenue|Blvd|Boulevard|Rd|Road|Ln|Lane|Dr|Drive|Ct|Court"
-        r"|Way|Pl|Place|Ter|Terrace|Cir|Circle|Hwy|Highway|Pkwy|Parkway)\b",
-        0,
-    ),
 }
 _VALUE_COMPILED = [re.compile(pat, flags) for pat, flags in _VALUE_PII_PATTERNS.values()]
+
+# scan_text caps its input before matching: the unanchored email local-part makes
+# `findall` O(n^2) on a long string (a measured multi-second hang on a pasted blob),
+# and router.summarize feeds operator-pasted field values in with no upstream cap. A
+# pass-through field value is a short de-identified stated token, so a generous cap
+# bounds the worst case without affecting any legitimate value (PR#78 SEC-1 — a
+# motivated availability control on the PII boundary).
+_MAX_SCAN_TEXT_LEN = 4096
 
 # Operator-identity tokens load from this GITIGNORED file (one regex per line);
 # absent on a fresh clone -> empty identity set. Keeps operator PII out of tracked
@@ -147,18 +163,20 @@ def scan_text(text, identity_config=DEFAULT_IDENTITY_CONFIG):
     """Count operator-PII matches in a single in-memory string.
 
     The value-level counterpart to `scan` (which reads file CONTENTS for the
-    file-distribution boundary). Applies the operator-IDENTITY tokens + the full
-    EXCLUDED_RAW_PII value classes — generic email (any domain), phone (E.164 +
-    NANP), and a conservative US street address (bead g5x) — and NOT the structural
-    store-line patterns (those detect a leaked store NDJSON FILE, not personal data
-    inside a scalar token). Used by the router summary boundary (bead 8j6) to
-    fail-closed on raw PII in a pass-through field value.
+    file-distribution boundary). Applies the operator-IDENTITY tokens + the tractable
+    EXCLUDED_RAW_PII value classes — generic dotted-domain email (any provider) and
+    phone (E.164 + NANP) (bead g5x) — and NOT the structural store-line patterns
+    (those detect a leaked store NDJSON FILE, not personal data inside a scalar
+    token). Used by the router summary boundary (bead 8j6) to fail-closed on raw PII
+    in a pass-through field value.
 
     The text is NFKC-folded first, so compatibility homographs (e.g. a fullwidth
-    `＠`) normalise to their canonical form before matching. Cross-script confusables
-    (e.g. a Cyrillic lookalike) are out of scope for this single-operator value
-    boundary. The widened classes are deliberately NOT applied by `scan` — see the
-    `_VALUE_PII_PATTERNS` note for why the trunk scanner stays gmail-conservative.
+    `＠`) normalise to their canonical form before matching, then capped at
+    `_MAX_SCAN_TEXT_LEN` to bound match cost. Out of scope for this single-operator
+    value boundary (see the `_VALUE_PII_PATTERNS` note): postal addresses,
+    cross-script (Cyrillic) confusables, TLD-less local addresses (`name@localhost`),
+    and bare contiguous phone digits. The value classes are deliberately NOT applied
+    by `scan` — the trunk scanner stays gmail-conservative.
 
     Args:
         text (str): The value to scan.
@@ -169,7 +187,7 @@ def scan_text(text, identity_config=DEFAULT_IDENTITY_CONFIG):
     Returns:
         (int) Total operator-PII (value-class + identity) matches in `text`.
     """
-    normalized = unicodedata.normalize("NFKC", text)
+    normalized = unicodedata.normalize("NFKC", text)[:_MAX_SCAN_TEXT_LEN]
     patterns = _VALUE_COMPILED + _load_identity_patterns(identity_config)
     return sum(len(pattern.findall(normalized)) for pattern in patterns)
 
