@@ -6,19 +6,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/block-dangerous.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-dangerous.sh"
           },
           {
             "type": "command",
-            "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/block-push-main.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-push-main.sh"
           },
           {
             "type": "command",
-            "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/block-commit-main.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-commit-main.sh"
           },
           {
             "type": "command",
-            "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/block-ungated-vault-write.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-ungated-vault-write.sh"
           }
         ]
       },
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/waltermcgivney/Documents/Projects/a-plus-maxing/.claude/hooks/enforce-role-inlining.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/enforce-role-inlining.sh"
           }
         ]
       }
