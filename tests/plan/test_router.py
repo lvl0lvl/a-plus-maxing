@@ -27,9 +27,9 @@ def _store_read_factory(records):
     return fake_read
 
 
-def _clean_store_read():
-    """A store.read whose state backs every field-set field with a clean token."""
-    records = [
+def _clean_records():
+    """The clean record set backing every field-set field with a PII-free token."""
+    return [
         {"item": "date-of-birth", "timepoint": "2026-01-01T00:00:00+00:00",
          "source": "intake", "value": "1986-04-12"},
         {"item": "postal-address", "timepoint": "2026-01-01T00:00:00+00:00",
@@ -53,7 +53,11 @@ def _clean_store_read():
         {"item": "hard-limits", "timepoint": "2026-01-01T00:00:00+00:00",
          "source": "intake", "value": "no overhead pressing"},
     ]
-    return _store_read_factory(records)
+
+
+def _clean_store_read():
+    """A store.read whose state backs every field-set field with a clean token."""
+    return _store_read_factory(_clean_records())
 
 
 # --- Cycle 1: summarize --------------------------------------------------------
@@ -539,3 +543,62 @@ def test_summarize_does_not_gate_derived_fields():
     # active-issue-class is DERIVED from raw-symptom-free-text -> band/class token.
     assert summary["active-issue-class"] == "back-region"
     assert "op.user@gmail.com" not in str(summary)
+
+
+# --- g5x: widened value boundary blocks the full EXCLUDED_RAW_PII contact classes ---
+# Before g5x the summarize gate (scan_text) caught only @gmail.com + identity, so a
+# non-gmail email / phone / postal in a free-text pass-through field reached BOTH the
+# model sink (dispatch) and the render sink (assemble), which both consume summarize's
+# output. summarize is the single upstream boundary: raising there blocks both sinks.
+
+@pytest.mark.parametrize("field, value, secret, label", [
+    ("goal-targets", "ping me at op.user@protonmail.com", "op.user@protonmail.com",
+     "non-gmail email"),
+    ("hard-limits", "ask op.user@googlemail.com first", "op.user@googlemail.com",
+     "googlemail"),
+    ("goal-targets", "call me +1 415 555 0199 anytime", "415 555 0199", "phone"),
+    ("hard-limits", "mail to 123 Main St if needed", "123 Main St", "postal"),
+])
+def test_summarize_raises_on_widened_pii_class_in_passthrough(field, value, secret, label):
+    """g5x AC1: each EXCLUDED_RAW_PII contact class in a pass-through field RAISES.
+
+    Reds on the gmail-only scan_text (a non-gmail email / phone / postal scored 0 and
+    flowed through). The raise names the field, never echoes the value (no PII leak in
+    the error). Asserted at the summarize boundary — the single 0-raw-PII boundary
+    upstream of BOTH dispatch (model) and assemble (render).
+    """
+    # Control: the all-clean baseline does NOT raise (the falsifying baseline).
+    router.summarize(_clean_store_read())
+
+    leaky = _store_read_factory([
+        {"item": field, "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": value},
+    ])
+    with pytest.raises(ValueError) as exc:
+        router.summarize(leaky)
+    assert field in str(exc.value), label
+    assert secret not in str(exc.value)
+
+
+def test_widened_pii_blocks_model_sink_both_paths():
+    """g5x AC1 (both sinks): a non-gmail email in a pass-through field never reaches the
+    model sink. Built on a COMPLETE clean read with ONLY goal-targets poisoned, so absent
+    the widening summarize would COMPLETE and dispatch WOULD send — making this
+    failing-capable (the sink IS called on the gmail-only scan_text). The widened gate
+    raises at the summarize boundary, upstream of BOTH dispatch (model) and assemble
+    (render); the `goal-targets` in the message pins the raise as the PII gate, not the
+    partial-summary fail-closed.
+    """
+    records = _clean_records()
+    for record in records:
+        if record["item"] == "goal-targets":
+            record["value"] = "reach me x@protonmail.com"
+    sink_calls = []
+    with pytest.raises(ValueError) as exc:
+        # The model path: summarize feeds dispatch; the raise precedes any send.
+        router.dispatch(
+            router.summarize(_store_read_factory(records)),
+            sink=lambda p: sink_calls.append(p),
+        )
+    assert "goal-targets" in str(exc.value)  # the PII gate, not the partial-summary guard
+    assert not sink_calls, "widened-PII value must not reach the model sink"
