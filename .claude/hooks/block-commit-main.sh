@@ -26,18 +26,18 @@ COMMAND=$(jq -r '.tool_input.command // empty' < /dev/stdin)
 [[ -z "$COMMAND" ]] && exit 0
 
 # Normalize whitespace for matching.
-NORM=$(echo "$COMMAND" | tr -s '[:space:]' ' ')
+NORM=$(echo "$COMMAND" | tr '\n' ';' | tr -s '[:space:]' ' ')
+NORM="${NORM#" "}"; NORM="${NORM%" "}"
 
-# Match `git commit` as a top-level git subcommand. Allows arbitrary flags
-# between `git` and `commit` (e.g., `git -c user.name=foo commit -m x`,
-# `git --no-pager commit`). Anchors at start of line or after a shell
-# separator (;, &&, ||) so embedded text like `echo git commit` would not
-# match. The trailing (space|$) prevents matching `--commit-msg` or
-# `commit-tree`.
-# cvr: hardened matcher — KEEP IN SYNC across block-pii-commit.sh /
-# block-commit-main.sh / block-ungated-vault-write.sh. Also catches env-var-
-# prefixed (EDITOR=vim git commit), path-prefixed (/usr/bin/git commit), and
-# trailing-separator (git commit; / git commit&) forms the prior matcher missed.
+# Only a git commit is our concern. cvr: hardened matcher + normalization — KEEP IN
+# SYNC across block-pii-commit.sh / block-commit-main.sh / block-ungated-vault-write.sh.
+# NORM maps newlines to ';' (so a commit on a later line is seen) and strips leading/
+# trailing space (so a leading-whitespace commit is not missed). The matcher anchors at
+# start / after a separator, tolerates optional env-var (VAR=val ) and path (dir/)
+# prefixes before git, allows flags between git and commit, and ends on space, a
+# separator [;&|], or EOL — so env-var-prefixed (EDITOR=vim git commit), path-prefixed
+# (/usr/bin/git commit), and trailing-separator (git commit; / git commit&) forms are
+# caught, while embedded text (echo git commit) and commit-tree / --commit-msg are not.
 if ! echo "$NORM" | grep -qE '(^|[;&|] *)([A-Za-z_][A-Za-z0-9_]*=[^ ;&|]* +)*([^ ;&|]*/)?git +([^|&;]*\s)?commit( |[;&|]|$)'; then
     exit 0
 fi

@@ -311,11 +311,13 @@ git -C "$REPO" reset -q; rm -f "$REPO/docs/leak5.md"
 # matcher let bypass (a silent PII-distribution hole now this hook is registered).
 mkfile "docs/leak6.md" "contact gwen@gmail.com"
 git -C "$REPO" add docs/leak6.md
-for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commit;"; do
+for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commit;" \
+              "git commit&" "FOO=1 BAR=2 git commit" "EDITOR=vim git commit;" \
+              " git commit" $'ls\ngit commit'; do
     OUT=$(invoke "$bypass")
     [[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
-        && ok "cvr bypass-form commit DENIED: $bypass" \
-        || bad "cvr bypass NOT denied (matcher gap): '$bypass' got: $OUT"
+        && ok "cvr bypass-form commit DENIED: ${bypass//$'\n'/\\n}" \
+        || bad "cvr bypass NOT denied (matcher gap): '${bypass//$'\n'/\\n}' got: $OUT"
 done
 git -C "$REPO" reset -q; rm -f "$REPO/docs/leak6.md"
 

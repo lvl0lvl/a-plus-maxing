@@ -119,12 +119,14 @@ OUT=$(invoke "git commit -m 'template'")
 
 # Cases 7-9 (cvr): bypass-form commits of an INVALID (ungated) page -> DENY.
 # Env-var/path/trailing-separator forms must be recognized so the gate still runs.
-for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commit;"; do
+for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commit;" \
+              "git commit&" "FOO=1 BAR=2 git commit" "EDITOR=vim git commit;" \
+              " git commit" $'ls\ngit commit'; do
     git reset -q; git add vault/compounds/ungated.md
     OUT=$(invoke "$bypass")
     [[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
-        && ok "cvr bypass-form commit recognized -> DENY: $bypass" \
-        || bad "cvr bypass NOT recognized: '$bypass' got: $OUT"
+        && ok "cvr bypass-form commit recognized -> DENY: ${bypass//$'\n'/\\n}" \
+        || bad "cvr bypass NOT recognized: '${bypass//$'\n'/\\n}' got: $OUT"
 done
 
 echo

@@ -67,13 +67,18 @@ if [[ $JQ_RC -ne 0 ]]; then
 fi
 [[ -z "$COMMAND" ]] && exit 0
 
-NORM=$(echo "$COMMAND" | tr -s '[:space:]' ' ')
+NORM=$(echo "$COMMAND" | tr '\n' ';' | tr -s '[:space:]' ' ')
+NORM="${NORM#" "}"; NORM="${NORM%" "}"
 
-# Only a git commit is our concern. cvr: hardened matcher — KEEP IN SYNC across
-# block-pii-commit.sh / block-commit-main.sh / block-ungated-vault-write.sh. Also
-# catches env-var-prefixed (EDITOR=vim git commit), path-prefixed (/usr/bin/git
-# commit), and trailing-separator (git commit; / git commit&) forms the prior
-# matcher let bypass — a PII-distribution bypass at this boundary.
+# Only a git commit is our concern. cvr: hardened matcher + normalization — KEEP IN
+# SYNC across block-pii-commit.sh / block-commit-main.sh / block-ungated-vault-write.sh.
+# NORM maps newlines to ';' (so a commit on a later line is seen) and strips leading/
+# trailing space (so a leading-whitespace commit is not missed). The matcher anchors at
+# start / after a separator, tolerates optional env-var (VAR=val ) and path (dir/)
+# prefixes before git, allows flags between git and commit, and ends on space, a
+# separator [;&|], or EOL — so env-var-prefixed (EDITOR=vim git commit), path-prefixed
+# (/usr/bin/git commit), and trailing-separator (git commit; / git commit&) forms are
+# caught, while embedded text (echo git commit) and commit-tree / --commit-msg are not.
 if ! echo "$NORM" | grep -qE '(^|[;&|] *)([A-Za-z_][A-Za-z0-9_]*=[^ ;&|]* +)*([^ ;&|]*/)?git +([^|&;]*\s)?commit( |[;&|]|$)'; then
     exit 0
 fi
