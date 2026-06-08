@@ -177,14 +177,24 @@ fi
 # Env-var-prefixed, path-prefixed, and trailing-separator commit forms must still
 # be recognized as commits (-> deny on this master temp repo). The prior matcher
 # let these bypass the branch guard.
-for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commit;"; do
+for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commit;" \
+              "git commit&" "FOO=1 BAR=2 git commit" "EDITOR=vim git commit;" \
+              " git commit" $'ls\ngit commit'; do
     out=$(invoke_with_override "$bypass")
     if [[ "$out" == *'"permissionDecision":"deny"'* ]]; then
-        echo "  PASS: cvr bypass form recognized -> deny: $bypass"; PASS=$((PASS + 1))
+        echo "  PASS: cvr bypass form recognized -> deny: ${bypass//$'\n'/\\n}"; PASS=$((PASS + 1))
     else
-        echo "  FAIL: cvr bypass NOT recognized: '$bypass' got: $out"; FAIL=$((FAIL + 1))
+        echo "  FAIL: cvr bypass NOT recognized: '${bypass//$'\n'/\\n}' got: $out"; FAIL=$((FAIL + 1))
     fi
 done
+# cvr negative control: an env-prefixed NON-commit lookalike must still ALLOW on master
+# (proves the deny above is recognition-driven, not branch-driven). TEST-4.
+out=$(invoke_with_override "echo EDITOR=vim git commit")
+if [[ -z "$out" ]]; then
+    echo "  PASS: cvr negative control (echo EDITOR=vim git commit) -> allow on master"; PASS=$((PASS + 1))
+else
+    echo "  FAIL: cvr negative control wrongly denied: $out"; FAIL=$((FAIL + 1))
+fi
 
 rm -rf "$TMP_REPO"
 
