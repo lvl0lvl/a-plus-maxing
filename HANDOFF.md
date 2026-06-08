@@ -34,6 +34,23 @@ NOT doing: Track 2 (V1 data-surface correctness — `s38`/`byj`/`5q5`/`juc`/`7lt
 
 Invariants at risk: INV-BRANCH-NOT-MAIN, INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-TRUNK-COMPLETENESS, INV-ROLE-INLINING. Governing: the `g5x` widening must STRENGTHEN the ADR-0005 PII-free-trunk boundary (a motivated SAFETY control — permitted under the no-defensive-programming rule); the trunk-`scan` conservatism must hold so clonability is not regressed.
 
+### PR-2 sub-contract (bead 7zj) — settings.json hook-path clone-portability (2026-06-08)
+
+> Confirmed by Walter ("7zj confirmed. write the scope contract and proceed"). PR-1 (`g5x`) MERGED (PR #78, `main` @ df15e85); postal residual tracked in `nue`. This unit fixes the alpha-tester distribution blocker.
+
+Goal: Make the 5 registered PreToolUse hooks resolve on any clone — replace the hardcoded `/Users/waltermcgivney/...` absolute paths in `.claude/settings.json` with `${CLAUDE_PROJECT_DIR}`-relative paths, so the governance/safety hook layer is no longer INERT on a fresh clone.
+
+Acceptance criteria:
+- [ ] AC1 (portable registration): every hook `command` in `.claude/settings.json` is `${CLAUDE_PROJECT_DIR}/.claude/hooks/<hook>.sh`; zero absolute home paths remain. All 5 registered hooks converted (block-dangerous, block-push-main, block-commit-main, block-ungated-vault-write, enforce-role-inlining); block-pii-commit.sh stays UNregistered (3lv).
+- [ ] AC2 (var verified authoritative + live): `${CLAUDE_PROJECT_DIR}` confirmed the documented portable form (claude-code-guide: docs show `"${CLAUDE_PROJECT_DIR}/.claude/hooks/..."`; hooks hot-reload mid-session); after the edit a hot-reloaded hook is shown to FIRE live this session (block-dangerous denies a safe `git clean -fdn` dry-run) — proving the edit did not silently disable the governance layer.
+- [ ] AC3 (failing-capable smoke test): new `scripts/tests/test_settings_hook_paths.sh` asserts every command is `${CLAUDE_PROJECT_DIR}`-prefixed (no absolute/home path) and resolves (PROJECT_ROOT-relative) to an existing script; all 5 hooks present. Reds on the pre-fix absolute-path settings.json.
+- [ ] AC4 (full lifecycle): PR via FULL `/review-pr` → `/merge`; every LEGITIMATE finding fixed or beaded, 0 suppressed (PF-S26-01); skills fresh via the Skill tool (PF-S39-01/S40-01).
+
+Files I WILL touch: `.claude/settings.json` (registration); `scripts/tests/test_settings_hook_paths.sh` (NEW); HANDOFF.md; `.beads/issues.jsonl` via bd. Short-lived `fix/s44-7zj-hook-paths` branch.
+Files I will NOT touch: the hook SCRIPTS (already portable — self-derive SCRIPT_DIR/PROJECT_ROOT); block-pii-commit.sh registration (3lv); pii_scan/router/V1 code; INVARIANTS register rows (a portable-hook-path INV is a candidate to surface, not unilaterally promote); `main` directly.
+NOT doing: registering block-pii-commit (3lv); Track 2; the operator-PII redesign (nue).
+Invariants at risk: INV-BRANCH-NOT-MAIN, INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-TRUNK-COMPLETENESS. Governing: the change must STRENGTHEN clone-portability of the governance layer (a hook layer inert on a clone is the bug); `.claude/settings.json` editing is authorized this session.
+
 ## Scope Contract — Session 43 (2026-06-07)
 
 > Confirmed by Walter ("let's proceed with your recommended paths") — a **residual-bead-fixing** session (NOT a `v1-build` wave; the build plan is fully drained, no Wave 8). Drive the open backlog in **least-reversible-risk priority order**: **Track 1 (PII / safety boundary)** fully, then **Track 2 (V1 data-surface correctness residuals)** as far as the session sustains — each as a coherent short-lived `fix/` branch off `main` → full `/review-pr` → `/merge`. Verify each bead's LIVE state before touching it (PF-S6-01); a bead already resolved is CLOSED with cited evidence, not re-fixed. `/review-pr` + `/merge` invoked FRESH via the Skill tool, FULL methodology incl. dispatched profile-less Phase-3 blind triage + Phase-7 blind verification (PF-S39-01 + PF-S40-01).
