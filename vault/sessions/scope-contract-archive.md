@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-41)
+title: Scope Contract Archive (Sessions 5-42)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-41. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-42. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 42 (2026-06-07)
+
+Build-plan **Wave 7** via `/execute-plan` WAVE mode — `1ih`/ADR-0007-T2 biomarker-matrix + projection render-time views (`scripts/generate/render_views.py`), the terminal V1 DAG sink, completing the V1 build (18/18). AC1-AC6: build (7 crit) + consume-only + W7 consumption-review decisions + W7→Done checkpoint gate + no-regression + three-tier review→merge. All AC PASS. **Full contract + S42 eval/drift/PF preserved in `vault/sessions/session-42.md` and git history** (compacted here at the S43 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 41 (2026-06-07)
 
