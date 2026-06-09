@@ -7,22 +7,30 @@
 #   /Users/<author>/.../.claude/hooks/<hook>.sh — absolute paths that do not exist on
 # any other clone/machine, so Claude Code could not run them and the ENTIRE hook layer
 # was inert on a clone (no commit-main block, no dangerous-command block, no
-# role-inlining enforcement). The hook SCRIPTS self-derive their own dir, so the fix is
-# the REGISTRATION: ${CLAUDE_PROJECT_DIR}/.claude/hooks/<hook>.sh (the documented
+# role-inlining enforcement). The hook scripts are location-independent (each
+# self-derives its own dir from BASH_SOURCE or references no path at all), so the fix
+# is the REGISTRATION: ${CLAUDE_PROJECT_DIR}/.claude/hooks/<hook>.sh (the documented
 # Claude Code project-root placeholder).
 #
+# This is a STATIC check (path shape + file existence + registration set); it does
+# NOT prove the hooks EXECUTE — runtime expansion of ${CLAUDE_PROJECT_DIR} depends on
+# the Claude Code build and is verified separately by a live-fire at fix time.
+#
 # Checks (this reds on the pre-fix absolute-path settings.json):
-#   1. settings.json parses and registers >=1 hook command.
-#   2. Every registered command is ${CLAUDE_PROJECT_DIR}/.claude/hooks/<name>.sh —
-#      no absolute /Users/ or /home/ or other absolute path.
+#   1. settings.json is valid JSON and registers >=1 hook command.
+#   2. Every registered command is a FLAT ${CLAUDE_PROJECT_DIR}/.claude/hooks/<name>.sh
+#      — no absolute /Users/ or /home/ path, no subdir / `..` traversal.
 #   3. Each command resolves (PROJECT_ROOT-relative) to an existing script file.
 #   4. The 5 governance hooks are all registered.
+#   5. block-pii-commit.sh is NOT registered (stays out until bead 3lv).
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SETTINGS="$PROJECT_ROOT/.claude/settings.json"
+# SETTINGS_HOOK_PATHS_FILE overrides the audited file for fixture tests (never set in
+# production); default is the project's real settings.json.
+SETTINGS="${SETTINGS_HOOK_PATHS_FILE:-$PROJECT_ROOT/.claude/settings.json}"
 PORTABLE_PREFIX='${CLAUDE_PROJECT_DIR}/.claude/hooks/'
 
 PASS=0
@@ -35,6 +43,16 @@ if [[ ! -f "$SETTINGS" ]]; then
     exit 1
 fi
 
+# Reject a malformed settings file up front: a jq parse error inside the process
+# substitution below is invisible to `pipefail` and would otherwise surface as an
+# empty CMDS (F1) — a clear message beats a downstream crash.
+if ! jq empty "$SETTINGS" 2>/dev/null; then
+    fail "settings.json is not valid JSON (or jq unavailable)"
+    echo ""
+    echo "test_settings_hook_paths: $PASS passed, $FAIL failed"
+    exit 1
+fi
+
 # Collect every registered hook command (bash 3.2 — no mapfile). The .hooks object is
 # keyed by event name; each value is an array of {matcher, hooks:[{type, command}]}.
 CMDS=()
@@ -44,23 +62,36 @@ done < <(jq -r '.hooks[][].hooks[].command // empty' "$SETTINGS")
 
 echo "settings.json: ${#CMDS[@]} registered hook command(s)"
 
-# Check 1: at least one hook is registered.
+# Check 1: at least one hook is registered. Empty here (a zero-hook file) is a hard
+# stop — falling through would hit `"${CMDS[@]}"` unbound under `set -u` on bash 3.2
+# (F1), crashing before the remaining checks and the summary line print.
 if [[ ${#CMDS[@]} -ge 1 ]]; then
     pass "settings.json registers >=1 hook command"
 else
-    fail "no hook commands registered (jq parse failed or empty)"
+    fail "no hook commands registered (zero hooks)"
+    echo ""
+    echo "test_settings_hook_paths: $PASS passed, $FAIL failed"
+    exit 1
 fi
 
-# Checks 2 + 3: every command is portable and resolves to an existing script.
-for cmd in "${CMDS[@]}"; do
+# Checks 2 + 3: every command is a FLAT portable path resolving to an existing script.
+for cmd in ${CMDS[@]+"${CMDS[@]}"}; do
     case "$cmd" in
         "$PORTABLE_PREFIX"*)
-            script="$PROJECT_ROOT/.claude/hooks/${cmd#"$PORTABLE_PREFIX"}"
-            if [[ -f "$script" ]]; then
-                pass "portable + resolves: $cmd"
-            else
-                fail "portable but script missing: $script (from '$cmd')"
-            fi
+            rest="${cmd#"$PORTABLE_PREFIX"}"
+            case "$rest" in
+                ""|*/*|*..*)
+                    fail "non-flat hook path (subdir / traversal escapes hooks/): '$cmd'"
+                    ;;
+                *)
+                    script="$PROJECT_ROOT/.claude/hooks/$rest"
+                    if [[ -f "$script" ]]; then
+                        pass "portable + resolves: $cmd"
+                    else
+                        fail "portable but script missing: $script (from '$cmd')"
+                    fi
+                    ;;
+            esac
             ;;
         /*)
             fail "absolute / clone-hostile path (inert on a clone): '$cmd'"
@@ -71,14 +102,23 @@ for cmd in "${CMDS[@]}"; do
     esac
 done
 
-# Check 4: the governance hooks are all registered (block-pii-commit stays out — 3lv).
+# Check 4: the governance hooks are all registered.
 for hook in block-dangerous block-push-main block-commit-main block-ungated-vault-write enforce-role-inlining; do
-    if printf '%s\n' "${CMDS[@]}" | grep -q "/${hook}\.sh$"; then
+    if printf '%s\n' ${CMDS[@]+"${CMDS[@]}"} | grep -q "/${hook}\.sh$"; then
         pass "registered: $hook"
     else
         fail "governance hook not registered: $hook"
     fi
 done
+
+# Check 5 (3lv): block-pii-commit.sh must stay UNregistered — its trunk-wide @gmail
+# scan is clone-hostile and was registered-then-reverted in S43. Guard the revert: a
+# future re-registration (even with a portable path) reds here.
+if printf '%s\n' ${CMDS[@]+"${CMDS[@]}"} | grep -q "/block-pii-commit\.sh$"; then
+    fail "block-pii-commit.sh must stay UNregistered until bead 3lv (S43 revert)"
+else
+    pass "block-pii-commit.sh correctly absent (3lv)"
+fi
 
 echo ""
 echo "test_settings_hook_paths: $PASS passed, $FAIL failed"
