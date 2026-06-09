@@ -41,9 +41,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${BLOCK_PII_COMMIT_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 PII_SCAN_ROOT="${BLOCK_PII_COMMIT_PII_SCAN_ROOT:-$PROJECT_ROOT}"
 
-# git-commit detection is single-sourced (bead mic).
-source "$SCRIPT_DIR/lib/commit-matcher.sh"
-
 # SCAFFOLD_PREFIX (Fix 4 single-source for the scaffold path): the filled-scaffold-value
 # prefix the repo-root .gitignore excludes, condition 1's matcher keys off, and the
 # test's representative value lives under. Condition 2 keys off STORE_PREFIX; both
@@ -58,6 +55,14 @@ deny() {  # $1 = reason string
         '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
     exit 0
 }
+
+# git-commit detection is single-sourced (bead mic). Sourced AFTER deny() so a load
+# failure fails CLOSED: under set -uo pipefail (no set -e) a failed source is non-fatal,
+# so without this guard is_git_commit would be undefined and `is_git_commit ... || exit 0`
+# would silently ALLOW — skipping the PII scan. This hook is fail-CLOSED (Security HIGH-1),
+# so a missing/corrupt matcher lib denies (PR#80 SEC-1).
+source "$SCRIPT_DIR/lib/commit-matcher.sh" 2>/dev/null
+declare -F is_git_commit >/dev/null 2>&1 || deny "PII-FREE-TRUNK: commit-matcher lib failed to load (is_git_commit undefined). Failing closed — commit blocked."
 
 COMMAND=$(jq -r '.tool_input.command // empty' < /dev/stdin)
 JQ_RC=$?

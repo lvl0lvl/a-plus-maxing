@@ -20,8 +20,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Allow tests to point at a temp repo. Never set in production.
 PROJECT_ROOT="${BLOCK_COMMIT_MAIN_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
-# git-commit detection is single-sourced (bead mic).
-source "$SCRIPT_DIR/lib/commit-matcher.sh"
+# git-commit detection is single-sourced (bead mic). Allow-on-error guard (block-push-main
+# is the second-line defense), but a missing/corrupt lib is a broken install — warn LOUDLY
+# rather than silently disable the commit-on-main guard (PR#80 SEC-2).
+source "$SCRIPT_DIR/lib/commit-matcher.sh" 2>/dev/null
+declare -F is_git_commit >/dev/null 2>&1 || {
+    echo "block-commit-main: commit-matcher lib failed to load; commit-on-main guard inactive." >&2
+    exit 0
+}
 
 COMMAND=$(jq -r '.tool_input.command // empty' < /dev/stdin)
 
