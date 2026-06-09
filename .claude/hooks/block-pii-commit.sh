@@ -41,6 +41,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${BLOCK_PII_COMMIT_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 PII_SCAN_ROOT="${BLOCK_PII_COMMIT_PII_SCAN_ROOT:-$PROJECT_ROOT}"
 
+# git-commit detection is single-sourced (bead mic).
+source "$SCRIPT_DIR/lib/commit-matcher.sh"
+
 # SCAFFOLD_PREFIX (Fix 4 single-source for the scaffold path): the filled-scaffold-value
 # prefix the repo-root .gitignore excludes, condition 1's matcher keys off, and the
 # test's representative value lives under. Condition 2 keys off STORE_PREFIX; both
@@ -67,21 +70,8 @@ if [[ $JQ_RC -ne 0 ]]; then
 fi
 [[ -z "$COMMAND" ]] && exit 0
 
-NORM=$(echo "$COMMAND" | tr '\n' ';' | tr -s '[:space:]' ' ')
-NORM="${NORM#" "}"; NORM="${NORM%" "}"
-
-# Only a git commit is our concern. cvr: hardened matcher + normalization — KEEP IN
-# SYNC across block-pii-commit.sh / block-commit-main.sh / block-ungated-vault-write.sh.
-# NORM maps newlines to ';' (so a commit on a later line is seen) and strips leading/
-# trailing space (so a leading-whitespace commit is not missed). The matcher anchors at
-# start / after a separator, tolerates optional env-var (VAR=val ) and path (dir/)
-# prefixes before git, allows flags between git and commit, and ends on space, a
-# separator [;&|], or EOL — so env-var-prefixed (EDITOR=vim git commit), path-prefixed
-# (/usr/bin/git commit), and trailing-separator (git commit; / git commit&) forms are
-# caught, while embedded text (echo git commit) and commit-tree / --commit-msg are not.
-if ! echo "$NORM" | grep -qE '(^|[;&|] *)([A-Za-z_][A-Za-z0-9_]*=[^ ;&|]* +)*([^ ;&|]*/)?git +([^|&;]*\s)?commit( |[;&|]|$)'; then
-    exit 0
-fi
+# Only a git commit is our concern — detection single-sourced in lib/commit-matcher.sh (mic).
+is_git_commit "$COMMAND" || exit 0
 
 # Staged set git will actually commit — NOT git ls-files (the HEAD/tracked set), so a
 # git add-ed file absent from HEAD is scanned (Fix 3). Filter ACMRT covers Added,
