@@ -26,24 +26,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${BLOCK_UNGATED_VAULT_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 INGEST_LINT="$SCRIPT_DIR/../../scripts/wiki-ingest-lint.sh"
 
+# git-commit detection is single-sourced (bead mic).
+source "$SCRIPT_DIR/lib/commit-matcher.sh"
+
 COMMAND=$(jq -r '.tool_input.command // empty' < /dev/stdin)
 [[ -z "$COMMAND" ]] && exit 0
 
-NORM=$(echo "$COMMAND" | tr '\n' ';' | tr -s '[:space:]' ' ')
-NORM="${NORM#" "}"; NORM="${NORM%" "}"
-
-# Only a git commit is our concern. cvr: hardened matcher + normalization — KEEP IN
-# SYNC across block-pii-commit.sh / block-commit-main.sh / block-ungated-vault-write.sh.
-# NORM maps newlines to ';' (so a commit on a later line is seen) and strips leading/
-# trailing space (so a leading-whitespace commit is not missed). The matcher anchors at
-# start / after a separator, tolerates optional env-var (VAR=val ) and path (dir/)
-# prefixes before git, allows flags between git and commit, and ends on space, a
-# separator [;&|], or EOL — so env-var-prefixed (EDITOR=vim git commit), path-prefixed
-# (/usr/bin/git commit), and trailing-separator (git commit; / git commit&) forms are
-# caught, while embedded text (echo git commit) and commit-tree / --commit-msg are not.
-if ! echo "$NORM" | grep -qE '(^|[;&|] *)([A-Za-z_][A-Za-z0-9_]*=[^ ;&|]* +)*([^ ;&|]*/)?git +([^|&;]*\s)?commit( |[;&|]|$)'; then
-    exit 0
-fi
+# Only a git commit is our concern — detection single-sourced in lib/commit-matcher.sh (mic).
+is_git_commit "$COMMAND" || exit 0
 
 # Collect staged gated-dir pages (added/copied/modified; deletions are not gated).
 # bash 3.2 — no mapfile; the case '*' spans '/', so nested library pages match.
