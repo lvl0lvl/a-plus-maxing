@@ -80,6 +80,39 @@ else
     fail "COMMIT_MATCHER_RE is not defined"
 fi
 
+# --- consumers' load posture on a MISSING lib (PR#80 SEC-1/SEC-2/F4) ----------------
+# The hooks source the lib via $SCRIPT_DIR/lib/. Run each hook from a tmp dir WITHOUT a
+# lib/ so the source fails, and confirm: block-pii-commit DENIES (fail-CLOSED — its PII
+# scan must NOT be silently skipped); the two annoyance guards exit 0 with a LOUD stderr
+# warning (allow-on-error posture, but a broken install must be visible, not silent).
+HOOKS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+MISSING_LIB_PAYLOAD='{"tool_input":{"command":"git commit -m x"}}'
+
+run_hook_without_lib() {  # $1 = hook filename; sets globals OUT / ERR
+    local hook="$1" tmp
+    tmp=$(mktemp -d)
+    cp "$HOOKS_DIR/$hook" "$tmp/$hook"   # copied alone — no sibling lib/ dir
+    OUT=$(printf '%s' "$MISSING_LIB_PAYLOAD" | bash "$tmp/$hook" 2>"$tmp/err")
+    ERR=$(cat "$tmp/err")
+    rm -rf "$tmp"
+}
+
+echo "Consumer posture on a MISSING lib:"
+run_hook_without_lib "block-pii-commit.sh"
+if echo "$OUT" | grep -q '"permissionDecision":"deny"'; then
+    pass "block-pii-commit.sh DENIES on missing lib (fail-closed)"
+else
+    fail "block-pii-commit.sh did NOT fail closed on missing lib (out: ${OUT:-<empty>})"
+fi
+for hook in block-commit-main.sh block-ungated-vault-write.sh; do
+    run_hook_without_lib "$hook"
+    if [[ -z "$OUT" ]] && echo "$ERR" | grep -qi "failed to load"; then
+        pass "$hook loud-allows on missing lib (exit 0 + stderr warning)"
+    else
+        fail "$hook missing-lib posture wrong (out: ${OUT:-<empty>} / err: ${ERR:-<empty>})"
+    fi
+done
+
 echo ""
 echo "test_commit_matcher: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1

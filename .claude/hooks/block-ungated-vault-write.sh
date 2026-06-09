@@ -26,8 +26,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${BLOCK_UNGATED_VAULT_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 INGEST_LINT="$SCRIPT_DIR/../../scripts/wiki-ingest-lint.sh"
 
-# git-commit detection is single-sourced (bead mic).
-source "$SCRIPT_DIR/lib/commit-matcher.sh"
+# git-commit detection is single-sourced (bead mic). Allow-on-error guard (wiki-ingest-lint
+# is the second-line defense), but a missing/corrupt lib is a broken install — warn LOUDLY
+# rather than silently disable the ingestion gate (PR#80 SEC-2).
+source "$SCRIPT_DIR/lib/commit-matcher.sh" 2>/dev/null
+declare -F is_git_commit >/dev/null 2>&1 || {
+    echo "block-ungated-vault-write: commit-matcher lib failed to load; ingestion gate inactive." >&2
+    exit 0
+}
 
 COMMAND=$(jq -r '.tool_input.command // empty' < /dev/stdin)
 [[ -z "$COMMAND" ]] && exit 0
