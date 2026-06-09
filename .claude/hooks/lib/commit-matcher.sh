@@ -19,6 +19,13 @@
 # commit), path-prefixed (/usr/bin/git commit), and trailing-separator (git commit; /
 # git commit&) forms are caught, while embedded text (echo git commit) and commit-tree
 # / --commit-msg are not.
+#
+# CONSUMER OBLIGATION: a failed `source` is non-fatal under `set -uo pipefail` (no
+# set -e), so a consumer MUST assert this lib loaded before relying on it —
+# `declare -F is_git_commit >/dev/null || <fail per the consumer's posture>` — else an
+# unguarded `is_git_commit ... || exit 0` silently ALLOWS on a missing/corrupt lib. The
+# fail-CLOSED consumer (block-pii-commit) denies; the allow-on-error guards warn loudly
+# (PR#80 SEC-1/SEC-2).
 
 # The hardened matcher regex (cvr). Single definition; the three hooks + the unit test
 # consume it from here.
