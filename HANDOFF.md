@@ -51,6 +51,25 @@ Files I will NOT touch: the hook SCRIPTS (already portable — self-derive SCRIP
 NOT doing: registering block-pii-commit (3lv); Track 2; the operator-PII redesign (nue).
 Invariants at risk: INV-BRANCH-NOT-MAIN, INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-TRUNK-COMPLETENESS. Governing: the change must STRENGTHEN clone-portability of the governance layer (a hook layer inert on a clone is the bug); `.claude/settings.json` editing is authorized this session.
 
+### PR-3/4/5 sub-contract — remaining Track-1 distribution (mic → rnm → dv3) (2026-06-08)
+
+> Confirmed by Walter ("proceed with the three in the order you proposed"). PR-1 `g5x` + PR-2 `7zj` MERGED (`main` @ 2a2691f). These three complete the actionable Track-1 distribution items the S44 contract scoped (`3lv` stays BLOCKED on the `nue`/`g5x` operator-specific redesign). Each its own short-lived `fix/s44-*` branch → FULL `/review-pr` → `/merge`. Hook/settings authorization is in effect this session.
+
+**PR-3 — `mic` (P2):** single-source the triplicated git-commit matcher + NORM.
+- [ ] AC-mic-1: a new sourced lib `.claude/hooks/lib/commit-matcher.sh` defines the matcher regex + an `is_git_commit()` helper ONCE; the 3 commit hooks (block-pii-commit / block-commit-main / block-ungated-vault-write) source it and call it instead of inlining the NORM+regex. The byte-identical triplication + the KEEP-IN-SYNC comment are removed from the hooks.
+- [ ] AC-mic-2 (behavior-preserving on a security boundary): the 3 hook suites stay green (25/30/14) — proving the extraction did not change matcher behavior. A dedicated lib unit test exercises `is_git_commit` on the canonical positive / non-commit / cvr-bypass forms.
+
+**PR-4 — `rnm` (P2):** pin the filled-scaffold-value path convention in ADR-0005 (docs-only).
+- [ ] AC-rnm-1: ADR-0005 records the `vault/scaffold/filled/` convention as the single upstream source the `.gitignore`, block-pii-commit's `SCAFFOLD_PREFIX`, and the test fixtures key off. Docs-only; no code/hook change. (Verify the bead's live detail at PR-4 start.)
+
+**PR-5 — `dv3` (P3):** add a pre-push/CI `pii_scan` backstop.
+- [ ] AC-dv3-1: a non-agent `git push` (or CI) path runs `pii_scan.scan` as a backstop to the agent-only/local-only PreToolUse hook, so a clone/CI without the PreToolUse hook still gates PII at the push boundary. Scope + mechanism confirmed against the bead's live detail at PR-5 start (verify-first); if it requires a consumed-contract change, HALT + escalate.
+
+Files I WILL touch (across the three): `.claude/hooks/lib/commit-matcher.sh` (NEW) + the 3 commit hooks + `.claude/hooks/tests/test_commit_matcher.sh` (NEW) [mic]; the ADR-0005 doc [rnm]; a pre-push/CI hook or script + its test [dv3]; HANDOFF.md; `.beads/issues.jsonl` via bd.
+Files I will NOT touch: `scripts/guard/pii_scan.py` (consumed read-only); block-pii-commit registration (3lv); the V1 pipeline code; `main` directly; INVARIANTS register rows (surface a candidate, don't unilaterally promote).
+NOT doing: `3lv` (blocked on `nue`); Track 2/3/4/5; the operator-PII redesign (`nue`); LM-04.
+Invariants at risk: INV-BRANCH-NOT-MAIN, INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-TRUNK-COMPLETENESS. Governing: `mic` must be behavior-preserving on the commit-gate security boundary; `dv3` must strengthen (never weaken) the PII boundary.
+
 ## Scope Contract — Session 43 (2026-06-07)
 
 > Confirmed by Walter ("let's proceed with your recommended paths") — a **residual-bead-fixing** session (NOT a `v1-build` wave; the build plan is fully drained, no Wave 8). Drive the open backlog in **least-reversible-risk priority order**: **Track 1 (PII / safety boundary)** fully, then **Track 2 (V1 data-surface correctness residuals)** as far as the session sustains — each as a coherent short-lived `fix/` branch off `main` → full `/review-pr` → `/merge`. Verify each bead's LIVE state before touching it (PF-S6-01); a bead already resolved is CLOSED with cited evidence, not re-fixed. `/review-pr` + `/merge` invoked FRESH via the Skill tool, FULL methodology incl. dispatched profile-less Phase-3 blind triage + Phase-7 blind verification (PF-S39-01 + PF-S40-01).
