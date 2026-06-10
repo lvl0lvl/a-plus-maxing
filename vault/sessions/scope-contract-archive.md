@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-45. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-46. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 46 (2026-06-10)
+
+Dashboard-demo (discovery) + ADR-0005 v1.5 freshness sweep (`am4`, PR#87). The demo drove both V1 render surfaces end-to-end with SYNTHETIC data and surfaced the `generate.run("dashboard")` crash on a realistic mixed store (P1 `i1t`) + 5 more gap beads; `am4` reconciled ADR-0005 to the built+registered PII enforcement (the docs `/review-pr` caught a real self-introduced scope error, fixed before merge). AC1-AC5 PASS. **Full contract + S46 eval/drift/PF preserved in `vault/sessions/session-46.md` and git history** (compacted here at the S47 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 45 (2026-06-09)
 
