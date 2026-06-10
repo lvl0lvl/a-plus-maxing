@@ -16,7 +16,7 @@ first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
 
 ## Scope Contract — Session 46 (2026-06-10)
 
-Dashboard-demo (discovery) + ADR-0005 v1.5 freshness sweep (`am4`, PR#87). The demo drove both V1 render surfaces end-to-end with SYNTHETIC data and surfaced the `generate.run("dashboard")` crash on a realistic mixed store (P1 `i1t`) + 5 more gap beads; `am4` reconciled ADR-0005 to the built+registered PII enforcement (the docs `/review-pr` caught a real self-introduced scope error, fixed before merge). AC1-AC5 PASS. **Full contract + S46 eval/drift/PF preserved in `vault/sessions/session-46.md` and git history** (compacted here at the S47 close per the rotation-rule no-accretion clause).
+Dashboard-demo (discovery) + ADR-0005 v1.5 freshness sweep (`am4`, PR#87). The demo drove both V1 render surfaces end-to-end with SYNTHETIC data and surfaced the `generate.run("dashboard")` crash on a realistic mixed store (P1 `i1t`) + 5 more gap beads; `am4` reconciled ADR-0005 to the built+registered PII enforcement (the docs `/review-pr` caught a real self-introduced scope error, fixed before merge). AC1-AC5 PASS. **Full contract + S46 eval/drift/PF preserved in `memory/process-failures.md` (S46 attestation, backfilled S48) + git history (commit 49c6764, the s46-close HANDOFF)** (compacted here at the S47 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 45 (2026-06-09)
 
