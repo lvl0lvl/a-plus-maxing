@@ -14,7 +14,7 @@ review_cadence: weekly
 
 ## Scope Contract — Session 47 (2026-06-10)
 
-> Confirmed by Walter ("Proceed" — fork on stop-at-sign-off vs roll-into-build deferred until we have an approved design, depends how long sign-off takes). Pencil is open with ANOTHER project's canvas (`anamnesis/.../painting-options.pen`) — create a NEW `.pen`, do not touch the open one. Session frame: Walter's completion directive (memory `project-completion-definition`) — a great dashboard (stats+plans+tracking). S47 = the dashboard, MOCKUP-FIRST (standing directive `feedback-dashboard-pencil-mockups`): mock the unified dashboard in Pencil, iterate to sign-off, THEN build (build phase is post-sign-off, possibly S48). **NO hook/settings authorization this session.** Verify each bead's LIVE state before touching (PF-S6-01).
+> Confirmed by Walter ("Proceed" — fork on stop-at-sign-off vs roll-into-build deferred until we have an approved design, depends how long sign-off takes). Pencil is open with ANOTHER project's canvas — create a NEW `.pen`, do not touch the open one. Session frame: Walter's completion directive (memory `project-completion-definition`) — a great dashboard (stats+plans+tracking). S47 = the dashboard, MOCKUP-FIRST (standing directive `feedback-dashboard-pencil-mockups`): mock the unified dashboard in Pencil, iterate to sign-off, THEN build (build phase is post-sign-off, possibly S48). **NO hook/settings authorization this session.** Verify each bead's LIVE state before touching (PF-S6-01).
 
 Goal: Mock the unified stats+plans+tracking dashboard in Pencil and iterate to Walter sign-off — establishing the approved design the six dashboard beads will be built against.
 
