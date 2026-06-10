@@ -1,0 +1,36 @@
+---
+title: store — local NDJSON time-series store
+type: reference
+status: active
+created: 2026-06-10
+last_reviewed: 2026-06-10
+review_cadence: on-change
+permalink: a-plus-maxing/components/store
+---
+
+# store (`scripts/store/store.py` + `scripts/store/keying.py`)
+
+**What:** the local append/read time-series store. One `.ndjson` file per item under the
+gitignored store root (`vault/store/` = `store.DEFAULT_ROOT`). Local file I/O only — no
+network, no model step (ADR-0001 → ADR-0002).
+
+**Contracts:**
+- `keying.LINE_FIELDS = (item, timepoint, source, value)` — the closed Line Field Set
+  every store line carries; the ONLY key definition in the codebase (ADR-0002-T0).
+- Dedupe identity = `(item, timepoint, source)` — value EXCLUDED, so a re-append of the
+  same tuple is an idempotent no-op (`keying.dedupe_key`). Distinct same-timepoint
+  entries need a varying source (see `loop_schema._content_tag`).
+- `store.append(item, reading, root)` — validates conformance, atomic rewrite
+  (temp sibling → fsync → `os.replace`), self-heals malformed lines.
+- `store.read(item, root)` — returns conformant readings sorted lexicographically by
+  `timepoint` (assumes UTC-offset timestamps). Malformed lines skipped with a
+  `STORE-SKIP: <path>:<line>` stderr signal (a consumer-visible channel).
+- `store._item_path` rejects any item whose path is not a direct child of the root
+  (path-escape guard); `::`-prefixed items are direct children (legal).
+- There is NO read-all surface; `generate._read_store` enumerates `*.ndjson` (a
+  documented coupling to the on-disk layout).
+
+**Called by (production):** `loop_schema` (all writers/readers), `generate._read_store`,
+ingest adapters, router tests/seeds.
+
+**Governing ADR:** ADR-0002 (store), ADR-0003 (ingestion keying).
