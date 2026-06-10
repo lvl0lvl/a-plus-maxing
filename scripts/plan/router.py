@@ -98,14 +98,6 @@ def _age_band(readings):
     return f"born-{year[:3]}0s" if year.isdigit() else "age-band-unknown"
 
 
-def _to_number(value):
-    """Parse `value` to a float, or None if it is missing/non-numeric."""
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
 def _trend_token(readings):
     """Derive a `recent-trend-direction` token from the readings SERIES.
 
@@ -125,7 +117,7 @@ def _trend_token(readings):
     insufficient series, NEVER a false affirmative for missing/non-numeric
     data (missing → `flat`, the no-signal token, not `improving`).
     """
-    nums = [_to_number(r["value"]) for r in readings]
+    nums = [biomarker_meta.to_number(r["value"]) for r in readings]
     nums = [n for n in nums if n is not None]
     if len(nums) < 2:
         return "flat"  # insufficient series / missing data — no false affirmative

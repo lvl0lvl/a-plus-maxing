@@ -40,6 +40,19 @@ def test_get_unknown_marker_returns_none(item):
     assert biomarker_meta.get(item) is None
 
 
+# --- to_number ---------------------------------------------------------------
+
+
+def test_to_number_nan_reads_none():
+    """A "nan" cell coerces to None — never a NaN float."""
+    assert biomarker_meta.to_number("nan") is None
+
+
+def test_to_number_overflow_reads_none():
+    """A "1e999" cell (float overflow to inf) coerces to None."""
+    assert biomarker_meta.to_number("1e999") is None
+
+
 # --- display_name ------------------------------------------------------------
 
 
@@ -89,6 +102,11 @@ def test_state_for_coerces_numeric_strings():
 def test_state_for_non_numeric_reads_none(value):
     """A non-coercible value reads None (neutral)."""
     assert biomarker_meta.state_for("rhr", value) is None
+
+
+def test_state_for_non_finite_reads_none():
+    """A non-finite value reads None (neutral) — never a fabricated "concern"."""
+    assert biomarker_meta.state_for("crp", "1e999") is None
 
 
 def test_state_for_no_registered_range_reads_none():
