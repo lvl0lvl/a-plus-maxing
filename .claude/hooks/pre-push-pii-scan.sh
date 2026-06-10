@@ -1,15 +1,23 @@
 #!/bin/bash
+# APLUS-MANAGED dv3 pre-push-pii-scan
 # pre-push-pii-scan.sh — git pre-push hook (bead dv3). PII backstop on the push range.
+#
+# The "APLUS-MANAGED" sentinel above (line 2) is the install-ownership marker
+# scripts/clone/init_instance.py keys on: it refreshes a .git/hooks/pre-push hook
+# only when that exact line is present, and never clobbers a hook lacking it.
 #
 # block-pii-commit.sh gates only AGENT-issued git commits inside a Claude session;
 # commits from a human terminal/IDE (and anything the commit-time scan missed)
 # bypass it entirely. This git-native pre-push hook is the defense-in-depth
-# backstop at the LAST local boundary before content reaches the remote: it scans
-# every file changed in the pushed range with the SAME two scopes as the commit
-# hook (the SEC-01(a) reuse contract — scripts/guard/pii_scan.scan, no bash/grep
-# token reimplementation):
-#   • trunk-wide — structural store-line patterns + the operator-contact tokens
-#     (gitignored config; empty on a fresh clone -> structural only)
+# backstop at the LAST local boundary before content reaches the remote. It mirrors
+# the commit hook's THREE conditions over the files changed in the pushed range
+# (the SEC-01(a) reuse contract — scripts/guard/pii_scan, no bash/grep token
+# reimplementation; the scope policy is single-sourced via lib/pii-scan-scope.sh):
+#   • path denial — a changed file under vault/scaffold/filled/ or vault/store/ is
+#     operator data by LOCATION, blocked regardless of token hits (PR#84 API-1; the
+#     human-terminal path is exactly where `git add -f` past .gitignore happens).
+#   • trunk-wide — structural store-line patterns + the operator-contact tokens,
+#     skipping the structural pass for tests/ fixture paths (the dv3 partition)
 #   • identity, data-bearing only — operator-name tokens over health-data paths
 # and blocks the push (exit 1) on any hit. Fail-closed: any scan/plumbing error
 # blocks, never allows.
@@ -21,7 +29,10 @@
 #   • Changed paths are scanned from the WORKING TREE (the same disk-content
 #     approximation block-pii-commit.sh uses for the staged set): PII that was
 #     committed AND since removed from disk is not seen here — the history
-#     question belongs to a history audit, not a push gate.
+#     question belongs to a history audit, not a push gate. This is the layer that
+#     covers the commit hook's bd-auto-stage blind spot (PR#84 HIST-2): bead text
+#     freshly flushed by the bd pre-commit hook is invisible to the commit-time
+#     scan but IS scanned here at push time.
 #
 # stdin (git pre-push contract): "<local_ref> <local_sha> <remote_ref> <remote_sha>"
 # per ref being pushed.
@@ -30,6 +41,7 @@
 
 set -uo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ZERO=0000000000000000000000000000000000000000
 # git's well-known empty-tree object: the diff base for a push with no usable
 # remote base (brand-new repo, no origin/main).
@@ -43,8 +55,16 @@ fi
 cd "$TOPLEVEL" || { echo "pre-push-pii-scan: cd failed — blocking (fail-closed)" >&2; exit 1; }
 SCAN_ROOT="${PRE_PUSH_PII_SCAN_ROOT:-$TOPLEVEL}"
 
-# Same data-bearing partition as block-pii-commit.sh (the identity-scan scope).
-DATA_BEARING_PREFIXES=("vault/scaffold/filled/" "vault/store/" "vault/dna/raw/" "vault/labs/raw/")
+# Path scope (PER_SE_DENY_PREFIXES + DATA_BEARING_PREFIXES) single-sourced with the
+# commit hook so the two boundaries cannot drift (PR#84 QUAL-1). The install copies
+# this hook to .git/hooks/pre-push, where SCRIPT_DIR resolves to .git/hooks, so the
+# lib is read from the tracked .claude/hooks/lib via the repo toplevel.
+source "$TOPLEVEL/.claude/hooks/lib/pii-scan-scope.sh" 2>/dev/null \
+    || source "$SCRIPT_DIR/lib/pii-scan-scope.sh" 2>/dev/null
+if [[ -z "${STORE_PREFIX:-}" ]]; then
+    echo "pre-push-pii-scan: pii-scan-scope lib failed to load — blocking (fail-closed)" >&2
+    exit 1
+fi
 
 CHANGED=()
 while read -r _local_ref local_sha _remote_ref remote_sha; do
@@ -58,7 +78,9 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     else
         base="$remote_sha"
     fi
-    DIFF_OUT=$(git diff --name-only --diff-filter=ACMRT "$base" "$local_sha" 2>/dev/null)
+    # core.quotepath=false: a non-ASCII path would otherwise be C-quoted and skip
+    # the scan (a silent fail-open — PR#84 BUG-1), matching the commit hook.
+    DIFF_OUT=$(git -c core.quotepath=false diff --name-only --diff-filter=ACMRT "$base" "$local_sha" 2>/dev/null)
     DIFF_RC=$?
     if [[ $DIFF_RC -ne 0 ]]; then
         echo "pre-push-pii-scan: git diff failed (rc=$DIFF_RC) enumerating the push range — blocking (fail-closed)" >&2
@@ -72,6 +94,20 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
 done
 
 [[ ${#CHANGED[@]} -eq 0 ]] && exit 0
+
+# ── Path denial (PR#84 API-1): a changed file under a per-se-deny prefix is ──────
+# operator data by location — block regardless of token hits, mirroring the commit
+# hook's conditions 1+2. The human-terminal push path is exactly where a `git add -f`
+# past .gitignore can land a filled-scaffold/store file carrying no token.
+for f in "${CHANGED[@]}"; do
+    for p in "${PER_SE_DENY_PREFIXES[@]}"; do
+        case "$f" in
+            "$p"*)
+                echo "pre-push-pii-scan: PII-FREE-TRUNK: pushed range includes operator-data path '$f' (under '$p'). Remove it from the pushed commits before pushing." >&2
+                exit 1 ;;
+        esac
+    done
+done
 
 DATA_BEARING=()
 for f in "${CHANGED[@]}"; do
@@ -88,23 +124,15 @@ import os
 import sys
 
 sys.path.insert(0, os.environ["PPS_SCAN_ROOT"])
-from scripts.guard.pii_scan import scan, DEFAULT_CONTACT_CONFIG, DEFAULT_IDENTITY_CONFIG
+from scripts.guard.pii_scan import scan_scoped
 
 n_changed = int(sys.argv[1])
 changed = sys.argv[2:2 + n_changed]
 data_bearing = sys.argv[2 + n_changed:]
 
-# Known-fixture partition (dv3, mirrors block-pii-commit.sh): tests/ fixtures
-# embed synthetic reading-shaped literals by construction, so the structural
-# patterns run only outside tests/; fixture paths still get the contact tokens.
-fixtures = [f for f in changed if f.startswith("tests/")]
-non_fixtures = [f for f in changed if not f.startswith("tests/")]
-
-trunk = scan(non_fixtures, identity_config=DEFAULT_CONTACT_CONFIG)
-trunk += scan(fixtures, identity_config=DEFAULT_CONTACT_CONFIG, include_structural=False)
-identity = scan(data_bearing, identity_config=DEFAULT_IDENTITY_CONFIG) if data_bearing else 0
-
-print(trunk + identity)
+# Single-sourced scope policy (the dv3 fixture partition + the two-scope scan),
+# shared with block-pii-commit.sh so the gate and its backstop cannot drift.
+print(scan_scoped(changed, data_bearing))
 PY
 )
 SCAN_RC=$?

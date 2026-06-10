@@ -6,22 +6,29 @@
 # CONTENTS carry operator PII, deny the commit. Mirror of block-ungated-vault-write.sh.
 #
 # Conditions 1 & 2 are PATH/membership checks over the staged set. Condition 3
-# delegates the token scan ENTIRELY to the cross-spec scripts/guard/pii_scan.scan
-# (the SEC-01(a) reuse contract) — NO bash/rg/grep token reimplementation. The
-# scan is scoped per the ADR-0005 amended Decision 2026-06-06 (bead qwj option iii),
-# with the contact model made operator-specific at 3lv (the generic @gmail.com
-# trunk-wide pattern flooded on synthetic fixture/bead emails — 14 false hits on a
-# routine staged set — so it moved to a gitignored config like the name):
-#   • trunk-wide — scan(<full staged set>, identity_config=DEFAULT_CONTACT_CONFIG)
-#     so the structural store-line patterns + the operator's REAL contact tokens
-#     run over every staged file. The contact has no legitimate tracked use
-#     (provenance prose uses the operator's name, never the email). On a fresh
-#     clone the config is absent -> structural patterns only -> no false floods.
-#   • identity, data-bearing only — scan(<data-bearing subset>, DEFAULT_IDENTITY_CONFIG)
-#     so the operator-name patterns run only over health-data paths (scaffold values,
-#     store, raw dropzones) where the name IS a leak; the name is accepted provenance
-#     in governance/session/design prose and must NOT be flagged trunk-wide.
-# Deny if EITHER call returns >=1.
+# delegates the token scan ENTIRELY to scripts/guard/pii_scan.scan_scoped (the
+# SEC-01(a) reuse contract; the scope policy is single-sourced with the pre-push
+# backstop) — NO bash/rg/grep token reimplementation. The scan is scoped per the
+# ADR-0005 amended Decision 2026-06-06 (bead qwj option iii), with the contact
+# model made operator-specific at 3lv (the generic @gmail.com trunk-wide pattern
+# flooded on synthetic fixture/bead emails — 14 false hits on a routine staged set
+# — so it moved to a gitignored config like the name). scan_scoped runs:
+#   • trunk-wide — structural store-line patterns + the operator's REAL contact
+#     tokens over every staged file EXCEPT tests/ paths, which get the contact
+#     tokens ONLY (their structural reading-shaped literals are synthetic fixtures
+#     by construction — the known-fixture partition, dv3). The contact has no
+#     legitimate tracked use (provenance prose uses the operator's name, never the
+#     email). On a fresh clone the config is absent -> structural patterns only.
+#   • identity, data-bearing only — the operator-name patterns over health-data
+#     paths (scaffold values, store, raw dropzones) where the name IS a leak; the
+#     name is accepted provenance in governance/session/design prose and must NOT
+#     be flagged trunk-wide.
+# Deny if the combined count is >=1.
+#
+# KNOWN LIMIT (PR#84 HIST-2): the bd pre-commit git hook stages
+# .beads/issues.jsonl INSIDE `git commit`, AFTER this PreToolUse snapshot, so
+# freshly-flushed bead text is not seen here — the pre-push backstop covers it
+# (a commit-time scan of the bd file is tracked separately).
 #
 # Fail-closed (Security HIGH-1): any error in the scan path — import fails, scan
 # raises, the python3 -c returns non-zero, or the git/jq plumbing fails — emits
@@ -46,15 +53,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${BLOCK_PII_COMMIT_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 PII_SCAN_ROOT="${BLOCK_PII_COMMIT_PII_SCAN_ROOT:-$PROJECT_ROOT}"
 
-# SCAFFOLD_PREFIX (Fix 4 single-source for the scaffold path): the filled-scaffold-value
-# prefix the repo-root .gitignore excludes, condition 1's matcher keys off, and the
-# test's representative value lives under. Condition 2 keys off STORE_PREFIX; both
-# prefixes also seed the data-bearing partition below.
-SCAFFOLD_PREFIX="vault/scaffold/filled/"
-STORE_PREFIX="vault/store/"
-# Data-bearing dropzones (gitignored health-data paths) the identity scan also covers.
-DATA_BEARING_PREFIXES=("$SCAFFOLD_PREFIX" "$STORE_PREFIX" "vault/dna/raw/" "vault/labs/raw/")
-
 deny() {  # $1 = reason string
     jq -nc --arg r "$1" \
         '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
@@ -68,6 +66,12 @@ deny() {  # $1 = reason string
 # so a missing/corrupt matcher lib denies (PR#80 SEC-1).
 source "$SCRIPT_DIR/lib/commit-matcher.sh" 2>/dev/null
 declare -F is_git_commit >/dev/null 2>&1 || deny "PII-FREE-TRUNK: commit-matcher lib failed to load (is_git_commit undefined). Failing closed — commit blocked."
+
+# Path scope (SCAFFOLD_PREFIX / STORE_PREFIX / PER_SE_DENY_PREFIXES /
+# DATA_BEARING_PREFIXES) is single-sourced with the pre-push backstop so the two
+# boundaries cannot drift (PR#84 QUAL-1, the PR#80 lesson). Same fail-closed guard.
+source "$SCRIPT_DIR/lib/pii-scan-scope.sh" 2>/dev/null
+[[ -n "${STORE_PREFIX:-}" ]] || deny "PII-FREE-TRUNK: pii-scan-scope lib failed to load (path prefixes undefined). Failing closed — commit blocked."
 
 COMMAND=$(jq -r '.tool_input.command // empty' < /dev/stdin)
 JQ_RC=$?
@@ -83,21 +87,37 @@ fi
 # Only a git commit is our concern — detection single-sourced in lib/commit-matcher.sh (mic).
 is_git_commit "$COMMAND" || exit 0
 
-# ── Condition 0: stage-and-commit in ONE command -> deny (sequencing guard) ─────
-# This PreToolUse hook runs BEFORE the command executes, so its staged-set snapshot
-# below predates any `git add` INSIDE the same command — `git add X && git commit`
-# (and `git commit -a`, which stages modified tracked files itself) would be scanned
-# against an EMPTY staged set and sail through: the content scan would be vacuous
-# for the dominant agent commit idiom (discovered live at 3lv registration — a
-# staged-plant commit denied while the same plant added-and-committed in one call
-# passed). Deny those forms with sequencing guidance; a plain `git commit` against
-# a previously-staged set is the scannable shape. Threat model is accidental
-# leakage (same stance as the rest of this hook), not adversarial shell forms.
-if printf '%s' "$COMMAND" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?(add|mv|rm)([[:space:]]|$)'; then
-    deny "PII-FREE-TRUNK: staging and committing in ONE command defeats the content scan (the staged set is snapshotted BEFORE your command runs). Run the 'git add' first as its own command, then 'git commit' separately so the scan sees what you staged."
+# ── Condition 0: in-command staging defeats the snapshot -> deny (sequencing) ───
+# This PreToolUse hook snapshots the staged set BELOW, BEFORE the command runs, so
+# any staging done INSIDE the same command (a `git add`, a `git commit -a`, or a
+# pathspec `git commit <file>`) is invisible to the content scan — it would scan an
+# empty/stale set and sail through (the vacuous-scan hole discovered live at 3lv
+# registration). The scannable shape is a plain `git commit` against a
+# previously-staged set; these forms deny with sequencing guidance.
+#
+# SEQ_CMD normalizes for matching (PR#84 SEC-1/BUG-2/BUG-5): newlines -> spaces (a
+# multi-line tool call is ONE pre-snapshot unit, so a later-line `git add` must be
+# seen), then quoted '...'/"..." segments are stripped so the commit MESSAGE cannot
+# trip the staging detectors (`-m 'docs: git add ...'` is not staging — BUG-5) and a
+# `;` inside a message cannot hide a trailing `-a` (BUG-2c). The detectors tolerate
+# arbitrary git global options (`-c k=v`, `--work-tree=.`, `-C path`) between `git`
+# and the subcommand (SEC-1/BUG-2b). Threat model is accidental leakage, not
+# adversarial shell. Accepted residual (documented): a bare top-level-filename
+# pathspec commit (`git commit notes.md`, no path separator) — caught by the
+# pre-push backstop, not here.
+SEQ_CMD=$(printf '%s' "$COMMAND" | tr '\n' ' ' | sed "s/'[^']*'//g; s/\"[^\"]*\"//g" | tr -s '[:space:]' ' ')
+SEQ_SUBCMD_GAP='([^;&|]*[[:space:]])?'   # any options between git and the subcommand
+if printf '%s' "$SEQ_CMD" | grep -qE "(^|[;&|[:space:]])git[[:space:]]+${SEQ_SUBCMD_GAP}(add|mv|rm)([[:space:]]|\$|[;&|])"; then
+    deny "PII-FREE-TRUNK: staging and committing in ONE command defeats the content scan (the staged set is snapshotted BEFORE your command runs). Run the 'git add'/'git mv'/'git rm' first as its own command, then 'git commit' separately so the scan sees what you staged."
 fi
-if printf '%s' "$COMMAND" | grep -qE 'git[[:space:]]+commit[^;&|]*([[:space:]]-[a-zA-Z]*a[a-zA-Z]*([[:space:]]|$|=)|[[:space:]]--all([[:space:]]|$))'; then
+if printf '%s' "$SEQ_CMD" | grep -qE "(^|[;&|[:space:]])git[[:space:]]+${SEQ_SUBCMD_GAP}commit[[:space:]]${SEQ_SUBCMD_GAP}(-[a-zA-Z]*a[a-zA-Z]*|--all)([[:space:]]|\$|[;&|=])"; then
     deny "PII-FREE-TRUNK: 'git commit -a/--all' stages files itself, AFTER this scan snapshots the staged set — the content scan cannot see them. Stage explicitly with 'git add' (own command), then 'git commit' without -a."
+fi
+# Pathspec commit: a path-separator-bearing bare argument anywhere after `commit`
+# commits that file's working-tree content regardless of the staged set (BUG-2a).
+# The bare token must not start with '-' (a flag) and must contain a '/'.
+if printf '%s' "$SEQ_CMD" | grep -qE "(^|[;&|[:space:]])git[[:space:]]+${SEQ_SUBCMD_GAP}commit[[:space:]]([^;&|]*[[:space:]])?[^-;&|[:space:]][^;&|[:space:]]*/"; then
+    deny "PII-FREE-TRUNK: committing a pathspec ('git commit <path>') commits that file's working-tree content, which this scan (keyed on the staged set) cannot see. 'git add <path>' first as its own command, then 'git commit'."
 fi
 
 # Staged set git will actually commit — NOT git ls-files (the HEAD/tracked set), so a
@@ -108,7 +128,11 @@ fi
 # path, correct for both the path checks and the content scan.
 # Capture the git rc explicitly: a process-substitution while-loop would discard it
 # and let a broken `git diff --cached` read as an empty staged set -> a silent allow.
-GIT_OUT=$(git -C "$PROJECT_ROOT" diff --cached --name-only --diff-filter=ACMRT 2>/dev/null)
+# core.quotepath=false: without it git C-quotes a non-ASCII path ("donn\303\251es.md"),
+# the python scan open()s that literal, OSError-swallows the miss, and the file goes
+# UNSCANNED -> a silent fail-open for any accented/Unicode filename carrying PII
+# (PR#84 BUG-1). The flag makes git emit the raw UTF-8 path the scanner can open.
+GIT_OUT=$(git -C "$PROJECT_ROOT" -c core.quotepath=false diff --cached --name-only --diff-filter=ACMRT 2>/dev/null)
 GIT_RC=$?
 
 # Fail-closed: git-plumbing failure (rc != 0) denies. Distinct from the legitimate
@@ -150,12 +174,13 @@ for f in "${STAGED[@]}"; do
     esac
 done
 
-# ── Condition 3: tracked-file PII token — delegated to pii_scan.scan ───────────
-# TWO scoped calls to the SAME published surface (no pii_scan.py change). The full
-# staged set and the data-bearing subset are passed on argv; scan does NOT
-# re-enumerate (TOCTOU-closing capture). The scanner is imported from PII_SCAN_ROOT
-# (sys.path-prepended), so a test stub deterministically flips the verdict (SEC-01(b)).
-# stdout = combined hit count; stderr carries scan's `PII-HIT: <path>` lines.
+# ── Condition 3: tracked-file PII token — delegated to pii_scan.scan_scoped ─────
+# ONE call to the SINGLE-SOURCED scope policy (pii_scan.scan_scoped — shared with
+# the pre-push backstop so the gate and its backstop cannot drift; PR#84 QUAL-1).
+# The full staged set and the data-bearing subset are passed on argv; scan does
+# NOT re-enumerate (TOCTOU-closing capture). The scanner is imported from
+# PII_SCAN_ROOT (sys.path-prepended), so a test stub deterministically flips the
+# verdict (SEC-01(b)). stdout = hit count; stderr carries `PII-HIT: <path>` lines.
 SCAN_ERR_FILE=$(mktemp)
 SCAN_OUT=$(
     cd "$PROJECT_ROOT" && \
@@ -165,32 +190,13 @@ import os
 import sys
 
 sys.path.insert(0, os.environ["BPC_SCAN_ROOT"])
-from scripts.guard.pii_scan import scan, DEFAULT_CONTACT_CONFIG, DEFAULT_IDENTITY_CONFIG
+from scripts.guard.pii_scan import scan_scoped
 
 n_staged = int(sys.argv[1])
 staged = sys.argv[2:2 + n_staged]
 data_bearing = sys.argv[2 + n_staged:]
 
-# Known-fixture partition (dv3): the test suites' fixtures embed synthetic
-# reading-shaped literals BY CONSTRUCTION (the scanner's own plants, the V1
-# store/router/render fixtures), so the structural patterns are pure false
-# positive there — measured 7 test files / 100+ structural hits on a clean
-# tree. Fixture paths still get the contact/identity token scans (a real
-# operator token in a test file IS a leak); the accepted residual is a real
-# store READING pasted verbatim into tests/ (narrow, documented).
-fixtures = [f for f in staged if f.startswith("tests/")]
-non_fixtures = [f for f in staged if not f.startswith("tests/")]
-
-# (1) trunk-wide: structural (agnostic) patterns + the operator-contact tokens
-# (3lv). DEFAULT_CONTACT_CONFIG is relative, resolved against the hook's
-# PROJECT_ROOT cwd; absent (a fresh clone) -> the loader returns [] and only the
-# structural patterns run. Fixture paths: contact tokens only.
-trunk = scan(non_fixtures, identity_config=DEFAULT_CONTACT_CONFIG)
-trunk += scan(fixtures, identity_config=DEFAULT_CONTACT_CONFIG, include_structural=False)
-# (2) identity, data-bearing only: default (name-bearing) identity_config.
-identity = scan(data_bearing, identity_config=DEFAULT_IDENTITY_CONFIG) if data_bearing else 0
-
-print(trunk + identity)
+print(scan_scoped(staged, data_bearing))
 PY
 )
 SCAN_RC=$?
