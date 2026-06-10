@@ -21,8 +21,10 @@
 #   2. Every registered command is a FLAT ${CLAUDE_PROJECT_DIR}/.claude/hooks/<name>.sh
 #      — no absolute /Users/ or /home/ path, no subdir / `..` traversal.
 #   3. Each command resolves (PROJECT_ROOT-relative) to an existing script file.
-#   4. The 5 governance hooks are all registered.
-#   5. block-pii-commit.sh is NOT registered (stays out until bead 3lv).
+#   4. The 6 governance hooks are all registered.
+#   5. block-pii-commit.sh IS registered (3lv resolved S45: the clone-hostile
+#      generic-gmail trunk scan became operator-specific + config-driven, so the
+#      content-scan boundary is finally ON; an unregistration reds here).
 
 set -uo pipefail
 
@@ -111,13 +113,14 @@ for hook in block-dangerous block-push-main block-commit-main block-ungated-vaul
     fi
 done
 
-# Check 5 (3lv): block-pii-commit.sh must stay UNregistered — its trunk-wide @gmail
-# scan is clone-hostile and was registered-then-reverted in S43. Guard the revert: a
-# future re-registration (even with a portable path) reds here.
+# Check 5 (3lv, flipped S45): block-pii-commit.sh MUST be registered — the S43
+# clone-hostility (generic trunk-wide @gmail scan) was resolved by the
+# operator-specific config-driven contact model, so the trunk content-scan
+# boundary is ON. A future unregistration (silent boundary loss) reds here.
 if printf '%s\n' ${CMDS[@]+"${CMDS[@]}"} | grep -q "/block-pii-commit\.sh$"; then
-    fail "block-pii-commit.sh must stay UNregistered until bead 3lv (S43 revert)"
+    pass "block-pii-commit.sh registered (3lv resolved S45 — content-scan boundary ON)"
 else
-    pass "block-pii-commit.sh correctly absent (3lv)"
+    fail "block-pii-commit.sh NOT registered — the trunk content-scan boundary is silently OFF (3lv regression)"
 fi
 
 echo ""

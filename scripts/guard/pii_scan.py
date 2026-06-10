@@ -8,13 +8,18 @@ caller's current staged/tracked set captured at invocation; `scan` does not
 re-enumerate (the hook passes its own `--staged` set, closing the
 add-after-enumeration TOCTOU window).
 
-Operator-identity tokens (the operator's name) load at run time from the
-GITIGNORED `vault/meta/operator-identity.txt`, so this tracked scanner carries
-NO operator PII and the trunk is shareable. A fresh clone has no such file, so
-identity detection is simply empty there while the operator-AGNOSTIC patterns
-still run. The operator-agnostic set is the generic `@gmail.com` contact pattern
-plus the two structural `{item, timepoint, source, value}` store-line patterns;
-none of those carry personal data.
+Operator-identity tokens (the operator's name) and operator-contact tokens (the
+operator's real email/handles) load at run time from GITIGNORED configs
+(`vault/meta/operator-identity.txt` / `operator-contact.txt`), so this tracked
+scanner carries NO operator PII and the trunk is shareable. A fresh clone has no
+such files, so token detection is simply empty there while the operator-AGNOSTIC
+patterns still run. The operator-agnostic set is the two structural
+`{item, timepoint, source, value}` store-line patterns; neither carries personal
+data. Contact moved OUT of the agnostic set at 3lv: a generic `@gmail.com`
+pattern run trunk-wide flags the scanner's own synthetic test fixtures and bead
+example emails (14 false hits on a routine staged set), so the operator's REAL
+contact is detected config-driven instead — present on the operator instance,
+absent (and therefore silent) on a clone.
 
 Deviation from the spike's literal scan command (implementation mechanism only):
 the spike names `git ls-files -z | xargs -0 rg ...`; this host's `rg` is a shell-
@@ -30,11 +35,12 @@ import sys
 import unicodedata
 from pathlib import Path
 
-# Operator-AGNOSTIC patterns (no personal data): the generic contact pattern and
-# the two field-order structural store-line patterns. Tracked, exposed so a test
-# can pin the tracked set to the spike's agnostic patterns.
+# Operator-AGNOSTIC patterns (no personal data): the two field-order structural
+# store-line patterns. Tracked, exposed so a test can pin the tracked set to the
+# spike's structural patterns. Contact is NOT here (3lv): the operator's contact
+# is a config-driven token (DEFAULT_CONTACT_CONFIG below), loaded by whichever
+# caller wants contact coverage — the commit hook's trunk-wide scope passes it.
 AGNOSTIC_PATTERNS = {
-    "contact": r"[A-Za-z0-9._%+-]+@gmail\.com",
     "health-data-item-then-tp": (
         r'("item"|"value")[\s\S]{0,400}?"timepoint"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}'
     ),
@@ -44,15 +50,8 @@ AGNOSTIC_PATTERNS = {
 }
 
 # Structural store-line patterns match across newlines (a pretty-printed reading
-# spans lines); the contact pattern is single-line either way. The contact pattern
-# matches case-INSENSITIVELY (2x1): a non-canonical-case email (Op.User@Gmail.COM)
-# is the same contact and must score a hit, not pass. The structural store-line
-# patterns stay DOTALL-only (store keys are canonical lowercase JSON).
-_CONTACT_COMPILED = re.compile(AGNOSTIC_PATTERNS["contact"], re.DOTALL | re.IGNORECASE)
-_STRUCTURAL_COMPILED = [
-    re.compile(p, re.DOTALL) for name, p in AGNOSTIC_PATTERNS.items() if name != "contact"
-]
-_COMPILED_AGNOSTIC = [_CONTACT_COMPILED] + _STRUCTURAL_COMPILED
+# spans lines) and stay DOTALL-only (store keys are canonical lowercase JSON).
+_COMPILED_AGNOSTIC = [re.compile(p, re.DOTALL) for p in AGNOSTIC_PATTERNS.values()]
 
 # Value-boundary PII patterns (bead g5x): the EXCLUDED_RAW_PII contact classes the
 # router names that are tractable for a free-text value scan — generic dotted-domain
@@ -67,8 +66,8 @@ _COMPILED_AGNOSTIC = [_CONTACT_COMPILED] + _STRUCTURAL_COMPILED
 # Shape note: this dict is name -> (pattern, flags) so each entry's flags travel with
 # it (email is IGNORECASE; phone is not). AGNOSTIC_PATTERNS above is name -> string
 # with flags applied at its compile site — a deliberate shape difference. The `email`
-# value pattern is a strict SUPERSET of AGNOSTIC_PATTERNS["contact"] (any-domain vs
-# gmail-only); they are intentionally nested, not independent.
+# value pattern is generic any-domain ON PURPOSE: at the VALUE boundary any email in
+# a free-text field is a leak risk, so the value scan needs no contact config (3lv).
 #
 # Phone patterns anchor on `(?<!\d)`/`(?!\d)` and a digit-count floor so ISO
 # timestamps (`08:00:00+00:00`) and bare numeric runs do not register; the separated
@@ -147,6 +146,14 @@ _MAX_SCAN_TEXT_LEN = 4096
 # absent on a fresh clone -> empty identity set. Keeps operator PII out of tracked
 # source.
 DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
+
+# Operator-contact tokens (real email/handles) load from this GITIGNORED file,
+# same one-regex-per-line shape and the same loader (3lv). Separate from the
+# identity config because the two carry different SCOPES at the commit hook: the
+# contact is denied TRUNK-WIDE (it has no legitimate tracked use — provenance
+# prose uses the operator's name, never the email), while the name is denied only
+# on data-bearing paths (it IS accepted provenance in governance/session prose).
+DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
 
 
 def _load_identity_patterns(config_path):
