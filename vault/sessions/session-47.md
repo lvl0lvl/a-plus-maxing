@@ -77,7 +77,7 @@ Closed: none. Annotated: `i1t`/`azf`/`1oh`/`i2yw`/`y0h0`/`04uk` (the 6 dashboard
 
 ## Drift / PF
 
-All three drift axes clean (see HANDOFF S47 close). No new PF-class entries (see HANDOFF
-S47 PF attestation). PF-S6-01 HELD (verified all 6 beads' live state + the deployed-agent
+All three drift axes clean (see `memory/process-failures.md` S47 entry). No new PF-class entries (see
+`memory/process-failures.md` S47 entry). PF-S6-01 HELD (verified all 6 beads' live state + the deployed-agent
 roster + the full data-model source before writing). PF-S13-01 HELD (open + close from the
 files).
