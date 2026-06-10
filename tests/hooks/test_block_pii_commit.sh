@@ -25,6 +25,9 @@
 #   TOCTOU staged file absent from HEAD -> deny (git diff --cached, not git ls-files)
 #   scoped-identity (i)  name in non-data-bearing prose -> allow (provenance)
 #   scoped-identity (ii) name in a data-bearing path    -> deny (identity leak)
+#   3lv (i)   non-operator gmail -> allow (the generic-gmail flood is gone)
+#   3lv (ii)  operator contact, NO config -> allow (config-driven; clone semantics)
+#   3lv (iii) operator contact in docs prose -> deny (contact scope is trunk-wide)
 #   fail-closed scan invocation errors with token staged -> deny (default-deny)
 #   SEC-01(b) stub scan returns 0 + writes sentinel -> allow AND sentinel present (reuse proof)
 
@@ -59,6 +62,7 @@ vault/store/
 $SCAFFOLD_PREFIX
 vault/dna/raw/
 vault/meta/operator-identity.txt
+vault/meta/operator-contact.txt
 EOF
 git add .gitignore; git commit -q -m "seed gitignore"
 
@@ -67,6 +71,14 @@ git add .gitignore; git commit -q -m "seed gitignore"
 # the name tokens — letting the scoped-identity cases exercise the REAL identity scan.
 mkdir -p "$REPO/vault/meta"
 printf 'Walter|McGivney\n' > "$REPO/vault/meta/operator-identity.txt"
+
+# Seed the operator-contact config (3lv): contact detection is config-driven and
+# TRUNK-WIDE — the hook's relative DEFAULT_CONTACT_CONFIG resolves here. The one
+# synthetic token below is what every contact plant in this suite uses; a
+# DIFFERENT gmail address (alice@) is deliberately NOT in the config, proving the
+# generic-gmail flood is gone (see the 3lv allow cases).
+OPERATOR_CONTACT="op.user@gmail.com"
+printf 'op\\.user@gmail\\.com\n' > "$REPO/vault/meta/operator-contact.txt"
 
 # invoke(): build the stdin JSON, run the hook against the scratch repo. PROJECT_ROOT
 # is the scratch repo (for staged-file detection); the scanner root is pointed at the
@@ -128,15 +140,11 @@ OUT=$(invoke "git commit -m 'oops store'")
 git -C "$REPO" reset -q; rm -f "$REPO/$STORE_FILE"
 
 # ── AC-5 fail-direction: planted tracked-file PII token via scan's >=1 ──────────
-# The planted SET carries BOTH a canonical token (which the consumed pii_scan.scan
-# detects, so the hook genuinely blocks via scan's >=1 and names the file) AND a
-# non-canonical-case token (Fix 7). The non-canonical token SURFACES an inherited
-# pii_scan normalization gap at this boundary: scan() is case-sensitive on the
-# `@gmail.com` literal, so `Op.User@Gmail.COM` scores 0 hits. The hook MUST NOT
-# reimplement the token scan in bash (SEC-01(b) reuse contract) and MUST NOT edit
-# the read-only pii_scan.py (ADR-0001-T1), so closing the gap is an UPSTREAM fix —
-# flagged, not patched here. This case proves the hook blocks a scan-detectable
-# token; the gap is recorded as an architectural finding.
+# The planted SET carries BOTH a canonical token AND a non-canonical-case token.
+# Detection is config-driven since 3lv: the seeded operator-contact config supplies
+# the token, the loader compiles it IGNORECASE (2x1), so BOTH forms hit and the
+# hook genuinely blocks via scan's >=1 and names the file. The hook MUST NOT
+# reimplement the token scan in bash (SEC-01(b) reuse contract).
 mkfile "docs/leak.md" "Canonical op.user@gmail.com and non-canonical Op.User@Gmail.COM."
 git -C "$REPO" add docs/leak.md
 OUT=$(invoke "git commit -m 'leak'")
@@ -146,7 +154,7 @@ OUT=$(invoke "git commit -m 'leak'")
 git -C "$REPO" reset -q; rm -f "$REPO/docs/leak.md"
 
 # ── TOCTOU: staged file absent from HEAD -> deny (git diff --cached set) ────────
-mkfile "docs/fresh.md" "contact alice@gmail.com"
+mkfile "docs/fresh.md" "contact $OPERATOR_CONTACT"
 git -C "$REPO" add docs/fresh.md   # never committed -> absent from HEAD; in staged set
 OUT=$(invoke "git commit -m 'fresh'")
 [[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
@@ -180,7 +188,7 @@ git -C "$REPO" reset -q; rm -f "$REPO/vault/dna/raw/sample.json"
 # ── Fail-closed: scan invocation errors with a token staged -> deny ────────────
 # Point the scanner root at a dir with NO importable scripts/guard/pii_scan -> import
 # fails -> python3 -c returns non-zero. The hook must DENY, never allow.
-mkfile "docs/leak2.md" "contact bob@gmail.com"
+mkfile "docs/leak2.md" "contact op.user@gmail.com"
 git -C "$REPO" add docs/leak2.md
 BADROOT="$TMP/no-scanner-here"; mkdir -p "$BADROOT"
 OUT=$(printf '{"tool_input":{"command":%s}}' \
@@ -193,7 +201,7 @@ git -C "$REPO" reset -q; rm -f "$REPO/docs/leak2.md"
 
 # ── SEC-01(b): stub scan returns 0 + writes sentinel -> allow AND sentinel ─────
 # THE load-bearing reuse proof: a deterministic stub scanner flips the decision.
-mkfile "docs/leak3.md" "contact carol@gmail.com"
+mkfile "docs/leak3.md" "contact op.user@gmail.com"
 git -C "$REPO" add docs/leak3.md
 STUBROOT="$TMP/stubroot"; mkdir -p "$STUBROOT/scripts/guard"
 SENTINEL="$TMP/sec01b-sentinel"
@@ -201,6 +209,7 @@ cat > "$STUBROOT/scripts/guard/pii_scan.py" <<PY
 import os
 from pathlib import Path
 DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
+DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
 def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG):
     open(os.environ["SEC01B_SENTINEL"], "w").write("ran")
     return 0
@@ -219,7 +228,7 @@ git -C "$REPO" reset -q; rm -f "$REPO/docs/leak3.md"
 # cd into PROJECT_ROOT before invoking the scan subprocess, the repo-relative staged
 # paths fail to open (OSError swallowed), scan returns 0, and the planted token
 # commits unscanned (ALLOW). The block must hold regardless of the agent's cwd.
-mkfile "docs/leak4.md" "contact dave@gmail.com"
+mkfile "docs/leak4.md" "contact op.user@gmail.com"
 git -C "$REPO" add docs/leak4.md
 SUBDIR="$REPO/docs/sub"; mkdir -p "$SUBDIR"
 OUT=$(cd "$SUBDIR" && printf '{"tool_input":{"command":%s}}' \
@@ -251,7 +260,7 @@ OUT=$(printf '{"tool_input":{"command":%s}}' \
 yes "lorem ipsum dolor sit amet padding line" | head -200 > "$REPO/big.txt"
 git -C "$REPO" add big.txt; git -C "$REPO" commit -q -m "seed big"
 git -C "$REPO" mv big.txt renamed.txt
-printf '\ncontact erin@gmail.com\n' >> "$REPO/renamed.txt"
+printf '\ncontact op.user@gmail.com\n' >> "$REPO/renamed.txt"
 git -C "$REPO" add renamed.txt
 OUT=$(invoke "git commit -m 'rename inject'")
 { [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"renamed.txt"* ]]; } \
@@ -271,8 +280,8 @@ OUT=$(printf 'not-json-at-all' \
     || bad "F-BUG1 jq fail-open: malformed stdin allowed, got: $OUT"
 
 # ── F-TEST1: non-canonical-case token ALONE -> DENY (bead 2x1 case gap CLOSED) ──
-# The inherited pii_scan case gap is now closed (bead 2x1, PR #75): scan()'s contact
-# + identity patterns compile re.IGNORECASE, so an upper/mixed-case token
+# The config loader compiles every identity/contact token re.IGNORECASE (2x1,
+# PR #75), so an upper/mixed-case form of the seeded contact token
 # (`Op.User@Gmail.COM`) scores >=1. With ONLY that token staged the hook DENIES via
 # the scan and names the file — the case-insensitive boundary holds end-to-end.
 mkfile "docs/noncanon.md" "Reach out to Op.User@Gmail.COM for details."
@@ -287,12 +296,13 @@ git -C "$REPO" reset -q; rm -f "$REPO/docs/noncanon.md"
 # A stub scan that prints a NON-NUMERIC string and returns rc 0 must be caught by the
 # `! [[ "$SCAN_OUT" =~ ^[0-9]+$ ]]` clause -> deny, BEFORE the `-ge 1` arithmetic
 # (which is false on non-numeric -> would ALLOW). Exercises that clause in isolation.
-mkfile "docs/leak5.md" "contact frank@gmail.com"
+mkfile "docs/leak5.md" "contact op.user@gmail.com"
 git -C "$REPO" add docs/leak5.md
 NUMSTUB="$TMP/numstub"; mkdir -p "$NUMSTUB/scripts/guard"
 cat > "$NUMSTUB/scripts/guard/pii_scan.py" <<PY
 from pathlib import Path
 DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
+DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
 def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG):
     print("not-a-number")
     return 0
@@ -305,11 +315,49 @@ OUT=$(printf '{"tool_input":{"command":%s}}' \
     || bad "F-TEST2 non-numeric output fell through to -ge 1 -> ALLOW, got: $OUT"
 git -C "$REPO" reset -q; rm -f "$REPO/docs/leak5.md"
 
+# ── 3lv (i): a NON-operator email -> ALLOW (the generic-gmail flood is GONE) ─────
+# The load-bearing clonability fix: a synthetic gmail address that is NOT in the
+# operator-contact config (the shape of the scanner's own test fixtures and bead
+# example emails) must commit cleanly. Reds under the pre-3lv generic trunk-wide
+# `@gmail.com` pattern — the 14-false-hit flood that blocked registration (S43).
+mkfile "docs/fixture-email.md" "example fixture address: alice@gmail.com"
+git -C "$REPO" add docs/fixture-email.md
+OUT=$(invoke "git commit -m 'fixture email'")
+[[ "$OUT" != *'"deny"'* ]] \
+    && ok "3lv (i) non-operator gmail -> ALLOW (generic-gmail flood gone)" \
+    || bad "3lv (i) synthetic fixture email wrongly DENIED (generic pattern back?): $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/fixture-email.md"
+
+# ── 3lv (ii): operator contact WITHOUT config -> ALLOW (clone semantics) ─────────
+# On a fresh clone the contact config is absent, so even the operator's own
+# address is undetectable there (structural patterns still run). Proves contact
+# detection is config-driven at the HOOK level, mirroring the identity model.
+mv "$REPO/vault/meta/operator-contact.txt" "$TMP/contact-config-parked"
+mkfile "docs/clone-sim.md" "contact $OPERATOR_CONTACT"
+git -C "$REPO" add docs/clone-sim.md
+OUT=$(invoke "git commit -m 'clone sim'")
+[[ "$OUT" != *'"deny"'* ]] \
+    && ok "3lv (ii) operator contact with NO config -> ALLOW (config-driven, clone-safe)" \
+    || bad "3lv (ii) expected allow without contact config, got: $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/clone-sim.md"
+mv "$TMP/contact-config-parked" "$REPO/vault/meta/operator-contact.txt"
+
+# ── 3lv (iii): operator contact in NON-data-bearing prose -> DENY (trunk-wide) ───
+# The contact scope is TRUNK-WIDE, unlike the name (data-bearing only): the email
+# has no legitimate tracked use. A contact token in plain docs prose must deny.
+mkfile "docs/contact-in-prose.md" "reach the operator at $OPERATOR_CONTACT"
+git -C "$REPO" add docs/contact-in-prose.md
+OUT=$(invoke "git commit -m 'contact prose'")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"docs/contact-in-prose.md"* ]]; } \
+    && ok "3lv (iii) operator contact in docs prose -> DENY (contact is trunk-wide)" \
+    || bad "3lv (iii) contact in prose NOT denied trunk-wide: $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/contact-in-prose.md"
+
 # ── cvr: hardened matcher catches bypass-form commits (env/path/trailing-sep) ───
 # With a PII file staged, the hook must DENY even when the commit command uses an
 # env-var prefix, an absolute git path, or a trailing separator — forms the prior
 # matcher let bypass (a silent PII-distribution hole now this hook is registered).
-mkfile "docs/leak6.md" "contact gwen@gmail.com"
+mkfile "docs/leak6.md" "contact op.user@gmail.com"
 git -C "$REPO" add docs/leak6.md
 for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commit;" \
               "git commit&" "FOO=1 BAR=2 git commit" "EDITOR=vim git commit;" \

@@ -1,0 +1,16 @@
+# Operator-contact tokens for the tracked-file PII scanner (bead 3lv).
+#
+# Copy this file to `operator-contact.txt` (same directory) and fill in your
+# real contact tokens (email addresses, phone-number fragments, handles).
+# `operator-contact.txt` is GITIGNORED so your real contact never lands in
+# tracked source — the trunk stays shareable.
+#
+# Unlike the operator NAME (accepted provenance in governance/session prose,
+# scanned only on data-bearing paths), the contact has no legitimate tracked
+# use and is denied TRUNK-WIDE by the commit hook.
+#
+# Format: one regex token per line. Blank lines and `#`-comment lines are
+# ignored. Each line is compiled as a Python regex (re.DOTALL | re.IGNORECASE).
+#
+# Example (replace with your own; escape regex dots):
+# your\.real\.email@example\.com

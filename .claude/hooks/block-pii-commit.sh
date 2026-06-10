@@ -8,14 +8,19 @@
 # Conditions 1 & 2 are PATH/membership checks over the staged set. Condition 3
 # delegates the token scan ENTIRELY to the cross-spec scripts/guard/pii_scan.scan
 # (the SEC-01(a) reuse contract) — NO bash/rg/grep token reimplementation. The
-# scan is scoped per the ADR-0005 amended Decision 2026-06-06 (bead qwj option iii):
-#   • agnostic, trunk-wide — scan(<full staged set>, identity_config=<non-existent>)
-#     so only the operator-AGNOSTIC patterns (@gmail.com contact + structural store
-#     lines) run over every staged file; the operator NAME is accepted provenance in
-#     governance/session/design prose and must NOT be flagged trunk-wide.
+# scan is scoped per the ADR-0005 amended Decision 2026-06-06 (bead qwj option iii),
+# with the contact model made operator-specific at 3lv (the generic @gmail.com
+# trunk-wide pattern flooded on synthetic fixture/bead emails — 14 false hits on a
+# routine staged set — so it moved to a gitignored config like the name):
+#   • trunk-wide — scan(<full staged set>, identity_config=DEFAULT_CONTACT_CONFIG)
+#     so the structural store-line patterns + the operator's REAL contact tokens
+#     run over every staged file. The contact has no legitimate tracked use
+#     (provenance prose uses the operator's name, never the email). On a fresh
+#     clone the config is absent -> structural patterns only -> no false floods.
 #   • identity, data-bearing only — scan(<data-bearing subset>, DEFAULT_IDENTITY_CONFIG)
 #     so the operator-name patterns run only over health-data paths (scaffold values,
-#     store, raw dropzones) where the name IS a leak.
+#     store, raw dropzones) where the name IS a leak; the name is accepted provenance
+#     in governance/session/design prose and must NOT be flagged trunk-wide.
 # Deny if EITHER call returns >=1.
 #
 # Fail-closed (Security HIGH-1): any error in the scan path — import fails, scan
@@ -143,20 +148,21 @@ import os
 import sys
 
 sys.path.insert(0, os.environ["BPC_SCAN_ROOT"])
-from scripts.guard.pii_scan import scan, DEFAULT_IDENTITY_CONFIG
+from scripts.guard.pii_scan import scan, DEFAULT_CONTACT_CONFIG, DEFAULT_IDENTITY_CONFIG
 
 n_staged = int(sys.argv[1])
 staged = sys.argv[2:2 + n_staged]
 data_bearing = sys.argv[2 + n_staged:]
 
-# (1) agnostic, trunk-wide: a guaranteed-NON-EXISTENT identity_config makes
-# _load_identity_patterns return [] (never "" / "." — those resolve to an existing
-# cwd and would turn the identity patterns on / raise).
-agnostic = scan(staged, identity_config="/nonexistent/aplus-no-identity")
+# (1) trunk-wide: structural (agnostic) patterns + the operator-contact tokens
+# (3lv). DEFAULT_CONTACT_CONFIG is relative, resolved against the hook's
+# PROJECT_ROOT cwd; absent (a fresh clone) -> the loader returns [] and only the
+# structural patterns run.
+trunk = scan(staged, identity_config=DEFAULT_CONTACT_CONFIG)
 # (2) identity, data-bearing only: default (name-bearing) identity_config.
 identity = scan(data_bearing, identity_config=DEFAULT_IDENTITY_CONFIG) if data_bearing else 0
 
-print(agnostic + identity)
+print(trunk + identity)
 PY
 )
 SCAN_RC=$?
