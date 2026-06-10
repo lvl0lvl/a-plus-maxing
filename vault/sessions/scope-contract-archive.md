@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-43)
+title: Scope Contract Archive (Sessions 5-45)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,17 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-43. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-45. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 45 (2026-06-09)
+
+**Track-1 PII/safety completion**, 2 reviewed `fix/` PRs merged: #83 (`nue` — precise ZIP/state-anchored postal detector in `pii_scan.scan_text`) and #84 (`3lv`+`dv3` — registered `block-pii-commit.sh`, operator-specific gitignored contact config, `pre-push-pii-scan.sh` backstop; the highest-yield review yet, 24 findings incl. 2 real fail-opens). AC1/AC2/AC4/AC6 PASS; AC3 (`am4`) + AC5 (dashboard demo) deferred to S46. Post-close, user-directed: the operator email was scrubbed from all `main` history via `git filter-repo` + Walter-authorized force-update (`46m`), and the alpha-test/sharing intent was made explicit in `design/vision.md` + `vault/meta/overview.md`. **Full contract + S45 eval/drift/PF preserved in `vault/sessions/session-45.md` and git history** (compacted here at the S46 close per the rotation-rule no-accretion clause).
+
+## Scope Contract — Session 44 (2026-06-07)
+
+Residual-bead session (compacted retroactively at the S46 close — the S45 close did not archive it). Closed 4 reviewed PRs (per the `chore(s44-close)` commit): the `rnm` track (ADR-0005 filled-scaffold-value path pinned to `vault/scaffold/filled/`; PR#81 ADR review) and the `mic` track (single-sourced the shared git-commit matcher across the commit hooks; PR#80 review). **Full contract + S44 eval/drift/PF preserved in `vault/sessions/session-44.md` and git history** (compacted here per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 43 (2026-06-07)
 
