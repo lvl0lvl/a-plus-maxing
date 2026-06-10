@@ -157,15 +157,20 @@ DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
 
 
 def _load_identity_patterns(config_path):
-    """Compile the operator-identity regexes from the gitignored config.
+    """Compile the operator token regexes (identity OR contact) from a gitignored config.
+
+    The shared loader for both token classes (3lv); the `identity_config` kwarg
+    name is kept for the stable published surface (a `token_config` rename is
+    tracked separately). Callers pass the identity config (name tokens,
+    data-bearing scope) or the contact config (email/handles, trunk-wide scope).
 
     Args:
-        config_path (str | Path): Path to the identity config; one regex token
-            per non-blank, non-`#`-comment line.
+        config_path (str | Path): Path to a token config; one regex token per
+            non-blank, non-`#`-comment line.
 
     Returns:
         (list[re.Pattern]) One compiled pattern per token line, or `[]` when the
-        file is absent (a fresh clone carries no identity tokens).
+        file is absent (a fresh clone carries no token configs).
     """
     path = Path(config_path)
     if not path.exists():
@@ -174,7 +179,8 @@ def _load_identity_patterns(config_path):
     for line in path.read_text(encoding="utf-8").splitlines():
         token = line.strip()
         if token and not token.startswith("#"):
-            # Case-INSENSITIVE (2x1): an operator name matches in any casing.
+            # Case-INSENSITIVE (2x1): an operator token (name or contact) matches
+            # in any casing.
             patterns.append(re.compile(token, re.DOTALL | re.IGNORECASE))
     return patterns
 
@@ -246,6 +252,49 @@ def scan_text(text, identity_config=DEFAULT_IDENTITY_CONFIG):
     normalized = unicodedata.normalize("NFKC", text)[:_MAX_SCAN_TEXT_LEN]
     patterns = _VALUE_COMPILED + _load_identity_patterns(identity_config)
     return sum(len(pattern.findall(normalized)) for pattern in patterns)
+
+
+# tests/ fixtures embed synthetic reading-shaped literals BY CONSTRUCTION (the
+# scanner's own plants, the V1 store/router/render fixtures), so the structural
+# patterns are pure false positive there. `scan_scoped` skips them for the
+# structural pass while still running the config-driven tokens (a real operator
+# token in a test file IS a leak). The accepted residual: a real store reading
+# pasted verbatim into tests/ — narrow, documented.
+FIXTURE_PREFIX = "tests/"
+
+
+def scan_scoped(changed, data_bearing, contact_config=DEFAULT_CONTACT_CONFIG,
+                identity_config=DEFAULT_IDENTITY_CONFIG):
+    """Run the two-scope PII scan with the known-fixture partition (bead dv3).
+
+    The SINGLE source of the scan policy both the commit-time hook and the
+    pre-push backstop run, so the gate and its backstop cannot drift (the PR#80
+    fail-open lesson; PR#84 QUAL-1). Two scopes:
+
+    - trunk-wide: structural store-line patterns + contact tokens over non-fixture
+      changed paths; contact tokens ONLY over `tests/` fixture paths.
+    - identity, data-bearing only: operator-name tokens over the `data_bearing`
+      subset (health-data paths where the name is a leak).
+
+    Args:
+        changed (list[str]): The full changed/staged path set.
+        data_bearing (list[str]): The subset under the data-bearing prefixes.
+        contact_config (str | Path, optional): The gitignored operator-contact
+            token config (trunk-wide scope).
+        identity_config (str | Path, optional): The gitignored operator-identity
+            token config (data-bearing scope).
+
+    Returns:
+        (int) Total operator-PII hits across both scopes. Each offending file is
+        named on stderr via scan's `PII-HIT: <path>` channel.
+    """
+    fixtures = [f for f in changed if f.startswith(FIXTURE_PREFIX)]
+    non_fixtures = [f for f in changed if not f.startswith(FIXTURE_PREFIX)]
+    total = scan(non_fixtures, identity_config=contact_config)
+    total += scan(fixtures, identity_config=contact_config, include_structural=False)
+    if data_bearing:
+        total += scan(data_bearing, identity_config=identity_config)
+    return total
 
 
 def store_is_gitignored(repo_root):
