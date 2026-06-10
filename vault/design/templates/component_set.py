@@ -139,18 +139,38 @@ def kpi(label, value):
     )
 
 
+# The empty-series stub both sparkline components return: same envelope, no data.
+_EMPTY_SERIES_SVG = "<svg width='180' height='40' role='img' aria-label='no data'></svg>"
+
+
+def _series_color(state):
+    """Resolve a semantic state to its series color (fail-loud).
+
+    "neutral" is the ONE approved non-SERIES state (no judgment, rendered
+    muted); any other unknown state token KeyErrors rather than silently
+    rendering muted — matching the render_views `_STATE_DISPLAY` contract.
+    """
+    return PALETTE["muted"] if state == "neutral" else PALETTE[state]
+
+
+def _series_scale(values):
+    """Return the (lo, span) normalization for a numeric series (span never 0)."""
+    lo, hi = min(values), max(values)
+    return lo, (hi - lo) or 1
+
+
 def sparkline(values, state):
     """Return an inline-SVG sparkline polyline for a series, colored by state.
 
     Args:
         values (list): The numeric series to plot.
-        state (str): The semantic state — a SERIES color, else rendered muted.
+        state (str): The semantic state — a SERIES color or "neutral" (muted);
+            any other token KeyErrors.
     """
-    color = PALETTE[state] if state in SERIES else PALETTE["muted"]
+    color = _series_color(state)
     if not values:
-        return f"<svg width='180' height='40' role='img' aria-label='no data'></svg>"
-    lo, hi = min(values), max(values)
-    span = (hi - lo) or 1
+        return _EMPTY_SERIES_SVG
+    lo, span = _series_scale(values)
     n = len(values)
     step = 180 / max(n - 1, 1)
     pts = " ".join(
@@ -176,13 +196,13 @@ def bar_sparkline(values, state):
 
     Args:
         values (list): The numeric series to plot.
-        state (str): The semantic state — a SERIES color, else rendered muted.
+        state (str): The semantic state — a SERIES color or "neutral" (muted);
+            any other token KeyErrors.
     """
-    color = PALETTE[state] if state in SERIES else PALETTE["muted"]
+    color = _series_color(state)
     if not values:
-        return "<svg width='180' height='40' role='img' aria-label='no data'></svg>"
-    lo, hi = min(values), max(values)
-    span = (hi - lo) or 1
+        return _EMPTY_SERIES_SVG
+    lo, span = _series_scale(values)
     n = len(values)
     width = (180 - 2 * (n - 1)) / n
     bars = "".join(
