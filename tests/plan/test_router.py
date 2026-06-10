@@ -221,6 +221,27 @@ def test_trend_token_raises_on_unlabellable_directional_change():
     assert "polarity" in str(exc.value)
 
 
+def test_trend_token_raises_on_cross_item_series():
+    """F8: the two compared numeric readings must come from ONE item.
+
+    A series mixing items (an alt reading then an hrv reading) has no
+    single-marker trend; resolving polarity from the last reading's item would
+    label the alt-vs-hrv movement `improving`. Fail-closed: raise naming both
+    items — never the values.
+    """
+    series = [
+        {"item": "alt", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "lab", "value": 30},
+        {"item": "hrv", "timepoint": "2026-02-01T00:00:00+00:00",
+         "source": "lab", "value": 50},
+    ]
+    with pytest.raises(ValueError) as exc:
+        router._trend_token(series)
+    message = str(exc.value)
+    assert "alt" in message and "hrv" in message
+    assert "30" not in message and "50" not in message
+
+
 def _marker_series(item, prev, latest):
     """A two-reading series for `item` carrying the prev/latest values."""
     return [
