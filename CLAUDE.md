@@ -129,10 +129,15 @@ Query the vault: `mcp__basic-memory__search` with project `a-plus-maxing`.
 
 ## Hooks
 
-Two project-level hooks are installed (`.claude/settings.json`):
+Six PreToolUse hooks are registered (`.claude/settings.json`; the roster is pinned by `scripts/tests/test_settings_hook_paths.sh`), plus one git-native pre-push hook installed outside settings:
 
 - **block-dangerous.sh** -- Denies recursive rm at root, `git reset --hard`, `git push --force` (allows `--force-with-lease`), `git clean -fd`
 - **block-push-main.sh** -- Denies `git push <remote> main/master`. Use feature branches.
+- **block-commit-main.sh** -- Denies commits on `main` (mirror of the push block).
+- **block-ungated-vault-write.sh** -- Denies committing a `vault/{compounds,biomarkers,library}/` entity page that has not passed the ingestion gate (INV-WIKI-INGESTION-GATED).
+- **enforce-role-inlining.sh** -- Denies a role-context Task dispatch that does not inline the full role profile (INV-ROLE-INLINING).
+- **block-pii-commit.sh** -- Denies a commit that stages a filled-scaffold/store path or whose content carries operator PII (ADR-0005; registered S45, bead 3lv). **Commit-sequencing rule:** stage with `git add` as its own command, then `git commit` separately — the hook denies single-call stage+commit, `git commit -a/--all`, and pathspec `git commit <path>` (their content is invisible to the pre-command staged-set scan).
+- **pre-push-pii-scan.sh** (`.claude/hooks/`, installed to `.git/hooks/pre-push` by `init_instance`, not a settings.json hook) -- Scans the push range as the human-terminal/CI backstop to the agent-only commit hook (bead dv3). `git push --no-verify` bypasses it.
 
 ## Conventions
 

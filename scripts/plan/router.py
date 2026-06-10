@@ -187,7 +187,8 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
             field-set field to source its backing state.
         identity_config (str | Path, optional): The gitignored operator-identity
             token file for the pass-through PII gate (bead 8j6); absent -> identity
-            detection is empty (the agnostic contact pattern still runs).
+            detection is empty (the value-boundary patterns — any-domain email,
+            phone, postal — still run via scan_text).
 
     Returns:
         (dict) A name-addressable summary keyed by the Summary Field-Set fields.
