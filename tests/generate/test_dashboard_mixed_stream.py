@@ -37,6 +37,11 @@ def _seed_mixed_store(root):
         )
 
 
+def _rows(html):
+    """Split the rendered dashboard into its kpi-row fragments."""
+    return html.split("<div class='kpi-row'>")[1:]
+
+
 def test_mixed_stream_store_renders_through_production_path(tmp_path):
     """generate.run('dashboard') over a mixed-stream store renders type-routed HTML."""
     root = tmp_path / "store"
@@ -48,10 +53,83 @@ def test_mixed_stream_store_renders_through_production_path(tmp_path):
     assert path.exists()
     html = path.read_text()
     assert "biomarker::" not in html, "raw store keys must never render as labels"
+    assert "panel::" not in html
+    assert "watch-out::" not in html
+    assert "feedback::" not in html
     assert "Ferritin" in html
-    assert "pending" in html
+    assert "Iron Panel" in html
+    assert "Injection Site Reaction" in html
+    assert "RHR" in html
+    assert "Physician Feedback" in html
+    assert "discussed at visit" in html
+    assert "ng/mL" in html, "a registered marker's headline carries its units"
     assert "none noticed" in html
     assert "<svg" in html
+    # PLACEMENT: the panel's pending state renders as a state-marker element,
+    # not as a bare value or a KPI headline.
+    assert "<span class='state-marker'>pending</span>" in html
+
+
+def test_trend_chips_registered_vs_unregistered(tmp_path):
+    """F15: a registered marker's chip carries the colored trend word; an
+    unregistered marker's chip carries only a neutral direction arrow; a
+    single-numeric-value series renders no chip."""
+    root = tmp_path / "store"
+    out = tmp_path / "out"
+    _seed_mixed_store(root)  # rhr 52 -> 49: registered "down" polarity, improving
+    loop_schema.record_biomarker("spo2", "2026-05-01T00:00:00+00:00", 97, root)
+    loop_schema.record_biomarker("spo2", "2026-05-02T00:00:00+00:00", 95, root)
+    loop_schema.record_biomarker("vitamin-d", "2026-05-01T00:00:00+00:00", 41, root)
+
+    html = generate.run("dashboard", _root=root, _out_dir=out).read_text()
+
+    rhr_row = next(r for r in _rows(html) if "RHR" in r)
+    assert "<span class='chip state-good'>improving</span>" in rhr_row
+
+    spo2_row = next(r for r in _rows(html) if "Spo2" in r)
+    assert "<span class='chip state-neutral'>" in spo2_row
+    assert "&#8595;" in spo2_row, "unregistered chip carries the direction arrow"
+    assert "improving" not in spo2_row
+    assert "regressing" not in spo2_row
+
+    vitd_row = next(r for r in _rows(html) if "Vitamin D" in r)
+    assert "chip" not in vitd_row, "a single-value series renders no chip"
+
+
+def test_unprefixed_string_item_renders_plain_row(tmp_path):
+    """F17a: an unprefixed string-valued item renders its value with no sparkline."""
+    root = tmp_path / "store"
+    out = tmp_path / "out"
+    store.append(
+        "note",
+        {"item": "note", "timepoint": "2026-05-01T00:00:00+00:00",
+         "source": "manual", "value": "felt fine"},
+        root=root,
+    )
+
+    html = generate.run("dashboard", _root=root, _out_dir=out).read_text()
+
+    note_row = next(r for r in _rows(html) if "felt fine" in r)
+    assert "Note" in note_row, "the catch-all routes its label through display_name"
+    assert "<svg" not in note_row
+    assert "<rect" not in note_row
+
+
+def test_biomarker_stream_all_strings_renders_plain_row(tmp_path):
+    """F17b: a biomarker:: stream with ONLY string values renders the clean
+    label + verbatim latest value, no sparkline."""
+    root = tmp_path / "store"
+    out = tmp_path / "out"
+    loop_schema.record_biomarker(
+        "ferritin", "2026-05-01T00:00:00+00:00", "draw scheduled", root
+    )
+
+    html = generate.run("dashboard", _root=root, _out_dir=out).read_text()
+
+    row = next(r for r in _rows(html) if "draw scheduled" in r)
+    assert "Ferritin" in row
+    assert "<svg" not in row
+    assert "<rect" not in row
 
 
 def test_unknown_stream_prefix_fails_loud(tmp_path):
