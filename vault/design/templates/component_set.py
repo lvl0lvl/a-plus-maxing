@@ -1,10 +1,11 @@
 """Shared inline-CSS/SVG component library for generated HTML artifacts.
 
 Single definition of the reusable rendered components (header, TL;DR banner,
-KPI section, inline-SVG sparkline) and the colorblind-safe semantic palette
-(good / watch / concern) that both the dashboard and report templates draw from.
-All styling is inline — inline `<style>`, inline SVG — with no external asset
-references, per the artifact-design-protocol single-file rule.
+KPI section, inline-SVG sparklines — polyline and bar) and the colorblind-safe
+semantic palette (good / watch / concern) that both the dashboard and report
+templates draw from. All styling is inline — inline `<style>`, inline SVG —
+with no external asset references, per the artifact-design-protocol
+single-file rule.
 
 The palette hex set, the foreground/background contrast pairs, and the
 `@media print` block are the source the accessibility gate (ADR-0004-T1 crit 3)
@@ -14,6 +15,8 @@ deuteranopia/protanopia simulation, and the metric are recorded independently in
 palette MUST match that recorded decision (the gate reads its expected values
 from the decision, not from here).
 """
+
+from scripts.store import biomarker_meta
 
 # Colorblind-safe semantic palette. good/watch/concern are the three semantic
 # series colors; they are spaced above the recorded CIEDE2000 deltaE floor under
@@ -34,20 +37,24 @@ PALETTE = {
 SERIES = ("good", "watch", "concern")
 
 
-def state_for(item):
-    """Pick the semantic series state for an item by name (single source of truth).
+def state_for(item, value=None):
+    """Resolve an item's semantic series state from the biomarker metadata registry.
 
-    Cycles through SERIES so a multi-item artifact exercises all three colors;
-    deterministic on the item name so two generations are structurally identical.
-    Shared by both the dashboard and report templates.
+    Delegates to `biomarker_meta.state_for` (real range logic, ADR-0008 D2): a
+    registered marker's numeric value inside its reference range reads "good",
+    outside reads "concern". A None verdict (unregistered marker, no registered
+    range, or non-numeric/absent value) reads "neutral" — no judgment possible,
+    rendered muted. Shared by the dashboard, report, and matrix/projection views.
 
     Args:
-        item (str): The tracked-item name.
+        item (str): The tracked-item name (stream prefix tolerated).
+        value (optional): The latest value the state judges; absent -> neutral.
 
     Returns:
-        (str) One of SERIES (good / watch / concern).
+        (str) "good", "concern", or "neutral".
     """
-    return SERIES[sum(ord(c) for c in item) % len(SERIES)]
+    state = biomarker_meta.state_for(item, value)
+    return state if state is not None else "neutral"
 
 
 def _style_block():
@@ -83,6 +90,8 @@ html, body {{
 .state-good {{ color: var(--good); }}
 .state-watch {{ color: var(--watch); }}
 .state-concern {{ color: var(--concern); }}
+.state-neutral {{ color: var(--muted); }}
+.chip {{ font-size: 13px; margin-left: 8px; }}
 caption, .caption {{ color: var(--muted); font-size: 13px; }}
 @media print {{
   html, body {{ background: #FFFFFF; color: #000000; }}
@@ -135,9 +144,9 @@ def sparkline(values, state):
 
     Args:
         values (list): The numeric series to plot.
-        state (str): One of SERIES — selects the semantic color.
+        state (str): The semantic state — a SERIES color, else rendered muted.
     """
-    color = PALETTE[state]
+    color = PALETTE[state] if state in SERIES else PALETTE["muted"]
     if not values:
         return f"<svg width='180' height='40' role='img' aria-label='no data'></svg>"
     lo, hi = min(values), max(values)
@@ -152,6 +161,38 @@ def sparkline(values, state):
         f"aria-label='{_escape(state)} sparkline'>"
         f"<polyline fill='none' stroke='{color}' stroke-width='2' points='{pts}'/>"
         "</svg>"
+    )
+
+
+def bar_sparkline(values, state):
+    """Return an inline-SVG bar sparkline for a series, colored by state.
+
+    Bottom-aligned `<rect>` columns in the same 180x40 envelope as `sparkline`:
+    n bars filling the 180px width with a 2px gap, heights scaled from the
+    series min..max to 4..36px (min 4px so every bar is visible; a constant
+    series renders equal-height bars). The dashboard's bars-not-paths component
+    (ADR-0008 D2); the polyline `sparkline` remains for the matrix/projection
+    views' ADR-0007 contract.
+
+    Args:
+        values (list): The numeric series to plot.
+        state (str): The semantic state — a SERIES color, else rendered muted.
+    """
+    color = PALETTE[state] if state in SERIES else PALETTE["muted"]
+    if not values:
+        return "<svg width='180' height='40' role='img' aria-label='no data'></svg>"
+    lo, hi = min(values), max(values)
+    span = (hi - lo) or 1
+    n = len(values)
+    width = (180 - 2 * (n - 1)) / n
+    bars = "".join(
+        f"<rect x='{i * (width + 2):.1f}' y='{40 - h:.1f}' "
+        f"width='{width:.1f}' height='{h:.1f}' fill='{color}'/>"
+        for i, h in ((i, 4 + (v - lo) / span * 32) for i, v in enumerate(values))
+    )
+    return (
+        "<svg width='180' height='40' role='img' "
+        f"aria-label='{_escape(state)} bar sparkline'>{bars}</svg>"
     )
 
 
