@@ -102,8 +102,11 @@ def _trend_token(readings):
     """Derive a `recent-trend-direction` token from the readings SERIES.
 
     The spike (lines 32-33) locks the closed vocabulary `improving`/`flat`/
-    `regressing` — a direction over time, derived here from the latest vs prior
-    reading, never a single value or a range-membership.
+    `regressing` — a direction over time, derived from the latest vs prior
+    NUMERIC reading, never a single value or a range-membership. The two
+    compared readings must come from ONE item: a series mixing items carries
+    no single-marker trend, so a cross-item comparison RAISES naming both
+    items (fail-closed — never the values).
 
     The per-marker good-direction gap is closable per marker via
     `scripts/store/biomarker_meta.py` (ADR-0008 D4): a registered-polarity
@@ -113,17 +116,29 @@ def _trend_token(readings):
     design — keeps the fail-closed raise: a determinable directional change
     with unknown polarity surfaces at the boundary rather than fabricate a
     value-judgment. Per-marker lab trends for the summary are the Track-2
-    residual (`juc`). `flat` is emitted ONLY for genuine no-change /
-    insufficient series, NEVER a false affirmative for missing/non-numeric
-    data (missing → `flat`, the no-signal token, not `improving`).
+    residual (`juc`). `flat` is emitted for genuine no-change, for an
+    insufficient/missing series (the no-signal token — missing data is NEVER
+    a false `improving`), and — since ADR-0008 — for an in-range-polarity
+    marker whose movement keeps the same distance-to-range (the value moved,
+    the judgment did not).
     """
-    nums = [biomarker_meta.to_number(r["value"]) for r in readings]
-    nums = [n for n in nums if n is not None]
-    if len(nums) < 2:
+    pairs = [
+        (r["item"], n)
+        for r in readings
+        if (n := biomarker_meta.to_number(r["value"])) is not None
+    ]
+    if len(pairs) < 2:
         return "flat"  # insufficient series / missing data — no false affirmative
-    if nums[-1] == nums[-2]:
+    (prev_item, prev), (last_item, last) = pairs[-2], pairs[-1]
+    if prev_item != last_item:
+        raise ValueError(
+            f"recent-trend-direction: the two compared numeric readings come "
+            f"from different items ({prev_item!r} vs {last_item!r}) — a "
+            f"cross-item comparison is not a marker trend (fail-closed)"
+        )
+    if last == prev:
         return "flat"  # genuine no-change
-    direction = biomarker_meta.trend(readings[-1]["item"], nums[-2], nums[-1])
+    direction = biomarker_meta.trend(last_item, prev, last)
     if direction is not None:
         return direction
     raise ValueError(
