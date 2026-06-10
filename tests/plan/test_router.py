@@ -221,6 +221,33 @@ def test_trend_token_raises_on_unlabellable_directional_change():
     assert "polarity" in str(exc.value)
 
 
+def _marker_series(item, prev, latest):
+    """A two-reading series for `item` carrying the prev/latest values."""
+    return [
+        {"item": item, "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "lab", "value": prev},
+        {"item": item, "timepoint": "2026-02-01T00:00:00+00:00",
+         "source": "lab", "value": latest},
+    ]
+
+
+def test_trend_token_registered_up_marker_rising_improves():
+    """ADR-0008 D4: a registered "up" marker rising resolves to improving (hrv)."""
+    assert router._trend_token(_marker_series("hrv", 50, 60)) == "improving"
+
+
+def test_trend_token_registered_down_marker_rising_regresses():
+    """ADR-0008 D4: a registered "down" marker rising resolves to regressing (alt)."""
+    assert router._trend_token(_marker_series("alt", 30, 50)) == "regressing"
+
+
+def test_trend_token_resolves_prefixed_item_name():
+    """ADR-0008 D4: the `biomarker::`-prefixed item name resolves the polarity too."""
+    assert router._trend_token(
+        _marker_series("biomarker::hrv", 50, 60)
+    ) == "improving"
+
+
 # --- Cycle 2: dispatch ---------------------------------------------------------
 
 

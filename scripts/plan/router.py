@@ -11,6 +11,7 @@ field NAMES were supplied by the spike at build time.
 """
 
 from scripts.guard import pii_scan
+from scripts.store import biomarker_meta
 
 # Closed Summary Field-Set (ADR-0006-T0). The single definition of the allowlist
 # both `summarize` and `dispatch`'s whitelist check reference — no second copy.
@@ -112,17 +113,17 @@ def _trend_token(readings):
     `regressing` — a direction over time, derived here from the latest vs prior
     reading, never a single value or a range-membership.
 
-    BLOCKED — improving/regressing requires per-biomarker good-direction polarity
-    (rising ALT regresses; rising HDL improves). The Line Field Set
-    (`scripts/store/keying.py`: item, timepoint, source, value) carries NO
-    good-direction metadata, so a real numeric change cannot be faithfully labelled
-    improving vs regressing here. Minimal faithful correction (F3): emit `flat`
-    ONLY for genuine no-change / insufficient series, and NEVER a false affirmative
-    for missing/non-numeric data (missing → `flat`, the no-signal token, not
-    `improving`). A determinable directional change with unknown polarity RAISES
-    rather than fabricate a value-judgment — the spec/metadata gap surfaces at the
-    boundary instead of silently mislabelling. See report: escalate to add
-    per-item good-direction polarity to the data model.
+    The per-marker good-direction gap is closable per marker via
+    `scripts/store/biomarker_meta.py` (ADR-0008 D4): a registered-polarity
+    marker's directional change resolves to `improving`/`regressing` through
+    the registry (rising ALT regresses; rising HDL improves). An UNREGISTERED
+    marker — including the generic `raw-lab-values` stream, unregistered by
+    design — keeps the fail-closed raise: a determinable directional change
+    with unknown polarity surfaces at the boundary rather than fabricate a
+    value-judgment. Per-marker lab trends for the summary are the Track-2
+    residual (`juc`). `flat` is emitted ONLY for genuine no-change /
+    insufficient series, NEVER a false affirmative for missing/non-numeric
+    data (missing → `flat`, the no-signal token, not `improving`).
     """
     nums = [_to_number(r["value"]) for r in readings]
     nums = [n for n in nums if n is not None]
@@ -130,10 +131,14 @@ def _trend_token(readings):
         return "flat"  # insufficient series / missing data — no false affirmative
     if nums[-1] == nums[-2]:
         return "flat"  # genuine no-change
+    direction = biomarker_meta.trend(readings[-1]["item"], nums[-2], nums[-1])
+    if direction is not None:
+        return direction
     raise ValueError(
         "recent-trend-direction: a directional change is not faithfully "
-        "labellable improving/regressing without per-item good-direction "
-        "polarity (absent from the Line Field Set) — spec/metadata gap"
+        "labellable improving/regressing for a marker with no registered "
+        "good-direction polarity (scripts/store/biomarker_meta.py) — "
+        "fail-closed on the unregistered marker"
     )
 
 
