@@ -173,6 +173,35 @@ def test_trend_in_range_both_inside_read_flat():
     assert biomarker_meta.trend("ferritin", 50, 60) == "flat"
 
 
+def test_trend_in_range_polarity_without_range_reads_none(monkeypatch):
+    """An "in-range" polarity with no registered range reads None (no distance)."""
+    monkeypatch.setitem(
+        biomarker_meta.METADATA,
+        "rangeless-marker",
+        {"units": "x", "reference_range": None, "good_direction": "in-range"},
+    )
+    assert biomarker_meta.trend("rangeless-marker", 10, 20) is None
+
+
+def test_trend_in_range_equal_distance_opposite_sides_reads_flat():
+    """Equal distance-to-range on OPPOSITE sides reads flat (ferritin 20 -> 410).
+
+    Both readings sit 10 from the (30, 400) range — below it, then above it —
+    so the distance is unchanged and the verdict is flat, not improving.
+    """
+    assert biomarker_meta.trend("ferritin", 20, 410) == "flat"
+
+
+def test_trend_in_range_landing_on_boundary_improves():
+    """Moving from outside onto the range boundary (distance 10 -> 0) improves."""
+    assert biomarker_meta.trend("ferritin", 20, 30) == "improving"
+
+
+def test_trend_in_range_boundary_no_change_reads_flat():
+    """Two readings exactly on the boundary (distance 0 -> 0) read flat."""
+    assert biomarker_meta.trend("ferritin", 30, 30) == "flat"
+
+
 def test_trend_prefixed_item_resolves():
     """The stream-prefixed item name resolves the same polarity."""
     assert biomarker_meta.trend("biomarker::alt", 30, 50) == "regressing"
