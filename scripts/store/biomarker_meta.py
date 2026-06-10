@@ -9,6 +9,8 @@ An unknown marker resolves to None everywhere (honest absence, never a
 fabricated range).
 """
 
+import math
+
 # marker -> {units, reference_range (low, high) | None, good_direction}.
 # good_direction: "up" (rising improves), "down" (falling improves), "in-range"
 # (movement toward the reference range improves), or None (no polarity).
@@ -39,12 +41,25 @@ def _strip_prefix(item):
     return item
 
 
-def _to_number(value):
-    """Parse `value` to a float, or None if it is missing/non-numeric."""
+def to_number(value):
+    """Parse `value` to a finite float, or None if it cannot be one.
+
+    The single numeric-coercion helper the store, render, and plan layers share.
+    CSV ingest stores values as strings, so a non-finite cell ("nan", "inf",
+    "1e999") must coerce to None — it must not fabricate a state verdict or
+    poison SVG scaling. Missing/non-numeric values likewise read None.
+
+    Args:
+        value: The stored value to coerce.
+
+    Returns:
+        (float | None) The finite number, or None.
+    """
     try:
-        return float(value)
+        number = float(value)
     except (TypeError, ValueError):
         return None
+    return number if math.isfinite(number) else None
 
 
 def get(item):
@@ -96,7 +111,7 @@ def state_for(item, value):
     Returns:
         (str | None) "good", "concern", or None.
     """
-    number = _to_number(value)
+    number = to_number(value)
     if number is None:
         return None
     meta = get(item)
@@ -124,7 +139,7 @@ def trend(item, prev, latest):
     Returns:
         (str | None) "improving", "flat", "regressing", or None.
     """
-    p, l = _to_number(prev), _to_number(latest)
+    p, l = to_number(prev), to_number(latest)
     if p is None or l is None:
         return None
     meta = get(item)

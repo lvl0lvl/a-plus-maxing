@@ -46,14 +46,6 @@ def _series_by_item(store_read):
     return series
 
 
-def _numeric(value):
-    """Parse `value` to a float, or None if it is not float-coercible."""
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
 def _plain_row(label, value):
     """Render a plain label + latest-value row (no state, no sparkline)."""
     return f"<div class='kpi-row'>{cs.kpi(label, value)}</div>"
@@ -82,7 +74,11 @@ def _biomarker_row(item, values):
     values, and a trend chip when the series carries >=2 numeric values. A
     stream with no numeric value routes to a plain value row instead.
     """
-    numeric = [(value, n) for value in values if (n := _numeric(value)) is not None]
+    numeric = [
+        (value, n)
+        for value in values
+        if (n := biomarker_meta.to_number(value)) is not None
+    ]
     label = biomarker_meta.display_name(item)
     if not numeric:
         return _plain_row(label, values[-1])
@@ -155,7 +151,7 @@ def render(store_read):
             watchouts.append(_watchout_row(item, values))
         elif item.startswith("feedback::"):
             feedback.append(_feedback_row(values))
-        elif all(_numeric(value) is not None for value in values):
+        elif all(biomarker_meta.to_number(value) is not None for value in values):
             biomarkers.append(_biomarker_row(item, values))
         else:
             other.append(_plain_row(item, values[-1]))
