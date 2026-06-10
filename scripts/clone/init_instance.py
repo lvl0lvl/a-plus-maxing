@@ -111,11 +111,14 @@ def _install_pre_push_hook(clone_root):
     if not src.is_file() or not hooks_dir.is_dir():
         return False
     dest = hooks_dir / "pre-push"
-    if dest.exists():
+    # is_symlink() catches a DANGLING link (exists() is False for a broken symlink,
+    # which would otherwise let copyfile write THROUGH it to the missing target).
+    if dest.is_symlink() or dest.exists():
         try:
             existing = dest.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
-            # An unreadable/binary existing hook is by definition not ours -> keep it.
+            # An unreadable/binary/dangling existing hook is by definition not
+            # ours -> keep it (never clobber what we cannot confirm we own).
             return False
         if _PRE_PUSH_SENTINEL not in existing:
             return False

@@ -429,6 +429,19 @@ def test_init_replaces_symlink_dest_not_its_target(tmp_path):
     assert "operator content" in target.read_text()  # target intact
 
 
+def test_init_preserves_dangling_symlink_pre_push(tmp_path):
+    """dv3 (BUG-4 dangling-link edge): a broken symlink at pre-push is not written
+    THROUGH to its missing target — it is preserved (not ours, cannot confirm)."""
+    clone = _make_scratch_clone(tmp_path)
+    _seed_pre_push_src(clone)
+    dest = clone / ".git" / "hooks" / "pre-push"
+    dest.symlink_to(clone / "nonexistent-target.sh")
+    pages = run(clone)  # must not raise, must not create the target
+    assert dest.is_symlink() is True
+    assert (clone / "nonexistent-target.sh").exists() is False
+    assert pages
+
+
 def test_init_without_hook_source_still_runs(tmp_path):
     """dv3: a clone missing the tracked hook source initializes normally (skip, not raise)."""
     clone = _make_scratch_clone(tmp_path)
