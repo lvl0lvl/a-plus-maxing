@@ -123,6 +123,26 @@ else
     fail "block-pii-commit.sh NOT registered — the trunk content-scan boundary is silently OFF (3lv regression)"
 fi
 
+# Check 5 self-test (PR#84 TEST-4): prove check 5 actually REDS when the registration
+# is absent, via the SETTINGS_HOOK_PATHS_FILE override on a fixture pair — else a
+# future grep/quoting break could leave unregistration silently passing. The
+# SETTINGS_HOOK_PATHS_SELFTEST guard stops the nested runs from recursing.
+if [[ -z "${SETTINGS_HOOK_PATHS_SELFTEST:-}" ]]; then
+    SELF_TMP="$(mktemp -d)"
+    REG_FIX="$SELF_TMP/registered.json"; UNREG_FIX="$SELF_TMP/unregistered.json"
+    jq '.' "$SETTINGS" > "$REG_FIX" 2>/dev/null
+    jq 'del(.hooks.PreToolUse[].hooks[] | select(.command | test("/block-pii-commit\\.sh$")))' \
+        "$SETTINGS" > "$UNREG_FIX" 2>/dev/null
+    SELF_SCRIPT="$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")"
+    SETTINGS_HOOK_PATHS_SELFTEST=1 SETTINGS_HOOK_PATHS_FILE="$REG_FIX" bash "$SELF_SCRIPT" >/dev/null 2>&1
+    [[ $? -eq 0 ]] && pass "check-5 self-test: registered fixture -> exit 0" \
+        || fail "check-5 self-test: registered fixture should pass"
+    SETTINGS_HOOK_PATHS_SELFTEST=1 SETTINGS_HOOK_PATHS_FILE="$UNREG_FIX" bash "$SELF_SCRIPT" >/dev/null 2>&1
+    [[ $? -ne 0 ]] && pass "check-5 self-test: unregistered fixture -> non-zero (deny direction reds)" \
+        || fail "check-5 self-test: unregistered fixture should FAIL (check 5 is not actually guarding)"
+    rm -rf "$SELF_TMP"
+fi
+
 echo ""
 echo "test_settings_hook_paths: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1

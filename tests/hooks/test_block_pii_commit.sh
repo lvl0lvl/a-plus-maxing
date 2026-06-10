@@ -215,6 +215,8 @@ from pathlib import Path
 DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
 DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
 def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG, include_structural=True):
+    return 0
+def scan_scoped(changed, data_bearing, contact_config=DEFAULT_CONTACT_CONFIG, identity_config=DEFAULT_IDENTITY_CONFIG):
     open(os.environ["SEC01B_SENTINEL"], "w").write("ran")
     return 0
 PY
@@ -308,6 +310,8 @@ from pathlib import Path
 DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
 DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
 def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG, include_structural=True):
+    return 0
+def scan_scoped(changed, data_bearing, contact_config=DEFAULT_CONTACT_CONFIG, identity_config=DEFAULT_IDENTITY_CONFIG):
     print("not-a-number")
     return 0
 PY
@@ -366,9 +370,47 @@ for seqform in "git add docs/x.md && git commit -m 'x'" \
         || bad "seq guard missed single-call form: '$seqform' got: $OUT"
 done
 
+# seq global-option evasion (PR#84 SEC-1/BUG-2): a global option between `git` and
+# the staging subcommand / `commit` must NOT let the form slip past the guard.
+for evasion in "git -c user.email=x@y.z add f && git commit -m 'x'" \
+               "git --work-tree=. add f && git commit -m 'x'" \
+               "git -c k=v commit -am 'x'" \
+               "git -C . commit -am 'x'" \
+               $'git \\\nadd f && git commit -m x' \
+               "git commit -m 'fix; tidy' -a"; do
+    OUT=$(invoke "$evasion")
+    [[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
+        && ok "seq global-opt/newline/msg-semicolon evasion DENIED: ${evasion//$'\n'/\\n}" \
+        || bad "seq evasion slipped past guard: '${evasion//$'\n'/\\n}' got: $OUT"
+done
+
+# seq pathspec commit (PR#84 BUG-2a): a path-separator-bearing pathspec arg after
+# commit commits working-tree content the staged-set scan can't see -> deny.
+for pathspec in "git commit -m 'x' docs/leak.md" "git commit docs/sub/file.md -m x"; do
+    OUT=$(invoke "$pathspec")
+    [[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
+        && ok "seq pathspec commit DENIED: $pathspec" \
+        || bad "seq pathspec commit slipped past guard: '$pathspec' got: $OUT"
+done
+
+# seq message-text FP (PR#84 BUG-5/TEST-2): the guard must NOT deny a plain commit
+# whose -m MESSAGE merely MENTIONS git add/rm/-a/--all — quoted segments are
+# stripped before the match. Pins the accepted boundary: plain commits with
+# subcommand-shaped message text stay allowed.
+for okmsg in "git commit -m 'docs: explain git add usage'" \
+             "git commit -m 'note: git rm removes files'" \
+             "git commit -m 'fix -and improve'" \
+             "git commit -m 'document the -a flag'" \
+             "git commit -m 'use --all carefully'"; do
+    OUT=$(invoke "$okmsg")
+    [[ "$OUT" != *'"deny"'* ]] \
+        && ok "seq message-text mentioning add/-a allowed: $okmsg" \
+        || bad "seq message-text FALSE-POSITIVE denied a plain commit: '$okmsg' got: $OUT"
+done
+
 # seq allow-boundary: amend (uses the VISIBLE staged set) and a plain commit are
 # the scannable shapes and must NOT trip the sequencing guard.
-for okform in "git commit --amend -m 'x'" "git commit -m 'plain'"; do
+for okform in "git commit --amend -m 'x'" "git commit -m 'plain'" "git -c k=v commit -m 'global opt, no -a'"; do
     OUT=$(invoke "$okform")
     [[ "$OUT" != *'"deny"'* ]] \
         && ok "seq scannable shape allowed: $okform" \
