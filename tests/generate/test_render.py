@@ -291,6 +291,22 @@ def test_emit_allows_operator_text_containing_url(tmp_path):
     assert path.exists()
 
 
+@pytest.mark.parametrize("component", [
+    component_set.sparkline,
+    component_set.bar_sparkline,
+])
+def test_sparkline_unknown_state_raises(component):
+    """F5: an unknown state token KeyErrors instead of silently rendering muted.
+
+    "neutral" is the one approved non-SERIES state; any other token (a typo, a
+    future unmapped state) fails loud, matching the render_views _STATE_DISPLAY
+    contract.
+    """
+    with pytest.raises(KeyError):
+        component([1.0, 2.0], "bogus-state")
+    assert component([1.0, 2.0], "neutral")  # the approved non-SERIES state renders
+
+
 # --------------------------------------------------------------------------- #
 # Cycle 2 — dashboard + report templates, size, structural identity (AC-2, AC-4, AC-7)
 # --------------------------------------------------------------------------- #
