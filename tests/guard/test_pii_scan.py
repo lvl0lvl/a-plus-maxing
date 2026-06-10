@@ -282,6 +282,31 @@ def test_scan_names_offending_file_on_stderr(tmp_path, capfd):
     assert f"PII-HIT: {offending}" in captured.err
 
 
+def test_scan_structural_switch(tmp_path):
+    """dv3: include_structural=False drops ONLY the structural patterns.
+
+    The commit/pre-push hooks scan known-fixture paths (tests/) with the switch
+    off — fixtures embed synthetic reading-shaped literals by construction. The
+    config-driven tokens MUST still run with the switch off (a real operator
+    token in a fixture file is a leak); reds if the switch silently disables the
+    token scan too, or if the default stops applying the structural patterns.
+    """
+    root = _scratch_clone(tmp_path)
+    leak = root / "code.py"
+    leak.write_text(leak.read_text() + PLANTS["health-data"] + PLANTS["contact"])
+    _git(["add", "-A"], root)
+    files = _tracked(root)
+    cfg = tmp_path / "operator-contact.txt"
+    cfg.write_text(SYNTHETIC_CONTACT + "\n")
+
+    # Default: structural plant detected even with no token config.
+    assert scan(files, identity_config=NO_CONFIG) >= 1
+    # Switch off, no config: the structural plant alone scores 0.
+    assert scan(files, identity_config=NO_CONFIG, include_structural=False) == 0
+    # Switch off, config present: the contact token STILL detects.
+    assert scan(files, identity_config=str(cfg), include_structural=False) >= 1
+
+
 def test_check_ignore_positive_when_entry_present(tmp_path):
     """AC-4 positive: git check-ignore vault/store/ exits 0 when entry present."""
     root = _scratch_clone(tmp_path, gitignore_store=True)

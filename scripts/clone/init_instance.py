@@ -15,6 +15,7 @@ generation runs through the ADR-0004-T1 `render.emit`. It publishes no new share
 signature.
 """
 
+import shutil
 from pathlib import Path
 
 from scripts.store import store
@@ -28,6 +29,16 @@ SCAFFOLD_DIR = "vault/scaffold"
 # Store root relative to the clone root — the gitignored boundary entered data
 # lands under (ADR-0005-T1 `.gitignore` excludes `vault/store/`).
 STORE_SUBDIR = store.DEFAULT_ROOT
+
+# Tracked source of the git pre-push PII backstop (bead dv3). git does not track
+# `.git/hooks`, so init copies this into the clone's `.git/hooks/pre-push` —
+# without it the only PII gate is the agent-session PreToolUse hook, which a
+# human-terminal/IDE push path never runs.
+PRE_PUSH_HOOK_SRC = ".claude/hooks/pre-push-pii-scan.sh"
+
+# First line of the tracked hook — the ownership marker `_install_pre_push_hook`
+# keys on so it never overwrites an operator's hand-written pre-push hook.
+_PRE_PUSH_MARKER = "pre-push-pii-scan.sh"
 
 
 def _resolve_clone_root(clone_root):
@@ -74,13 +85,39 @@ def _surface_scaffolds(clone_root):
     return sorted(p for p in scaffold.glob("*.md") if p.is_file())
 
 
+def _install_pre_push_hook(clone_root):
+    """Install the tracked pre-push PII backstop into `.git/hooks/pre-push` (dv3).
+
+    Copies `PRE_PUSH_HOOK_SRC` to the clone's `.git/hooks/pre-push` (executable).
+    Skips, returning False, when the clone has no `.git/hooks` dir (a non-git
+    working copy — the test fixtures' tmp dirs) or when a pre-push hook NOT
+    carrying this script's marker already exists (never clobber an operator's own
+    hook). Re-running over a previously-installed copy refreshes it (marker
+    present -> ours to overwrite).
+
+    Returns:
+        (bool) True when the hook is installed/refreshed, False when skipped.
+    """
+    src = clone_root / PRE_PUSH_HOOK_SRC
+    hooks_dir = clone_root / ".git" / "hooks"
+    if not src.is_file() or not hooks_dir.is_dir():
+        return False
+    dest = hooks_dir / "pre-push"
+    if dest.exists() and _PRE_PUSH_MARKER not in dest.read_text(encoding="utf-8"):
+        return False
+    shutil.copyfile(src, dest)
+    dest.chmod(0o755)
+    return True
+
+
 def run(clone_root=Path(".")):
     """Initialize a fresh clone into a fillable, PII-free local instance.
 
-    Initializes the local store (0 operator readings, readable empty-but-well-formed)
-    and surfaces the empty `status: scaffold` pages, staying entirely within the
-    clone root (0 cross-clone path, 0 network). Entered data lands untracked via the
-    ADR-0005-T1 `.gitignore` boundary.
+    Initializes the local store (0 operator readings, readable empty-but-well-formed),
+    installs the git pre-push PII backstop (dv3), and surfaces the empty
+    `status: scaffold` pages, staying entirely within the clone root (0 cross-clone
+    path, 0 network). Entered data lands untracked via the ADR-0005-T1 `.gitignore`
+    boundary.
 
     Args:
         clone_root (str | Path, optional): The clone root to initialize. Defaults to
@@ -94,4 +131,5 @@ def run(clone_root=Path(".")):
     """
     root = _resolve_clone_root(clone_root)
     _init_store(root)
+    _install_pre_push_hook(root)
     return _surface_scaffolds(root)

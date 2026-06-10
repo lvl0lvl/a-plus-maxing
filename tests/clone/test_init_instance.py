@@ -342,3 +342,59 @@ def test_clone_readme_states_no_version_control_backup():
     text = CLONE_README.read_text().lower()
     assert "version control" in text or "version-control" in text
     assert "backup" in text
+
+
+# --- dv3: pre-push PII backstop install ------------------------------------------
+
+
+def _seed_pre_push_src(clone):
+    """Copy the live tracked pre-push hook source into the scratch clone."""
+    src = clone / init_instance.PRE_PUSH_HOOK_SRC
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text((REPO_ROOT / init_instance.PRE_PUSH_HOOK_SRC).read_text())
+    return src
+
+
+def test_init_installs_pre_push_pii_backstop(tmp_path):
+    """dv3: run() installs the tracked pre-push hook into .git/hooks, executable.
+
+    Without the install, a clone's only PII gate is the agent-session PreToolUse
+    hook — a human-terminal/IDE push path would be wholly ungated. Reds if run()
+    drops the install step.
+    """
+    clone = _make_scratch_clone(tmp_path)
+    _seed_pre_push_src(clone)
+    run(clone)
+    dest = clone / ".git" / "hooks" / "pre-push"
+    assert dest.is_file()
+    assert "pre-push-pii-scan.sh" in dest.read_text()
+    assert os.access(dest, os.X_OK)
+
+
+def test_init_does_not_clobber_foreign_pre_push_hook(tmp_path):
+    """dv3: an operator's own pre-push hook (no marker) is preserved, not overwritten."""
+    clone = _make_scratch_clone(tmp_path)
+    _seed_pre_push_src(clone)
+    foreign = clone / ".git" / "hooks" / "pre-push"
+    foreign_body = "#!/bin/sh\n# operator-owned hook\nexit 0\n"
+    foreign.write_text(foreign_body)
+    run(clone)
+    assert foreign.read_text() == foreign_body
+
+
+def test_init_refreshes_previously_installed_backstop(tmp_path):
+    """dv3: a marker-carrying (ours) pre-push hook is refreshed on re-init."""
+    clone = _make_scratch_clone(tmp_path)
+    _seed_pre_push_src(clone)
+    dest = clone / ".git" / "hooks" / "pre-push"
+    dest.write_text("# pre-push-pii-scan.sh (stale prior install)\n")
+    run(clone)
+    assert "fail-closed" in dest.read_text()  # current source body, not the stale stub
+
+
+def test_init_without_hook_source_still_runs(tmp_path):
+    """dv3: a clone missing the tracked hook source initializes normally (skip, not raise)."""
+    clone = _make_scratch_clone(tmp_path)
+    pages = run(clone)
+    assert (clone / ".git" / "hooks" / "pre-push").exists() is False
+    assert pages  # the scaffold surface still works
