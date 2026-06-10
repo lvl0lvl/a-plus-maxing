@@ -343,8 +343,28 @@ def test_scan_text_detects_value_pii_classes(value, label):
     """g5x AC1: scan_text catches each tractable EXCLUDED_RAW_PII contact class.
 
     Each class (generic/non-gmail email, googlemail, phone E.164/NANP) typed into a
-    free-text value scores >=1 — reds on the gmail-only scan_text. Postal is NOT a
-    value-boundary class (PR#78 BUG-1/HIST-1; deferred to a precise-detector bead).
+    free-text value scores >=1 — reds on the gmail-only scan_text. Postal has its own
+    precise ZIP/state-anchored detector (bead nue; tests below).
+    """
+    assert pii_scan.scan_text(value, identity_config=NO_CONFIG) >= 1, label
+
+
+@pytest.mark.parametrize("value, label", [
+    ("ship to 123 main st, springfield il 62704", "lowercase street+state+ZIP (the nue canonical)"),
+    ("123 Main St, Springfield IL 62704", "Title-case street+state+ZIP"),
+    ("MAIL TO 123 MAIN ST SPRINGFIELD IL 62704", "uppercase, no commas"),
+    ("456 oak avenue, columbus oh 43004-1234", "full suffix word + ZIP+4"),
+    ("789 elm rd 62704", "street-suffix + ZIP, no state token"),
+    ("100 acacia, springfield il 62704", "state+ZIP, no recognizable street suffix"),
+])
+def test_scan_text_detects_postal_address(value, label):
+    """nue AC1: a full street address in a free-text value scores >=1, ANY case.
+
+    The detector is anchored on the strong co-signal the bead specifies — a US ZIP
+    5(-4) preceded by street-number+words plus a street-suffix token OR a 2-letter
+    state token — so it is case-INSENSITIVE (case is the wrong discriminator,
+    PR#78 BUG-1/HIST-1) without flooding on Title-case training text. Reds on the
+    postal-less scan_text.
     """
     assert pii_scan.scan_text(value, identity_config=NO_CONFIG) >= 1, label
 
@@ -371,16 +391,22 @@ def test_scan_text_detects_compatibility_homograph_email():
     "sleep 7-8 hours",
     "call 4155550199",                     # bare contiguous 10-digit — out of scope (numeric-ID flood)
     "return to pre-Jan-2026 loading",      # the clean goal-targets baseline value
+    "4 vial lot 90210",                    # number+words+5-digit with no suffix/state co-signal (nue)
+    "10 St John's Wort daily",             # 'St' as Saint + a number, no ZIP (nue)
+    "5 Star Gym Way every morning",        # street-suffix word but no ZIP anywhere (nue)
 ])
 def test_scan_text_value_boundary_negative_controls(value):
-    """g5x AC2: health free-text does NOT trip the value patterns (== 0).
+    """g5x AC2 + nue: health free-text does NOT trip the value patterns (== 0).
 
     Pins the false-positive boundary: Title-cased gym/training text (which a
     case-sensitive postal regex would have wrongly raised on — PR#78 BUG-1),
     rep/distance/weight/BP numerics, bare contiguous phone digits (numeric-ID flood —
-    F-TEST2 honest boundary), and date fragments must not register as PII. The leading
-    liveness assert proves _VALUE_COMPILED is ACTIVE, so a regression that disabled the
-    patterns reds here too (not only in the positive-detection test — F-TEST1).
+    F-TEST2 honest boundary), and date fragments must not register as PII. The nue
+    rows pin the postal detector's co-signal anchoring: a bare 5-digit number, a
+    Saint/honorific 'St'/'Dr', or a suffix-shaped word WITHOUT a ZIP must not match.
+    The leading liveness assert proves _VALUE_COMPILED is ACTIVE, so a regression that
+    disabled the patterns reds here too (not only in the positive-detection test —
+    F-TEST1).
     """
     assert pii_scan.scan_text("x@protonmail.com", identity_config=NO_CONFIG) >= 1  # patterns live
     assert pii_scan.scan_text(value, identity_config=NO_CONFIG) == 0
@@ -403,9 +429,9 @@ def test_scan_text_caps_input_length():
 def test_trunk_scan_stays_gmail_conservative(tmp_path):
     """g5x AC2: the trunk-wide `scan` is NOT widened — clonability is preserved.
 
-    The widened value classes (non-gmail email / phone) are scoped to the value
-    boundary (scan_text) only. The trunk commit-scanner `scan` must still ignore them
-    (its gmail-only contact choice keeps a fresh clone from flooding on docs/test
+    The widened value classes (non-gmail email / phone / postal) are scoped to the
+    value boundary (scan_text) only. The trunk commit-scanner `scan` must still ignore
+    them (its gmail-only contact choice keeps a fresh clone from flooding on docs/test
     fixtures — see bead 3lv). Reds if a future edit widens `scan` to the value classes.
     """
     root = _scratch_clone(tmp_path)
@@ -415,6 +441,7 @@ def test_trunk_scan_stays_gmail_conservative(tmp_path):
         leak.read_text()
         + "contact x@protonmail.com\n"
         + "phone +1 415 555 0199\n"
+        + "ship to 123 main st, springfield il 62704\n"
     )
     _git(["add", "-A"], root)
     assert scan(_tracked(root), identity_config=NO_CONFIG) == 0

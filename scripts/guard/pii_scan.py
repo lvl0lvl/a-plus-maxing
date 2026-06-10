@@ -74,22 +74,51 @@ _COMPILED_AGNOSTIC = [_CONTACT_COMPILED] + _STRUCTURAL_COMPILED
 # timestamps (`08:00:00+00:00`) and bare numeric runs do not register; the separated
 # form requires separators so a contiguous numeric ID does not match.
 #
-# POSTAL address is NOT detected at this boundary: a number+words+suffix regex over
-# free-text health values either fail-closes on legitimate Title-case text ("5 Star
-# Gym Way", "Dr Patel followup") or misses non-Title-case addresses — case is the
-# wrong discriminator (PR#78 BUG-1/HIST-1). A precise (ZIP/state-anchored,
-# case-insensitive) postal detector is deferred to its own bead; structured
-# `postal-address` store data is already stripped via the router's _RAW_TO_FIELD
-# derivation, so the residual value-boundary gap is narrow. Likewise out of scope
-# here: cross-script (Cyrillic) homographs, TLD-less local addresses (name@localhost),
-# and bare contiguous phone digits (which flood on numeric IDs) — single-operator
-# accidental-leakage threat model.
+# POSTAL address (bead nue) is detected at this boundary by a PRECISE detector
+# anchored on the strong co-signal PR#78 BUG-1/HIST-1 demanded: a US ZIP 5(-4) on
+# the same line as a street-number lead-in plus EITHER a street-suffix token OR a
+# 2-letter state token. Case-INSENSITIVE (case is the wrong discriminator —
+# "123 MAIN ST" and "123 main st" are the same address), yet "Dr Patel followup" /
+# "5 Star Gym Way" / "1 Rep Max St progression" cannot match: no ZIP. A bare
+# 5-digit number cannot match either: no street lead-in + co-signal. Accepted
+# edges, deliberate on a fail-closed PII boundary: a 2-letter state token that is
+# also an English word ("in", "or", "me") adjacent to a 5-digit token after a
+# number+words lead-in DOES match (a standalone ZIP-shaped token in that position
+# is plausibly real location data); spelled-out state names ("illinois") and
+# ZIP-less street lines are NOT matched (the ZIP is the co-signal that keeps the
+# detector off legitimate training text). Structured `postal-address` store data
+# is already stripped via the router's _RAW_TO_FIELD derivation, so this covers
+# the free-text-typed residual. Out of scope here: cross-script (Cyrillic)
+# homographs, TLD-less local addresses (name@localhost), and bare contiguous
+# phone digits (which flood on numeric IDs) — single-operator accidental-leakage
+# threat model.
+_ZIP = r"\d{5}(?:-\d{4})?"
+_STREET_SUFFIX = (
+    r"st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|way|ct|court|"
+    r"pl|place|ter|terrace|cir|circle|hwy|highway|pkwy|parkway"
+)
+_US_STATE = (
+    r"al|ak|az|ar|ca|co|ct|de|fl|ga|hi|id|il|in|ia|ks|ky|la|me|md|ma|mi|mn|ms|mo|"
+    r"mt|ne|nv|nh|nj|nm|ny|nc|nd|oh|ok|or|pa|ri|sc|sd|tn|tx|ut|vt|va|wa|wv|wi|wy|dc"
+)
 _VALUE_PII_PATTERNS = {
     "email": (r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", re.IGNORECASE),
     "phone-e164": (r"(?<!\d)\+\d{8,15}(?!\d)", 0),
     "phone-separated": (
         r"(?<!\d)(?:\+?\d{1,3}[\s.\-])?\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}(?!\d)",
         0,
+    ),
+    # street-number + 1-5 words + street-suffix token ... ZIP, all on one line.
+    "postal-street-zip": (
+        rf"(?<!\d)\d{{1,5}}\s+(?:[\w'’.#-]+\s+){{1,5}}(?:{_STREET_SUFFIX})\b\.?"
+        rf"[^\n]{{0,48}}?(?<!\d){_ZIP}(?!\d)",
+        re.IGNORECASE,
+    ),
+    # street-number lead-in ... 2-letter state token directly before the ZIP
+    # (catches suffix-less street names: "100 acacia, springfield il 62704").
+    "postal-state-zip": (
+        rf"(?<!\d)\d{{1,5}}\s+[^\n]{{2,60}}?\b(?:{_US_STATE})\s*,?\s+(?<!\d){_ZIP}(?!\d)",
+        re.IGNORECASE,
     ),
 }
 _VALUE_COMPILED = [re.compile(pat, flags) for pat, flags in _VALUE_PII_PATTERNS.values()]
@@ -164,16 +193,17 @@ def scan_text(text, identity_config=DEFAULT_IDENTITY_CONFIG):
 
     The value-level counterpart to `scan` (which reads file CONTENTS for the
     file-distribution boundary). Applies the operator-IDENTITY tokens + the tractable
-    EXCLUDED_RAW_PII value classes — generic dotted-domain email (any provider) and
-    phone (E.164 + NANP) (bead g5x) — and NOT the structural store-line patterns
-    (those detect a leaked store NDJSON FILE, not personal data inside a scalar
-    token). Used by the router summary boundary (bead 8j6) to fail-closed on raw PII
-    in a pass-through field value.
+    EXCLUDED_RAW_PII value classes — generic dotted-domain email (any provider),
+    phone (E.164 + NANP) (bead g5x), and US postal address via the precise
+    ZIP/state-anchored detector (bead nue) — and NOT the structural store-line
+    patterns (those detect a leaked store NDJSON FILE, not personal data inside a
+    scalar token). Used by the router summary boundary (bead 8j6) to fail-closed on
+    raw PII in a pass-through field value.
 
     The text is NFKC-folded first, so compatibility homographs (e.g. a fullwidth
     `＠`) normalise to their canonical form before matching, then capped at
     `_MAX_SCAN_TEXT_LEN` to bound match cost. Out of scope for this single-operator
-    value boundary (see the `_VALUE_PII_PATTERNS` note): postal addresses,
+    value boundary (see the `_VALUE_PII_PATTERNS` note): ZIP-less postal fragments,
     cross-script (Cyrillic) confusables, TLD-less local addresses (`name@localhost`),
     and bare contiguous phone digits. The value classes are deliberately NOT applied
     by `scan` — the trunk scanner stays gmail-conservative.

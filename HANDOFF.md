@@ -12,6 +12,28 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 45 (2026-06-09)
+
+> Confirmed by Walter ("confirmed, proceed with nue"). Session frame: Walter's completion directive (saved as memory `project-completion-definition`) — project completed, tested/verified, a great dashboard (stats+plans+tracking), build decisions documented for future-session extensibility. **Hook/settings authorization GRANTED this session** ("You have permission to edit hooks/settings" — does NOT persist past S45). S45 = close the Track-1 PII/safety boundary + prove the dashboard production path with synthetic data. Each unit its own short-lived `fix/s45-*` branch → FULL `/review-pr` (fresh via Skill tool, all phases incl. dispatched blind triage + blind verify) → `/merge`. Verify each bead's LIVE state before touching it (PF-S6-01).
+
+Goal: Close the Track-1 PII/safety boundary (the gate on real operator data) and prove the dashboard production path end-to-end with synthetic data so the quality gaps for "great" are known and beaded.
+
+Acceptance criteria:
+- [ ] AC1 (`nue` P2): `pii_scan.scan_text` gains a PRECISE postal detector — case-insensitive, anchored on a strong co-signal (US ZIP 5(-4) and/or 2-letter state token) per the bead; negative controls prove "Dr Patel followup" / "5 Star Gym Way" / "1 Rep Max St progression" do NOT match; asserted through `router.summarize` (both sinks). RED-proven tests. The trunk-wide `scan` stays gmail-conservative (not widened).
+- [ ] AC2 (`3lv` P2): `block-pii-commit.sh` registered in `.claude/settings.json` (`${CLAUDE_PROJECT_DIR}`-relative), verified to FIRE live this session, with its clone-hostility resolved per the bead's live detail (verified at PR start; HALT + escalate if resolution requires more than `nue` delivers).
+- [ ] AC3 (`am4` P2, docs-only): single dated ADR-0005 freshness sweep — OQ-1 flipped to resolved-downstream, Y-statement + Consequences + Review-triggers reconciled to the built enforcement.
+- [ ] AC4 (`dv3` P3): pre-push git hook running `pii_scan.scan` over the push range (pre-push chosen over hosted CI — local-first fit; installed for clones via `init_instance` if that is the right seam, verified at PR start).
+- [ ] AC5 (dashboard verification): `generate.run("dashboard")` + `render_views` exercised end-to-end with SYNTHETIC data through the real production path (no PII; artifact NOT committed); rendered artifact presented to Walter; every quality/feature gap (incl. plans-on-dashboard) beaded with severity.
+- [ ] AC6 (lifecycle): each unit its own `fix/` branch → FULL `/review-pr` → `/merge`; every LEGITIMATE finding fixed or beaded, 0 suppressed (PF-S26-01); suite stays green (310+); 4 close audits @ `--session 45` green; close after all merges (PF-S25-01).
+
+Files I WILL touch: `scripts/guard/pii_scan.py` + `tests/guard/test_pii_scan.py` + `tests/plan/test_router.py` (nue); `.claude/settings.json` + `.claude/hooks/*` + their tests (3lv, dv3 — authorized); `docs/adr/ADR-0005-operator-agnostic-clonable-pii-free-trunk.md` (am4); `scripts/clone/init_instance.py` + tests IF the pre-push install lands there (dv3); HANDOFF.md; `vault/sessions/session-45.md` (NEW); `vault/meta/overview.md`; `vault/sessions/scope-contract-archive.md` (archive S44 at close); `.beads/issues.jsonl` via `bd`.
+
+Files I will NOT touch: `scripts/plan/router.py` `summarize`/`dispatch` SIGNATURES (consume read-only; assert through them); `scripts/store/keying.py`; `loop_schema` published contract; `render.emit` engine + `component_set`; `scripts/store/store.py`; the deployed roster `.claude/agents/*`; INVARIANTS.md register rows (surface candidates, don't self-promote); `main` directly; real operator-PII values.
+
+NOT doing: Track 2 correctness beads; the dashboard "great" feature work itself (beaded, not built); library population; LM-04 with real data; the platform-map doc; redefining any consumed read-only V1 contract (escalate).
+
+Invariants at risk: INV-BRANCH-NOT-MAIN, INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-TRUNK-COMPLETENESS, INV-ROLE-INLINING. Governing: every change must STRENGTHEN the PII boundary (motivated safety controls, not defensive programming); trunk-`scan` conservatism holds so clonability is not regressed.
+
 ## Scope Contract — Session 44 (2026-06-08)
 
 > Confirmed by Walter ("confirmed g5x path and yes I authorize editing hooks and settings") — a **residual-bead-fixing** session continuing **Track 1 (PII/safety)** in least-reversible-risk priority order. PR-1 = `g5x` (the actionable P1; the other open P1 `c6k` is the LM-01 epic, not code). Each coherent unit = a short-lived `fix/` branch off `main` → FULL `/review-pr` (6 agents + dispatched profile-less Phase-3 blind triage + Phase-7 blind verify) → `/merge`. Verify each bead's LIVE state before touching it (PF-S6-01). Skills invoked FRESH via the Skill tool, FULL methodology (PF-S39-01 + PF-S40-01). **Hook/settings authorization GRANTED this session** (`.claude/hooks/*` + `.claude/settings.json` — does NOT persist past S44) so Track-1 distribution items can follow `g5x` without stalling mid-flight.

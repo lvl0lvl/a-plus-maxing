@@ -557,15 +557,18 @@ def test_summarize_does_not_gate_derived_fields():
     ("hard-limits", "ask op.user@googlemail.com first", "op.user@googlemail.com",
      "googlemail"),
     ("goal-targets", "call me +1 415 555 0199 anytime", "415 555 0199", "phone"),
+    ("hard-limits", "deliveries to 123 main st, springfield il 62704 only",
+     "123 main st", "postal (nue)"),
 ])
 def test_summarize_raises_on_widened_pii_class_in_passthrough(field, value, secret, label):
-    """g5x AC1: each tractable EXCLUDED_RAW_PII contact class in a pass-through RAISES.
+    """g5x AC1 + nue: each tractable EXCLUDED_RAW_PII contact class in a pass-through
+    RAISES.
 
-    Reds on the gmail-only scan_text (a non-gmail email / phone scored 0 and flowed
-    through). The raise names the field, never echoes the value (no PII leak in the
-    error). Asserted at the summarize boundary — the single 0-raw-PII boundary upstream
-    of BOTH dispatch (model) and assemble (render). (Postal is not a value-boundary
-    class — PR#78 BUG-1/HIST-1, deferred to a precise-detector bead.)
+    Reds on the gmail-only scan_text (a non-gmail email / phone / postal scored 0 and
+    flowed through). The raise names the field, never echoes the value (no PII leak in
+    the error). Asserted at the summarize boundary — the single 0-raw-PII boundary
+    upstream of BOTH dispatch (model) and assemble (render). The postal row binds the
+    nue precise (ZIP/state-anchored, case-insensitive) detector to this boundary.
     """
     # Control: the all-clean baseline does NOT raise (the falsifying baseline).
     router.summarize(_clean_store_read())
