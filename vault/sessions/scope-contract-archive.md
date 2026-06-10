@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-46. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-47. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 47 (2026-06-10)
+
+Dashboard v1 target design, MOCKUP-FIRST (pure design/docs — no build). Mocked the unified plan-forward Whoop/Apple-Health "Today" command center in Pencil across 4 iteration rounds to Walter's sign-off ("good enough for v1"); 7 zones (hero rings → week calendar → today's-plan app-screens → trends → all-16-specialist care team → goals → labs). Captured as the frozen target `vault/design/dashboard-v1-design.md` (+ load-bearing decisions + data-model delta + bead-resolution map); annotated the 6 dashboard beads. AC1-AC4 PASS. **Full contract + S47 eval/drift/PF preserved in `vault/sessions/session-47.md` + `memory/process-failures.md` (S47 drift checks + close attestation) + git history** (compacted here at the S48 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 46 (2026-06-10)
 
