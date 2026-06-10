@@ -18,7 +18,8 @@ and unattended/cron use: no stdin, no prompt, no server, run-to-completion. CLI:
 exit 0.
 
 **Contracts:**
-- `_TEMPLATES = {"dashboard", "report"}` — unknown name KeyErrors.
+- `_TEMPLATES` is a name→module dict (`"dashboard"`/`"report"` → its template module);
+  `run()` raises `KeyError` naming the known set for an unknown artifact name.
 - `_read_store(root)` enumerates `*.ndjson` under the root and concatenates per-item
   reads into the flat read model — a DOCUMENTED coupling to the store's on-disk layout
   (replace in one line when a published `store.read_all` exists). This is why ALL stream

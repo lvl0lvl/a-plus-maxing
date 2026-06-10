@@ -18,8 +18,10 @@ Per the frozen dashboard design, the full matrix table is NOT a v1 dashboard zon
 module remains the detail output until v2.
 
 **Contracts:**
-- `_STATE_DISPLAY` maps each published `loop_schema` state 1:1 to a display string; an
-  unmapped marker KeyErrors (fails loud, never a silent wrong render).
+- `_STATE_DISPLAY` covers the four absence/pending states (`pending`,
+  `not-yet-answered`, `no-data`, `no-prior`) 1:1; `ANSWERED_OVER_TIME` deliberately has
+  no row (an answered watch-out renders its answers, not a state marker); an unmapped
+  state KeyErrors (fails loud, never a silent wrong render).
 - Projection guardrail (ADR-0007, render-time contract): renders only at
   `PROJECTION_MIN_TIMEPOINTS = 3`+; carries the verbatim honest-absence
   `PROJECTION_LABEL`, the method, datapoint count, widening band, time axis. At most ONE

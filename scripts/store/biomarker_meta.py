@@ -50,7 +50,7 @@ def to_number(value):
     poison SVG scaling. Missing/non-numeric values likewise read None.
 
     Args:
-        value: The stored value to coerce.
+        value (int | float | str | None): The stored value to coerce.
 
     Returns:
         (float | None) The finite number, or None.
@@ -106,7 +106,7 @@ def state_for(item, value):
 
     Args:
         item (str): The marker name, with or without a stream prefix.
-        value: The latest value to judge.
+        value (int | float | str | None): The latest value to judge.
 
     Returns:
         (str | None) "good", "concern", or None.
@@ -133,8 +133,8 @@ def trend(item, prev, latest):
 
     Args:
         item (str): The marker name, with or without a stream prefix.
-        prev: The prior value.
-        latest: The latest value.
+        prev (int | float | str | None): The prior value.
+        latest (int | float | str | None): The latest value.
 
     Returns:
         (str | None) "improving", "flat", "regressing", or None.

@@ -21,8 +21,10 @@ protocols; raises no automated signal.
   `watch-out::<name>` (string answers), `feedback::physician-feedback` (free-text
   entries, one fixed item). The `::` separator keeps prefixed ids direct children of the
   store root.
-- **Published states (read 1:1 by render):** `pending`, `not-yet-answered`, `no-data`
-  (zero timepoints), `no-prior` (exactly one), `answered-over-time`.
+- **Published states:** `pending`, `not-yet-answered`, `no-data` (zero timepoints),
+  `no-prior` (exactly one), `answered-over-time`. Render maps the four absence/pending
+  states 1:1 (`render_views._STATE_DISPLAY`); `answered-over-time` has no display row
+  (an answered watch-out renders its answers); an unmapped state KeyErrors.
 - Writers: `record_biomarker / record_pending_panel / record_watchout_answer /
   record_physician_feedback`. Readers: `read_biomarker` (returns
   `{state, timepoints}` — state None when ≥2 timepoints), `read_panel`,
