@@ -356,6 +356,10 @@ def test_scan_text_detects_value_pii_classes(value, label):
     ("456 oak avenue, columbus oh 43004-1234", "full suffix word + ZIP+4"),
     ("789 elm rd 62704", "street-suffix + ZIP, no state token"),
     ("100 acacia, springfield il 62704", "state+ZIP, no recognizable street suffix"),
+    ("100 maple, fort wayne in 46802", "word-state token 'in' (Indiana) — TEST-2"),
+    ("po box 123, springfield il 62704", "PO Box, comma after box number — TEST-3"),
+    ("po box 123 springfield il 62704", "PO Box, no comma — TEST-3"),
+    ("ship to 123 main st, springfield il\n62704", "\\s+ separator bridges the newline — TEST-1"),
 ])
 def test_scan_text_detects_postal_address(value, label):
     """nue AC1: a full street address in a free-text value scores >=1, ANY case.
@@ -364,7 +368,9 @@ def test_scan_text_detects_postal_address(value, label):
     5(-4) preceded by street-number+words plus a street-suffix token OR a 2-letter
     state token — so it is case-INSENSITIVE (case is the wrong discriminator,
     PR#78 BUG-1/HIST-1) without flooding on Title-case training text. Reds on the
-    postal-less scan_text.
+    postal-less scan_text. The TEST-2/TEST-3/TEST-1 rows pin the word-state token,
+    both PO Box comma forms (the \\s*,?\\s+ lead-in), and the newline-crossing \\s+
+    separator (fail-closed widening).
     """
     assert pii_scan.scan_text(value, identity_config=NO_CONFIG) >= 1, label
 
@@ -394,6 +400,11 @@ def test_scan_text_detects_compatibility_homograph_email():
     "4 vial lot 90210",                    # number+words+5-digit with no suffix/state co-signal (nue)
     "10 St John's Wort daily",             # 'St' as Saint + a number, no ZIP (nue)
     "5 Star Gym Way every morning",        # street-suffix word but no ZIP anywhere (nue)
+    "walked 5 km in 10000 steps",          # word-state 'in' + metric, tail guard kills it (BUG-1)
+    "target 10000 steps or 12500 calories",  # word-state 'or' + two ZIP-shaped metrics (BUG-1)
+    "12 week plan from dr patel: 10000 steps/day",  # 'dr' honorific as street-suffix lead (BUG-2)
+    "10 sets in 90210 zone",               # word-state 'in' + 5-digit mid-value (HIST-1)
+    "123 Main St\nSpringfield, IL 62704",  # canonical TWO-LINE address — out of scope (TEST-1)
 ])
 def test_scan_text_value_boundary_negative_controls(value):
     """g5x AC2 + nue: health free-text does NOT trip the value patterns (== 0).
@@ -404,12 +415,27 @@ def test_scan_text_value_boundary_negative_controls(value):
     F-TEST2 honest boundary), and date fragments must not register as PII. The nue
     rows pin the postal detector's co-signal anchoring: a bare 5-digit number, a
     Saint/honorific 'St'/'Dr', or a suffix-shaped word WITHOUT a ZIP must not match.
-    The leading liveness assert proves _VALUE_COMPILED is ACTIVE, so a regression that
-    disabled the patterns reds here too (not only in the positive-detection test —
-    F-TEST1).
+    The BUG-1/BUG-2/HIST-1 rows pin the (?!\\s*\\w) tail guard: a ZIP-shaped metric
+    followed by more words must not match even with a word-state/honorific co-signal
+    (a hit here fail-closes planning on legit health text). The two-line row pins the
+    documented out-of-scope street-line/city-line newline split. The leading liveness
+    assert proves _VALUE_COMPILED is ACTIVE, so a regression that disabled the
+    patterns reds here too (not only in the positive-detection test — F-TEST1).
     """
     assert pii_scan.scan_text("x@protonmail.com", identity_config=NO_CONFIG) >= 1  # patterns live
     assert pii_scan.scan_text(value, identity_config=NO_CONFIG) == 0
+
+
+def test_scan_text_postal_accepted_residual_value_final_metric():
+    """nue residual pin: a value ENDING in a bare 5-digit metric after a word-state
+    token ("felt ok," -> 'ok' is Oklahoma) survives the tail guard and STILL matches.
+
+    This is the documented accepted false positive (fail-closed: the operator
+    rephrases). Pinned so a future regex change that silently flips it to 0 reds
+    here and forces the residual documentation in _VALUE_PII_PATTERNS to be
+    re-evaluated alongside it.
+    """
+    assert pii_scan.scan_text("did 3 sets, felt ok, 10000", identity_config=NO_CONFIG) >= 1
 
 
 def test_scan_text_caps_input_length():
