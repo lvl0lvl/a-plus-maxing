@@ -108,6 +108,6 @@ this dashboard requires, scoped as its own effort:
 | `i1t` (P1) | Unified surface routes by stream TYPE (typed reads); biomarkers → numeric viz, panels/watch-outs/feedback → typed renders. No string value reaches a numeric sparkline. |
 | `azf` (P2) | Clean labels throughout ("Ferritin", never `biomarker::ferritin`). |
 | `1oh` (P2) | The entire Today's-plan zone + a render surface for `assemble()` output; generalized to structured daily plans (workout/nutrition/supplements/peptides). |
-| `i2yw` (P2) | Stats zone merges `dashboard.py` value-cards + `render_views.py` matrix/projection into one type-routed surface. |
+| `i2yw` (P2) | Performance & trends (zone 4) is the merged stats surface: `dashboard.py` value-cards + `render_views.py` trend/projection content render there as type-routed metric cells (trend chips carry the naive-projection readout). The full biomarker matrix table is NOT a v1 dashboard zone — it stays available as `render_views` detail output until v2. |
 | `y0h0` (P3) | Cards carry units, dates, deltas, ranges, state dots — gated on the new biomarker metadata. |
 | `04uk` (P2) | The design forces a mixed store; the test seeds biomarker+panel+watch-out+feedback and asserts no crash + correct type-routing (the coverage that hid the F1 crash). |
