@@ -25,6 +25,10 @@
 #   TOCTOU staged file absent from HEAD -> deny (git diff --cached, not git ls-files)
 #   scoped-identity (i)  name in non-data-bearing prose -> allow (provenance)
 #   scoped-identity (ii) name in a data-bearing path    -> deny (identity leak)
+#   fixture  store-line in docs/ -> deny; SAME line in tests/ -> allow (partition);
+#            operator contact in tests/ -> deny (tokens run everywhere)
+#   seq      stage-and-commit in one command / commit -a -> deny (sequencing guard);
+#            amend + plain commit stay allowed (scannable shapes)
 #   3lv (i)   non-operator gmail -> allow (the generic-gmail flood is gone)
 #   3lv (ii)  operator contact, NO config -> allow (config-driven; clone semantics)
 #   3lv (iii) operator contact in docs prose -> deny (contact scope is trunk-wide)
@@ -210,7 +214,7 @@ import os
 from pathlib import Path
 DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
 DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
-def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG):
+def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG, include_structural=True):
     open(os.environ["SEC01B_SENTINEL"], "w").write("ran")
     return 0
 PY
@@ -303,7 +307,7 @@ cat > "$NUMSTUB/scripts/guard/pii_scan.py" <<PY
 from pathlib import Path
 DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
 DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
-def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG):
+def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG, include_structural=True):
     print("not-a-number")
     return 0
 PY
@@ -314,6 +318,62 @@ OUT=$(printf '{"tool_input":{"command":%s}}' \
     && ok "F-TEST2 non-numeric rc-0 scan output -> DENY (^[0-9]+\$ fail-closed clause)" \
     || bad "F-TEST2 non-numeric output fell through to -ge 1 -> ALLOW, got: $OUT"
 git -C "$REPO" reset -q; rm -f "$REPO/docs/leak5.md"
+
+# ── fixture partition (dv3): structural patterns skip tests/, tokens do not ─────
+# A reading-shaped literal in a NON-fixture path is the real leaked-store vector
+# and must deny; the SAME literal in tests/ is a synthetic fixture by construction
+# and must commit; an operator-contact token in tests/ is STILL a leak and denies.
+STORE_LINE='{"item": "rhr", "timepoint": "2026-06-01T08:00:00+00:00", "source": "manual", "value": 55}'
+mkfile "docs/pasted-reading.md" "$STORE_LINE"
+git -C "$REPO" add docs/pasted-reading.md
+OUT=$(invoke "git commit -m 'pasted'")
+[[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
+    && ok "fixture-partition: store-line in docs/ -> DENY (structural net live)" \
+    || bad "fixture-partition: store-line in docs/ NOT denied: $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/pasted-reading.md"
+
+mkfile "tests/store/test_fixture.py" "PLANT = '$STORE_LINE'"
+git -C "$REPO" add tests/store/test_fixture.py
+OUT=$(invoke "git commit -m 'fixture'")
+[[ "$OUT" != *'"deny"'* ]] \
+    && ok "fixture-partition: store-line in tests/ -> ALLOW (synthetic fixture)" \
+    || bad "fixture-partition: tests/ fixture wrongly DENIED (clonability regression): $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/tests/store/test_fixture.py"
+
+mkfile "tests/store/test_leak.py" "CONTACT = '$OPERATOR_CONTACT'"
+git -C "$REPO" add tests/store/test_leak.py
+OUT=$(invoke "git commit -m 'leakfixture'")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"tests/store/test_leak.py"* ]]; } \
+    && ok "fixture-partition: operator contact in tests/ -> DENY (tokens still run)" \
+    || bad "fixture-partition: contact in tests/ NOT denied (token scan dropped): $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/tests/store/test_leak.py"
+
+# ── seq: stage-and-commit in ONE command -> deny (condition-0 sequencing guard) ──
+# The PreToolUse staged-set snapshot predates any `git add` inside the same command,
+# so single-call add+commit (and `git commit -a`, which stages by itself) would be
+# scanned against an EMPTY staged set — a vacuous boundary for the dominant agent
+# idiom (discovered live at 3lv registration). These deny EVEN ON A CLEAN TREE:
+# the guard is about sequencing, not content.
+for seqform in "git add docs/x.md && git commit -m 'x'" \
+               "git rm old.md && git commit -m 'x'" \
+               "printf 'y' > f && git add f && git commit -m 'x'" \
+               "git commit -am 'x'" \
+               "git commit -a -m 'x'" \
+               "git commit --all -m 'x'"; do
+    OUT=$(invoke "$seqform")
+    [[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
+        && ok "seq stage+commit single-call DENIED: $seqform" \
+        || bad "seq guard missed single-call form: '$seqform' got: $OUT"
+done
+
+# seq allow-boundary: amend (uses the VISIBLE staged set) and a plain commit are
+# the scannable shapes and must NOT trip the sequencing guard.
+for okform in "git commit --amend -m 'x'" "git commit -m 'plain'"; do
+    OUT=$(invoke "$okform")
+    [[ "$OUT" != *'"deny"'* ]] \
+        && ok "seq scannable shape allowed: $okform" \
+        || bad "seq guard false-positive on scannable shape '$okform': $OUT"
+done
 
 # ── 3lv (i): a NON-operator email -> ALLOW (the generic-gmail flood is GONE) ─────
 # The load-bearing clonability fix: a synthetic gmail address that is NOT in the

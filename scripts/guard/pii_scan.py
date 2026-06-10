@@ -179,20 +179,26 @@ def _load_identity_patterns(config_path):
     return patterns
 
 
-def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG):
+def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG, include_structural=True):
     """Count operator-PII matches across the contents of the supplied files.
 
     Args:
         tracked_files (iterable[str]): Paths to scan (the caller's current
             staged/tracked set; not re-enumerated here).
-        identity_config (str | Path, optional): Path to the gitignored
-            operator-identity token file; absent -> identity detection is empty.
+        identity_config (str | Path, optional): Path to a gitignored token file
+            (identity or contact); absent -> token detection is empty.
+        include_structural (bool, optional): Apply the agnostic structural
+            store-line patterns. Callers scanning known-fixture paths (test
+            suites whose fixtures embed synthetic reading-shaped literals by
+            construction) pass False so only the config-driven tokens run there
+            (bead dv3 — the structural net over fixtures is pure false positive).
 
     Returns:
         (int) Total number of operator-PII matches across the files' contents.
         Each file with >=1 match is named on stderr as `PII-HIT: <path>`.
     """
-    patterns = _COMPILED_AGNOSTIC + _load_identity_patterns(identity_config)
+    structural = _COMPILED_AGNOSTIC if include_structural else []
+    patterns = structural + _load_identity_patterns(identity_config)
     total = 0
     for path in tracked_files:
         try:
