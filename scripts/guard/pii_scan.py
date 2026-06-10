@@ -75,23 +75,30 @@ _COMPILED_AGNOSTIC = [_CONTACT_COMPILED] + _STRUCTURAL_COMPILED
 # form requires separators so a contiguous numeric ID does not match.
 #
 # POSTAL address (bead nue) is detected at this boundary by a PRECISE detector
-# anchored on the strong co-signal PR#78 BUG-1/HIST-1 demanded: a US ZIP 5(-4) on
-# the same line as a street-number lead-in plus EITHER a street-suffix token OR a
-# 2-letter state token. Case-INSENSITIVE (case is the wrong discriminator —
-# "123 MAIN ST" and "123 main st" are the same address), yet "Dr Patel followup" /
-# "5 Star Gym Way" / "1 Rep Max St progression" cannot match: no ZIP. A bare
-# 5-digit number cannot match either: no street lead-in + co-signal. Accepted
-# edges, deliberate on a fail-closed PII boundary: a 2-letter state token that is
-# also an English word ("in", "or", "me") adjacent to a 5-digit token after a
-# number+words lead-in DOES match (a standalone ZIP-shaped token in that position
-# is plausibly real location data); spelled-out state names ("illinois") and
-# ZIP-less street lines are NOT matched (the ZIP is the co-signal that keeps the
-# detector off legitimate training text). Structured `postal-address` store data
-# is already stripped via the router's _RAW_TO_FIELD derivation, so this covers
-# the free-text-typed residual. Out of scope here: cross-script (Cyrillic)
-# homographs, TLD-less local addresses (name@localhost), and bare contiguous
-# phone digits (which flood on numeric IDs) — single-operator accidental-leakage
-# threat model.
+# anchored on the strong co-signal PR#78 BUG-1/HIST-1 demanded: a US ZIP 5(-4)
+# preceded by a street-number lead-in plus EITHER a street-suffix token OR a
+# 2-letter state token, with the ZIP value-final or punctuation-followed (the
+# (?!\s*\w) tail guard keeps metric continuations like "10000 steps" out).
+# Span semantics: the suffix->ZIP span and the state pattern's middle span are
+# line-confined ([^\n]), but every \s+ separator crosses newlines — which only
+# widens the catch (fail-closed direction). Case-INSENSITIVE (case is the wrong
+# discriminator — "123 MAIN ST" and "123 main st" are the same address), yet
+# "Dr Patel followup" / "5 Star Gym Way" / "1 Rep Max St progression" cannot
+# match: no ZIP. A bare 5-digit number cannot match either: no street lead-in +
+# co-signal. Honest residuals, deliberate on a fail-closed PII boundary:
+# (i) a value ENDING in a bare 5-digit metric after a word-state token ("did 3
+# sets, felt ok, 10000") still false-positives — fail-closed, the operator
+# rephrases; (ii) the tail guard makes a ZIP followed by a bare word ("62704
+# usa") an accepted recall miss; (iii) the canonical TWO-LINE mailing address
+# ("123 Main St\nSpringfield, IL 62704") is NOT detected — the street-line/
+# city-line newline split is out of scope (extension tracked in a bead).
+# Spelled-out state names ("illinois") and ZIP-less street lines are NOT
+# matched (the ZIP is the co-signal that keeps the detector off legitimate
+# training text). Structured `postal-address` store data is already stripped
+# via the router's _RAW_TO_FIELD derivation, so this covers the free-text-typed
+# residual. Out of scope here: cross-script (Cyrillic) homographs, TLD-less
+# local addresses (name@localhost), and bare contiguous phone digits (which
+# flood on numeric IDs) — single-operator accidental-leakage threat model.
 _ZIP = r"\d{5}(?:-\d{4})?"
 _STREET_SUFFIX = (
     r"st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|way|ct|court|"
@@ -108,16 +115,21 @@ _VALUE_PII_PATTERNS = {
         r"(?<!\d)(?:\+?\d{1,3}[\s.\-])?\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}(?!\d)",
         0,
     ),
-    # street-number + 1-5 words + street-suffix token ... ZIP, all on one line.
+    # street-number (optional comma) + 1-5 words + street-suffix token ... ZIP;
+    # the suffix->ZIP span is line-confined, the ZIP tail-guarded.
     "postal-street-zip": (
         rf"(?<!\d)\d{{1,5}}\s*,?\s+(?:[\w'’.#-]+\s+){{1,5}}(?:{_STREET_SUFFIX})\b\.?"
         rf"[^\n]{{0,48}}?(?<!\d){_ZIP}(?!\s*\w)",
         re.IGNORECASE,
     ),
-    # street-number lead-in ... 2-letter state token directly before the ZIP
+    # street-number lead-in ... 2-letter state token, then the tail-guarded ZIP
     # (catches suffix-less street names: "100 acacia, springfield il 62704").
     "postal-state-zip": (
-        rf"(?<!\d)\d{{1,5}}\s*,?\s+[^\n]{{2,60}}?\b(?:{_US_STATE})\s*,?\s+(?<!\d){_ZIP}(?!\s*\w)",
+        rf"(?<!\d)\d{{1,5}}\s*,?\s+[^\n]{{2,60}}?\b(?:{_US_STATE})\s*,?\s+"
+        # The (?<!\d) before the ZIP is inert here (the mandatory \s+ precedes
+        # it) — kept as parallelism with postal-street-zip, where it IS
+        # load-bearing, and as insurance against a future separator edit.
+        rf"(?<!\d){_ZIP}(?!\s*\w)",
         re.IGNORECASE,
     ),
 }
@@ -204,9 +216,10 @@ def scan_text(text, identity_config=DEFAULT_IDENTITY_CONFIG):
     `＠`) normalise to their canonical form before matching, then capped at
     `_MAX_SCAN_TEXT_LEN` to bound match cost. Out of scope for this single-operator
     value boundary (see the `_VALUE_PII_PATTERNS` note): ZIP-less postal fragments,
-    cross-script (Cyrillic) confusables, TLD-less local addresses (`name@localhost`),
-    and bare contiguous phone digits. The value classes are deliberately NOT applied
-    by `scan` — the trunk scanner stays gmail-conservative.
+    two-line/multi-line addresses (the street line + city line split across
+    newlines), cross-script (Cyrillic) confusables, TLD-less local addresses
+    (`name@localhost`), and bare contiguous phone digits. The value classes are
+    deliberately NOT applied by `scan` — the trunk scanner stays gmail-conservative.
 
     Args:
         text (str): The value to scan.
