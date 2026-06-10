@@ -350,6 +350,24 @@ def test_two_generation_structural_identity(tmp_path):
     assert _mask_data(a) == _mask_data(b), f"structural diff != 0: {diff[:3]}"
 
 
+def test_report_series_colors_registry_driven(tmp_path):
+    """F1: the report's data-driven series colors are registry-driven, not all-muted.
+
+    Mirrors the dashboard color leg of the AC-3 gate over the same fixture: rhr's
+    latest is in-range (good) and crp's latest is out-of-range (concern), so the
+    rendered sparkline strokes must include BOTH the good and concern decision
+    hexes. A report path that judges state without the latest value renders every
+    series muted and fails here.
+    """
+    from vault.design.templates import report
+
+    expected = _parse_decision()["palette"]
+    html = emit(report, _store_read(), _out_dir=tmp_path).read_text()
+    colors = _rendered_series_colors(html)
+    assert expected["good"].lower() in colors, f"good hex not rendered: {colors}"
+    assert expected["concern"].lower() in colors, f"concern hex not rendered: {colors}"
+
+
 def test_report_structural_identity(tmp_path):
     """AC-4: the report shares the structural-identity property (0 masked diff).
 

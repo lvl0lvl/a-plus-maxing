@@ -50,7 +50,7 @@ def render(store_read):
     for item in sorted(by_item):
         readings = by_item[item]
         values = [r["value"] for r in readings]
-        state = cs.state_for(item)
+        state = cs.state_for(item, values[-1] if values else None)
         latest = values[-1] if values else "—"
         sections.append(
             "<section>"
