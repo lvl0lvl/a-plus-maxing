@@ -4,8 +4,9 @@ vault/labs/raw/
 vault/store/
 vault/scaffold/filled/
 vault/artifacts/generated/
-# Operator-identity tokens for the PII scanner (per-instance; .example is tracked)
+# Operator-identity + operator-contact tokens for the PII scanner (per-instance; .example is tracked)
 vault/meta/operator-identity.txt
+vault/meta/operator-contact.txt
 
 # Environment
 .env

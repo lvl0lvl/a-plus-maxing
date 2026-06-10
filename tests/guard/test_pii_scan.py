@@ -1,9 +1,12 @@
 """Tests for scripts/guard/pii_scan.py — tracked-file operator-PII scanner.
 
 `scan(tracked_files, identity_config=...) -> int` reads each file's CONTENTS and
-counts operator-PII matches. The operator-AGNOSTIC patterns (generic `@gmail.com`
-contact + two structural store-line patterns) are tracked; the operator-IDENTITY
-tokens load at run time from the gitignored `vault/meta/operator-identity.txt`.
+counts operator-PII matches. The operator-AGNOSTIC patterns (two structural
+store-line patterns) are tracked; the operator-IDENTITY and operator-CONTACT
+tokens load at run time from gitignored configs (`vault/meta/operator-identity.txt`
+/ `operator-contact.txt`) — contact moved from a generic tracked `@gmail.com`
+pattern to the config model at 3lv (the generic pattern flooded on fixture/bead
+emails, breaking clonability).
 AC-2/AC-3 run the SAME scanner over the SAME controlled scratch git clone: clean
 set -> 0, then a planted token per class -> >=1, with the offending path reported
 via the single PII-HIT: <path> stderr channel. Identity detection is proven
@@ -25,6 +28,11 @@ from scripts.guard.pii_scan import scan
 # so the fixtures carry no operator name. Detection of this token must depend on
 # the config being present (config-driven, not hardcoded).
 SYNTHETIC_IDENTITY = "Testperson|Examplename"
+
+# A SYNTHETIC contact token (3lv): contact detection is config-driven like identity
+# — the trunk scan carries NO generic email pattern (it flooded on fixture/bead
+# emails, breaking clonability). Tests supply this token via a tmp config line.
+SYNTHETIC_CONTACT = r"test\.fixture@gmail\.com"
 
 # One planted token per declared operator-PII class. The contact plant uses a
 # synthetic gmail address; the structural health-data token is a synthetic
@@ -78,9 +86,14 @@ def _tracked(root):
 
 
 def _identity_config(tmp_path, token=SYNTHETIC_IDENTITY):
-    """Write a tmp identity config holding one synthetic token; return its path."""
+    """Write a tmp token config (synthetic identity + contact lines); return its path.
+
+    One regex per line, matching the production config shape. The contact line is
+    included because contact detection is config-driven (3lv) — tests asserting
+    all-class detection supply both token classes through this one config.
+    """
     cfg = tmp_path / "operator-identity.txt"
-    cfg.write_text(f"# synthetic test token\n{token}\n")
+    cfg.write_text(f"# synthetic test token\n{token}\n{SYNTHETIC_CONTACT}\n")
     return str(cfg)
 
 
@@ -108,14 +121,15 @@ def test_scan_clean_then_planted_same_clone(tmp_path):
 
 
 def test_agnostic_detection_without_config(tmp_path):
-    """Agnostic patterns detect with NO identity config (non-existent path).
+    """Agnostic (structural) patterns detect with NO config (a fresh clone).
 
-    A planted structural store-line and a generic `@gmail.com` contact are caught
-    even when the gitignored identity config is absent (a fresh clone).
+    A planted structural store-line is caught even when the gitignored token
+    configs are absent. Contact is NOT agnostic since 3lv — its config-driven
+    behavior is pinned in test_contact_detection_is_config_driven.
     """
     root = _scratch_clone(tmp_path)
     leak = root / "README.md"
-    body = leak.read_text() + PLANTS["contact"] + PLANTS["health-data"]
+    body = leak.read_text() + PLANTS["health-data"]
     leak.write_text(body)
     _git(["add", "-A"], root)
 
@@ -168,7 +182,8 @@ def test_scan_hits_each_pii_class(tmp_path, pii_class):
 
     Each declared class (identity, contact, health-data) planted alone into a
     tracked file's CONTENTS must produce >=1 — a single-token scanner fails this.
-    Identity is supplied via the synthetic tmp config.
+    Identity AND contact tokens are supplied via the synthetic tmp config (contact
+    is config-driven since 3lv); health-data detects agnostically.
     """
     root = _scratch_clone(tmp_path)
     cfg = _identity_config(tmp_path)
@@ -179,16 +194,17 @@ def test_scan_hits_each_pii_class(tmp_path, pii_class):
     assert scan(_tracked(root), identity_config=cfg) >= 1
 
 
-def test_agnostic_set_pins_spike_and_identity_is_config_sourced(tmp_path):
-    """Tracked AGNOSTIC set EQUALS the spike's agnostic patterns; identity is not.
+def test_agnostic_set_pins_structural_and_tokens_are_config_sourced(tmp_path):
+    """Tracked AGNOSTIC set is the two structural patterns ONLY; tokens are config-sourced.
 
     The scanner exposes its agnostic patterns as a module-level structure; this
-    asserts the exact spike regexes for contact + the two structural store-line
-    patterns, and that no operator-identity literal is in that tracked set (it is
-    sourced from the gitignored config instead).
+    asserts the exact spike regexes for the two structural store-line patterns,
+    and that neither the operator-identity nor the operator-contact tokens are in
+    that tracked set (each is sourced from its own gitignored config — bead 3lv:
+    the generic `@gmail.com` contact pattern was REMOVED from the trunk-wide set
+    because it floods on synthetic fixture/bead emails, breaking clonability).
     """
     declared_agnostic = {
-        "contact": r"[A-Za-z0-9._%+-]+@gmail\.com",
         "health-data-item-then-tp": (
             r'("item"|"value")[\s\S]{0,400}?"timepoint"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}'
         ),
@@ -198,9 +214,33 @@ def test_agnostic_set_pins_spike_and_identity_is_config_sourced(tmp_path):
     }
     assert set(pii_scan.AGNOSTIC_PATTERNS) == set(declared_agnostic)
     assert pii_scan.AGNOSTIC_PATTERNS == declared_agnostic
-    # Identity is config-sourced, not part of the tracked pattern set.
+    # Identity AND contact are config-sourced, not part of the tracked pattern set.
     assert "identity" not in pii_scan.AGNOSTIC_PATTERNS
+    assert "contact" not in pii_scan.AGNOSTIC_PATTERNS
     assert pii_scan.DEFAULT_IDENTITY_CONFIG.name == "operator-identity.txt"
+    assert pii_scan.DEFAULT_CONTACT_CONFIG.name == "operator-contact.txt"
+
+
+def test_contact_detection_is_config_driven(tmp_path):
+    """3lv: the operator contact is detected only when a config supplies it.
+
+    Plant a synthetic gmail address in a tracked file. With a contact config
+    carrying that token it is detected (>=1); with no config that same address is
+    NOT detected (==0) — proving contact detection is operator-specific and
+    config-driven, mirroring the identity model. The ==0 leg is the clonability
+    fix: a fresh clone (no config) no longer floods on fixture/bead emails.
+    """
+    root = _scratch_clone(tmp_path)
+    leak = root / "code.py"
+    leak.write_text(leak.read_text() + PLANTS["contact"])
+    _git(["add", "-A"], root)
+    files = _tracked(root)
+
+    cfg = tmp_path / "operator-contact.txt"
+    cfg.write_text("# synthetic test contact\n" + SYNTHETIC_CONTACT + "\n")
+    assert scan(files, identity_config=str(cfg)) >= 1
+    # Same address, no config -> NOT detected (the generic-gmail flood is gone).
+    assert scan(files, identity_config=NO_CONFIG) == 0
 
 
 def test_scan_detects_multiline_pretty_printed_reading(tmp_path):
@@ -228,11 +268,12 @@ def test_scan_names_offending_file_on_stderr(tmp_path, capfd):
     """AC-3 offending-file channel (Security MED): PII-HIT: <path> on stderr.
 
     The single pinned channel the ADR-0005-T1 hook reads — not the return value,
-    not a second channel.
+    not a second channel. Uses the structural (agnostic) plant since contact is
+    config-driven (3lv).
     """
     root = _scratch_clone(tmp_path)
     leak = root / "README.md"
-    leak.write_text(leak.read_text() + PLANTS["contact"])
+    leak.write_text(leak.read_text() + PLANTS["health-data"])
     _git(["add", "-A"], root)
     offending = str(leak)
 
@@ -267,17 +308,20 @@ def test_scan_returns_int_on_nonempty(tmp_path):
 
 
 def test_scan_contact_is_case_insensitive(tmp_path):
-    """2x1: a non-canonical-case gmail (Op.User@Gmail.COM) is detected (>=1).
+    """2x1: a non-canonical-case contact (Test.Fixture@Gmail.COM) is detected (>=1).
 
-    The contact literal `@gmail.com` was case-sensitive, so an upper/mixed-case
-    email scored 0 and PASSED the content scan. Case-insensitive matching must
-    catch it. Reds on the old case-sensitive pattern.
+    An upper/mixed-case email is the same contact and must score a hit, not pass.
+    Contact is config-driven since 3lv, so the token comes from the synthetic
+    config; the config loader compiles every token IGNORECASE, which this pins
+    (reds if the loader drops the flag).
     """
     root = _scratch_clone(tmp_path)
+    cfg = tmp_path / "operator-contact.txt"
+    cfg.write_text(SYNTHETIC_CONTACT + "\n")
     leak = root / "README.md"
-    leak.write_text(leak.read_text() + "reply-to: Op.User@Gmail.COM\n")
+    leak.write_text(leak.read_text() + "reply-to: Test.Fixture@Gmail.COM\n")
     _git(["add", "-A"], root)
-    assert scan(_tracked(root), identity_config=NO_CONFIG) >= 1
+    assert scan(_tracked(root), identity_config=str(cfg)) >= 1
 
 
 def test_identity_match_is_case_insensitive(tmp_path):
