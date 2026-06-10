@@ -2,12 +2,15 @@
 
 `run(clone_root)` is the one command a new operator runs after `git clone` to
 reach a fillable, PII-free local instance. It initializes the local NDJSON store
-under the gitignored `vault/store/` root through the ADR-0002-T1 store API and
-surfaces the empty `status: scaffold` pages in their unfilled state — it seeds no
-reading and rewrites no scaffold. Every read and write stays under the clone root:
-no path outside it, no other clone's store, no network. Data entered after init
-lands untracked via the ADR-0005-T1 `.gitignore` boundary, so a clone carries no
-operator data (the accepted no-VC-backup trade-off — see docs/clone-init.md).
+under the gitignored `vault/store/` root through the ADR-0002-T1 store API,
+installs the dv3 pre-push PII backstop into the clone's `.git/hooks/pre-push`
+(the only `.git/` write — marker-guarded, never clobbering an operator's own
+hook), and surfaces the empty `status: scaffold` pages in their unfilled state —
+it seeds no reading and rewrites no scaffold. Every read and write stays under the
+clone root: no path outside it, no other clone's store, no network. Data entered
+after init lands untracked via the ADR-0005-T1 `.gitignore` boundary, so a clone
+carries no operator data (the accepted no-VC-backup trade-off — see
+docs/clone-init.md).
 
 This is a THIN LEAF entry point (ADR-0005-T2 has 0 outgoing dependency edges); it
 CONSUMES the store (`store.read` / `vault/store/` root), and at Wave 4 the dashboard
@@ -36,9 +39,13 @@ STORE_SUBDIR = store.DEFAULT_ROOT
 # human-terminal/IDE push path never runs.
 PRE_PUSH_HOOK_SRC = ".claude/hooks/pre-push-pii-scan.sh"
 
-# First line of the tracked hook — the ownership marker `_install_pre_push_hook`
-# keys on so it never overwrites an operator's hand-written pre-push hook.
-_PRE_PUSH_MARKER = "pre-push-pii-scan.sh"
+# Ownership sentinel written as the SECOND line of every install (after the
+# shebang). `_install_pre_push_hook` refreshes a pre-push hook ONLY when this
+# exact line is present, and never overwrites a hook that lacks it — so an
+# operator's hand-written hook, or a wrapper that merely *calls* the backstop by
+# name, is preserved (PR#84 BUG-4: a substring-anywhere match clobbered such
+# wrappers).
+_PRE_PUSH_SENTINEL = "# APLUS-MANAGED dv3 pre-push-pii-scan"
 
 
 def _resolve_clone_root(clone_root):
@@ -90,10 +97,11 @@ def _install_pre_push_hook(clone_root):
 
     Copies `PRE_PUSH_HOOK_SRC` to the clone's `.git/hooks/pre-push` (executable).
     Skips, returning False, when the clone has no `.git/hooks` dir (a non-git
-    working copy — the test fixtures' tmp dirs) or when a pre-push hook NOT
-    carrying this script's marker already exists (never clobber an operator's own
-    hook). Re-running over a previously-installed copy refreshes it (marker
-    present -> ours to overwrite).
+    working copy — the test fixtures' tmp dirs) or when a pre-push hook that does
+    NOT carry the `_PRE_PUSH_SENTINEL` line already exists — a hand-written hook,
+    a wrapper that merely calls the backstop by name, or any binary/unreadable
+    hook is preserved untouched (PR#84 BUG-3/BUG-4). Re-running over a prior
+    install (sentinel present) refreshes it.
 
     Returns:
         (bool) True when the hook is installed/refreshed, False when skipped.
@@ -103,8 +111,17 @@ def _install_pre_push_hook(clone_root):
     if not src.is_file() or not hooks_dir.is_dir():
         return False
     dest = hooks_dir / "pre-push"
-    if dest.exists() and _PRE_PUSH_MARKER not in dest.read_text(encoding="utf-8"):
-        return False
+    if dest.exists():
+        try:
+            existing = dest.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            # An unreadable/binary existing hook is by definition not ours -> keep it.
+            return False
+        if _PRE_PUSH_SENTINEL not in existing:
+            return False
+        # Unlink first so a symlinked dest is replaced, not written THROUGH to its
+        # target (PR#84 BUG-4 symlink variant).
+        dest.unlink()
     shutil.copyfile(src, dest)
     dest.chmod(0o755)
     return True
