@@ -18,6 +18,20 @@ state. It makes no network call and reads nothing outside the clone. After init,
 fill the scaffold pages and enter your own readings; the instance generates a
 dashboard from your local inputs alone.
 
+### The PII pre-push backstop
+
+Init copies `.claude/hooks/pre-push-pii-scan.sh` into your clone's
+`.git/hooks/pre-push`. It scans the files in each push range for operator PII
+(your name on health-data paths, your contact tokens anywhere, store-shaped
+content) and blocks a push that would carry any to the remote — defense-in-depth
+behind the agent-session commit hook, for pushes from a plain terminal or IDE.
+
+- It **never overwrites** a pre-push hook you wrote yourself (it keys on an
+  ownership marker); re-running init refreshes only its own prior copy.
+- `git push --no-verify` bypasses it (as it does any pre-push hook).
+- To enable contact detection, copy `vault/meta/operator-contact.txt.example` to
+  `vault/meta/operator-contact.txt` (gitignored) and add your real email/handles.
+
 ### Your entered data is excluded from version control — keep a separate local backup
 
 Everything you enter after init — your readings under `vault/store/` and your
