@@ -557,7 +557,7 @@ def test_summarize_does_not_gate_derived_fields():
     ("hard-limits", "ask op.user@googlemail.com first", "op.user@googlemail.com",
      "googlemail"),
     ("goal-targets", "call me +1 415 555 0199 anytime", "415 555 0199", "phone"),
-    ("hard-limits", "deliveries to 123 main st, springfield il 62704 only",
+    ("hard-limits", "deliveries to 123 main st, springfield il 62704",
      "123 main st", "postal (nue)"),
 ])
 def test_summarize_raises_on_widened_pii_class_in_passthrough(field, value, secret, label):

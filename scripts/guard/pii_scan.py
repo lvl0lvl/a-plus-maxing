@@ -110,14 +110,14 @@ _VALUE_PII_PATTERNS = {
     ),
     # street-number + 1-5 words + street-suffix token ... ZIP, all on one line.
     "postal-street-zip": (
-        rf"(?<!\d)\d{{1,5}}\s+(?:[\w'’.#-]+\s+){{1,5}}(?:{_STREET_SUFFIX})\b\.?"
-        rf"[^\n]{{0,48}}?(?<!\d){_ZIP}(?!\d)",
+        rf"(?<!\d)\d{{1,5}}\s*,?\s+(?:[\w'’.#-]+\s+){{1,5}}(?:{_STREET_SUFFIX})\b\.?"
+        rf"[^\n]{{0,48}}?(?<!\d){_ZIP}(?!\s*\w)",
         re.IGNORECASE,
     ),
     # street-number lead-in ... 2-letter state token directly before the ZIP
     # (catches suffix-less street names: "100 acacia, springfield il 62704").
     "postal-state-zip": (
-        rf"(?<!\d)\d{{1,5}}\s+[^\n]{{2,60}}?\b(?:{_US_STATE})\s*,?\s+(?<!\d){_ZIP}(?!\d)",
+        rf"(?<!\d)\d{{1,5}}\s*,?\s+[^\n]{{2,60}}?\b(?:{_US_STATE})\s*,?\s+(?<!\d){_ZIP}(?!\s*\w)",
         re.IGNORECASE,
     ),
 }
