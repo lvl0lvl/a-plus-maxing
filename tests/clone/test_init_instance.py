@@ -372,7 +372,7 @@ def test_init_installs_pre_push_pii_backstop(tmp_path):
 
 
 def test_init_does_not_clobber_foreign_pre_push_hook(tmp_path):
-    """dv3: an operator's own pre-push hook (no marker) is preserved, not overwritten."""
+    """dv3: an operator's own pre-push hook (no sentinel) is preserved, not overwritten."""
     clone = _make_scratch_clone(tmp_path)
     _seed_pre_push_src(clone)
     foreign = clone / ".git" / "hooks" / "pre-push"
@@ -382,14 +382,51 @@ def test_init_does_not_clobber_foreign_pre_push_hook(tmp_path):
     assert foreign.read_text() == foreign_body
 
 
-def test_init_refreshes_previously_installed_backstop(tmp_path):
-    """dv3: a marker-carrying (ours) pre-push hook is refreshed on re-init."""
+def test_init_does_not_clobber_wrapper_that_calls_backstop_by_name(tmp_path):
+    """dv3 (BUG-4): a wrapper hook that CALLS the backstop by name (but lacks the
+    sentinel) is preserved — a substring-anywhere match would have clobbered it."""
     clone = _make_scratch_clone(tmp_path)
     _seed_pre_push_src(clone)
     dest = clone / ".git" / "hooks" / "pre-push"
-    dest.write_text("# pre-push-pii-scan.sh (stale prior install)\n")
+    wrapper = "#!/bin/sh\n./my-lint.sh && exec .claude/hooks/pre-push-pii-scan.sh \"$@\"\n"
+    dest.write_text(wrapper)
+    run(clone)
+    assert dest.read_text() == wrapper
+
+
+def test_init_preserves_binary_pre_push_hook_without_crashing(tmp_path):
+    """dv3 (BUG-3): a binary/non-UTF8 existing hook is preserved and run() does not raise."""
+    clone = _make_scratch_clone(tmp_path)
+    _seed_pre_push_src(clone)
+    dest = clone / ".git" / "hooks" / "pre-push"
+    dest.write_bytes(b"\x7fELF\x02\x01\x01\x00\xff\xfe\x00\x01binary-hook")
+    pages = run(clone)  # must not raise UnicodeDecodeError
+    assert dest.read_bytes().startswith(b"\x7fELF")
+    assert pages
+
+
+def test_init_refreshes_previously_installed_backstop(tmp_path):
+    """dv3: a sentinel-carrying (ours) pre-push hook is refreshed on re-init."""
+    clone = _make_scratch_clone(tmp_path)
+    _seed_pre_push_src(clone)
+    dest = clone / ".git" / "hooks" / "pre-push"
+    dest.write_text("#!/bin/bash\n" + init_instance._PRE_PUSH_SENTINEL + "\n# stale prior install\n")
     run(clone)
     assert "fail-closed" in dest.read_text()  # current source body, not the stale stub
+
+
+def test_init_replaces_symlink_dest_not_its_target(tmp_path):
+    """dv3 (BUG-4 symlink): a sentinel-carrying symlink dest is REPLACED — its target
+    is not written through."""
+    clone = _make_scratch_clone(tmp_path)
+    _seed_pre_push_src(clone)
+    target = clone / "operator-script.sh"
+    target.write_text("#!/bin/bash\n" + init_instance._PRE_PUSH_SENTINEL + "\noperator content\n")
+    dest = clone / ".git" / "hooks" / "pre-push"
+    dest.symlink_to(target)
+    run(clone)
+    assert dest.is_symlink() is False                # link replaced, not followed
+    assert "operator content" in target.read_text()  # target intact
 
 
 def test_init_without_hook_source_still_runs(tmp_path):
