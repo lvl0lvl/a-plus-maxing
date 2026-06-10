@@ -307,6 +307,66 @@ def test_sparkline_unknown_state_raises(component):
     assert component([1.0, 2.0], "neutral")  # the approved non-SERIES state renders
 
 
+def test_bar_sparkline_empty_series_renders_no_data_stub():
+    """An empty series renders the no-data svg with zero rects."""
+    svg = component_set.bar_sparkline([], "good")
+    assert "aria-label='no data'" in svg
+    assert "<rect" not in svg
+
+
+def test_bar_sparkline_single_value_spans_width():
+    """A single value renders one rect spanning the full 180px width."""
+    svg = component_set.bar_sparkline([7.0], "good")
+    rects = re.findall(r"<rect [^/>]*/>", svg)
+    assert len(rects) == 1
+    assert "width='180.0'" in rects[0]
+
+
+def _rect_heights(svg):
+    """Extract the height attribute of each <rect> (not the svg envelope's)."""
+    return [
+        re.search(r"height='([\d.]+)'", rect).group(1)
+        for rect in re.findall(r"<rect [^/>]*/>", svg)
+    ]
+
+
+def test_bar_sparkline_constant_series_equal_heights():
+    """A constant series renders equal-height bars (the span-0 fallback)."""
+    heights = _rect_heights(component_set.bar_sparkline([5.0, 5.0, 5.0], "good"))
+    assert len(heights) == 3
+    assert len(set(heights)) == 1
+
+
+def test_bar_sparkline_min_max_heights_hit_bounds():
+    """The series min and max scale to the 4px and 36px height bounds."""
+    heights = _rect_heights(component_set.bar_sparkline([0.0, 10.0], "good"))
+    assert heights == ["4.0", "36.0"]
+
+
+def test_dashboard_long_series_windows_to_cap(tmp_path):
+    """F4: a 120-point series renders at most the cap's bars, every width positive.
+
+    Without the tail window, 120 bars in the 180px envelope compute a NEGATIVE
+    per-bar width — invisible/garbage rects. The dashboard must render only the
+    LAST `render.MAX_TIMEPOINTS_PER_VIEW` values (the pinned ADR-0004 cap,
+    single-sourced from render.py).
+    """
+    from vault.design.templates import dashboard
+
+    sr = [
+        {"item": "biomarker::rhr", "timepoint": f"2026-01-01T{t // 60:02d}:{t % 60:02d}:00+00:00",
+         "source": "whoop", "value": 50 + (t % 7)}
+        for t in range(120)
+    ]
+    html = emit(dashboard, sr, _out_dir=tmp_path).read_text()
+    widths = [float(w) for w in re.findall(r"<rect [^>]*?width='(-?[\d.]+)'", html)]
+    assert widths, "the long series must render bars"
+    assert len(widths) <= render.MAX_TIMEPOINTS_PER_VIEW, (
+        f"{len(widths)} rects > cap {render.MAX_TIMEPOINTS_PER_VIEW}"
+    )
+    assert all(w > 0 for w in widths), f"non-positive rect widths: {sorted(widths)[:3]}"
+
+
 # --------------------------------------------------------------------------- #
 # Cycle 2 — dashboard + report templates, size, structural identity (AC-2, AC-4, AC-7)
 # --------------------------------------------------------------------------- #

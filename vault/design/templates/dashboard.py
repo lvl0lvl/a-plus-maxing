@@ -22,6 +22,8 @@ per-template color literals — so the palette stays single-sourced and the
 asset-checks the returned markup.
 """
 
+# Aliased: this module's template surface is itself named `render`.
+from scripts.generate import render as render_engine
 from scripts.store import biomarker_meta
 from vault.design.templates import component_set as cs
 
@@ -82,6 +84,9 @@ def _biomarker_row(item, values):
     label = biomarker_meta.display_name(item)
     if not numeric:
         return _plain_row(label, values[-1])
+    # Tail-window to the pinned per-view cap (single-sourced per ADR-0004): the
+    # bar envelope is fixed-width, so an uncapped series computes negative bars.
+    numeric = numeric[-render_engine.MAX_TIMEPOINTS_PER_VIEW:]
     latest_raw, latest = numeric[-1]
     meta = biomarker_meta.get(item)
     shown = f"{latest_raw} {meta['units']}" if meta else str(latest_raw)
