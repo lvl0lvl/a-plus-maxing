@@ -638,8 +638,6 @@ def _rendered_series_colors(html):
     }
 
 
-
-
 def test_contrast_and_colorblind(tmp_path):
     """AC-3 (Wave 3->4 go/no-go): COMPUTED contrast + CIEDE2000 deltaE, never booleans.
 

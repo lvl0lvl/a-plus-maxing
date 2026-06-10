@@ -48,7 +48,8 @@ def state_for(item, value=None):
 
     Args:
         item (str): The tracked-item name (stream prefix tolerated).
-        value (optional): The latest value the state judges; absent -> neutral.
+        value (int | float | str | None, optional): The latest value the state
+            judges; absent -> neutral.
 
     Returns:
         (str) "good", "concern", or "neutral".
