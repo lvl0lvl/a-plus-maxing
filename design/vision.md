@@ -3,7 +3,7 @@ title: Product Vision — a-plus-maxing
 type: vision
 status: active
 created: 2026-06-03
-last_reviewed: 2026-06-03
+last_reviewed: 2026-06-10
 review_cadence: every-5-sessions
 permalink: a-plus-maxing/design/vision
 ---
@@ -30,7 +30,7 @@ It is NOT a diagnosis, a prescription, or a substitute for clinical judgment.
 
 ## Who it is for
 
-- **V1 (now) — single operator.** Walter. He **builds his own plans** with the specialist roster + the gated wiki, tracks progress and outcomes over time, and **shares + refines them with his physician** (validation, lab orders, prescriptions; first physician touchpoint: the July 2026 visit, LM-01).
+- **V1 (now) — single operator, distributed to alpha testers.** Walter is the first operator: he **builds his own plans** with the specialist roster + the gated wiki, tracks progress and outcomes over time, and **shares + refines them with his physician** (validation, lab orders, prescriptions; first physician touchpoint: the July 2026 visit, LM-01). **V1 is also shared with others to alpha-test it** — each alpha tester `git clone`s the repository into their own fully independent local instance and fills it with *their own* data. This is the load-bearing reason the trunk must carry **zero operator PII**: the shared artifact is cloned by real people, so no operator's personal data (contact details, name on data-bearing paths, health data) may live in tracked source or git history. The operator-agnostic clonable distribution (ADR-0005) and the PII boundary (ADR-0001; the registered commit hook + pre-push backstop) exist precisely to make this safe.
 - **North Star (later) — a product for general practitioners.** The same engine, extended so a GP can track and interact with *their patients* — each patient's data isolated, the output a clinician-facing plan/report surface.
 
 ## The V1 / North-Star boundary (load-bearing)
