@@ -12,6 +12,28 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 48 (2026-06-10)
+
+> Confirmed by Walter ("the lighter path is approved") — the post-V1 documentation model: no per-feature spec→build-plan→task-plan pipeline; instead ADR per contract-changing decision + full `/review-pr` lifecycle + vault component notes. Walter additionally directed: keep the documentation/vault correctly configured — the `vault/components/` "what" layer (named by the CLAUDE.md ownership matrix but never created) gets seeded this session (AC6). PR #89 merged at open (`a47b313`, rebase, after a 3-agent docs-subset review fixed 6 findings). Not a `v1-build` recipe task — the wave/checkpoint attestation field is N/A (V1 plan complete 18/18).
+
+Goal: Build Slice 1 of the dashboard data-model delta — biomarker metadata, the type-routed unified render surface, and the mixed-stream test — per the frozen target `vault/design/dashboard-v1-design.md`.
+
+Acceptance criteria:
+- [ ] AC1: PR #89 reviewed (docs 3-agent subset) + merged to `main`; session continues from `main`.
+- [ ] AC2 (biomarker metadata): per-marker units + reference_range + good-direction polarity exist in the data model; `component_set.state_for` name-hash placeholder replaced with real in-range logic; `router._trend_token` no longer RAISES on directional change → resolves `y0h0`, `juc`.
+- [ ] AC3 (type-routed render): one unified render surface routing by stream type — no string value reaches numeric viz; clean labels (no `biomarker::` prefix) → resolves `i1t` (P1 crash), `i2yw`, `azf`.
+- [ ] AC4 (mixed-stream test): test seeding biomarker+panel+watch-out+feedback asserting no crash + correct type-routing → resolves `04uk`.
+- [ ] AC5: build decisions captured in an ADR; full `/review-pr` (all phases incl. blind triage + blind verify) → `/merge` on the build PR.
+- [ ] AC6 (vault "what" layer): `vault/components/` seeded with as-built component notes for the modules this build touches, with the maintenance rule (contract-changing PR updates its component note) stated.
+
+Files I WILL touch: `scripts/` data-model + render modules (`component_set.py`, `router.py`, `dashboard.py`, `render_views.py`, `generate.py`, `loop_schema.py` + new metadata module), `tests/`, a new `docs/adr/` entry, `vault/components/` (NEW), `.beads/issues.jsonl` via `bd`, HANDOFF/vault at close.
+
+Files I will NOT touch: `.claude/hooks/*` + `settings.json` (no authorization); INVARIANTS.md rows; deployed roster `.claude/agents/*`; `main` directly; `vault/design/dashboard-v1-design.md` (frozen target, read-only).
+
+NOT doing: plan-content schemas + `assemble()` render surface (`1oh` — Slice 2); wearable→recovery/strain/sleep scoring (LM-02-gated); calendar/event + goal-progress models; per-specialist rollup; library population; Track-2 beads beyond the overlapping `juc`.
+
+Invariants at risk: none structurally; the close set (INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS) enforced by the audits.
+
 ## Scope Contract — Session 47 (2026-06-10)
 
 > Confirmed by Walter ("Proceed" — fork on stop-at-sign-off vs roll-into-build deferred until we have an approved design, depends how long sign-off takes). Pencil is open with ANOTHER project's canvas — create a NEW `.pen`, do not touch the open one. Session frame: Walter's completion directive (memory `project-completion-definition`) — a great dashboard (stats+plans+tracking). S47 = the dashboard, MOCKUP-FIRST (standing directive `feedback-dashboard-pencil-mockups`): mock the unified dashboard in Pencil, iterate to sign-off, THEN build (build phase is post-sign-off, possibly S48). **NO hook/settings authorization this session.** Verify each bead's LIVE state before touching (PF-S6-01).
