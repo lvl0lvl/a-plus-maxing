@@ -81,7 +81,7 @@ log against it, rather than presenting an empty log.
 
 The mock is ahead of the current build. Today the store holds only biomarker / panel /
 watch-out / feedback streams (`{item, timepoint, source, value}` via `loop_schema`), and
-`plan/assemble.py` composes an attributed plan dict that has **no render surface**. Building
+`scripts/plan/assemble.py` composes an attributed plan dict that has **no render surface**. Building
 this dashboard requires, scoped as its own effort:
 
 - **Biomarker metadata** (per-marker units + reference_range + good-direction polarity).
