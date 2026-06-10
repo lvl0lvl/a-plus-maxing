@@ -544,28 +544,6 @@ def _rendered_series_colors(html):
     }
 
 
-def _registry_state_template(store_read):
-    """A fixture template rendering each item through the registry state path.
-
-    Mirrors the type-routed dashboard's component contract — `state_for` judged
-    on the latest value, `bar_sparkline` colored by that state — so the AC-3
-    data-driven color walk exercises the real registry-driven selection.
-    """
-    series = {}
-    for r in store_read:
-        series.setdefault(r["item"], []).append(r["value"])
-    rows = []
-    for item in sorted(series):
-        values = series[item]
-        state = component_set.state_for(item, values[-1])
-        rows.append(
-            "<div class='kpi-row'>"
-            f"{component_set.kpi(item, values[-1])}"
-            f"{component_set.bar_sparkline(values, state)}"
-            "</div>"
-        )
-    body = f"<div class='wrap'>{component_set.legend()}{''.join(rows)}</div>"
-    return f"<!doctype html><html lang='en'>{component_set.head('states')}<body>{body}</body></html>"
 
 
 def test_contrast_and_colorblind(tmp_path):
@@ -619,13 +597,11 @@ def test_contrast_and_colorblind(tmp_path):
     )
 
     # --- the data-driven series colors (NOT the legend swatches) must be exactly
-    # the registry-driven set the seed data exercises: rhr in-range -> good, crp
-    # out-of-range -> concern, hrv no-registered-range -> neutral (muted). watch
-    # is reserved (ADR-0008 D1) and can never be data-driven.
-    state_html = emit(
-        _registry_state_template, _store_read(), _out_dir=tmp_path / "states"
-    ).read_text()
-    colors = _rendered_series_colors(state_html)
+    # the registry-driven set the seed data exercises through the PRODUCTION
+    # dashboard: rhr in-range -> good, crp out-of-range -> concern, hrv
+    # no-registered-range -> neutral (muted). watch is reserved (ADR-0008 D1)
+    # and can never be data-driven.
+    colors = _rendered_series_colors(html)
     expected_colors = {
         expected["good"].lower(), expected["concern"].lower(), root["muted"].lower()
     }

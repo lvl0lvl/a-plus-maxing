@@ -103,7 +103,7 @@ def _biomarker_row(item, values, dates, projection=""):
     biomarker), so a non-final window renders the matrix points with no projection.
     Draws ALL markup from the shared `component_set` def (referenced, never re-declared).
     """
-    state = cs.state_for(item)
+    state = cs.state_for(item, values[-1])
     return (
         "<div class='kpi-row'>"
         f"{cs.kpi(item, values[-1])}"
@@ -237,7 +237,7 @@ def _windowed_rows(unit):
     if unit[0] == "marker":
         return [unit[2]]
     _kind, item, values, dates = unit
-    state = cs.state_for(item)
+    state = cs.state_for(item, values[-1])
     bounds = _window_bounds(len(values), render.MAX_TIMEPOINTS_PER_VIEW)
     rows = []
     for i, (start, end) in enumerate(bounds):
