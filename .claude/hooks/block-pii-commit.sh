@@ -83,6 +83,23 @@ fi
 # Only a git commit is our concern — detection single-sourced in lib/commit-matcher.sh (mic).
 is_git_commit "$COMMAND" || exit 0
 
+# ── Condition 0: stage-and-commit in ONE command -> deny (sequencing guard) ─────
+# This PreToolUse hook runs BEFORE the command executes, so its staged-set snapshot
+# below predates any `git add` INSIDE the same command — `git add X && git commit`
+# (and `git commit -a`, which stages modified tracked files itself) would be scanned
+# against an EMPTY staged set and sail through: the content scan would be vacuous
+# for the dominant agent commit idiom (discovered live at 3lv registration — a
+# staged-plant commit denied while the same plant added-and-committed in one call
+# passed). Deny those forms with sequencing guidance; a plain `git commit` against
+# a previously-staged set is the scannable shape. Threat model is accidental
+# leakage (same stance as the rest of this hook), not adversarial shell forms.
+if printf '%s' "$COMMAND" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?(add|mv|rm)([[:space:]]|$)'; then
+    deny "PII-FREE-TRUNK: staging and committing in ONE command defeats the content scan (the staged set is snapshotted BEFORE your command runs). Run the 'git add' first as its own command, then 'git commit' separately so the scan sees what you staged."
+fi
+if printf '%s' "$COMMAND" | grep -qE 'git[[:space:]]+commit[^;&|]*([[:space:]]-[a-zA-Z]*a[a-zA-Z]*([[:space:]]|$|=)|[[:space:]]--all([[:space:]]|$))'; then
+    deny "PII-FREE-TRUNK: 'git commit -a/--all' stages files itself, AFTER this scan snapshots the staged set — the content scan cannot see them. Stage explicitly with 'git add' (own command), then 'git commit' without -a."
+fi
+
 # Staged set git will actually commit — NOT git ls-files (the HEAD/tracked set), so a
 # git add-ed file absent from HEAD is scanned (Fix 3). Filter ACMRT covers Added,
 # Copied, Modified, Renamed, Type-changed: R/T must be included or a high-similarity
@@ -154,11 +171,22 @@ n_staged = int(sys.argv[1])
 staged = sys.argv[2:2 + n_staged]
 data_bearing = sys.argv[2 + n_staged:]
 
+# Known-fixture partition (dv3): the test suites' fixtures embed synthetic
+# reading-shaped literals BY CONSTRUCTION (the scanner's own plants, the V1
+# store/router/render fixtures), so the structural patterns are pure false
+# positive there — measured 7 test files / 100+ structural hits on a clean
+# tree. Fixture paths still get the contact/identity token scans (a real
+# operator token in a test file IS a leak); the accepted residual is a real
+# store READING pasted verbatim into tests/ (narrow, documented).
+fixtures = [f for f in staged if f.startswith("tests/")]
+non_fixtures = [f for f in staged if not f.startswith("tests/")]
+
 # (1) trunk-wide: structural (agnostic) patterns + the operator-contact tokens
 # (3lv). DEFAULT_CONTACT_CONFIG is relative, resolved against the hook's
 # PROJECT_ROOT cwd; absent (a fresh clone) -> the loader returns [] and only the
-# structural patterns run.
-trunk = scan(staged, identity_config=DEFAULT_CONTACT_CONFIG)
+# structural patterns run. Fixture paths: contact tokens only.
+trunk = scan(non_fixtures, identity_config=DEFAULT_CONTACT_CONFIG)
+trunk += scan(fixtures, identity_config=DEFAULT_CONTACT_CONFIG, include_structural=False)
 # (2) identity, data-bearing only: default (name-bearing) identity_config.
 identity = scan(data_bearing, identity_config=DEFAULT_IDENTITY_CONFIG) if data_bearing else 0
 
