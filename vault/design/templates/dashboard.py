@@ -12,7 +12,10 @@ numeric viz by construction:
 - `panel::X` -> a state-marker row: clean label + the stored value verbatim.
 - `watch-out::X` -> clean label + the stored answers joined `; `.
 - `feedback::...` -> a `Physician Feedback` row with each entry as a note line.
-- Anything else -> a plain label + latest-value row.
+- Any OTHER `::` prefix -> KeyError naming the prefix: routing for a new stream
+  type is added deliberately, never by silent fallthrough (ADR-0008 D3).
+- An unprefixed non-numeric item (the legacy catch-all) -> a plain clean-label +
+  latest-value row.
 
 Sections render biomarkers (sorted) first, then panels, watch-outs, feedback,
 and other rows. All markup and colors come from `component_set` — no
@@ -69,17 +72,17 @@ def _trend_chip(item, prev, latest):
 
 
 def _biomarker_row(item, values):
-    """Render one biomarker KPI row from its numeric values.
+    """Render one biomarker KPI row from its value series.
 
-    Clean label, latest value plus units when registered, registry-driven state
-    judged on the latest numeric value, a bar sparkline over ONLY the numeric
-    values, and a trend chip when the series carries >=2 numeric values. A
-    stream with no numeric value routes to a plain value row instead.
+    Clean label; the stream's TRUE latest reading as the headline — with units
+    when it is numeric and the marker is registered, verbatim with no units
+    when non-numeric (ADR-0008 D3); registry-driven state judged on the latest
+    NUMERIC value; a bar sparkline over ONLY the numeric values; and a trend
+    chip when the series carries >=2 numeric values. A stream with no numeric
+    value routes to a plain value row instead.
     """
     numeric = [
-        (value, n)
-        for value in values
-        if (n := biomarker_meta.to_number(value)) is not None
+        n for value in values if (n := biomarker_meta.to_number(value)) is not None
     ]
     label = biomarker_meta.display_name(item)
     if not numeric:
@@ -87,15 +90,18 @@ def _biomarker_row(item, values):
     # Tail-window to the pinned per-view cap (single-sourced per ADR-0004): the
     # bar envelope is fixed-width, so an uncapped series computes negative bars.
     numeric = numeric[-render_engine.MAX_TIMEPOINTS_PER_VIEW:]
-    latest_raw, latest = numeric[-1]
+    latest_reading = values[-1]
     meta = biomarker_meta.get(item)
-    shown = f"{latest_raw} {meta['units']}" if meta else str(latest_raw)
-    state = cs.state_for(item, latest)
-    chip = _trend_chip(item, numeric[-2][1], latest) if len(numeric) >= 2 else ""
+    if meta and biomarker_meta.to_number(latest_reading) is not None:
+        shown = f"{latest_reading} {meta['units']}"
+    else:
+        shown = str(latest_reading)
+    state = cs.state_for(item, numeric[-1])
+    chip = _trend_chip(item, numeric[-2], numeric[-1]) if len(numeric) >= 2 else ""
     return (
         "<div class='kpi-row'>"
         f"{cs.kpi(label, shown)}"
-        f"{cs.bar_sparkline([n for _, n in numeric], state)}"
+        f"{cs.bar_sparkline(numeric, state)}"
         f"{chip}"
         "</div>"
     )
@@ -143,6 +149,10 @@ def render(store_read):
 
     Returns:
         (str) The assembled dashboard HTML (single document, inline styling).
+
+    Raises:
+        KeyError: An item carries a `::` prefix outside the four routed stream
+            types (fail-loud; ADR-0008 D3).
     """
     series = _series_by_item(store_read)
     biomarkers, panels, watchouts, feedback, other = [], [], [], [], []
@@ -156,10 +166,16 @@ def render(store_read):
             watchouts.append(_watchout_row(item, values))
         elif item.startswith("feedback::"):
             feedback.append(_feedback_row(values))
+        elif "::" in item:
+            prefix = item.split("::", 1)[0] + "::"
+            raise KeyError(
+                f"unrouted stream prefix {prefix!r}: routing for a new stream "
+                f"type is added deliberately, never by silent fallthrough"
+            )
         elif all(biomarker_meta.to_number(value) is not None for value in values):
             biomarkers.append(_biomarker_row(item, values))
         else:
-            other.append(_plain_row(item, values[-1]))
+            other.append(_plain_row(biomarker_meta.display_name(item), values[-1]))
     rows = biomarkers + panels + watchouts + feedback + other
     body = (
         "<div class='wrap'>"
