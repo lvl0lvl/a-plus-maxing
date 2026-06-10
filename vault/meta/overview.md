@@ -4,7 +4,7 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-06-07
+last_reviewed: 2026-06-10
 depends_on: []
 superseded_by: null
 review_cadence: monthly
@@ -14,7 +14,9 @@ permalink: a-plus-maxing/meta/overview
 # A+ Maxing — System Overview
 
 ## Purpose
-Personal health agent focused on longevity + body composition. Bryan Johnson Blueprint-inspired but low-budget. Sleep, diet, training, supplementation, biomarker tracking — all in one agent-driven system. Walter is the user; Claude is the agent.
+Personal health agent focused on longevity + body composition. Bryan Johnson Blueprint-inspired but low-budget. Sleep, diet, training, supplementation, biomarker tracking — all in one agent-driven system. Walter is the first operator; Claude is the agent.
+
+**Distribution (load-bearing):** V1 is **shared with others to alpha-test it** — each tester clones the repo into their own independent local instance and fills it with their own data (the operator-agnostic clonable distribution, ADR-0005). Because the shared artifact is cloned by real people, **no operator PII may live in tracked source or git history** — enforced by the PII boundary (ADR-0001), the registered `block-pii-commit` hook, and the `pre-push-pii-scan` backstop. See `design/vision.md` "Who it is for".
 
 ## Architecture
 - **Markdown vault** = single source of truth (this directory)
