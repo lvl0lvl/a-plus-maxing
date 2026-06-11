@@ -28,12 +28,25 @@ self-contained HTML file. Templates are callables `template(store_read) -> html_
 - `component_set.sparkline(values, state)` — polyline SVG (render_views' ADR-0007
   surface). `bar_sparkline(values, state)` (S48) — bottom-aligned rect columns, the
   dashboard's bars-not-paths component. Both: numeric values ONLY (callers route).
-- Templates: `dashboard.py` — the TYPE-ROUTED operator surface (routes by stream prefix:
-  biomarker/unprefixed-numeric → KPI + units + state + bar sparkline + trend chip;
-  panel → state-marker row; watch-out → answers; feedback → notes; no string ever
-  reaches numeric viz). `report.py` — the physician-facing summary template.
+- `component_set.ACCENTS` (S49) — the five surface-category chrome colors from the
+  approved dashboard design (training/nutrition/supplements/peptides/sleep). Chrome
+  ONLY (zone borders, card headers) — never data state; data state stays the PALETTE
+  good/watch/concern/neutral vocabulary (ADR-0009 D3). Zone primitives `zone()`,
+  `awaiting()`, `ring_scaffold()` (S49) — the 7-zone scaffolding; `awaiting()` is the
+  mechanical honest-empty-state (no numbers ever; zone tests enforce digit-free).
+- Templates: `dashboard.py` — the 7-ZONE "Today" surface (ADR-0009): hero readiness
+  (awaiting until LM-02 wearable scoring), real week calendar (`_today` test seam),
+  four accent-chromed plan cards (awaiting until `1oh` plan schemas), Performance &
+  Trends (the REAL ADR-0008 type-routed rows: biomarker/unprefixed-numeric → KPI +
+  units + state + bar sparkline + trend chip), 16-card care-team grid (static
+  `_SPECIALISTS` tuple mirroring the deployed roster; replaced when a rollup model
+  lands), goals (awaiting), labs strip (panel → state-marker; watch-out → answers;
+  feedback → notes — real). Routing stays total: unknown `::` prefix raises (ADR-0008
+  D3 preserved verbatim). `report.py` — the physician-facing summary template
+  (untouched by the zone build).
 
 **Called by (production):** `generate.run` (dashboard/report), `render_views` (per-page
 emit).
 
-**Governing ADR:** ADR-0004 (engine + cap), ADR-0008 (type-routing, state, bars).
+**Governing ADR:** ADR-0004 (engine + cap), ADR-0008 (type-routing, state, bars),
+ADR-0009 (7-zone visual shell, accents, zone-state honesty).
