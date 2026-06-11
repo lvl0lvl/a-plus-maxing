@@ -140,10 +140,12 @@ def _trend_chip(item, prev, latest):
     if word is not None:
         return cs.pill(word, _TREND_STATE[word])
     arrow = "&#8593;" if latest > prev else "&#8595;" if latest < prev else "&#8594;"
+    # Raw span, not cs.pill(): pill() escapes its text, which would render the
+    # arrow ENTITY as literal "&#8593;" instead of the arrow glyph.
     return f"<span class='pill tint-neutral'>{arrow}</span>"
 
 
-def _biomarker_row(item, values):
+def _metric_card(item, values):
     """Render one zone-4 metric card from its value series.
 
     Card anatomy (visual spec zone 4), top to bottom: clean label; the
@@ -189,7 +191,10 @@ def _panel_chip(item, values):
     """Render a pending-draw chip: clean label + the stored value verbatim.
 
     The state stays a `.state-marker` element inside the bordered chip (the
-    ADR-0008 panel-state contract, restyled per visual spec zone 7).
+    ADR-0008 panel-state contract, restyled per visual spec zone 7). Built as
+    a raw span rather than via `cs.chip_b` because chip_b escapes its WHOLE
+    text argument — the nested state-marker element needs raw construction
+    (each text piece is escaped individually instead).
     """
     return (
         "<span class='chip-b'>"
@@ -482,7 +487,7 @@ def render(store_read, _today=None):
     for item in sorted(series):
         values = series[item]
         if item.startswith("biomarker::"):
-            biomarkers.append(_biomarker_row(item, values))
+            biomarkers.append(_metric_card(item, values))
         elif item.startswith("panel::"):
             panels.append(_panel_chip(item, values))
         elif item.startswith("watch-out::"):
@@ -496,7 +501,7 @@ def render(store_read, _today=None):
                 f"type is added deliberately, never by silent fallthrough"
             )
         elif all(biomarker_meta.to_number(value) is not None for value in values):
-            biomarkers.append(_biomarker_row(item, values))
+            biomarkers.append(_metric_card(item, values))
         else:
             other.append(_plain_row(biomarker_meta.display_name(item), values[-1]))
 

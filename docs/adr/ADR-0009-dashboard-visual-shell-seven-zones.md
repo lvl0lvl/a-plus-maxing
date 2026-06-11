@@ -140,6 +140,17 @@ LM-02, calendar, goals, rollup) fills its zone in place.
   of this ADR's target. The honesty rule is unchanged: designed chrome renders
   with styled empty states (track-only rings, em-dash stat slots, unfilled
   progress tracks), never invented values.
+- [AMENDED 2026-06-11]: D3's accent-chrome surface set → as built per the visual
+  spec: accent chrome is glyph dots, card titles, tint pills, and (future) ring
+  arcs. The zone-border treatment and the sleep-accent-on-Readiness assignment
+  are superseded — the sleep accent moves to the future Sleep ring arc (zone 1
+  renders neutral chrome until LM-02 lands real ring values). When LM-02 wires
+  those values, the zone test's accent-in-SVG assertion is NARROWED to sparkline
+  SVGs (ring arcs are documented chrome) — narrowed, not deleted. Additionally,
+  the dashboard's header-bar status pill serves as its at-a-glance line in place
+  of the TL;DR banner (exception recorded in
+  `vault/design/artifact-design-protocol.md`); report-class artifacts keep the
+  banner.
 
 ## Review triggers
 

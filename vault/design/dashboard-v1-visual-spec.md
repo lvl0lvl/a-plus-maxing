@@ -27,7 +27,7 @@ SLOT SHAPE only — the honesty rule (ADR-0009 D2) governs what may actually ren
   (`#FFFFFF`, border-radius 12px, 1px border `#E5E7EB`, max-width ~1140px, centered,
   24-32px inner padding) sitting on the gray page — an app surface, not a document.
 - **Header bar** (top of sheet, full width, bottom border `#E5E7EB`): left — product
-  name `A+ Maxing` (bold, ~17px) over the real long-form date (`Tuesday · June 10,
+  name `A+ Maxing` (bold, ~17px) over the real long-form date (`Wednesday · June 10,
   2026`, muted 13px). Right — a status pill (see Pills) carrying the readiness
   headline when wearable scoring exists; until then the pill reads the awaiting
   state (`— awaiting wearable baseline`, muted), and a `Today` label chip.
@@ -51,8 +51,10 @@ SLOT SHAPE only — the honesty rule (ADR-0009 D2) governs what may actually ren
   bordered chip — radius 999px, 12px, 1px `#E5E7EB` border, ink text, used for
   metric chips (`HRV 64 ms`), pending items, legend entries.
 - Type scale: zone heading 16px/700; card title 13-14px/600; big metric value
-  24-28px/700; body 13px; captions/labels 11-12px muted. (The old 28px KPI value
-  carries over as the trends-card value.)
+  24-28px/700; body 13px; captions/labels 11-12px muted. [AMENDED 2026-06-11]:
+  as built, the trends-card value is 20-22px (`.grid6 .kpi .value` 21px) — 28px
+  stays the non-grid KPI default, not the trends-card value; captions/labels
+  run 11-13px (the 13px `.caption` carry-over is accepted).
 
 ## Zone 1 — Readiness (hero)
 
@@ -75,7 +77,10 @@ One full-width card. Two horizontal halves:
 
 Card header row: `📅`-class glyph optional, `This week` + the real date range
 (`Jun 8 – 14`), prev/next chevrons and a `Month` toggle as INERT styled buttons
-(no behavior in a static artifact — render as muted bordered chips), and a legend
+(no behavior in a static artifact — render as muted bordered chips
+[AMENDED 2026-06-11]: as built, the inert chevron/Month controls are ink-text
+bordered chips per the Pills clause — the bordered-chip flavor carries ink
+text, not muted), and a legend
 of four tinted event-category pills (Training / Lab draw / Check-in / Appointment —
 training uses ACCENTS training tint; the others use neutral/accent tints; labels
 only, no events exist yet).
