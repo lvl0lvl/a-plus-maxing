@@ -67,6 +67,16 @@ CHROME = {
     "peptides-tint": "#F2EBFD",    # ACCENTS peptides #7C3AED
     "sleep-tint": "#EFEFFB",       # ACCENTS sleep #5B5BD6
     "today-tint": "#EFF4FE",       # calendar today column (light training-blue tint)
+    # Accent tint TEXT colors: fixed shades of the ACCENTS base measuring
+    # >= 4.5:1 (WCAG AA normal text) on their OWN tint background. The base
+    # training/nutrition/supplements hexes measure 4.08/2.48/3.05 on their
+    # tints and may not be tint text; peptides/sleep bases already measure
+    # >= 4.5 (4.91/4.71), so their text hex IS the base.
+    "training-text": "#1D67DB",    # ACCENTS training #1F6FEB darkened (4.61 on training-tint)
+    "nutrition-text": "#A25C29",   # ACCENTS nutrition #E8833A darkened (4.68 on nutrition-tint)
+    "supplements-text": "#0B787F", # ACCENTS supplements #0E9AA3 darkened (4.69 on supplements-tint)
+    "peptides-text": "#7C3AED",    # = ACCENTS peptides (4.91 on peptides-tint unchanged)
+    "sleep-text": "#5B5BD6",       # = ACCENTS sleep (4.71 on sleep-tint unchanged)
 }
 
 # The pill-tintable tint names: BOTH `pill()`'s guard AND `_style_block`'s
@@ -76,7 +86,7 @@ CHROME = {
 _TINTABLE = frozenset({"good", "concern", "neutral", *ACCENTS})
 
 # The semantic-state tints' text colors (the :root custom properties); an
-# accent-category tint takes its text color from ACCENTS.
+# accent-category tint takes its text color from the CHROME `*-text` hex.
 _STATE_TINT_TEXT = {
     "good": "var(--good)",
     "concern": "var(--concern)",
@@ -89,11 +99,13 @@ def _tint_rules():
 
     Generated from the SAME set `pill()` guards on, pairing each name's CHROME
     `*-tint` background with its text color (state tints -> the :root semantic
-    custom property; accent tints -> the ACCENTS hex).
+    custom property; accent tints -> the CHROME `*-text` hex, the shade
+    measuring >= 4.5:1 on its tint). Every pair here is computed by the
+    accessibility gate's tint-contrast section.
     """
     return "".join(
         f"\n.tint-{name} {{ background: {CHROME[name + '-tint']}; "
-        f"color: {_STATE_TINT_TEXT[name] if name in _STATE_TINT_TEXT else ACCENTS[name]}; }}"
+        f"color: {_STATE_TINT_TEXT[name] if name in _STATE_TINT_TEXT else CHROME[name + '-text']}; }}"
         for name in sorted(_TINTABLE)
     )
 
