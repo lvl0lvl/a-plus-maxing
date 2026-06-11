@@ -92,23 +92,29 @@ the earlier header/body description with his direction.]
   from data-state PALETTE), then a month nav shaped `‹ Month ›` (inert), then the
   **expand control** — a real, functional caret that expands the week view to the
   full current month.
-- **Expand mechanics:** native `<details>`/`<summary>` (no scripts — ADR-0004
-  single-file rule intact): the summary is the caret control; opening it renders
-  the **full month grid in document flow below the week strip, pushing every
-  zone below DOWN — never sliding over the cards beneath** (Walter's explicit
-  requirement). The month grid: real weeks × 7 of the current month, day numbers,
-  today's cell highlighted, leading/trailing other-month days muted, empty cells
-  (no events exist yet).
+- **Expand mechanics [AMENDED 2026-06-11, Walter iteration 2]:** the week view
+  IS one row of the month calendar — "imagine the week view is actually just
+  hiding the rest of the month's calendar." The calendar is rendered as the
+  FULL month grid (weeks × 7 rows, one row per week, Monday-start matching the
+  week strip); in the collapsed default state every row EXCEPT the current week
+  is hidden. The header caret reveals the hidden rows IN PLACE — same grid,
+  same cell size, contiguous rows above and below the current week ("literally
+  exactly the same — not disconnected"); content below the calendar pushes
+  down, never overlaid. Mechanism: a hidden `<input type='checkbox'>` + the
+  header `<label>` caret + a CSS `:checked` sibling rule toggling the
+  non-current rows (zero scripts — ADR-0004 single-file rule intact; the caret
+  stays pinned in the header in both states).
 
-**Body — an actual calendar table, not boxes:** a bordered 7-column grid reading
-as one connected calendar: a header STRIP (one bordered row: weekday abbrev +
-day number per column, vertical separators between columns; today's header cell
-in the training-blue tint with the bolded `WED 10 · Today` form), and beneath it
-full-height day COLUMNS (~180px min-height, shared vertical separators, no gaps
-between cells — one table, not seven floating boxes). Today's full column is
-tinted. Event pills land inside the cells when the calendar model exists; until
-then the cells stay empty and one muted caption under the grid reads the
-awaiting copy (`No scheduled events — the calendar model is pending.`).
+**Body — an actual month calendar, not boxes:** one bordered 7-column grid:
+a weekday header STRIP (MON–SUN abbrevs, vertical separators), then week ROWS
+of day cells (~180px min-height, day number in the cell's top corner,
+shared borders, no gaps — one connected table). Today's cell: training-blue
+tint + the bolded `10 · Today` marker. Leading/trailing other-month days
+render muted. Collapsed: header strip + the current week's row only.
+Expanded: all the month's rows. Event pills land inside the cells when the
+calendar model exists; until then the cells stay empty and one muted caption
+under the grid reads the awaiting copy (`No scheduled events — the calendar
+model is pending.`).
 
 ## Zone 3 — Today's Plan
 
