@@ -39,9 +39,10 @@ PALETTE = {
 # are the pairs the crit-3 color-distance assertion walks.
 SERIES = ("good", "watch", "concern")
 
-# Surface-category chrome per `vault/design/dashboard-v1-design.md` (ADR-0009 D3):
-# accents color zone/card chrome (headers, borders) ONLY — NEVER data state.
-# Data state stays exclusively PALETTE good/watch/concern/neutral.
+# Surface-category chrome per the visual spec (ADR-0009 D3 as amended
+# 2026-06-11): accents color category chrome ONLY — glyph dots, card titles,
+# tint pills, and (future) ring arcs — NEVER data state. Data state stays
+# exclusively PALETTE good/watch/concern/neutral.
 ACCENTS = {
     "training": "#1F6FEB",
     "nutrition": "#E8833A",
@@ -242,7 +243,13 @@ def head(title):
 
 
 def tldr_banner(text):
-    """Return the one-sentence TL;DR banner that opens every artifact."""
+    """Return the one-sentence TL;DR banner opening report-class artifacts.
+
+    Consumed by the report template and the matrix/projection views. The
+    dashboard does NOT carry it — its header-bar status pill serves as the
+    at-a-glance line per the visual spec (ADR-0009 amendment 2026-06-11;
+    exception recorded in `vault/design/artifact-design-protocol.md`).
+    """
     return f"<div class='tldr'>{_escape(text)}</div>"
 
 
@@ -385,6 +392,9 @@ def chip_b(text):
 
     Args:
         text (str): The chip text (escaped).
+
+    Returns:
+        (str) The assembled `.chip-b` markup.
     """
     return f"<span class='chip-b'>{_escape(str(text))}</span>"
 
@@ -399,6 +409,9 @@ def stat_box(label, value="—", tinted=False):
         label (str): The box label (escaped).
         value (str, optional): The box value (escaped); defaults to an em-dash.
         tinted (bool, optional): Highlight the box with the context tint.
+
+    Returns:
+        (str) The assembled `.stat` markup.
     """
     klass = "stat tinted" if tinted else "stat"
     return (
@@ -414,6 +427,9 @@ def track_bar(fill_pct=None, color=None):
         fill_pct (int | float, optional): The 0-100 fill width; None -> empty
             track (ADR-0009 D2 — never an invented fill).
         color (str, optional): The fill hex; unused while fill_pct is None.
+
+    Returns:
+        (str) The assembled `.track` markup.
     """
     if fill_pct is None:
         return "<div class='track'></div>"

@@ -65,6 +65,7 @@ Any session generating an HTML artifact MUST read this file first. If a category
 
 ### Content Rules
 - Every artifact opens with a one-sentence TL;DR
+  - Exception (2026-06-11, ADR-0009 amendment): the dashboard's header-bar status pill serves as its at-a-glance line; report-class artifacts keep the banner.
 - Every claim cites its source file (e.g., "see `daily/2026-05-14.md`")
 - Every recommendation includes confidence level + reversibility note
 - No emoji unless explicitly requested by Walter

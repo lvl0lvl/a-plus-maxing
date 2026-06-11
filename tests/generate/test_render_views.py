@@ -503,8 +503,9 @@ def test_worst_case_paginates_each_under_budget(tmp_path):
     )
     for p in paths:
         size = p.stat().st_size
-        # the failing-capable bound: a full-cap page rides ~19859 bytes; this reds if a
-        # page inflates materially past the measured worst case.
+        # the failing-capable bound: a full-cap page rides ~24232 bytes (S49 — the
+        # MEASURED_PAGE_CEILING comment above records the measurement); this reds if
+        # a page inflates materially past the measured worst case.
         assert size < MEASURED_PAGE_CEILING, (
             f"{p.name}: {size} bytes >= measured ceiling {MEASURED_PAGE_CEILING}"
         )
