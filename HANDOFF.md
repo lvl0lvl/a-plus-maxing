@@ -41,7 +41,7 @@ Invariants at risk: none structurally; the close set (INV-SCOPE-CONTRACT, INV-PF
 - **AC3 (type-routed render) — PASS; `i2yw` PARTIAL.** Single type-routed `dashboard.py`: no string value reaches numeric viz; clean `display_name` labels; unknown `::` prefix fails loud. `i1t` (P1 crash) + `azf` CLOSED. `i2yw` reopened (dashboard-level surfaces merged; the design's projection-readout-on-chips clause DEFERRED, recorded in ADR-0008 consequences).
 - **AC4 (mixed-stream test) — PASS.** `tests/generate/test_dashboard_mixed_stream.py` seeds all four streams + a 120-pt series via the production writers, runs `generate.run("dashboard")`, RED-proved the `i1t` TypeError pre-fix, asserts no `::` leak + correct type-routing + units + placement. `04uk` CLOSED.
 - **AC5 (ADR + full review → merge) — PASS.** `docs/adr/ADR-0008-...md` (the decision record, +3 review-driven adjudication amendments). Full `/review-pr 90` (6 agents → blind triage → 20 LEGITIMATE/2 DEFERRED → fixes → blind-verify 20/20). Merged `6cb85a2`. The review was LOAD-BEARING: it caught `report.py` as a missed `state_for` wiring site (the physician report would have rendered every marker neutral), the bar-sparkline negative-width-at-n≥91 bug, the non-finite-float poison path, and the fail-loud-color regression.
-- **AC6 (vault "what" layer) — PASS.** `vault/components/` seeded (README + 8 module notes) with the maintenance rule (a contract-changing PR updates its component note).
+- **AC6 (vault "what" layer) — PASS.** `vault/components/` seeded (README + 7 module notes) with the maintenance rule (a contract-changing PR updates its component note).
 
 ### Drift checks (S48 close)
 
