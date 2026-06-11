@@ -717,12 +717,15 @@ def test_contrast_and_colorblind(tmp_path):
         m = re.fullmatch(r"var\(--([a-z-]+)\)", color)
         return root[m.group(1)] if m else color
 
+    # `[a-z-]` in the name class: the event-category tints (lab-draw, check-in,
+    # appointment) are hyphenated — a `[a-z]+` class would silently skip them
+    # and the gate would never measure their pairs.
     tint_rules = re.findall(
-        r"\.tint-([a-z]+) \{ background: (#[0-9A-Fa-f]{6}); "
+        r"\.tint-([a-z][a-z-]*) \{ background: (#[0-9A-Fa-f]{6}); "
         r"color: (var\(--[a-z-]+\)|#[0-9A-Fa-f]{6}); \}",
         html,
     )
-    assert len(tint_rules) >= 8, f"expected the full .tint-* rule set, got {tint_rules}"
+    assert len(tint_rules) >= 11, f"expected the full .tint-* rule set, got {tint_rules}"
     tint_pairs = [
         (f"tint-{name} text", resolve(fg), tint_bg) for name, tint_bg, fg in tint_rules
     ]
