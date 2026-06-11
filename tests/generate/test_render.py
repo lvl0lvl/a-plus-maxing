@@ -621,7 +621,7 @@ def _ciede2000(lab1, lab2):
 
 def _root_vars(html):
     """Parse the `:root` CSS custom properties (--name: #hex) from the emitted file."""
-    return dict(re.findall(r"--([a-z]+)\s*:\s*(#[0-9A-Fa-f]{6})", html))
+    return dict(re.findall(r"--([a-z-]+)\s*:\s*(#[0-9A-Fa-f]{6})", html))
 
 
 def _rendered_series_colors(html):
@@ -669,6 +669,39 @@ def test_contrast_and_colorblind(tmp_path):
     muted_ratio = _contrast_ratio(_hex_to_rgb(root["muted"]), bg)
     print(f"AC-3 contrast ratio muted/paper = {muted_ratio:.2f} (need >= 3.0)")
     assert muted_ratio >= 3.0, f"muted contrast {muted_ratio:.2f} < 3.0"
+
+    # --- rendered tint fg/bg pairs: every pill `.tint-*` rule's text color on
+    # its tint background, the tinted stat boxes' label (muted) + value (ink)
+    # text on each tinted background, and the calendar today cell's ink text on
+    # its tint — each COMPUTED >= 4.5 (WCAG AA normal text, 12px pill text).
+    # A regressed tint pair (e.g. an accent base hex back on its ~10% tint)
+    # turns this red.
+    def resolve(color):
+        m = re.fullmatch(r"var\(--([a-z-]+)\)", color)
+        return root[m.group(1)] if m else color
+
+    tint_rules = re.findall(
+        r"\.tint-([a-z]+) \{ background: (#[0-9A-Fa-f]{6}); "
+        r"color: (var\(--[a-z-]+\)|#[0-9A-Fa-f]{6}); \}",
+        html,
+    )
+    assert len(tint_rules) >= 8, f"expected the full .tint-* rule set, got {tint_rules}"
+    tint_pairs = [
+        (f"tint-{name} text", resolve(fg), tint_bg) for name, tint_bg, fg in tint_rules
+    ]
+    stat_bgs = re.findall(r"\.stat\.tinted \{ background: ([^;]+); \}", html)
+    assert len(stat_bgs) >= 3, f"expected the default + per-card tinted stat rules, got {stat_bgs}"
+    for stat_bg in (resolve(b) for b in stat_bgs):
+        tint_pairs.append(("tinted stat slabel (muted)", root["muted"], stat_bg))
+        tint_pairs.append(("tinted stat sval (ink)", root["ink"], stat_bg))
+    today_bg = re.search(r"\.cal \.today \{ background: (#[0-9A-Fa-f]{6})", html).group(1)
+    tint_pairs.append(("calendar today cell (ink)", root["ink"], today_bg))
+    for what, fg_hex, bg_hex in tint_pairs:
+        tint_ratio = _contrast_ratio(_hex_to_rgb(fg_hex), _hex_to_rgb(bg_hex))
+        print(f"AC-3 tint contrast {what} {fg_hex}/{bg_hex} = {tint_ratio:.2f} (need >= 4.5)")
+        assert tint_ratio >= 4.5, (
+            f"tint pair {what} {fg_hex} on {bg_hex} computes {tint_ratio:.2f} < 4.5"
+        )
 
     roles = ("good", "watch", "concern")
 
