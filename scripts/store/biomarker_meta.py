@@ -24,13 +24,19 @@ METADATA = {
     "fasting-glucose": {"units": "mg/dL",  "reference_range": (70.0, 99.0),  "good_direction": "in-range"},
     "rhr":             {"units": "bpm",    "reference_range": (40.0, 100.0), "good_direction": "down"},
     "hrv":             {"units": "ms",     "reference_range": None,           "good_direction": "up"},
+    # Fitness markers (ADR-0009 D4): no invented ranges — all four are goal- or
+    # person-dependent; polarity only where physiologically unambiguous.
+    "bodyweight":      {"units": "lb",     "reference_range": None,           "good_direction": None},
+    "sleep-hours":     {"units": "h",      "reference_range": None,           "good_direction": "up"},
+    "est-1rm":         {"units": "lb",     "reference_range": None,           "good_direction": None},
+    "steps":           {"units": "steps",  "reference_range": None,           "good_direction": None},
 }
 
 # The per-stream item-id prefixes the accessors tolerate (loop_schema namespaces).
 _PREFIXES = ("biomarker::", "panel::", "watch-out::")
 
 # Marker-name words rendered as acronyms (upper-cased) by display_name.
-_ACRONYMS = frozenset({"hrv", "rhr", "crp", "alt", "hdl", "ldl"})
+_ACRONYMS = frozenset({"hrv", "rhr", "crp", "alt", "hdl", "ldl", "1rm"})
 
 
 def _strip_prefix(item):
