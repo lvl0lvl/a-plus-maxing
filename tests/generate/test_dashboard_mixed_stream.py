@@ -44,9 +44,13 @@ def _seed_mixed_store(root):
         )
 
 
-def _rows(html):
-    """Split the rendered dashboard into its kpi-row fragments."""
-    return html.split("<div class='kpi-row'>")[1:]
+def _rows(html, zone_title):
+    """Split one zone's section into its kpi-row fragments.
+
+    Splitting inside the zone's own section markup means a row fragment
+    terminates at its zone boundary — never running past it to EOF.
+    """
+    return _zones(html)[zone_title].split("<div class='kpi-row'>")[1:]
 
 
 def _zones(html):
@@ -72,13 +76,15 @@ def test_mixed_stream_store_renders_through_production_path(tmp_path):
     assert "panel::" not in html
     assert "watch-out::" not in html
     assert "feedback::" not in html
-    assert "<svg" in html
 
     # PLACEMENT (ADR-0009 D5): biomarker rows land in zone 4, panel/watch-out/
     # feedback rows in zone 7 — and not in each other's zone.
     zones = _zones(html)
     trends = zones["Performance & Trends"]
     labs = zones["Labs & Bloodwork"]
+    # The bar sparkline is the only <rect> producer (S48 invariant): the
+    # biomarker series must render its bars inside zone 4 specifically.
+    assert "<rect" in trends
     assert "Ferritin" in trends
     assert "ng/mL" in trends, "a registered marker's headline carries its units"
     assert "RHR" in trends
@@ -108,16 +114,16 @@ def test_trend_chips_registered_vs_unregistered(tmp_path):
 
     html = generate.run("dashboard", _root=root, _out_dir=out).read_text()
 
-    rhr_row = next(r for r in _rows(html) if "RHR" in r)
+    rhr_row = next(r for r in _rows(html, "Performance & Trends") if "RHR" in r)
     assert "<span class='chip state-good'>improving</span>" in rhr_row
 
-    spo2_row = next(r for r in _rows(html) if "Spo2" in r)
+    spo2_row = next(r for r in _rows(html, "Performance & Trends") if "Spo2" in r)
     assert "<span class='chip state-neutral'>" in spo2_row
     assert "&#8595;" in spo2_row, "unregistered chip carries the direction arrow"
     assert "improving" not in spo2_row
     assert "regressing" not in spo2_row
 
-    vitd_row = next(r for r in _rows(html) if "Vitamin D" in r)
+    vitd_row = next(r for r in _rows(html, "Performance & Trends") if "Vitamin D" in r)
     assert "chip" not in vitd_row, "a single-value series renders no chip"
 
 
@@ -134,7 +140,7 @@ def test_unprefixed_string_item_renders_plain_row(tmp_path):
 
     html = generate.run("dashboard", _root=root, _out_dir=out).read_text()
 
-    note_row = next(r for r in _rows(html) if "felt fine" in r)
+    note_row = next(r for r in _rows(html, "Labs & Bloodwork") if "felt fine" in r)
     assert "Note" in note_row, "the catch-all routes its label through display_name"
     assert "<svg" not in note_row
     assert "<rect" not in note_row
@@ -153,7 +159,9 @@ def test_biomarker_stream_all_strings_renders_plain_row(tmp_path):
 
     html = generate.run("dashboard", _root=root, _out_dir=out).read_text()
 
-    row = next(r for r in _rows(html) if "draw scheduled" in r)
+    row = next(
+        r for r in _rows(html, "Performance & Trends") if "draw scheduled" in r
+    )
     assert "Ferritin" in row
     assert "<svg" not in row
     assert "<rect" not in row
