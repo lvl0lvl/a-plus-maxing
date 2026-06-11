@@ -69,6 +69,34 @@ CHROME = {
     "today-tint": "#EFF4FE",       # calendar today column (light training-blue tint)
 }
 
+# The pill-tintable tint names: BOTH `pill()`'s guard AND `_style_block`'s
+# `.tint-*` rule generation read this one set, so a guard-accepted name always
+# has a rendered CSS rule (and vice versa — they cannot diverge). `today-tint`
+# stays calendar-cell CHROME (the today column background), NOT pill-tintable.
+_TINTABLE = frozenset({"good", "concern", "neutral", *ACCENTS})
+
+# The semantic-state tints' text colors (the :root custom properties); an
+# accent-category tint takes its text color from ACCENTS.
+_STATE_TINT_TEXT = {
+    "good": "var(--good)",
+    "concern": "var(--concern)",
+    "neutral": "var(--muted)",
+}
+
+
+def _tint_rules():
+    """Return one `.tint-*` CSS rule per `_TINTABLE` name.
+
+    Generated from the SAME set `pill()` guards on, pairing each name's CHROME
+    `*-tint` background with its text color (state tints -> the :root semantic
+    custom property; accent tints -> the ACCENTS hex).
+    """
+    return "".join(
+        f"\n.tint-{name} {{ background: {CHROME[name + '-tint']}; "
+        f"color: {_STATE_TINT_TEXT[name] if name in _STATE_TINT_TEXT else ACCENTS[name]}; }}"
+        for name in sorted(_TINTABLE)
+    )
+
 
 def state_for(item, value=None):
     """Resolve an item's semantic series state from the biomarker metadata registry.
@@ -102,7 +130,6 @@ def _style_block():
     """
     p = PALETTE
     c = CHROME
-    a = ACCENTS
     return f"""<style>
 :root {{
   --good: {p['good']};
@@ -158,15 +185,7 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .cal .today {{ background: {c['today-tint']}; font-weight: 600; }}
 .calhead {{ display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }}
 .calhead .card-title {{ font-size: 14px; font-weight: 600; }}
-.pill {{ display: inline-block; border-radius: 999px; font-size: 12px; padding: 2px 10px; background: {c['neutral-tint']}; color: var(--muted); }}
-.tint-good {{ background: {c['good-tint']}; color: var(--good); }}
-.tint-concern {{ background: {c['concern-tint']}; color: var(--concern); }}
-.tint-neutral {{ background: {c['neutral-tint']}; color: var(--muted); }}
-.tint-training {{ background: {c['training-tint']}; color: {a['training']}; }}
-.tint-nutrition {{ background: {c['nutrition-tint']}; color: {a['nutrition']}; }}
-.tint-supplements {{ background: {c['supplements-tint']}; color: {a['supplements']}; }}
-.tint-peptides {{ background: {c['peptides-tint']}; color: {a['peptides']}; }}
-.tint-sleep {{ background: {c['sleep-tint']}; color: {a['sleep']}; }}
+.pill {{ display: inline-block; border-radius: 999px; font-size: 12px; padding: 2px 10px; background: {c['neutral-tint']}; color: var(--muted); }}{_tint_rules()}
 .chip-b {{ display: inline-block; border-radius: 999px; font-size: 12px; padding: 2px 10px; border: 1px solid var(--card-border); color: var(--ink); }}
 .stat {{ border: 1px solid var(--card-border); border-radius: 8px; text-align: center; padding: 8px 4px; }}
 .stat .slabel {{ font-size: 11px; color: var(--muted); }}
@@ -285,6 +304,9 @@ def progress_ring(label, value=None, color=None):
     real value renders the colored arc with rounded caps and the value centered
     — the arc is chrome around a value, never a data-state semantic (D3).
 
+    A value outside 0-100 ValueErrors rather than silently rendering — matching
+    the module's `pill` / `_series_color` fail-loud convention.
+
     Args:
         label (str): The ring's caption text (escaped).
         value (int | float, optional): The 0-100 score; None -> awaiting state.
@@ -295,6 +317,9 @@ def progress_ring(label, value=None, color=None):
     """
     circumference = 263.9  # 2 * pi * r, r = 42
     arc = ""
+    if value is not None and not 0 <= value <= 100:
+        # An out-of-range score must not render as a full/overflowing ring (ADR-0009 D2).
+        raise ValueError(f"progress_ring value {value!r} outside 0-100")
     if value is not None:
         arc = (
             f"<circle cx='48' cy='48' r='42' fill='none' stroke='{color}' "
@@ -320,20 +345,22 @@ def progress_ring(label, value=None, color=None):
 def pill(text, tint_state=None):
     """Return a tinted pill: ~10% tint background, base-color 12px text.
 
-    `tint_state` names a CHROME tint (good / concern / neutral, or an ACCENTS
-    category); None renders the muted default. An unknown tint name KeyErrors
-    rather than silently rendering unstyled — matching `_series_color`.
+    `tint_state` names a pill-tintable tint (good / concern / neutral, or an
+    ACCENTS category — the `_TINTABLE` set, which also generates the `.tint-*`
+    rules); None renders the muted default. A name outside `_TINTABLE` (a typo,
+    or a CHROME-only token like `today`) KeyErrors rather than silently
+    rendering an unstyled class — matching `_series_color`.
 
     Args:
         text (str): The pill text (escaped).
-        tint_state (str, optional): The CHROME tint name (without `-tint`).
+        tint_state (str, optional): The `_TINTABLE` tint name (without `-tint`).
 
     Returns:
         (str) The assembled `.pill` markup.
     """
     if tint_state is None:
         return f"<span class='pill'>{_escape(str(text))}</span>"
-    if f"{tint_state}-tint" not in CHROME:
+    if tint_state not in _TINTABLE:
         raise KeyError(tint_state)
     return f"<span class='pill tint-{tint_state}'>{_escape(str(text))}</span>"
 
@@ -385,8 +412,16 @@ def track_bar(fill_pct=None, color=None):
     )
 
 
+# The 180x40 sparkline envelope's scaling attributes: the viewBox +
+# preserveAspectRatio let `.grid6 svg { width:100% }` STRETCH the drawing to
+# the card width instead of clipping it; the width/height attrs stay as the
+# intrinsic size for non-grid contexts (report, matrix/projection views).
+_SPARK_ENVELOPE = (
+    "width='180' height='40' viewBox='0 0 180 40' preserveAspectRatio='none'"
+)
+
 # The empty-series stub both sparkline components return: same envelope, no data.
-_EMPTY_SERIES_SVG = "<svg width='180' height='40' role='img' aria-label='no data'></svg>"
+_EMPTY_SERIES_SVG = f"<svg {_SPARK_ENVELOPE} role='img' aria-label='no data'></svg>"
 
 
 def _series_color(state):
@@ -423,7 +458,7 @@ def sparkline(values, state):
         f"{i * step:.1f},{38 - (v - lo) / span * 36:.1f}" for i, v in enumerate(values)
     )
     return (
-        "<svg width='180' height='40' role='img' "
+        f"<svg {_SPARK_ENVELOPE} role='img' "
         f"aria-label='{_escape(state)} sparkline'>"
         f"<polyline fill='none' stroke='{color}' stroke-width='2' points='{pts}'/>"
         "</svg>"
@@ -457,7 +492,7 @@ def bar_sparkline(values, state):
         for i, h in ((i, 4 + (v - lo) / span * 32) for i, v in enumerate(values))
     )
     return (
-        "<svg width='180' height='40' role='img' "
+        f"<svg {_SPARK_ENVELOPE} role='img' "
         f"aria-label='{_escape(state)} bar sparkline'>{bars}</svg>"
     )
 
