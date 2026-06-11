@@ -52,6 +52,21 @@ def _bodyweight_read():
     ]
 
 
+def _mixed_fitness_read():
+    """A mixed fitness-domain store read populating BOTH data zones: the
+    bodyweight biomarker series (zone 4) plus a panel, a watch-out answer, and
+    a physician-feedback note (zone 7)."""
+    return _bodyweight_read() + [
+        {"item": "panel::movement-screen", "timepoint": "2026-06-08T00:00:00+00:00",
+         "source": "manual", "value": "pending"},
+        {"item": "watch-out::soreness-check", "timepoint": "2026-06-08T00:00:00+00:00",
+         "source": "manual", "value": "none noticed"},
+        {"item": "feedback::physician-feedback",
+         "timepoint": "2026-06-08T00:00:00+00:00", "source": "manual",
+         "value": "keep current training block"},
+    ]
+
+
 def _zones(html):
     """Map each rendered zone's decoded h2 title to its full section markup."""
     out = {}
@@ -79,36 +94,62 @@ def test_all_seven_zone_titles_render_in_order():
 
 
 def test_awaiting_states_carry_no_digits():
-    """The hero/plan/goals awaiting cards exist and carry NO digits.
+    """The fully-awaiting zones carry NO digits anywhere; the calendar's card is clean.
 
     The mechanical no-fake-numbers guard (ADR-0009 D2): an unbuilt zone names
-    what is missing and never renders an invented number. The calendar zone's
-    date digits live outside its awaiting card, so it is checked on the card
-    text alone too.
+    what is missing and never renders an invented number — so Readiness,
+    Today's Plan, and Goals & Progress are checked on their WHOLE tag-stripped,
+    entity-decoded zone text (a fake number anywhere in the zone fails, not
+    just inside the awaiting card). This Week's date digits are legitimate, so
+    it keeps the per-card check alone.
     """
     zones = _zones(dashboard.render([], _today=_TODAY))
-    for title in ("Readiness", "This Week", "Today's Plan", "Goals & Progress"):
-        texts = _awaiting_texts(zones[title])
-        assert texts, f"zone {title!r} must render an awaiting card"
-        for text in texts:
-            assert not re.search(r"\d", text), (
-                f"awaiting card in {title!r} carries a digit: {text!r}"
-            )
+    for title in ("Readiness", "Today's Plan", "Goals & Progress"):
+        assert _awaiting_texts(zones[title]), (
+            f"zone {title!r} must render an awaiting card"
+        )
+        text = html_lib.unescape(re.sub(r"<[^>]*>", "", zones[title]))
+        assert not re.search(r"\d", text), (
+            f"fully-awaiting zone {title!r} carries a digit: {text!r}"
+        )
+    texts = _awaiting_texts(zones["This Week"])
+    assert texts, "zone 'This Week' must render an awaiting card"
+    for text in texts:
+        assert not re.search(r"\d", text), (
+            f"awaiting card in 'This Week' carries a digit: {text!r}"
+        )
 
 
 def test_accent_hexes_only_in_chrome():
     """ACCENTS hexes never color data state: no accent inside any SVG block,
-    and no state-* element carrying an accent inline style (ADR-0009 D3)."""
-    html = dashboard.render(_bodyweight_read(), _today=_TODAY)
+    no state-* element carrying an accent inline style, and no accent anywhere
+    inside the data zones' kpi-row / state-marker / value / caption fragments
+    (ADR-0009 D3). Rendered from a mixed store so zones 4 AND 7 both carry
+    data rows the scan covers."""
+    html = dashboard.render(_mixed_fitness_read(), _today=_TODAY)
+    zones = _zones(html)
     svg_blocks = re.findall(r"<svg.*?</svg>", html, re.S)
     assert svg_blocks, "the rendered dashboard must carry SVG (rings + sparkline)"
     state_tags = re.findall(r"<[^>]*class='[^']*state-[^']*'[^>]*>", html)
     assert state_tags, "the rendered dashboard must carry state-classed elements"
+    data_fragments = []
+    for title in ("Performance & Trends", "Labs & Bloodwork"):
+        rows = zones[title].split("<div class='kpi-row'>")[1:]
+        assert rows, f"data zone {title!r} must carry kpi rows"
+        data_fragments.extend(rows)
+        data_fragments.extend(re.findall(
+            r"<[^>]*class='[^']*(?:state-marker|value|caption)[^']*'[^>]*>",
+            zones[title],
+        ))
     for accent in component_set.ACCENTS.values():
         for block in svg_blocks:
             assert accent not in block, f"accent {accent} leaked into an SVG block"
         for tag in state_tags:
             assert accent not in tag, f"accent {accent} leaked into a state element"
+        for fragment in data_fragments:
+            assert accent not in fragment, (
+                f"accent {accent} leaked into a data fragment: {fragment[:120]!r}"
+            )
     # The accents DO render as chrome (zone/card borders), not nowhere at all.
     for accent in component_set.ACCENTS.values():
         assert accent in html
