@@ -23,7 +23,7 @@ absence, never a fabricated range.
 - `display_name(item)` — strips stream prefixes, title-cases words, upper-cases the
   acronym set (HRV/RHR/CRP/ALT/HDL/LDL + 1RM, S49). The clean-label source (`azf`).
 - Fitness markers (S49, ADR-0009 D4): bodyweight (lb), sleep-hours (h), est-1rm (lb),
-  steps — units always; `reference_range` None (goal/person-dependent, no invented
+  steps (steps) — units always; `reference_range` None (goal/person-dependent, no invented
   ranges); `good_direction` only where unambiguous (sleep-hours up; others None →
   direction-only neutral arrow on the dashboard).
 - `state_for(item, value)` — in registered range (inclusive) → `good`; outside →
