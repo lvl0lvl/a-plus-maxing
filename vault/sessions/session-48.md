@@ -46,7 +46,7 @@ attestations (the compact-pointer archive cites it).
   (decision-pinned).
 - **`router._trend_token`:** polarity-aware for registered markers + single-marker-series
   enforced; the generic `raw-lab-values` stream keeps the deliberate S39 fail-closed raise.
-- **`vault/components/` (NEW):** README + 8 module notes + the maintenance rule
+- **`vault/components/` (NEW):** README + 7 module notes + the maintenance rule
   (contract-changing PR updates its component note).
 
 ## The review earned its keep (PF-S40-01 load-bearing ×2)
