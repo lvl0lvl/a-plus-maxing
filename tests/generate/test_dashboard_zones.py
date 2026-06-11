@@ -216,47 +216,55 @@ def test_specialists_tuple_mirrors_deployed_roster():
 @pytest.mark.parametrize("today, day_numbers, today_cell, range_text", [
     # Mid-week, mid-month: the original seam case.
     (datetime.date(2026, 6, 10),
-     ["8", "9", "10", "11", "12", "13", "14"], ("day today", "Wed", "10"),
+     ["8", "9", "10", "11", "12", "13", "14"], ("dhead today", "Wed", "10"),
      "Jun 8 – 14"),
     # Monday of a month-spanning week: today is the FIRST cell.
     (datetime.date(2026, 6, 29),
-     ["29", "30", "1", "2", "3", "4", "5"], ("day today", "Mon", "29"),
+     ["29", "30", "1", "2", "3", "4", "5"], ("dhead today", "Mon", "29"),
      "Jun 29 – Jul 5"),
     # Sunday of the same month-spanning week: today is the LAST cell.
     (datetime.date(2026, 7, 5),
-     ["29", "30", "1", "2", "3", "4", "5"], ("day today", "Sun", "5"),
+     ["29", "30", "1", "2", "3", "4", "5"], ("dhead today", "Sun", "5"),
      "Jun 29 – Jul 5"),
     # A year-spanning week: the strip crosses into January.
     (datetime.date(2026, 12, 30),
-     ["28", "29", "30", "31", "1", "2", "3"], ("day today", "Wed", "30"),
+     ["28", "29", "30", "31", "1", "2", "3"], ("dhead today", "Wed", "30"),
      "Dec 28 – Jan 3"),
 ])
 def test_calendar_strip_renders_week_with_today_marked(
     today, day_numbers, today_cell, range_text
 ):
-    """The week grid renders 7 real columns of the seam date's Mon-Sun week
-    with the rendered date-range string, the inert chevron/Month chips, and
-    the four legend pills; exactly the seam date's column carries the .today
-    class + the `· Today` marker."""
+    """The week table renders one connected 7-column grid of the seam date's
+    Mon-Sun week — a header strip (weekday + day number) over full-height day
+    columns — with the rendered date-range string, the inert navbtn chevrons,
+    the `Month` nav label, and the four legend pills each on its OWN tint;
+    exactly the seam date's header cell AND column carry the .today class,
+    and exactly the header cell carries the `· Today` marker."""
     zone = _zones(dashboard.render([], _today=today))["This Week"]
-    cells = re.findall(
-        r"<div class='(day[^']*)'><div class='dhead'>([A-Za-z]+) (\d+)", zone
+    heads = re.findall(
+        r"<div class='(dhead[^']*)'><span class='dwd'>([A-Za-z]+)</span> (\d+)",
+        zone,
     )
-    assert len(cells) == 7
-    assert [c[1] for c in cells] == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    assert [c[2] for c in cells] == day_numbers
-    today_cells = [c for c in cells if "today" in c[0]]
-    assert today_cells == [today_cell]
-    assert zone.count("· Today") == 1, "exactly the seam column carries the marker"
+    assert len(heads) == 7
+    assert [h[1] for h in heads] == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    assert [h[2] for h in heads] == day_numbers
+    today_heads = [h for h in heads if "today" in h[0]]
+    assert today_heads == [today_cell]
+    cols = re.findall(r"<div class='(dcol[^']*)'>", zone)
+    assert cols.count("dcol") + cols.count("dcol today") == 7
+    assert cols.count("dcol today") == 1, "exactly the seam date's column is tinted"
+    assert zone.count("· Today") == 1, "exactly the seam header cell carries the marker"
     # The header carries the real rendered week range (month-/year-spanning
-    # weeks name both months), the inert chevron/Month chips, and the four
-    # event-category legend pills (Training on the accent tint).
+    # weeks name both months), the navbtn chevrons (week nav + month nav),
+    # the Month nav label, and the four event-category legend pills, each on
+    # its OWN tint class.
     assert f"<span class='caption'>{range_text}</span>" in zone
-    for chip in ("‹", "›", "Month"):
-        assert f"<span class='chip-b'>{chip}</span>" in zone
-    assert "<span class='pill tint-training'>Training</span>" in zone
-    for label in ("Lab draw", "Check-in", "Appointment"):
-        assert f"<span class='pill'>{label}</span>" in zone
+    assert zone.count("<span class='navbtn'>‹</span>") == 2
+    assert zone.count("<span class='navbtn'>›</span>") == 2
+    assert "<span class='caption'>Month</span>" in zone
+    for label, tint in (("Training", "training"), ("Lab draw", "lab-draw"),
+                        ("Check-in", "check-in"), ("Appointment", "appointment")):
+        assert f"<span class='pill tint-{tint}'>{label}</span>" in zone
 
 
 def test_fitness_marker_renders_units_and_neutral_trend():
