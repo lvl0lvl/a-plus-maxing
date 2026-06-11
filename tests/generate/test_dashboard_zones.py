@@ -332,6 +332,34 @@ def test_hero_metric_chips_render_only_from_stored_readings():
     assert "chip-b" not in partial, "a non-hero marker renders no metric chip"
 
 
+def test_hero_chip_latest_decided_across_both_item_forms():
+    """The hero chip carries the timepoint-latest numeric when BOTH item forms
+    exist, and an all-non-numeric prefixed form does not suppress the legacy
+    form's chip (the or-chain regression)."""
+    stale_prefixed = [
+        {"item": "biomarker::rhr", "timepoint": "2026-06-08T00:00:00+00:00",
+         "source": "whoop", "value": 52},
+        {"item": "rhr", "timepoint": "2026-06-09T00:00:00+00:00",
+         "source": "whoop", "value": 49},
+    ]
+    zone = _zones(dashboard.render(stale_prefixed, _today=_TODAY))["Readiness"]
+    assert "<span class='chip-b'>RHR 49 bpm</span>" in zone, (
+        "the chip must carry the timepoint-latest numeric across BOTH forms"
+    )
+    assert "RHR 52" not in zone, "a stale prefixed reading must not shadow the newer one"
+
+    nonnumeric_prefixed = [
+        {"item": "biomarker::rhr", "timepoint": "2026-06-09T00:00:00+00:00",
+         "source": "manual", "value": "redraw scheduled"},
+        {"item": "rhr", "timepoint": "2026-06-08T00:00:00+00:00",
+         "source": "whoop", "value": 52},
+    ]
+    zone = _zones(dashboard.render(nonnumeric_prefixed, _today=_TODAY))["Readiness"]
+    assert "<span class='chip-b'>RHR 52 bpm</span>" in zone, (
+        "an all-non-numeric prefixed form must not suppress the legacy form's chip"
+    )
+
+
 def test_header_bar_carries_seam_date_long_form():
     """The header bar renders the product name, the real long-form seam date,
     the muted awaiting status pill, and the Today chip — and the old h1 is

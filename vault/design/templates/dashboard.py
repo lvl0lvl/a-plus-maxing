@@ -217,19 +217,27 @@ def _feedback_row(values):
     return f"<div class='kpi-row'>{_label_cell('Physician Feedback')}{notes}</div>"
 
 
-def _latest_numeric_reading(series, marker):
-    """Return a marker's latest numeric reading from the grouped series, or None.
+def _latest_numeric_reading(store_read, marker):
+    """Return a marker's latest numeric reading across both item forms, or None.
 
-    Tolerates both the `biomarker::`-prefixed and legacy unprefixed item forms.
+    Tolerates the `biomarker::`-prefixed and legacy unprefixed item forms
+    TOGETHER: the latest is decided by timepoint over the MERGED readings of
+    both forms, so a stale reading in one form never shadows a newer one in
+    the other, and an all-non-numeric prefixed form never suppresses the
+    legacy form's numeric.
 
     Args:
-        series (dict): item -> value series, per `_series_by_item`.
+        store_read (list): The store read model (list of reading dicts).
         marker (str): The registry marker name (unprefixed).
     """
-    values = series.get(f"biomarker::{marker}") or series.get(marker) or []
-    for value in reversed(values):
-        if biomarker_meta.to_number(value) is not None:
-            return value
+    forms = (f"biomarker::{marker}", marker)
+    readings = sorted(
+        (r for r in store_read if r["item"] in forms),
+        key=lambda r: r["timepoint"],
+    )
+    for reading in reversed(readings):
+        if biomarker_meta.to_number(reading["value"]) is not None:
+            return reading["value"]
     return None
 
 
@@ -256,7 +264,7 @@ def _topbar(today):
     )
 
 
-def _hero_zone(series):
+def _hero_zone(store_read):
     """Render zone 1 — readiness hero: track-only rings + the designed readout.
 
     Wearable recovery/sleep/strain scoring is LM-02-gated, so the rings render
@@ -268,7 +276,7 @@ def _hero_zone(series):
     ACCENTS training (chrome around a value, not data state — D3).
 
     Args:
-        series (dict): item -> value series, per `_series_by_item`.
+        store_read (list): The store read model (list of reading dicts).
     """
     rings = "".join(
         cs.progress_ring(label, value=None, color=color)
@@ -280,7 +288,7 @@ def _hero_zone(series):
     )
     chips = []
     for label, marker in _HERO_CHIPS:
-        reading = _latest_numeric_reading(series, marker)
+        reading = _latest_numeric_reading(store_read, marker)
         if reading is not None:
             units = biomarker_meta.get(marker)["units"]
             chips.append(cs.chip_b(f"{label} {reading} {units}"))
@@ -515,7 +523,7 @@ def render(store_read, _today=None):
     )
     today = _today if _today is not None else datetime.date.today()
     zones = (
-        _hero_zone(series),
+        _hero_zone(store_read),
         _calendar_zone(today),
         _plan_zone(),
         cs.zone(
