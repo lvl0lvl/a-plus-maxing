@@ -307,6 +307,43 @@ def test_sparkline_unknown_state_raises(component):
     assert component([1.0, 2.0], "neutral")  # the approved non-SERIES state renders
 
 
+def test_progress_ring_value_renders_arc_value_and_numeric_aria():
+    """F17: a real 0-100 value renders the colored arc with plausible dash
+    geometry, the centered value text, and a numeric aria-label."""
+    svg = component_set.progress_ring("Recovery", 72, color="#117733")
+    m = re.search(r"stroke-dasharray='([\d.]+) ([\d.]+)'", svg)
+    assert m, "a valued ring must draw the arc dash geometry"
+    arc_len, circumference = float(m.group(1)), float(m.group(2))
+    assert abs(arc_len - 0.72 * circumference) < 0.1, (
+        f"arc length {arc_len} must be ~72% of the circumference {circumference}"
+    )
+    assert "stroke='#117733'" in svg
+    assert re.search(r"<text[^>]*>72</text>", svg), "the value text must render"
+    assert "aria-label='72'" in svg, "a valued ring carries a numeric aria-label"
+
+
+def test_progress_ring_out_of_range_value_raises():
+    """F17/F3: a value outside 0-100 ValueErrors instead of rendering a
+    full/overflowing ring."""
+    for bogus in (150, -1):
+        with pytest.raises(ValueError):
+            component_set.progress_ring("Recovery", bogus, color="#117733")
+
+
+def test_track_bar_fill_renders_width_and_color():
+    """F17: a 60% fill renders the width:60% fill div in the given color."""
+    markup = component_set.track_bar(60, "#117733")
+    assert "<div class='fill' style='width:60%;background:#117733'></div>" in markup
+
+
+def test_pill_unknown_tint_raises():
+    """F17/F4: a tint name outside the tintable set KeyErrors — including the
+    CHROME-only `today` token, which has no `.tint-*` rule."""
+    for bogus in ("bogus", "today"):
+        with pytest.raises(KeyError):
+            component_set.pill("x", bogus)
+
+
 def test_bar_sparkline_empty_series_renders_no_data_stub():
     """An empty series renders the no-data svg with zero rects."""
     svg = component_set.bar_sparkline([], "good")
