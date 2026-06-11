@@ -1,13 +1,15 @@
-"""Tests for the 7-zone dashboard visual shell (ADR-0009).
+"""Tests for the 7-zone dashboard visual shell (ADR-0009 + visual spec).
 
-Pins the zone model the visual ships with: all seven zones in design order,
-mechanically honest awaiting states (no digits — the no-fake-numbers guard),
-accents confined to zone/card chrome (never data state, never inside an SVG),
-the decision-pinned PALETTE unchanged (D3), the 16-card care-team grid with
-the 4 internal build/review roles excluded, the real week-calendar strip via
-the `_today` seam, and the D4 fitness markers rendering units with a neutral
-direction-only trend. New fixtures are fitness-domain only (S49 demo-data
-constraint).
+Pins the zone model AND the visual language the dashboard ships with: all
+seven zones in design order, mechanically honest empty states (no digits —
+the no-fake-numbers guard; track-only hero rings with no arc; an unfilled
+goals track), accents confined to zone/card chrome (never data state, never
+inside an SVG), the decision-pinned PALETTE unchanged (D3), the 16-card
+care-team grid with the 4 internal build/review roles excluded, the real
+week-calendar card via the `_today` seam, the header bar's long-form seam
+date, real hero metric chips ONLY when the store carries them, the grid6
+metric cards, and the page-frame sheet tokens. New fixtures are
+fitness-domain only (S49 demo-data constraint).
 """
 
 import datetime
@@ -97,29 +99,36 @@ def test_all_seven_zone_titles_render_in_order():
 
 
 def test_awaiting_states_carry_no_digits():
-    """The fully-awaiting zones carry NO digits anywhere; the calendar's card is clean.
+    """The fully-awaiting zones carry NO digits anywhere; the calendar's copy is clean.
 
-    The mechanical no-fake-numbers guard (ADR-0009 D2): an unbuilt zone names
-    what is missing and never renders an invented number — so Readiness,
-    Today's Plan, and Goals & Progress are checked on their WHOLE tag-stripped,
-    entity-decoded zone text (a fake number anywhere in the zone fails, not
-    just inside the awaiting card). This Week's date digits are legitimate, so
-    it keeps the per-card check alone.
+    The mechanical no-fake-numbers guard (ADR-0009 D2), rendered from an EMPTY
+    store so the hero's real-metric chips (legitimate digits) cannot
+    false-trip: with an empty store, EVERY digit in Readiness, Today's Plan,
+    or Goals & Progress is by definition invented — so those zones are checked
+    on their WHOLE tag-stripped, entity-decoded text. Readiness's awaiting
+    state is the designed headline (the visual spec replaced its dashed card);
+    Today's Plan and Goals & Progress keep dashed awaiting rows. This Week's
+    date digits are legitimate, so it checks only its muted awaiting caption.
     """
     zones = _zones(dashboard.render([], _today=_TODAY))
-    for title in ("Readiness", "Today's Plan", "Goals & Progress"):
+    assert "Awaiting wearable baseline" in zones["Readiness"], (
+        "the hero must render its awaiting headline"
+    )
+    for title in ("Today's Plan", "Goals & Progress"):
         assert _awaiting_texts(zones[title]), (
             f"zone {title!r} must render an awaiting card"
         )
+    for title in ("Readiness", "Today's Plan", "Goals & Progress"):
         text = html_lib.unescape(re.sub(r"<[^>]*>", "", zones[title]))
         assert not re.search(r"\d", text), (
             f"fully-awaiting zone {title!r} carries a digit: {text!r}"
         )
-    texts = _awaiting_texts(zones["This Week"])
-    assert texts, "zone 'This Week' must render an awaiting card"
-    for text in texts:
-        assert not re.search(r"\d", text), (
-            f"awaiting card in 'This Week' carries a digit: {text!r}"
+    captions = re.findall(r"<div class='caption'>(.*?)</div>", zones["This Week"], re.S)
+    awaiting = [c for c in captions if "No scheduled events" in c]
+    assert awaiting, "zone 'This Week' must render its muted awaiting caption"
+    for text in awaiting:
+        assert not re.search(r"\d", html_lib.unescape(re.sub(r"<[^>]*>", "", text))), (
+            f"awaiting caption in 'This Week' carries a digit: {text!r}"
         )
 
 
@@ -207,15 +216,19 @@ def test_specialists_tuple_mirrors_deployed_roster():
      ["28", "29", "30", "31", "1", "2", "3"], ("day today", "Wed", "30")),
 ])
 def test_calendar_strip_renders_week_with_today_marked(today, day_numbers, today_cell):
-    """The week strip renders 7 real cells of the seam date's Mon-Sun week,
-    and exactly the seam date's cell carries the .today class."""
+    """The week grid renders 7 real columns of the seam date's Mon-Sun week,
+    and exactly the seam date's column carries the .today class + the
+    `· Today` marker."""
     zone = _zones(dashboard.render([], _today=today))["This Week"]
-    cells = re.findall(r"<div class='(day[^']*)'>([A-Za-z]+)<br>(\d+)</div>", zone)
+    cells = re.findall(
+        r"<div class='(day[^']*)'><div class='dhead'>([A-Za-z]+) (\d+)", zone
+    )
     assert len(cells) == 7
     assert [c[1] for c in cells] == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     assert [c[2] for c in cells] == day_numbers
     today_cells = [c for c in cells if "today" in c[0]]
     assert today_cells == [today_cell]
+    assert zone.count("· Today") == 1, "exactly the seam column carries the marker"
 
 
 def test_fitness_marker_renders_units_and_neutral_trend():
@@ -226,7 +239,7 @@ def test_fitness_marker_renders_units_and_neutral_trend():
     assert "Bodyweight" in trends
     assert "183 lb" in trends
     row = trends.split("<div class='kpi-row'>")[1]
-    assert "<span class='chip state-neutral'>" in row
+    assert "<span class='pill tint-neutral'>" in row
     assert "&#8595;" in row, "direction-only arrow (184 -> 183 falls)"
     assert "improving" not in row
     assert "regressing" not in row
@@ -236,9 +249,10 @@ def test_production_path_renders_zone_shell(tmp_path):
     """generate.run('dashboard') over an EMPTY store emits the full zone shell.
 
     The production path (store read -> template -> render.emit) must deliver
-    all seven decoded zone titles in design order, with awaiting cards in the
-    Readiness, Today's Plan, Performance & Trends, Goals & Progress, and
-    Labs & Bloodwork zones (1/3/4/6/7).
+    all seven decoded zone titles in design order, the hero's awaiting
+    headline (zone 1's designed empty state), and awaiting cards in the
+    Today's Plan, Performance & Trends, Goals & Progress, and Labs &
+    Bloodwork zones (3/4/6/7).
     """
     root = tmp_path / "store"
     root.mkdir()
@@ -249,7 +263,10 @@ def test_production_path_renders_zone_shell(tmp_path):
     ]
     assert tuple(titles) == _ZONE_TITLES
     zones = _zones(html)
-    for title in ("Readiness", "Today's Plan", "Performance & Trends",
+    assert "Awaiting wearable baseline" in zones["Readiness"], (
+        "the hero must render its awaiting headline through the production path"
+    )
+    for title in ("Today's Plan", "Performance & Trends",
                   "Goals & Progress", "Labs & Bloodwork"):
         assert _awaiting_texts(zones[title]), (
             f"zone {title!r} must render an awaiting card through the production path"
@@ -264,3 +281,96 @@ def test_empty_store_renders_awaiting_in_data_zones():
             f"empty-store zone {title!r} must render an awaiting card, not an empty section"
         )
         assert "kpi-row" not in zones[title]
+
+
+def _wearable_read():
+    """A fitness-domain store read carrying the three hero readout markers.
+
+    `rhr` uses the legacy unprefixed item form on purpose — the hero chip
+    lookup must tolerate both forms.
+    """
+    return [
+        {"item": "biomarker::hrv", "timepoint": "2026-06-08T00:00:00+00:00",
+         "source": "whoop", "value": 58},
+        {"item": "biomarker::hrv", "timepoint": "2026-06-09T00:00:00+00:00",
+         "source": "whoop", "value": 64},
+        {"item": "rhr", "timepoint": "2026-06-09T00:00:00+00:00",
+         "source": "whoop", "value": 49},
+        {"item": "biomarker::sleep-hours", "timepoint": "2026-06-09T00:00:00+00:00",
+         "source": "whoop", "value": 7.5},
+    ]
+
+
+def test_hero_rings_render_track_only_with_no_wearable_scoring():
+    """The hero renders exactly 3 rings, each track-only: one circle (the
+    light track), NO colored arc (no second circle, no dash geometry), and the
+    em-dash where the value would be (ADR-0009 D2 — never a fake percentage).
+    Holds with AND without store data, since wearable SCORING does not exist
+    in either case."""
+    for store_read in ([], _wearable_read()):
+        zone = _zones(dashboard.render(store_read, _today=_TODAY))["Readiness"]
+        assert zone.count("<div class='ring'>") == 3
+        assert zone.count("<circle") == 3, "a track-only ring draws ONE circle"
+        assert "stroke-dasharray" not in zone, "no arc without a real score"
+        assert "stroke-linecap" not in zone, "no arc cap geometry without a score"
+        assert len(re.findall(r"<text[^>]*>—</text>", zone)) == 3, (
+            "each ring centers an em-dash in the value slot"
+        )
+
+
+def test_hero_metric_chips_render_only_from_stored_readings():
+    """The hero chips row carries real latest readings WITH units when the
+    store has them, and NO bordered chip at all when it does not (ADR-0009
+    D2 in both directions)."""
+    with_data = _zones(dashboard.render(_wearable_read(), _today=_TODAY))["Readiness"]
+    assert "<span class='chip-b'>HRV 64 ms</span>" in with_data, "latest hrv reading"
+    assert "<span class='chip-b'>RHR 49 bpm</span>" in with_data, "legacy unprefixed rhr"
+    assert "<span class='chip-b'>Sleep 7.5 h</span>" in with_data
+    empty = _zones(dashboard.render([], _today=_TODAY))["Readiness"]
+    assert "chip-b" not in empty, "an empty store renders no metric chip"
+    partial = _zones(dashboard.render(_bodyweight_read(), _today=_TODAY))["Readiness"]
+    assert "chip-b" not in partial, "a non-hero marker renders no metric chip"
+
+
+def test_header_bar_carries_seam_date_long_form():
+    """The header bar renders the product name, the real long-form seam date,
+    the muted awaiting status pill, and the Today chip — and the old h1 is
+    gone (the header bar replaced it)."""
+    html = dashboard.render([], _today=_TODAY)
+    assert "<header class='topbar'>" in html
+    assert "A+ Maxing" in html
+    assert "Wednesday · June 10, 2026" in html, "the long-form date derives from _today"
+    assert "— awaiting wearable baseline" in html
+    assert "<span class='chip-b'>Today</span>" in html
+    assert "<h1>" not in html
+
+
+def test_trends_renders_one_metric_card_per_item_in_grid6():
+    """Zone 4 lays its metric cards out in the 6-column grid: one kpi-row
+    card per tracked item, inside `.grid6`."""
+    read = _bodyweight_read() + [
+        {"item": "biomarker::steps", "timepoint": "2026-06-08T00:00:00+00:00",
+         "source": "phone", "value": 9000},
+    ]
+    trends = _zones(dashboard.render(read, _today=_TODAY))["Performance & Trends"]
+    assert "<div class='grid6'>" in trends
+    assert trends.count("<div class='kpi-row'>") == 2, "one card per item"
+
+
+def test_goals_track_renders_without_fill():
+    """Zone 6 renders the designed empty progress track: the track element is
+    present, the fill element is NOT, and no percent renders (ADR-0009 D2)."""
+    zone = _zones(dashboard.render([], _today=_TODAY))["Goals & Progress"]
+    assert "<div class='track'></div>" in zone
+    assert "class='fill'" not in zone
+    assert "%" not in zone
+
+
+def test_page_frame_sheet_tokens_present():
+    """The artifact carries the app-surface page frame: the gray page-bg and
+    card-border CHROME tokens in :root, and the 1140px white sheet wrap."""
+    html = dashboard.render([], _today=_TODAY)
+    assert "--page-bg: #F3F4F6" in html
+    assert "--card-border: #E5E7EB" in html
+    assert "<div class='wrap'>" in html
+    assert "max-width: 1140px" in html
