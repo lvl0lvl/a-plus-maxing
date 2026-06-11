@@ -283,6 +283,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 ## Landmark window check (close step 8.7)
 
 S49 close (2026-06-11): re-read `vault/meta/landmarks.md`. No `active` landmark's trigger window opened during S49 (LM-01 July visit >14 days out; LM-02/LM-03 date-TBD pending Walter; LM-04 awaits real operator data — S49 demos were synthetic fitness-domain only, no `vault/artifacts/` artifact generated). No landmark actions due.
+
 ## Open Issues
 
 ### `agent-verdict-halt` sentinel inconsistency (gate_attest.py vs schemas)
