@@ -162,6 +162,18 @@ def test_accent_hexes_only_in_chrome():
             assert accent not in fragment, (
                 f"accent {accent} leaked into a data fragment: {fragment[:120]!r}"
             )
+    # Accent-CATEGORY tint classes are chrome too: a `tint-training`-class pill
+    # inside a data fragment would dress data state in category chrome just as
+    # surely as the raw hex (state tints good/concern/neutral stay allowed).
+    accent_tint_re = re.compile(
+        r"tint-(?:training|nutrition|supplements|peptides|sleep)"
+    )
+    for fragment in data_fragments:
+        leak = accent_tint_re.search(fragment)
+        assert leak is None, (
+            f"accent tint class {leak.group(0)!r} leaked into a data fragment: "
+            f"{fragment[:120]!r}"
+        )
     # The accents DO render as chrome (zone/card borders), not nowhere at all.
     for accent in component_set.ACCENTS.values():
         assert accent in html
@@ -201,24 +213,31 @@ def test_specialists_tuple_mirrors_deployed_roster():
     assert care_team | set(_INTERNAL_ROLES) == deployed
 
 
-@pytest.mark.parametrize("today, day_numbers, today_cell", [
+@pytest.mark.parametrize("today, day_numbers, today_cell, range_text", [
     # Mid-week, mid-month: the original seam case.
     (datetime.date(2026, 6, 10),
-     ["8", "9", "10", "11", "12", "13", "14"], ("day today", "Wed", "10")),
+     ["8", "9", "10", "11", "12", "13", "14"], ("day today", "Wed", "10"),
+     "Jun 8 – 14"),
     # Monday of a month-spanning week: today is the FIRST cell.
     (datetime.date(2026, 6, 29),
-     ["29", "30", "1", "2", "3", "4", "5"], ("day today", "Mon", "29")),
+     ["29", "30", "1", "2", "3", "4", "5"], ("day today", "Mon", "29"),
+     "Jun 29 – Jul 5"),
     # Sunday of the same month-spanning week: today is the LAST cell.
     (datetime.date(2026, 7, 5),
-     ["29", "30", "1", "2", "3", "4", "5"], ("day today", "Sun", "5")),
+     ["29", "30", "1", "2", "3", "4", "5"], ("day today", "Sun", "5"),
+     "Jun 29 – Jul 5"),
     # A year-spanning week: the strip crosses into January.
     (datetime.date(2026, 12, 30),
-     ["28", "29", "30", "31", "1", "2", "3"], ("day today", "Wed", "30")),
+     ["28", "29", "30", "31", "1", "2", "3"], ("day today", "Wed", "30"),
+     "Dec 28 – Jan 3"),
 ])
-def test_calendar_strip_renders_week_with_today_marked(today, day_numbers, today_cell):
-    """The week grid renders 7 real columns of the seam date's Mon-Sun week,
-    and exactly the seam date's column carries the .today class + the
-    `· Today` marker."""
+def test_calendar_strip_renders_week_with_today_marked(
+    today, day_numbers, today_cell, range_text
+):
+    """The week grid renders 7 real columns of the seam date's Mon-Sun week
+    with the rendered date-range string, the inert chevron/Month chips, and
+    the four legend pills; exactly the seam date's column carries the .today
+    class + the `· Today` marker."""
     zone = _zones(dashboard.render([], _today=today))["This Week"]
     cells = re.findall(
         r"<div class='(day[^']*)'><div class='dhead'>([A-Za-z]+) (\d+)", zone
@@ -229,6 +248,15 @@ def test_calendar_strip_renders_week_with_today_marked(today, day_numbers, today
     today_cells = [c for c in cells if "today" in c[0]]
     assert today_cells == [today_cell]
     assert zone.count("· Today") == 1, "exactly the seam column carries the marker"
+    # The header carries the real rendered week range (month-/year-spanning
+    # weeks name both months), the inert chevron/Month chips, and the four
+    # event-category legend pills (Training on the accent tint).
+    assert f"<span class='caption'>{range_text}</span>" in zone
+    for chip in ("‹", "›", "Month"):
+        assert f"<span class='chip-b'>{chip}</span>" in zone
+    assert "<span class='pill tint-training'>Training</span>" in zone
+    for label in ("Lab draw", "Check-in", "Appointment"):
+        assert f"<span class='pill'>{label}</span>" in zone
 
 
 def test_fitness_marker_renders_units_and_neutral_trend():
@@ -402,3 +430,100 @@ def test_page_frame_sheet_tokens_present():
     assert "--card-border: #E5E7EB" in html
     assert "<div class='wrap'>" in html
     assert "max-width: 1140px" in html
+
+
+def test_plan_zone_renders_designed_card_anatomy():
+    """Zone 3 renders the 2x2 grid of four specialist-attributed cards with
+    the designed empty-state anatomy (visual spec zone 3): per card the accent
+    glyph dot, the `via <specialist>` caption, and the `awaiting plan` pill;
+    Workout's four em-dash stat boxes (Heart rate tinted); Nutrition's
+    calorie-arithmetic row plus exactly three empty macro tracks."""
+    zone = _zones(dashboard.render([], _today=_TODAY))["Today's Plan"]
+    assert "<div class='grid2'>" in zone
+    cards = re.findall(r"<div class='card pcard pc-([a-z]+)'>", zone)
+    assert cards == ["training", "nutrition", "supplements", "peptides"]
+    assert zone.count("<span class='dot' style='background:#") == 4
+    for specialist in ("personal-trainer", "nutritionist",
+                       "supplement-specialist", "peptide-specialist"):
+        assert f"<span class='caption'>via {specialist}</span>" in zone
+    assert zone.count("<span class='pill'>awaiting plan</span>") == 4
+    # Workout: the 4-slot stat row, all em-dash values, the LAST box tinted.
+    workout = zone.split("<div class='card pcard pc-")[1]
+    boxes = re.findall(
+        r"<div class='(stat[^']*)'><div class='slabel'>([^<]*)</div>"
+        r"<div class='sval'>([^<]*)</div></div>", workout
+    )
+    assert [(klass, label) for klass, label, _v in boxes] == [
+        ("stat", "Elapsed"), ("stat", "Volume"), ("stat", "Sets"),
+        ("stat tinted", "Heart rate"),
+    ]
+    assert all(value == "—" for _k, _l, value in boxes)
+    # Nutrition: Goal/Food/Exercise/Remaining + exactly 3 empty macro tracks.
+    nutrition = zone.split("<div class='card pcard pc-")[2]
+    assert re.findall(r"<div class='slabel'>([^<]*)</div>", nutrition) == [
+        "Goal", "Food", "Exercise", "Remaining",
+    ]
+    assert nutrition.count("<div class='macro'>") == 3
+    assert nutrition.count("<div class='track'></div>") == 3
+    assert "class='fill'" not in nutrition, "empty macro tracks carry no fill"
+
+
+def test_populated_hero_non_chip_text_is_digit_free():
+    """With wearable readings stored, every digit in the Readiness zone lives
+    in a real-data metric chip: stripping the chip-b fragments leaves a
+    digit-free remainder (ADR-0009 D2 — no invented score rides in beside the
+    real chips)."""
+    zone = _zones(dashboard.render(_wearable_read(), _today=_TODAY))["Readiness"]
+    without_chips = re.sub(r"<span class='chip-b'>.*?</span>", "", zone)
+    text = html_lib.unescape(re.sub(r"<[^>]*>", "", without_chips))
+    assert not re.search(r"\d", text), (
+        f"non-chip hero text carries a digit: {text!r}"
+    )
+
+
+def test_watchout_only_store_renders_no_pending_draws_row():
+    """A labs strip holding only a watch-out (no panel:: items) renders NO
+    `Pending draws:` row."""
+    watchout_only = [
+        {"item": "watch-out::soreness-check",
+         "timepoint": "2026-06-08T00:00:00+00:00",
+         "source": "manual", "value": "none noticed"},
+    ]
+    labs = _zones(dashboard.render(watchout_only, _today=_TODAY))["Labs & Bloodwork"]
+    assert "none noticed" in labs, "the watch-out row must render"
+    assert "Pending draws:" not in labs, (
+        "no panel items -> no Pending-draws row"
+    )
+
+
+# zone title -> the designed subtitle copy (visual spec per-zone clauses).
+_ZONE_SUBTITLES = {
+    "Today's Plan": "Your training, fuel, and protocol for today — built from "
+                    "your goals, attributed to each specialist.",
+    "Performance & Trends": "How you're tracking — recent readings per metric.",
+    "Your Care Team": "What each specialist tracks for you — every claim "
+                      "attributed and evidence-gated.",
+    "Goals & Progress": "Where each goal stands.",
+    "Labs & Bloodwork": "Clinical detail — the supporting layer under your plan.",
+}
+
+
+def test_zone_subtitles_and_hero_caption_pin_designed_copy():
+    """Each zone's subtitle and the hero readout caption carry the designed
+    copy verbatim (visual spec per-zone clauses); zones 1-2 carry no subtitle
+    by design."""
+    zones = _zones(dashboard.render([], _today=_TODAY))
+    for title, subtitle in _ZONE_SUBTITLES.items():
+        m = re.search(r"<div class='subtitle'>(.*?)</div>", zones[title])
+        assert m, f"zone {title!r} must carry its subtitle"
+        assert html_lib.unescape(m.group(1)) == subtitle
+    for title in ("Readiness", "This Week"):
+        assert "class='subtitle'" not in zones[title]
+    captions = [
+        html_lib.unescape(c)
+        for c in re.findall(r"<div class='caption'>([^<]*)</div>", zones["Readiness"])
+    ]
+    assert (
+        "Recovery, sleep, and strain scoring arrives with the first "
+        "thirty-day wearable window."
+    ) in captions, "the hero readout caption must carry the designed copy"
