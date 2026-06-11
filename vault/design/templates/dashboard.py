@@ -198,6 +198,7 @@ def _hero_zone():
         "Awaiting wearable baseline — recovery, sleep, and strain scoring "
         "arrives with the first thirty-day wearable window."
     )
+    # Design assignment (ADR-0009 D3): the sleep accent chromes Readiness until a dedicated sleep surface exists.
     return cs.zone("Readiness", body, accent=cs.ACCENTS["sleep"])
 
 
@@ -302,8 +303,9 @@ def render(store_read, _today=None):
         else:
             other.append(_plain_row(biomarker_meta.display_name(item), values[-1]))
 
-    # Zone 4 — REAL: the routed biomarker rows; the legend renders here because
-    # only zones 4 and 7 carry data-state colors. Empty -> its own awaiting card.
+    # Zone 4 — REAL: the routed biomarker rows; the legend moved from page top
+    # into zone 4 — the one zone whose rows carry data-state colors — so it sits
+    # beside the colors it explains. Empty -> its own awaiting card.
     trends_body = (
         cs.legend() + "".join(biomarkers)
         if biomarkers

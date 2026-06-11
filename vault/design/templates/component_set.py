@@ -190,8 +190,8 @@ def awaiting(what_is_missing):
     """Return the honest awaiting-state card naming WHAT data is missing.
 
     The mechanical form of ADR-0009 D2: a muted dashed box carrying the
-    missing-data text verbatim-escaped. Never carries numbers — an unbuilt
-    zone states its absence rather than rendering an invented value.
+    missing-data text verbatim-escaped. Callers keep the text digit-free
+    (ADR-0009 D2); the zone tests enforce it.
 
     Args:
         what_is_missing (str): The missing-data text (escaped).

@@ -65,11 +65,14 @@ distinct from the decision-pinned semantic `PALETTE` (which the accessibility
 gate reads from `vault/decisions/2026-06-05-render-colorblind-safe-palette.md`
 and which MUST NOT change). Accents color zone/card chrome (headers, card
 borders) only — never data state. Data state stays exclusively
-good/watch/concern/neutral.
+good/watch/concern/neutral. The sleep accent additionally chromes the hero
+Readiness zone (the readiness-adjacent category) until a dedicated sleep
+surface exists.
 
 **D4 — Fitness-domain registry extension.** `biomarker_meta.METADATA` gains
 the fitness markers the demo constraint names: `bodyweight` (lb), `sleep-hours`
-(h), `est-1rm` (lb), `steps` (count). Units always; `reference_range` only where
+(h), `est-1rm` (lb), `steps` (steps — the count renders as its own unit word).
+Units always; `reference_range` only where
 a general-adult range is defensible (none of these four — all goal- or
 person-dependent → `None`, so state reads neutral); `good_direction` only where
 physiologically unambiguous (`sleep-hours` up; the others `None` → direction-only
