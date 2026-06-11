@@ -68,6 +68,13 @@ CHROME = {
     "peptides-tint": "#F2EBFD",    # ACCENTS peptides #7C3AED
     "sleep-tint": "#EFEFFB",       # ACCENTS sleep #5B5BD6
     "today-tint": "#EFF4FE",       # calendar today column (light training-blue tint)
+    # Event-category chrome (visual spec zone 2, amended 2026-06-11): fixed
+    # tint/text pairs for the calendar legend's event categories — chrome, NOT
+    # data state, and distinct from the data-state PALETTE hexes. Training
+    # events reuse the existing ACCENTS training tint pair.
+    "lab-draw-tint": "#F8EEE6",    # event-category lab-draw, ~10% of amber #B45309
+    "check-in-tint": "#F4EBFD",    # event-category check-in, ~10% of purple #9333EA
+    "appointment-tint": "#E8F2EC", # event-category appointment, ~10% of green #15803D
     # Accent tint TEXT colors: fixed shades of the ACCENTS base measuring
     # >= 4.5:1 (WCAG AA normal text) on their OWN tint background. The base
     # training/nutrition/supplements hexes measure 4.08/2.48/3.05 on their
@@ -78,13 +85,23 @@ CHROME = {
     "supplements-text": "#0B787F", # ACCENTS supplements #0E9AA3 darkened (4.69 on supplements-tint)
     "peptides-text": "#7C3AED",    # = ACCENTS peptides (4.91 on peptides-tint unchanged)
     "sleep-text": "#5B5BD6",       # = ACCENTS sleep (4.71 on sleep-tint unchanged)
+    # Event-category tint TEXT colors, same >= 4.5:1 rule: lab-draw and
+    # appointment darken their base (the bases measure 4.39/4.38 on their
+    # tints); check-in's base already clears AA.
+    "lab-draw-text": "#955F0D",    # lab-draw #B45309 darkened (4.68 on lab-draw-tint)
+    "check-in-text": "#9333EA",    # = check-in base (4.65 on check-in-tint unchanged)
+    "appointment-text": "#127A3B", # appointment #15803D darkened (4.74 on appointment-tint)
 }
+
+# The calendar legend's event categories beyond training (which reuses the
+# ACCENTS training tint): pill-tintable chrome names, never data state.
+_EVENT_TINTS = ("lab-draw", "check-in", "appointment")
 
 # The pill-tintable tint names: BOTH `pill()`'s guard AND `_style_block`'s
 # `.tint-*` rule generation read this one set, so a guard-accepted name always
 # has a rendered CSS rule (and vice versa — they cannot diverge). `today-tint`
 # stays calendar-cell CHROME (the today column background), NOT pill-tintable.
-_TINTABLE = frozenset({"good", "concern", "neutral", *ACCENTS})
+_TINTABLE = frozenset({"good", "concern", "neutral", *ACCENTS, *_EVENT_TINTS})
 
 # The semantic-state tints' text colors (the :root custom properties); an
 # accent-category tint takes its text color from the CHROME `*-text` hex.
@@ -191,13 +208,28 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .grid6 .kpi .label {{ font-size: 11px; }}
 .grid6 .kpi .value {{ font-size: 21px; }}
 .grid6 svg {{ width: 100%; height: 40px; display: block; margin-top: 8px; }}
-.cal {{ display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }}
-.cal .day {{ border: 1px solid var(--card-border); border-radius: 8px; padding: 6px 8px; font-size: 12px; }}
-.cal .dhead {{ text-align: center; }}
-.cal .dslot {{ min-height: 70px; }}
+.calcard {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }}
+.calcard .cal {{ flex-basis: 100%; }}
+.calcard > .caption {{ order: 9; }}
+.wknav, .evlegend {{ display: flex; align-items: center; gap: 8px; }}
+.wknav .card-title {{ font-size: 14px; font-weight: 600; }}
+.evlegend {{ margin-left: auto; }}
+.navbtn {{ display: inline-block; box-sizing: border-box; width: 22px; height: 22px; line-height: 20px; text-align: center; border: 1px solid var(--card-border); border-radius: 6px; font-size: 13px; }}
+.cal {{ display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--card-border); border-radius: 8px; overflow: hidden; }}
+.cal .dhead {{ padding: 6px 4px; font-size: 12px; text-align: center; border-bottom: 1px solid var(--card-border); border-right: 1px solid var(--card-border); }}
+.cal .dhead .dwd {{ font-size: 11px; color: var(--muted); text-transform: uppercase; }}
+.cal .dcol {{ min-height: 180px; padding: 6px; border-right: 1px solid var(--card-border); font-size: 12px; }}
+.cal > :nth-child(7n) {{ border-right: none; }}
 .cal .today {{ background: {c['today-tint']}; font-weight: 600; }}
-.calhead {{ display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }}
-.calhead .card-title {{ font-size: 14px; font-weight: 600; }}
+.monthx summary {{ display: inline-block; border: 1px solid var(--card-border); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; list-style: none; }}
+.monthx summary::-webkit-details-marker {{ display: none; }}
+.monthx[open] {{ order: 5; flex-basis: 100%; }}
+.month {{ display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--card-border); border-radius: 8px; overflow: hidden; margin-top: 8px; }}
+.month .mhead {{ padding: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; text-align: center; border-right: 1px solid var(--card-border); }}
+.month .mday {{ min-height: 64px; padding: 4px 6px; font-size: 12px; border-top: 1px solid var(--card-border); border-right: 1px solid var(--card-border); }}
+.month > :nth-child(7n) {{ border-right: none; }}
+.month .mout {{ color: var(--muted); background: var(--page-bg); }}
+.month .mtoday {{ background: {c['today-tint']}; font-weight: 600; }}
 .pill {{ display: inline-block; border-radius: 999px; font-size: 12px; padding: 2px 10px; background: {c['neutral-tint']}; color: var(--muted); }}{_tint_rules()}
 .chip-b {{ display: inline-block; border-radius: 999px; font-size: 12px; padding: 2px 10px; border: 1px solid var(--card-border); color: var(--ink); }}
 .stat {{ border: 1px solid var(--card-border); border-radius: 8px; text-align: center; padding: 8px 4px; }}
@@ -232,7 +264,7 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
   html, body {{ background: #FFFFFF; color: #000000; }}
   .wrap {{ max-width: 100%; padding: 0; border: none; border-radius: 0; }}
   .card, .grid6 .kpi-row, .stat {{ box-shadow: none; }}
-  .cal .today {{ background: #FFFFFF; }}
+  .cal .today, .month .mtoday, .month .mout {{ background: #FFFFFF; }}
   .tldr {{ border-left-color: #000000; }}
   .grid6 {{ grid-template-columns: repeat(3, 1fr); }}
 }}
