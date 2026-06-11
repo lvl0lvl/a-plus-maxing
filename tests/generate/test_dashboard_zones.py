@@ -165,8 +165,11 @@ def test_accent_hexes_only_in_chrome():
     # Accent-CATEGORY tint classes are chrome too: a `tint-training`-class pill
     # inside a data fragment would dress data state in category chrome just as
     # surely as the raw hex (state tints good/concern/neutral stay allowed).
+    # The event-category tints (lab-draw/check-in/appointment, calendar legend
+    # chrome) are banned from data fragments on the same grounds.
     accent_tint_re = re.compile(
-        r"tint-(?:training|nutrition|supplements|peptides|sleep)"
+        r"tint-(?:training|nutrition|supplements|peptides|sleep"
+        r"|lab-draw|check-in|appointment)"
     )
     for fragment in data_fragments:
         leak = accent_tint_re.search(fragment)
@@ -265,6 +268,94 @@ def test_calendar_strip_renders_week_with_today_marked(
     for label, tint in (("Training", "training"), ("Lab draw", "lab-draw"),
                         ("Check-in", "check-in"), ("Appointment", "appointment")):
         assert f"<span class='pill tint-{tint}'>{label}</span>" in zone
+
+
+def test_calendar_week_nav_chevrons_flank_the_range():
+    """The header-left week nav is shaped `‹ Jun 8 – 14 ›`: inside the wknav
+    fragment a navbtn chevron sits BEFORE the range span and one AFTER it
+    (asserted by index, not mere presence)."""
+    zone = _zones(dashboard.render([], _today=_TODAY))["This Week"]
+    wknav = re.search(r"<div class='wknav'>.*?</div>", zone, re.S).group(0)
+    prev_at = wknav.find("<span class='navbtn'>‹</span>")
+    range_at = wknav.find("<span class='caption'>Jun 8 – 14</span>")
+    next_at = wknav.find("<span class='navbtn'>›</span>")
+    assert prev_at != -1 and range_at != -1 and next_at != -1, wknav
+    assert prev_at < range_at < next_at, (
+        f"week nav must read ‹ range ›, got indexes {prev_at}/{range_at}/{next_at}"
+    )
+    assert "This week" in wknav
+    assert "<svg class='calglyph'" in wknav, "the calendar glyph leads the nav"
+
+
+def test_calendar_legend_pills_carry_own_tints():
+    """Each event-category legend pill rides its OWN tint class — training on
+    the ACCENTS tint, the other three on the CHROME event-category tints."""
+    zone = _zones(dashboard.render([], _today=_TODAY))["This Week"]
+    for label, tint in (("Training", "training"), ("Lab draw", "lab-draw"),
+                        ("Check-in", "check-in"), ("Appointment", "appointment")):
+        assert f"<span class='pill tint-{tint}'>{label}</span>" in zone, (
+            f"legend pill {label!r} must carry tint-{tint}"
+        )
+
+
+def test_calendar_month_nav_sits_on_the_header_right():
+    """The header-right group carries the legend pills then the inert
+    `‹ Month ›` nav (navbtn + label + navbtn, in that order)."""
+    zone = _zones(dashboard.render([], _today=_TODAY))["This Week"]
+    ev = re.search(r"<div class='evlegend'>.*?</div>", zone, re.S).group(0)
+    assert ev.count("class='pill") == 4, "the four legend pills lead the group"
+    prev_at = ev.find("<span class='navbtn'>‹</span>")
+    label_at = ev.find("<span class='caption'>Month</span>")
+    next_at = ev.find("<span class='navbtn'>›</span>")
+    assert -1 < prev_at < label_at < next_at, (
+        f"month nav must read ‹ Month ›, got indexes {prev_at}/{label_at}/{next_at}"
+    )
+
+
+@pytest.mark.parametrize("today, in_month, lead, trail", [
+    # June 2026 opens ON a Monday: 30 days, no lead, 5 trailing July days.
+    (datetime.date(2026, 6, 10), 30, 0, 5),
+    (datetime.date(2026, 6, 29), 30, 0, 5),
+    # July 2026 starts mid-week (Wed): 31 days, 2 leading June, 2 trailing Aug.
+    (datetime.date(2026, 7, 5), 31, 2, 2),
+    # December 2026 starts Tue and ends Thu: 1 leading Nov, 3 trailing Jan.
+    (datetime.date(2026, 12, 30), 31, 1, 3),
+])
+def test_calendar_month_expand_renders_full_month_grid(today, in_month, lead, trail):
+    """The zone-2 `<details class='monthx'>` expand: the summary caret control
+    followed by the seam month's full grid — a Mon-Sun weekday header strip,
+    the right in-month day-cell count, the exact muted lead/trail other-month
+    cells, today's cell highlighted exactly once, and every cell digit-bearing
+    but EMPTY of event content."""
+    zone = _zones(dashboard.render([], _today=today))["This Week"]
+    m = re.search(
+        r"<details class='monthx'><summary[^>]*>[^<]*</summary>"
+        r"<div class='month'>(.*?)</div></details>",
+        zone, re.S,
+    )
+    assert m, "zone 2 must carry the details/summary month expand"
+    month = m.group(1)
+    assert re.findall(r"<div class='mhead'>([A-Za-z]+)</div>", month) == [
+        "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+    ], "the month grid keeps the week strip's Mon-Sun order"
+    # Each day cell's inner content is its day number ALONE — digit-bearing,
+    # empty of events (none exist yet).
+    cells = re.findall(r"<div class='(mday[^']*)'>(\d+)</div>", month)
+    assert len(cells) == month.count("mday"), "every mday cell holds digits only"
+    assert len(cells) % 7 == 0, "the grid renders whole weeks x 7"
+    muted_flags = ["mout" in klass for klass, _day in cells]
+    assert muted_flags.count(False) == in_month
+    assert muted_flags[:lead] == [True] * lead and not muted_flags[lead], (
+        f"expected exactly {lead} muted leading other-month cells"
+    )
+    assert muted_flags[-trail:] == [True] * trail if trail else True
+    assert not muted_flags[-(trail + 1)], (
+        f"expected exactly {trail} muted trailing other-month cells"
+    )
+    todays = [(klass, day) for klass, day in cells if "mtoday" in klass]
+    assert todays == [("mday mtoday", str(today.day))], (
+        "exactly the seam date's cell is highlighted in the month grid"
+    )
 
 
 def test_fitness_marker_renders_units_and_neutral_trend():
