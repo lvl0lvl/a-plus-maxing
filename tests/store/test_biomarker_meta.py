@@ -40,6 +40,19 @@ def test_get_unknown_marker_returns_none(item):
     assert biomarker_meta.get(item) is None
 
 
+@pytest.mark.parametrize("marker, units", [
+    ("bodyweight", "lb"),
+    ("sleep-hours", "h"),
+    ("est-1rm", "lb"),
+    ("steps", "steps"),
+])
+def test_get_fitness_marker_units_without_range(marker, units):
+    """A D4 fitness marker registers its units and NO invented reference range."""
+    meta = biomarker_meta.get(marker)
+    assert meta["units"] == units
+    assert meta["reference_range"] is None
+
+
 # --- to_number ---------------------------------------------------------------
 
 
@@ -63,6 +76,7 @@ def test_to_number_overflow_reads_none():
     ("watch-out::injection_site_reaction", "Injection Site Reaction"),
     ("panel::iron-panel", "Iron Panel"),
     ("biomarker::ldl", "LDL"),
+    ("biomarker::est-1rm", "Est 1RM"),
 ])
 def test_display_name(item, expected):
     """display_name strips the prefix and title-cases words, acronyms upper-case."""
@@ -135,6 +149,11 @@ def test_state_for_never_returns_watch():
 def test_trend_up_polarity_rising_improves():
     """An "up" marker rising reads improving (hrv)."""
     assert biomarker_meta.trend("hrv", 50, 60) == "improving"
+
+
+def test_trend_sleep_hours_rising_improves():
+    """The D4 "up"-polarity fitness marker: more sleep reads improving."""
+    assert biomarker_meta.trend("sleep-hours", 6, 7) == "improving"
 
 
 def test_trend_up_polarity_falling_regresses():

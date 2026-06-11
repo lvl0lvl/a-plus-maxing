@@ -15,6 +15,9 @@ import html as html_lib
 import re
 from pathlib import Path
 
+import pytest
+
+from scripts.generate import generate
 from vault.design.templates import component_set, dashboard
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -189,16 +192,30 @@ def test_specialists_tuple_mirrors_deployed_roster():
     assert care_team | set(_INTERNAL_ROLES) == deployed
 
 
-def test_calendar_strip_renders_week_with_today_marked():
+@pytest.mark.parametrize("today, day_numbers, today_cell", [
+    # Mid-week, mid-month: the original seam case.
+    (datetime.date(2026, 6, 10),
+     ["8", "9", "10", "11", "12", "13", "14"], ("day today", "Wed", "10")),
+    # Monday of a month-spanning week: today is the FIRST cell.
+    (datetime.date(2026, 6, 29),
+     ["29", "30", "1", "2", "3", "4", "5"], ("day today", "Mon", "29")),
+    # Sunday of the same month-spanning week: today is the LAST cell.
+    (datetime.date(2026, 7, 5),
+     ["29", "30", "1", "2", "3", "4", "5"], ("day today", "Sun", "5")),
+    # A year-spanning week: the strip crosses into January.
+    (datetime.date(2026, 12, 30),
+     ["28", "29", "30", "31", "1", "2", "3"], ("day today", "Wed", "30")),
+])
+def test_calendar_strip_renders_week_with_today_marked(today, day_numbers, today_cell):
     """The week strip renders 7 real cells of the seam date's Mon-Sun week,
     and exactly the seam date's cell carries the .today class."""
-    zone = _zones(dashboard.render([], _today=_TODAY))["This Week"]
+    zone = _zones(dashboard.render([], _today=today))["This Week"]
     cells = re.findall(r"<div class='(day[^']*)'>([A-Za-z]+)<br>(\d+)</div>", zone)
     assert len(cells) == 7
     assert [c[1] for c in cells] == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    assert [c[2] for c in cells] == ["8", "9", "10", "11", "12", "13", "14"]
+    assert [c[2] for c in cells] == day_numbers
     today_cells = [c for c in cells if "today" in c[0]]
-    assert today_cells == [("day today", "Wed", "10")]
+    assert today_cells == [today_cell]
 
 
 def test_fitness_marker_renders_units_and_neutral_trend():
@@ -213,6 +230,30 @@ def test_fitness_marker_renders_units_and_neutral_trend():
     assert "&#8595;" in row, "direction-only arrow (184 -> 183 falls)"
     assert "improving" not in row
     assert "regressing" not in row
+
+
+def test_production_path_renders_zone_shell(tmp_path):
+    """generate.run('dashboard') over an EMPTY store emits the full zone shell.
+
+    The production path (store read -> template -> render.emit) must deliver
+    all seven decoded zone titles in design order, with awaiting cards in the
+    Readiness, Today's Plan, Performance & Trends, Goals & Progress, and
+    Labs & Bloodwork zones (1/3/4/6/7).
+    """
+    root = tmp_path / "store"
+    root.mkdir()
+    path = generate.run("dashboard", _root=root, _out_dir=tmp_path / "out")
+    html = path.read_text()
+    titles = [
+        html_lib.unescape(t) for t in re.findall(r"<h2[^>]*>([^<]*)</h2>", html)
+    ]
+    assert tuple(titles) == _ZONE_TITLES
+    zones = _zones(html)
+    for title in ("Readiness", "Today's Plan", "Performance & Trends",
+                  "Goals & Progress", "Labs & Bloodwork"):
+        assert _awaiting_texts(zones[title]), (
+            f"zone {title!r} must render an awaiting card through the production path"
+        )
 
 
 def test_empty_store_renders_awaiting_in_data_zones():
