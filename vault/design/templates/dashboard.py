@@ -349,55 +349,66 @@ def _navbtn(symbol):
     return f"<span class='navbtn'>{cs._escape(symbol)}</span>"
 
 
-def _month_grid(today):
-    """Render the full current-month grid the `<details>` expand reveals.
+def _month_calendar(today):
+    """Render zone 2's ONE month calendar — the week row IS a month row.
 
-    Real weeks x 7 of `today`'s month in the week strip's Mon-Sun order: a
-    weekday header strip, then one digit-bearing cell per day from the Monday
-    on/before the 1st through the Sunday on/after the month's last day —
-    leading/trailing other-month days muted (`mout`), today's cell highlighted
-    (`mtoday`), every cell empty of events (none exist yet).
+    The full grid of `today`'s month in the week strip's Mon-Sun order: a
+    weekday header strip (`wkhead` of `mhead` abbrevs), then one `wkrow` per
+    real week from the Monday on/before the 1st through the Sunday on/after
+    the month's last day. Every row is the SAME 7-cell markup (`dcell`, day
+    number top-corner): leading/trailing other-month days muted (`dout`),
+    today's cell tinted with the bolded `{day} · Today` marker, every cell
+    empty of events (none exist yet). The current week's row carries `wk-now`
+    (always visible); every other row carries `wk-hide` (hidden until the
+    header caret's `:checked` rule reveals them in place — visual spec zone 2,
+    amended 2026-06-11 Walter iteration 2).
 
     Args:
-        today (datetime.date): The date whose month the grid renders.
+        today (datetime.date): The date whose month the calendar renders.
     """
+    monday = today - datetime.timedelta(days=today.weekday())
     first = today.replace(day=1)
     start = first - datetime.timedelta(days=first.weekday())
     # day 1 + 32 days always lands in the next month, whatever the length.
     last = (first + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
     end = last + datetime.timedelta(days=6 - last.weekday())
     head = "".join(f"<div class='mhead'>{wd}</div>" for wd in _WEEKDAYS)
-    cells = []
-    day = start
-    while day <= end:
-        klass = "mday"
-        if day.month != today.month:
-            klass += " mout"
-        if day == today:
-            klass += " mtoday"
-        cells.append(f"<div class='{klass}'>{day.day}</div>")
-        day += datetime.timedelta(days=1)
-    return f"<div class='month'>{head}{''.join(cells)}</div>"
+    rows = [f"<div class='wkhead'>{head}</div>"]
+    week = start
+    while week <= end:
+        cells = []
+        for offset in range(7):
+            day = week + datetime.timedelta(days=offset)
+            klass = "dcell"
+            if day.month != today.month:
+                klass += " dout"
+            num = str(day.day)
+            if day == today:
+                klass += " today"
+                num += " · Today"
+            cells.append(f"<div class='{klass}'><span class='dnum'>{num}</span></div>")
+        row_klass = "wkrow wk-now" if week == monday else "wkrow wk-hide"
+        rows.append(f"<div class='{row_klass}'>{''.join(cells)}</div>")
+        week += datetime.timedelta(days=7)
+    return f"<div class='cal'>{''.join(rows)}</div>"
 
 
 def _calendar_zone(today):
-    """Render zone 2 — the week-calendar card of `today`'s Mon-Sun week.
+    """Render zone 2 — the month calendar collapsed to `today`'s Mon-Sun week.
 
-    Per the visual spec as amended 2026-06-11. Header left: calendar glyph +
-    `This week` + the week nav shaped `‹ Jun 8 – 14 ›` (inert square chevron
-    buttons flanking the real range). Header right: the four event-category
-    legend pills, each in its OWN tint; the inert `‹ Month ›` nav; then the
-    expand control — a native `<details>`/`<summary>` whose summary is the
-    caret chip and whose body is the full current-month grid. Body: ONE
-    bordered 7-column table — a header strip (weekday + day number; today's
-    cell tinted, bolded, `· Today`-marked) over full-height empty day columns
-    (today's column tinted). The muted awaiting caption stays under the grid.
-
-    The card is a flex container so the closed summary sits beside the month
-    nav while `details[open]` (CSS `order: 5; flex-basis: 100%`) drops the
-    open month panel below the week strip — normal document flow, so opening
-    pushes every zone beneath DOWN, never slides over it. Date math is real
-    data from the seam; the events stay an awaiting state until a
+    Per the visual spec as amended 2026-06-11, Walter iteration 2: "the week
+    view is actually just hiding the rest of the month's calendar." Header
+    left: calendar glyph + `This week` + the week nav shaped `‹ Jun 8 – 14 ›`
+    (inert square chevron buttons flanking the real range). Header right: the
+    four event-category legend pills, each in its OWN tint; the inert
+    `‹ Month ›` nav; then the expand control — a `<label>` caret chip pinned
+    in the header in BOTH states. Body: ONE contiguous month grid
+    (`_month_calendar`) whose non-current `wk-hide` rows are hidden by
+    default; the caret's hidden checkbox `:checked` sibling rule reveals them
+    in place — zero scripts (ADR-0004 single-file rule intact), normal
+    document flow, so expanding pushes every zone beneath DOWN, never
+    overlays. The muted awaiting caption stays under the grid. Date math is
+    real data from the seam; the events stay an awaiting state until a
     calendar/event model exists.
 
     Args:
@@ -405,6 +416,9 @@ def _calendar_zone(today):
     """
     monday = today - datetime.timedelta(days=today.weekday())
     week_range = _week_range(monday, monday + datetime.timedelta(days=6))
+    # The zero-script reveal mechanism: this hidden checkbox is the card's
+    # FIRST child so the `~` sibling selectors reach the label and the grid.
+    toggle = "<input type='checkbox' id='calx' class='calx'>"
     wknav = (
         "<div class='wknav'>"
         f"{_CAL_GLYPH}<span class='card-title'>This week</span>"
@@ -414,30 +428,19 @@ def _calendar_zone(today):
     legend = "".join(cs.pill(label, tint) for label, tint in _EVENT_LEGEND)
     evlegend = (
         f"<div class='evlegend'>{legend}"
-        f"{_navbtn('‹')}<span class='caption'>Month</span>{_navbtn('›')}</div>"
+        f"{_navbtn('‹')}<span class='caption'>Month</span>{_navbtn('›')}"
+        "<label for='calx' class='calbtn' aria-label='expand to month view'>"
+        "<span class='x-closed'>⌄</span><span class='x-open'>⌃</span></label>"
+        "</div>"
     )
-    expand = (
-        "<details class='monthx'><summary aria-label='expand to month view'>"
-        f"▾</summary>{_month_grid(today)}</details>"
-    )
-    heads, cols = [], []
-    for offset in range(7):
-        day = monday + datetime.timedelta(days=offset)
-        today_klass = " today" if day == today else ""
-        mark = "<span class='tmark'> · Today</span>" if day == today else ""
-        heads.append(
-            f"<div class='dhead{today_klass}'>"
-            f"<span class='dwd'>{_WEEKDAYS[day.weekday()]}</span> {day.day}{mark}</div>"
-        )
-        cols.append(f"<div class='dcol{today_klass}'></div>")
-    grid = f"<div class='cal'>{''.join(heads)}{''.join(cols)}</div>"
     caption = (
         "<div class='caption'>No scheduled events — the calendar model is "
         "pending.</div>"
     )
     return cs.zone(
         "This Week",
-        f"<div class='card calcard'>{wknav}{evlegend}{expand}{grid}{caption}</div>",
+        f"<div class='card calcard'>{toggle}{wknav}{evlegend}"
+        f"{_month_calendar(today)}{caption}</div>",
     )
 
 

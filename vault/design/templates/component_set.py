@@ -210,26 +210,26 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .grid6 svg {{ width: 100%; height: 40px; display: block; margin-top: 8px; }}
 .calcard {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }}
 .calcard .cal {{ flex-basis: 100%; }}
-.calcard > .caption {{ order: 9; }}
 .wknav, .evlegend {{ display: flex; align-items: center; gap: 8px; }}
 .wknav .card-title {{ font-size: 14px; font-weight: 600; }}
 .evlegend {{ margin-left: auto; }}
 .navbtn {{ display: inline-block; box-sizing: border-box; width: 22px; height: 22px; line-height: 20px; text-align: center; border: 1px solid var(--card-border); border-radius: 6px; font-size: 13px; }}
-.cal {{ display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--card-border); border-radius: 8px; overflow: hidden; }}
-.cal .dhead {{ padding: 6px 4px; font-size: 12px; text-align: center; border-bottom: 1px solid var(--card-border); border-right: 1px solid var(--card-border); }}
-.cal .dhead .dwd {{ font-size: 11px; color: var(--muted); text-transform: uppercase; }}
-.cal .dcol {{ min-height: 180px; padding: 6px; border-right: 1px solid var(--card-border); font-size: 12px; }}
-.cal > :nth-child(7n) {{ border-right: none; }}
-.cal .today {{ background: {c['today-tint']}; font-weight: 600; }}
-.monthx summary {{ display: inline-block; border: 1px solid var(--card-border); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; list-style: none; }}
-.monthx summary::-webkit-details-marker {{ display: none; }}
-.monthx[open] {{ order: 5; flex-basis: 100%; }}
-.month {{ display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--card-border); border-radius: 8px; overflow: hidden; margin-top: 8px; }}
-.month .mhead {{ padding: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; text-align: center; border-right: 1px solid var(--card-border); }}
-.month .mday {{ min-height: 64px; padding: 4px 6px; font-size: 12px; border-top: 1px solid var(--card-border); border-right: 1px solid var(--card-border); }}
-.month > :nth-child(7n) {{ border-right: none; }}
-.month .mout {{ color: var(--muted); background: var(--page-bg); }}
-.month .mtoday {{ background: {c['today-tint']}; font-weight: 600; }}
+.calx {{ display: none; }}
+.calbtn {{ display: inline-block; border: 1px solid var(--card-border); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; }}
+.calbtn .x-open {{ display: none; }}
+.calx:checked ~ .evlegend .calbtn .x-open {{ display: inline; }}
+.calx:checked ~ .evlegend .calbtn .x-closed {{ display: none; }}
+.cal {{ border: 1px solid var(--card-border); border-radius: 8px; overflow: hidden; }}
+.cal .wkhead, .cal .wkrow {{ display: grid; grid-template-columns: repeat(7, 1fr); }}
+.cal .mhead {{ padding: 6px 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; text-align: center; border-right: 1px solid var(--card-border); }}
+.cal .dcell {{ min-height: 180px; padding: 6px; font-size: 12px; border-top: 1px solid var(--card-border); border-right: 1px solid var(--card-border); }}
+.cal .mhead:last-child, .cal .dcell:last-child {{ border-right: none; }}
+.cal .dnum {{ font-size: 11px; color: var(--muted); }}
+.cal .dout {{ background: var(--page-bg); }}
+.cal .today {{ background: {c['today-tint']}; }}
+.cal .today .dnum {{ color: var(--ink); font-size: 12px; font-weight: 700; }}
+.cal .wk-hide {{ display: none; }}
+.calx:checked ~ .cal .wk-hide {{ display: grid; }}
 .pill {{ display: inline-block; border-radius: 999px; font-size: 12px; padding: 2px 10px; background: {c['neutral-tint']}; color: var(--muted); }}{_tint_rules()}
 .chip-b {{ display: inline-block; border-radius: 999px; font-size: 12px; padding: 2px 10px; border: 1px solid var(--card-border); color: var(--ink); }}
 .stat {{ border: 1px solid var(--card-border); border-radius: 8px; text-align: center; padding: 8px 4px; }}
@@ -264,7 +264,7 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
   html, body {{ background: #FFFFFF; color: #000000; }}
   .wrap {{ max-width: 100%; padding: 0; border: none; border-radius: 0; }}
   .card, .grid6 .kpi-row, .stat {{ box-shadow: none; }}
-  .cal .today, .month .mtoday, .month .mout {{ background: #FFFFFF; }}
+  .cal .today, .cal .dout {{ background: #FFFFFF; }}
   .tldr {{ border-left-color: #000000; }}
   .grid6 {{ grid-template-columns: repeat(3, 1fr); }}
 }}
