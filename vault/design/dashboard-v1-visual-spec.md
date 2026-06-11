@@ -77,21 +77,38 @@ One full-width card. Two horizontal halves:
 
 ## Zone 2 — This Week (calendar)
 
-Card header row: `📅`-class glyph optional, `This week` + the real date range
-(`Jun 8 – 14`), prev/next chevrons and a `Month` toggle as INERT styled buttons
-(no behavior in a static artifact — render as muted bordered chips
-[AMENDED 2026-06-11]: as built, the inert chevron/Month controls are ink-text
-bordered chips per the Pills clause — the bordered-chip flavor carries ink
-text, not muted), and a legend
-of four tinted event-category pills (Training / Lab draw / Check-in / Appointment —
-training uses ACCENTS training tint; the others use neutral/accent tints; labels
-only, no events exist yet).
-Body: **7-column grid**, one column per day. Column header: weekday abbrev + day
-number (11-12px). Today's column: tinted background (`#EFF4FE`-class light tint of
-training blue) + bolded `· Today` marker. Column body: an empty event-slot area
-(~70px min-height) — event pills land here when the calendar model exists; until
-then the columns stay empty and one muted caption under the grid reads the awaiting
-copy (`No scheduled events — the calendar model is pending.`).
+[AMENDED 2026-06-11, Walter side-by-side review: "your's is not a calendar —
+it's just boxes; the top nav of your calendar is off". This section supersedes
+the earlier header/body description with his direction.]
+
+**Card header row, two sides:**
+- **Left — week nav:** calendar glyph + `This week` (bold) + the week nav shaped
+  `‹ Jun 7 – 13 ›` — prev/next chevrons FLANKING the real date range (small
+  bordered square buttons, inert until a calendar model exists).
+- **Right — legend + month nav + expand:** the four event-category legend pills,
+  each in its OWN category tint (Training = training blue tint; Lab draw = amber
+  tint; Check-in = purple tint; Appointment = green tint — event-category chrome
+  hexes live in CHROME as fixed literals, AA-measured by the tint gate, distinct
+  from data-state PALETTE), then a month nav shaped `‹ Month ›` (inert), then the
+  **expand control** — a real, functional caret that expands the week view to the
+  full current month.
+- **Expand mechanics:** native `<details>`/`<summary>` (no scripts — ADR-0004
+  single-file rule intact): the summary is the caret control; opening it renders
+  the **full month grid in document flow below the week strip, pushing every
+  zone below DOWN — never sliding over the cards beneath** (Walter's explicit
+  requirement). The month grid: real weeks × 7 of the current month, day numbers,
+  today's cell highlighted, leading/trailing other-month days muted, empty cells
+  (no events exist yet).
+
+**Body — an actual calendar table, not boxes:** a bordered 7-column grid reading
+as one connected calendar: a header STRIP (one bordered row: weekday abbrev +
+day number per column, vertical separators between columns; today's header cell
+in the training-blue tint with the bolded `WED 10 · Today` form), and beneath it
+full-height day COLUMNS (~180px min-height, shared vertical separators, no gaps
+between cells — one table, not seven floating boxes). Today's full column is
+tinted. Event pills land inside the cells when the calendar model exists; until
+then the cells stay empty and one muted caption under the grid reads the
+awaiting copy (`No scheduled events — the calendar model is pending.`).
 
 ## Zone 3 — Today's Plan
 
