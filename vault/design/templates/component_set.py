@@ -1,11 +1,12 @@
 """Shared inline-CSS/SVG component library for generated HTML artifacts.
 
 Single definition of the reusable rendered components (header, TL;DR banner,
-KPI section, inline-SVG sparklines — polyline and bar) and the colorblind-safe
-semantic palette (good / watch / concern) that both the dashboard and report
-templates draw from. All styling is inline — inline `<style>`, inline SVG —
-with no external asset references, per the artifact-design-protocol
-single-file rule.
+KPI section, inline-SVG sparklines — polyline and bar; the ADR-0009 dashboard
+zone primitives — zone, awaiting, ring_scaffold), the colorblind-safe semantic
+palette (good / watch / concern) that both the dashboard and report templates
+draw from, and the surface-category ACCENTS chrome set (ADR-0009 D3). All
+styling is inline — inline `<style>`, inline SVG — with no external asset
+references, per the artifact-design-protocol single-file rule.
 
 The palette hex set, the foreground/background contrast pairs, and the
 `@media print` block are the source the accessibility gate (ADR-0004-T1 crit 3)
@@ -35,6 +36,17 @@ PALETTE = {
 # The three semantic series colors, in series order. Adjacent pairs in this order
 # are the pairs the crit-3 color-distance assertion walks.
 SERIES = ("good", "watch", "concern")
+
+# Surface-category chrome per `vault/design/dashboard-v1-design.md` (ADR-0009 D3):
+# accents color zone/card chrome (headers, borders) ONLY — NEVER data state.
+# Data state stays exclusively PALETTE good/watch/concern/neutral.
+ACCENTS = {
+    "training": "#1F6FEB",
+    "nutrition": "#E8833A",
+    "supplements": "#0E9AA3",
+    "peptides": "#7C3AED",
+    "sleep": "#5B5BD6",
+}
 
 
 def state_for(item, value=None):
@@ -94,6 +106,18 @@ html, body {{
 .state-neutral {{ color: var(--muted); }}
 .chip {{ font-size: 13px; margin-left: 8px; }}
 caption, .caption {{ color: var(--muted); font-size: 13px; }}
+.zone {{ margin: 28px 0; }}
+.zone h2 {{ font-size: 17px; margin: 0 0 8px; }}
+.awaiting {{ color: var(--muted); border: 1px dashed var(--muted); border-radius: 6px; padding: 12px 16px; }}
+.cards {{ display: flex; flex-wrap: wrap; gap: 12px; }}
+.card {{ border: 1px solid var(--muted); border-radius: 6px; min-width: 170px; padding: 12px; }}
+.card .label {{ font-size: 13px; font-weight: 600; }}
+.card .body {{ font-size: 13px; }}
+.cal {{ display: flex; gap: 8px; }}
+.cal .day {{ border: 1px solid var(--muted); border-radius: 6px; padding: 6px 10px; text-align: center; font-size: 13px; }}
+.cal .today {{ border: 2px solid var(--ink); font-weight: 600; }}
+.grid4 {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }}
+.ring {{ display: inline-block; text-align: center; margin-right: 16px; }}
 @media print {{
   html, body {{ background: #FFFFFF; color: #000000; }}
   .wrap {{ max-width: 100%; padding: 0; }}
@@ -137,6 +161,65 @@ def kpi(label, value):
     return (
         f"<div class='kpi'><div class='label'>{_escape(str(label))}</div>"
         f"<div class='value'>{_escape(str(value))}</div></div>"
+    )
+
+
+def zone(title, body_html, accent=None):
+    """Return a dashboard zone section: a titled `<section>` wrapping its body.
+
+    An accent, when given, chromes the section (left border + header underline
+    in the accent color) — chrome only, never data state (ADR-0009 D3).
+
+    Args:
+        title (str): The zone heading text (escaped).
+        body_html (str): The assembled zone body markup, included verbatim.
+        accent (str, optional): An ACCENTS hex for the zone chrome.
+
+    Returns:
+        (str) The assembled `<section class='zone'>` markup.
+    """
+    section_style = f" style='border-left: 4px solid {accent}; padding-left: 12px'" if accent else ""
+    h2_style = f" style='border-bottom: 2px solid {accent}'" if accent else ""
+    return (
+        f"<section class='zone'{section_style}>"
+        f"<h2{h2_style}>{_escape(str(title))}</h2>{body_html}</section>"
+    )
+
+
+def awaiting(what_is_missing):
+    """Return the honest awaiting-state card naming WHAT data is missing.
+
+    The mechanical form of ADR-0009 D2: a muted dashed box carrying the
+    missing-data text verbatim-escaped. Never carries numbers — an unbuilt
+    zone states its absence rather than rendering an invented value.
+
+    Args:
+        what_is_missing (str): The missing-data text (escaped).
+
+    Returns:
+        (str) The assembled `.awaiting` card markup.
+    """
+    return f"<div class='awaiting'>&#8212; {_escape(str(what_is_missing))}</div>"
+
+
+def ring_scaffold(label):
+    """Return a hero awaiting-state ring: an unfilled outline circle + label.
+
+    Used ONLY by the hero zone's awaiting state — stroke muted, no fill, no
+    percentage text, so the scaffold carries no implied score (ADR-0009 D2).
+
+    Args:
+        label (str): The ring's caption text (escaped).
+
+    Returns:
+        (str) The assembled `.ring` markup (inline SVG + caption).
+    """
+    return (
+        "<div class='ring'>"
+        "<svg width='72' height='72' role='img' aria-label='awaiting data'>"
+        f"<circle cx='36' cy='36' r='30' fill='none' stroke='{PALETTE['muted']}' stroke-width='4'/>"
+        "</svg>"
+        f"<div class='caption'>{_escape(str(label))}</div></div>"
     )
 
 
