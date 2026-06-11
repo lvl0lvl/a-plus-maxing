@@ -12,6 +12,28 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 49 (2026-06-10)
+
+> Confirmed by Walter (the model was re-assigned to Fable at open; his demo-data directive — "use data that will give us a view of the dashboard but not trigger false flagging" — is the amendment). PR #91 merged at open (`a5bcb4e`, rebase, after a 3-agent docs-subset review fixed 5 findings + 1 sibling). Post-V1 lighter-path model: ADR + full `/review-pr` lifecycle + component notes; not the spec pipeline. Not a `v1-build` recipe task — wave/checkpoint attestation N/A (V1 plan complete 18/18).
+
+Goal: Build the dashboard VISUAL shell to the approved 7-zone design — closing the "looks nothing like the design" gap (PF-S48-01).
+
+Acceptance criteria:
+- [ ] AC1: PR #91 (`fix/s48-close` → `main`) reviewed (docs 3-agent subset) + REST rebase merged; `main` carries the S48 close.
+- [ ] AC2: A dashboard render surface matching the approved 7-zone layout (`vault/design/dashboard-v1-design.md`): hero/calendar/plan/trends/care-team/goals/labs, locked palette + category accents, bar-sparklines (not paths).
+- [ ] AC3: Zones with live data render it (biomarker trends, panels/watch-outs/feedback); zones whose data model doesn't exist yet (wearable scoring, plan content, calendar, goals, rollup) render EXPLICIT "awaiting data / awaiting plan" states — never fake/placeholder numbers.
+- [ ] AC4: ADR for the render-surface decision + full `/review-pr` → `/merge`.
+
+Constraint (Walter, S49): demo/sample data is fitness-domain only (bodyweight, RHR, HRV, sleep, 1RM, steps). No lab chemistry, compounds, doses, or protocols in any rendered demo artifact — zones whose real data is health-domain render empty states.
+
+Files I WILL touch: `vault/design/templates/*` (new dashboard shell), `scripts/generate/*`, `tests/`, a new `docs/adr/` entry, `vault/components/`, `.beads/issues.jsonl` via `bd`, HANDOFF/vault at close.
+
+Files I will NOT touch: `.claude/hooks/*` + `settings.json` (no authorization); INVARIANTS.md rows; deployed roster `.claude/agents/*`; `main` directly; `vault/design/dashboard-v1-design.md` (frozen target, read-only).
+
+NOT doing: wearable→recovery/strain/sleep SCORING (LM-02-gated, no real data); plan-content schemas as a full build (`1oh`'s own slice — this session renders the plan ZONE with an honest empty state); calendar/goal data models; per-specialist rollup data model; library population; Track-2 beads.
+
+Invariants at risk: none structurally; the close set (INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS) enforced by the audits.
+
 ## Scope Contract — Session 48 (2026-06-10)
 
 > Confirmed by Walter ("the lighter path is approved") — the post-V1 documentation model: no per-feature spec→build-plan→task-plan pipeline; instead ADR per contract-changing decision + full `/review-pr` lifecycle + vault component notes. Walter additionally directed: keep the documentation/vault correctly configured — the `vault/components/` "what" layer (named by the CLAUDE.md ownership matrix but never created) gets seeded this session (AC6). PR #89 merged at open (`a47b313`, rebase, after a 3-agent docs-subset review fixed 6 findings). Not a `v1-build` recipe task — the wave/checkpoint attestation field is N/A (V1 plan complete 18/18).
