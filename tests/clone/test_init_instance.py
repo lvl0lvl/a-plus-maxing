@@ -233,7 +233,8 @@ def test_generate_dashboard_from_local_inputs_only_zero_cross_clone_reads(tmp_pa
     sibling = tmp_path / "sibling-clone"
     sibling_store = sibling / "vault/store"
     sibling_store.mkdir(parents=True)
-    store.append("rhr", _reading(value=999, source="sibling"), root=sibling_store)
+    # 98765 never collides with style-block tokens (the pill radius is 999px).
+    store.append("rhr", _reading(value=98765, source="sibling"), root=sibling_store)
 
     store_root = clone / "vault/store"
     out_dir = clone / "vault/artifacts/generated"
@@ -245,7 +246,7 @@ def test_generate_dashboard_from_local_inputs_only_zero_cross_clone_reads(tmp_pa
     assert path.exists(), "dashboard did not render from local inputs"
     html = path.read_text()
     assert "Health Dashboard" in html, "dashboard rendered from local inputs"
-    assert "999" not in html, "dashboard leaked the sibling clone's value"
+    assert "98765" not in html, "dashboard leaked the sibling clone's value"
 
     outside = trace.opens_outside(clone)
     assert outside == [], f"generation read paths outside the clone root: {outside}"

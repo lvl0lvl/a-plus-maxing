@@ -33,11 +33,12 @@ SIZE_BUDGET = 500000
 
 # A tight, MEASURED per-page byte ceiling. The worst case — a full-cap page of
 # MAX_SERIES_PER_VIEW series x MAX_TIMEPOINTS_PER_VIEW timepoints, every series
-# carrying a projection — measured ~19859 bytes (S/2026-06). The 24000 ceiling adds a
-# ~20% margin: it RIDES the real worst-case bytes so a materially-inflated page (a
-# double-render, a per-window projection regression, a cap breach that lands more rows
-# on a page) turns it red, unlike the 25x-headroom SIZE_BUDGET ceiling which cannot.
-MEASURED_PAGE_CEILING = 24000
+# carrying a projection — measured ~24232 bytes (S49, after the visual-spec chrome
+# grew the shared style block). The 29000 ceiling adds a ~20% margin: it RIDES the
+# real worst-case bytes so a materially-inflated page (a double-render, a per-window
+# projection regression, a cap breach that lands more rows on a page) turns it red,
+# unlike the 25x-headroom SIZE_BUDGET ceiling which cannot.
+MEASURED_PAGE_CEILING = 29000
 
 
 def _external_refs(html):

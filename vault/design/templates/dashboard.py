@@ -187,19 +187,18 @@ def _feedback_row(values):
 
 
 def _hero_zone():
-    """Render zone 1 — readiness: ring scaffolds + the awaiting state.
+    """Render zone 1 — readiness: track-only progress rings + the awaiting state.
 
     Wearable recovery/sleep/strain scoring is LM-02-gated, so the hero renders
-    outline-only ring scaffolds and the explicit awaiting copy — no fake
-    percentage, ever (ADR-0009 D2).
+    track-only progress rings (no arc, em-dash value slot) and the explicit
+    awaiting copy — no fake percentage, ever (ADR-0009 D2).
     """
-    rings = "".join(cs.ring_scaffold(label) for label in ("Recovery", "Sleep", "Strain"))
+    rings = "".join(cs.progress_ring(label) for label in ("Recovery", "Sleep", "Strain"))
     body = f"<div>{rings}</div>" + cs.awaiting(
         "Awaiting wearable baseline — recovery, sleep, and strain scoring "
         "arrives with the first thirty-day wearable window."
     )
-    # Design assignment (ADR-0009 D3): the sleep accent chromes Readiness until a dedicated sleep surface exists.
-    return cs.zone("Readiness", body, accent=cs.ACCENTS["sleep"])
+    return cs.zone("Readiness", body)
 
 
 def _calendar_zone(today):
