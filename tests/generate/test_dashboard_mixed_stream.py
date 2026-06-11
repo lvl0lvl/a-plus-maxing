@@ -6,7 +6,14 @@ PRODUCTION writers, then runs `generate.run("dashboard")` end-to-end and asserts
 the type-routed render: no crash on string-valued streams, no raw `biomarker::`
 key in the HTML, clean labels, the panel state verbatim, the watch-out answer,
 and a sparkline. RED-proves the `i1t` crash on the pre-ADR-0008 dashboard.
+
+Placement assertions target the ADR-0009 zone model: biomarker rows land in
+the Performance & Trends zone (4), panel/watch-out/feedback/catch-all rows in
+the Labs & Bloodwork zone (7) — and NOT vice versa.
 """
+
+import html as html_lib
+import re
 
 import pytest
 
@@ -42,6 +49,15 @@ def _rows(html):
     return html.split("<div class='kpi-row'>")[1:]
 
 
+def _zones(html):
+    """Map each rendered zone's decoded h2 title to its full section markup."""
+    out = {}
+    for section in re.findall(r"<section class='zone'[^>]*>.*?</section>", html, re.S):
+        title = re.search(r"<h2[^>]*>([^<]*)</h2>", section).group(1)
+        out[html_lib.unescape(title)] = section
+    return out
+
+
 def test_mixed_stream_store_renders_through_production_path(tmp_path):
     """generate.run('dashboard') over a mixed-stream store renders type-routed HTML."""
     root = tmp_path / "store"
@@ -56,18 +72,27 @@ def test_mixed_stream_store_renders_through_production_path(tmp_path):
     assert "panel::" not in html
     assert "watch-out::" not in html
     assert "feedback::" not in html
-    assert "Ferritin" in html
-    assert "Iron Panel" in html
-    assert "Injection Site Reaction" in html
-    assert "RHR" in html
-    assert "Physician Feedback" in html
-    assert "discussed at visit" in html
-    assert "ng/mL" in html, "a registered marker's headline carries its units"
-    assert "none noticed" in html
     assert "<svg" in html
-    # PLACEMENT: the panel's pending state renders as a state-marker element,
+
+    # PLACEMENT (ADR-0009 D5): biomarker rows land in zone 4, panel/watch-out/
+    # feedback rows in zone 7 — and not in each other's zone.
+    zones = _zones(html)
+    trends = zones["Performance & Trends"]
+    labs = zones["Labs & Bloodwork"]
+    assert "Ferritin" in trends
+    assert "ng/mL" in trends, "a registered marker's headline carries its units"
+    assert "RHR" in trends
+    assert "Iron Panel" in labs
+    assert "Injection Site Reaction" in labs
+    assert "none noticed" in labs
+    assert "Physician Feedback" in labs
+    assert "discussed at visit" in labs
+    # The panel's pending state renders as a state-marker element in zone 7,
     # not as a bare value or a KPI headline.
-    assert "<span class='state-marker'>pending</span>" in html
+    assert "<span class='state-marker'>pending</span>" in labs
+    assert "Ferritin" not in labs, "biomarker rows must not leak into the labs strip"
+    assert "state-marker" not in trends, "panel rows must not leak into trends"
+    assert "discussed at visit" not in trends
 
 
 def test_trend_chips_registered_vs_unregistered(tmp_path):
@@ -113,6 +138,8 @@ def test_unprefixed_string_item_renders_plain_row(tmp_path):
     assert "Note" in note_row, "the catch-all routes its label through display_name"
     assert "<svg" not in note_row
     assert "<rect" not in note_row
+    # PLACEMENT (ADR-0009): the catch-all lands in the labs strip (zone 7).
+    assert "felt fine" in _zones(html)["Labs & Bloodwork"]
 
 
 def test_biomarker_stream_all_strings_renders_plain_row(tmp_path):
