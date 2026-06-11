@@ -55,7 +55,7 @@ S49 close (2026-06-11): **One new PF promoted — PF-S49-01 (`AP-BUILT-FROM-SUMM
 
 ## Historical Scope Contracts (archived)
 
-Scope contracts for Sessions 5-47 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S46 archived S44 + S45 together — S44's entry had been missed at the S45 close; S47 archived S46; S48 archived S47; S49 archived S48) to keep this handoff lean. The current (S49) scope contract is above; the archive holds the prior-session archaeology.
+Scope contracts for Sessions 5-48 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S46 archived S44 + S45 together — S44's entry had been missed at the S45 close; S47 archived S46; S48 archived S47; S49 archived S48) to keep this handoff lean. The current (S49) scope contract is above; the archive holds the prior-session archaeology.
 
 ## Session 4 close — 2026-05-25
 
