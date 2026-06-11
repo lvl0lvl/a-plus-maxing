@@ -143,13 +143,13 @@ model is pending.`) and NO percent — track rendered, no fill.
 ## Zone 7 — Labs & Bloodwork
 
 Heading + subtitle: `Clinical detail — the supporting layer under your plan.`
-One compact strip card:
-- a chips row of biomarker chips (bordered chip per marker: state glyph + name +
-  latest value — real data when present, state-colored glyph),
-- a `Pending draws:` row of bordered chips (one per `panel::` item, value
-  verbatim),
-- watch-out answers + the latest physician note as muted caption lines (real
-  `watch-out::`/`feedback::` data).
+One compact strip card rendering the zone's EXISTING routed content (the
+ADR-0008/0009 D5 routing is untouched — biomarker chips in the mock belong to a
+future lab-stream slice, NOT this pass):
+- a `Pending draws:` row of bordered chips (one chip per `panel::` item: clean
+  label + the stored value verbatim),
+- watch-out rows (clean label + answers) and the latest physician note as muted
+  caption lines (real `watch-out::`/`feedback::` data).
 Empty store: the existing dashed awaiting copy inside the strip card.
 
 ## Print
