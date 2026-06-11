@@ -81,6 +81,24 @@ def _zones(html):
     return out
 
 
+def _calendar_rows(zone):
+    """Parse zone 2's month grid into (row_class, [(cell_class, dnum), ...]).
+
+    Cells are matched on the FULL cell markup shape, so a cell whose markup
+    diverges from `<div class='dcell...'><span class='dnum'>...</span></div>`
+    simply does not parse — the count asserts catch it.
+    """
+    cal = re.search(r"<div class='cal'>.*", zone, re.S).group(0)
+    parts = re.split(r"<div class='(wkrow[^']*)'>", cal)
+    return [
+        (klass, re.findall(
+            r"<div class='(dcell[^']*)'><span class='dnum'>([^<]*)</span></div>",
+            body,
+        ))
+        for klass, body in zip(parts[1::2], parts[2::2])
+    ]
+
+
 def _awaiting_texts(fragment):
     """Return each awaiting card's decoded inner text within a markup fragment."""
     return [
@@ -216,47 +234,45 @@ def test_specialists_tuple_mirrors_deployed_roster():
     assert care_team | set(_INTERNAL_ROLES) == deployed
 
 
-@pytest.mark.parametrize("today, day_numbers, today_cell, range_text", [
+@pytest.mark.parametrize("today, day_numbers, range_text", [
     # Mid-week, mid-month: the original seam case.
     (datetime.date(2026, 6, 10),
-     ["8", "9", "10", "11", "12", "13", "14"], ("dhead today", "Wed", "10"),
-     "Jun 8 – 14"),
+     ["8", "9", "10", "11", "12", "13", "14"], "Jun 8 – 14"),
     # Monday of a month-spanning week: today is the FIRST cell.
     (datetime.date(2026, 6, 29),
-     ["29", "30", "1", "2", "3", "4", "5"], ("dhead today", "Mon", "29"),
-     "Jun 29 – Jul 5"),
+     ["29", "30", "1", "2", "3", "4", "5"], "Jun 29 – Jul 5"),
     # Sunday of the same month-spanning week: today is the LAST cell.
     (datetime.date(2026, 7, 5),
-     ["29", "30", "1", "2", "3", "4", "5"], ("dhead today", "Sun", "5"),
-     "Jun 29 – Jul 5"),
-    # A year-spanning week: the strip crosses into January.
+     ["29", "30", "1", "2", "3", "4", "5"], "Jun 29 – Jul 5"),
+    # A year-spanning week: the row crosses into January.
     (datetime.date(2026, 12, 30),
-     ["28", "29", "30", "31", "1", "2", "3"], ("dhead today", "Wed", "30"),
-     "Dec 28 – Jan 3"),
+     ["28", "29", "30", "31", "1", "2", "3"], "Dec 28 – Jan 3"),
 ])
 def test_calendar_strip_renders_week_with_today_marked(
-    today, day_numbers, today_cell, range_text
+    today, day_numbers, range_text
 ):
-    """The week table renders one connected 7-column grid of the seam date's
-    Mon-Sun week — a header strip (weekday + day number) over full-height day
-    columns — with the rendered date-range string, the inert navbtn chevrons,
-    the `Month` nav label, and the four legend pills each on its OWN tint;
-    exactly the seam date's header cell AND column carry the .today class,
-    and exactly the header cell carries the `· Today` marker."""
+    """The collapsed week view IS the month calendar's current-week row: the
+    MON-SUN weekday header strip, then exactly ONE `wk-now` row carrying the
+    seam date's Mon-Sun week (7 day-number cells; today's cell tinted with
+    the bolded `{day} · Today` marker, exactly once in the whole zone) — plus
+    the rendered date-range string, the inert navbtn chevrons, the `Month`
+    nav label, and the four legend pills each on its OWN tint."""
     zone = _zones(dashboard.render([], _today=today))["This Week"]
-    heads = re.findall(
-        r"<div class='(dhead[^']*)'><span class='dwd'>([A-Za-z]+)</span> (\d+)",
-        zone,
+    assert re.findall(r"<div class='mhead'>([A-Za-z]+)</div>", zone) == [
+        "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+    ], "the weekday header strip keeps the Mon-Sun order"
+    rows = _calendar_rows(zone)
+    now_rows = [cells for klass, cells in rows if klass == "wkrow wk-now"]
+    assert len(now_rows) == 1, "exactly one row is the current week"
+    cells = now_rows[0]
+    assert len(cells) == 7
+    marker = f"{today.day} · Today"
+    assert [n.replace(" · Today", "") for _k, n in cells] == day_numbers
+    today_cells = [(k, n) for k, n in cells if "today" in k]
+    assert today_cells == [("dcell today", marker)], (
+        "exactly the seam date's cell is tinted and `· Today`-marked"
     )
-    assert len(heads) == 7
-    assert [h[1] for h in heads] == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    assert [h[2] for h in heads] == day_numbers
-    today_heads = [h for h in heads if "today" in h[0]]
-    assert today_heads == [today_cell]
-    cols = re.findall(r"<div class='(dcol[^']*)'>", zone)
-    assert cols.count("dcol") + cols.count("dcol today") == 7
-    assert cols.count("dcol today") == 1, "exactly the seam date's column is tinted"
-    assert zone.count("· Today") == 1, "exactly the seam header cell carries the marker"
+    assert zone.count("· Today") == 1, "exactly the seam cell carries the marker"
     # The header carries the real rendered week range (month-/year-spanning
     # weeks name both months), the navbtn chevrons (week nav + month nav),
     # the Month nav label, and the four event-category legend pills, each on
@@ -299,16 +315,19 @@ def test_calendar_legend_pills_carry_own_tints():
 
 
 def test_calendar_month_nav_sits_on_the_header_right():
-    """The header-right group carries the legend pills then the inert
-    `‹ Month ›` nav (navbtn + label + navbtn, in that order)."""
+    """The header-right group carries the legend pills, then the inert
+    `‹ Month ›` nav (navbtn + label + navbtn, in that order), then the caret
+    label — the expand control stays pinned in the header in both states."""
     zone = _zones(dashboard.render([], _today=_TODAY))["This Week"]
     ev = re.search(r"<div class='evlegend'>.*?</div>", zone, re.S).group(0)
     assert ev.count("class='pill") == 4, "the four legend pills lead the group"
     prev_at = ev.find("<span class='navbtn'>‹</span>")
     label_at = ev.find("<span class='caption'>Month</span>")
     next_at = ev.find("<span class='navbtn'>›</span>")
-    assert -1 < prev_at < label_at < next_at, (
-        f"month nav must read ‹ Month ›, got indexes {prev_at}/{label_at}/{next_at}"
+    caret_at = ev.find("<label for='calx'")
+    assert -1 < prev_at < label_at < next_at < caret_at, (
+        f"the group must read ‹ Month › then the caret, got indexes "
+        f"{prev_at}/{label_at}/{next_at}/{caret_at}"
     )
 
 
@@ -321,29 +340,25 @@ def test_calendar_month_nav_sits_on_the_header_right():
     # December 2026 starts Tue and ends Thu: 1 leading Nov, 3 trailing Jan.
     (datetime.date(2026, 12, 30), 31, 1, 3),
 ])
-def test_calendar_month_expand_renders_full_month_grid(today, in_month, lead, trail):
-    """The zone-2 `<details class='monthx'>` expand: the summary caret control
-    followed by the seam month's full grid — a Mon-Sun weekday header strip,
-    the right in-month day-cell count, the exact muted lead/trail other-month
-    cells, today's cell highlighted exactly once, and every cell digit-bearing
-    but EMPTY of event content."""
+def test_calendar_month_grid_renders_full_month_in_place(today, in_month, lead, trail):
+    """Zone 2 renders ONE month grid (no separate expand panel): whole weeks
+    x 7 of the seam month, the right in-month day-cell count, the exact muted
+    lead/trail other-month cells in Mon-Sun reading order, today's cell
+    highlighted exactly once, and every cell digit-bearing but EMPTY of event
+    content."""
     zone = _zones(dashboard.render([], _today=today))["This Week"]
-    m = re.search(
-        r"<details class='monthx'><summary[^>]*>[^<]*</summary>"
-        r"<div class='month'>(.*?)</div></details>",
-        zone, re.S,
-    )
-    assert m, "zone 2 must carry the details/summary month expand"
-    month = m.group(1)
-    assert re.findall(r"<div class='mhead'>([A-Za-z]+)</div>", month) == [
-        "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
-    ], "the month grid keeps the week strip's Mon-Sun order"
-    # Each day cell's inner content is its day number ALONE — digit-bearing,
-    # empty of events (none exist yet).
-    cells = re.findall(r"<div class='(mday[^']*)'>(\d+)</div>", month)
-    assert len(cells) == month.count("mday"), "every mday cell holds digits only"
-    assert len(cells) % 7 == 0, "the grid renders whole weeks x 7"
-    muted_flags = ["mout" in klass for klass, _day in cells]
+    assert zone.count("<div class='cal'>") == 1, "exactly ONE calendar grid"
+    rows = _calendar_rows(zone)
+    for _klass, row_cells in rows:
+        assert len(row_cells) == 7, "every row is a whole week x 7"
+    cells = [cell for _klass, row_cells in rows for cell in row_cells]
+    assert len(cells) == zone.count("'dnum'"), "every cell is day-number only"
+    marker = f"{today.day} · Today"
+    for klass, num in cells:
+        assert re.fullmatch(r"\d+", num) or num == marker, (
+            f"cell {klass!r} carries event content: {num!r}"
+        )
+    muted_flags = ["dout" in klass for klass, _num in cells]
     assert muted_flags.count(False) == in_month
     assert muted_flags[:lead] == [True] * lead and not muted_flags[lead], (
         f"expected exactly {lead} muted leading other-month cells"
@@ -352,10 +367,62 @@ def test_calendar_month_expand_renders_full_month_grid(today, in_month, lead, tr
     assert not muted_flags[-(trail + 1)], (
         f"expected exactly {trail} muted trailing other-month cells"
     )
-    todays = [(klass, day) for klass, day in cells if "mtoday" in klass]
-    assert todays == [("mday mtoday", str(today.day))], (
+    todays = [(klass, num) for klass, num in cells if "today" in klass]
+    assert todays == [("dcell today", marker)], (
         "exactly the seam date's cell is highlighted in the month grid"
     )
+
+
+def test_calendar_reveal_is_checkbox_label_css_no_script():
+    """The month reveal is the zero-script mechanism (visual spec zone 2,
+    Walter iteration 2): a hidden checkbox FIRST in the card (so the `~`
+    sibling rules reach the label and the grid), the header `<label>` caret
+    referencing its id, the `:checked` reveal rule + hidden-by-default rule
+    in the CSS — and NO `<details>` and NO `<script>` anywhere."""
+    html = dashboard.render([], _today=_TODAY)
+    zone = _zones(html)["This Week"]
+    checkbox = "<input type='checkbox' id='calx' class='calx'>"
+    assert checkbox in zone
+    assert "<label for='calx'" in zone, "the caret label drives the checkbox"
+    card_at = zone.find("<div class='card calcard'>")
+    box_at = zone.find(checkbox)
+    legend_at = zone.find("<div class='evlegend'>")
+    grid_at = zone.find("<div class='cal'>")
+    assert -1 < card_at < box_at < legend_at < grid_at, (
+        "the checkbox precedes the label's group and the grid as a sibling"
+    )
+    assert ".calx { display: none; }" in html, "the checkbox itself never shows"
+    assert ".cal .wk-hide { display: none; }" in html, "non-current rows hide by default"
+    assert ".calx:checked ~ .cal .wk-hide { display: grid; }" in html, (
+        "the :checked sibling rule reveals the hidden rows in place"
+    )
+    assert "<details" not in html, "the separate details/summary expand is gone"
+    assert "<script" not in html, "the reveal ships zero scripts (ADR-0004)"
+
+
+def test_calendar_hidden_rows_are_same_cells_as_current_week():
+    """The week view IS a month-calendar row — 'literally exactly the same':
+    exactly ONE row carries `wk-now` (and holds today's cell), every other
+    row carries `wk-hide`, and the hidden rows' cells ride the IDENTICAL cell
+    markup/class as the current week's (`dcell`, modulo the today/other-month
+    modifiers)."""
+    rows = _calendar_rows(_zones(dashboard.render([], _today=_TODAY))["This Week"])
+    assert {klass for klass, _cells in rows} == {"wkrow wk-now", "wkrow wk-hide"}
+    assert [klass for klass, _cells in rows].count("wkrow wk-now") == 1
+    for klass, cells in rows:
+        base_classes = {
+            cell_klass.replace(" dout", "").replace(" today", "")
+            for cell_klass, _num in cells
+        }
+        assert base_classes == {"dcell"}, (
+            f"row {klass!r} cells diverge from the shared markup: {base_classes}"
+        )
+        if klass == "wkrow wk-now":
+            assert any("today" in c for c, _n in cells), (
+                "the current-week row holds today's cell"
+            )
+        else:
+            assert not any("today" in c for c, _n in cells)
 
 
 def test_fitness_marker_renders_units_and_neutral_trend():
