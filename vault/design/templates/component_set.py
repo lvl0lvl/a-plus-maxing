@@ -135,13 +135,11 @@ html, body {{
 .state-watch {{ color: var(--watch); }}
 .state-concern {{ color: var(--concern); }}
 .state-neutral {{ color: var(--muted); }}
-.chip {{ font-size: 13px; margin-left: 8px; }}
 caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .zone {{ margin: 30px 0; }}
 .zone h2 {{ font-size: 16px; margin: 0 0 2px; }}
 .subtitle {{ color: var(--muted); font-size: 13px; margin: 0 0 10px; }}
 .awaiting {{ color: var(--muted); border: 1px dashed var(--muted); border-radius: 6px; padding: 12px 16px; }}
-.cards {{ display: flex; flex-wrap: wrap; gap: 12px; }}
 .card {{ background: var(--paper); border: 1px solid var(--card-border); border-radius: 10px; padding: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }}
 .card .label {{ font-size: 13px; font-weight: 600; }}
 .card .body {{ font-size: 13px; }}
