@@ -630,11 +630,14 @@ def _rendered_series_colors(html):
     Reads the stroke colors on inline-SVG polyline sparklines AND the fill
     colors on bar-sparkline rects — the per-series colors chosen from the
     store-read data through the registry, NOT the always-present legend
-    swatches (which are self-satisfying). A color only appears here if a
+    swatches (which are self-satisfying) and NOT the hero rings' neutral
+    chrome (track/text — never data state). A color only appears here if a
     store-read item rendered it.
     """
     return {
-        h.lower() for h in re.findall(r"(?:stroke|fill)='(#[0-9A-Fa-f]{6})'", html)
+        h.lower()
+        for tag in re.findall(r"<(?:polyline|rect)\b[^>]*>", html)
+        for h in re.findall(r"(?:stroke|fill)='(#[0-9A-Fa-f]{6})'", tag)
     }
 
 
