@@ -130,6 +130,17 @@ LM-02, calendar, goals, rollup) fills its zone in place.
   gate-measured; mixing chrome colors into the semantic set muddies the
   data-state vocabulary.
 
+## Amendments
+
+- [AMENDED 2026-06-11]: D2's zone scaffolding → the full visual language of the
+  signed-off mock, per `vault/design/dashboard-v1-visual-spec.md` (S49 AC5).
+  Reason: the S49 shell as first merged matched the zone TABLE but not the mock's
+  visual language (Walter, side-by-side: "They are not the same") — the mock is
+  operator-held, so the visual spec is its in-repo transcription and becomes part
+  of this ADR's target. The honesty rule is unchanged: designed chrome renders
+  with styled empty states (track-only rings, em-dash stat slots, unfilled
+  progress tracks), never invented values.
+
 ## Review triggers
 
 - The `1oh` plan-schema slice lands → zone 3 fills; revisit the card contract.
