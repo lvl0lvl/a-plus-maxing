@@ -93,8 +93,9 @@ def test_mixed_stream_store_renders_through_production_path(tmp_path):
     assert "none noticed" in labs
     assert "Physician Feedback" in labs
     assert "discussed at visit" in labs
-    # The panel's pending state renders as a state-marker element in zone 7,
-    # not as a bare value or a KPI headline.
+    # The panel's pending state renders as a state-marker element inside the
+    # zone-7 Pending-draws chip row, not as a bare value or a KPI headline.
+    assert "Pending draws:" in labs
     assert "<span class='state-marker'>pending</span>" in labs
     assert "Ferritin" not in labs, "biomarker rows must not leak into the labs strip"
     assert "state-marker" not in trends, "panel rows must not leak into trends"
@@ -102,9 +103,9 @@ def test_mixed_stream_store_renders_through_production_path(tmp_path):
 
 
 def test_trend_chips_registered_vs_unregistered(tmp_path):
-    """F15: a registered marker's chip carries the colored trend word; an
-    unregistered marker's chip carries only a neutral direction arrow; a
-    single-numeric-value series renders no chip."""
+    """F15: a registered marker's trend pill carries the state-tinted trend
+    word; an unregistered marker's pill carries only a neutral direction
+    arrow; a single-numeric-value series renders no trend pill."""
     root = tmp_path / "store"
     out = tmp_path / "out"
     _seed_mixed_store(root)  # rhr 52 -> 49: registered "down" polarity, improving
@@ -115,16 +116,16 @@ def test_trend_chips_registered_vs_unregistered(tmp_path):
     html = generate.run("dashboard", _root=root, _out_dir=out).read_text()
 
     rhr_row = next(r for r in _rows(html, "Performance & Trends") if "RHR" in r)
-    assert "<span class='chip state-good'>improving</span>" in rhr_row
+    assert "<span class='pill tint-good'>improving</span>" in rhr_row
 
     spo2_row = next(r for r in _rows(html, "Performance & Trends") if "Spo2" in r)
-    assert "<span class='chip state-neutral'>" in spo2_row
-    assert "&#8595;" in spo2_row, "unregistered chip carries the direction arrow"
+    assert "<span class='pill tint-neutral'>" in spo2_row
+    assert "&#8595;" in spo2_row, "unregistered pill carries the direction arrow"
     assert "improving" not in spo2_row
     assert "regressing" not in spo2_row
 
     vitd_row = next(r for r in _rows(html, "Performance & Trends") if "Vitamin D" in r)
-    assert "chip" not in vitd_row, "a single-value series renders no chip"
+    assert "pill" not in vitd_row, "a single-value series renders no trend pill"
 
 
 def test_unprefixed_string_item_renders_plain_row(tmp_path):
