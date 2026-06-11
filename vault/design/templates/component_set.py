@@ -222,6 +222,12 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .pchead .pill {{ margin-left: auto; }}
 .pending {{ margin-bottom: 8px; }}
 .pending .chip-b {{ margin-right: 8px; }}
+@media (max-width: 900px) {{
+  .grid6 {{ grid-template-columns: repeat(3, 1fr); }}
+}}
+@media (max-width: 560px) {{
+  .grid6 {{ grid-template-columns: repeat(2, 1fr); }}
+}}
 @media print {{
   html, body {{ background: #FFFFFF; color: #000000; }}
   .wrap {{ max-width: 100%; padding: 0; border: none; border-radius: 0; }}

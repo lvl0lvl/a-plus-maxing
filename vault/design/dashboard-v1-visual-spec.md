@@ -46,6 +46,8 @@ SLOT SHAPE only — the honesty rule (ADR-0009 D2) governs what may actually ren
   subtle shadow (`0 1px 2px rgba(0,0,0,.05)`).
 - Card grids: CSS grid with 12-16px gap. Plan zone = 2 columns; trends = 6 columns
   (wraps 3/2 on narrow); care team = 4 columns; calendar = 7 columns.
+  [AMENDED 2026-06-11]: the trends narrow wrap is pinned at max-width 900px → 3
+  columns and max-width 560px → 2 columns.
 - **Pills/chips** (one component, two flavors): tinted pill — radius 999px, 12px
   text, colored text on its ~10% tint background (e.g. good-green status pill);
   bordered chip — radius 999px, 12px, 1px `#E5E7EB` border, ink text, used for
