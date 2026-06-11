@@ -13,8 +13,11 @@ constraint).
 import datetime
 import html as html_lib
 import re
+from pathlib import Path
 
 from vault.design.templates import component_set, dashboard
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # A fixed mid-week date for the calendar seam: Wednesday 2026-06-10.
 _TODAY = datetime.date(2026, 6, 10)
@@ -132,6 +135,17 @@ def test_care_team_renders_16_cards_without_internal_roles():
         assert slug not in zone
         humanized = slug.replace("-", " ").title()
         assert humanized not in zone, f"internal role {humanized!r} on the care team"
+
+
+def test_specialists_tuple_mirrors_deployed_roster():
+    """The care-team slug column plus the 4 internal roles is EXACTLY the
+    deployed `.claude/agents/` roster — slug drift (an agent added, removed,
+    or renamed without the tuple following) fails here."""
+    deployed = {
+        p.name for p in (REPO_ROOT / ".claude" / "agents").iterdir() if p.is_dir()
+    }
+    care_team = {slug for slug, _name, _tracks in dashboard._SPECIALISTS}
+    assert care_team | set(_INTERNAL_ROLES) == deployed
 
 
 def test_calendar_strip_renders_week_with_today_marked():
