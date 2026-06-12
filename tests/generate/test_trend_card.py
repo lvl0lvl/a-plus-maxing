@@ -107,8 +107,9 @@ def test_unparseable_timepoint_renders_no_date():
         "Bodyweight",
     )
     assert (
-        "<div class='labelrow'><div class='label'>Bodyweight</div></div>" in card
-    ), "an unparseable timepoint must render an empty date slot"
+        "<div class='kpi'><div class='label'>Bodyweight</div>"
+        "<div class='value'>183 lb</div></div>" in card
+    ), "an unparseable timepoint renders the dateless label-over-value form"
     assert "after the trip" not in _captions(card), (
         "the raw timepoint string must never render as the date"
     )

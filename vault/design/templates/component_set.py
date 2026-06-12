@@ -316,10 +316,30 @@ def legend():
     return f"<div class='legend'>{''.join(items)}</div>"
 
 
-def kpi(label, value):
-    """Return a single KPI card: a label over its latest value."""
+def kpi(label, value, *, top_right=None):
+    """Return a single KPI card: a label over its latest value.
+
+    Args:
+        label (str): The label text (escaped).
+        value (str | int | float): The value text (escaped).
+        top_right (str, optional): A right-aligned muted caption on the label
+            row (the trend card's latest-reading date). When given, the label
+            renders inside the `labelrow` flex wrapper with the caption beside
+            it; when absent, the markup is the bare label-over-value form,
+            unchanged.
+
+    Returns:
+        (str) The assembled `.kpi` markup.
+    """
+    if top_right is None:
+        return (
+            f"<div class='kpi'><div class='label'>{_escape(str(label))}</div>"
+            f"<div class='value'>{_escape(str(value))}</div></div>"
+        )
     return (
-        f"<div class='kpi'><div class='label'>{_escape(str(label))}</div>"
+        "<div class='kpi'>"
+        f"<div class='labelrow'><div class='label'>{_escape(str(label))}</div>"
+        f"<span class='caption'>{_escape(str(top_right))}</span></div>"
         f"<div class='value'>{_escape(str(value))}</div></div>"
     )
 
