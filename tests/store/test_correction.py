@@ -11,6 +11,7 @@ basis `loop_schema.read_panel` resolves by). Normal ingest is untouched:
 """
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -148,6 +149,38 @@ def test_correct_to_already_resolved_value_is_noop(tmp_path):
 
     assert _line_count(tmp_path) == 2
     assert store.read("rhr", root=tmp_path)[0]["value"] == 62
+
+
+def test_correct_bool_over_int_appends_superseding_line(tmp_path):
+    """Correcting a stored 1 to True appends; the resolved value IS the bool.
+
+    Python's `1 == True` made the value-equality no-op check drop this
+    correction silently; the serialized-form compare distinguishes `1` from
+    `true`.
+    """
+    store.append("rhr", _reading(T1, 1), root=tmp_path)
+    store.correct("rhr", _reading(T1, True), root=tmp_path)
+
+    assert _line_count(tmp_path) == 2
+    readings = store.read("rhr", root=tmp_path)
+    assert len(readings) == 1
+    assert readings[0]["value"] is True
+
+
+def test_correct_to_nan_is_idempotent_across_reruns(tmp_path):
+    """Re-running the same NaN correction appends 0 duplicate lines.
+
+    `float("nan") != float("nan")`, so the value-equality no-op check appended
+    one duplicate line per re-run; the serialized-form compare ("NaN" == "NaN")
+    makes the re-runs no-ops.
+    """
+    store.append("rhr", _reading(T1, 55), root=tmp_path)
+    store.correct("rhr", _reading(T1, float("nan")), root=tmp_path)
+    store.correct("rhr", _reading(T1, float("nan")), root=tmp_path)
+    store.correct("rhr", _reading(T1, float("nan")), root=tmp_path)
+
+    assert _line_count(tmp_path) == 2  # original + exactly ONE superseding line
+    assert math.isnan(store.read("rhr", root=tmp_path)[0]["value"])
 
 
 @pytest.mark.parametrize("missing", sorted(keying.LINE_FIELDS))
