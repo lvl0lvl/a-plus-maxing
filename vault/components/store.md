@@ -29,7 +29,10 @@ network, no model step (ADR-0001 → ADR-0002).
   line stays on disk (append-only audit trail, ADR-0002 v1.4). Idempotent on the
   resolved value (re-running the same correction appends 0 lines); a never-stored
   identity raises `ValueError` (a mistyped correction fails loud, never a silent new
-  series point).
+  series point). The correction contract is defined for content-independent source
+  tags; loop_schema's content-tagged identities (watch-out / feedback / panel-result
+  streams, whose source tag embeds a hash of the value) are outside it — the
+  supported correction story for those streams is re-recording.
 - `store.read(item, root)` — resolves each `(item, timepoint, source)` identity to its
   LAST line in file (append) order (latest-wins — a correction supersedes the line it
   corrects), then returns the resolved readings sorted lexicographically by

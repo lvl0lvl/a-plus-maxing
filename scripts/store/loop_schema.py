@@ -163,8 +163,10 @@ def read_watchout_answers(watchout, root):
     """Return a watch-out's stored answers, carried forward as next-generation input.
 
     The store is the carry-forward medium: an answer appended in one generation is
-    returned by any later generation's read because ``store.read`` returns all
-    appended readings. No stored answer is dropped, expired, or overwritten.
+    returned by any later generation's read because distinct answer contents carry
+    distinct content-tagged identities (the per-value source tag), so ``store.read``'s
+    latest-wins resolution collapses nothing. No stored answer is dropped, expired,
+    or overwritten.
     """
     return store.read(f"{_PREFIX_WATCHOUT}{watchout}", root=root)
 
@@ -225,8 +227,9 @@ def record_physician_feedback(content, timepoint, root):
 def read_physician_feedback(root):
     """Return all recorded physician-feedback entries as next-generation input.
 
-    Same carry-forward medium as the watch-out answer: a recorded entry is returned
-    by any later generation's read via ``store.read``; no entry is dropped, expired,
-    or overwritten.
+    Same carry-forward medium as the watch-out answer: distinct entry contents
+    carry distinct content-tagged identities (the per-value source tag), so
+    ``store.read``'s latest-wins resolution collapses nothing; no entry is dropped,
+    expired, or overwritten.
     """
     return store.read(_FEEDBACK_ITEM, root=root)

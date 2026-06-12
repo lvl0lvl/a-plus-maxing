@@ -25,8 +25,15 @@ def manual_correction(item, reading, root=store.DEFAULT_ROOT):
     Where `manual_entry` inherits `store.append`'s dedupe (a re-entered value
     for a stored `(item, timepoint, source)` is dropped), this path appends the
     corrected reading as a superseding line, and every store read resolves the
-    identity to it. The prior line stays on disk — the audit trail is
-    append-only, never mutated or deleted.
+    identity to it. The prior well-formed lines' LOGICAL content stays on disk
+    — the audit trail is append-only, never mutated or deleted — though the
+    byte form is not guaranteed stable across rewrites, and pre-existing
+    malformed lines are dropped on write (`store.correct` self-heals like
+    `store.append`). The correction contract is defined for content-independent
+    source tags; loop_schema's content-tagged identities (the watch-out /
+    feedback / panel-result streams, whose source tag embeds a hash of the
+    value) are OUTSIDE it — the supported correction story for those streams is
+    re-recording.
 
     The `item` argument must equal `reading["item"]`; a mismatch raises
     `ValueError` (the same divergence guard as `manual_entry`), a missing

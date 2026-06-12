@@ -251,6 +251,31 @@ def test_correction_never_surfaces_in_another_stream(tmp_path):
     assert _line_count(tmp_path, item="panel::ferritin") == 1
 
 
+def test_correcting_content_tagged_identity_pins_out_of_contract_behavior(tmp_path):
+    """CHARACTERIZATION, not endorsement: a content-tagged identity CAN be corrected.
+
+    loop_schema's content-tagged streams (watch-out / feedback / panel-result)
+    embed a hash of the value in the source tag, so the correction contract does
+    not cover them — the supported correction story there is re-recording. The
+    store layer does not reject such a correct() call though: it supersedes the
+    identity, leaving the source tag's embedded hash stale against the new
+    value. This test pins that current documented-unsupported behavior so a
+    shift (e.g. a rejection guard) alerts maintainers instead of landing
+    silently.
+    """
+    loop_schema.record_watchout_answer("redness", "mild", T1, tmp_path)
+    stored = store.read("watch-out::redness", root=tmp_path)[0]
+
+    store.correct(
+        "watch-out::redness", dict(stored, value="severe"), root=tmp_path
+    )
+
+    answers = loop_schema.read_watchout_answers("redness", root=tmp_path)
+    assert len(answers) == 1
+    assert answers[0]["value"] == "severe"
+    assert answers[0]["source"] == stored["source"]  # tag's hash now stale
+
+
 def test_corrected_biomarker_keeps_published_state_and_count(tmp_path):
     """A correction changes the VALUE only: no-prior stays no-prior (1 timepoint).
 
