@@ -116,10 +116,11 @@ def _resolve_latest(readings):
     The bead-1vi latest-wins read basis: a correction appends a superseding
     line for an already-stored `(item, timepoint, source)` (see `correct`), so
     among lines sharing that identity the LAST in file order — append order —
-    is the current value; the same most-recent-wins resolution basis
-    `loop_schema.read_panel` follows. Each surviving reading keeps its
-    first-appearance position, so the relative order of distinct identities is
-    unchanged.
+    is the current value. Latest-wins by append order WITHIN a dedupe identity
+    — following the shape of `loop_schema.read_panel`'s most-recent-wins
+    resolution, which resolves ACROSS identities by provenance-tag filter in
+    timepoint order. Each surviving reading keeps its first-appearance
+    position, so the relative order of distinct identities is unchanged.
 
     Args:
         readings (list): Conformant reading dicts in file order.
