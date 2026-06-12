@@ -240,6 +240,13 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .pc-training .stat.tinted {{ background: {c['training-tint']}; }}
 .pc-nutrition .stat.tinted {{ background: {c['nutrition-tint']}; }}
 .statrow {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }}
+.prow {{ display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }}
+.prow .plabel {{ font-size: 13px; font-weight: 600; }}
+.setdots {{ margin-left: auto; }}
+.setdot {{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; }}
+.btnfill {{ display: inline-block; border-radius: 999px; font-size: 12px; padding: 2px 10px; color: var(--paper); }}
+.linkish {{ color: var(--muted); font-size: 12px; text-decoration: underline; }}
+.resttimer {{ display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--card-border); }}
 .track {{ height: 8px; border-radius: 999px; background: var(--card-border); }}
 .fill {{ height: 8px; border-radius: 999px; }}
 .macro {{ margin: 8px 0; }}
