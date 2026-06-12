@@ -649,10 +649,12 @@ def test_page_frame_sheet_tokens_present():
 
 def test_plan_zone_renders_designed_card_anatomy():
     """Zone 3 renders the 2x2 grid of four specialist-attributed cards with
-    the designed empty-state anatomy (visual spec zone 3): per card the accent
-    glyph dot, the `via <specialist>` caption, and the `awaiting plan` pill;
-    Workout's four em-dash stat boxes (Heart rate tinted); Nutrition's
-    calorie-arithmetic row plus exactly three empty macro tracks."""
+    the designed empty-state anatomy (visual spec zone 3 as amended
+    2026-06-12 — the populated-card labels govern both states): per card the
+    accent glyph dot, the `via <specialist>` caption, and the `awaiting plan`
+    pill; Workout's four em-dash stat boxes (`Sets done` the governing label,
+    Heart rate on the NEUTRAL state tint — no reading, no judgment);
+    Nutrition's calorie-arithmetic row plus exactly three empty macro tracks."""
     zone = _zones(dashboard.render([], _today=_TODAY))["Today's Plan"]
     assert "<div class='grid2'>" in zone
     cards = re.findall(r"<div class='card pcard pc-([a-z]+)'>", zone)
@@ -662,15 +664,17 @@ def test_plan_zone_renders_designed_card_anatomy():
                        "supplement-specialist", "peptide-specialist"):
         assert f"<span class='caption'>via {specialist}</span>" in zone
     assert zone.count("<span class='pill'>awaiting plan</span>") == 4
-    # Workout: the 4-slot stat row, all em-dash values, the LAST box tinted.
+    # Workout: the 4-slot stat row, all em-dash values, the LAST box on the
+    # neutral state-tint pair (the amended live-state-tinted slot's honest
+    # no-reading fallback — not the card-accent tint).
     workout = zone.split("<div class='card pcard pc-")[1]
     boxes = re.findall(
         r"<div class='(stat[^']*)'><div class='slabel'>([^<]*)</div>"
         r"<div class='sval'>([^<]*)</div></div>", workout
     )
     assert [(klass, label) for klass, label, _v in boxes] == [
-        ("stat", "Elapsed"), ("stat", "Volume"), ("stat", "Sets"),
-        ("stat tinted", "Heart rate"),
+        ("stat", "Elapsed"), ("stat", "Volume"), ("stat", "Sets done"),
+        ("stat tint-neutral", "Heart rate"),
     ]
     assert all(value == "—" for _k, _l, value in boxes)
     # Nutrition: Goal/Food/Exercise/Remaining + exactly 3 empty macro tracks.

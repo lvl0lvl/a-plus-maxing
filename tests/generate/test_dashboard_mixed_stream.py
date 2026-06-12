@@ -1,28 +1,36 @@
 """Mixed-stream dashboard test through the production path (ADR-0008 D5).
 
 Seeds all four loop_schema stream types (biomarker, pending panel, watch-out
-answer, physician feedback) plus a legacy unprefixed numeric item via the
-PRODUCTION writers, then runs `generate.run("dashboard")` end-to-end and asserts
-the type-routed render: no crash on string-valued streams, no raw `biomarker::`
-key in the HTML, clean labels, the panel state verbatim, the watch-out answer,
-and a sparkline. RED-proves the `i1t` crash on the pre-ADR-0008 dashboard.
+answer, physician feedback), the ADR-0010 plan + tracking streams, plus a
+legacy unprefixed numeric item via the PRODUCTION writers, then runs
+`generate.run("dashboard")` end-to-end and asserts the type-routed render: no
+crash on string- or dict-valued streams, no raw `biomarker::`/`plan::` key in
+the HTML, clean labels, the panel state verbatim, the watch-out answer, and a
+sparkline. RED-proves the `i1t` crash on the pre-ADR-0008 dashboard.
 
-Placement assertions target the ADR-0009 zone model: biomarker rows land in
-the Performance & Trends zone (4), panel/watch-out/feedback/catch-all rows in
-the Labs & Bloodwork zone (7) — and NOT vice versa.
+Placement assertions target the ADR-0009/0010 zone model: biomarker rows land
+in the Performance & Trends zone (4), panel/watch-out/feedback/catch-all rows
+in the Labs & Bloodwork zone (7), plan/tracking content in the Today's Plan
+zone (3) — and NOT vice versa.
 """
 
+import datetime
 import html as html_lib
 import re
 
 import pytest
 
 from scripts.generate import generate
-from scripts.store import loop_schema, store
+from scripts.store import loop_schema, plan_schema, store
 
 
 def _seed_mixed_store(root):
-    """Seed a tmp store with all four stream types via the production writers."""
+    """Seed a tmp store with every routed stream type via the production writers.
+
+    The plan + tracking entries are dated the REAL today: the production path
+    has no `_today` seam, so today-dated plans are what `generate.run` resolves
+    populated.
+    """
     loop_schema.record_biomarker("ferritin", "2026-05-01T00:00:00+00:00", 95, root)
     loop_schema.record_biomarker("ferritin", "2026-05-15T00:00:00+00:00", 110, root)
     loop_schema.record_pending_panel("iron-panel", "2026-05-01T00:00:00+00:00", root)
@@ -31,6 +39,19 @@ def _seed_mixed_store(root):
     )
     loop_schema.record_physician_feedback(
         "discussed at visit", "2026-05-03T00:00:00+00:00", root
+    )
+    today = datetime.date.today().isoformat()
+    plan_schema.record_plan(
+        "workout",
+        {"exercises": [{"name": "Bench Press", "sets": 3, "load": "185 lb"}]},
+        today, "strength-coach", root,
+    )
+    plan_schema.record_plan_tracking(
+        "workout", {"elapsed_min": 42, "sets_done": {"Bench Press": 2}}, today, root
+    )
+    plan_schema.record_plan(
+        "peptides", {"compound": "bpc-157", "dose": "250 mcg", "route": "subq"},
+        today, "peptide-doc", root,
     )
     # The legacy direct-append form: an unprefixed numeric series.
     for timepoint, value in (
@@ -76,12 +97,24 @@ def test_mixed_stream_store_renders_through_production_path(tmp_path):
     assert "panel::" not in html
     assert "watch-out::" not in html
     assert "feedback::" not in html
+    assert "plan::" not in html
+    assert "plan-track::" not in html
 
-    # PLACEMENT (ADR-0009 D5): biomarker rows land in zone 4, panel/watch-out/
-    # feedback rows in zone 7 — and not in each other's zone.
+    # PLACEMENT (ADR-0009 D5 + ADR-0010 D5): biomarker rows land in zone 4,
+    # panel/watch-out/feedback rows in zone 7, plan content in zone 3 — and
+    # not in each other's zone.
     zones = _zones(html)
     trends = zones["Performance & Trends"]
     labs = zones["Labs & Bloodwork"]
+    plan_zone = zones["Today's Plan"]
+    assert "Bench Press" in plan_zone, "the recorded plan populates its zone-3 card"
+    assert "via strength-coach" in plan_zone, "attribution from the plan source"
+    assert "awaiting plan" not in plan_zone.partition("<div class='card pcard pc-training'>")[2].partition("<div class='card pcard pc-")[0]
+    assert "Bench Press" not in trends, "plan content must not leak into trends"
+    assert "Bench Press" not in labs, "plan content must not leak into the labs strip"
+    # Second consumer, not a re-route: the peptide card reads the SAME stored
+    # watch-out answer zone 7 renders.
+    assert "none noticed" in plan_zone, "the peptide card reads the grouped answers"
     # The bar sparkline is the only <rect> producer (S48 invariant): the
     # biomarker series must render its bars inside zone 4 specifically.
     assert "<rect" in trends

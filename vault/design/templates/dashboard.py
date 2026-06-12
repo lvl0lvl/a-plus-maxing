@@ -27,13 +27,21 @@ construction:
   (a `.state-marker` element inside the bordered chip).
 - `watch-out::X` -> clean label + the stored answers joined `; `.
 - `feedback::...` -> a `Physician Feedback` row with each entry as a note line.
+- `plan::<domain>` (a `plan_schema.PLAN_DOMAINS` member) -> the zone-3 plan
+  card group, carrying FULL readings (`resolve_plan` needs timepoint+source).
+- `plan-track::<domain>` (a `TRACKED_DOMAINS` member) -> the zone-3 tracking
+  group. An unknown plan::/plan-track:: suffix raises KeyError naming it.
 - Any OTHER `::` prefix -> KeyError naming the prefix: routing for a new stream
   type is added deliberately, never by silent fallthrough (ADR-0008 D3).
 - An unprefixed non-numeric item (the legacy catch-all) -> a plain clean-label +
   latest-value row.
 
 Biomarker cards (and unprefixed numeric series) land in zone 4; panel,
-watch-out, feedback, and catch-all rows land in the zone-7 strip card. All
+watch-out, feedback, and catch-all rows land in the zone-7 strip card; plan
+and tracking readings render ONLY in the zone-3 cards (ADR-0010 D5 — never
+`_metric_card`, sparklines, or the labs strip). The peptide card additionally
+reads the grouped watch-out answers (a second consumer of the zone-7 routed
+stream, not a re-route). All
 markup and colors come from `component_set` — no per-template color literals —
 so the palette stays single-sourced and the `@media print` block is inherited.
 A template is a callable `template(store_read) -> html_str`; `render.emit`
@@ -44,7 +52,7 @@ import datetime
 
 # Aliased: this module's template surface is itself named `render`.
 from scripts.generate import render as render_engine
-from scripts.store import biomarker_meta
+from scripts.store import biomarker_meta, loop_schema, plan_schema
 from vault.design.templates import component_set as cs
 
 # Trend word -> the semantic state coloring it: a registered-polarity verdict is
@@ -72,18 +80,23 @@ _MONTH_ABBR = (
 # the store carries a numeric reading for the marker (ADR-0009 D2).
 _HERO_CHIPS = (("HRV", "hrv"), ("RHR", "rhr"), ("Sleep", "sleep-hours"))
 
-# Today's-plan cards: (label, ACCENTS key, attributed specialist). Each renders
-# its designed empty-state anatomy until the plan-content schemas land
-# (ADR-0009 zone 3; visual spec zone 3).
+# Today's-plan cards: (label, plan domain, ACCENTS key, default specialist).
+# A resolved plan renders the populated anatomy attributed to ITS specialist
+# (the `plan::` source); the absence states keep the default attribution and
+# the designed empty anatomy (ADR-0010 D4/D5; visual spec zone 3 as amended
+# 2026-06-12).
 _PLAN_CARDS = (
-    ("Workout", "training", "personal-trainer"),
-    ("Nutrition", "nutrition", "nutritionist"),
-    ("Supplements", "supplements", "supplement-specialist"),
-    ("Peptides", "peptides", "peptide-specialist"),
+    ("Workout", "workout", "training", "personal-trainer"),
+    ("Nutrition", "nutrition", "nutrition", "nutritionist"),
+    ("Supplements", "supplements", "supplements", "supplement-specialist"),
+    ("Peptides", "peptides", "peptides", "peptide-specialist"),
 )
 
-# The shared plan-card empty-state copy (digit-free per the zone tests).
-_AWAITING_PLAN = "No plan on file — plan-content schemas are the next slice."
+# The plan-card absence-state copy, one line per published absence state
+# (digit-free per the zone tests; ADR-0010 D5 — awaiting copy names what is
+# missing).
+_NO_PLAN_COPY = "No plan on file — record one to fill this card."
+_NO_PLAN_TODAY_COPY = "Plan on file is for another day — none recorded for today."
 
 # The calendar legend's event categories: (label, pill tint name). Training
 # rides its ACCENTS tint; the other three are the CHROME event-category tints
@@ -129,19 +142,23 @@ _SPECIALISTS = (
 )
 
 
-def _series_by_item(store_read):
-    """Group the store read model's readings into per-item value series.
+def _readings_by_item(store_read):
+    """Group the store read model's readings into per-item reading lists.
+
+    Full readings, not value series: the plan routes need timepoint+source
+    (`resolve_plan`'s attribution + today-resolution inputs); the other routes
+    derive their value series from these lists.
 
     Args:
         store_read (list): The store read model (list of reading dicts).
 
     Returns:
-        (dict) item -> list of values, in store-read (timepoint) order.
+        (dict) item -> list of readings, in store-read (timepoint) order.
     """
-    series = {}
+    by_item = {}
     for reading in store_read:
-        series.setdefault(reading["item"], []).append(reading["value"])
-    return series
+        by_item.setdefault(reading["item"], []).append(reading)
+    return by_item
 
 
 def _plain_row(label, value):
@@ -444,20 +461,68 @@ def _calendar_zone(today):
     )
 
 
-def _workout_body():
-    """Render the workout card's designed empty anatomy: stat row + empty list.
+def _state_stat(label, value, state):
+    """Render a stat box on the measured state-tint pair for `state`.
 
-    Four em-dash stat boxes (the last accent-tinted via the card's CSS
-    context), then the dashed empty-state row (visual spec zone 3).
+    The visual spec's "live-state tinted" slot (zone 3 as amended 2026-06-12):
+    the box rides the existing `.tint-*` pair for the metric's current state —
+    PALETTE semantics via the measured pairs, the neutral chrome tint when no
+    judgment exists. An unknown state token KeyErrors rather than silently
+    rendering an unstyled class (the `pill`/`_series_color` fail-loud
+    convention).
+    """
+    if state not in cs._TINTABLE:
+        raise KeyError(state)
+    return (
+        f"<div class='stat tint-{state}'><div class='slabel'>{cs._escape(str(label))}</div>"
+        f"<div class='sval'>{cs._escape(str(value))}</div></div>"
+    )
+
+
+def _set_dots(total, filled, accent_hex):
+    """Render an exercise's per-set progress dots: filled accent, rest border-gray.
+
+    Non-text chrome (ADR-0010 D5): the filled count is the TRACKED sets-done
+    for the exercise (0 when untracked — an unfilled dot IS the honest
+    absence); fills draw only the existing accent / card-border hexes.
+    """
+    dots = (
+        f"<span class='setdot' style='background:{accent_hex}'></span>" * filled
+        + f"<span class='setdot' style='background:{cs.CHROME['card-border']}'></span>"
+        * (total - filled)
+    )
+    return f"<span class='setdots'>{dots}</span>"
+
+
+def _btnfill(text, accent_key):
+    """Render an inert accent-filled button (no href, no script; ADR-0004).
+
+    The fill is the CHROME `*-text` shade of the card accent — the hex already
+    AA-measured >= 4.5 against its ~10% tint, so paper text on the SAME hex
+    measures higher still (the tint is darker than paper; the contrast ratio
+    is symmetric) — never a new color pair.
+    """
+    return (
+        f"<span class='btnfill' style='background:{cs.CHROME[accent_key + '-text']}'>"
+        f"{cs._escape(text)}</span>"
+    )
+
+
+def _workout_empty(copy):
+    """Render the workout card's designed empty anatomy: stat row + dashed row.
+
+    The populated-card labels govern both states (visual spec supersession):
+    four stat boxes — Elapsed / Volume / Sets done / Heart rate, all em-dash,
+    the heart-rate box on the neutral state tint (no reading, no judgment).
     """
     boxes = (
-        cs.stat_box("Elapsed") + cs.stat_box("Volume") + cs.stat_box("Sets")
-        + cs.stat_box("Heart rate", tinted=True)
+        cs.stat_box("Elapsed") + cs.stat_box("Volume") + cs.stat_box("Sets done")
+        + _state_stat("Heart rate", "—", "neutral")
     )
-    return f"<div class='statrow'>{boxes}</div>{cs.awaiting(_AWAITING_PLAN)}"
+    return f"<div class='statrow'>{boxes}</div>{cs.awaiting(copy)}"
 
 
-def _nutrition_body():
+def _nutrition_empty(copy):
     """Render the nutrition card's designed empty anatomy.
 
     The calorie-arithmetic stat row (Goal − Food + Exercise = Remaining, all
@@ -472,46 +537,344 @@ def _nutrition_body():
         f"<div class='macro'><div class='caption'>{m} —</div>{cs.track_bar()}</div>"
         for m in ("Protein", "Carbs", "Fat")
     )
-    return f"<div class='statrow'>{boxes}</div>{macros}{cs.awaiting(_AWAITING_PLAN)}"
+    return f"<div class='statrow'>{boxes}</div>{macros}{cs.awaiting(copy)}"
 
 
-def _list_body():
-    """Render the supplements/peptides items-list area: the dashed empty row only."""
-    return cs.awaiting(_AWAITING_PLAN)
+def _list_empty(copy):
+    """Render the supplements/peptides empty list area: the dashed row only."""
+    return cs.awaiting(copy)
 
 
-# label -> the card's designed empty-state body builder (visual spec zone 3).
-_PLAN_BODIES = {
-    "Workout": _workout_body,
-    "Nutrition": _nutrition_body,
-    "Supplements": _list_body,
-    "Peptides": _list_body,
+# domain -> the card's designed empty-state body builder (visual spec zone 3),
+# taking the absence-state copy line.
+_EMPTY_BODIES = {
+    "workout": _workout_empty,
+    "nutrition": _nutrition_empty,
+    "supplements": _list_empty,
+    "peptides": _list_empty,
 }
 
 
-def _plan_card(label, accent_key, specialist):
+def _workout_populated(plan, tracking):
+    """Render the workout card's populated anatomy from plan + tracking snapshot.
+
+    Slot-level honesty (ADR-0010 D5): every tracked slot renders only from a
+    PRESENT tracking field — an absent operand is an em-dash / unfilled dot /
+    omitted chip, never 0. The sets-done box renders the tracked total over
+    the planned total only when the snapshot carries `sets_done`; a per-
+    exercise sets_done above its planned sets raises (never a silently capped
+    claim); sets_done keys matching no plan exercise render no row. The
+    heart-rate box is live-state tinted (`_state_stat`); the rest-timer footer
+    and Resume button are static inert chrome.
+
+    Args:
+        plan (dict): The resolved workout plan document.
+        tracking (dict | None): The day's tracking snapshot, or None.
+
+    Returns:
+        (str) The card body markup.
+
+    Raises:
+        ValueError: An exercise's tracked sets_done exceeds its planned sets.
+    """
+    tracking = tracking if tracking is not None else {}
+    exercises = plan["exercises"]
+    sets_done = tracking.get("sets_done")
+    if sets_done is not None:
+        for exercise in exercises:
+            done = sets_done.get(exercise["name"], 0)
+            if done > exercise["sets"]:
+                raise ValueError(
+                    f"sets_done {done} exceeds the planned {exercise['sets']} "
+                    f"sets for {exercise['name']!r}"
+                )
+        sets_value = f"{sum(sets_done.values())}/{sum(e['sets'] for e in exercises)}"
+    else:
+        sets_value = "—"
+    elapsed = f"{tracking['elapsed_min']} min" if "elapsed_min" in tracking else "—"
+    volume = f"{tracking['volume_lb']} lb" if "volume_lb" in tracking else "—"
+    hr = tracking.get("heart_rate_bpm")
+    boxes = (
+        cs.stat_box("Elapsed", elapsed) + cs.stat_box("Volume", volume)
+        + cs.stat_box("Sets done", sets_value)
+        + _state_stat(
+            "Heart rate",
+            f"{hr} bpm" if hr is not None else "—",
+            cs.state_for("heart-rate", hr),
+        )
+    )
+    chips = [
+        cs.chip_b(text.format(tracking[field]))
+        for field, text in (
+            ("steps", "{} steps"), ("kcal_burned", "{} kcal"),
+            ("exercise_min", "{} min exercise"),
+        )
+        if field in tracking
+    ]
+    chips_row = f"<div class='chips'>{''.join(chips)}</div>" if chips else ""
+    done_by_name = sets_done if sets_done is not None else {}
+    rows = []
+    for exercise in exercises:
+        parts = [str(exercise[f]) for f in ("load", "reps") if f in exercise]
+        caption = (
+            f"<span class='caption'>{cs._escape(' × '.join(parts))}</span>"
+            if parts else ""
+        )
+        detail = (
+            f"<div class='caption'>{cs._escape(exercise['detail'])}</div>"
+            if "detail" in exercise else ""
+        )
+        rows.append(
+            "<div class='prow'>"
+            f"<span class='plabel'>{cs._escape(exercise['name'])}</span>"
+            f"{caption}"
+            f"{_set_dots(exercise['sets'], done_by_name.get(exercise['name'], 0), cs.ACCENTS['training'])}"
+            f"</div>{detail}"
+        )
+    footer = (
+        "<div class='resttimer'><span class='caption'>Rest timer —</span>"
+        f"{_btnfill('Resume', 'training')}</div>"
+    )
+    return f"<div class='statrow'>{boxes}</div>{chips_row}{''.join(rows)}{footer}"
+
+
+def _fill_track(label, value, target, unit):
+    """Render one labeled value/target track (macros, water).
+
+    The caption carries the TRUE numbers (`{label} {v} / {t} {unit}`; an
+    untracked value reads `— / {t}` with no fill — never a 0 default); the
+    fill geometry clamps to 100% (nutrition accent hex, non-text chrome).
+    """
+    if value is None:
+        caption = f"{label} — / {target} {unit}"
+        bar = cs.track_bar()
+    else:
+        caption = f"{label} {value} / {target} {unit}"
+        bar = cs.track_bar(
+            round(min(100, value / target * 100), 1), cs.ACCENTS["nutrition"]
+        )
+    return f"<div class='macro'><div class='caption'>{cs._escape(caption)}</div>{bar}</div>"
+
+
+def _nutrition_populated(plan, tracking):
+    """Render the nutrition card's populated anatomy from plan + tracking snapshot.
+
+    Slot-level honesty (ADR-0010 D5): Goal comes from the plan; Food/Exercise
+    only from present tracking fields; Remaining = goal − food + exercise ONLY
+    when all three operands exist (an absent operand is NOT 0 — the slot reads
+    em-dash). Macro and water tracks caption true numbers; the meals checklist
+    marks logged meals with the PALETTE-good check, the first unlogged meal
+    `Up next`, later unlogged meals an inert `Log` chip; `Add food` is inert
+    muted link-text.
+
+    Args:
+        plan (dict): The resolved nutrition plan document.
+        tracking (dict | None): The day's tracking snapshot, or None.
+
+    Returns:
+        (str) The card body markup.
+    """
+    tracking = tracking if tracking is not None else {}
+    goal = plan["calorie_goal"]
+    food = tracking.get("food_kcal")
+    exercise = tracking.get("exercise_kcal")
+    remaining = (
+        goal - food + exercise if food is not None and exercise is not None else "—"
+    )
+    boxes = (
+        cs.stat_box("Goal", goal)
+        + cs.stat_box("Food", food if food is not None else "—")
+        + cs.stat_box("Exercise", exercise if exercise is not None else "—")
+        + cs.stat_box("Remaining", remaining, tinted=True)
+    )
+    macros_g = tracking.get("macros_g", {})
+    tracks = "".join(
+        _fill_track(label, macros_g.get(key), plan["macros"][key], "g")
+        for label, key in (
+            ("Protein", "protein"), ("Carbs", "carbs"), ("Fat", "fat"),
+        )
+    )
+    logged = set(tracking.get("meals_logged", ()))
+    rows = ["<div class='caption'>Today's meals · from your plan</div>"]
+    up_next_taken = False
+    for meal in plan["meals"]:
+        if meal["name"] in logged:
+            marker = "<span class='state-good'>✓</span>"
+        elif not up_next_taken:
+            marker = cs.chip_b("Up next")
+            up_next_taken = True
+        else:
+            marker = cs.chip_b("Log")
+        contents = (
+            f"<span class='caption'>{cs._escape(meal['contents'])}</span>"
+            if "contents" in meal else ""
+        )
+        kcal = (
+            f"<span class='caption'>{meal['kcal']} kcal</span>"
+            if "kcal" in meal else ""
+        )
+        rows.append(
+            "<div class='prow'>"
+            f"<span class='plabel'>{cs._escape(meal['name'])}</span>"
+            f"{contents}{kcal}{marker}</div>"
+        )
+    rows.append("<span class='linkish'>Add food</span>")
+    water = (
+        _fill_track("Water", tracking.get("water_l"), plan["water_l"], "L")
+        if "water_l" in plan else ""
+    )
+    return f"<div class='statrow'>{boxes}</div>{tracks}{''.join(rows)}{water}"
+
+
+def _supplements_populated(plan, tracking):
+    """Render the supplements card's populated anatomy from plan + tracking.
+
+    The counter chip distinguishes the explicit none-taken snapshot from no
+    snapshot (ADR-0010 D4): `{"taken": []}` reads `0 of m taken` on the card
+    accent tint; NO snapshot reads the muted `— of m taken` — never a 0
+    default. The taken count is the intersection with the plan's item names.
+    Rows: name, dose caption, timing chip when present, the PALETTE-good check
+    when taken else an unfilled marker dot.
+
+    Args:
+        plan (dict): The resolved supplements plan document.
+        tracking (dict | None): The day's tracking snapshot, or None.
+
+    Returns:
+        (str) The card body markup.
+    """
+    items = plan["items"]
+    names = {entry["name"] for entry in items}
+    if tracking is None:
+        taken = frozenset()
+        counter = cs.pill(f"— of {len(items)} taken")
+    else:
+        taken = frozenset(tracking["taken"])
+        counter = cs.pill(f"{len(taken & names)} of {len(items)} taken", "supplements")
+    rows = []
+    for entry in items:
+        marker = (
+            "<span class='state-good'>✓</span>"
+            if entry["name"] in taken
+            else f"<span class='setdot' style='background:{cs.CHROME['card-border']}'></span>"
+        )
+        timing = cs.chip_b(entry["timing"]) if "timing" in entry else ""
+        rows.append(
+            "<div class='prow'>"
+            f"<span class='plabel'>{cs._escape(entry['name'])}</span>"
+            f"<span class='caption'>{cs._escape(entry['dose'])}</span>"
+            f"{timing}{marker}</div>"
+        )
+    return f"<div class='prow'>{counter}</div>{''.join(rows)}"
+
+
+def _peptides_populated(plan, watchout_answers):
+    """Render the peptides card's populated anatomy from plan + watch-out answers.
+
+    Protocol line `{compound} · {dose} · {route}`; the week caption renders
+    only when BOTH cycle fields are present; tags render as plain bordered
+    chips (no tint — no special `experimental` styling is invented). The
+    watch-out rows derive from `loop_schema.derive_watchout_questions` over
+    the plan's compound and read the GROUPED zone-7 watch-out answers (second
+    consumer, not a re-route): an answered question shows its latest answer as
+    a bordered chip, an unanswered one an inert accent `Answer` button. The
+    optional evidence field renders as inert link-styled muted caption.
+
+    Args:
+        plan (dict): The resolved peptides plan document.
+        watchout_answers (dict): watch-out name -> stored answer values.
+
+    Returns:
+        (str) The card body markup.
+    """
+    protocol = f"{plan['compound']} · {plan['dose']} · {plan['route']}"
+    parts = [f"<div class='label'>{cs._escape(protocol)}</div>"]
+    if "cycle_week" in plan and "cycle_length_weeks" in plan:
+        parts.append(
+            f"<div class='caption'>Week {plan['cycle_week']} of "
+            f"{plan['cycle_length_weeks']}</div>"
+        )
+    if plan.get("tags"):
+        parts.append(
+            f"<div class='prow'>{''.join(cs.chip_b(tag) for tag in plan['tags'])}</div>"
+        )
+    for question in sorted(loop_schema.derive_watchout_questions([plan["compound"]])):
+        answers = watchout_answers.get(question)
+        control = (
+            cs.chip_b(str(answers[-1])) if answers else _btnfill("Answer", "peptides")
+        )
+        parts.append(
+            "<div class='prow'>"
+            f"<span class='plabel'>{cs._escape(biomarker_meta.display_name(question))}</span>"
+            f"{control}</div>"
+        )
+    if "evidence" in plan:
+        parts.append(f"<span class='linkish'>{cs._escape(plan['evidence'])}</span>")
+    return "".join(parts)
+
+
+def _plan_card(label, domain, accent_key, default_specialist,
+               plan_readings, track_readings, watchout_answers, on_date):
     """Render one today's-plan card per the visual-spec anatomy.
 
-    Header row: accent glyph dot + accent-colored title + `via <specialist>`
-    muted caption + the muted `awaiting plan` status pill; then the card's
-    designed empty-state body. Accents color chrome only — text inside stays
-    ink/muted (ADR-0009 D3).
+    Resolves the domain's plan for `on_date` (ADR-0010 D4): a resolved plan
+    renders the populated anatomy attributed `via` ITS specialist (from the
+    `plan::` source, not the static default) under an accent-tinted `today`
+    status pill; either absence state renders the designed empty anatomy, the
+    muted `awaiting plan` pill, and its own dashed-row copy. Accents color
+    chrome only — text inside stays ink/muted (ADR-0009 D3).
+
+    Raises:
+        ValueError: The workout tracking claims more sets done than planned.
     """
     accent = cs.ACCENTS[accent_key]
+    resolved = plan_schema.resolve_plan(plan_readings.get(domain, []), on_date)
+    if resolved["state"] is None:
+        specialist = resolved["specialist"]
+        pill = cs.pill("today", accent_key)
+        tracking = plan_schema.resolve_tracking(track_readings.get(domain, []), on_date)
+        if domain == "workout":
+            body = _workout_populated(resolved["plan"], tracking)
+        elif domain == "nutrition":
+            body = _nutrition_populated(resolved["plan"], tracking)
+        elif domain == "supplements":
+            body = _supplements_populated(resolved["plan"], tracking)
+        else:
+            body = _peptides_populated(resolved["plan"], watchout_answers)
+    else:
+        specialist = default_specialist
+        pill = cs.pill("awaiting plan")
+        copy = (
+            _NO_PLAN_COPY if resolved["state"] == plan_schema.NO_PLAN
+            else _NO_PLAN_TODAY_COPY
+        )
+        body = _EMPTY_BODIES[domain](copy)
     head = (
         "<div class='pchead'>"
         f"<span class='dot' style='background:{accent}'></span>"
         f"<span class='ptitle' style='color:{accent}'>{cs._escape(label)}</span>"
         f"<span class='caption'>via {cs._escape(specialist)}</span>"
-        f"{cs.pill('awaiting plan')}"
+        f"{pill}"
         "</div>"
     )
-    return f"<div class='card pcard pc-{accent_key}'>{head}{_PLAN_BODIES[label]()}</div>"
+    return f"<div class='card pcard pc-{accent_key}'>{head}{body}</div>"
 
 
-def _plan_zone():
-    """Render zone 3 — today's plan: the 2x2 specialist-attributed card grid."""
-    cards = "".join(_plan_card(*card) for card in _PLAN_CARDS)
+def _plan_zone(plan_readings, track_readings, watchout_answers, today):
+    """Render zone 3 — today's plan: the 2x2 specialist-attributed card grid.
+
+    Args:
+        plan_readings (dict): domain -> the `plan::<domain>` full readings.
+        track_readings (dict): domain -> the `plan-track::<domain>` readings.
+        watchout_answers (dict): watch-out name -> stored answer values (the
+            peptide card's second-consumer read of the zone-7 stream).
+        today (datetime.date): The seam date plans resolve against (D4).
+    """
+    on_date = today.isoformat()
+    cards = "".join(
+        _plan_card(*card, plan_readings, track_readings, watchout_answers, on_date)
+        for card in _PLAN_CARDS
+    )
     return cs.zone(
         "Today's Plan",
         f"<div class='grid2'>{cards}</div>",
@@ -555,21 +918,45 @@ def render(store_read, _today=None):
         (str) The assembled dashboard HTML (single document, inline styling).
 
     Raises:
-        KeyError: An item carries a `::` prefix outside the four routed stream
-            types (fail-loud; ADR-0008 D3).
+        KeyError: An item carries a `::` prefix outside the routed stream
+            types, or an unknown plan::/plan-track:: domain suffix (fail-loud;
+            ADR-0008 D3).
+        ValueError: A workout tracking snapshot claims more sets done than the
+            plan schedules for an exercise (never a silently capped claim).
     """
-    series = _series_by_item(store_read)
+    by_item = _readings_by_item(store_read)
     biomarkers, panels, watchouts, feedback, other = [], [], [], [], []
-    for item in sorted(series):
-        values = series[item]
+    plan_readings, track_readings, watchout_answers = {}, {}, {}
+    for item in sorted(by_item):
+        readings = by_item[item]
+        values = [r["value"] for r in readings]
         if item.startswith("biomarker::"):
             biomarkers.append(_metric_card(item, values))
         elif item.startswith("panel::"):
             panels.append(_panel_chip(item, values))
         elif item.startswith("watch-out::"):
             watchouts.append(_watchout_row(item, values))
+            # Second consumer, not a re-route: the peptide plan card reads the
+            # same grouped answers for its watch-out rows (ADR-0010 D5).
+            watchout_answers[item[len("watch-out::"):]] = values
         elif item.startswith("feedback::"):
             feedback.append(_feedback_row(values))
+        elif item.startswith("plan-track::"):
+            domain = item[len("plan-track::"):]
+            if domain not in plan_schema.TRACKED_DOMAINS:
+                raise KeyError(
+                    f"unrouted plan-track:: domain {domain!r}: routing for a new "
+                    f"stream type is added deliberately, never by silent fallthrough"
+                )
+            track_readings[domain] = readings
+        elif item.startswith("plan::"):
+            domain = item[len("plan::"):]
+            if domain not in plan_schema.PLAN_DOMAINS:
+                raise KeyError(
+                    f"unrouted plan:: domain {domain!r}: routing for a new "
+                    f"stream type is added deliberately, never by silent fallthrough"
+                )
+            plan_readings[domain] = readings
         elif "::" in item:
             prefix = item.split("::", 1)[0] + "::"
             raise KeyError(
@@ -606,7 +993,7 @@ def render(store_read, _today=None):
     zones = (
         _hero_zone(store_read),
         _calendar_zone(today),
-        _plan_zone(),
+        _plan_zone(plan_readings, track_readings, watchout_answers, today),
         cs.zone(
             "Performance & Trends",
             trends_body,
