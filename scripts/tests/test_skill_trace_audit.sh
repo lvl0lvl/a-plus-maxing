@@ -218,6 +218,51 @@ else
     FAIL=$((FAIL + 1))
 fi
 
+# ── T15: quoted hatch sentence mid-prose does not waive the table ─────
+# RED-proven: pre-fix (substring hatch test) this exited 0.
+echo "T15: quoted escape-hatch sentence mid-prose does not count"
+run_case t15_quoted_hatch 51 "$(cat <<'EOF'
+## Session 51 (2026-06-11 → 12)
+
+### S51 close attestation (2026-06-12)
+
+The close plan said to write "No PR lifecycles ran this session." if zero PRs ran, but six lifecycles ran and no table was written.
+EOF
+)" 1 "no per-PR invocation table"
+
+# ── T16: table inside a code fence is not a real table ────────────────
+# RED-proven: pre-fix (no fence stripping) this exited 0.
+echo "T16: fenced example table does not satisfy the table check"
+run_case t16_fenced_table 51 "$(cat <<'EOF'
+## Session 51 (2026-06-11 → 12)
+
+### S51 close attestation (2026-06-12)
+
+An example of the mandated shape (no real table follows):
+
+```
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh |
+|---|---|---|
+| #96 | YES | YES |
+```
+EOF
+)" 1 "no per-PR invocation table"
+
+# ── T17: escaped pipe inside a YES cell stays one cell → pass ─────────
+# RED-proven: pre-fix (split on every pipe) this exited 1 with a spurious
+# neither-YES-nor-NO finding on the split-off fragment.
+echo "T17: escaped pipe in a YES cell passes"
+run_case t17_escaped_pipe 51 "$(cat <<'EOF'
+## Session 51 (2026-06-11 → 12)
+
+### S51 close attestation (2026-06-12)
+
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh |
+|---|---|---|
+| #96 | YES (Skill tool \| ref) | YES |
+EOF
+)" 0
+
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""
 echo "Total: $((PASS + FAIL))"

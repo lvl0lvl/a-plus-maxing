@@ -116,6 +116,18 @@ n = int(sys.argv[2])
 with open(path, encoding='utf-8') as f:
     lines = f.readlines()
 
+# ── Blank out fenced code blocks (``` ... ```) up front, before section
+# detection, the escape-hatch search, and the table scan — example tables
+# and quoted sentences inside fences must not satisfy (or fail) any check.
+# Interior lines become empty strings so violation line numbers stay correct.
+in_fence = False
+for i, line in enumerate(lines):
+    if line.lstrip().startswith('```'):
+        in_fence = not in_fence
+        lines[i] = ''
+    elif in_fence:
+        lines[i] = ''
+
 # ── Locate the `## Session <N>` section (H2 to next H2 or EOF). ──────────
 SESSION_RE = re.compile(r'^##\s+Session\s+(\d+)\b')
 H2_RE = re.compile(r'^##\s+\S')
@@ -167,17 +179,20 @@ if n not in attest_ns:
             f'no S{n} close attestation found in the Session {n} section',
         ))
 
-# ── Zero-PR escape hatch (exact sentence). ────────────────────────────────
-no_lifecycle = 'No PR lifecycles ran this session.' in body
+# ── Zero-PR escape hatch (exact sentence, line-anchored so a quoted or
+# mid-prose mention cannot waive the table requirement). ──────────────────
+no_lifecycle = bool(re.search(
+    r'(?m)^\s*(?:\*{1,2})?No PR lifecycles ran this session\.', body))
 
 # ── Check 2: find per-PR invocation table(s). ─────────────────────────────
 def cells(line):
-    parts = [c.strip() for c in line.strip().split('|')]
+    # Split on unescaped pipes only; \| is literal cell text.
+    parts = [c.strip() for c in re.split(r'(?<!\\)\|', line.strip())]
     if parts and parts[0] == '':
         parts = parts[1:]
     if parts and parts[-1] == '':
         parts = parts[:-1]
-    return parts
+    return [c.replace('\\|', '|') for c in parts]
 
 def is_separator(row):
     return all(re.fullmatch(r':?-{2,}:?|:?-:?', c) for c in row) and len(row) > 0
