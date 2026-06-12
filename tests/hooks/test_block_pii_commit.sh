@@ -475,11 +475,13 @@ git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note.md"
 # eb1 (2): NOTHING staged, same dirty bd file -> deny. Uniquely pins that the bd
 # append precedes the empty-staged-set early exit: a commit with nothing
 # agent-staged still succeeds carrying bd's auto-staged flush, so the scan must
-# run on the bd file alone (current-main allows via that exit).
+# run on the bd file alone (pre-eb1, the hook allowed via that exit). The deny
+# must NAME .beads/issues.jsonl (PR#100 F6): a bare deny check also matches the
+# fail-closed ERROR deny, passing vacuously when the scan path is broken.
 OUT=$(invoke "git commit -m 'flush only'")
-[[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
-    && ok "eb1 (2) EMPTY staged set + dirty bd file -> DENY (append precedes empty-set exit)" \
-    || bad "eb1 (2) empty-staged-set commit allowed despite dirty bd file: $OUT"
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *".beads/issues.jsonl"* ]]; } \
+    && ok "eb1 (2) EMPTY staged set + dirty bd file -> DENY naming .beads/issues.jsonl" \
+    || bad "eb1 (2) empty-staged-set commit allowed or deny did not name the bd file: $OUT"
 
 # eb1 (3): token-free bd file + clean staged file -> allow (the flood boundary —
 # the bd corpus must not over-block routine commits; content is neither a contact
@@ -492,6 +494,15 @@ OUT=$(invoke "git commit -m 'note2'")
     && ok "eb1 (3) token-free bd file + clean staged file -> ALLOW (no over-blocking)" \
     || bad "eb1 (3) token-free bd file wrongly DENIED (flood boundary breached): $OUT"
 git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note2.md"
+
+# eb1 (4): token-free bd file, NOTHING staged -> allow (PR#100 F5). Pins that
+# the bd append does not turn (empty staged set + bd file present) into a
+# per-se deny: a routine flush-only commit with clean bead text must pass.
+# Reds if the hook denies on bd-file presence instead of bd-file content.
+OUT=$(invoke "git commit -m 'flush only clean'")
+[[ "$OUT" != *'"deny"'* ]] \
+    && ok "eb1 (4) token-free bd file + EMPTY staged set -> ALLOW (content, not presence)" \
+    || bad "eb1 (4) flush-only clean commit wrongly DENIED (per-se bd deny): $OUT"
 rm -rf "$REPO/.beads"
 
 # ── cvr: hardened matcher catches bypass-form commits (env/path/trailing-sep) ───
