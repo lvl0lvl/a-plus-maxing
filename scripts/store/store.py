@@ -195,7 +195,9 @@ def correct(item, reading, root=DEFAULT_ROOT):
     key = keying.dedupe_key(reading)
     if key not in current:
         raise ValueError(f"no stored reading with identity {key!r} to correct")
-    if current[key]["value"] == reading["value"]:
+    if json.dumps(current[key]["value"], sort_keys=True) == json.dumps(
+        reading["value"], sort_keys=True
+    ):
         return
     _write_atomic(path, (*well_formed, reading))
 
