@@ -1,11 +1,15 @@
 """Local NDJSON store: per-item append/read over the gitignored store root.
 
 One NDJSON file per item under the store root (ADR-0002-T0 File Granularity).
-`append` validates and idempotently writes one line; `read` scans the item file
-and returns readings ordered by timepoint; `items`/`read_all` publish the
-cross-item surface (sorted item enumeration, flat item-then-timepoint-ordered
-read model) so no consumer enumerates the on-disk layout itself. Local file
-I/O only — no network, login, or model step (ADR-0001 D1->D2).
+`append` validates and idempotently writes one line; `correct` appends a
+SUPERSEDING line for an already-stored (item, timepoint, source) — the bead-1vi
+explicit correction primitive, never an in-place mutation; `read` scans the
+item file, resolves each (item, timepoint, source) identity to its
+last-appended line (latest-wins), and returns readings ordered by timepoint;
+`items`/`read_all` publish the cross-item surface (sorted item enumeration,
+flat item-then-timepoint-ordered read model) so no consumer enumerates the
+on-disk layout itself. Local file I/O only — no network, login, or model step
+(ADR-0001 D1->D2).
 """
 
 import json
@@ -68,43 +72,23 @@ def _read_lines(path):
     return readings
 
 
-def append(item, reading, root=DEFAULT_ROOT):
-    """Append one reading to its item file by rewriting the file atomically.
+def _write_atomic(path, readings):
+    """Rewrite the item file as `readings`, one JSON line each, atomically.
 
-    Rewrites the item file as its well-formed prior lines plus the new line
-    (write temp sibling -> fsync -> `os.replace`). Idempotent on the dedupe
-    identity: re-appending a reading with the same `(item, timepoint, source)`
-    is a no-op. Self-heals: pre-existing malformed or non-conformant lines are
-    dropped on write (`_read_lines` filters them). Prior lines' logical content
-    is preserved, but their exact on-disk byte form is not guaranteed stable
-    across appends (they are re-serialized).
+    Write the full file to a temp sibling, then os.replace. os.replace is atomic
+    on POSIX, so a reader never sees a torn line — it sees either the complete old
+    file or the complete new one. fsync before the replace makes the new bytes
+    durable on disk first, so a crash after the rename cannot expose empty/short
+    content. Prior lines' logical content is preserved, but their exact on-disk
+    byte form is not guaranteed stable across writes (they are re-serialized).
 
     Args:
-        item (str): The item identifier (names the item's `.ndjson` file).
-        reading (dict): A reading carrying every Line Field Set field.
-        root (str | Path, optional): Store root. Defaults to `vault/store/`.
-
-    Raises:
-        ValueError: The reading is missing a required Line Field Set field.
+        path (Path): The item's `.ndjson` file.
+        readings (tuple | list): The conformant reading dicts to write, in order.
     """
-    if not keying.is_conformant(reading):
-        raise ValueError(
-            f"reading missing required field(s); needs {keying.LINE_FIELDS}"
-        )
-
-    path = _item_path(item, root)
-    well_formed = _read_lines(path)
-    if keying.dedupe_key(reading) in {keying.dedupe_key(r) for r in well_formed}:
-        return
-
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines = [json.dumps(r) + "\n" for r in (*well_formed, reading)]
+    lines = [json.dumps(r) + "\n" for r in readings]
 
-    # Write the full file to a temp sibling, then os.replace. os.replace is atomic
-    # on POSIX, so a reader never sees a torn line — it sees either the complete old
-    # file or the complete new one. fsync before the replace makes the new bytes
-    # durable on disk first, so a crash after the rename cannot expose empty/short
-    # content. Self-heals: malformed lines were already dropped by _read_lines.
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.", suffix=".tmp")
     try:
         # os.fdopen takes ownership of fd; close fd directly only if it raises first.
@@ -126,26 +110,120 @@ def append(item, reading, root=DEFAULT_ROOT):
         raise
 
 
+def _resolve_latest(readings):
+    """Collapse same-dedupe-key readings to the last one in file (append) order.
+
+    The bead-1vi latest-wins read basis: a correction appends a superseding
+    line for an already-stored `(item, timepoint, source)` (see `correct`), so
+    among lines sharing that identity the LAST in file order — append order —
+    is the current value; the same most-recent-wins resolution basis
+    `loop_schema.read_panel` follows. Each surviving reading keeps its
+    first-appearance position, so the relative order of distinct identities is
+    unchanged.
+
+    Args:
+        readings (list): Conformant reading dicts in file order.
+
+    Returns:
+        (list) One reading per `(item, timepoint, source)` identity.
+    """
+    return list({keying.dedupe_key(r): r for r in readings}.values())
+
+
+def append(item, reading, root=DEFAULT_ROOT):
+    """Append one reading to its item file by rewriting the file atomically.
+
+    Rewrites the item file as its well-formed prior lines plus the new line
+    (write temp sibling -> fsync -> `os.replace`). Idempotent on the dedupe
+    identity: re-appending a reading with the same `(item, timepoint, source)`
+    is a no-op — value included or not, so the normal ingest path NEVER
+    overrides a stored value (an intended value correction is an explicit
+    `correct` call). Self-heals: pre-existing malformed or non-conformant lines
+    are dropped on write (`_read_lines` filters them).
+
+    Args:
+        item (str): The item identifier (names the item's `.ndjson` file).
+        reading (dict): A reading carrying every Line Field Set field.
+        root (str | Path, optional): Store root. Defaults to `vault/store/`.
+
+    Raises:
+        ValueError: The reading is missing a required Line Field Set field.
+    """
+    if not keying.is_conformant(reading):
+        raise ValueError(
+            f"reading missing required field(s); needs {keying.LINE_FIELDS}"
+        )
+
+    path = _item_path(item, root)
+    well_formed = _read_lines(path)
+    if keying.dedupe_key(reading) in {keying.dedupe_key(r) for r in well_formed}:
+        return
+    _write_atomic(path, (*well_formed, reading))
+
+
+def correct(item, reading, root=DEFAULT_ROOT):
+    """Append a superseding value for an already-stored (item, timepoint, source).
+
+    The bead-1vi explicit correction primitive: where `append` drops a re-entry
+    whose dedupe identity is already stored, `correct` appends it as a new line
+    DESPITE the dedupe, and `read` resolves the identity to this last-appended
+    line (latest-wins). The prior line stays in the file untouched — the audit
+    trail is append-only per ADR-0002, never mutated or deleted. Correcting an
+    identity to the value it already resolves to is an idempotent no-op (a
+    re-run appends 0 duplicate lines). An identity with no stored line raises:
+    a correction targets an existing reading, so a mistyped item / timepoint /
+    source fails loud instead of silently creating a new series point.
+
+    Args:
+        item (str): The item identifier (names the item's `.ndjson` file).
+        reading (dict): The superseding reading, carrying every Line Field Set
+            field; its `(item, timepoint, source)` must already be stored.
+        root (str | Path, optional): Store root. Defaults to `vault/store/`.
+
+    Raises:
+        ValueError: The reading is missing a required Line Field Set field, or
+            no stored reading carries its `(item, timepoint, source)` identity.
+    """
+    if not keying.is_conformant(reading):
+        raise ValueError(
+            f"reading missing required field(s); needs {keying.LINE_FIELDS}"
+        )
+
+    path = _item_path(item, root)
+    well_formed = _read_lines(path)
+    current = {keying.dedupe_key(r): r for r in well_formed}
+    key = keying.dedupe_key(reading)
+    if key not in current:
+        raise ValueError(f"no stored reading with identity {key!r} to correct")
+    if current[key]["value"] == reading["value"]:
+        return
+    _write_atomic(path, (*well_formed, reading))
+
+
 def read(item, root=DEFAULT_ROOT):
-    """Return the item's well-formed, conformant readings ordered by timepoint.
+    """Return the item's latest-wins-resolved readings ordered by timepoint.
 
     Returns only lines that are valid JSON, a `dict`, and carry every Line Field
     Set field. Malformed or non-conformant lines are skipped (not raised on) and
     each emits one `STORE-SKIP: <path>:<1-based-line-number>` line on stderr, so
     the returned list may be a proper subset of the readings ever appended if the
-    file was corrupted. The ordering is lexicographic on the `timepoint` string
-    and assumes the spike's UTC-offset producer obligation; a non-UTC-offset
-    timepoint would sort wrong. A directory named `<item>.ndjson` under the root
-    raises `IsADirectoryError` — fail-fast at the storage boundary, not guarded.
+    file was corrupted. Lines sharing an `(item, timepoint, source)` identity
+    are resolved to the LAST in file (append) order — a `correct` superseding
+    append wins over the line it corrects (`_resolve_latest`), so every store
+    consumer reads corrected values through this one surface. The ordering is
+    lexicographic on the `timepoint` string and assumes the spike's UTC-offset
+    producer obligation; a non-UTC-offset timepoint would sort wrong. A
+    directory named `<item>.ndjson` under the root raises `IsADirectoryError` —
+    fail-fast at the storage boundary, not guarded.
 
     Args:
         item (str): The item identifier.
         root (str | Path, optional): Store root. Defaults to `vault/store/`.
 
     Returns:
-        (list) The item's well-formed readings, sorted by their `timepoint` field.
+        (list) The item's resolved readings, sorted by their `timepoint` field.
     """
-    readings = _read_lines(_item_path(item, root))
+    readings = _resolve_latest(_read_lines(_item_path(item, root)))
     return sorted(readings, key=lambda r: r["timepoint"])
 
 
@@ -176,8 +254,9 @@ def read_all(root=DEFAULT_ROOT):
 
     Concatenates `read(item, root=root)` over `items(root)`: the outer order
     is item-name lexicographic, the order within an item is `read`'s timepoint
-    sort. Delegates through `read`, so malformed-line skipping behaves exactly
-    as a per-item read (one `STORE-SKIP:` stderr line per skipped line). A
+    sort. Delegates through `read`, so malformed-line skipping AND the
+    latest-wins identity resolution behave exactly as a per-item read (one
+    `STORE-SKIP:` stderr line per skipped line; one reading per identity). A
     directory named `*.ndjson` under the root raises `IsADirectoryError` out of
     its `read` — fail-fast at the storage boundary, not guarded.
 
