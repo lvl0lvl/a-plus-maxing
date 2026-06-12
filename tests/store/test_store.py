@@ -388,6 +388,21 @@ def test_items_returns_sorted_stems(tmp_path):
     assert store.items(root=tmp_path) == ["glucose", "hrv", "rhr"]
 
 
+def test_items_empty_item_round_trips(tmp_path):
+    """The documented-allowed empty item ("" -> root/.ndjson) round-trips.
+
+    RED against a `p.stem` derivation: pathlib treats the dotfile `.ndjson`
+    as suffix-less, so its stem is the whole name and items() returns a
+    phantom '.ndjson' slug whose file does not exist — read_all then silently
+    drops the readings. The exact-inverse suffix strip restores the slug "".
+    """
+    reading = _reading("2026-06-01T08:00:00+00:00", 55, item="")
+    store.append("", reading, root=tmp_path)
+
+    assert store.items(root=tmp_path) == [""]
+    assert reading in store.read_all(root=tmp_path)
+
+
 def test_read_all_orders_items_then_timepoints(tmp_path):
     """read_all is item-name-sorted outer, timepoint-sorted within each item.
 

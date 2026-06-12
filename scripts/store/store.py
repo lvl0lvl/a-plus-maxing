@@ -161,7 +161,10 @@ def items(root=DEFAULT_ROOT):
     Returns:
         (list) The stored item identifiers, sorted lexicographically.
     """
-    return sorted(p.stem for p in Path(root).glob("*.ndjson"))
+    # Exact inverse of _item_path's f"{item}.ndjson" naming: a literal suffix
+    # strip, not p.stem — the dotfile `.ndjson` (the documented-allowed empty
+    # item) is suffix-less to pathlib, so its stem would be a phantom slug.
+    return sorted(p.name[: -len(".ndjson")] for p in Path(root).glob("*.ndjson"))
 
 
 def read_all(root=DEFAULT_ROOT):
