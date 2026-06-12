@@ -14,6 +14,10 @@
 #   4 commit staging only non-vault files              -> allow
 #   5 commit staging a grandfathered page (no prov)    -> allow
 #   6 commit staging a non-gated vault file (_template)-> allow
+#   7-9 cvr bypass-form commits of an INVALID page     -> DENY (recognition holds)
+#   10 worktree commit staging an ungated page (29u4)  -> DENY via the cwd target
+#   11 foreign-repo commit staging an ungated page     -> allow (trunk scope gate)
+#   12 resolve-target-repo lib missing                 -> warning + fallback verdict
 
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -153,6 +157,47 @@ OUT=$(printf '{"cwd":%s,"tool_input":{"command":%s}}' \
 { [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"INV-WIKI-INGESTION-GATED"* ]]; } \
     && ok "case10 (29u4): worktree commit staging ungated page DENIED via cwd resolution" \
     || bad "case10 (29u4): worktree-staged ungated page NOT denied (worktree-blind), got: $OUT"
+
+# Case 11 (F4): FOREIGN repo staging an ungated page -> ALLOW (the ingestion gate
+# guards THIS trunk's wiki only; another project's vault/ layout is out of scope).
+# Case 10 above is the control: a worktree OF the fallback repo still denies.
+FOREIGN="$TMP/foreign"
+git init -q -b feat "$FOREIGN"
+git -C "$FOREIGN" config user.email t@t.t; git -C "$FOREIGN" config user.name t
+git -C "$FOREIGN" commit -q --allow-empty -m seed
+mkdir -p "$FOREIGN/vault/compounds"
+emit ungated | grep -v '^provenance_' > "$FOREIGN/vault/compounds/ungated.md"
+git -C "$FOREIGN" add vault/compounds/ungated.md
+OUT=$(printf '{"cwd":%s,"tool_input":{"command":%s}}' \
+        "$(printf '%s' "$FOREIGN" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+        "$(printf '%s' "git commit -m 'foreign ungated'" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+      | BLOCK_UNGATED_VAULT_PROJECT_ROOT="$REPO" WIKI_BDA_CMD="$TMP/bda.sh" bash "$HOOK")
+[[ "$OUT" != *'"deny"'* ]] \
+    && ok "case11 (F4): foreign-repo ungated page -> ALLOW (trunk scope gate)" \
+    || bad "case11 (F4): foreign repo wrongly gated: $OUT"
+
+# Case 12: resolve-target-repo lib MISSING -> loud warning + fallback VERDICT. The
+# scratch copy mirrors the checkout shape (hook under .claude/hooks/, the REAL lint
+# script + its helper libs under scripts/) so the hook's script-relative lint path
+# resolves and the verdict comes from the GATE, not a missing-file error. The
+# fallback root ($REPO) has the ungated page staged, so the fallback verdict is
+# the deny — proving the fallback still gates rather than only warning.
+VMISS="$TMP/vmiss"
+mkdir -p "$VMISS/.claude/hooks/lib" "$VMISS/scripts/lib"
+cp "$HOOK" "$VMISS/.claude/hooks/"
+cp "$SCRIPT_DIR/../lib/commit-matcher.sh" "$VMISS/.claude/hooks/lib/"
+cp "$SCRIPT_DIR/../../../scripts/wiki-ingest-lint.sh" "$VMISS/scripts/"
+cp "$SCRIPT_DIR/../../../scripts/lib/audit-helpers.sh" \
+   "$SCRIPT_DIR/../../../scripts/lib/wiki-helpers.sh" "$VMISS/scripts/lib/"
+git -C "$REPO" reset -q; git -C "$REPO" add vault/compounds/ungated.md
+OUT=$(printf '{"tool_input":{"command":%s}}' \
+        "$(printf '%s' "git commit -m 'x'" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+      | BLOCK_UNGATED_VAULT_PROJECT_ROOT="$REPO" WIKI_BDA_CMD="$TMP/bda.sh" \
+        bash "$VMISS/.claude/hooks/block-ungated-vault-write.sh" 2>"$VMISS/err")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"INV-WIKI-INGESTION-GATED"* ]] \
+  && grep -q "resolve-target-repo lib failed to load" "$VMISS/err"; } \
+    && ok "case12: resolve-lib missing -> warning + fallback gate verdict (deny)" \
+    || bad "case12: lib-missing posture wrong (out: $OUT; err: $(cat "$VMISS/err"))"
 
 echo
 echo "test_block_ungated_vault_write: ${PASS} passed, ${FAIL} failed"

@@ -249,6 +249,57 @@ else
 fi
 rm -rf "$WT_BASE" "$WT_FIX" "$WT_MAIN"
 
+# ── T27-T28: trunk scope gate + resolve-lib-missing posture ───────────────────
+echo "T27-T28: trunk scope gate + lib-missing posture"
+mkscratch() {  # $1 = dir ; $2 = branch
+    git -C "$1" init -q -b "$2" 2>/dev/null || {
+        git -C "$1" init -q
+        git -C "$1" symbolic-ref HEAD "refs/heads/$2"
+    }
+    git -C "$1" config user.email t@t.t
+    git -C "$1" config user.name t
+    git -C "$1" commit -q --allow-empty -m seed
+}
+
+# T27: a commit targeting a DIFFERENT repository that sits ON main -> ALLOW. This
+# covers both the foreign-clone and the agent's-own-/tmp-scratch-repo shapes: the
+# guard protects THIS trunk only, not every repo on the machine. T26 above is the
+# control: a worktree OF the fallback repo (shared common dir) still denies.
+SCOPE_FB=$(mktemp -d); mkscratch "$SCOPE_FB" feature/scope
+SCRATCH_MAIN=$(mktemp -d); mkscratch "$SCRATCH_MAIN" main
+payload=$(printf '{"cwd":%s,"tool_input":{"command":%s}}' \
+    "$(printf '%s' "$SCRATCH_MAIN" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
+    "$(printf '%s' "git commit -m 'x'" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')")
+out=$(echo "$payload" | BLOCK_COMMIT_MAIN_PROJECT_ROOT="$SCOPE_FB" "$HOOK")
+if [[ -z "$out" ]]; then
+    echo "  PASS: T27 scratch/foreign repo ON main → allow (trunk scope gate)"
+    PASS=$((PASS + 1))
+else
+    echo "  FAIL: T27 — expected silent allow for out-of-scope repo, got: $out"
+    FAIL=$((FAIL + 1))
+fi
+
+# T28: resolve-target-repo lib MISSING -> loud warning + fallback VERDICT (the
+# allow-on-error posture keeps the guard alive on the script-path root). The
+# fallback repo is ON main, so the verdict must be the deny — proving the
+# fallback still gates rather than only warning. Copy the hook + the matcher lib
+# to scratch and delete only resolve-target-repo.sh.
+LIBMISS=$(mktemp -d); mkdir -p "$LIBMISS/lib"
+cp "$HOOK" "$LIBMISS/"
+cp "$SCRIPT_DIR/../lib/commit-matcher.sh" "$LIBMISS/lib/"
+MAIN_FB=$(mktemp -d); mkscratch "$MAIN_FB" main
+payload=$(printf '{"tool_input":{"command":%s}}' \
+    "$(printf '%s' "git commit -m 'x'" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')")
+out=$(echo "$payload" | BLOCK_COMMIT_MAIN_PROJECT_ROOT="$MAIN_FB" bash "$LIBMISS/block-commit-main.sh" 2>"$LIBMISS/err")
+if [[ "$out" == *'"permissionDecision":"deny"'* ]] && grep -q "resolve-target-repo lib failed to load" "$LIBMISS/err"; then
+    echo "  PASS: T28 resolve-lib missing → warning + fallback deny on main"
+    PASS=$((PASS + 1))
+else
+    echo "  FAIL: T28 — expected warning + fallback deny, got out: $out / err: $(cat "$LIBMISS/err")"
+    FAIL=$((FAIL + 1))
+fi
+rm -rf "$SCOPE_FB" "$SCRATCH_MAIN" "$LIBMISS" "$MAIN_FB"
+
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""
 echo "Total: $((PASS + FAIL))"
