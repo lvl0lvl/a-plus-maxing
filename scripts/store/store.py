@@ -153,8 +153,11 @@ def items(root=DEFAULT_ROOT):
     """Return the sorted item identifiers stored under the store root.
 
     Owns the one-`.ndjson`-file-per-item layout knowledge (ADR-0002-T0 File
-    Granularity): an item is stored iff its `.ndjson` file exists under the
-    root. A missing or empty root yields an empty list.
+    Granularity): enumeration is by NAME only — every direct child named
+    `*.ndjson` is an item slug, deliberately unfiltered by file-kind, so a
+    directory named `*.ndjson` is enumerated too and `read` of its slug raises
+    `IsADirectoryError` (the fail-fast storage-boundary contract). A missing or
+    empty root yields an empty list.
 
     Args:
         root (str | Path, optional): Store root. Defaults to `vault/store/`.
