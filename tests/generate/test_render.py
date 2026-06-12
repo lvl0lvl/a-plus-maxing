@@ -770,6 +770,23 @@ def test_contrast_and_colorblind(tmp_path):
             f"tint pair {what} {fg_hex} on {bg_hex} computes {tint_ratio:.2f} < 4.5"
         )
 
+    # --- state TEXT on paper: each `.state-*` color the dashboard renders as
+    # a standalone text glyph must compute >= 4.5 on paper, so a future
+    # PALETTE retune cannot silently regress the rendered glyphs. The zone-3
+    # ✓ markers (logged meals, taken supplements) ride `.state-good`;
+    # watch/concern render only glyph+swatch-paired legend entries and trend
+    # words on measured tint pairs, never a standalone text marker.
+    state_rules = dict(
+        re.findall(r"\.state-([a-z]+) \{ color: var\(--([a-z]+)\); \}", html)
+    )
+    for state in ("good",):
+        marker_hex = root[state_rules[state]]
+        marker_ratio = _contrast_ratio(_hex_to_rgb(marker_hex), bg)
+        print(f"AC-3 state-{state} text on paper = {marker_ratio:.2f} (need >= 4.5)")
+        assert marker_ratio >= 4.5, (
+            f"state-{state} text {marker_hex} on paper computes {marker_ratio:.2f} < 4.5"
+        )
+
     roles = ("good", "watch", "concern")
 
     # --- rendered semantic hexes by role, parsed from the emitted :root block —
