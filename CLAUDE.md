@@ -84,10 +84,11 @@ Before saying "done" or "complete":
 6. **Update memory** -- Write vault notes for any decisions, patterns, or open questions.
 7. **Update beads** -- `bd close` completed issues, `bd sync --flush-only`.
 8. **Review documents** -- Run the Document Freshness Rubric (see DOCUMENT_RUBRIC.md). Flag or archive stale docs.
-8.5. **Run audit scripts** -- For every invariant in INVARIANTS.md with a Mechanical Verification entry, run that script. On non-zero exit: do NOT commit until fixed or explicit user-adjudicated path-extension granted. Run all four at every close (and run `branch-completeness-audit.sh` at session OPEN too):
+8.5. **Run audit scripts** -- For every invariant in INVARIANTS.md with a Mechanical Verification entry, run that script. On non-zero exit: do NOT commit until fixed or explicit user-adjudicated path-extension granted. Run all five at every close (and run `branch-completeness-audit.sh` at session OPEN too):
    - `scripts/handoff-audit.sh` — INV-HO-ROTATION + INV-HO-NO-STALE-HASH
    - `scripts/scope-contract-audit.sh --session <N>` — INV-SCOPE-CONTRACT (asserts latest contract matches current session)
    - `scripts/pf-attestation-audit.sh --session <N>` — INV-PF-ATTESTATION (asserts close attestation dated current session)
+   - `scripts/skill-trace-audit.sh --session <N>` — PF-S39/S40/S51 family — asserts the close attestation carries the per-PR gated-skill invocation table
    - `scripts/branch-completeness-audit.sh` — INV-TRUNK-COMPLETENESS (asserts the checkout holds every deployed agent on `origin/main` + the governance layer; catches branch-write fragmentation, PF-S22-01)
 
    Conditional: for any aplus-research dispatch this session run `scripts/audit-research-provenance.sh <design-work-dir> <slug>` (bda — asserts the mode-required attested gates are PRESENT, then runs `gate_attest.py verify-chain`; closes the vacuous-pass hole where verify-chain alone skips ABSENT gates). This is the INV-RESEARCH-PROVENANCE-DISJOINT enforcement and is mandatory before any specialist's research feeds a wiki write.
