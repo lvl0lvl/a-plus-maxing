@@ -235,3 +235,47 @@ def test_trend_non_numeric_reads_none(prev, latest):
 def test_trend_unknown_marker_reads_none():
     """An unregistered marker reads None — no fabricated value judgment."""
     assert biomarker_meta.trend("spo2", 95, 98) is None
+
+
+# --- projection_values -------------------------------------------------------
+
+
+def test_projection_values_extends_one_step_along_last_segment():
+    """The projection appends ONE point continuing the last two points' slope."""
+    assert biomarker_meta.projection_values([45, 52, 60]) == [45, 52, 60, 68]
+
+
+def test_projection_values_negative_slope():
+    """A falling last segment projects further down (naive, no clamping)."""
+    assert biomarker_meta.projection_values([10, 8, 5]) == [10, 8, 5, 2]
+
+
+def test_projection_values_flat_segment_projects_flat():
+    """An equal last pair projects the same value again."""
+    assert biomarker_meta.projection_values([7, 7]) == [7, 7, 7]
+
+
+def test_projection_values_uses_only_last_two_points():
+    """Earlier points never influence the projected step (last-segment slope)."""
+    assert biomarker_meta.projection_values([100, 1, 2])[-1] == 3
+
+
+def test_projection_values_does_not_mutate_input():
+    """The input series is returned extended as a NEW list, never mutated."""
+    values = [1, 2, 3]
+    biomarker_meta.projection_values(values)
+    assert values == [1, 2, 3]
+
+
+def test_projection_min_timepoints_is_three():
+    """The honest-absence guardrail constant lives on the shared seam."""
+    assert biomarker_meta.PROJECTION_MIN_TIMEPOINTS == 3
+
+
+def test_render_views_min_timepoints_single_sourced():
+    """render_views' constant IS the shared seam's value (one derivation rule)."""
+    from scripts.generate import render_views
+
+    assert render_views.PROJECTION_MIN_TIMEPOINTS is (
+        biomarker_meta.PROJECTION_MIN_TIMEPOINTS
+    )

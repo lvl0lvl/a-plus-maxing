@@ -32,6 +32,12 @@ METADATA = {
     "steps":           {"units": "steps",  "reference_range": None,           "good_direction": None},
 }
 
+# A projection is derivable only at or above this many stored numeric
+# timepoints. Below it, a surface renders trend-only with no projection — the
+# honest-absence guardrail (ADR-0007 accepted documented limitation). Shared by
+# the matrix/projection views and the dashboard trend card (one rule, one home).
+PROJECTION_MIN_TIMEPOINTS = 3
+
 # The per-stream item-id prefixes the accessors tolerate (loop_schema namespaces).
 _PREFIXES = ("biomarker::", "panel::", "watch-out::")
 
@@ -66,6 +72,24 @@ def to_number(value):
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+def projection_values(values):
+    """Extend `values` one step along the slope of its last two points (naive trend).
+
+    The single linear-extrapolation derivation the matrix/projection views and
+    the dashboard trend card share: the projected next point continues the
+    most-recent segment. Callers gate on `PROJECTION_MIN_TIMEPOINTS` — the
+    derivation itself only needs two points for the slope.
+
+    Args:
+        values (list): The numeric series to extend (at least two points).
+
+    Returns:
+        (list) A new list: the stored values plus the one projected point.
+    """
+    slope = values[-1] - values[-2]
+    return values + [values[-1] + slope]
 
 
 def get(item):

@@ -16,7 +16,7 @@ store and writes self-contained local HTML files.
 """
 
 from scripts.generate import render
-from scripts.store import loop_schema
+from scripts.store import biomarker_meta, loop_schema
 from vault.design.templates import component_set as cs
 
 
@@ -47,24 +47,16 @@ def _state_marker(marker):
 
 # A projection is rendered only at or above this many stored timepoints. Below it,
 # the view renders trend-only (the matrix sparkline) with no projection — the
-# honest-absence guardrail (ADR-0007 accepted documented limitation).
-PROJECTION_MIN_TIMEPOINTS = 3
+# honest-absence guardrail (ADR-0007 accepted documented limitation). The value
+# is the shared `biomarker_meta` projection seam's (single-sourced; the dashboard
+# trend card gates on the same constant).
+PROJECTION_MIN_TIMEPOINTS = biomarker_meta.PROJECTION_MIN_TIMEPOINTS
 
 # The fixed honest-absence label every rendered projection carries verbatim.
 PROJECTION_LABEL = "naive projection from recent trend — not a clinical forecast"
 
 # The named projection method (the projection extends the recent trend linearly).
 PROJECTION_METHOD = "linear extrapolation of the recent trend"
-
-
-def _projection_values(values):
-    """Extend `values` one step along the slope of its last two points (naive trend).
-
-    A naive linear extrapolation: the projected next point continues the most-recent
-    segment. The returned sequence is the stored values plus the one projected point.
-    """
-    slope = values[-1] - values[-2]
-    return values + [values[-1] + slope]
 
 
 def _projection_block(values, dates, state):
@@ -76,7 +68,7 @@ def _projection_block(values, dates, state):
     the shared `component_set` markup; the band widens from the last stored point
     toward the projected one.
     """
-    projected = _projection_values(values)
+    projected = biomarker_meta.projection_values(values)
     spark = cs.sparkline(projected, state)
     # A widening uncertainty band: a faint marker spanning the projected step, drawn
     # once as a distinct element so a missing band is detectable. Inline-only.
