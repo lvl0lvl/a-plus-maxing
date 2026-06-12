@@ -342,21 +342,13 @@ def _metric_card(item, readings):
     else:
         shown = str(latest_reading)
     day = _reading_date(readings[-1]["timepoint"])
-    date_html = (
-        f"<span class='caption'>{cs._escape(_short_date(day))}</span>"
-        if day is not None
-        else ""
-    )
+    top_right = _short_date(day) if day is not None else None
     state = cs.state_for(item, numeric[-1])
     chip = _delta_chip(item, numeric[-2], numeric[-1]) if len(numeric) >= 2 else ""
     projection = _projection_caption(numeric_readings, numeric, day)
     return (
         "<div class='kpi-row'>"
-        "<div class='kpi'>"
-        f"<div class='labelrow'><div class='label'>{cs._escape(label)}</div>"
-        f"{date_html}</div>"
-        f"<div class='value'>{cs._escape(str(shown))}</div>"
-        "</div>"
+        f"{cs.kpi(label, shown, top_right=top_right)}"
         f"{_range_caption(item, latest_reading)}"
         f"{chip}"
         f"{cs.bar_sparkline(numeric, state)}"
