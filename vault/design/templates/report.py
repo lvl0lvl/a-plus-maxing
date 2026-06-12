@@ -2,9 +2,12 @@
 
 Assembles the same shared `component_set` components into the report layout: a
 TL;DR, a legend, and a per-item section carrying the latest value, a sparkline,
-and the readings as a comparison table. All markup and colors come from
-`component_set` — no per-template color literals — so the palette stays single-
-sourced and the `@media print` block is inherited. A template is a callable
+and the readings as a comparison table. `plan::`/`plan-track::` items (the
+ADR-0010 dict-valued plan streams) route to a heading + verbatim readings
+table only — no KPI, no sparkline; a dict value must never reach numeric viz
+(ADR-0010 D5). All markup and colors come from `component_set` — no
+per-template color literals — so the palette stays single-sourced and the
+`@media print` block is inherited. A template is a callable
 `template(store_read) -> html_str`.
 """
 
@@ -49,6 +52,18 @@ def render(store_read):
     sections = []
     for item in sorted(by_item):
         readings = by_item[item]
+        if item.startswith(("plan::", "plan-track::")):
+            # Deliberate plan routing (ADR-0010 D5): the item heading + the
+            # readings table verbatim (the table str()s values) — no KPI, no
+            # sparkline, so the dict-valued plan content never reaches the
+            # numeric viz path.
+            sections.append(
+                "<section>"
+                f"<h2>{cs._escape(item)}</h2>"
+                f"{_table(readings)}"
+                "</section>"
+            )
+            continue
         values = [r["value"] for r in readings]
         state = cs.state_for(item, values[-1] if values else None)
         latest = values[-1] if values else "—"
