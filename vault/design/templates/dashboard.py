@@ -212,12 +212,14 @@ def _delta_chip(item, prev, latest):
     Equal values keep the prior flat presentation: the registered-polarity
     `flat` word pill, else the neutral direction arrow.
     """
+    # Both raw-span branches below bypass cs.pill(): pill() escapes its WHOLE
+    # text, which would render the arrow ENTITY as literal "&#8594;"/"&#9650;"
+    # instead of the glyph. The arrow stays raw; the text half is escaped
+    # individually instead.
     word = biomarker_meta.trend(item, prev, latest)
     if latest == prev:
         if word is not None:
             return cs.pill(word, _TREND_STATE[word])
-        # Raw span, not cs.pill(): pill() escapes its text, which would render
-        # the arrow ENTITY as literal "&#8594;" instead of the arrow glyph.
         return "<span class='pill tint-neutral'>&#8594;</span>"
     state = _TREND_STATE[word] if word is not None else "neutral"
     arrow = "&#9650;" if latest > prev else "&#9660;"
@@ -225,7 +227,7 @@ def _delta_chip(item, prev, latest):
     unit = f" {meta['units']}" if meta else ""
     return (
         f"<span class='pill tint-{state}'>{arrow} "
-        f"{_format_number(abs(latest - prev))}{unit}</span>"
+        f"{cs._escape(f'{_format_number(abs(latest - prev))}{unit}')}</span>"
     )
 
 
