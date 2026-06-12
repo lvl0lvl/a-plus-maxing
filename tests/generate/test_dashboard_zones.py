@@ -383,7 +383,19 @@ def test_calendar_reveal_is_checkbox_label_css_no_script():
     zone = _zones(html)["This Week"]
     checkbox = "<input type='checkbox' id='calx' class='calx'>"
     assert checkbox in zone
-    assert "<label for='calx'" in zone, "the caret label drives the checkbox"
+    assert (
+        "<label for='calx' class='calbtn' aria-label='expand to month view'>"
+        "<span class='x-closed'>⌄</span><span class='x-open'>⌃</span></label>"
+    ) in zone, (
+        "the caret label drives the checkbox: named for AT, both glyphs in "
+        "closed-then-open order"
+    )
+    assert ".calx:checked ~ .evlegend .calbtn .x-open { display: inline; }" in html, (
+        "the :checked rule shows the open caret glyph"
+    )
+    assert ".calx:checked ~ .evlegend .calbtn .x-closed { display: none; }" in html, (
+        "the :checked rule hides the closed caret glyph"
+    )
     card_at = zone.find("<div class='card calcard'>")
     box_at = zone.find(checkbox)
     legend_at = zone.find("<div class='evlegend'>")
