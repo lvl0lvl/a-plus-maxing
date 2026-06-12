@@ -25,12 +25,16 @@
 #     be flagged trunk-wide.
 # Deny if the combined count is >=1.
 #
-# bd auto-stage coverage (eb1, closes PR#84 HIST-2): the bd pre-commit git hook
-# stages .beads/issues.jsonl INSIDE `git commit`, AFTER this PreToolUse snapshot,
-# so freshly-flushed bead text — the exact vector of the historical operator-email
-# leak (bead 46m) — is invisible to the staged-set capture. The working-tree bd
-# file is therefore unconditionally appended to the trunk-wide scan set below on
-# every commit; the pre-push backstop remains the human-terminal layer.
+# bd auto-stage coverage (eb1, PR#84 HIST-2): the bd pre-commit git hook stages
+# .beads/issues.jsonl INSIDE `git commit`, AFTER this PreToolUse snapshot, so
+# that file is invisible to the staged-set capture. The working-tree bd file is
+# therefore unconditionally appended to the trunk-wide scan set below on every
+# commit, covering bead text ALREADY FLUSHED to .beads/issues.jsonl — the exact
+# vector of the historical operator-email leak (bead 46m). NOT covered here:
+# bead text still pending in .beads/beads.db at scan time — the bd pre-commit
+# hook flushes AND stages it inside `git commit`, after this scan ran, so it
+# commits unscanned at this boundary; the pre-push scan remains the backstop
+# for that window (tracked: bead ycqo).
 #
 # Fail-closed (Security HIGH-1): any error in the scan path — import fails, scan
 # raises, the python3 -c returns non-zero, or the git/jq plumbing fails — emits
