@@ -22,6 +22,10 @@ module remains the detail output until v2.
   `not-yet-answered`, `no-data`, `no-prior`) 1:1; `ANSWERED_OVER_TIME` deliberately has
   no row (an answered watch-out renders its answers, not a state marker); an unmapped
   state KeyErrors (fails loud, never a silent wrong render).
+- Panel rows branch in `_panel_row` (bead s38+byj): `read_panel` == `PENDING` renders
+  the pending state marker; a landed result (a VALUE, not a fifth state) renders as a
+  value row mirroring the answered-watchout shape. `_STATE_DISPLAY`'s KeyError stays
+  reserved for genuinely-unmapped published STATES.
 - Projection guardrail (ADR-0007, render-time contract): renders only at
   `PROJECTION_MIN_TIMEPOINTS = 3`+; carries the verbatim honest-absence
   `PROJECTION_LABEL`, the method, datapoint count, widening band, time axis. At most ONE
