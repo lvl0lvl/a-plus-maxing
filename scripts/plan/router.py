@@ -201,11 +201,19 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
             e.g. `functools.partial(store.read, root=instance_root)` — mirroring
             `generate.run`'s call-site binding (`store.read_all(root)`). An
             unbound `store.read` reads `store.DEFAULT_ROOT` (`vault/store/`
-            under the cwd), not the caller's instance.
+            under the cwd), not the caller's instance — silently; no error is
+            raised at this boundary, the misread surfaces only as
+            wrong-instance summary data.
         identity_config (str | Path, optional): The gitignored operator-identity
             token file for the pass-through PII gate (bead 8j6); absent -> identity
             detection is empty (the value-boundary patterns — any-domain email,
-            phone, postal — still run via scan_text).
+            phone, postal — still run via scan_text). When the caller's cwd
+            diverges from the instance root (the same scenario requiring the
+            bound `store_read` partial), `identity_config` MUST also be passed
+            instance-bound (e.g. `<instance_root>/vault/meta/operator-identity.txt`),
+            because the default resolves under the cwd and an ABSENT file
+            silently empties identity-token detection
+            (`pii_scan._load_token_patterns` returns `[]`).
 
     Returns:
         (dict) A name-addressable summary keyed by the Summary Field-Set fields.
