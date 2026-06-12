@@ -460,6 +460,30 @@ def test_resulted_panel_renders_result_value(tmp_path):
     )
 
 
+def test_panel_result_value_renders_escaped(tmp_path):
+    """PR#99 F3: a markup-carrying panel result renders HTML-escaped, never live.
+
+    The payload routes through the REAL record_panel_result -> read_panel ->
+    _panel_row result branch. Removing cs._escape from the result branch puts a
+    live <script> tag on the page and turns this RED; the escaped row carries the
+    entity-encoded tag and the &quot;-encoded double quote (PR#90 F20/SEC-001).
+    """
+    payload = "done<script>alert('x')</script> \"q\""
+    loop_schema.record_panel_result(
+        "lipid_panel", payload, "2026-06-08T00:00:00+00:00", root=tmp_path
+    )
+
+    paths = render_views.render_views(
+        tmp_path, panels=("lipid_panel",), _out_dir=tmp_path / "out"
+    )
+    html = _read_all(paths)
+    row = _row_for(html, "lipid_panel")
+    assert row, "the resulted panel must render its row"
+    assert "<script>" not in html, "a live <script> tag must never reach the page"
+    assert "&lt;script&gt;" in row, "the markup payload renders entity-escaped"
+    assert "&quot;q&quot;" in row, "the double quote encodes to &quot;"
+
+
 def test_unanswered_watchout_renders_not_yet_answered(tmp_path):
     """AC-4: an unanswered watch-out renders the "not yet answered" spaced display string.
 
