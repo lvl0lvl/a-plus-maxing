@@ -30,13 +30,18 @@
 #     approximation block-pii-commit.sh uses for the staged set): PII that was
 #     committed AND since removed from disk is not seen here — the history
 #     question belongs to a history audit, not a push gate. The commit hook's
-#     bd-auto-stage blind spot (PR#84 HIST-2) is closed at the commit boundary:
-#     bead text already flushed to .beads/issues.jsonl is appended to its scan
-#     set (eb1), and bead text still pending in .beads/beads.db is flushed
-#     before the scan via `bd sync --flush-only` (ycqo); commit-time scans also
-#     follow the repo receiving the commit since 29u4, so worktree commits are
-#     covered there too (this hook fires for worktree pushes as well — worktrees
-#     share the common .git). This layer remains the backstop for human-terminal
+#     bd-auto-stage blind spot (PR#84 HIST-2) is closed at the commit boundary
+#     for MAIN-CHECKOUT commits: bead text already flushed to .beads/issues.jsonl
+#     is appended to its scan set (eb1), and bead text still pending in the beads
+#     database is flushed before the scan via `bd sync --flush-only` (ycqo; the
+#     flush is db-gated, so a fresh clone commits cleanly). Commit-time scans
+#     follow the repo receiving the commit since 29u4 — scoped to THIS trunk and
+#     its worktrees — but a WORKTREE commit skips the flush (bd resolves via the
+#     common .git, so a worktree flush would mutate the main checkout without
+#     feeding that scan; bd's own pre-commit hook skips staging in worktrees for
+#     the same reason): worktree-PENDING bead text reaches the remote boundary
+#     HERE, since this hook fires for worktree pushes too (worktrees share the
+#     common .git). This layer also remains the backstop for human-terminal
 #     commits (which bypass the agent-only commit hook entirely) and for the
 #     commit hook's documented residuals (e.g. a bare top-level-filename
 #     pathspec commit, or an in-command `cd <elsewhere> && git commit`).

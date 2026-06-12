@@ -12,7 +12,11 @@
 # (wiki-ingest-lint.sh exits non-zero on the staged pages). Everything else passes
 # through. The staged set and vault content are read from the TARGET repo — the
 # working tree containing the hook input's cwd (worktree-aware since 29u4;
-# script-path fallback when cwd is absent/unresolvable).
+# script-path fallback when cwd is absent/unresolvable); a target that provably
+# belongs to a different repository passes through (trunk scope gate below).
+# Residual: an in-command `cd <elsewhere> && git commit` is checked against the
+# STARTING cwd's repo — the periodic scripts/wiki-lint.sh is the catch-up layer
+# that flags any ungated page such a commit lands on the trunk.
 #
 # TEST/OVERRIDE ENV (never set in production):
 #   BLOCK_UNGATED_VAULT_PROJECT_ROOT — FALLBACK git root for staged-file detection +
