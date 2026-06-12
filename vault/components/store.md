@@ -3,7 +3,7 @@ title: store — local NDJSON time-series store
 type: reference
 status: active
 created: 2026-06-10
-last_reviewed: 2026-06-11
+last_reviewed: 2026-06-12
 review_cadence: on-change
 permalink: a-plus-maxing/components/store
 ---
@@ -24,11 +24,16 @@ network, no model step (ADR-0001 → ADR-0002).
   (temp sibling → fsync → `os.replace`), self-heals malformed lines.
 - `store.read(item, root)` — returns conformant readings sorted lexicographically by
   `timepoint` (assumes UTC-offset timestamps). Malformed lines skipped with a
-  `STORE-SKIP: <path>:<line>` stderr signal (a consumer-visible channel).
+  `STORE-SKIP: <path>:<line>` stderr signal (a consumer-visible channel). A directory
+  named `<item>.ndjson` under the root raises `IsADirectoryError` out of `read`
+  (`read_all` propagates) — fail-fast at the storage boundary, not guarded (bead u8u,
+  convention default).
 - `store._item_path` rejects any item whose path is not a direct child of the root
   (path-escape guard); `::`-prefixed items are direct children (legal).
 - `store.items(root)` — sorted item slugs under the root (owns the one-`.ndjson`-per-item
-  layout knowledge); `store.read_all(root)` — the flat cross-item read model,
+  layout knowledge); enumeration is by NAME only — a directory named `*.ndjson` is
+  enumerated as an item, deliberately unfiltered (its `read` raises, per the fail-fast
+  contract above). `store.read_all(root)` — the flat cross-item read model,
   item-name-sorted outer order, timepoint-sorted within item. `read_all` delegates
   through `read`, so the STORE-SKIP channel passes through unchanged (bead 4yk;
   ADR-0002 v1.3 amendment).
