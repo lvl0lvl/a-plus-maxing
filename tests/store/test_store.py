@@ -370,3 +370,61 @@ def test_append_is_atomic_on_write_failure(tmp_path, monkeypatch):
     for ln in after.splitlines():
         if ln.strip():
             json.loads(ln)  # every non-blank line parses — no partial line
+
+
+# --------------------------------------------------------------------------- #
+# Cross-item read surface — store.items / store.read_all (bead 4yk)
+# --------------------------------------------------------------------------- #
+
+
+def test_items_returns_sorted_stems(tmp_path):
+    """items enumerates sorted item slugs; a non-.ndjson sibling is excluded."""
+    for item in ("rhr", "hrv", "glucose"):
+        store.append(
+            item, _reading("2026-06-01T08:00:00+00:00", 55, item=item), root=tmp_path
+        )
+    (tmp_path / "notes.txt").write_text("not a store item\n")
+
+    assert store.items(root=tmp_path) == ["glucose", "hrv", "rhr"]
+
+
+def test_read_all_orders_items_then_timepoints(tmp_path):
+    """read_all is item-name-sorted outer, timepoint-sorted within each item.
+
+    Appends are interleaved (later item first, later timepoint first) so
+    neither ordering can fall out of append or file order: the assertion dies
+    if either the outer item sort or the inner timepoint sort dies.
+    """
+    t1 = "2026-06-01T08:00:00+00:00"
+    t2 = "2026-06-02T08:00:00+00:00"
+    store.append("rhr", _reading(t2, 58, item="rhr"), root=tmp_path)
+    store.append("hrv", _reading(t2, 88, item="hrv"), root=tmp_path)
+    store.append("rhr", _reading(t1, 55, item="rhr"), root=tmp_path)
+    store.append("hrv", _reading(t1, 71, item="hrv"), root=tmp_path)
+
+    got = [(r["item"], r["timepoint"]) for r in store.read_all(root=tmp_path)]
+    assert got == [("hrv", t1), ("hrv", t2), ("rhr", t1), ("rhr", t2)]
+
+
+def test_read_all_empty_root_returns_empty(tmp_path):
+    """A nonexistent root and an empty existing root both read back as []."""
+    assert store.read_all(root=tmp_path / "never-created") == []
+    assert store.read_all(root=tmp_path) == []  # exists, holds no item files
+
+
+def test_read_all_emits_store_skip_for_malformed_line(tmp_path, capfd):
+    """read_all delegates through read: a torn line is skipped and STORE-SKIP'd.
+
+    Proves the cross-item surface routes through `_read_lines`' corruption
+    channel — RED if read_all bypasses read() with its own line parse.
+    """
+    store.append("rhr", _reading("2026-06-01T08:00:00+00:00", 55), root=tmp_path)
+    path = _item_file(tmp_path)
+    path.write_text(path.read_text() + '{"item": "rhr"\n')  # torn line 2
+
+    readings = store.read_all(root=tmp_path)
+    assert [r["timepoint"] for r in readings] == ["2026-06-01T08:00:00+00:00"]
+
+    err = capfd.readouterr().err
+    assert f"STORE-SKIP: {path}:2" in err
+    assert err.count("STORE-SKIP:") == 1
