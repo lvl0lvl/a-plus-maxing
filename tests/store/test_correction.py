@@ -5,8 +5,10 @@ used to dedupe away silently (first-write-wins, pinned by PR #47's TEST-006).
 The S51-adjudicated fix keeps ADR-0002's append-only substrate: `store.correct`
 APPENDS a superseding line for the stored identity (the prior line stays in the
 file — the audit trail is never mutated or deleted), and `store.read` resolves
-each identity to its last-appended line (latest-wins, the same most-recent-wins
-basis `loop_schema.read_panel` resolves by). Normal ingest is untouched:
+each identity to its last-appended line (latest-wins by append order within a
+dedupe identity — following the shape of `loop_schema.read_panel`'s
+most-recent-wins resolution, which resolves across identities by
+provenance-tag filter in timepoint order). Normal ingest is untouched:
 `store.append` still drops a re-entered identity, value drift included.
 """
 
@@ -121,6 +123,25 @@ def test_correction_of_a_correction_latest_wins(tmp_path):
     assert len(readings) == 1
     assert readings[0]["value"] == 64
     assert _line_count(tmp_path) == 3
+
+
+def test_correct_leaves_same_timepoint_other_source_identity_intact(tmp_path):
+    """Correcting one of two same-(item, timepoint) sources touches only it.
+
+    The resolve key is the full (item, timepoint, source) identity — narrowed
+    to (item, timepoint), the device reading would collapse into the corrected
+    manual one.
+    """
+    store.append("rhr", _reading(T1, 55, source="manual"), root=tmp_path)
+    store.append("rhr", _reading(T1, 58, source="device"), root=tmp_path)
+    store.correct("rhr", _reading(T1, 62, source="manual"), root=tmp_path)
+
+    readings = store.read("rhr", root=tmp_path)
+    assert len(readings) == 2
+    assert {(r["source"], r["value"]) for r in readings} == {
+        ("manual", 62),
+        ("device", 58),
+    }
 
 
 def test_correct_unstored_identity_raises_and_writes_nothing(tmp_path):

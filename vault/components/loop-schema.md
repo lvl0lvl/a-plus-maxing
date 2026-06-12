@@ -30,8 +30,9 @@ protocols; raises no automated signal.
 - Writers: `record_biomarker / record_pending_panel / record_panel_result /
   record_watchout_answer / record_physician_feedback`. Readers: `read_biomarker`
   (returns `{state, timepoints}` — state None when ≥2 timepoints), `read_panel`
-  (order-independent pending→result resolution: the most-recent non-pending value
-  wins regardless of timepoint sort, else `pending`), `read_watchout(_answers)`,
+  (order-independent pending→result resolution: the most-recent reading under a
+  non-pending source tag wins (its value returned verbatim) regardless of timepoint
+  sort, else `pending`), `read_watchout(_answers)`,
   `read_physician_feedback`.
 - Same-timepoint distinct values persist via `_content_tag` (value-hash folded into the
   source tag, since the store dedupe identity excludes value).
