@@ -53,6 +53,7 @@ inlines + size-checks + asset-checks the returned markup.
 """
 
 import datetime
+import math
 
 # Aliased: this module's template surface is itself named `render`.
 from scripts.generate import render as render_engine
@@ -185,12 +186,13 @@ def _reading_date(timepoint):
 
     Store timepoints are ISO `YYYY-MM-DD[Thh:mm:ss…]` strings; the date is the
     first 10 chars (the render_views date-axis convention) parsed with the
-    house `datetime.date.fromisoformat`. An unparseable timepoint reads None —
-    the card renders NO date, never a raw string (honest absence).
+    house `datetime.date.fromisoformat`. An unparseable — or non-string —
+    timepoint reads None: the card renders NO date, never a raw string and
+    never a crash (honest absence).
     """
     try:
         return datetime.date.fromisoformat(timepoint[:10])
-    except ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -251,29 +253,53 @@ def _range_caption(item, latest):
     return f"<div class='caption'>{cs._escape(text)}</div>"
 
 
-def _projection_caption(numeric_readings):
+def _projection_caption(numeric_readings, numeric, day):
     """Render the naive-projection caption, or '' when not derivable.
 
     DASHBOARD-ONLY (S52 operator direction): the physician report must never
-    carry an extrapolation. Renders only from real stored data — at least
-    `biomarker_meta.PROJECTION_MIN_TIMEPOINTS` numeric readings AND parseable
-    dates on the last two of them. The projected value is the shared
-    `biomarker_meta.projection_values` seam's; the projected date is one step
-    beyond the latest reading at the spacing of the last two reading dates
-    (naive, consistent with the value extrapolation). Otherwise NO caption —
-    never a fabricated date or value.
+    carry an extrapolation. Renders only from real stored data, when ALL of
+    these hold: at least `biomarker_meta.PROJECTION_MIN_TIMEPOINTS` numeric
+    readings; parseable dates on the last two of them AND on the card's
+    latest reading (`day` — the same date the label row renders top-right); a
+    finite projected value (the shared `biomarker_meta.projection_values`
+    seam's); a projected date that computes without overflowing the calendar;
+    and a projected date STRICTLY AFTER the card's latest reading date — an
+    extrapolation must be a forecast, never a past- or same-day-dated claim.
+    The projected date is one step beyond the latest numeric reading at the
+    spacing of the last two numeric reading dates (naive, consistent with the
+    value extrapolation). Otherwise NO caption — never a fabricated date or
+    value.
+
+    Args:
+        numeric_readings (list): The series' numeric readings — full store
+            reading dicts (`timepoint`, `value`) in store-read order.
+        numeric (list): The coerced float series the card plots (one float
+            per numeric reading, tail-windowed to the per-view cap; the
+            projection slope reads only the last two).
+        day (datetime.date | None): The card's latest-reading date — the
+            `_reading_date(readings[-1])` the label row renders top-right —
+            or None when that timepoint is unparseable.
     """
     if len(numeric_readings) < biomarker_meta.PROJECTION_MIN_TIMEPOINTS:
+        return ""
+    if day is None:
         return ""
     latest = _reading_date(numeric_readings[-1]["timepoint"])
     prev = _reading_date(numeric_readings[-2]["timepoint"])
     if latest is None or prev is None:
         return ""
-    values = [biomarker_meta.to_number(r["value"]) for r in numeric_readings]
-    projected = biomarker_meta.projection_values(values)[-1]
+    projected = biomarker_meta.projection_values(numeric)[-1]
+    if not math.isfinite(projected):
+        return ""
+    try:
+        projected_day = latest + (latest - prev)
+    except OverflowError:
+        return ""
+    if projected_day <= day:
+        return ""
     text = (
         f"→ {_format_number(projected)} by "
-        f"{_short_date(latest + (latest - prev))} · naive projection"
+        f"{_short_date(projected_day)} · naive projection"
     )
     return f"<div class='caption'>{cs._escape(text)}</div>"
 
@@ -293,14 +319,17 @@ def _metric_card(item, readings):
     physician report). A stream with no numeric value routes to a plain
     value row instead.
     """
-    numeric_readings = [
-        r for r in readings if biomarker_meta.to_number(r["value"]) is not None
-    ]
+    # The single numeric-coercion pass: the filtered readings and their float
+    # values come from one walk, shared by the chip, sparkline, and projection.
+    numeric_readings, numeric = [], []
+    for reading in readings:
+        number = biomarker_meta.to_number(reading["value"])
+        if number is not None:
+            numeric_readings.append(reading)
+            numeric.append(number)
     label = biomarker_meta.display_name(item)
     if not numeric_readings:
         return _plain_row(label, readings[-1]["value"])
-    projection = _projection_caption(numeric_readings)
-    numeric = [biomarker_meta.to_number(r["value"]) for r in numeric_readings]
     # Tail-window to the pinned per-view cap (single-sourced per ADR-0004): the
     # bar envelope is fixed-width, so an uncapped series computes negative bars.
     numeric = numeric[-render_engine.MAX_TIMEPOINTS_PER_VIEW:]
@@ -318,6 +347,7 @@ def _metric_card(item, readings):
     )
     state = cs.state_for(item, numeric[-1])
     chip = _delta_chip(item, numeric[-2], numeric[-1]) if len(numeric) >= 2 else ""
+    projection = _projection_caption(numeric_readings, numeric, day)
     return (
         "<div class='kpi-row'>"
         "<div class='kpi'>"
