@@ -31,8 +31,21 @@ tables behind it. Print-native (the page IS the print form — no gray app chrom
 Own document identity, NOT the dashboard sheet: ~880px white page, 32px padding, 1px
 `#E5E7EB` border, Inter. A 2px primary-blue (`#1F6FEB`) rule under the header block.
 Sections separated by ~14px gaps; each section header carries a 4×16px rounded accent
-bar in its section color (the semantic accent device — colors from the system ACCENTS
-set so dashboard and report share one language).
+bar in its section color (the semantic accent device). Where the section's category
+exists in the locked ACCENTS set, the bar reuses ACCENTS — regimen teal `#0E9AA3`
+(supplements), signals indigo `#5B5BD6` (sleep), asks orange `#E8833A` (nutrition) —
+and the header rule + lab-grade tier glyph reuse ACCENTS training blue `#1F6FEB`, so
+dashboard and report share one language at the category-bar level. Two bars do NOT
+come from ACCENTS: the Biomarkers crimson `#B42318` is a NEW report-local token, and
+the Goals bar reuses PALETTE good `#117733` as section chrome — a signed-mock
+exception to the chrome/data-state separation, recorded as such. Nine hexes in this
+spec are repo-novel report-local tokens sanctioned by the signed mock: `#B42318`,
+`#8A6D1F`, `#B7791F`, `#EEF2FD`, `#C9D4F6`, `#FBEAE8`, `#7A2E22`, `#EFF6F0`,
+`#FDF4E7`. **BUILD OBLIGATION:** at build time the report-local hexes are registered
+as named constants (a report-token set beside `ACCENTS`/`CHROME` in
+`component_set.py`) and every text/background pair they form is measured by the AA
+gate; the Goals bar's reuse of the data-state green as section chrome is recorded as
+a signed-mock exception to the chrome/data-state separation.
 
 ## Page-one sections, in order
 
@@ -71,6 +84,16 @@ set so dashboard and report share one language).
    (`every value tagged · gaps stated, never inferred · local-first · print-safe`) +
    generation date.
 
+**Data-state adjudication (report-local):** the abnormal/attention data-state colors
+above (`#B42318`/`#7A2E22`/`#FBEAE8` red-family; `#B7791F`/`#8A6D1F` ambers) are
+report-local tokens from the signed mock and deliberately diverge from the dashboard's
+colorblind-safe PALETTE concern/watch. The CVD guard on the report is glyph/shape
+redundancy — the source-tier glyphs and direction arrows this spec already defines —
+so color is never the sole carrier of a data state. The build registers these as
+report-state tokens and AA-measures every text/background pair they form (the same
+obligation as the Page frame's report-local tokens). The dashboard and report share
+one language only at the ACCENTS category-bar level, not at the data-state level.
+
 ## Page 2+ (detail layer)
 
 The existing per-item render (readings tables with Date/Value/Source + sparklines),
@@ -86,9 +109,21 @@ rows with operator answers live here too.
 - **Gating (honest awaiting states until the model lands):** renderable today —
   abnormal-first biomarkers, source tiers, watch-outs, pending draws, patient questions;
   gated — regimen+adherence (`1oh` plan schemas), since-last-review deltas (LM-01 visit
-  anchoring), signal aggregates (LM-02 wearable baseline), goals (goal model).
+  anchoring), signal aggregates (LM-02 wearable baseline), goals (goal model). Header
+  status line: age band + issue status source from `vault/meta/operator-profile.md`,
+  which is still an unfilled scaffold (the Demographics age and January-issue status
+  prompts are blank) — gated with em-dash awaiting slots until the profile is filled;
+  last review + next visit are gated on LM-01 visit anchoring, also em-dash awaiting
+  slots.
+- **Section 2 awaiting state:** until LM-01 visit anchoring lands, the card renders
+  the first-visit copy (`No prior review — full baseline below`), which is literally
+  true in both the first-visit and model-not-landed conditions — the first-visit copy
+  doubles as the awaiting state.
 
 ## What this spec does NOT change
 
 ADR-0004 single-file zero-script artifacts; the print contract; `PALETTE`/`SERIES`/
-`ACCENTS` (locked — the accent coding above REUSES them); the dashboard's own spec.
+`ACCENTS` (locked — their VALUES are untouched; the accent coding above reuses ACCENTS
+only for the categories ACCENTS carries, and otherwise introduces the report-local
+tokens enumerated in Page frame, which carry the build-time registration +
+AA-measurement obligation stated there); the dashboard's own spec.
