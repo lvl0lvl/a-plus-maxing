@@ -52,6 +52,17 @@ operands exist; interactive-looking controls are inert per ADR-0004; the report
 renders plan items as verbatim readings tables (no numeric viz); awaiting copy
 names the missing data. Accent chrome extends to in-card track fills and
 progress dots (non-text chrome on existing hexes); zero new color tokens.
+[AMENDED 2026-06-12 (#109 review)]: recorded as built — the inert button fills
+render the card accent's CHROME `*-text` shade carrying paper text,
+computed-contrast gated >= 4.5 (zero new tokens); the supplements counter rides
+the measured supplements tint pair whenever a snapshot exists (the muted
+em-dash pill only with NO snapshot); the Sets-done numerator counts
+plan-intersecting snapshot keys only (the supplements counter's taken ∩ plan
+rule — an unknown key never inflates the claim); the domain-keyed readers
+(`read_plan` AND `read_plan_tracking`) ValueError on a domain outside their
+published set; and tracking renders only against a RESOLVED plan — an orphaned
+snapshot stays visible through the report's verbatim table, never the zone-3
+card.
 
 **D6 — The v1 writer is the manual path.** `plan_schema.record_plan` /
 `record_plan_tracking` / `correct_plan` follow the `correction.py` precedent

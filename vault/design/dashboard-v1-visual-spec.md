@@ -163,6 +163,10 @@ Heart-rate box uses the measured state-tint pair for the metric's current state
 (PALETTE good/watch/concern semantics via the existing measured tint pairs), falling
 back to the neutral chrome tint with an em-dash value when no live reading exists.
 
+[AMENDED 2026-06-12 #109 review]: "accent-filled" button fills render as the card
+accent's CHROME *-text shade with paper text (the raw accent has no measured paper
+pairing); computed-contrast gated ≥4.5.
+
 ## Zone 4 — Performance & Trends
 
 Heading + subtitle: `How you're tracking — recent readings per metric.` Legend
