@@ -41,7 +41,9 @@ protocols; raises no automated signal.
   explicit `store.correct` superseding append reads back as the corrected value with the
   timepoint COUNT unchanged, so the published states (no-data / no-prior) never flip on
   a correction. Content-tagged streams (watch-out / feedback / panel results) carry
-  per-value source tags, so their carry-forward lists are untouched by the resolution.
+  per-value source tags, so their carry-forward lists are untouched by the READ
+  resolution; the write primitive (`store.correct`) is out-of-contract for those
+  content-tagged identities — the supported correction story there is re-recording.
 
 **Called by (production):** `render_views` (typed reads), the type-routed dashboard
 template (stream-prefix routing over `store.read_all`'s flat read model), the

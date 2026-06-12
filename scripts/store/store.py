@@ -167,12 +167,20 @@ def correct(item, reading, root=DEFAULT_ROOT):
     The bead-1vi explicit correction primitive: where `append` drops a re-entry
     whose dedupe identity is already stored, `correct` appends it as a new line
     DESPITE the dedupe, and `read` resolves the identity to this last-appended
-    line (latest-wins). The prior line stays in the file untouched — the audit
-    trail is append-only per ADR-0002, never mutated or deleted. Correcting an
-    identity to the value it already resolves to is an idempotent no-op (a
-    re-run appends 0 duplicate lines). An identity with no stored line raises:
-    a correction targets an existing reading, so a mistyped item / timepoint /
-    source fails loud instead of silently creating a new series point.
+    line (latest-wins). The prior well-formed lines' LOGICAL content stays in
+    the file — the audit trail is append-only per ADR-0002, never mutated or
+    deleted — though their exact on-disk byte form is not guaranteed stable
+    across rewrites (`_write_atomic` re-serializes). Self-heals: pre-existing
+    malformed or non-conformant lines are dropped on write (`_read_lines`
+    filters them). Correcting an identity to the value it already resolves to
+    is an idempotent no-op (a re-run appends 0 duplicate lines). An identity
+    with no stored line raises: a correction targets an existing reading, so a
+    mistyped item / timepoint / source fails loud instead of silently creating
+    a new series point. The correction contract is defined for
+    content-independent source tags; loop_schema's content-tagged identities
+    (the watch-out / feedback / panel-result streams, whose source tag embeds a
+    hash of the value) are OUTSIDE it — the supported correction story for
+    those streams is re-recording.
 
     Args:
         item (str): The item identifier (names the item's `.ndjson` file).
