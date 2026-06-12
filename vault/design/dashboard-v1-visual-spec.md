@@ -83,7 +83,7 @@ the earlier header/body description with his direction.]
 
 **Card header row, two sides:**
 - **Left — week nav:** calendar glyph + `This week` (bold) + the week nav shaped
-  `‹ Jun 7 – 13 ›` — prev/next chevrons FLANKING the real date range (small
+  `‹ Jun 8 – 14 ›` — prev/next chevrons FLANKING the real date range (small
   bordered square buttons, inert until a calendar model exists).
 - **Right — legend + month nav + expand:** the four event-category legend pills,
   each in its OWN category tint (Training = training blue tint; Lab draw = amber
