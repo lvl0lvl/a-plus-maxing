@@ -12,15 +12,13 @@ attributes + CSS `url()`/`@import` inside `<style>` blocks); if any would resolv
 to an external URL (a non-`data:`, non-fragment target), it RAISES and writes no
 file. Escaped operator text carrying the same substring never trips the scan.
 
-Published surface (ADR-0004-T1; consumed by ADR-0004-T2/T3, ADR-0006-T2,
+Published surface (ADR-0004-T1; consumed by ADR-0004-T3, ADR-0006-T2,
 ADR-0007-T2): `emit(template, store_read) -> Path`.
 """
 
 import re
 from html.parser import HTMLParser
 from pathlib import Path
-
-from vault.design.templates import component_set as cs
 
 DEFAULT_OUT_DIR = Path("vault/artifacts/generated")
 
@@ -184,117 +182,3 @@ def emit(template, store_read, *, _out_dir=None):
     path = out_dir / f"{_name_for(template)}.html"
     path.write_text(html, encoding="utf-8")
     return path
-
-
-def _series_in_order(store_read):
-    """Group the store read model into per-item value series, in first-seen order.
-
-    Returns:
-        (list) (item, values) pairs; `values` are the readings in store-read order.
-    """
-    series = {}
-    for reading in store_read:
-        series.setdefault(reading["item"], []).append(reading["value"])
-    return list(series.items())
-
-
-def _matrix_projection_html(page_series, page_no):
-    """Assemble one matrix+projection page from per-item series, page_no in the title.
-
-    Draws ALL chart-component markup from the shared `component_set` (head/style,
-    legend, KPI cards, inline-SVG sparklines) — the shared-defs block is emitted
-    ONCE via `cs.head`, then REFERENCED per series (one matrix sparkline + one
-    projection sparkline per series), never re-emitted per series. A projection
-    sparkline extends each series by its last value (a placeholder local recompute);
-    everything is inlined (0 external references).
-
-    Args:
-        page_series (list): (item, values) pairs for the series on this page.
-        page_no (int): The 1-based page index (distinguishes split pages).
-
-    Returns:
-        (str) The assembled single-document HTML for this page.
-    """
-    rows = []
-    for item, values in page_series:
-        state = cs.state_for(item)
-        latest = values[-1] if values else "—"
-        projection = values + [values[-1]] if values else values
-        rows.append(
-            "<div class='kpi-row'>"
-            f"{cs.kpi(item, latest)}"
-            f"{cs.sparkline(values, state)}"
-            f"{cs.sparkline(projection, state)}"
-            "</div>"
-        )
-    body = (
-        "<div class='wrap'>"
-        f"<h1>Biomarker Matrix &amp; Projection (page {page_no})</h1>"
-        f"{cs.tldr_banner('Biomarker matrix with per-series projection.')}"
-        f"{cs.legend()}"
-        f"{''.join(rows)}"
-        "</div>"
-    )
-    return f"<!doctype html><html lang='en'>{cs.head('Biomarker Matrix')}<body>{body}</body></html>"
-
-
-def _page_slices(store_read):
-    """Split a store read into per-page (item, values) groups within the cap.
-
-    A page carries at most MAX_SERIES_PER_VIEW series AND at most
-    MAX_TIMEPOINTS_PER_VIEW timepoints per series; a series with more timepoints is
-    split across pages too, so every page stays within both cap bounds. A cap-or-
-    below dataset yields exactly one page.
-
-    Returns:
-        (list) Pages, each a list of (item, values) pairs within both cap bounds.
-    """
-    series = _series_in_order(store_read)
-    pages = []
-    for s_start in range(0, max(len(series), 1), MAX_SERIES_PER_VIEW):
-        series_page = series[s_start:s_start + MAX_SERIES_PER_VIEW]
-        max_tp = max((len(v) for _, v in series_page), default=0)
-        for t_start in range(0, max(max_tp, 1), MAX_TIMEPOINTS_PER_VIEW):
-            # A series shorter than max_tp has no data in a later timepoint-window;
-            # drop its empty slice so it is not rendered as a phantom "—" row.
-            page = [
-                (item, window)
-                for item, values in series_page
-                if (window := values[t_start:t_start + MAX_TIMEPOINTS_PER_VIEW])
-            ]
-            if page:
-                pages.append(page)
-    return pages
-
-
-def emit_matrix_projection(store_read, *, _out_dir=None):
-    """Render the biomarker matrix + projection from `store_read`, capped per view.
-
-    The caller-side render path above the single-file `emit` primitive: it slices an
-    over-cap dataset into per-page slices (each within the ADR-0004-T0 cap of
-    MAX_SERIES_PER_VIEW series AND MAX_TIMEPOINTS_PER_VIEW timepoints), calls the
-    published `emit(template, store_read) -> Path` ONCE per slice (each page template
-    carries a distinct name so `_name_for` derives a distinct basename), and returns
-    the list of written paths. A cap-or-below dataset yields exactly one path; an
-    over-cap dataset paginates to >=2 paths. Each page routes through the SAME `emit`
-    inline + external-asset discipline, so each is self-contained. The <500000-byte
-    budget is guaranteed by the cap (<=MAX_SERIES_PER_VIEW series and
-    <=MAX_TIMEPOINTS_PER_VIEW timepoints per page) against the ADR-0004-T0 spike's
-    worst-case bound, NOT by a runtime byte check. Reads operator data only from
-    `store_read`; makes no model step.
-
-    Args:
-        store_read (list): The store read model (the data `store.read` returns).
-        _out_dir (Path, optional): Test-only output-dir seam (same as `emit`).
-
-    Returns:
-        (list) The Path of each page written (length 1 at/below cap, >=2 over-cap).
-    """
-    paths = []
-    for page_no, page_series in enumerate(_page_slices(store_read), start=1):
-        def page_template(_store_read, _page_series=page_series, _page_no=page_no):
-            return _matrix_projection_html(_page_series, _page_no)
-
-        page_template.__name__ = f"matrix_projection_page_{page_no}"
-        paths.append(emit(page_template, store_read, _out_dir=_out_dir))
-    return paths
