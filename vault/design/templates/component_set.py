@@ -67,7 +67,7 @@ CHROME = {
     "supplements-tint": "#E7F5F6", # ACCENTS supplements #0E9AA3
     "peptides-tint": "#F2EBFD",    # ACCENTS peptides #7C3AED
     "sleep-tint": "#EFEFFB",       # ACCENTS sleep #5B5BD6
-    "today-tint": "#EFF4FE",       # calendar today column (light training-blue tint)
+    "today-tint": "#EFF4FE",       # calendar today day-cell (light training-blue tint)
     # Event-category chrome (visual spec zone 2, amended 2026-06-11): fixed
     # tint/text pairs for the calendar legend's event categories — chrome, NOT
     # data state, and distinct from the data-state PALETTE hexes. Training
@@ -100,7 +100,7 @@ _EVENT_TINTS = ("lab-draw", "check-in", "appointment")
 # The pill-tintable tint names: BOTH `pill()`'s guard AND `_style_block`'s
 # `.tint-*` rule generation read this one set, so a guard-accepted name always
 # has a rendered CSS rule (and vice versa — they cannot diverge). `today-tint`
-# stays calendar-cell CHROME (the today column background), NOT pill-tintable.
+# stays calendar-cell CHROME (the today day-cell background), NOT pill-tintable.
 _TINTABLE = frozenset({"good", "concern", "neutral", *ACCENTS, *_EVENT_TINTS})
 
 # The semantic-state tints' text colors (the :root custom properties); an
