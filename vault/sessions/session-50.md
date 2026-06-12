@@ -63,7 +63,8 @@ S49 close PR and the deferred calendar-zone review, both reviewed and rebase-mer
 
 - Calendar zone COMPLETE on `main`: real month table (the visible week IS one month row),
   keyboard-accessible zero-script in-place reveal, structurally pinned tests, AA gate
-  measuring every rendered pair (11 tints + the other-month cell).
+  measuring the tint pairs, tinted-stat pairs, and calendar today/other-month cells
+  (state-colored legend text is outside the gate).
 - Zones still awaiting data models (unchanged): plans `1oh` (+ nutrition card content),
   wearable scoring LM-02, calendar events, goals, per-specialist rollup. `y0h0`/`i2yw`
   residuals and the report design-pass bead open.
