@@ -214,7 +214,7 @@ import os
 from pathlib import Path
 DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
 DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
-def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG, include_structural=True):
+def scan(tracked_files, token_config=DEFAULT_IDENTITY_CONFIG, include_structural=True, identity_config=None):
     return 0
 def scan_scoped(changed, data_bearing, contact_config=DEFAULT_CONTACT_CONFIG, identity_config=DEFAULT_IDENTITY_CONFIG):
     open(os.environ["SEC01B_SENTINEL"], "w").write("ran")
@@ -309,7 +309,7 @@ cat > "$NUMSTUB/scripts/guard/pii_scan.py" <<PY
 from pathlib import Path
 DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
 DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
-def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG, include_structural=True):
+def scan(tracked_files, token_config=DEFAULT_IDENTITY_CONFIG, include_structural=True, identity_config=None):
     return 0
 def scan_scoped(changed, data_bearing, contact_config=DEFAULT_CONTACT_CONFIG, identity_config=DEFAULT_IDENTITY_CONFIG):
     print("not-a-number")

@@ -33,6 +33,7 @@ import re
 import subprocess
 import sys
 import unicodedata
+import warnings
 from pathlib import Path
 
 # Operator-AGNOSTIC patterns (no personal data): the two field-order structural
@@ -156,13 +157,12 @@ DEFAULT_IDENTITY_CONFIG = Path("vault/meta/operator-identity.txt")
 DEFAULT_CONTACT_CONFIG = Path("vault/meta/operator-contact.txt")
 
 
-def _load_identity_patterns(config_path):
+def _load_token_patterns(config_path):
     """Compile the operator token regexes (identity OR contact) from a gitignored config.
 
-    The shared loader for both token classes (3lv); the `identity_config` kwarg
-    name is kept for the stable published surface (a `token_config` rename is
-    tracked separately). Callers pass the identity config (name tokens,
-    data-bearing scope) or the contact config (email/handles, trunk-wide scope).
+    The shared loader for both token classes (3lv). Callers pass the identity
+    config (name tokens, data-bearing scope) or the contact config
+    (email/handles, trunk-wide scope).
 
     Args:
         config_path (str | Path): Path to a token config; one regex token per
@@ -185,26 +185,37 @@ def _load_identity_patterns(config_path):
     return patterns
 
 
-def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG, include_structural=True):
+def scan(tracked_files, token_config=DEFAULT_IDENTITY_CONFIG, include_structural=True,
+         identity_config=None):
     """Count operator-PII matches across the contents of the supplied files.
 
     Args:
         tracked_files (iterable[str]): Paths to scan (the caller's current
             staged/tracked set; not re-enumerated here).
-        identity_config (str | Path, optional): Path to a gitignored token file
+        token_config (str | Path, optional): Path to a gitignored token file
             (identity or contact); absent -> token detection is empty.
         include_structural (bool, optional): Apply the agnostic structural
             store-line patterns. Callers scanning known-fixture paths (test
             suites whose fixtures embed synthetic reading-shaped literals by
             construction) pass False so only the config-driven tokens run there
             (bead dv3 — the structural net over fixtures is pure false positive).
+        identity_config (str | Path, optional): Deprecated alias for
+            `token_config` (the pre-b9l kwarg name, kept for the ADR-0005-T1
+            change-controlled published surface); emits DeprecationWarning.
 
     Returns:
         (int) Total number of operator-PII matches across the files' contents.
         Each file with >=1 match is named on stderr as `PII-HIT: <path>`.
     """
+    if identity_config is not None:
+        warnings.warn(
+            "pii_scan.scan: the 'identity_config' kwarg is deprecated; use 'token_config'",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        token_config = identity_config
     structural = _COMPILED_AGNOSTIC if include_structural else []
-    patterns = structural + _load_identity_patterns(identity_config)
+    patterns = structural + _load_token_patterns(token_config)
     total = 0
     for path in tracked_files:
         try:
@@ -219,7 +230,7 @@ def scan(tracked_files, identity_config=DEFAULT_IDENTITY_CONFIG, include_structu
     return total
 
 
-def scan_text(text, identity_config=DEFAULT_IDENTITY_CONFIG):
+def scan_text(text, token_config=DEFAULT_IDENTITY_CONFIG, identity_config=None):
     """Count operator-PII matches in a single in-memory string.
 
     The value-level counterpart to `scan` (which reads file CONTENTS for the
@@ -242,15 +253,24 @@ def scan_text(text, identity_config=DEFAULT_IDENTITY_CONFIG):
 
     Args:
         text (str): The value to scan.
-        identity_config (str | Path, optional): The gitignored operator-identity
+        token_config (str | Path, optional): The gitignored operator-identity
             token file; absent -> identity detection is empty (the value patterns
             still run).
+        identity_config (str | Path, optional): Deprecated alias for
+            `token_config` (the pre-b9l kwarg name); emits DeprecationWarning.
 
     Returns:
         (int) Total operator-PII (value-class + identity) matches in `text`.
     """
+    if identity_config is not None:
+        warnings.warn(
+            "pii_scan.scan_text: the 'identity_config' kwarg is deprecated; use 'token_config'",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        token_config = identity_config
     normalized = unicodedata.normalize("NFKC", text)[:_MAX_SCAN_TEXT_LEN]
-    patterns = _VALUE_COMPILED + _load_identity_patterns(identity_config)
+    patterns = _VALUE_COMPILED + _load_token_patterns(token_config)
     return sum(len(pattern.findall(normalized)) for pattern in patterns)
 
 
@@ -290,10 +310,10 @@ def scan_scoped(changed, data_bearing, contact_config=DEFAULT_CONTACT_CONFIG,
     """
     fixtures = [f for f in changed if f.startswith(FIXTURE_PREFIX)]
     non_fixtures = [f for f in changed if not f.startswith(FIXTURE_PREFIX)]
-    total = scan(non_fixtures, identity_config=contact_config)
-    total += scan(fixtures, identity_config=contact_config, include_structural=False)
+    total = scan(non_fixtures, token_config=contact_config)
+    total += scan(fixtures, token_config=contact_config, include_structural=False)
     if data_bearing:
-        total += scan(data_bearing, identity_config=identity_config)
+        total += scan(data_bearing, token_config=identity_config)
     return total
 
 
