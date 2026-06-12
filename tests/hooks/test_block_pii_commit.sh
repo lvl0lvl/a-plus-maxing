@@ -570,6 +570,80 @@ OUT=$(invoke_cwd "git commit -m 'wt clean'" "$WT")
     || bad "29u4 (2) clean worktree commit wrongly DENIED: $OUT"
 git -C "$WT" reset -q; rm -f "$WT/docs/clean-wt.md"
 
+# ── ycqo: flush-before-scan — pending bead text reaches the jsonl ONLY via flush ─
+# The bd pre-commit git hook flushes .beads/beads.db AND stages the jsonl INSIDE
+# `git commit`, AFTER this hook's scan — so bead text still pending in the db at
+# scan time committed unscanned. The hook must run `bd sync --flush-only` BEFORE
+# reading the jsonl. Simulated hermetically: the "pending db text" lives in a side
+# file the flushing bd STUB appends to the jsonl when invoked (cwd = the target
+# repo, as the hook runs it); pre-ycqo the hook never invoked bd, so the dirty
+# text stayed pending and the commit sailed through.
+PENDING="$TMP/pending-bead.txt"
+printf '{"id":"x-2","title":"ping %s about labs"}\n' "$OPERATOR_CONTACT" > "$PENDING"
+BD_FLUSH="$TMP/bd-flush.sh"
+cat > "$BD_FLUSH" <<EOF
+#!/usr/bin/env bash
+cat "$PENDING" >> .beads/issues.jsonl
+exit 0
+EOF
+chmod +x "$BD_FLUSH"
+BD_FAIL="$TMP/bd-fail.sh"
+printf '#!/usr/bin/env bash\necho "bd: no beads database found" >&2\nexit 1\n' > "$BD_FAIL"
+chmod +x "$BD_FAIL"
+
+invoke_bd() {  # $1 = command string ; $2 = bd command override ; echoes hook stdout
+    printf '{"tool_input":{"command":%s}}' \
+        "$(printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+        | BLOCK_PII_COMMIT_PROJECT_ROOT="$REPO" BLOCK_PII_COMMIT_PII_SCAN_ROOT="$REAL_ROOT" \
+          BLOCK_PII_COMMIT_BD_CMD="$2" bash "$HOOK"
+}
+
+# ycqo (1): clean jsonl on disk, dirty text PENDING (db-only) at scan time -> the
+# in-hook flush materializes it BEFORE the jsonl read -> DENY naming the bd file.
+mkfile ".beads/issues.jsonl" '{"id":"x-1","title":"routine clean task"}'
+mkfile "docs/clean-note3.md" "Plain note."
+git -C "$REPO" add docs/clean-note3.md
+OUT=$(invoke_bd "git commit -m 'note3'" "$BD_FLUSH")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *".beads/issues.jsonl"* ]]; } \
+    && ok "ycqo (1) pending-in-db dirty text flushed-then-scanned -> DENY naming the bd file" \
+    || bad "ycqo (1) pending dirty text NOT caught (flush-before-scan missing): $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note3.md"; rm -rf "$REPO/.beads"
+
+# ycqo (2): flush FAILURE -> DENY (fail-closed, matching the git-rc/scan-rc
+# convention and bd's own exit-1-on-flush-failure) — pending text it could not
+# flush cannot be scanned.
+mkfile ".beads/issues.jsonl" '{"id":"x-1","title":"routine clean task"}'
+mkfile "docs/clean-note4.md" "Plain note."
+git -C "$REPO" add docs/clean-note4.md
+OUT=$(invoke_bd "git commit -m 'note4'" "$BD_FAIL")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"flush"* ]]; } \
+    && ok "ycqo (2) bd flush failure -> DENY (fail-closed)" \
+    || bad "ycqo (2) flush failure NOT denied (fail-open on flush rc): $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note4.md"; rm -rf "$REPO/.beads"
+
+# ycqo (3): .beads/ present but NO jsonl yet — the flush CREATES it carrying the
+# dirty text -> DENY. Pins the ordering: flush runs BEFORE the jsonl existence
+# check, not after (an after-check flush would miss a freshly-created jsonl).
+mkdir -p "$REPO/.beads"
+mkfile "docs/clean-note5.md" "Plain note."
+git -C "$REPO" add docs/clean-note5.md
+OUT=$(invoke_bd "git commit -m 'note5'" "$BD_FLUSH")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *".beads/issues.jsonl"* ]]; } \
+    && ok "ycqo (3) flush-created jsonl with dirty text -> DENY (flush precedes existence check)" \
+    || bad "ycqo (3) flush-created jsonl NOT scanned (existence check precedes flush): $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note5.md"; rm -rf "$REPO/.beads"
+
+# ycqo (4) control: bd UNAVAILABLE + clean jsonl -> ALLOW (clone semantics — a
+# checkout without bd commits on the as-is jsonl scan, no flush, no per-se deny).
+mkfile ".beads/issues.jsonl" '{"id":"x-1","title":"routine clean task"}'
+mkfile "docs/clean-note6.md" "Plain note."
+git -C "$REPO" add docs/clean-note6.md
+OUT=$(invoke_bd "git commit -m 'note6'" "$TMP/no-such-bd")
+[[ "$OUT" != *'"deny"'* ]] \
+    && ok "ycqo (4) bd unavailable + clean jsonl -> ALLOW (flush guard skips, scan still runs)" \
+    || bad "ycqo (4) bd-absent commit wrongly DENIED: $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note6.md"; rm -rf "$REPO/.beads"
+
 echo
 echo "test_block_pii_commit: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
