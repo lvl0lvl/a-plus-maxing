@@ -273,9 +273,21 @@ def test_projection_min_timepoints_is_three():
 
 
 def test_render_views_min_timepoints_single_sourced():
-    """render_views' constant IS the shared seam's value (one derivation rule)."""
+    """render_views ASSIGNS its constant from the seam (textual pin + value).
+
+    An `is` identity check would be vacuous here — CPython interns small
+    ints, so a hand-spelled 3 would pass it; the source-line pin is what
+    proves the single-sourcing.
+    """
+    import inspect
+
     from scripts.generate import render_views
 
-    assert render_views.PROJECTION_MIN_TIMEPOINTS is (
-        biomarker_meta.PROJECTION_MIN_TIMEPOINTS
+    assert (
+        "PROJECTION_MIN_TIMEPOINTS = biomarker_meta.PROJECTION_MIN_TIMEPOINTS"
+        in inspect.getsource(render_views)
+    ), "render_views must assign the constant FROM the biomarker_meta seam"
+    assert (
+        render_views.PROJECTION_MIN_TIMEPOINTS
+        == biomarker_meta.PROJECTION_MIN_TIMEPOINTS
     )
