@@ -323,14 +323,16 @@ def test_unwired_marker_governs_wired_set_membership():
             "        return iter(())\n"
         )
 
-    # Identical adapters except the typed attribute in the declaring module.
-    wired_mod.write_text(
-        _adapter_module_src("guardwired", "GuardWiredAdapter", declare_unwired=False)
-    )
-    unwired_mod.write_text(
-        _adapter_module_src("guardunwired", "GuardUnwiredAdapter", declare_unwired=True)
-    )
     try:
+        # Identical adapters except the typed attribute in the declaring module.
+        # Writes INSIDE try: a mid-setup failure still reaches the cleanup, whose
+        # exists()/glob guards tolerate the not-yet-written fixture.
+        wired_mod.write_text(
+            _adapter_module_src("guardwired", "GuardWiredAdapter", declare_unwired=False)
+        )
+        unwired_mod.write_text(
+            _adapter_module_src("guardunwired", "GuardUnwiredAdapter", declare_unwired=True)
+        )
         importlib.invalidate_caches()
         wired = scheduler._wired_adapters()  # the REAL discovery predicate
         tags = {a.source_tag() for a in wired}
@@ -402,16 +404,18 @@ def test_docstring_unwired_prose_does_not_exclude():
     from scripts.ingest import scheduler
 
     probe_mod = ADAPTERS_DIR / "proseprobe.py"
-    probe_mod.write_text(
-        '"""Prose-probe adapter; unlike an unwired scaffold, it is fully wired."""\n'
-        "from typing import Iterable\n\n\n"
-        "class ProseProbeAdapter:\n"
-        "    def source_tag(self) -> str:\n"
-        '        return "proseprobe"\n\n'
-        "    def read_readings(self, export_file) -> Iterable[dict]:\n"
-        "        return iter(())\n"
-    )
     try:
+        # Write INSIDE try: a mid-setup failure still reaches the cleanup, whose
+        # exists()/glob guards tolerate the not-yet-written fixture.
+        probe_mod.write_text(
+            '"""Prose-probe adapter; unlike an unwired scaffold, it is fully wired."""\n'
+            "from typing import Iterable\n\n\n"
+            "class ProseProbeAdapter:\n"
+            "    def source_tag(self) -> str:\n"
+            '        return "proseprobe"\n\n'
+            "    def read_readings(self, export_file) -> Iterable[dict]:\n"
+            "        return iter(())\n"
+        )
         importlib.invalidate_caches()
         wired = scheduler._wired_adapters()  # the REAL discovery predicate
         tags = {a.source_tag() for a in wired}
