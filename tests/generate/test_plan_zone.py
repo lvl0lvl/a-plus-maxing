@@ -537,6 +537,44 @@ def test_report_routes_plan_items_to_verbatim_tables(tmp_path):
     )
 
 
+# --- adversarial content: escaping across every interpolated plan field ---
+
+
+def test_adversarial_plan_content_escapes_in_dashboard_and_report(tmp_path):
+    """HTML-special content in every interpolated plan field across all four
+    domains — seeded via RAW store.append, bypassing writer validation so the
+    int fields (kcal, cycle_*) carry string payloads too — renders escaped
+    through BOTH the dashboard and the report route: entities present, no raw
+    tag, no script."""
+    evil = 'A&W "5\\" bar" <b>x</b><script>alert(1)</script>'
+    plans = {
+        "workout": {"exercises": [
+            {"name": evil, "sets": 2, "load": evil, "reps": evil, "detail": evil},
+        ]},
+        "nutrition": {
+            "calorie_goal": evil,
+            "macros": {"protein": 180, "carbs": 300, "fat": 80},
+            "meals": [{"name": evil, "contents": evil, "kcal": evil}],
+        },
+        "supplements": {"items": [{"name": evil, "dose": evil, "timing": evil}]},
+        "peptides": {
+            "compound": "bpc-157", "dose": evil, "route": evil,
+            "cycle_week": evil, "cycle_length_weeks": evil,
+            "tags": [evil], "evidence": evil,
+        },
+    }
+    for domain, plan in plans.items():
+        item = f"plan::{domain}"
+        store.append(item, {"item": item, "timepoint": _DATE,
+                            "source": "plan::adversary", "value": plan}, root=tmp_path)
+    dash = _render(tmp_path)
+    report = generate.run("report", _root=tmp_path, _out_dir=tmp_path / "out").read_text()
+    for what, html in (("dashboard", dash), ("report", report)):
+        assert "A&amp;W" in html, f"the {what} must render the escaped entity"
+        assert "<b>" not in html, f"raw markup reached the {what}"
+        assert "<script" not in html, f"script content reached the {what}"
+
+
 # --- measured AA pairs for the new text-on-fill chrome ---
 
 
