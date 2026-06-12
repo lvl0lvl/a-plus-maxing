@@ -53,9 +53,10 @@ Final `main`: `e8b0dd8`; suite **489 passed / 2 skipped**.
 - The justified out-of-contract item: `pre-push-pii-scan.sh` header-comment edits ×2
   (claim truth-ups for the #107 flush rescope; behavior-diff empty; flagged in-passing).
 - Late branch cleanup at the #108 review: local `feature/store-correction`,
-  `feature/skill-trace-audit`, `feature/denylist-starter` and remote
-  `fix/hooks-worktree-aware` survived their merges and were deleted at the #108
-  review, after the denylist provenance note's SHA citations were re-anchored to `main`.
+  `feature/skill-trace-audit`, `feature/denylist-starter` survived their merges and
+  were deleted at the #108 review, after the denylist provenance note's SHA citations
+  were re-anchored to `main`. The remote `fix/hooks-worktree-aware` was already
+  deleted server-side at S52; its stale local tracking ref was pruned.
 
 ## Beads
 
