@@ -94,6 +94,35 @@ report-state tokens and AA-measures every text/background pair they form (the sa
 obligation as the Page frame's report-local tokens). The dashboard and report share
 one language only at the ACCENTS category-bar level, not at the data-state level.
 
+**[AMENDED 2026-06-12]: report-local color tokens -> standardized system tokens.
+Reason: operator direction at S53 ("shouldn't the colors for the platform be
+standardized so future builds operate within the design theme? If the facesheet does
+not match the dashboard, that seems like an issue") — supersedes the report-local
+adjudication paragraph above and the Page frame's nine-report-local-token framing.**
+
+- **Data states re-map to the locked PALETTE:** out-of-range/abnormal renders in
+  PALETTE concern `#882255` (with its measured tint pair and AA-darkened text
+  variant per the existing CHROME `*-text` pattern); attention/below-threshold and
+  the `watch` chip render in PALETTE watch `#DDAA33` semantics (AA-darkened watch
+  text token on tints — never raw `#DDAA33` text on white); improving/in-range
+  stays PALETTE good `#117733`; the in-range collapse strip uses the measured good
+  tint pair. The red-family/amber hexes (`#B42318` as a data state, `#7A2E22`,
+  `#FBEAE8`, `#B7791F`, `#8A6D1F`, `#EFF6F0`) do NOT ship.
+- **Chrome/data-state separation holds everywhere — no signed-mock exception:** the
+  Goals bar does not use data-state green as chrome; it and the Biomarkers bar get
+  section-accent tokens registered in the SYSTEM token set (`component_set.py`,
+  beside ACCENTS — values chosen and operator-signed at the Package C design round,
+  AA-measured by the gate like every other registered token). Card tints
+  (`#EEF2FD`/`#C9D4F6`, `#FDF4E7`) likewise resolve to system tokens (existing
+  measured tints where suitable, else registered) at the same round.
+- **One language, both surfaces:** dashboard and report share the full design
+  vocabulary — ACCENTS for category chrome, PALETTE + measured tint pairs for data
+  state. Glyph/shape redundancy stays as specified (it is a print/monochrome
+  guarantee, not a divergence compensator).
+- **PF-S49-01 consequence:** the signed mock's colors change under this re-map, so
+  Package C starts with an updated Pencil render + operator sign-off BEFORE any
+  `report.py` code; this amendment is the recorded direction, not the signed visual.
+
 ## Page 2+ (detail layer)
 
 The existing per-item render (readings tables with Date/Value/Source + sparklines),
@@ -123,7 +152,7 @@ rows with operator answers live here too.
 ## What this spec does NOT change
 
 ADR-0004 single-file zero-script artifacts; the print contract; `PALETTE`/`SERIES`/
-`ACCENTS` (locked — their VALUES are untouched; the accent coding above reuses ACCENTS
-only for the categories ACCENTS carries, and otherwise introduces the report-local
-tokens enumerated in Page frame, which carry the build-time registration +
-AA-measurement obligation stated there); the dashboard's own spec.
+`ACCENTS` (locked — their VALUES are untouched; per the [AMENDED 2026-06-12]
+standardization the report draws on the locked sets plus system-registered
+section-accent tokens, with no report-local color vocabulary); the dashboard's own
+spec.
