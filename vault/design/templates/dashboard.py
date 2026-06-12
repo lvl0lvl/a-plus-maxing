@@ -461,24 +461,6 @@ def _calendar_zone(today):
     )
 
 
-def _state_stat(label, value, state):
-    """Render a stat box on the measured state-tint pair for `state`.
-
-    The visual spec's "live-state tinted" slot (zone 3 as amended 2026-06-12):
-    the box rides the existing `.tint-*` pair for the metric's current state —
-    PALETTE semantics via the measured pairs, the neutral chrome tint when no
-    judgment exists. An unknown state token KeyErrors rather than silently
-    rendering an unstyled class (the `pill`/`_series_color` fail-loud
-    convention).
-    """
-    if state not in cs._TINTABLE:
-        raise KeyError(state)
-    return (
-        f"<div class='stat tint-{state}'><div class='slabel'>{cs._escape(str(label))}</div>"
-        f"<div class='sval'>{cs._escape(str(value))}</div></div>"
-    )
-
-
 def _set_dots(total, filled, accent_hex):
     """Render an exercise's per-set progress dots: filled accent, rest border-gray.
 
@@ -517,7 +499,7 @@ def _workout_empty(copy):
     """
     boxes = (
         cs.stat_box("Elapsed") + cs.stat_box("Volume") + cs.stat_box("Sets done")
-        + _state_stat("Heart rate", "—", "neutral")
+        + cs.stat_box("Heart rate", tint="neutral")
     )
     return f"<div class='statrow'>{boxes}</div>{cs.awaiting(copy)}"
 
@@ -566,8 +548,8 @@ def _workout_populated(plan, tracking):
     unknown key never inflates the claim); a per-exercise sets_done above its
     planned sets raises (never a silently capped claim); sets_done keys
     matching no plan exercise render no row. The
-    heart-rate box is live-state tinted (`_state_stat`); the rest-timer footer
-    and Resume button are static inert chrome.
+    heart-rate box is live-state tinted (`cs.stat_box(tint=...)`); the
+    rest-timer footer and Resume button are static inert chrome.
 
     Args:
         plan (dict): The resolved workout plan document.
@@ -602,10 +584,10 @@ def _workout_populated(plan, tracking):
     boxes = (
         cs.stat_box("Elapsed", elapsed) + cs.stat_box("Volume", volume)
         + cs.stat_box("Sets done", sets_value)
-        + _state_stat(
+        + cs.stat_box(
             "Heart rate",
             f"{hr} bpm" if hr is not None else "—",
-            cs.state_for("heart-rate", hr),
+            tint=cs.state_for("heart-rate", hr),
         )
     )
     chips = [
@@ -831,6 +813,17 @@ def _plan_card(label, domain, accent_key, default_specialist,
     status pill; either absence state renders the designed empty anatomy, the
     muted `awaiting plan` pill, and its own dashed-row copy. Accents color
     chrome only — text inside stays ink/muted (ADR-0009 D3).
+
+    Args:
+        label (str): The card title text (escaped).
+        domain (str): The `plan_schema.PLAN_DOMAINS` member the card renders.
+        accent_key (str): The `ACCENTS` key coloring the card chrome.
+        default_specialist (str): The `via` attribution for the absence states.
+        plan_readings (dict): domain -> the `plan::<domain>` full readings.
+        track_readings (dict): domain -> the `plan-track::<domain>` readings.
+        watchout_answers (dict): watch-out name -> stored answer values (the
+            peptide card's second-consumer read of the zone-7 stream).
+        on_date (str): The render date plans resolve against, YYYY-MM-DD.
 
     Raises:
         ValueError: The workout tracking claims more sets done than planned.

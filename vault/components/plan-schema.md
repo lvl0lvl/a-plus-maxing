@@ -40,8 +40,11 @@ Line Field Set — no second key, no second content-tag derivation (loop_schema'
 - **Readers** (never raise on absence; ValueError on an unknown domain):
   `read_plan(domain, on_date, root)` / `read_plan_tracking(domain, on_date, root)`, both
   thin over the PURE `resolve_plan(readings, on_date)` / `resolve_tracking(readings,
-  on_date)` — latest-appended wins within a date (the `read_panel` reversed-scan shape);
-  no tracking snapshot for the date is `None`, never an invented empty snapshot.
+  on_date)` — the last reading in `store.read` list order wins within a date (the
+  append order of DISTINCT identities, the `read_panel` reversed-scan shape; a
+  correction supersedes its identity's value WITHOUT re-promoting it past a
+  later-recorded same-date plan); no tracking snapshot for the date is `None`, never an
+  invented empty snapshot.
 - **Plan schema tables** (closed required, open extras — the ADR-0006 T2 seam):
   *workout* `exercises` (≥1 dicts: `name`, `sets` int ≥1; opt `load`/`reps`/`detail`);
   *nutrition* `calorie_goal` int >0, `macros` (all of protein/carbs/fat int >0), `meals`

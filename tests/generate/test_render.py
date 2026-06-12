@@ -746,8 +746,12 @@ def test_contrast_and_colorblind(tmp_path):
     tint_pairs = [
         (f"tint-{name} text", resolve(fg), tint_bg) for name, tint_bg, fg in tint_rules
     ]
+    # Exactly the two LIVE tinted-stat rules: the default `.stat.tinted`
+    # (page-bg) and `.pc-nutrition .stat.tinted` (nutrition-tint) — the only
+    # rendered consumers (the workout card's tinted slot is the live-state
+    # `stat_box(tint=...)`, measured with the `.tint-*` pairs above).
     stat_bgs = re.findall(r"\.stat\.tinted \{ background: ([^;]+); \}", html)
-    assert len(stat_bgs) >= 3, f"expected the default + per-card tinted stat rules, got {stat_bgs}"
+    assert len(stat_bgs) == 2, f"expected exactly the default + pc-nutrition tinted stat rules, got {stat_bgs}"
     for stat_bg in (resolve(b) for b in stat_bgs):
         tint_pairs.append(("tinted stat slabel (muted)", root["muted"], stat_bg))
         tint_pairs.append(("tinted stat sval (ink)", root["ink"], stat_bg))
