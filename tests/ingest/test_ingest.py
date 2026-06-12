@@ -455,10 +455,13 @@ def test_import_csv_header_only_writes_nothing(tmp_path, store_root):
 def test_cross_mechanism_same_identity_first_write_wins(tmp_path, store_root):
     """TEST-006: adapter then CSV, same (item,timepoint,source), different value.
 
-    The FIRST write (adapter, value 55) wins; the CSV value-correction (62) is
-    dropped because the dedupe key is (item, timepoint, source) only — value is
-    excluded (ADR-0002 keying property). This pins the documented dedupe-on-
-    identity behavior across the two write mechanisms.
+    The FIRST write (adapter, value 55) wins for NORMAL ingest; the CSV
+    re-entry (62) is dropped because the dedupe key is (item, timepoint,
+    source) only — value is excluded (ADR-0002 keying property). This pins the
+    documented dedupe-on-identity behavior across the two write mechanisms.
+    Since bead 1vi a value CORRECTION is an explicit `manual_correction` /
+    `store.correct` superseding append — never a normal-path re-entry, which
+    stays a no-op exactly as pinned here.
     """
     from scripts.ingest import ingest
 
@@ -476,8 +479,9 @@ def test_cross_mechanism_same_identity_first_write_wins(tmp_path, store_root):
 
     stored = store.read("hrv", root=store_root)
     assert len(stored) == 1
-    # value 55 (the first write) survived; the CSV "62" correction was dropped —
+    # value 55 (the first write) survived; the CSV "62" re-entry was dropped —
     # the known ADR-0002 keying property: value is excluded from the dedupe key.
+    # An intended correction goes through the explicit manual_correction path.
     assert stored[0]["value"] == 55
 
 
@@ -585,3 +589,66 @@ def test_manual_entry_rejects_traversing_item_writes_nothing(tmp_path):
     with pytest.raises(ValueError):
         ingest.manual_entry("../escaped/pwn", reading, root=root)
     assert not (tmp_path / "escaped").exists()
+
+
+# --- bead 1vi: the explicit correction entry point (correction.manual_correction) ---
+
+
+def test_manual_correction_supersedes_cross_mechanism_value(tmp_path, store_root):
+    """Adapter ingest then an EXPLICIT correction: the corrected value reads back.
+
+    The TEST-006 counterpart: where the normal CSV re-entry is dropped
+    (first-write-wins for normal ingest, unchanged), the explicit
+    `correction.manual_correction` path appends a superseding line — the read
+    resolves to the corrected value, and the original line stays on disk
+    (audit trail). The entry lives in its own module, NOT in ingest.py: the
+    AC-3/AC-6 0-edit gates pin the shared routine at the branch fork point.
+    """
+    from scripts.ingest import correction, ingest
+
+    export = tmp_path / "export.ndjson"
+    _write_export(export, [_reading("hrv", "2026-01-01T08:00", "oura", 55)])
+    ingest.run(_ListAdapter("oura"), export, root=store_root)
+
+    correction.manual_correction(
+        "hrv", _reading("hrv", "2026-01-01T08:00", "oura", 62), root=store_root
+    )
+
+    stored = store.read("hrv", root=store_root)
+    assert len(stored) == 1
+    assert stored[0]["value"] == 62
+    lines = (store_root / "hrv.ndjson").read_text().splitlines()
+    assert len([ln for ln in lines if ln.strip()]) == 2
+
+
+def test_manual_correction_item_mismatch_raises(tmp_path, store_root):
+    """The item argument must equal reading["item"], exactly like manual_entry."""
+    from scripts.ingest import correction
+
+    reading = _reading("hrv", "2026-01-01T08:00", "oura", 55)
+    store.append("hrv", reading, root=store_root)
+
+    corrected = _reading("hrv", "2026-01-01T08:00", "oura", 62)
+    with pytest.raises(ValueError):
+        correction.manual_correction("rhr", corrected, root=store_root)
+    assert store.read("hrv", root=store_root)[0]["value"] == 55
+
+
+def test_manual_correction_missing_item_raises(store_root):
+    """A reading without `item` raises the uniform missing-field ValueError."""
+    from scripts.ingest import correction
+
+    corrected = _reading("hrv", "2026-01-01T08:00", "oura", 62)
+    del corrected["item"]
+    with pytest.raises(ValueError):
+        correction.manual_correction("hrv", corrected, root=store_root)
+
+
+def test_manual_correction_unstored_identity_raises(store_root):
+    """A correction whose identity was never stored propagates store.correct's raise."""
+    from scripts.ingest import correction
+
+    with pytest.raises(ValueError):
+        correction.manual_correction(
+            "hrv", _reading("hrv", "2026-01-01T08:00", "oura", 62), root=store_root
+        )
