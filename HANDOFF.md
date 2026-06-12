@@ -276,9 +276,11 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 **FIRST: merge the S52 close PR** (`feature/s52-contract` → `main`; docs 3-agent `/review-pr` subset → REST rebase `/merge`, BOTH invoked fresh via the Skill tool; `skill-trace-audit.sh --session 53` now runs at close per INV-SKILL-TRACE). Open normally (Session Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline on `main` **489 passed / 2 skipped**).
 
-1. **Visual package builds — all targets SIGNED (PF-S49-01 satisfied; build ONLY from the recorded targets):** A (`1oh` plan schemas + render surface — plan-zone slot shape in `vault/design/dashboard-v1-visual-spec.md` [AMENDED 2026-06-12]), B (`y0h0`+`i2yw` trend-card v2 — same spec; projection readout is DASHBOARD-ONLY by operator decision), C (`nsxy` physician face sheet — `vault/design/physician-facesheet-v1-spec.md`). Full lifecycles, sequential merges (shared `component_set.py`).
-2. **Open governance/correctness beads:** `e3b` (OPEN — close criterion is ADR-0006-T2 wiring verification), the `juc` design conversation (architect + operator; sub-questions in the bead), S52-discovered `rn3v` (whole-body denylist coverage), `imev` (roster sweep audit-layer), `tdre` (design-doc §13 row 10 stale), `vjsw` (clone-init never runs `bd init`), `dt0t` (INVARIANTS count-free citations); carried `1ww`, `46m`.
-3. **Then:** LM-04 (Walter-pending real data) + the library-population `/aplus-research` track. Tail: `bd ready`.
+**S53 plan, operator-adopted at the S52 close ("we'll do the remaining work in the next session based on your recommendations"):**
+
+1. **The `juc` design conversation FIRST** (architect + operator; sub-questions in the bead) — per-marker good-direction polarity is an INPUT to Package B's improving/regressing rendering, so it precedes the builds.
+2. **Visual package builds — all targets SIGNED (PF-S49-01 satisfied; build ONLY from the recorded targets), sequential lifecycles in order A → B → C** (shared `component_set.py`; if capacity runs short, A alone is the highest-value single package): A (`1oh` plan schemas + render surface — plan-zone slot shape in `vault/design/dashboard-v1-visual-spec.md` [AMENDED 2026-06-12]), B (`y0h0`+`i2yw` trend-card v2 + render-surface unification — same spec; projection readout is DASHBOARD-ONLY by operator decision), C (`nsxy` physician face sheet — `vault/design/physician-facesheet-v1-spec.md`; unblocks the LM-01 MD-handoff artifact once the visit date is pinned).
+3. **Correctness/governance tail (filler or one cleanup batch):** `e3b` (OPEN — close criterion is ADR-0006-T2 wiring verification), `b6um` (sub-AA legend, the one P2 bug), S52-discovered `rn3v`/`imev`/`tdre`/`vjsw`/`dt0t`; carried `1ww`, `46m`. Then LM-04 (Walter-pending real data) + the library-population `/aplus-research` track (explicitly deferred from this plan by the operator). Tail: `bd ready`.
 
 ## Landmark window check (close step 8.7)
 
