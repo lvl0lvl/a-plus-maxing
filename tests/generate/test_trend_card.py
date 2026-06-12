@@ -54,10 +54,16 @@ def _read(item, *readings):
 
 
 def _captions(fragment):
-    """Return each caption div's decoded text within a card fragment."""
+    """Return each caption div/span's decoded text within a card fragment.
+
+    The closing tag backreferences the opening one, so mismatched tag pairs
+    never match.
+    """
     return [
-        html_lib.unescape(c)
-        for c in re.findall(r"<(?:div|span) class='caption'>([^<]*)</(?:div|span)>", fragment)
+        html_lib.unescape(text)
+        for _tag, text in re.findall(
+            r"<(div|span) class='caption'>([^<]*)</\1>", fragment
+        )
     ]
 
 
@@ -243,6 +249,62 @@ def test_delta_chip_regressing_renders_concern_tint():
         "ALT",
     )
     assert "<span class='pill tint-concern'>&#9650; 20 U/L</span>" in card
+
+
+def test_delta_chip_in_range_polarity_toward_range_good_tint():
+    """ferritin rising toward its range (in-range polarity, improving) ->
+    `▲ 5 ng/mL` on the good tint."""
+    card = _card(
+        _read(
+            "biomarker::ferritin",
+            ("2026-05-11T00:00:00+00:00", 20),
+            ("2026-06-10T00:00:00+00:00", 25),
+        ),
+        "Ferritin",
+    )
+    assert "<span class='pill tint-good'>&#9650; 5 ng/mL</span>" in card
+
+
+def test_delta_chip_in_range_polarity_away_from_range_concern_tint():
+    """ferritin falling away from its range (regressing) -> the concern tint."""
+    card = _card(
+        _read(
+            "biomarker::ferritin",
+            ("2026-05-11T00:00:00+00:00", 25),
+            ("2026-06-10T00:00:00+00:00", 20),
+        ),
+        "Ferritin",
+    )
+    assert "<span class='pill tint-concern'>&#9660; 5 ng/mL</span>" in card
+
+
+def test_delta_chip_within_range_movement_numeric_on_neutral():
+    """Within-range movement (distance-to-range unchanged at 0) renders the
+    NUMERIC delta on the neutral tint — the deliberate v2 presentation change
+    from v1's word-"flat" pill: the value moved, the judgment did not."""
+    card = _card(
+        _read(
+            "biomarker::ferritin",
+            ("2026-05-11T00:00:00+00:00", 95),
+            ("2026-06-10T00:00:00+00:00", 110),
+        ),
+        "Ferritin",
+    )
+    assert "<span class='pill tint-neutral'>&#9650; 15 ng/mL</span>" in card
+    assert "flat" not in card, "unequal values never render the word pill"
+
+
+def test_delta_chip_up_polarity_rising_good_tint():
+    """hdl rising (up polarity, improving) -> the numeric delta on good tint."""
+    card = _card(
+        _read(
+            "biomarker::hdl",
+            ("2026-05-11T00:00:00+00:00", 50),
+            ("2026-06-10T00:00:00+00:00", 60),
+        ),
+        "HDL",
+    )
+    assert "<span class='pill tint-good'>&#9650; 10 mg/dL</span>" in card
 
 
 def test_delta_chip_no_polarity_renders_neutral_tint():
@@ -497,9 +559,31 @@ def test_projection_renders_on_dashboard_not_on_report(tmp_path):
     assert "naive projection" not in report, (
         "the physician report must never carry the projection"
     )
-    assert "0.8" not in report, (
-        "the projected VALUE must not reach the report in any form"
-    )
     assert "Jul 10" not in report, (
         "the projected DATE must not reach the report in any form"
     )
+    # Sparkline coordinate attributes can legitimately contain any digit run;
+    # strip them so the value check tests rendered TEXT, not plot geometry.
+    assert "0.8" not in re.sub(r" points='[^']*'", "", report), (
+        "the projected VALUE must not reach the report in any form"
+    )
+
+
+def test_zero_latest_value_renders_through_production_path(tmp_path):
+    """A latest reading of 0 is a real value, never an absence (falsy-zero pin).
+
+    crp 0.3 -> 0 through the production writer + generate.run: the `0 mg/L`
+    headline, the improving chip, and the in-range verdict all render.
+    """
+    root = tmp_path / "store"
+    loop_schema.record_biomarker("crp", "2026-05-11T00:00:00+00:00", 0.3, root)
+    loop_schema.record_biomarker("crp", "2026-06-10T00:00:00+00:00", 0, root)
+
+    html = generate.run(
+        "dashboard", _root=root, _out_dir=tmp_path / "out", _today=_TODAY
+    ).read_text()
+
+    card = next(r for r in _trend_rows(html) if "CRP" in r)
+    assert "<div class='value'>0 mg/L</div>" in card
+    assert "<span class='pill tint-good'>&#9660; 0.3 mg/L</span>" in card
+    assert "ref 0 – 3 mg/L · in range" in _captions(card)

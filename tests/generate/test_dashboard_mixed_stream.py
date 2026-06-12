@@ -153,7 +153,7 @@ def test_mixed_stream_store_renders_through_production_path(tmp_path):
     assert "discussed at visit" not in trends
 
 
-def test_trend_chips_registered_vs_unregistered(tmp_path):
+def test_delta_chips_registered_vs_unregistered(tmp_path):
     """F15 (Trend Card v2): a registered marker's delta chip carries the
     NUMERIC movement in its own unit on the polarity-aware tint; an
     unregistered marker's chip stays neutral with NO unit suffix; a
