@@ -339,6 +339,14 @@ def test_calendar_month_nav_sits_on_the_header_right():
     (datetime.date(2026, 7, 5), 31, 2, 2),
     # December 2026 starts Tue and ends Thu: 1 leading Nov, 3 trailing Jan.
     (datetime.date(2026, 12, 30), 31, 1, 3),
+    # August 2026 needs SIX rows: 5 leading Jul, 6 trailing Sep.
+    (datetime.date(2026, 8, 15), 31, 5, 6),
+    # February 2027 is exactly FOUR whole weeks: zero lead, zero trail.
+    (datetime.date(2027, 2, 10), 28, 0, 0),
+    # Leap February 2028: 29 days, 1 leading Jan, 5 trailing Mar.
+    (datetime.date(2028, 2, 29), 29, 1, 5),
+    # May 2026 ends ON a Sunday with today the month's last day: zero trail.
+    (datetime.date(2026, 5, 31), 31, 4, 0),
 ])
 def test_calendar_month_grid_renders_full_month_in_place(today, in_month, lead, trail):
     """Zone 2 renders ONE month grid (no separate expand panel): whole weeks
