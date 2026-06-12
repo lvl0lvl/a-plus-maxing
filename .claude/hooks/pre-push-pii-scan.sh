@@ -30,11 +30,15 @@
 #     approximation block-pii-commit.sh uses for the staged set): PII that was
 #     committed AND since removed from disk is not seen here — the history
 #     question belongs to a history audit, not a push gate. The commit hook's
-#     historical bd-auto-stage blind spot (PR#84 HIST-2) is closed at the commit
-#     boundary since eb1 (block-pii-commit.sh appends the working-tree
-#     .beads/issues.jsonl to its trunk-wide scan set on every commit); this layer
-#     remains the backstop for human-terminal commits, which bypass the
-#     agent-only commit hook entirely.
+#     bd-auto-stage blind spot (PR#84 HIST-2) is closed at the commit boundary
+#     since eb1 only for bead text ALREADY FLUSHED to .beads/issues.jsonl
+#     (block-pii-commit.sh appends the working-tree bd file to its trunk-wide
+#     scan set on every commit); bead text still pending in .beads/beads.db at
+#     commit-scan time is flushed+staged inside `git commit` by the bd
+#     pre-commit hook, AFTER that scan (bead ycqo). This layer remains the
+#     backstop BOTH for human-terminal commits (which bypass the agent-only
+#     commit hook entirely) AND for agent commits in that pending-unflushed
+#     window.
 #
 # stdin (git pre-push contract): "<local_ref> <local_sha> <remote_ref> <remote_sha>"
 # per ref being pushed.
