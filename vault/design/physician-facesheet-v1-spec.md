@@ -123,6 +123,31 @@ adjudication paragraph above and the Page frame's nine-report-local-token framin
   Package C starts with an updated Pencil render + operator sign-off BEFORE any
   `report.py` code; this amendment is the recorded direction, not the signed visual.
 
+**[AMENDED 2026-06-12, S53 — the v3 standardized render is SIGNED]:** the Pencil
+re-render carrying this re-map ("Physician Face Sheet — v3 (standardized tokens)")
+was reviewed on screen and operator-approved ("approved and saved"); the signed v3
+mock is operator-held per ADR-0005. The v3 token bindings, exact:
+
+- **New system tokens to register in `component_set.py` at build (all rendered
+  pairs gate-measured):** `labs` section accent `#B42318` (the v2 crimson, kept —
+  now a SYSTEM section accent); `goals` section accent `#2E8B57` (replaces the
+  data-state green as section chrome); `watch-text` `#8A6D1F` (the AA-dark form of
+  PALETTE watch — supersedes the "does NOT ship" listing of this hex above: it
+  ships as the registered watch-text token, not as an ad-hoc amber; also the fix
+  vehicle for the `b6um` sub-AA watch-text class); `watch-tint` `#FAF3E0` (exact
+  value gate-measured at build against `watch-text`).
+- **Re-mapped to existing measured tokens:** abnormal rows -> concern `#882255` on
+  concern-tint `#F3E9EE`; in-range strip + adherence chips -> good-tint `#E7F1EB`;
+  triage card -> training-tint `#EAF1FD` with `training-text` `#1D67DB` title;
+  asks card -> nutrition-tint `#FDF3EB`; borders -> card-border `#E5E7EB`; small
+  captions -> muted `#555555`; footer source-tier legend text -> the `*-text`
+  shades (`#1D67DB` lab-grade, `#0B787F` wearable, `#8A6D1F` self-reported).
+- **Unchanged (correct usages):** improving/in-range data states PALETTE good
+  `#117733`; the ACCENTS section bars (supplements teal, sleep indigo, nutrition
+  orange) + the training-blue header rule; glyph shapes ◆/●/○.
+- The v2 hex literals in the body above are the historical signed record; the v3
+  bindings in this block govern the build.
+
 ## Page 2+ (detail layer)
 
 The existing per-item render (readings tables with Date/Value/Source + sparklines),
