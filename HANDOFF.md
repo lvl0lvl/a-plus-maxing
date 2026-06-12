@@ -3,7 +3,7 @@ title: Session Handoff
 type: note
 owner: Walter McGivney
 created: 2026-05-16
-last_reviewed: 2026-06-11
+last_reviewed: 2026-06-12
 status: active
 depends_on: []
 superseded_by: null
@@ -12,46 +12,52 @@ review_cadence: weekly
 
 # Session Handoff
 
-## Scope Contract — Session 50 (2026-06-11)
+## Scope Contract — Session 51 (2026-06-11)
 
-> Confirmed by Walter ("confirmed, keep S50 to the two PRs"). Pure PR-lifecycle session — landing the two owed S49 lifecycles. Not a `v1-build` recipe task — wave/checkpoint attestation N/A (V1 plan complete 18/18).
+> Confirmed by Walter ("confirmed, and yes to the eb1 authorization"). Ultracode (dynamic workflow orchestration) explicitly enabled for this session via `/effort` — BUILD phase only; the gated skills (`/review-pr`, `/merge`) run as themselves in full, never substituted (PF-S39/S40 family + standing feedback memory). `eb1` hook-edit authorization GRANTED for `.claude/hooks/block-pii-commit.sh` only. Not a `v1-build` recipe task (remaining work is beads, not `docs/task-plan/` recipes — V1 plan complete 18/18), so wave/checkpoint attestation N/A.
 
-Goal: Land the two owed PR lifecycles — merge the S49 close (#95) and run the deferred full review cycle on the calendar zone (#94) — leaving `main` carrying both.
+Goal: Merge the S50 close PR, batch all outstanding design decisions with Walter, then ultracode-build the work packages through full review/merge lifecycles — D+E first (no design dependency), visual packages as sign-offs land.
 
 Acceptance criteria:
-- [x] AC1: PR #95 reviewed (docs 3-agent subset) with every legitimate finding fixed or beaded, then REST rebase-merged to `main`.
-- [x] AC2: PR #94 reviewed with the FULL 6-agent `/review-pr` (blind triage + blind verify dispatched, profile-less), every legitimate finding fixed or beaded, then REST rebase-merged to `main`.
-- [x] AC3: Post-merge `main` suite green.
-- [x] AC4: Session close per protocol (audits, rotation, PF attestation, close PR).
+- [ ] AC1: PR #96 reviewed (docs 3-agent subset, full methodology incl. blind triage + blind verify) with every legitimate finding fixed or beaded, REST rebase-merged to `main`; post-merge suite green.
+- [ ] AC2 (design-input batch): Walter has provided mock content — or explicit sign-off on the textual interpretation — for each visual target: `1oh` (Today's-Plan zone + nutrition meals/water/macro content), `nsxy` (physician-report design), `y0h0` (trend-card dates/ranges/deltas), `i2yw` (projection readout). Each recorded as a build target in `vault/design/dashboard-v1-visual-spec.md` (`[AMENDED]` blocks) or a new report-spec note. PF-S49-01: no visual code before its target is signed.
+- [ ] AC3 (Package D — Track-2 correctness): `s38`+`byj` (landed together), `5q5`, `juc` residual, `7lt`/`e3b`/`r5l`/`bhc`, store beads `4yk`/`1ww`/`u8u`/`1vi`, `pka` — built via ultracode worktree fan-out, full 6-agent `/review-pr`, merged; suite green.
+- [ ] AC4 (Package E — hygiene): `vp5p`, `b9l`, `2kk`, `pmp`, `eb1` (authorized) built, reviewed (full methodology), merged; suite green.
+- [ ] AC5 (visual packages, capacity-bound): of A (`1oh`), B (`y0h0`+`i2yw`), C (`nsxy`) — as many as signed targets + session capacity allow, each built against its signed target, each through full 6-agent `/review-pr` + `/merge`, sequential merges (shared `component_set.py`). Any not completed carry to S52 with their signed design targets already recorded.
+- [ ] AC6 (documentation guarantee): verified pass — every new schema/surface has a `vault/components` entry; every decision-bearing choice gets an ADR (post-V1 lighter path); visual spec amended where directed; beads closed with reasons; `vault/meta/overview.md` updated.
+- [ ] AC7: Session close per protocol (4 audits, rotation, PF attestation, close PR), with the summary explicitly attesting the full close protocol ran.
 
-Files I WILL touch: whatever the #95/#94 review findings legitimately require on their branches; `.beads/issues.jsonl` via `bd`; HANDOFF/vault/session notes at close.
+Files I WILL touch: store/ingest/scripts surfaces Package D requires; `vault/design/templates/` (component_set, render, report) for visual packages; `tests/**`; `vault/design/dashboard-v1-visual-spec.md`; `docs/adr/` (new ADRs only); `vault/components/`; `.beads/issues.jsonl` via `bd`; HANDOFF/vault at close; `.claude/hooks/block-pii-commit.sh` ONLY (the `eb1` authorization).
 
-Files I will NOT touch: `.claude/hooks/*` + `settings.json` (no authorization); INVARIANTS.md rows; deployed roster `.claude/agents/*`; `main` directly; `vault/design/dashboard-v1-design.md` + `dashboard-v1-visual-spec.md` (read-only unless a finding demands a doc fix).
+Files I will NOT touch: `.claude/settings.json`; any hook other than `eb1`'s target; INVARIANTS.md rows; deployed roster `.claude/agents/*`; `main` directly; `PALETTE`/`SERIES`/`ACCENTS` (ADR-0009 locked).
 
-NOT doing: the next dashboard slices (`1oh` plan-content schemas, `y0h0`/`i2yw` residuals, the report design pass, LM-02 wearable scoring); Track-2 beads; library population.
+NOT doing: library research (`/aplus-research` track); LM-02 wearable scoring and all data-gated work (LM-03/LM-04, July-visit ingestion).
 
 Invariants at risk: none structurally; the close set (INV-SCOPE-CONTRACT, INV-PF-ATTESTATION, INV-HO-ROTATION, INV-HO-NO-STALE-HASH, INV-BRANCH-NOT-MAIN, INV-TRUNK-COMPLETENESS) enforced by the audits.
 
-### S50 Scope Contract Evaluation (2026-06-11, volatile)
+### S51 Scope Contract Evaluation (2026-06-12, volatile)
 
-- **AC1 (PR #95 reviewed + merged) — PASS.** 3-agent docs subset → 5 findings; blind triage 4 LEGITIMATE + 1 NOT_A_BUG (refuted with cited evidence — the fitness-demo constraint is durable in ADR-0009, no rotation-loss risk). 4 fixed + blind-verified 4/4, including the month-calendar overstatement in the durable close record (the PF-S48/S49 class, caught by review before merge). REST rebase merged.
-- **AC2 (PR #94 full review + merged) — PASS.** 6 agents → 11 raw / 8 deduped findings; blind triage 8/8 LEGITIMATE (the triage agent independently re-ran all three mutation claims); 8 fixed + blind-verified 8/8, RED-proofs on the three test strengthenings. Substantive catches: the month-reveal control was keyboard/AT-inoperable (fixed to a focusable visually-hidden checkbox + `:focus-visible` outline, zero-script intact) and the reveal test could not detect its own feature dying (a div-wrap mutation killing every `~` rule passed all 7 calendar tests — now structurally pinned). Suite grew 447→451 (4 new month-shape params: 6-row, 4-row/zero-lead-zero-trail, leap-Feb, today-on-last-day). REST rebase merged.
-- **AC3 (main suite green) — PASS.** 451 passed / 2 skipped on merged `main` (above the predicted 447 — the review added tests).
-- **AC4 (close) — PASS** (this close).
+- **AC1 (PR #96 reviewed + merged; post-merge green) — PASS.** Docs 3-agent subset → 4 deduped findings (incl. one elevated from a reviewer's self-suppressed note per PF-S26-01); blind triage 2 LEGITIMATE (fixed + blind-verified 2/2, incl. the AA-gate "every rendered pair" overclaim disproven with a computed 2.13:1 counterexample) + 2 beaded (`b6um`, `jyy5`). REST rebase merged; suite 451/2 then.
+- **AC2 (design-input batch) — FAIL, operator-deferred.** Walter deferred the mock screenshots + `nsxy` preference to S52 at close ("we'll pick up the actual work in the next session"). Not silently changed — explicitly deferred; PF-S49-01 HELD (zero visual code built without a signed target).
+- **AC3 (Package D) — PASS for the buildable set / CHANGED (operator-adopted) for the decision set.** The 19-agent analysis fan-out verified every bead live and routed 9 to decisions (flagged at the time, not silent). Built + full-6-agent-reviewed + merged: `s38`+`byj`+`bhc`+`5q5` (#99), `4yk` (#98), `7lt` (#97), `r5l`+`u8u` (#101, convention defaults). Adjudicated by Walter at close (recorded in beads): `1vi` superseding-append, `pka` project-local, `e3b` option (b), `juc` own design conversation, `1ww` keep-deferred.
+- **AC4 (Package E) — PASS / CHANGED same shape.** Built + merged: `vp5p` (#99), `b9l`+`eb1` (#100, hook edit within its single authorized file). Adjudicated: `2kk` closed keep-out-of-scope, `pmp` author + Role-4 review (S52).
+- **AC5 (visual packages) — NOT STARTED, carried.** No signed design targets existed (AC2); carried to S52 per the contract's carve-out, with the targets still to be recorded there.
+- **AC6 (documentation guarantee) — PASS for everything built.** Every merged unit carries its component-doc updates (5 pages), ADR/recipe inline amendments (ADR-0002, ADR-0005-T1, ADR-0007-T1), one new vault decision note (scheduler marker), beads closed with provenance reasons, `vault/meta/overview.md` S51 block.
+- **AC7 (close) — PASS** (this close).
 
-### Drift checks (S50 close)
+### Drift checks (S51 close)
 
-- **Task drift:** the contracted unit delivered exactly — two PR lifecycles, nothing else started. The 12 review fixes fall inside the contract's "whatever findings legitimately require on their branches" clause (including the one visual-spec line, which the NOT-touch list explicitly conditioned on a finding demanding it). No silent drift.
-- **Architecture drift:** none degraded; three guards STRENGTHENED on #94 — the month reveal is now keyboard/AT-operable (honoring ADR-0004's unqualified WCAG-AA commitment beyond contrast), the reveal's sibling mechanism is structurally pinned in tests (the div-wrap mutation now fails the suite), and the AA gate measures the `.cal .dout` pair explicitly (closing the same gap class the S49 measured-pairs fix closed). `PALETTE`/`SERIES`/`ACCENTS` byte-identical (contracts-agent verified pre-merge). Zero-script held (the focusable pattern is pure CSS). INV-BRANCH-NOT-MAIN held (review fixes on the PR branches; close on `fix/s50-close`); INV-TRUNK-COMPLETENESS 0 violations at open + close.
-- **Vision drift:** none. What the system IS after S50: "a local-first health tracking + planning system, V1 complete, whose dashboard renders the designed app surface INCLUDING the finished calendar zone — real month-table where the week view is one month row, with a keyboard-accessible zero-script in-place month reveal — on `main`, fully reviewed, over real fitness-domain data with mechanically honest awaiting states in the five zones whose data models are still unbuilt (plans `1oh`, wearable LM-02, calendar events, goals, rollup)." Matches `design/vision.md`; the remaining gap is data models, not surface.
+- **Task drift:** AC2/AC5 operator-deferred at close (explicit, recorded above). The AC3/AC4 decision-routing was flagged mid-session and operator-adopted. Two flagged in-spirit doc-surface additions beyond the contract's "new ADRs only" line: inline amendments to existing ADR/recipe files (ADR-0002, ADR-0005-T1, ADR-0007-T1) + the new `vault/decisions/` scheduler note — each required by a contracted bead's own fix and flagged when discovered. The `eb1` hook edit stayed within its single authorized file; the `ycqo` expansion was correctly NOT built until Walter's sign-off (granted at close, build S52). No silent drift.
+- **Architecture drift:** none degraded; five guards STRENGTHENED — the PII commit boundary now scans bd bead content (headers precisely scoped, the pending-in-db residual tracked in `ycqo`); the store has a single enumeration owner with pinned round-trip + propagation contracts; the scheduler's wired-set membership is a typed contract (prose==code pinned by a falsy-fixture test); the panel loop's no-fabrication direction is provenance-based (a stale superseded result can no longer render as current); fail-fast storage contracts are docstring+page+test pinned. `PALETTE`/`SERIES`/`ACCENTS` byte-identical (review-verified on #99). INV-BRANCH-NOT-MAIN held (all work on short-lived branches; the checkout moved off `main` early — also the legitimate unblock for the newly-DISCOVERED worktree-blind hook gap, bead `29u4`: `block-commit-main` false-positives + `block-pii-commit` vacuous staged-set scan for worktree commits — surfaced, beaded, not introduced). INV-TRUNK-COMPLETENESS verified by audit at open + close.
+- **Vision drift:** none. What the system IS after S51: "a local-first health tracking + planning system, V1 complete, dashboard designed-surface complete, whose data/correctness layer is now hardened — panel results flow store→render with provenance-based resolution, the store publishes its enumeration surface, the scheduler's wired-set contract is typed, the PII commit boundary covers bead content, and the fail-fast storage contracts are pinned — with the remaining gap unchanged: data models for the five awaiting zones, gated on the S52 design-input batch." Matches `design/vision.md`.
 
 ### PF attestation
 
-S50 close (2026-06-11): **No new PF-class entries this session.** Full attestation with held falsification windows and non-promoted observations in `memory/process-failures.md` (Session 50 section).
+S51 close (2026-06-12): **PF-S51-01 promoted** (`AP-SHARED-WORKTREE-CONCURRENT-AGENTS`, N=3) and **PF-S39-01 recurrence recorded on the merge surface** (merges #100/#99/#101 ran the full methodology substance without fresh `/merge` Skill invocations; self-caught at close; structural fix beaded `lz01`). Full attestation with the per-PR invocation table, held windows, and non-promoted observations in `memory/process-failures.md` (Session 51 section).
 
 ## Historical Scope Contracts (archived)
 
-Scope contracts for Sessions 5-49 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S46 archived S44 + S45 together — S44's entry had been missed at the S45 close; S47 archived S46; S48 archived S47; S49 archived S48; S50 archived S49) to keep this handoff lean. The current (S50) scope contract is above; the archive holds the prior-session archaeology.
+Scope contracts for Sessions 5-50 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S46 archived S44 + S45 together — S44's entry had been missed at the S45 close; S47 archived S46; S48 archived S47; S49 archived S48; S50 archived S49; S51 archived S50) to keep this handoff lean. The current (S51) scope contract is above; the archive holds the prior-session archaeology.
 
 ## Session 4 close — 2026-05-25
 
@@ -68,7 +74,7 @@ If context was compacted, run `bd prime` then:
 4. Read MEMORY.md (in `~/.claude/projects/-Users-waltermcgivney-Documents-Projects-a-plus-maxing/memory/`)
 5. Read `vault/WIKI.md` (wiki schema + agent consumer roster)
 6. Query vault for current phase (basic-memory search)
-7. Read the most recent session note in `vault/sessions/` — currently `session-42.md`
+7. Read the most recent session note in `vault/sessions/`
 8. Read `vault/decisions/` for architecture decisions
 9. Read `.claude/skills/aplus-research/SKILL.md` (project-local research skill with blocking gates — the path to use for all wiki-bound research from session 3 forward)
 10. Read `vault/design/artifact-design-protocol.md` before generating any HTML artifact
@@ -253,32 +259,32 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **Next dashboard slice is `1oh` (plan-content schemas + the `assemble()` render surface) — and it is VISUAL work, so PF-S49-01 applies BEFORE any code.** The Today's-Plan zone and the nutrition card's meals-checklist/water/macro-fill content (Walter's S49 confirmation: that content belongs to this slice) must be built from the authoritative visual: request the operator-held mock content (a screenshot suffices) or get explicit sign-off on the textual interpretation FIRST. In-repo build target: `vault/design/dashboard-v1-visual-spec.md` (now carries the complete Zone-2 `[AMENDED]` blocks on `main`).
-2. **The S49 close PR cycle taught: review catches overstated build-state in the durable record.** The #95 review caught the close attestation claiming the month calendar was merged when it lived on #94 (the PF-S48/S49 overstate class, in the PF log itself). At every close: state what is ON MAIN, attribute everything else to its open PR/branch by number.
-3. **Standing discipline:** read-before-invoke + run the FULL methodology (Phase-3 blind triage + Phase-7 blind verify are non-optional, profile-less); GraphQL throttled → PR create/merge via REST `gh api` with the full 40-char SHA guard; `git add` / `git commit` / `git push` / any `gh` call as SEPARATE tool calls; `.claude/hooks/*` + `settings.json` edits need explicit per-session authorization; rendered demo artifacts use fitness-domain data ONLY (durable in ADR-0009); the bd pre-commit hook auto-stages `.beads/issues.jsonl` into the first commit after a daemon flush (`eb1`) — inspect that diff before pushing.
+1. **S52 opens with the design-input batch — PF-S49-01 applies BEFORE any visual code.** All three visual packages (A `1oh` plans+nutrition content, B `y0h0`+`i2yw` trend-card residuals, C `nsxy` report design) are gated on Walter's mock screenshots or explicit sign-off on a textual interpretation; record each signed target in `vault/design/dashboard-v1-visual-spec.md` (or a report-spec note) before building. The adjudicated non-visual builds (`ycqo` approved hook completion, `1vi`, `pka`, `pmp`, `e3b`) carry their decisions in the bead notes — build from those, not from memory.
+2. **Gated-skill invocation discipline (PF-S39-01 recurred S51 on the merge surface):** invoke `/review-pr` AND `/merge` via the Skill tool fresh for EVERY PR — running the methodology substance from in-session context is the documented failure even when complete; the close attestation now carries a per-PR invocation table (interim guard until bead `lz01` mechanizes the trace check).
+3. **Multi-agent review orchestration (PF-S51-01):** mutation-running agents get EXCLUSIVE worktree access; concurrent readers use `git show <sha>:<path>`; reused worktrees get `__pycache__` cleared + a clean-tree check before dispatch. Standing: REST `gh api` with the full-40-char SHA for PR ops; separate git tool calls; `.claude/hooks/*` edits need per-session authorization (the worktree-blind hook gap is bead `29u4` — its fix needs that authorization).
 
 ## Current State (volatile)
 
-- **S50 (2026-06-11) landed the two owed PR lifecycles.** `main` at `ec58580` (as of 2026-06-11 S50 close), suite **451 passed / 2 skipped** on `main`. Merged: #95 (S49 close + 4 review fixes, 3-agent docs subset, blind-verified 4/4) and #94 (calendar in-place month reveal + 8 review fixes, full 6-agent review, blind-verified 8/8). No PR is open except the S50 close PR (opened at this close).
-- **The calendar zone is COMPLETE on `main`:** a real month-calendar table where the visible week IS one month row, with a zero-script, now keyboard/AT-operable in-place month reveal (focusable visually-hidden checkbox + `:focus-visible` outline). The reveal mechanism is structurally pinned (a div-wrap mutation fails the suite), the month grid is pinned across 8 month shapes (incl. 6-row, 4-row zero-lead/zero-trail, leap-Feb, today-on-last-day) plus a datetime-derived whole-grid day-sequence oracle, and the AA gate measures the 11 tint pairs, the tinted-stat pairs, and the calendar today/other-month cells explicitly (state-colored legend text is outside the gate).
-- **Zones still awaiting data models:** plans (`1oh` — also carries the nutrition meals/water/macro-fill content per Walter's S49 note), wearable scoring (LM-02), calendar events, goals, per-specialist rollup. `i2yw` (projection readout) + `y0h0` (card dates/ranges/deltas) residuals unchanged. The physician-report design-pass bead remains open.
-- **Active landmarks:** no trigger windows opened. LM-04 still gated on real operator data.
+- **S51 (2026-06-11→12) ran the first ultracode build fan-out: five units merged through six full PR lifecycles.** `main` at `f0c54ff` (as of 2026-06-12 S51 close), suite **461 passed / 2 skipped**; hook shell suite 57/0. Merged: #96 (S50 close + 2 review fixes), #97 (scheduler typed `UNWIRED` contract), #98 (store `items`/`read_all` published), #100 (PII `token_config` rename + bd-content commit scan), #99 (panel result writer + provenance-based `read_panel` + render value rows), #101 (fail-fast doc+test pins). 13 beads closed (11 build + `2kk` adjudicated + `jyy5` fixed in this close); 0 review findings suppressed across ~36 deduped findings.
+- **Operator adjudications recorded in beads (Walter, 2026-06-12):** `ycqo` flush-before-scan APPROVED (build S52); `1vi` superseding-append; `pka` project-local checklist; `pmp` author + Role-4 review; `e3b` option (b); `juc` own design conversation; `1ww` keep-deferred.
+- **Zones still awaiting data models (unchanged):** plans (`1oh` + nutrition content), wearable LM-02, calendar events, goals, rollup; `y0h0`/`i2yw` residuals + `nsxy` open — all gated on the S52 design-input batch.
+- **Active landmarks:** no trigger windows opened (LM-01 July visit date still TBD).
 
-**Historical (kept for reference):** `vault/sessions/session-50.md`.
+**Historical (kept for reference):** `vault/sessions/session-51.md`.
 
 ## What Is Next (volatile)
 
-### Resume checklist — next session (S51) open
+### Resume checklist — next session (S52) open
 
-**FIRST: merge the S50 close PR** (`fix/s50-close` → `main`; docs 3-agent `/review-pr` subset → REST rebase `/merge`). Open normally (Session Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline on `main` **451 passed / 2 skipped**). Separate-tool-call git rules + REST-for-PR-ops per Top-3 #3.
+**FIRST: merge the S51 close PR** (`fix/s51-close` → `main`; docs 3-agent `/review-pr` subset → REST rebase `/merge`, BOTH invoked fresh via the Skill tool per Top-3 #2). Open normally (Session Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline on `main` **461 passed / 2 skipped**).
 
-1. **Next dashboard slices, highest value first:** (a) **`1oh` plan-content schemas + the `assemble()` render surface** — fills the Today's-Plan zone AND the nutrition card's meals checklist / water / macro fills (Walter confirmed those belong to this slice); VISUAL work — apply Top-3 #1 (request the mock content / sign-off before building); (b) **`y0h0` residual** — measurement date + rendered range + numeric delta on trend cards; (c) **`i2yw` residual** — projection readout on trend chips; (d) the **report design pass** (it inherited the sheet frame without its own design); (e) LM-02-gated wearable scoring (fills the hero rings; remember the recorded guard-narrowing note in ADR-0009 when ring arcs go live).
-2. **Track 2 (V1 data-surface correctness):** `s38`+`byj` panel-result-writer pair (land TOGETHER); `5q5`; `juc` residual (per-marker lab streams); `7lt`/`e3b`/`r5l`/`bhc`; store beads `4yk`/`1ww`/`u8u`/`1vi`; `pka` before the library track.
-3. **LM-04** first HTML artifact (Walter-pending real data) + **library-population** `/aplus-research` track. The P3 tail: run `bd ready` / `bd list --status open`.
+1. **Design-input batch with Walter (the S51 AC2 carryover):** mock screenshots (Today's-Plan + nutrition card + a trend-card close-up) or signed textual interpretations; record each target in the visual spec / a report-spec note. THEN the visual packages: A (`1oh` plan schemas + render surface), B (`y0h0`+`i2yw` residuals), C (`nsxy` report design) — full lifecycles, sequential merges (shared `component_set.py`).
+2. **Approved/adjudicated builds (decisions in the bead notes):** `ycqo` (hook flush-before-scan, operator-approved — cite the recorded approval in the scope contract), `e3b` (option b + ADR-0006-T1 amendment), `pka` (project-local checklist), `pmp` (denylist + Role-4 review), `1vi` (superseding-append — needs the consumer wiring sweep + ADR-0002 amendment), `29u4` (worktree-aware hooks — needs hook authorization), `lz01` (skill-trace close audit).
+3. **The `juc` design conversation** (architect + operator; sub-questions in the bead). Then LM-04 (Walter-pending real data) + the library-population `/aplus-research` track. Tail: `bd ready`.
 
 ## Landmark window check (close step 8.7)
 
-S50 close (2026-06-11): re-read `vault/meta/landmarks.md`. No `active` landmark's trigger window opened during S50 (LM-01 July visit — exact date still TBD, >14 days out; LM-02/LM-03 date-TBD pending Walter; LM-04 awaits real operator data — no artifact from real data this session). No landmark actions due.
+S51 close (2026-06-12): re-read `vault/meta/landmarks.md`. No `active` landmark's trigger window opened during S51 (LM-01 July visit — exact date still TBD, >14 days out; LM-02/LM-03 date-TBD pending Walter; LM-04 awaits real operator data — no artifact from real data this session). No landmark actions due.
 
 ## Open Issues
 

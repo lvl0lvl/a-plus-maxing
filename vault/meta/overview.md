@@ -4,7 +4,7 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-06-11
+last_reviewed: 2026-06-12
 depends_on: []
 superseded_by: null
 review_cadence: monthly
@@ -75,6 +75,23 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - No diet app — LLM computes macros/micros from `protocols/meal-template.md`
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
+
+## Status as of 2026-06-12 (S51) — data/correctness layer hardened (ultracode build fan-out)
+
+Five build units merged through full review lifecycles (PRs #97-#101; `main` at `f0c54ff`,
+suite 461 passed / 2 skipped): the scheduler's wired-set membership is a typed `UNWIRED`
+attribute contract; the store publishes `items()`/`read_all()` (single enumeration owner,
+empty-item round-trip fixed, exception propagation pinned); the PII commit boundary scans
+bd bead content (with precisely-scoped headers — the pending-in-db window remains until
+bead `ycqo`, operator-approved for S52) and `scan`/`scan_text` use `token_config` with a
+guarded deprecation alias; the ADR-0007 panel loop has its result side (`record_panel_result`
++ source-tag-provenance `read_panel`, landed results render as escaped value rows); fail-fast
+storage contracts are docstring+test pinned (`r5l`/`u8u` convention defaults). Eleven build
+beads closed + `2kk` adjudicated closed; operator adjudications recorded on `1vi`/`pka`/
+`pmp`/`e3b`/`juc`/`1ww`. Dashboard zones still awaiting data models (unchanged): plans
+(`1oh` + nutrition content), wearable LM-02, calendar events, goals, rollup; `y0h0`/`i2yw`
+residuals + the `nsxy` report design pass open — all gated on the S52 design-input batch
+(PF-S49-01). Session detail: `vault/sessions/session-51.md`.
 
 ## Status as of 2026-06-11 (S50) — dashboard DESIGNED SURFACE complete incl. calendar zone
 
