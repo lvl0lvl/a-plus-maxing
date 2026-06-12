@@ -2,8 +2,10 @@
 
 One NDJSON file per item under the store root (ADR-0002-T0 File Granularity).
 `append` validates and idempotently writes one line; `read` scans the item file
-and returns readings ordered by timepoint. Local file I/O only — no network,
-login, or model step (ADR-0001 D1->D2).
+and returns readings ordered by timepoint; `items`/`read_all` publish the
+cross-item surface (sorted item enumeration, flat item-then-timepoint-ordered
+read model) so no consumer enumerates the on-disk layout itself. Local file
+I/O only — no network, login, or model step (ADR-0001 D1->D2).
 """
 
 import json
@@ -144,3 +146,39 @@ def read(item, root=DEFAULT_ROOT):
     """
     readings = _read_lines(_item_path(item, root))
     return sorted(readings, key=lambda r: r["timepoint"])
+
+
+def items(root=DEFAULT_ROOT):
+    """Return the sorted item identifiers stored under the store root.
+
+    Owns the one-`.ndjson`-file-per-item layout knowledge (ADR-0002-T0 File
+    Granularity): an item is stored iff its `.ndjson` file exists under the
+    root. A missing or empty root yields an empty list.
+
+    Args:
+        root (str | Path, optional): Store root. Defaults to `vault/store/`.
+
+    Returns:
+        (list) The stored item identifiers, sorted lexicographically.
+    """
+    return sorted(p.stem for p in Path(root).glob("*.ndjson"))
+
+
+def read_all(root=DEFAULT_ROOT):
+    """Return every stored item's readings as one flat cross-item list.
+
+    Concatenates `read(item, root=root)` over `items(root)`: the outer order
+    is item-name lexicographic, the order within an item is `read`'s timepoint
+    sort. Delegates through `read`, so malformed-line skipping behaves exactly
+    as a per-item read (one `STORE-SKIP:` stderr line per skipped line).
+
+    Args:
+        root (str | Path, optional): Store root. Defaults to `vault/store/`.
+
+    Returns:
+        (list) The flat list of reading dicts across every stored item.
+    """
+    readings = []
+    for item in items(root):
+        readings.extend(read(item, root=root))
+    return readings
