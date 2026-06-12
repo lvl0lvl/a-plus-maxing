@@ -18,12 +18,23 @@ network, no model step (ADR-0001 → ADR-0002).
 - `keying.LINE_FIELDS = (item, timepoint, source, value)` — the closed Line Field Set
   every store line carries; the ONLY key definition in the codebase (ADR-0002-T0).
 - Dedupe identity = `(item, timepoint, source)` — value EXCLUDED, so a re-append of the
-  same tuple is an idempotent no-op (`keying.dedupe_key`). Distinct same-timepoint
-  entries need a varying source (see `loop_schema._content_tag`).
+  same tuple is an idempotent no-op (`keying.dedupe_key`), value drift included: normal
+  ingest NEVER overrides a stored value. Distinct same-timepoint entries need a varying
+  source (see `loop_schema._content_tag`).
 - `store.append(item, reading, root)` — validates conformance, atomic rewrite
   (temp sibling → fsync → `os.replace`), self-heals malformed lines.
-- `store.read(item, root)` — returns conformant readings sorted lexicographically by
-  `timepoint` (assumes UTC-offset timestamps). Malformed lines skipped with a
+- `store.correct(item, reading, root)` — the bead-1vi explicit correction primitive
+  (surfaced as `scripts/ingest/correction.py` `manual_correction`): appends a
+  SUPERSEDING line for an already-stored identity despite the dedupe; the superseded
+  line stays on disk (append-only audit trail, ADR-0002 v1.4). Idempotent on the
+  resolved value (re-running the same correction appends 0 lines); a never-stored
+  identity raises `ValueError` (a mistyped correction fails loud, never a silent new
+  series point).
+- `store.read(item, root)` — resolves each `(item, timepoint, source)` identity to its
+  LAST line in file (append) order (latest-wins — a correction supersedes the line it
+  corrects), then returns the resolved readings sorted lexicographically by
+  `timepoint` (assumes UTC-offset timestamps). Every consumer reads corrected values
+  through this one surface. Malformed lines skipped with a
   `STORE-SKIP: <path>:<line>` stderr signal (a consumer-visible channel). A directory
   named `<item>.ndjson` under the root raises `IsADirectoryError` out of `read`
   (`read_all` propagates) — fail-fast at the storage boundary, not guarded (bead u8u,
@@ -35,10 +46,11 @@ network, no model step (ADR-0001 → ADR-0002).
   enumerated as an item, deliberately unfiltered (its `read` raises, per the fail-fast
   contract above). `store.read_all(root)` — the flat cross-item read model,
   item-name-sorted outer order, timepoint-sorted within item. `read_all` delegates
-  through `read`, so the STORE-SKIP channel passes through unchanged (bead 4yk;
-  ADR-0002 v1.3 amendment).
+  through `read`, so the STORE-SKIP channel AND the latest-wins resolution pass
+  through unchanged (bead 4yk; ADR-0002 v1.3 amendment).
 
 **Called by (production):** `loop_schema` (all writers/readers), `generate.run`
-(via `store.read_all`), ingest adapters, router tests/seeds.
+(via `store.read_all`), ingest adapters, `correction.manual_correction` (via
+`store.correct`), router tests/seeds.
 
 **Governing ADR:** ADR-0002 (store), ADR-0003 (ingestion keying).
