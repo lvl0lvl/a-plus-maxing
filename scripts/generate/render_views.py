@@ -6,10 +6,11 @@ data only through the ADR-0002-T1 store read model (surfaced by `loop_schema`), 
 assembles them through the ADR-0004-T1 `render.emit` engine + the single
 `component_set` shared component def. It maps the ADR-0007-T1 store states 1:1 to
 rendered state (a landed panel result — a value, not a state — renders as a value
-row) and keeps each artifact under the ADR-0004-T0 cap. It CONSUMES five
+row) and keeps each artifact under the ADR-0004-T0 cap. It CONSUMES six
 published interfaces (the T1 store-state contract, the T1 render engine + component
-library, the T0 cap, the T1 store read model, the T1 egress guard) and publishes no
-new broadly-reused interface.
+library, the T0 cap, the T1 store read model, the T1 egress guard, and the shared
+`biomarker_meta` projection seam — `projection_values` + `PROJECTION_MIN_TIMEPOINTS`)
+and publishes no new broadly-reused interface.
 
 Local-only by construction: it opens no network and runs no model step — it reads the
 store and writes self-contained local HTML files.
