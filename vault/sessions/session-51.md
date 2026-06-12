@@ -51,8 +51,8 @@ where real (#96 HIST note → 2 LEGITIMATE fixes).
   use `git show`; reused worktrees get `__pycache__` cleared + clean-tree check.
 - **PF-S39-01 recurrence (merge surface):** merges #100/#99/#101 ran the full methodology
   substance but without fresh `/merge` Skill invocations (reviews were 5/5 fresh).
-  Self-caught at close; family structural fix finally beaded (`hwq8`-class skill-trace
-  close audit — see bead created at this close).
+  Self-caught at close; family structural fix finally beaded (`lz01`, the skill-trace
+  close audit, created at this close).
 - **Worktree-blind hooks discovered** (bead `29u4`): `block-commit-main` false-positives +
   `block-pii-commit` vacuous staged-set scan for worktree commits; one builder worked
   around it via `sh -c` (disclosed, content verified clean), another used the hook's
@@ -72,7 +72,7 @@ superseding-append semantics; `pka` project-local checklist; `pmp` author + Role
 
 - Beads closed this session: 11 build (`7lt 4yk b9l eb1 s38 byj bhc 5q5 vp5p r5l u8u`) +
   `2kk` (adjudicated) + `jyy5` (stale pointer, fixed in this close). Created: `b6um`,
-  `jyy5`, `29u4`, `5zfk`, `kzdw`, `1uav`, `ycqo`, `r3pq`, + the skill-trace audit bead.
+  `jyy5`, `29u4`, `5zfk`, `kzdw`, `1uav`, `ycqo`, `r3pq`, + `lz01` (skill-trace audit).
 - NOT done (operator-deferred to S52 at close): AC2 design-input batch (mock screenshots,
   `nsxy` preference) and therefore all visual packages (A `1oh`, B `y0h0`+`i2yw`, C `nsxy`)
   — PF-S49-01 held: no visual code was built without a signed target.
