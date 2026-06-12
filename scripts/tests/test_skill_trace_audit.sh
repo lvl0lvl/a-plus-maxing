@@ -78,7 +78,7 @@ run_case t3_bare_no 51 "$(cat <<'EOF'
 | #96 | YES | YES |
 | #100 | YES | **NO — same** |
 EOF
-)" 1 'lacks the word "violation"'
+)" 1 '/merge cell starts with NO but lacks the word "violation"'
 
 # ── T4: NO cell WITH violation marker → pass ──────────────────────────
 echo "T4: NO with violation marker passes"
@@ -262,6 +262,76 @@ run_case t17_escaped_pipe 51 "$(cat <<'EOF'
 | #96 | YES (Skill tool \| ref) | YES |
 EOF
 )" 0
+
+# ── T18: invalid UTF-8 crashes the analyzer → exit 2, never 0 ─────────
+# Kills the crash-exit-0 mutant (exit 2 → exit 0 in the analyzer-failed
+# branch).
+echo "T18: analyzer crash on invalid UTF-8 exits 2"
+printf '## Session 51\n\xff\xfe\n' > "$TMP/t18.md"
+stderr_capture=$("$AUDIT" --session 51 --file "$TMP/t18.md" 2>&1 >/dev/null)
+rc=$?
+if [[ $rc -eq 2 && "$stderr_capture" == *"analyzer failed"* ]]; then
+    echo "  PASS: analyzer crash exit code + message"
+    PASS=$((PASS + 1))
+else
+    echo "  FAIL: analyzer crash rc=$rc (expected 2 + 'analyzer failed')"
+    echo "    stderr: $stderr_capture"
+    FAIL=$((FAIL + 1))
+fi
+
+# ── T19: escape hatch present, but a present table is still validated ──
+# Kills the if-no_lifecycle-skip-rows mutant (hatch sentence waiving the
+# per-cell validation of a table that IS present).
+echo "T19: hatch sentence does not waive row validation of a present table"
+run_case t19_composite 51 "$(cat <<'EOF'
+## Session 51 (2026-06-11 → 12)
+
+### S51 close attestation (2026-06-12)
+
+No PR lifecycles ran this session.
+
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh |
+|---|---|---|
+| #96 | YES | **NO — same** |
+EOF
+)" 1 'lacks the word "violation"'
+
+# ── T20: --session=N / --file=PATH equals forms parse ─────────────────
+# Kills the equals-form-parse mutant (broken --session=* branch).
+echo "T20: equals-form arguments accepted"
+cat > "$TMP/t20.md" <<'EOF'
+## Session 51 (2026-06-11 → 12)
+
+### S51 close attestation (2026-06-12)
+
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh |
+|---|---|---|
+| #96 | YES | YES |
+EOF
+"$AUDIT" --session=51 --file="$TMP/t20.md" 2>/dev/null
+rc=$?
+if [[ $rc -eq 0 ]]; then
+    echo "  PASS: equals-form exit code"
+    PASS=$((PASS + 1))
+else
+    echo "  FAIL: equals-form rc=$rc (expected 0)"
+    FAIL=$((FAIL + 1))
+fi
+
+# ── T21: bare NO in the REVIEW column is attributed to /review-pr ─────
+# Kills the column-swap mutant (review/merge skill labels exchanged);
+# pairs with T3's /merge-attributed needle.
+echo "T21: bare NO in review column attributed to /review-pr"
+run_case t21_review_attribution 51 "$(cat <<'EOF'
+## Session 51 (2026-06-11 → 12)
+
+### S51 close attestation (2026-06-12)
+
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh |
+|---|---|---|
+| #96 | **NO — same** | YES |
+EOF
+)" 1 '/review-pr cell starts with NO but lacks the word "violation"'
 
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""
