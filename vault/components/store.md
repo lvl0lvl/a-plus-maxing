@@ -3,7 +3,7 @@ title: store — local NDJSON time-series store
 type: reference
 status: active
 created: 2026-06-10
-last_reviewed: 2026-06-10
+last_reviewed: 2026-06-11
 review_cadence: on-change
 permalink: a-plus-maxing/components/store
 ---
@@ -27,10 +27,13 @@ network, no model step (ADR-0001 → ADR-0002).
   `STORE-SKIP: <path>:<line>` stderr signal (a consumer-visible channel).
 - `store._item_path` rejects any item whose path is not a direct child of the root
   (path-escape guard); `::`-prefixed items are direct children (legal).
-- There is NO read-all surface; `generate._read_store` enumerates `*.ndjson` (a
-  documented coupling to the on-disk layout).
+- `store.items(root)` — sorted item slugs under the root (owns the one-`.ndjson`-per-item
+  layout knowledge); `store.read_all(root)` — the flat cross-item read model,
+  item-name-sorted outer order, timepoint-sorted within item. `read_all` delegates
+  through `read`, so the STORE-SKIP channel passes through unchanged (bead 4yk;
+  ADR-0002 v1.3 amendment).
 
-**Called by (production):** `loop_schema` (all writers/readers), `generate._read_store`,
-ingest adapters, router tests/seeds.
+**Called by (production):** `loop_schema` (all writers/readers), `generate.run`
+(via `store.read_all`), ingest adapters, router tests/seeds.
 
 **Governing ADR:** ADR-0002 (store), ADR-0003 (ingestion keying).

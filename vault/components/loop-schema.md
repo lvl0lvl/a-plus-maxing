@@ -35,7 +35,7 @@ protocols; raises no automated signal.
   next-generation inputs (nothing expires or is overwritten).
 
 **Called by (production):** `render_views` (typed reads), the type-routed dashboard
-template (stream-prefix routing over `generate._read_store`'s flat read model), the
+template (stream-prefix routing over `store.read_all`'s flat read model), the
 plan loop.
 
 **Governing ADR:** ADR-0007 (placement: loop state = store schema; matrix/projection =
