@@ -335,6 +335,21 @@ def test_tracking_identical_reentry_is_idempotent(tmp_path):
     assert len(store.read("plan-track::workout", root=tmp_path)) == 1
 
 
+def test_tracking_revert_to_earlier_snapshot_is_dedupe_noop(tmp_path):
+    """A→B→A: re-recording A is a no-op (its content-tagged identity already
+    exists) and the read keeps serving B — the documented revert hole
+    (ADR-0010 consequences); reverting requires any differing content."""
+    plan_schema.record_plan_tracking("workout", {"elapsed_min": 20}, "2026-06-10", tmp_path)
+    plan_schema.record_plan_tracking("workout", {"elapsed_min": 42}, "2026-06-10", tmp_path)
+    plan_schema.record_plan_tracking("workout", {"elapsed_min": 20}, "2026-06-10", tmp_path)
+    assert len(store.read("plan-track::workout", root=tmp_path)) == 2, (
+        "the A re-entry appends nothing"
+    )
+    assert plan_schema.read_plan_tracking("workout", "2026-06-10", tmp_path) == {
+        "elapsed_min": 42
+    }, "the read keeps serving B (documentation-of-reality)"
+
+
 def test_tracking_sources_reuse_loop_schema_content_tag(tmp_path):
     """The tracking source IS loop_schema's content-tag derivation — no second one.
 
@@ -415,6 +430,26 @@ def test_resolve_plan_same_date_latest_appended_wins(tmp_path):
     plan_schema.record_plan("workout", second, "2026-06-10", "trainer", tmp_path)
     resolved = plan_schema.read_plan("workout", "2026-06-10", tmp_path)
     assert resolved["plan"] == second
+    assert resolved["specialist"] == "trainer"
+
+
+def test_correction_never_repromotes_past_later_same_date_plan(tmp_path):
+    """The last reading in `store.read` list order wins — the append order of
+    DISTINCT identities: correcting the earlier specialist's plan supersedes
+    its identity's value WITHOUT re-promoting it past the later-recorded
+    same-date plan; correcting the later one updates the resolved render."""
+    plan_schema.record_plan("workout", _workout_plan(), "2026-06-10", "coach", tmp_path)
+    trainer_plan = {"exercises": [{"name": "Row", "sets": 3}]}
+    plan_schema.record_plan("workout", trainer_plan, "2026-06-10", "trainer", tmp_path)
+    coach_corrected = {"exercises": [{"name": "Deadlift", "sets": 5}]}
+    plan_schema.correct_plan("workout", coach_corrected, "2026-06-10", "coach", tmp_path)
+    resolved = plan_schema.read_plan("workout", "2026-06-10", tmp_path)
+    assert resolved["plan"] == trainer_plan, "a correction never re-promotes its identity"
+    assert resolved["specialist"] == "trainer"
+    trainer_corrected = {"exercises": [{"name": "Press", "sets": 2}]}
+    plan_schema.correct_plan("workout", trainer_corrected, "2026-06-10", "trainer", tmp_path)
+    resolved = plan_schema.read_plan("workout", "2026-06-10", tmp_path)
+    assert resolved["plan"] == trainer_corrected, "correcting the winner updates the read"
     assert resolved["specialist"] == "trainer"
 
 

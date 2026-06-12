@@ -79,6 +79,10 @@ schema-stable seam for roster assembly tomorrow.
 - Negative (accepted): recording is manual until T2 — no orchestrated assembly.
 - Negative (accepted): tracking is a coarse day-snapshot, not an event log; an
   intra-day correction story is re-recording (content-tagged identities).
+- Negative (accepted) [recorded 2026-06-12, #109 review]: the snapshot revert
+  hole — after recording snapshot A then B, re-recording A verbatim is a
+  store-dedupe no-op (A's content-tagged identity already exists) and the read
+  keeps serving B; reverting requires re-recording with any differing content.
 - Negative (accepted): derived slots (Remaining, sets-done) read em-dash until
   every operand exists — visibly partial cards are the honest default.
 

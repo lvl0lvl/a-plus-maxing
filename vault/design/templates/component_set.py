@@ -237,7 +237,6 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .stat .slabel {{ font-size: 11px; color: var(--muted); }}
 .stat .sval {{ font-size: 16px; font-weight: 600; }}
 .stat.tinted {{ background: var(--page-bg); }}
-.pc-training .stat.tinted {{ background: {c['training-tint']}; }}
 .pc-nutrition .stat.tinted {{ background: {c['nutrition-tint']}; }}
 .statrow {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }}
 .prow {{ display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }}
@@ -445,21 +444,31 @@ def chip_b(text):
     return f"<span class='chip-b'>{_escape(str(text))}</span>"
 
 
-def stat_box(label, value="—", tinted=False):
+def stat_box(label, value="—", tinted=False, tint=None):
     """Return a bordered stat box: centered 11px label over its 16px value.
 
     The em-dash default is the honest empty slot (ADR-0009 D2). tinted=True
     adds the highlight class; the enclosing card's CSS picks the tint color.
+    `tint` names a `_TINTABLE` tint instead: the box rides that measured
+    `.tint-*` pair (live-state stat slots, visual spec zone 3 as amended
+    2026-06-12). An unknown tint name KeyErrors rather than silently
+    rendering an unstyled class — matching `pill`/`_series_color`.
 
     Args:
         label (str): The box label (escaped).
         value (str, optional): The box value (escaped); defaults to an em-dash.
         tinted (bool, optional): Highlight the box with the context tint.
+        tint (str, optional): The `_TINTABLE` tint name (without `-tint`).
 
     Returns:
         (str) The assembled `.stat` markup.
     """
-    klass = "stat tinted" if tinted else "stat"
+    if tint is not None:
+        if tint not in _TINTABLE:
+            raise KeyError(tint)
+        klass = f"stat tint-{tint}"
+    else:
+        klass = "stat tinted" if tinted else "stat"
     return (
         f"<div class='{klass}'><div class='slabel'>{_escape(str(label))}</div>"
         f"<div class='sval'>{_escape(str(value))}</div></div>"

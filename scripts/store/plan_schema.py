@@ -428,8 +428,12 @@ def record_plan_tracking(domain, tracking, on_date, root):
     Appends item ``plan-track::<domain>`` at `on_date` under a content-tagged
     source (loop_schema's derivation on the ``plan-track::`` prefix), so two
     distinct same-day snapshots both persist while an identical re-entry stays
-    an idempotent no-op. Peptide tracking IS the existing watch-out stream —
-    "peptides" is not a tracked domain here.
+    an idempotent no-op — unless a distinct snapshot intervened (the revert
+    hole, ADR-0010 consequences): after recording snapshot A then B,
+    re-recording A is a store-dedupe no-op (A's content-tagged identity
+    already exists) and the read keeps serving B; reverting requires
+    re-recording with any differing content. Peptide tracking IS the existing
+    watch-out stream — "peptides" is not a tracked domain here.
 
     Args:
         domain (str): A `TRACKED_DOMAINS` member.
@@ -462,9 +466,11 @@ def resolve_plan(readings, on_date):
     append-order-stable within a timepoint). Zero readings resolve to the
     `NO_PLAN` state; readings none of which is dated `on_date` resolve to
     `NO_PLAN_TODAY` carrying the latest on-file date; otherwise the LAST
-    reading in list order dated `on_date` wins (latest-appended, the
-    `read_panel` reversed-scan shape) and resolves to the plan value plus its
-    specialist attribution (the source minus the ``plan::`` prefix).
+    reading in `store.read` list order dated `on_date` wins — the append
+    order of DISTINCT identities (the `read_panel` reversed-scan shape): a
+    correction supersedes its identity's value WITHOUT re-promoting it past
+    a later-recorded same-date plan — and resolves to the plan value plus
+    its specialist attribution (the source minus the ``plan::`` prefix).
 
     Args:
         readings (list): One plan item's readings, in `store.read` order.
