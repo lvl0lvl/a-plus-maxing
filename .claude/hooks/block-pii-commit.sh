@@ -173,18 +173,33 @@ while IFS= read -r f; do
     STAGED+=("$f")
 done <<< "$GIT_OUT"
 
-# bd auto-stage coverage (eb1): the bd pre-commit git hook stages
-# .beads/issues.jsonl INSIDE `git commit`, AFTER the snapshot above, so the
-# working-tree bd file joins the trunk-wide scan set on every commit (dedupe
-# keeps the deny hit-count honest). BEFORE the empty-set exit: a commit with
-# nothing agent-staged still succeeds carrying bd's auto-staged flush, so the
-# scan must run on the bd file alone. The single -f guard preserves clone
-# semantics (a fresh non-beads clone has no .beads/) rather than leaning on the
-# scanner's OSError swallow (the PR#84 BUG-1 fail-open trap class). .beads/ is
-# not a data-bearing prefix — the operator name in bead text is accepted
-# authorship — so the file gets the trunk-wide scope only (structural patterns
-# + contact tokens via scan_scoped).
+# bd auto-stage coverage (eb1 + ycqo): the bd pre-commit git hook flushes pending
+# bead text from .beads/beads.db AND stages .beads/issues.jsonl INSIDE `git
+# commit`, AFTER the snapshot above. Two measures close that:
+#   • flush-before-scan (ycqo): run `bd sync --flush-only` against the target repo
+#     BEFORE the jsonl is read, so bead text still pending in the db at scan time
+#     is materialized and scanned. DENY on flush failure — fail-closed, matching
+#     this hook's git-rc/scan-rc convention and the bd hook's own exit-1-on-flush-
+#     failure. Guarded on bd being invocable and the target repo carrying .beads/
+#     (a non-beads clone commits without bd; the guard preserves clone semantics).
+#     The flush precedes the -f check below because it may CREATE the jsonl.
+#   • working-tree append (eb1): the bd file joins the trunk-wide scan set on
+#     every commit (dedupe keeps the deny hit-count honest), BEFORE the empty-set
+#     exit — a commit with nothing agent-staged still succeeds carrying bd's
+#     auto-staged flush, so the scan must run on the bd file alone. The single -f
+#     guard avoids leaning on the scanner's OSError swallow (the PR#84 BUG-1
+#     fail-open trap class). .beads/ is not a data-bearing prefix — the operator
+#     name in bead text is accepted authorship — so the file gets the trunk-wide
+#     scope only (structural patterns + contact tokens via scan_scoped).
 BD_ISSUES=".beads/issues.jsonl"
+BD_CMD="${BLOCK_PII_COMMIT_BD_CMD:-bd}"
+if command -v "$BD_CMD" >/dev/null 2>&1 && [[ -d "$PROJECT_ROOT/.beads" ]]; then
+    BD_FLUSH_OUT=$( (cd "$PROJECT_ROOT" && "$BD_CMD" sync --flush-only) 2>&1 )
+    BD_FLUSH_RC=$?
+    if [[ $BD_FLUSH_RC -ne 0 ]]; then
+        deny "PII-FREE-TRUNK: bd flush-before-scan failed (bd sync --flush-only rc=$BD_FLUSH_RC) — bead text pending in .beads/beads.db cannot be scanned. Failing closed — commit blocked. Detail: ${BD_FLUSH_OUT:-no output}"
+    fi
+fi
 if [[ -f "$PROJECT_ROOT/$BD_ISSUES" ]]; then
     BD_SEEN=0
     for f in ${STAGED[@]+"${STAGED[@]}"}; do
