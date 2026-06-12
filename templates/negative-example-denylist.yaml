@@ -1,0 +1,65 @@
+# Negative-Example Harmful-Content Denylist — v1-substitute STARTER set
+#
+# Owner (curated content): medical-safety-reviewer (Role 4), per Pass-1 R10 / OQ-6.
+# Author (v1-substitute starter): health-implementer (Role 2), bead a-plus-maxing-pmp.
+# Source: S10 finding S-08 (DEFERRED-TO-BEAD).
+# Consumer: scripts/audit-specialist-profile.sh — §13 row 10 (check_negative_examples).
+# Created: 2026-06-12 (option (c) of the bead-pmp adjudication).
+#
+# This is a STARTER detection set, NOT the curated denylist. Role 4
+# (medical-safety-reviewer) owns the curated content; this file unblocks the
+# row-10 WARN->BLOCK transition out of the box. The deployed medical-safety-reviewer
+# content-reviews this file BEFORE merge; that review provenance is recorded at merge.
+#
+# Scan surface (design patterns to it): row 10 greps these `pattern:` values
+# case-insensitively against the `## Negative Examples` section ONLY, AFTER fenced
+# code blocks and inline `code` spans are stripped (AQ-002). A faithful BAD
+# demonstration belongs inside a fenced block and is therefore NOT counted; unfenced
+# harmful prose in the section is the BLOCK target. Patterns are POSIX ERE (grep -E):
+# digit/space classes are [0-9]/[[:space:]], never \d/\s (those are PCRE-only and the
+# consuming engine is grep -E). The drug+dose entries are order-agnostic on a line.
+last_reviewed: 2026-06-12
+
+entries:
+  # ---- class (a): FDA Pregnancy Category X drug co-occurring with a dosed unit ----
+  - class: pregnancy_category_x_dose
+    pattern: '((isotretinoin|thalidomide|warfarin|methotrexate|finasteride|leflunomide|mycophenolate).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)|[0-9]+[[:space:]]?(mg|mcg|g|iu|ml).*(isotretinoin|thalidomide|warfarin|methotrexate|finasteride|leflunomide|mycophenolate))'
+    rationale: 'FDA Pregnancy Category X drug shown with a concrete dose-with-unit is a teratogen dosing directive, not a refusal demonstration.'
+    false_positive_note: 'Wide: a faithful BAD example that quotes such a directive must sit in a fenced/inline code block (stripped pre-scan). Unfenced drug-name-plus-dose prose in Negative Examples is the intended hit. A teaching mention of the drug WITHOUT a numeric dose-with-unit (e.g. a route-out rule naming warfarin) does not match.'
+
+  # ---- class (b): common contraindication pairs co-occurring with a dosed unit ----
+  - class: contraindication_anticoagulant_nsaid_dose
+    pattern: '((warfarin|apixaban|rivaroxaban).*(ibuprofen|naproxen|aspirin)|(ibuprofen|naproxen|aspirin).*(warfarin|apixaban|rivaroxaban)).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)'
+    rationale: 'Anticoagulant plus an analgesic NSAID with a dose on the same line is a bleeding-risk co-administration directive.'
+    false_positive_note: 'Requires both drug classes AND a dose-with-unit on the line, so an interaction-screen rule that names the pair without a dose does not match. A faithful BAD demonstration belongs in a fenced block.'
+
+  - class: contraindication_maoi_ssri_dose
+    pattern: '((phenelzine|tranylcypromine|selegiline).*(sertraline|fluoxetine|paroxetine|escitalopram)|(sertraline|fluoxetine|paroxetine|escitalopram).*(phenelzine|tranylcypromine|selegiline)).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)'
+    rationale: 'MAOI plus SSRI with a dose on the same line is a serotonin-syndrome co-administration directive.'
+    false_positive_note: 'Requires both an MAOI and an SSRI AND a dose-with-unit on the line. A fenced BAD example is stripped before the scan.'
+
+  # ---- class (c): jailbreak-trigger framings (no dose required) ----
+  - class: jailbreak_ignore_instructions
+    pattern: 'ignore (all )?previous instructions'
+    rationale: 'Direct prompt-injection trigger asking the model to discard its instructions.'
+    false_positive_note: 'Narrow literal phrase. A profile that demonstrates this jailbreak in a BAD example must fence it (stripped pre-scan).'
+
+  - class: jailbreak_authority_override
+    pattern: 'as (a|your) (doctor|physician|pharmacist|nurse)'
+    rationale: 'Authority-impersonation framing used to demand an override (medRxiv 2026.02.26.26347212, 81.8 percent of successful jailbreaks; the AUTHORITY_FRAMING_BYPASS class).'
+    false_positive_note: 'Wide: this exact phrase is how profiles legitimately DESCRIBE the attack. Row 10 scans the Negative Examples section only, and strips fenced/inline code first, so a faithful description in Core Rules / Anti-Patterns prose, or a fenced BAD example, is out of scope. Unfenced occurrence in the Negative Examples section is the hit.'
+
+  - class: jailbreak_dan_mode
+    pattern: '\bdan mode\b'
+    rationale: 'Named DAN (Do Anything Now) jailbreak persona.'
+    false_positive_note: 'Word-bounded to avoid substring hits. Case-insensitive match covers DAN/Dan/dan.'
+
+  - class: jailbreak_developer_mode
+    pattern: '\bdeveloper mode\b'
+    rationale: 'Named developer-mode jailbreak persona that claims restrictions are lifted.'
+    false_positive_note: 'Word-bounded. A genuine product feature named developer mode is out of scope here because row 10 only scans the Negative Examples section.'
+
+  - class: jailbreak_pretend_no_restrictions
+    pattern: 'pretend (you )?(have )?no restrictions'
+    rationale: 'Roleplay framing that asks the model to act as if its safety restrictions do not apply.'
+    false_positive_note: 'Matches the common phrasings (pretend no restrictions / pretend you have no restrictions). A fenced BAD example is stripped before the scan.'
