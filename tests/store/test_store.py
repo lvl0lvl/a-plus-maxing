@@ -447,6 +447,23 @@ def test_read_all_propagates_per_item_read_failure(tmp_path):
         store.read_all(root=tmp_path)
 
 
+def test_read_all_raises_on_directory_named_ndjson(tmp_path):
+    """A directory named `*.ndjson` under the root fails read_all loud (bead u8u).
+
+    The store writer (append's mkstemp + os.replace) never creates such a layout,
+    so its presence is external interference: read_all must raise IsADirectoryError
+    out of read's read_text — fail-fast at the storage boundary, per the project's
+    no-defensive-programming convention. RED if items() grows an is_file() filter
+    that silently skips the directory (read_all then returns the healthy item and
+    the raises-check dies).
+    """
+    store.append("rhr", _reading("2026-06-01T08:00:00+00:00", 55), root=tmp_path)
+    (tmp_path / "bogus.ndjson").mkdir()
+
+    with pytest.raises(IsADirectoryError):
+        store.read_all(root=tmp_path)
+
+
 def test_read_all_emits_store_skip_for_malformed_line(tmp_path, capfd):
     """read_all delegates through read: a torn line is skipped and STORE-SKIP'd.
 
