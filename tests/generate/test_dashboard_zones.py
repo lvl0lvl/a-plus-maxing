@@ -353,6 +353,20 @@ def test_calendar_month_grid_renders_full_month_in_place(today, in_month, lead, 
         assert len(row_cells) == 7, "every row is a whole week x 7"
     cells = [cell for _klass, row_cells in rows for cell in row_cells]
     assert len(cells) == zone.count("'dnum'"), "every cell is day-number only"
+    # Independent date-math oracle: the Monday on/before the 1st through the
+    # Sunday on/after month end, day by day — counts alone survive a row swap;
+    # the flattened sequence does not.
+    first = today.replace(day=1)
+    start = first - datetime.timedelta(days=first.weekday())
+    last = (first + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
+    end = last + datetime.timedelta(days=6 - last.weekday())
+    expected_days = [
+        str((start + datetime.timedelta(days=i)).day)
+        for i in range((end - start).days + 1)
+    ]
+    assert [num.replace(" · Today", "") for _klass, num in cells] == expected_days, (
+        "the grid's day numbers must run the whole-week month range in order"
+    )
     marker = f"{today.day} · Today"
     for klass, num in cells:
         assert re.fullmatch(r"\d+", num) or num == marker, (
