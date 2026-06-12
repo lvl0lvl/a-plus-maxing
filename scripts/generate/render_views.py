@@ -5,7 +5,8 @@ matrix and naive projections from stored timepoints AT RENDER TIME, reading oper
 data only through the ADR-0002-T1 store read model (surfaced by `loop_schema`), and
 assembles them through the ADR-0004-T1 `render.emit` engine + the single
 `component_set` shared component def. It maps the ADR-0007-T1 store states 1:1 to
-rendered state and keeps each artifact under the ADR-0004-T0 cap. It CONSUMES five
+rendered state (a landed panel result — a value, not a state — renders as a value
+row) and keeps each artifact under the ADR-0004-T0 cap. It CONSUMES five
 published interfaces (the T1 store-state contract, the T1 render engine + component
 library, the T0 cap, the T1 store read model, the T1 egress guard) and publishes no
 new broadly-reused interface.
@@ -157,6 +158,26 @@ def _watchout_row(root, watchout):
     )
 
 
+def _panel_row(root, panel):
+    """Build one panel row: pending -> the 'pending' marker, else the landed result.
+
+    Mirrors `_watchout_row`'s branch shape: `read_panel` returns the PENDING marker
+    until a result lands, then the result VALUE (a value, not a fifth published
+    state — bead s38+byj). The value row reuses the answered-watchout markup shape;
+    `_STATE_DISPLAY` keeps its fail-loud KeyError for genuinely-unmapped published
+    STATES only.
+    """
+    state = loop_schema.read_panel(panel, root=root)
+    if state == loop_schema.PENDING:
+        return _state_row(panel, loop_schema.PENDING)
+    return (
+        "<div class='kpi-row'>"
+        f"<div class='kpi'><div class='label'>{cs._escape(panel)}</div></div>"
+        f"<div class='value'>{cs._escape(str(state))}</div>"
+        "</div>"
+    )
+
+
 def _matrix_units(root, biomarkers):
     """Read each biomarker into a render unit, mapped 1:1 to its store state.
 
@@ -186,16 +207,15 @@ def _matrix_units(root, biomarkers):
 def _units(root, panels, watchouts, biomarkers):
     """Build every render unit in panel / watch-out / biomarker order.
 
-    Panels and watch-outs are 0-timepoint marker units; biomarkers are marker-or-trend
-    units (see `_matrix_units`).
+    Panels and watch-outs are 0-timepoint pass-through units — a pending panel /
+    unanswered watch-out renders its state marker, a landed result / stored answer
+    renders as a value row (see `_panel_row` / `_watchout_row`); biomarkers are
+    marker-or-trend units (see `_matrix_units`).
 
     Returns:
         (list) Render units (marker or trend) in render order.
     """
-    units = [
-        ("marker", p, _state_row(p, loop_schema.read_panel(p, root=root)))
-        for p in panels
-    ]
+    units = [("marker", p, _panel_row(root, p)) for p in panels]
     units += [("marker", w, _watchout_row(root, w)) for w in watchouts]
     units += _matrix_units(root, biomarkers)
     return units
@@ -278,7 +298,8 @@ def render_views(root, *, panels=(), watchouts=(), biomarkers=(), _out_dir=None)
     Recomputes the matrix and projections at render time from the store read model:
     reads each biomarker's stored timepoints (via `loop_schema.read_biomarker`) and
     renders them side-by-side, and maps each ADR-0007-T1 store state (pending /
-    not-yet-answered / no-prior / no-data) 1:1 to its rendered state. Splits an over-cap
+    not-yet-answered / no-prior / no-data) 1:1 to its rendered state; a panel whose
+    result has landed renders the result as a value row instead. Splits an over-cap
     view into per-page slices within the ADR-0004-T0 cap and routes every page through
     the published `render.emit(template, store_read) -> Path`, so each is a single
     self-contained inline file under the 500000-byte budget. Reads operator data only
@@ -286,7 +307,8 @@ def render_views(root, *, panels=(), watchouts=(), biomarkers=(), _out_dir=None)
 
     Args:
         root (str | Path): The store root the views read operator data from.
-        panels (tuple, optional): Recommended-panel ids to render their pending state.
+        panels (tuple, optional): Recommended-panel ids to render their pending
+            state or, once a result lands, the result value.
         watchouts (tuple, optional): Watch-out ids to render their answered state.
         biomarkers (tuple, optional): Biomarker ids to render in the matrix/projection.
         _out_dir (Path, optional): Test-only output-dir seam, forwarded to `emit`.

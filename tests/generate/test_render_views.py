@@ -427,6 +427,39 @@ def test_pending_panel_renders_pending_never_result(tmp_path):
     assert "clear" not in block.group(0).lower()
 
 
+def test_resulted_panel_renders_result_value(tmp_path):
+    """AC-4 (bead byj): a landed panel result renders as a value row, never a crash.
+
+    Pre-fix, a landed result flowed from read_panel straight into _STATE_DISPLAY
+    (which maps only the 4 absence markers) and the KeyError killed the WHOLE page
+    render. The contract: pending renders the pending marker; a landed result renders
+    the escaped result value (the answered-watchout value-row shape) with no pending
+    marker in the row. Deleting the result branch re-raises KeyError and reds this.
+    """
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-01T00:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_panel_result(
+        "lipid_panel", "results received", "2026-06-08T00:00:00+00:00", root=tmp_path
+    )
+
+    paths = render_views.render_views(
+        tmp_path, panels=("lipid_panel",), _out_dir=tmp_path / "out"
+    )
+    html = _read_all(paths)
+    row = _row_for(html, "lipid_panel")
+    assert row, "the resulted panel must render its row (not crash the page render)"
+    assert "results received" in row, "the landed result value must render in the row"
+    # The resulted row renders a VALUE, not a state marker — and the 'pending'
+    # display string is absent from the whole rendered view.
+    assert _state_marker_in(row) == "", (
+        "a resulted panel renders its result value, not a state marker"
+    )
+    assert _display_for(loop_schema.PENDING) not in _state_markers(html), (
+        "a resulted panel must not still render the 'pending' marker"
+    )
+
+
 def test_unanswered_watchout_renders_not_yet_answered(tmp_path):
     """AC-4: an unanswered watch-out renders the "not yet answered" spaced display string.
 
