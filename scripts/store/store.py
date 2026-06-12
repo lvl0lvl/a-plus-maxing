@@ -135,7 +135,8 @@ def read(item, root=DEFAULT_ROOT):
     the returned list may be a proper subset of the readings ever appended if the
     file was corrupted. The ordering is lexicographic on the `timepoint` string
     and assumes the spike's UTC-offset producer obligation; a non-UTC-offset
-    timepoint would sort wrong.
+    timepoint would sort wrong. A directory named `<item>.ndjson` under the root
+    raises `IsADirectoryError` — fail-fast at the storage boundary, not guarded.
 
     Args:
         item (str): The item identifier.
@@ -173,7 +174,9 @@ def read_all(root=DEFAULT_ROOT):
     Concatenates `read(item, root=root)` over `items(root)`: the outer order
     is item-name lexicographic, the order within an item is `read`'s timepoint
     sort. Delegates through `read`, so malformed-line skipping behaves exactly
-    as a per-item read (one `STORE-SKIP:` stderr line per skipped line).
+    as a per-item read (one `STORE-SKIP:` stderr line per skipped line). A
+    directory named `*.ndjson` under the root raises `IsADirectoryError` out of
+    its `read` — fail-fast at the storage boundary, not guarded.
 
     Args:
         root (str | Path, optional): Store root. Defaults to `vault/store/`.
