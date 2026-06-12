@@ -12,6 +12,30 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 53 (2026-06-12)
+
+> Confirmed by Walter ("the scope contract is approved, proceed"). Executes the operator-adopted S53 plan from the S52 close. Not a `v1-build` recipe task (beads, not `docs/task-plan/` recipes), so wave/checkpoint attestation N/A. No hook-edit authorization requested this session.
+
+Goal: Merge the S52 close PR, resolve the `juc` polarity design with Walter, then build visual packages A → B → C from the recorded signed targets, each through a full review/merge lifecycle.
+
+Acceptance criteria:
+- [ ] AC1: PR #108 reviewed (docs 3-agent subset, full methodology) and rebase-merged, both `/review-pr` and `/merge` invoked fresh via the Skill tool; post-merge baseline green (489/2).
+- [ ] AC2: the `juc` design conversation — the four S51-adjudicated sub-questions (which streams feed trend-direction; the aggregation rule vs SUMMARY_FIELD_SET change; raw-lab-values/PII-exclusion disposition; zero-lab-stream behavior) resolved with Walter and the decision recorded (vault decision note + bead updated). Its polarity outcome is an input to Package B.
+- [ ] AC3 (Package A — `1oh`): plan content schemas + the plan-zone render built strictly from the `[AMENDED 2026-06-12]` plan-zone slot shape in `vault/design/dashboard-v1-visual-spec.md`; full 6-agent `/review-pr` + `/merge`; suite green after merge.
+- [ ] AC4 (Package B — `y0h0`+`i2yw`): trend-card v2 (date top-right, ref-range/state caption, numeric delta chip, naive-projection caption DASHBOARD-ONLY) + unification of the two render surfaces, from the same spec; full lifecycle; suite green.
+- [ ] AC5 (Package C — `nsxy`): physician face sheet per `vault/design/physician-facesheet-v1-spec.md` (semantic accent bars, source-tier glyphs, honest awaiting-states, NO projection on the report); full lifecycle; suite green.
+- [ ] AC6 (capacity carve-out): packages run sequentially A → B → C; any not completed carry with their signed targets (already recorded). A alone is the acceptable minimum.
+- [ ] AC7 (documentation guarantee): `vault/components/` entries for new schemas/surfaces; ADR inline amendments for decision-bearing choices; beads closed with reasons; `vault/meta/overview.md` updated.
+- [ ] AC8: full session close per protocol — all FIVE audits including `skill-trace-audit.sh --session 53`, rotation, PF attestation with the per-PR invocation table, close PR.
+
+Files I WILL touch: `vault/design/templates/` (dashboard.py, component_set.py, report.py and siblings); `scripts/` store/ingest/generate files the plan schemas and polarity metadata require; `tests/`; `vault/components/`; `docs/adr/` (inline amendments); `vault/decisions/` (juc decision note); `.beads/issues.jsonl` via `bd`; HANDOFF/vault at close.
+
+Files I will NOT touch: `.claude/hooks/*` and `.claude/settings.json` (no hook authorization requested this session); INVARIANTS.md rows; deployed roster `.claude/agents/*`; `main` directly; `PALETTE`/`SERIES`/`ACCENTS` values (ADR-0009 locked — the face sheet reuses ACCENTS where categories overlap; its report-local tokens are registered as NEW constants, not edits to the locked sets).
+
+NOT doing: library research (`/aplus-research` track — operator-deferred); LM-02/03/04 data-gated work; the correctness/governance tail (`e3b` T2 wiring, `b6um`, `rn3v`, `imev`, `tdre`, `vjsw`, `dt0t`, `1ww`) unless capacity remains after the packages — conditional filler only.
+
+Invariants at risk: none structurally. INV-SKILL-TRACE binds every PR this session (per-PR table at close).
+
 ## Scope Contract — Session 52 (2026-06-12)
 
 > Confirmed by Walter ("yes, proceed that way, and both hook edits are authorized. the scope contract is approved"). Ultracode on for the session — BUILD phase only; the gated skills (`/review-pr`, `/merge`) run as themselves in full, invoked fresh per PR (PF-S39/S40 family; per-PR invocation table at close). **Hook-edit authorizations GRANTED this session:** (1) `ycqo` — `.claude/hooks/block-pii-commit.sh` flush-before-scan (operator approval also recorded in the bead at S51 close); (2) `29u4` — worktree-aware PROJECT_ROOT resolution in `block-commit-main.sh` + `block-pii-commit.sh` + (same pattern, per the bead's fix direction) `block-ungated-vault-write.sh`. AC2 shape per Walter's clarified direction: I design each missing zone in Pencil, he signs off on screen, the signed target is recorded, THEN code — no screenshots owed by the operator. Not a `v1-build` recipe task (beads, not `docs/task-plan/` recipes), so wave/checkpoint attestation N/A.
