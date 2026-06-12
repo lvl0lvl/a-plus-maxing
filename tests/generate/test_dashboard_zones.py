@@ -391,7 +391,14 @@ def test_calendar_reveal_is_checkbox_label_css_no_script():
     assert -1 < card_at < box_at < legend_at < grid_at, (
         "the checkbox precedes the label's group and the grid as a sibling"
     )
-    assert ".calx { display: none; }" in html, "the checkbox itself never shows"
+    assert ".calx { position: absolute; width: 1px; height: 1px; opacity: 0; }" in html, (
+        "the checkbox is visually hidden but stays focusable (never display:none)"
+    )
+    assert "display: none" not in re.search(r"\.calx \{[^}]*\}", html).group(0)
+    assert (".calx:focus-visible ~ .evlegend .calbtn "
+            "{ outline: 2px solid var(--ink); outline-offset: 2px; }") in html, (
+        "keyboard focus on the checkbox outlines the caret label"
+    )
     assert ".cal .wk-hide { display: none; }" in html, "non-current rows hide by default"
     assert ".calx:checked ~ .cal .wk-hide { display: grid; }" in html, (
         "the :checked sibling rule reveals the hidden rows in place"

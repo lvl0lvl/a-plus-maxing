@@ -214,7 +214,8 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .wknav .card-title {{ font-size: 14px; font-weight: 600; }}
 .evlegend {{ margin-left: auto; }}
 .navbtn {{ display: inline-block; box-sizing: border-box; width: 22px; height: 22px; line-height: 20px; text-align: center; border: 1px solid var(--card-border); border-radius: 6px; font-size: 13px; }}
-.calx {{ display: none; }}
+.calx {{ position: absolute; width: 1px; height: 1px; opacity: 0; }}
+.calx:focus-visible ~ .evlegend .calbtn {{ outline: 2px solid var(--ink); outline-offset: 2px; }}
 .calbtn {{ display: inline-block; border: 1px solid var(--card-border); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; }}
 .calbtn .x-open {{ display: none; }}
 .calx:checked ~ .evlegend .calbtn .x-open {{ display: inline; }}
