@@ -14,7 +14,7 @@ The merge-time record the denylist's header promises ("review provenance is
 recorded at merge"). Satisfies the PR #106 review's T20 disposition.
 
 - **Artifact:** `templates/negative-example-denylist.yaml` (row-10 deploy-gate BLOCK
-  content), merged via PR #106 at branch head `7a6ad7f`
+  content), merged via PR #106; rebase-merge tip on `main` is `0f86be1`
   (content sha256 `6edf464d217555ac0ec4f3a0657576ef119c26582afa426c124136c4cab70585`).
 - **Reviewer (content owner per Pass-1 R10/OQ-6):** the DEPLOYED
   `medical-safety-reviewer` (Role 4), dispatched S52 with its full profile inlined.
@@ -23,12 +23,15 @@ recorded at merge"). Satisfies the PR #106 review's T20 disposition.
   `override_path: {adjudicator: medical-liaison, conditions: fix F1 (+ optionally F2)
   before flipping row-10 to BLOCK, OR accept as documented v1-starter residuals}`.
   No CRITICAL/H1-H2 (content review; no runtime agent).
-- **Findings + dispositions (applying commit `01938c8`, hardened in `5c21a86`):**
+- **Findings + dispositions (applying commit `6c2f545`, hardened in `da1e16b`):**
   F1 unit right-boundary (MEDIUM, gating) — APPLIED + RED-proven; F2 taxonomy noun
-  alignment (MEDIUM borderline) — APPLIED + mechanical sync test (`7a6ad7f`);
+  alignment (MEDIUM borderline) — APPLIED + mechanical sync test (`0f86be1`);
   F3 `\b` removal (LOW) — APPLIED; F4 whole-body coverage residual (LOW) — ROUTED to
   bead `rn3v` (open); F5 valproate (LOW advisory) — APPLIED; F6 nitrate×PDE5 (LOW
   advisory) — APPLIED; F7 mycophenolate category-D precision (LOW info) — APPLIED.
+  (Pre-rebase branch commits `7a6ad7f` / `01938c8` / `5c21a86` correspond to
+  `0f86be1` / `6c2f545` / `da1e16b` on `main` and are resolvable only via the
+  PR #106 refs.)
 - **Adjudication (Role 7 `medical-liaison`, deployed, dispatched S52 2026-06-12):**
   `severity_final: {set_by: medical-liaison, verdict: conditions-met, content may
   merge}` — the first disjunct of the override conditions satisfied and exceeded;
