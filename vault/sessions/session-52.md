@@ -1,8 +1,10 @@
 ---
 title: Session 52 — six lifecycles merged; all visual targets signed; INV-SKILL-TRACE born mechanical
-type: session
-status: complete
+type: note
+owner: Walter McGivney
 created: 2026-06-12
+last_reviewed: 2026-06-12
+status: active
 permalink: a-plus-maxing/sessions/session-52
 ---
 
@@ -50,17 +52,22 @@ Final `main`: `e8b0dd8`; suite **489 passed / 2 skipped**.
   This close is its first mechanically-audited attestation (green, 6 rows all-YES).
 - The justified out-of-contract item: `pre-push-pii-scan.sh` header-comment edits ×2
   (claim truth-ups for the #107 flush rescope; behavior-diff empty; flagged in-passing).
+- Late branch cleanup at the #108 review: local `feature/store-correction`,
+  `feature/skill-trace-audit`, `feature/denylist-starter` and remote
+  `fix/hooks-worktree-aware` survived their merges and were deleted at the #108
+  review, after the denylist provenance note's SHA citations were re-anchored to `main`.
 
 ## Beads
 
 Closed with provenance reasons: `ycqo`, `29u4`, `1vi`, `lz01`, `pka`, `pmp`.
-Open: `e3b` (T2 wiring), `juc` (design conversation), `1ww`, `46m`.
+Open: `e3b` (T2 wiring), `juc` (design conversation), `1ww`.
 New this session: `rn3v` (whole-body denylist coverage), `imev` (roster sweep
 audit-layer), `tdre` (design-doc §13 row 10 stale), `vjsw` (clone-init never runs
 `bd init`), `dt0t` (INVARIANTS count-free citations).
 
 ## Next (S53)
 
-Merge the close PR, then build visual packages A (`1oh`), B (`y0h0`+`i2yw`),
-C (`nsxy`) strictly from the recorded signed targets; `juc` conversation; the new
-governance beads. Baseline 489/2.
+Merge the close PR, then the `juc` design conversation FIRST (per-marker
+good-direction polarity is an input to Package B's improving/regressing rendering);
+then build visual packages A (`1oh`), B (`y0h0`+`i2yw`), C (`nsxy`) strictly from the
+recorded signed targets; then the new governance beads. Baseline 489/2.
