@@ -396,12 +396,20 @@ def test_calendar_reveal_is_checkbox_label_css_no_script():
     assert ".calx:checked ~ .evlegend .calbtn .x-closed { display: none; }" in html, (
         "the :checked rule hides the closed caret glyph"
     )
-    card_at = zone.find("<div class='card calcard'>")
-    box_at = zone.find(checkbox)
-    legend_at = zone.find("<div class='evlegend'>")
-    grid_at = zone.find("<div class='cal'>")
-    assert -1 < card_at < box_at < legend_at < grid_at, (
-        "the checkbox precedes the label's group and the grid as a sibling"
+    # Structural adjacency, not mere index ordering: a wrapper `<div>` around
+    # any of these siblings would kill every `~` reveal rule while still
+    # passing a find()-index walk.
+    assert (
+        "<div class='card calcard'>"
+        "<input type='checkbox' id='calx' class='calx'>"
+        "<div class='wknav'>"
+    ) in zone, (
+        "the checkbox is the calcard's FIRST direct child, unwrapped, with the "
+        "wknav group adjacent"
+    )
+    assert "</label></div><div class='cal'>" in zone, (
+        "the evlegend group (closing at its caret label) sits directly beside "
+        "the month grid — no wrapper between the `~` siblings"
     )
     assert ".calx { position: absolute; width: 1px; height: 1px; opacity: 0; }" in html, (
         "the checkbox is visually hidden but stays focusable (never display:none)"
