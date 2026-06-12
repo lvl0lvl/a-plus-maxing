@@ -18,10 +18,10 @@ The five published states are read 1:1 by ADR-0007-T2's render views:
 
 A landed panel result is a VALUE returned by ``read_panel``, NOT a fifth published
 state marker — the 4-marker render map is unchanged; the render layer renders a
-result as a value row. ``read_panel`` resolves pending->result ORDER-INDEPENDENTLY:
-the most-recent non-pending value wins regardless of how its timepoint sorts against
-the pending marker's, and the result reading carries a source tag DISTINCT from the
-pending marker's so it cannot dedupe-collide with it.
+result as a value row. ``read_panel`` resolves pending->result by source PROVENANCE,
+order-independently: the most-recent result reading wins regardless of how its
+timepoint sorts against the pending marker's, and the result reading carries a source
+tag DISTINCT from the pending marker's so it cannot dedupe-collide with it.
 """
 
 import hashlib
@@ -125,17 +125,19 @@ def record_panel_result(panel, result, timepoint, root):
 def read_panel(panel, root):
     """Resolve a panel's state: the most-recent landed result, else "pending".
 
-    Order-INDEPENDENT pending->result resolution: returns the most-recent reading
-    whose value is not the PENDING marker, regardless of how the result's timepoint
-    sorts against the pending marker's (the store sorts timepoints lexicographically,
-    so a result recorded for an earlier-sorting timepoint must still win). With no
-    result landed — including the empty stream, whose PENDING return is the published
-    default state, not a guard — the panel reads "pending" verbatim, never a
-    fabricated result. A panel re-recommended after a result lands therefore still
-    reads the landed result, not pending.
+    Resolution is by source PROVENANCE, not a value sentinel: the pending marker is
+    the only reading written under the plan-recommendation tag, so the most-recent
+    result reading wins (its value returned verbatim — even a result whose value
+    equals the "pending" string) and a panel with only pending markers reads
+    pending. The provenance scan stays order-independent across the store's
+    lexicographic timepoint sort: a result recorded for an earlier-sorting
+    timepoint still wins over a later pending marker, and the empty stream's
+    PENDING return is the published default state, not a guard. The render
+    boundary still routes a result VALUE equal to "pending" to the pending marker
+    row — a known residual tracked as bead r3pq.
     """
     for reading in reversed(store.read(f"{_PREFIX_PANEL}{panel}", root=root)):
-        if reading["value"] != PENDING:
+        if reading["source"] != _TAG_PANEL:
             return reading["value"]
     return PENDING
 
