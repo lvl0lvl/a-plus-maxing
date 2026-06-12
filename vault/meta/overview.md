@@ -4,7 +4,7 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-06-10
+last_reviewed: 2026-06-11
 depends_on: []
 superseded_by: null
 review_cadence: monthly
@@ -75,6 +75,10 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - No diet app — LLM computes macros/micros from `protocols/meal-template.md`
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
+
+## Status as of 2026-06-11 (S50) — dashboard DESIGNED SURFACE complete incl. calendar zone
+
+The dashboard (S46-S50 arc) now renders the signed-off designed app surface from `generate.run("dashboard")`: ADR-0008 data layer (S48), ADR-0009 7-zone visual shell + the mock's visual language (S49, PRs #92/#93, build target `vault/design/dashboard-v1-visual-spec.md` — the PII-safe transcription of the operator-held mock), and the finished calendar zone (S49 build / S50 review, PR #94): a real month-calendar table where the visible week IS one month row, with a zero-script, keyboard/AT-operable in-place month reveal. Honest awaiting states (digit-free, mechanically guarded) hold in the five zones whose data models are unbuilt: plans (`1oh`, next slice — includes the nutrition card's meals/water/macro content), wearable scoring (LM-02), calendar events, goals, per-specialist rollup. Suite 451 passed / 2 skipped on `main`; the render AA gate measures every rendered text/background pair. Remaining dashboard residuals: `y0h0` (dates/ranges/deltas on trend cards), `i2yw` (projection readout), the physician-report design pass. Session detail: `vault/sessions/session-48.md` … `session-50.md`.
 
 ## Status as of 2026-06-10 (S45) — V1 BUILD COMPLETE (18/18); Track-1 PII/safety COMPLETE
 
