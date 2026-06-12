@@ -431,13 +431,18 @@ SIZE_BUDGET = 500000
 def _mask_data(html):
     """Mask data-dependent values so only template/component STRUCTURE remains.
 
-    Replaces digit runs (KPI values, table cells) and SVG point coordinates with
+    Replaces digit runs (KPI values, table cells), SVG point coordinates, and
+    month-abbreviation tokens (the trend card's reading/projection dates render
+    `Jun 10`-form text whose MONTH word is data, not structure) with
     placeholders, leaving the markup skeleton. Two renders that share structure
     but differ in data collapse to the same masked string; a structural change
     (a moved/added/removed element) does not.
     """
     masked = re.sub(r"points='[^']*'", "points='MASKED'", html)
     masked = re.sub(r"\d+(?:\.\d+)?", "N", masked)
+    masked = re.sub(
+        r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b", "MON", masked
+    )
     return masked
 
 

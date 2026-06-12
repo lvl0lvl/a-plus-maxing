@@ -475,15 +475,17 @@ def test_calendar_hidden_rows_are_same_cells_as_current_week():
 
 
 def test_fitness_marker_renders_units_and_neutral_trend():
-    """A bodyweight series renders its lb units and a NEUTRAL direction-only
-    arrow — polarity is None, so no good/concern trend coloring (ADR-0009 D4)."""
+    """A bodyweight series renders its lb units and a NEUTRAL numeric delta
+    chip — polarity is None, so no good/concern trend coloring (ADR-0009 D4;
+    chip numeric per the Trend Card v2 amendment, beads y0h0 + i2yw)."""
     html = dashboard.render(_bodyweight_read(), _today=_TODAY)
     trends = _zones(html)["Performance & Trends"]
     assert "Bodyweight" in trends
     assert "183 lb" in trends
     row = trends.split("<div class='kpi-row'>")[1]
-    assert "<span class='pill tint-neutral'>" in row
-    assert "&#8595;" in row, "direction-only arrow (184 -> 183 falls)"
+    assert "<span class='pill tint-neutral'>&#9660; 1 lb</span>" in row, (
+        "numeric delta on the neutral tint (184 -> 183 falls, no polarity)"
+    )
     assert "improving" not in row
     assert "regressing" not in row
 

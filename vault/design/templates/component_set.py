@@ -207,6 +207,8 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .grid6 .kpi {{ display: block; margin: 0; }}
 .grid6 .kpi .label {{ font-size: 11px; }}
 .grid6 .kpi .value {{ font-size: 21px; }}
+.grid6 .caption {{ font-size: 11px; }}
+.grid6 .labelrow {{ display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }}
 .grid6 svg {{ width: 100%; height: 40px; display: block; margin-top: 8px; }}
 .calcard {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }}
 .calcard .cal {{ flex-basis: 100%; }}
