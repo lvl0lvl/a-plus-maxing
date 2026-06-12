@@ -61,7 +61,8 @@ def test_pending_panel_reads_result_once_landed(tmp_path):
     The result's timepoint sorts lexicographically BEFORE the pending marker's, so a
     naive last-reading read (readings[-1] under the store's timepoint sort) returns
     the later-sorting PENDING marker and turns this RED. The contract: the most-recent
-    non-pending value wins regardless of how its timepoint sorts against the marker's.
+    reading under a non-pending source tag wins regardless of how its timepoint sorts
+    against the marker's.
     """
     loop_schema.record_pending_panel(
         "lipid_panel", "2026-06-08T08:00:00+00:00", root=tmp_path
