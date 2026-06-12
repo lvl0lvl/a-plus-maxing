@@ -2,8 +2,8 @@
 
 The schemas write THROUGH scripts/store/store.py (append/read) and the keying.py
 Line Field Set; they define no second key and reimplement no store I/O. This suite
-asserts the four published store states (pending / not-yet-answered / no-prior /
-answered-over-time) with adversarial no-fabrication and drop-fails-the-test
+asserts the five published store states (pending / not-yet-answered / no-data /
+no-prior / answered-over-time) with adversarial no-fabrication and drop-fails-the-test
 directions, the 0-automated-detection NG-6 floor, and the egress boundary over a
 real store/read cycle.
 """
