@@ -18,7 +18,7 @@ import html as html_lib
 import re
 
 from scripts.generate import generate
-from scripts.store import loop_schema
+from scripts.store import loop_schema, store
 from vault.design.templates import dashboard
 
 # A fixed mid-week date for the calendar seam: Wednesday 2026-06-10.
@@ -112,6 +112,30 @@ def test_unparseable_timepoint_renders_no_date():
     assert "after the trip" not in _captions(card), (
         "the raw timepoint string must never render as the date"
     )
+
+
+def test_non_string_timepoint_renders_no_date_not_a_crash(tmp_path):
+    """A non-string store timepoint renders the card dateless — never a crash.
+
+    Raw `store.append` bypasses the writer validation, so the production read
+    path can deliver an int timepoint to the render; `fromisoformat`'s
+    documented raise for a non-str is TypeError, not ValueError."""
+    root = tmp_path / "store"
+    store.append(
+        "biomarker::bodyweight",
+        {"item": "biomarker::bodyweight", "timepoint": 20260610,
+         "source": "test", "value": 184},
+        root=root,
+    )
+
+    html = generate.run(
+        "dashboard", _root=root, _out_dir=tmp_path / "out", _today=_TODAY
+    ).read_text()
+
+    card = next(r for r in _trend_rows(html) if "Bodyweight" in r)
+    assert "<div class='label'>Bodyweight</div>" in card
+    assert "184 lb" in card
+    assert "20260610" not in card, "the raw timepoint must never render"
 
 
 # --------------------------------------------------------------------------- #
@@ -329,6 +353,116 @@ def test_projection_caption_absent_when_dates_unparseable():
     )
     assert "naive projection" not in card
     assert "0.8" not in card, "no projected value may render without real dates"
+
+
+def test_mixed_tail_strictly_future_projection_renders():
+    """Mixed tail: chip from the last two NUMERIC readings, date from the raw
+    latest, projection rendered because its date is strictly future."""
+    card = _card(
+        _read(
+            "biomarker::crp",
+            ("2026-04-11T00:00:00+00:00", 1.1),
+            ("2026-05-11T00:00:00+00:00", 1.0),
+            ("2026-06-01T00:00:00+00:00", 0.9),
+            ("2026-06-10T00:00:00+00:00", "redraw scheduled"),
+        ),
+        "CRP",
+    )
+    assert "<span class='pill tint-good'>&#9660; 0.1 mg/L</span>" in card, (
+        "the chip derives from the last two numeric readings"
+    )
+    # The last-two-numeric spacing is 21 days, so one step beyond Jun 1 lands
+    # on Jun 22 — strictly after the card's Jun 10 latest-reading date.
+    assert _captions(card) == [
+        "Jun 10",
+        "ref 0 – 3 mg/L",
+        "→ 0.8 by Jun 22 · naive projection",
+    ], "date from the raw latest; bare range (non-numeric latest); projection"
+
+
+def test_mixed_tail_past_dated_projection_suppressed():
+    """A projected date at or before the card's latest reading date renders NO
+    caption — an extrapolation must be a forecast, never a past-dated claim."""
+    card = _card(
+        _read(
+            "biomarker::crp",
+            ("2026-04-11T00:00:00+00:00", 1.1),
+            ("2026-05-01T00:00:00+00:00", 1.0),
+            ("2026-05-02T00:00:00+00:00", 0.9),
+            ("2026-06-10T00:00:00+00:00", "redraw scheduled"),
+        ),
+        "CRP",
+    )
+    # The numeric tail projects May 3 — before the card's Jun 10 latest date.
+    assert "naive projection" not in card
+    assert _captions(card) == ["Jun 10", "ref 0 – 3 mg/L"]
+
+
+def test_unparseable_latest_timepoint_no_date_and_no_projection():
+    """An unparseable LATEST timepoint renders neither the date nor the
+    projection — never a forecast on a card that cannot date its own reading."""
+    card = _card(
+        _read(
+            "biomarker::crp",
+            ("2026-04-11T00:00:00+00:00", 1.1),
+            ("2026-05-11T00:00:00+00:00", 1.0),
+            ("2026-06-01T00:00:00+00:00", 0.9),
+            ("when it settles", "redraw scheduled"),
+        ),
+        "CRP",
+    )
+    assert "naive projection" not in card
+    assert _captions(card) == ["ref 0 – 3 mg/L"], (
+        "no date caption, no projection caption — the bare range only"
+    )
+
+
+def test_same_day_last_two_numeric_no_projection():
+    """A zero-interval last numeric segment projects the SAME day — not
+    strictly future, so no caption (a same-day 'forecast' is fabricated)."""
+    card = _card(
+        _read(
+            "biomarker::crp",
+            ("2026-04-11T00:00:00+00:00", 1.1),
+            ("2026-06-10T08:00:00+00:00", 1.0),
+            ("2026-06-10T20:00:00+00:00", 0.9),
+        ),
+        "CRP",
+    )
+    assert "naive projection" not in card
+    assert _captions(card) == ["Jun 10", "ref 0 – 3 mg/L · in range"]
+
+
+def test_projected_date_overflow_no_crash_no_caption():
+    """A reading spacing that overflows the calendar renders no caption — and
+    never an OverflowError crash."""
+    card = _card(
+        _read(
+            "biomarker::crp",
+            ("0001-01-01T00:00:00+00:00", 1.1),
+            ("0001-01-02T00:00:00+00:00", 1.0),
+            ("9999-12-31T00:00:00+00:00", 0.9),
+        ),
+        "CRP",
+    )
+    assert "naive projection" not in card
+    assert _captions(card) == ["Dec 31", "ref 0 – 3 mg/L · in range"]
+
+
+def test_huge_finite_values_no_infinite_projection():
+    """Finite stored values whose projection overflows to inf render no
+    caption — '→ inf by …' is a fabricated claim."""
+    card = _card(
+        _read(
+            "biomarker::crp",
+            ("2026-04-11T00:00:00+00:00", 8e307),
+            ("2026-05-11T00:00:00+00:00", 1e308),
+            ("2026-06-10T00:00:00+00:00", 1.7e308),
+        ),
+        "CRP",
+    )
+    assert "naive projection" not in card
+    assert "inf" not in card
 
 
 # --------------------------------------------------------------------------- #

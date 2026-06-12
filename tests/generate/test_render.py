@@ -55,8 +55,11 @@ def _store_read_variant():
     """A second read: SAME items/structure as `_store_read`, DIFFERENT values + order.
 
     Same three items, same per-item reading count, identical non-data text, so it
-    is structurally equivalent — but every value differs and the readings are
-    reordered. The values keep each item's registry-driven state AND trend
+    is structurally equivalent — but every value and date differs and the ITEM
+    blocks are reordered. Within each item the readings stay timepoint-sorted:
+    that is `store.read`'s published guarantee, and an intra-item disorder would
+    flip data-derived markup (a past-dated projection is suppressed, not
+    rendered). The values keep each item's registry-driven state AND trend
     direction equal to `_store_read`'s (rhr good/improving, crp
     concern/regressing, hrv neutral/regressing), since state classes and trend
     words are data-derived markup under ADR-0008. Two generations from
@@ -64,15 +67,15 @@ def _store_read_variant():
     masked-structure equality is load-bearing.
     """
     return [
-        {"item": "crp", "timepoint": "2026-06-03T00:00:00+00:00", "source": "lab", "value": 8.4},
-        {"item": "crp", "timepoint": "2026-06-01T00:00:00+00:00", "source": "lab", "value": 9.0},
-        {"item": "crp", "timepoint": "2026-06-02T00:00:00+00:00", "source": "lab", "value": 9.6},
-        {"item": "hrv", "timepoint": "2026-06-02T00:00:00+00:00", "source": "whoop", "value": 92},
+        {"item": "crp", "timepoint": "2026-06-01T00:00:00+00:00", "source": "lab", "value": 8.4},
+        {"item": "crp", "timepoint": "2026-06-02T00:00:00+00:00", "source": "lab", "value": 9.0},
+        {"item": "crp", "timepoint": "2026-06-03T00:00:00+00:00", "source": "lab", "value": 9.6},
         {"item": "hrv", "timepoint": "2026-06-01T00:00:00+00:00", "source": "whoop", "value": 80},
+        {"item": "hrv", "timepoint": "2026-06-02T00:00:00+00:00", "source": "whoop", "value": 92},
         {"item": "hrv", "timepoint": "2026-06-03T00:00:00+00:00", "source": "whoop", "value": 65},
         {"item": "rhr", "timepoint": "2026-06-01T00:00:00+00:00", "source": "whoop", "value": 60},
-        {"item": "rhr", "timepoint": "2026-06-03T00:00:00+00:00", "source": "whoop", "value": 55},
-        {"item": "rhr", "timepoint": "2026-06-02T00:00:00+00:00", "source": "whoop", "value": 48},
+        {"item": "rhr", "timepoint": "2026-06-02T00:00:00+00:00", "source": "whoop", "value": 56},
+        {"item": "rhr", "timepoint": "2026-06-03T00:00:00+00:00", "source": "whoop", "value": 50},
     ]
 
 
