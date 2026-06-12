@@ -2,7 +2,7 @@
 
 The data-in loop schemas record three operator-facing streams — plan-recommended
 panels, watch-out check-in answers, and physician-feedback entries — and read them
-back as four published store states. Every write goes THROUGH ``scripts.store.store``
+back as five published store states. Every write goes THROUGH ``scripts.store.store``
 (``append`` / ``read``) keyed by the one ``scripts.store.keying`` Line Field Set; this
 module defines no second key and reimplements no store I/O. It reads no operator
 answer against a cutoff and raises no automated signal: it stores only
@@ -16,9 +16,9 @@ The five published states are read 1:1 by ADR-0007-T2's render views:
     no-prior            a biomarker with exactly one stored timepoint
     answered-over-time  an answer / feedback entry carried into the next generation
 
-A landed panel result is a VALUE returned by ``read_panel``, NOT a fifth published
-state marker — the 4-marker render map is unchanged; the render layer renders a
-result as a value row. ``read_panel`` resolves pending->result by source PROVENANCE,
+A landed panel result is a VALUE returned by ``read_panel``, NOT a fifth
+``_STATE_DISPLAY`` marker — the 4-entry render map is unchanged; the render layer
+renders a result as a value row. ``read_panel`` resolves pending->result by source PROVENANCE,
 order-independently: the most-recent result reading wins regardless of how its
 timepoint sorts against the pending marker's, and the result reading carries a source
 tag DISTINCT from the pending marker's so it cannot dedupe-collide with it.
