@@ -412,6 +412,20 @@ def test_resolve_plan_other_dates_reads_no_plan_today(tmp_path):
     }
 
 
+def test_resolve_plan_future_dated_plans_read_no_plan_today(tmp_path):
+    """Past + FUTURE plans, none dated the render date: NO_PLAN_TODAY, plan
+    None, and plan_date carries the max on-file date — the future one."""
+    plan_schema.record_plan("workout", _workout_plan(), "2026-06-09", "coach", tmp_path)
+    plan_schema.record_plan(
+        "workout", {"exercises": [{"name": "Row", "sets": 3}]},
+        "2026-06-12", "coach", tmp_path,
+    )
+    assert plan_schema.read_plan("workout", "2026-06-10", tmp_path) == {
+        "state": plan_schema.NO_PLAN_TODAY, "plan": None,
+        "specialist": None, "plan_date": "2026-06-12",
+    }
+
+
 def test_resolve_plan_today_carries_value_and_attribution(tmp_path):
     """A today-dated plan resolves to its value + the source minus `plan::`."""
     plan = _workout_plan()
