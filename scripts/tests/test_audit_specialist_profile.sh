@@ -489,6 +489,43 @@ mutate "denylist_f5_valproate_dose_blocks" \
   's/^BAD: emits a fix\./BAD: take valproate 500 mg nightly for the migraines./' \
   "R13-10"
 
+# ---- 8. taxonomy noun sync: AUTHORITY_FRAMING_BYPASS → jailbreak_authority_override ----
+# The denylist authority pattern must cover every noun the taxonomy enumerates in
+# the AUTHORITY_FRAMING_BYPASS trigger ("as a [...]" bracket list). Mechanical
+# sync: extract both artifacts, probe each noun against the live pattern.
+# RED-proven: the pre-Role-4-fix pattern (doctor|physician|pharmacist|nurse) left
+# medical-student/trainee/researcher/caregiver uncovered.
+TAXONOMY_FILE="$SCRIPT_DIR/../../templates/refusal-class-taxonomy.yaml"
+DENYLIST_FILE="$SCRIPT_DIR/../../templates/negative-example-denylist.yaml"
+TAX_NOUNS="$(sed -n 's/.*"as a \[\(.*\)\]".*/\1/p' "$TAXONOMY_FILE" | tr '/' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$')"
+NOUN_COUNT="$(echo "$TAX_NOUNS" | grep -c .)"
+AUTH_PATTERN="$(awk '/class: jailbreak_authority_override/{f=1} f && /^[[:space:]]*pattern:/{print; exit}' "$DENYLIST_FILE" \
+    | sed -E "s/^[[:space:]]*pattern:[[:space:]]*//; s/^'//; s/'[[:space:]]*$//; s/''/'/g")"
+# extraction sanity: 6+ nouns and a non-empty pattern, else the sync test is vacuous
+if [[ "$NOUN_COUNT" -ge 6 && -n "$AUTH_PATTERN" ]]; then
+    echo "  PASS: taxonomy_noun_extraction ($NOUN_COUNT nouns)"; PASS=$((PASS+1))
+else
+    echo "  FAIL: taxonomy_noun_extraction — nouns=$NOUN_COUNT pattern=${AUTH_PATTERN:-<empty>}"; FAIL=$((FAIL+1))
+fi
+MISSING_NOUNS=""
+while IFS= read -r noun; do
+    [[ -z "$noun" ]] && continue
+    echo "as a $noun" | grep -qiE "$AUTH_PATTERN" || MISSING_NOUNS="$MISSING_NOUNS $noun"
+done <<< "$TAX_NOUNS"
+if [[ -z "$MISSING_NOUNS" ]]; then
+    echo "  PASS: taxonomy_nouns_all_in_denylist"; PASS=$((PASS+1))
+else
+    echo "  FAIL: taxonomy_nouns_all_in_denylist — uncovered:$MISSING_NOUNS"; FAIL=$((FAIL+1))
+fi
+# the taxonomy writes medical-student hyphenated; the pattern covers both
+# separators ([[:space:]-]) and the scan is case-insensitive
+if echo "as a medical student" | grep -qiE "$AUTH_PATTERN" \
+   && echo "As A Medical-Student" | grep -qiE "$AUTH_PATTERN"; then
+    echo "  PASS: taxonomy_noun_separator_variants"; PASS=$((PASS+1))
+else
+    echo "  FAIL: taxonomy_noun_separator_variants"; FAIL=$((FAIL+1))
+fi
+
 # ---- summary ---------------------------------------------------------------
 echo ""
 echo "audit-specialist-profile tests: $PASS passed, $FAIL failed"

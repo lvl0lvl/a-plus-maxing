@@ -3,6 +3,7 @@
 # Owner: health-specialist-architect (Role 1)
 # Mirror of: design/health-specialist-architect-design.md §2.2 item 3
 # Consumer: scripts/audit-specialist-profile.sh --check refusal-classes
+# Consumer: templates/negative-example-denylist.yaml (jailbreak_authority_override tracks the AUTHORITY_FRAMING_BYPASS trigger nouns) → scripts/audit-specialist-profile.sh §13 row 10 (check_negative_examples); sync pinned by scripts/tests/test_audit_specialist_profile.sh §8
 # Created: 2026-05-27 (S10 Phase 5; resolves §18 OQ-3 in Role 2 design doc)
 #
 # The 8 classes are the canonical taxonomy. Specialists encode ≥4 distinct
