@@ -32,6 +32,8 @@
 #   3lv (i)   non-operator gmail -> allow (the generic-gmail flood is gone)
 #   3lv (ii)  operator contact, NO config -> allow (config-driven; clone semantics)
 #   3lv (iii) operator contact in docs prose -> deny (contact scope is trunk-wide)
+#   eb1       dirty working-tree .beads/issues.jsonl (bd auto-stage vector) -> deny,
+#             even with NOTHING staged; token-free bd file + clean staged -> allow
 #   fail-closed scan invocation errors with token staged -> deny (default-deny)
 #   SEC-01(b) stub scan returns 0 + writes sentinel -> allow AND sentinel present (reuse proof)
 
@@ -454,6 +456,43 @@ OUT=$(invoke "git commit -m 'contact prose'")
     && ok "3lv (iii) operator contact in docs prose -> DENY (contact is trunk-wide)" \
     || bad "3lv (iii) contact in prose NOT denied trunk-wide: $OUT"
 git -C "$REPO" reset -q; rm -f "$REPO/docs/contact-in-prose.md"
+
+# ── eb1: bd auto-stage coverage — working-tree .beads/issues.jsonl is scanned ───
+# The bd pre-commit git hook stages .beads/issues.jsonl INSIDE `git commit`, AFTER
+# this hook's staged-set snapshot, so freshly-flushed bead text (the 46m leak
+# vector) would otherwise commit unscanned. The hook appends the working-tree bd
+# file to its trunk-wide scan set on EVERY commit when it exists. The bd file is
+# deliberately NOT git-added here — that is the exact blind-spot shape.
+mkfile ".beads/issues.jsonl" "{\"id\":\"x-1\",\"title\":\"ping $OPERATOR_CONTACT about labs\"}"
+mkfile "docs/clean-note.md" "Plain clean note."
+git -C "$REPO" add docs/clean-note.md
+OUT=$(invoke "git commit -m 'note'")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *".beads/issues.jsonl"* ]]; } \
+    && ok "eb1 (1) dirty bd file + clean staged file -> DENY naming .beads/issues.jsonl" \
+    || bad "eb1 (1) bd-file token NOT denied (bd auto-stage blind spot open): $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note.md"
+
+# eb1 (2): NOTHING staged, same dirty bd file -> deny. Uniquely pins that the bd
+# append precedes the empty-staged-set early exit: a commit with nothing
+# agent-staged still succeeds carrying bd's auto-staged flush, so the scan must
+# run on the bd file alone (current-main allows via that exit).
+OUT=$(invoke "git commit -m 'flush only'")
+[[ "$OUT" == *'"permissionDecision":"deny"'* ]] \
+    && ok "eb1 (2) EMPTY staged set + dirty bd file -> DENY (append precedes empty-set exit)" \
+    || bad "eb1 (2) empty-staged-set commit allowed despite dirty bd file: $OUT"
+
+# eb1 (3): token-free bd file + clean staged file -> allow (the flood boundary —
+# the bd corpus must not over-block routine commits; content is neither a contact
+# token nor store-line shaped).
+mkfile ".beads/issues.jsonl" '{"id":"x-1","title":"routine governance task"}'
+mkfile "docs/clean-note2.md" "Another plain note."
+git -C "$REPO" add docs/clean-note2.md
+OUT=$(invoke "git commit -m 'note2'")
+[[ "$OUT" != *'"deny"'* ]] \
+    && ok "eb1 (3) token-free bd file + clean staged file -> ALLOW (no over-blocking)" \
+    || bad "eb1 (3) token-free bd file wrongly DENIED (flood boundary breached): $OUT"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note2.md"
+rm -rf "$REPO/.beads"
 
 # ── cvr: hardened matcher catches bypass-form commits (env/path/trailing-sep) ───
 # With a PII file staged, the hook must DENY even when the commit command uses an
