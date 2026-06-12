@@ -125,6 +125,20 @@ def test_mixed_stream_store_renders_through_production_path(tmp_path):
     assert "Ferritin" in trends
     assert "ng/mL" in trends, "a registered marker's headline carries its units"
     assert "RHR" in trends
+    # Trend Card v2 (beads y0h0 + i2yw) through the production path: the
+    # registered rhr card carries its latest reading date on the label row,
+    # the ref-range/state caption, and the numeric polarity-tinted delta chip.
+    rhr_row = next(r for r in _rows(html, "Performance & Trends") if "RHR" in r)
+    assert (
+        "<div class='labelrow'><div class='label'>RHR</div>"
+        "<span class='caption'>May 2</span></div>"
+    ) in rhr_row, "the latest reading's date renders top-right on the label row"
+    assert "ref 40 – 100 bpm · in range" in rhr_row, (
+        "the registered marker carries its ref-range/state caption"
+    )
+    assert "<span class='pill tint-good'>&#9660; 3 bpm</span>" in rhr_row, (
+        "the delta chip is numeric, in the metric's unit, polarity-tinted"
+    )
     assert "Iron Panel" in labs
     assert "Injection Site Reaction" in labs
     assert "none noticed" in labs
@@ -140,9 +154,10 @@ def test_mixed_stream_store_renders_through_production_path(tmp_path):
 
 
 def test_trend_chips_registered_vs_unregistered(tmp_path):
-    """F15: a registered marker's trend pill carries the state-tinted trend
-    word; an unregistered marker's pill carries only a neutral direction
-    arrow; a single-numeric-value series renders no trend pill."""
+    """F15 (Trend Card v2): a registered marker's delta chip carries the
+    NUMERIC movement in its own unit on the polarity-aware tint; an
+    unregistered marker's chip stays neutral with NO unit suffix; a
+    single-numeric-value series renders no chip."""
     root = tmp_path / "store"
     out = tmp_path / "out"
     _seed_mixed_store(root)  # rhr 52 -> 49: registered "down" polarity, improving
@@ -153,16 +168,18 @@ def test_trend_chips_registered_vs_unregistered(tmp_path):
     html = generate.run("dashboard", _root=root, _out_dir=out).read_text()
 
     rhr_row = next(r for r in _rows(html, "Performance & Trends") if "RHR" in r)
-    assert "<span class='pill tint-good'>improving</span>" in rhr_row
+    assert "<span class='pill tint-good'>&#9660; 3 bpm</span>" in rhr_row
+    assert "improving" not in rhr_row, "the v2 chip is numeric, not the trend word"
 
     spo2_row = next(r for r in _rows(html, "Performance & Trends") if "Spo2" in r)
-    assert "<span class='pill tint-neutral'>" in spo2_row
-    assert "&#8595;" in spo2_row, "unregistered pill carries the direction arrow"
+    assert "<span class='pill tint-neutral'>&#9660; 2</span>" in spo2_row, (
+        "unregistered chip: neutral tint, numeric delta, NO unit suffix"
+    )
     assert "improving" not in spo2_row
     assert "regressing" not in spo2_row
 
     vitd_row = next(r for r in _rows(html, "Performance & Trends") if "Vitamin D" in r)
-    assert "pill" not in vitd_row, "a single-value series renders no trend pill"
+    assert "pill" not in vitd_row, "a single-value series renders no delta chip"
 
 
 def test_unprefixed_string_item_renders_plain_row(tmp_path):

@@ -18,10 +18,14 @@ routes by its stream prefix, so no string value reaches numeric viz by
 construction:
 
 - `biomarker::X` (and an unprefixed all-numeric series, the legacy direct-append
-  form) -> a zone-4 metric card: clean label, latest value + units when
-  registered, real registry-driven state, a tinted trend pill (the polarity
-  word when registered, else a direction-only arrow on the neutral tint — the
-  ADR-0008 honesty caveat), and a bar sparkline over ONLY the numeric values.
+  form) -> a zone-4 metric card (Trend Card v2, visual spec zone 4 as amended
+  2026-06-12, beads y0h0 + i2yw): clean label + the latest reading's date,
+  latest value + units when registered, the ref-range/state caption, a NUMERIC
+  delta chip in the metric's own unit tinted by the polarity-aware semantic
+  state (neutral without registered grounds — the ADR-0008 honesty caveat), a
+  bar sparkline over ONLY the numeric values, and a naive-projection caption
+  when derivable — DASHBOARD-ONLY by S52 operator direction (the physician
+  report never carries an extrapolation).
   A biomarker stream with no numeric value routes to a plain value row instead.
 - `panel::X` -> a pending-draw chip: clean label + the stored value verbatim
   (a `.state-marker` element inside the bordered chip).
@@ -166,56 +170,165 @@ def _plain_row(label, value):
     return f"<div class='kpi-row'>{cs.kpi(label, value)}</div>"
 
 
-def _trend_chip(item, prev, latest):
-    """Render the trend pill for a >=2-point numeric series.
+def _format_number(number):
+    """Format a numeric for card chips/captions: no float noise, no trailing zeros.
 
-    A registered-polarity marker renders the trend WORD (improving / flat /
-    regressing) as a pill tinted by its own semantic state; an unregistered
-    marker renders a direction-only arrow on the neutral tint — never a
-    good/bad color without registered grounds (the ADR-0008 honesty caveat).
+    `.10g` keeps health-scale magnitudes in plain decimal while collapsing
+    float artifacts (`0.30000000000000004` -> `0.3`) and integral floats
+    (`3.0` -> `3`, `20.0` -> `20`).
+    """
+    return f"{number:.10g}"
+
+
+def _reading_date(timepoint):
+    """Parse a stored timepoint's date part, or None when not ISO-parseable.
+
+    Store timepoints are ISO `YYYY-MM-DD[Thh:mm:ss…]` strings; the date is the
+    first 10 chars (the render_views date-axis convention) parsed with the
+    house `datetime.date.fromisoformat`. An unparseable timepoint reads None —
+    the card renders NO date, never a raw string (honest absence).
+    """
+    try:
+        return datetime.date.fromisoformat(timepoint[:10])
+    except ValueError:
+        return None
+
+
+def _short_date(day):
+    """Format a date as the card's short form, e.g. `Jun 10`."""
+    return f"{_MONTH_ABBR[day.month - 1]} {day.day}"
+
+
+def _delta_chip(item, prev, latest):
+    """Render the numeric delta chip for a >=2-point numeric series.
+
+    The chip carries the latest-minus-prev movement in the metric's own unit
+    (`▼ 0.3 mg/L`, `▲ 20 lb`; no unit suffix for an unregistered marker),
+    tinted by the polarity-aware semantic state via `biomarker_meta.trend`
+    (improving=good, regressing=concern, flat/no-polarity=neutral — never a
+    good/bad color without registered grounds, the ADR-0008 honesty caveat).
+    Equal values keep the prior flat presentation: the registered-polarity
+    `flat` word pill, else the neutral direction arrow.
     """
     word = biomarker_meta.trend(item, prev, latest)
-    if word is not None:
-        return cs.pill(word, _TREND_STATE[word])
-    arrow = "&#8593;" if latest > prev else "&#8595;" if latest < prev else "&#8594;"
-    # Raw span, not cs.pill(): pill() escapes its text, which would render the
-    # arrow ENTITY as literal "&#8593;" instead of the arrow glyph.
-    return f"<span class='pill tint-neutral'>{arrow}</span>"
+    if latest == prev:
+        if word is not None:
+            return cs.pill(word, _TREND_STATE[word])
+        # Raw span, not cs.pill(): pill() escapes its text, which would render
+        # the arrow ENTITY as literal "&#8594;" instead of the arrow glyph.
+        return "<span class='pill tint-neutral'>&#8594;</span>"
+    state = _TREND_STATE[word] if word is not None else "neutral"
+    arrow = "&#9650;" if latest > prev else "&#9660;"
+    meta = biomarker_meta.get(item)
+    unit = f" {meta['units']}" if meta else ""
+    return (
+        f"<span class='pill tint-{state}'>{arrow} "
+        f"{_format_number(abs(latest - prev))}{unit}</span>"
+    )
 
 
-def _metric_card(item, values):
-    """Render one zone-4 metric card from its value series.
+def _range_caption(item, latest):
+    """Render the ref-range/state caption under the card's value row.
 
-    Card anatomy (visual spec zone 4), top to bottom: clean label; the
-    stream's TRUE latest reading as the big value — with units when it is
-    numeric and the marker is registered, verbatim with no units when
-    non-numeric (ADR-0008 D3); a tinted trend pill when the series carries
-    >=2 numeric values; and the bar sparkline (registry-driven state over
-    ONLY the numeric values) at the card bottom. A stream with no numeric
-    value routes to a plain value row instead.
+    A registered marker with a range reads `ref {low} – {high} {units}` plus
+    the latest value's range verdict (` · in range` / ` · out of range`; a
+    non-numeric latest renders the range with NO verdict — no judgment
+    possible). A marker without a range — registered rangeless and
+    unregistered alike — collapses to the performance-metric caption: absence
+    of clinical metadata is what makes it a performance metric.
     """
-    numeric = [
-        n for value in values if (n := biomarker_meta.to_number(value)) is not None
+    meta = biomarker_meta.get(item)
+    if meta is None or meta["reference_range"] is None:
+        text = "no reference range · performance metric"
+    else:
+        low, high = meta["reference_range"]
+        state = biomarker_meta.state_for(item, latest)
+        suffix = {"good": " · in range", "concern": " · out of range"}.get(state, "")
+        text = (
+            f"ref {_format_number(low)} – {_format_number(high)} "
+            f"{meta['units']}{suffix}"
+        )
+    return f"<div class='caption'>{cs._escape(text)}</div>"
+
+
+def _projection_caption(numeric_readings):
+    """Render the naive-projection caption, or '' when not derivable.
+
+    DASHBOARD-ONLY (S52 operator direction): the physician report must never
+    carry an extrapolation. Renders only from real stored data — at least
+    `biomarker_meta.PROJECTION_MIN_TIMEPOINTS` numeric readings AND parseable
+    dates on the last two of them. The projected value is the shared
+    `biomarker_meta.projection_values` seam's; the projected date is one step
+    beyond the latest reading at the spacing of the last two reading dates
+    (naive, consistent with the value extrapolation). Otherwise NO caption —
+    never a fabricated date or value.
+    """
+    if len(numeric_readings) < biomarker_meta.PROJECTION_MIN_TIMEPOINTS:
+        return ""
+    latest = _reading_date(numeric_readings[-1]["timepoint"])
+    prev = _reading_date(numeric_readings[-2]["timepoint"])
+    if latest is None or prev is None:
+        return ""
+    values = [biomarker_meta.to_number(r["value"]) for r in numeric_readings]
+    projected = biomarker_meta.projection_values(values)[-1]
+    text = (
+        f"→ {_format_number(projected)} by "
+        f"{_short_date(latest + (latest - prev))} · naive projection"
+    )
+    return f"<div class='caption'>{cs._escape(text)}</div>"
+
+
+def _metric_card(item, readings):
+    """Render one zone-4 metric card from its FULL readings (timepoint + value).
+
+    Card anatomy (visual spec zone 4 as amended 2026-06-12, beads y0h0 +
+    i2yw), top to bottom: the label row — clean label with the LATEST
+    reading's date top-right (`Jun 10`; an unparseable timepoint renders no
+    date); the stream's TRUE latest reading as the big value — with units
+    when it is numeric and the marker is registered, verbatim with no units
+    when non-numeric (ADR-0008 D3); the ref-range/state caption; the numeric
+    delta chip when the series carries >=2 numeric values; the bar sparkline
+    (registry-driven state over ONLY the numeric values); and the
+    naive-projection caption when derivable (dashboard-only — never on the
+    physician report). A stream with no numeric value routes to a plain
+    value row instead.
+    """
+    numeric_readings = [
+        r for r in readings if biomarker_meta.to_number(r["value"]) is not None
     ]
     label = biomarker_meta.display_name(item)
-    if not numeric:
-        return _plain_row(label, values[-1])
+    if not numeric_readings:
+        return _plain_row(label, readings[-1]["value"])
+    projection = _projection_caption(numeric_readings)
+    numeric = [biomarker_meta.to_number(r["value"]) for r in numeric_readings]
     # Tail-window to the pinned per-view cap (single-sourced per ADR-0004): the
     # bar envelope is fixed-width, so an uncapped series computes negative bars.
     numeric = numeric[-render_engine.MAX_TIMEPOINTS_PER_VIEW:]
-    latest_reading = values[-1]
+    latest_reading = readings[-1]["value"]
     meta = biomarker_meta.get(item)
     if meta and biomarker_meta.to_number(latest_reading) is not None:
         shown = f"{latest_reading} {meta['units']}"
     else:
         shown = str(latest_reading)
+    day = _reading_date(readings[-1]["timepoint"])
+    date_html = (
+        f"<span class='caption'>{cs._escape(_short_date(day))}</span>"
+        if day is not None
+        else ""
+    )
     state = cs.state_for(item, numeric[-1])
-    chip = _trend_chip(item, numeric[-2], numeric[-1]) if len(numeric) >= 2 else ""
+    chip = _delta_chip(item, numeric[-2], numeric[-1]) if len(numeric) >= 2 else ""
     return (
         "<div class='kpi-row'>"
-        f"{cs.kpi(label, shown)}"
+        "<div class='kpi'>"
+        f"<div class='labelrow'><div class='label'>{cs._escape(label)}</div>"
+        f"{date_html}</div>"
+        f"<div class='value'>{cs._escape(str(shown))}</div>"
+        "</div>"
+        f"{_range_caption(item, latest_reading)}"
         f"{chip}"
         f"{cs.bar_sparkline(numeric, state)}"
+        f"{projection}"
         "</div>"
     )
 
@@ -932,7 +1045,7 @@ def render(store_read, _today=None):
         readings = by_item[item]
         values = [r["value"] for r in readings]
         if item.startswith("biomarker::"):
-            biomarkers.append(_metric_card(item, values))
+            biomarkers.append(_metric_card(item, readings))
         elif item.startswith("panel::"):
             panels.append(_panel_chip(item, values))
         elif item.startswith("watch-out::"):
@@ -965,7 +1078,7 @@ def render(store_read, _today=None):
                 f"type is added deliberately, never by silent fallthrough"
             )
         elif all(biomarker_meta.to_number(value) is not None for value in values):
-            biomarkers.append(_metric_card(item, values))
+            biomarkers.append(_metric_card(item, readings))
         else:
             other.append(_plain_row(biomarker_meta.display_name(item), values[-1]))
 
