@@ -291,6 +291,23 @@ def test_emit_allows_operator_text_containing_url(tmp_path):
     assert path.exists()
 
 
+def test_escape_encodes_full_vector():
+    """F20/SEC-001 (bead vp5p): _escape entity-encodes the full set & < > ' ".
+
+    The double quote is the load-bearing addition: every template attribute is
+    single-quoted by convention (and the apostrophe IS escaped), so no breakout
+    exists today — but a future double-quoted attribute interpolation would be
+    injectable without &quot;. The combined vector also pins the replace-chain
+    ordering: & encodes FIRST, so the later entities are not double-encoded.
+    """
+    assert component_set._escape("&") == "&amp;"
+    assert component_set._escape("<") == "&lt;"
+    assert component_set._escape(">") == "&gt;"
+    assert component_set._escape("'") == "&#39;"
+    assert component_set._escape('"') == "&quot;"
+    assert component_set._escape('a"b<c>d&e\'f') == "a&quot;b&lt;c&gt;d&amp;e&#39;f"
+
+
 @pytest.mark.parametrize("component", [
     component_set.sparkline,
     component_set.bar_sparkline,
