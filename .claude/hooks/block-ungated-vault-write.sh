@@ -9,11 +9,15 @@
 # into a structural block instead of trust.
 #
 # Decision: deny iff (command is a git commit) AND (it stages a gated entity page) AND
-# (wiki-ingest-lint.sh exits non-zero on the staged pages). Everything else passes through.
+# (wiki-ingest-lint.sh exits non-zero on the staged pages). Everything else passes
+# through. The staged set and vault content are read from the TARGET repo — the
+# working tree containing the hook input's cwd (worktree-aware since 29u4;
+# script-path fallback when cwd is absent/unresolvable).
 #
 # TEST/OVERRIDE ENV (never set in production):
-#   BLOCK_UNGATED_VAULT_PROJECT_ROOT — git root used for staged-file detection + vault
-#                                      content (default: derived from this hook's location).
+#   BLOCK_UNGATED_VAULT_PROJECT_ROOT — FALLBACK git root for staged-file detection +
+#                                      vault content, used when the hook input
+#                                      carries no resolvable cwd (29u4).
 #   WIKI_BDA_CMD — inherited by the gate (tests stub it; unset in production).
 #
 # Exit codes (Claude Code hook convention):
