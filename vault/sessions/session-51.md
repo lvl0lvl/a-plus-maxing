@@ -50,7 +50,7 @@ where real (#96 HIST note → 2 LEGITIMATE fixes).
   rule applied mid-session: mutation-capable agents get exclusive worktree access; readers
   use `git show`; reused worktrees get `__pycache__` cleared + clean-tree check.
 - **PF-S39-01 recurrence (merge surface):** merges #100/#99/#101 ran the full methodology
-  substance but without fresh `/merge` Skill invocations (reviews were 5/5 fresh).
+  substance but without fresh `/merge` Skill invocations (reviews were 6/6 fresh).
   Self-caught at close; family structural fix finally beaded (`lz01`, the skill-trace
   close audit, created at this close).
 - **Worktree-blind hooks discovered** (bead `29u4`): `block-commit-main` false-positives +
