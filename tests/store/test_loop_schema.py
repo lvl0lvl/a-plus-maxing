@@ -53,6 +53,41 @@ def test_pending_panel_persists_never_result(tmp_path):
     assert state is not None  # never an absent state
 
 
+def test_pending_panel_reads_result_once_landed(tmp_path):
+    """F7/F3 (bead s38): a landed result resolves the pending panel ORDER-INDEPENDENTLY.
+
+    The result's timepoint sorts lexicographically BEFORE the pending marker's, so a
+    naive last-reading read (readings[-1] under the store's timepoint sort) returns
+    the later-sorting PENDING marker and turns this RED. The contract: the most-recent
+    non-pending value wins regardless of how its timepoint sorts against the marker's.
+    """
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-08T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_panel_result(
+        "lipid_panel", "results received", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+
+    state = loop_schema.read_panel("lipid_panel", root=tmp_path)
+    assert state == "results received"
+    assert state != loop_schema.PENDING
+
+
+def test_same_timepoint_result_survives_pending_dedupe(tmp_path):
+    """F4 (bead s38): a result at the pending marker's OWN timepoint is not dedupe-dropped.
+
+    The store dedupe identity (item, timepoint, source) EXCLUDES value, so a result
+    writer reusing the pending marker's source tag silently no-ops at the same
+    timepoint and the read stays stuck pending — that turns this RED. The result
+    carries a DISTINCT source tag, so both readings persist and the result wins.
+    """
+    tp = "2026-06-01T08:00:00+00:00"
+    loop_schema.record_pending_panel("lipid_panel", tp, root=tmp_path)
+    loop_schema.record_panel_result("lipid_panel", "results received", tp, root=tmp_path)
+
+    assert loop_schema.read_panel("lipid_panel", root=tmp_path) == "results received"
+
+
 def test_unanswered_reads_not_yet_answered(tmp_path):
     """AC-2(a): an unanswered watch-out reads "not-yet-answered", never clear/absent."""
     state = loop_schema.read_watchout("sleep_quality", root=tmp_path)
