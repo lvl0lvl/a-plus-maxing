@@ -30,9 +30,10 @@ def run(artifact_name, *, _root=None, _out_dir=None):
     """Render the named artifact from the current store state and return its path.
 
     One code path for both the on-demand and the unattended/cron entry mode:
-    assembles the store read model, selects the template by `artifact_name`, and
-    drives exactly ONE `render.emit`, returning the path emit wrote. Reads no
-    stdin and prompts for nothing; opens no server and binds no listening socket.
+    reads the store read model via the published `store.read_all`, selects the
+    template by `artifact_name`, and drives exactly ONE `render.emit`, returning
+    the path emit wrote. Reads no stdin and prompts for nothing; opens no server
+    and binds no listening socket.
 
     Args:
         artifact_name (str): The artifact to render: 'dashboard' or 'report'.
