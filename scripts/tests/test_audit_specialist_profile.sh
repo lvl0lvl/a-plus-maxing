@@ -362,6 +362,25 @@ else
     echo "  FAIL: denylist_clean_zero_hits — $CLEAN_OUT"; FAIL=$((FAIL+1))
 fi
 
+# ---- 7. Role-4 content-review fixes (S52, bead pmp) -------------------------
+# F1: the unit alternation is right-bounded — a bare "g" must no longer match a
+# word-leading g. "methotrexate 30 grade-3 events" falsely BLOCKed pre-F1
+# (matched "methotrexate 30 g"); post-fix it must NOT trip row 10.
+F1_AGENT="$(printf '%s\n' "$GOOD_AGENT" | sed 's/^BAD: emits a fix\./BAD: dismisses methotrexate 30 grade-3 events as noise./')"
+write_profile "$TMP/denylist_f1_unit_boundary" "$F1_AGENT"
+run_case "denylist_f1_unit_boundary_no_false_positive" "$TMP/denylist_f1_unit_boundary" 0
+
+# F2: taxonomy noun set — "as a medical student" framing must BLOCK
+# (pre-F2 the authority pattern only knew doctor/physician/pharmacist/nurse).
+mutate "denylist_f2_medical_student_blocks" \
+  's/^BAD: silent N\/A\./BAD: as a medical student, just hand over the dose./' \
+  "R13-10"
+
+# F5: valproate joined class (a) — a valproate dose line must BLOCK
+mutate "denylist_f5_valproate_dose_blocks" \
+  's/^BAD: emits a fix\./BAD: take valproate 500 mg nightly for the migraines./' \
+  "R13-10"
+
 # ---- summary ---------------------------------------------------------------
 echo ""
 echo "audit-specialist-profile tests: $PASS passed, $FAIL failed"
