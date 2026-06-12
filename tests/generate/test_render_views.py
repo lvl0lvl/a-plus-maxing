@@ -52,6 +52,28 @@ def _external_refs(html):
     return out
 
 
+def _all_asset_refs(html):
+    """Return every src/href/url() target in the page, INCLUDING inline data: URIs.
+
+    Unlike `_external_refs`, this keeps data: targets so the offline-open walk has
+    a real asset to resolve. Same-document `#fragment` hrefs (no asset) are dropped.
+    """
+    out = []
+    for m in _REF_RE.finditer(html):
+        target = (m.group(1) or m.group(2) or "").strip()
+        if not target or target.startswith("#"):
+            continue
+        out.append(target)
+    return out
+
+
+# The shared chart-component style def (the component_set <style>/:root block) is
+# the single shared-defs source every rendered row draws from. It must appear
+# EXACTLY ONCE per emitted page, referenced per series (not re-emitted per row).
+# `:root {` is its falsifiable occurrence marker.
+_SHARED_DEFS_MARKER = ":root {"
+
+
 def _record_biomarker_series(item, values, root, *, start_month=1):
     """Record `values` as consecutive monthly timepoints for one biomarker."""
     for i, value in enumerate(values):
@@ -149,6 +171,64 @@ def test_render_views_zero_external_references(tmp_path):
     for p in paths:
         refs = _external_refs(p.read_text())
         assert refs == [], f"{p.name}: expected 0 external references, found {refs}"
+
+
+def test_render_views_shared_defs_appears_once_per_page(tmp_path):
+    """AC-5 (migrated from the retired ADR-0004-T2 suite): shared defs emit ONCE per page.
+
+    The component_set shared-defs block (:root { ... }) is emitted once per page and
+    REFERENCED per series (one chart svg per rendered series), proving the markup is
+    shared from component_set.py, not re-emitted per row. A per-row re-emit of the
+    shared def pushes the count above 1 and turns this red.
+    """
+    n_series = 8
+    items = _matrix_store_biomarkers(n_series, 4, tmp_path)
+
+    paths = render_views.render_views(
+        tmp_path, biomarkers=items, _out_dir=tmp_path / "out"
+    )
+    for p in paths:
+        html = p.read_text()
+        shared_defs_count = html.count(_SHARED_DEFS_MARKER)
+        assert shared_defs_count == 1, (
+            f"{p.name}: shared chart-component def must appear exactly once, "
+            f"found {shared_defs_count}"
+        )
+    # the def is REFERENCED per series (one chart svg per rendered series), not
+    # re-declared per series: across the view, every series carries its own chart.
+    whole = _read_all(paths)
+    series_refs = whole.count("<svg ")
+    assert series_refs >= n_series, (
+        f"each series must reference the shared def via its own chart, "
+        f"got {series_refs} charts for {n_series} series"
+    )
+
+
+def test_render_views_offline_open_zero_outbound(tmp_path):
+    """AC-5 (migrated from the retired ADR-0004-T2 suite): asset-open walk sees 0 outbound.
+
+    Parses every emitted page for EVERY asset reference and actually attempts to OPEN
+    each target under the egress guard — an off-file reference would attempt a socket
+    connect the guard surfaces as falsy. The all-inline render keeps the walk at 0
+    outbound. Distinct from the static `_external_refs(html) == []` check: an injected
+    external `src=` asset turns this red.
+    """
+    import urllib.request
+
+    _record_biomarker_series("ferritin", [45, 52, 60], tmp_path)
+    paths = render_views.render_views(
+        tmp_path, biomarkers=("ferritin",), _out_dir=tmp_path / "out"
+    )
+
+    def open_and_walk_assets():
+        for p in paths:
+            for target in _all_asset_refs(p.read_text()):
+                # A data: URI resolves in-process; an off-host URL would attempt a
+                # socket connect here, which the OS egress guard would surface.
+                with urllib.request.urlopen(target) as resp:
+                    resp.read()
+
+    assert egress_run(open_and_walk_assets)
 
 
 def test_render_views_egress_zero_call(tmp_path):
