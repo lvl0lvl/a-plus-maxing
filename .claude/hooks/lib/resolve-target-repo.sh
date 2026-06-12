@@ -14,13 +14,17 @@
 # the resolution lives ONCE, here.
 #
 # resolve_target_repo "<hook stdin JSON>" "<fallback root>" — echo the toplevel of
-# the working tree containing the hook input's `cwd`. Fail-closed design (29u4): a
+# the working tree containing the hook input's `cwd`. Fallback behavior (29u4): a
 # missing/empty `cwd`, a non-directory, or a cwd outside any git working tree falls
-# back to "<fallback root>" (the pre-29u4 script-path/env behavior), so consumers
-# are never weaker than before this lib existed. NOT followed: an in-command
-# `cd <elsewhere> && git commit` — the hook input's cwd names the tool call's
-# STARTING directory; the pre-push backstop covers that shape (worktrees share the
-# common .git, so its hook fires for worktree pushes too).
+# back to "<fallback root>" (the pre-29u4 script-path/env behavior) — on THOSE
+# fallback branches a consumer is never weaker than before this lib existed. (A
+# cwd that RESOLVES to a different repository is a separate, deliberate case: the
+# trunk-scope helper below lets consumers allow it through.) NOT followed: an
+# in-command `cd <elsewhere> && git commit` — the hook input's cwd names the tool
+# call's STARTING directory. Each consumer has its own catch-up layer for that
+# residual: block-pii-commit -> the pre-push scan (worktrees share the common
+# .git, so its hook fires for worktree pushes too); block-commit-main ->
+# block-push-main; block-ungated-vault-write -> the periodic scripts/wiki-lint.sh.
 #
 # CONSUMER OBLIGATION: a failed `source` is non-fatal under `set -uo pipefail`, so a
 # consumer MUST `declare -F resolve_target_repo` before calling and fall back to its

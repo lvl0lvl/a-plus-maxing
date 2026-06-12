@@ -28,22 +28,31 @@
 # Target repo (29u4): the staged set is read from the repo RECEIVING the commit —
 # the working tree containing the hook input's cwd (a linked worktree's index when
 # the commit is issued there; script-path fallback when cwd is absent/unresolvable).
-# The identity/contact configs are per-checkout (gitignored): a worktree or clone
+# The gate guards THIS trunk only: a target that provably belongs to a different
+# repository (scratch /tmp repos, other projects' clones) is allowed through after
+# the command-text sequencing checks — see the scope gate below. The scanner
+# imports from the script-path root (the scan POLICY ships with this checkout);
+# the identity/contact configs are per-checkout (gitignored): a worktree or clone
 # without them scans structural-patterns-only, same as a fresh clone (3lv).
 #
-# bd auto-stage coverage (eb1, PR#84 HIST-2; completed by ycqo): the bd pre-commit
-# git hook flushes pending bead text from .beads/beads.db AND stages
-# .beads/issues.jsonl INSIDE `git commit`, AFTER this PreToolUse snapshot, so that
-# file is invisible to the staged-set capture. Two measures close that: the hook
-# runs `bd sync --flush-only` against the target repo BEFORE reading the jsonl
-# (ycqo — bead text pending in the db at scan time is flushed and scanned; flush
-# failure denies, fail-closed), and the working-tree bd file is unconditionally
-# appended to the trunk-wide scan set on every commit (eb1 — the exact vector of
-# the historical operator-email leak, bead 46m). NOT covered here: human-terminal
-# commits (no PreToolUse boundary), an in-command `cd <elsewhere> && git commit`
-# (the cwd names the tool call's starting directory), and the documented bare
-# top-level-filename pathspec residual — the pre-push scan remains the backstop
-# for those.
+# bd auto-stage coverage (eb1, PR#84 HIST-2; ycqo, scoped to MAIN-CHECKOUT
+# commits): the bd pre-commit git hook flushes pending bead text from the beads
+# database AND stages .beads/issues.jsonl INSIDE `git commit`, AFTER this
+# PreToolUse snapshot, so that file is invisible to the staged-set capture. Two
+# measures close that: the hook runs `bd sync --flush-only` against the target
+# repo BEFORE reading the jsonl (ycqo — bead text pending in the db at scan time
+# is flushed and scanned; flush failure denies, fail-closed; skipped with an info
+# line when no database exists — a fresh clone of this repo commits cleanly, no
+# `bd init` required — and for linked-worktree targets, where bd resolves via the
+# common git dir and a flush would mutate the main checkout without ever feeding
+# this scan), and the working-tree bd file is unconditionally appended to the
+# trunk-wide scan set on every commit (eb1 — the exact vector of the historical
+# operator-email leak, bead 46m). NOT covered here: human-terminal commits (no
+# PreToolUse boundary), an in-command `cd <elsewhere> && git commit` (the cwd
+# names the tool call's starting directory), worktree-PENDING bead text (bd's own
+# pre-commit hook skips staging in worktrees, and this hook skips the worktree
+# flush), and the documented bare top-level-filename pathspec residual — the
+# pre-push scan remains the backstop for those.
 #
 # Fail-closed (Security HIGH-1): any error in the scan path — import fails, scan
 # raises, the python3 -c returns non-zero, or the git/jq plumbing fails — emits
@@ -56,7 +65,8 @@
 #                                     used when the hook input carries no
 #                                     resolvable cwd (29u4).
 #   BLOCK_PII_COMMIT_PII_SCAN_ROOT  — sys.path root for the pii_scan import
-#                                     (default: the resolved target root). Tests
+#                                     (default: the script-path root — the scan
+#                                     policy ships with this checkout). Tests
 #                                     point it at a stub (SEC-01(b)) or an
 #                                     unimportable dir (fail-closed).
 #   BLOCK_PII_COMMIT_BD_CMD         — bd command for the flush-before-scan (ycqo;
