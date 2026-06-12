@@ -1,7 +1,8 @@
 """Tests for scripts/guard/pii_scan.py — tracked-file operator-PII scanner.
 
-`scan(tracked_files, identity_config=...) -> int` reads each file's CONTENTS and
-counts operator-PII matches. The operator-AGNOSTIC patterns (two structural
+`scan(tracked_files, token_config=...) -> int` reads each file's CONTENTS and
+counts operator-PII matches (`identity_config` is the deprecated alias — b9l).
+The operator-AGNOSTIC patterns (two structural
 store-line patterns) are tracked; the operator-IDENTITY and operator-CONTACT
 tokens load at run time from gitignored configs (`vault/meta/operator-identity.txt`
 / `operator-contact.txt`) — contact moved from a generic tracked `@gmail.com`
@@ -107,7 +108,7 @@ def test_scan_clean_then_planted_same_clone(tmp_path):
     root = _scratch_clone(tmp_path)
     cfg = _identity_config(tmp_path)
     # AC-2: clean tracked set -> 0.
-    assert scan(_tracked(root), identity_config=cfg) == 0
+    assert scan(_tracked(root), token_config=cfg) == 0
 
     # AC-3: plant every class into a tracked file's CONTENTS in the SAME clone.
     leak = root / "README.md"
@@ -117,7 +118,7 @@ def test_scan_clean_then_planted_same_clone(tmp_path):
     leak.write_text(body)
     _git(["add", "-A"], root)
 
-    assert scan(_tracked(root), identity_config=cfg) >= 1
+    assert scan(_tracked(root), token_config=cfg) >= 1
 
 
 def test_agnostic_detection_without_config(tmp_path):
@@ -133,7 +134,7 @@ def test_agnostic_detection_without_config(tmp_path):
     leak.write_text(body)
     _git(["add", "-A"], root)
 
-    assert scan(_tracked(root), identity_config=NO_CONFIG) >= 1
+    assert scan(_tracked(root), token_config=NO_CONFIG) >= 1
 
 
 def test_identity_detection_is_config_driven(tmp_path):
@@ -150,9 +151,9 @@ def test_identity_detection_is_config_driven(tmp_path):
     files = _tracked(root)
 
     cfg = _identity_config(tmp_path)
-    assert scan(files, identity_config=cfg) >= 1
+    assert scan(files, token_config=cfg) >= 1
     # Same token, no config -> agnostic patterns find nothing here -> 0.
-    assert scan(files, identity_config=NO_CONFIG) == 0
+    assert scan(files, token_config=NO_CONFIG) == 0
 
 
 def test_tracked_source_carries_no_operator_identity(tmp_path):
@@ -191,7 +192,7 @@ def test_scan_hits_each_pii_class(tmp_path, pii_class):
     leak.write_text(leak.read_text() + PLANTS[pii_class])
     _git(["add", "-A"], root)
 
-    assert scan(_tracked(root), identity_config=cfg) >= 1
+    assert scan(_tracked(root), token_config=cfg) >= 1
 
 
 def test_agnostic_set_pins_structural_and_tokens_are_config_sourced(tmp_path):
@@ -238,9 +239,9 @@ def test_contact_detection_is_config_driven(tmp_path):
 
     cfg = tmp_path / "operator-contact.txt"
     cfg.write_text("# synthetic test contact\n" + SYNTHETIC_CONTACT + "\n")
-    assert scan(files, identity_config=str(cfg)) >= 1
+    assert scan(files, token_config=str(cfg)) >= 1
     # Same address, no config -> NOT detected (the generic-gmail flood is gone).
-    assert scan(files, identity_config=NO_CONFIG) == 0
+    assert scan(files, token_config=NO_CONFIG) == 0
 
 
 def test_scan_detects_multiline_pretty_printed_reading(tmp_path):
@@ -261,7 +262,7 @@ def test_scan_detects_multiline_pretty_printed_reading(tmp_path):
     leak.write_text(leak.read_text() + "\n" + json.dumps(reading, indent=2) + "\n")
     _git(["add", "-A"], root)
 
-    assert scan(_tracked(root), identity_config=NO_CONFIG) >= 1
+    assert scan(_tracked(root), token_config=NO_CONFIG) >= 1
 
 
 def test_scan_names_offending_file_on_stderr(tmp_path, capfd):
@@ -277,7 +278,7 @@ def test_scan_names_offending_file_on_stderr(tmp_path, capfd):
     _git(["add", "-A"], root)
     offending = str(leak)
 
-    assert scan(_tracked(root), identity_config=NO_CONFIG) >= 1
+    assert scan(_tracked(root), token_config=NO_CONFIG) >= 1
     captured = capfd.readouterr()
     assert f"PII-HIT: {offending}" in captured.err
 
@@ -300,11 +301,11 @@ def test_scan_structural_switch(tmp_path):
     cfg.write_text(SYNTHETIC_CONTACT + "\n")
 
     # Default: structural plant detected even with no token config.
-    assert scan(files, identity_config=NO_CONFIG) >= 1
+    assert scan(files, token_config=NO_CONFIG) >= 1
     # Switch off, no config: the structural plant alone scores 0.
-    assert scan(files, identity_config=NO_CONFIG, include_structural=False) == 0
+    assert scan(files, token_config=NO_CONFIG, include_structural=False) == 0
     # Switch off, config present: the contact token STILL detects.
-    assert scan(files, identity_config=str(cfg), include_structural=False) >= 1
+    assert scan(files, token_config=str(cfg), include_structural=False) >= 1
 
 
 def test_check_ignore_positive_when_entry_present(tmp_path):
@@ -329,7 +330,7 @@ def test_scan_empty_list_returns_zero_int():
 def test_scan_returns_int_on_nonempty(tmp_path):
     """SEC-01(a): the -> int return-type shape holds on a real set too."""
     root = _scratch_clone(tmp_path)
-    assert isinstance(scan(_tracked(root), identity_config=NO_CONFIG), int)
+    assert isinstance(scan(_tracked(root), token_config=NO_CONFIG), int)
 
 
 def test_scan_contact_is_case_insensitive(tmp_path):
@@ -346,7 +347,7 @@ def test_scan_contact_is_case_insensitive(tmp_path):
     leak = root / "README.md"
     leak.write_text(leak.read_text() + "reply-to: Test.Fixture@Gmail.COM\n")
     _git(["add", "-A"], root)
-    assert scan(_tracked(root), identity_config=str(cfg)) >= 1
+    assert scan(_tracked(root), token_config=str(cfg)) >= 1
 
 
 def test_identity_match_is_case_insensitive(tmp_path):
@@ -356,7 +357,7 @@ def test_identity_match_is_case_insensitive(tmp_path):
     leak = root / "code.py"
     leak.write_text(leak.read_text() + "contact EXAMPLENAME today\n")
     _git(["add", "-A"], root)
-    assert scan(_tracked(root), identity_config=cfg) >= 1
+    assert scan(_tracked(root), token_config=cfg) >= 1
 
 
 def test_scan_text_counts_contact_and_identity(tmp_path):
@@ -371,10 +372,10 @@ def test_scan_text_counts_contact_and_identity(tmp_path):
     # Pin the agnostic assertions to NO_CONFIG so they do not bind to the real
     # gitignored operator-identity file (present on dev, absent on a fresh clone):
     # contact detection is config-independent (TEST-1).
-    assert scan_text("hello world, no pii here", identity_config=NO_CONFIG) == 0
-    assert scan_text("mail me at Test.Fixture@Gmail.COM", identity_config=NO_CONFIG) >= 1  # case-insensitive too
-    assert scan_text("ask Examplename first", identity_config=cfg) >= 1
-    assert scan_text("ask Examplename first", identity_config=NO_CONFIG) == 0
+    assert scan_text("hello world, no pii here", token_config=NO_CONFIG) == 0
+    assert scan_text("mail me at Test.Fixture@Gmail.COM", token_config=NO_CONFIG) >= 1  # case-insensitive too
+    assert scan_text("ask Examplename first", token_config=cfg) >= 1
+    assert scan_text("ask Examplename first", token_config=NO_CONFIG) == 0
 
 
 def test_scan_text_scopes_out_structural_store_pattern():
@@ -387,7 +388,7 @@ def test_scan_text_scopes_out_structural_store_pattern():
         '{"item": "rhr", "timepoint": "2026-06-01T08:00:00+00:00", '
         '"source": "manual", "value": 55}'
     )
-    assert scan_text(store_line, identity_config=NO_CONFIG) == 0
+    assert scan_text(store_line, token_config=NO_CONFIG) == 0
 
 
 # --- g5x: widen scan_text to the full EXCLUDED_RAW_PII value classes ------------
@@ -415,7 +416,7 @@ def test_scan_text_detects_value_pii_classes(value, label):
     free-text value scores >=1 — reds on the gmail-only scan_text. Postal has its own
     precise ZIP/state-anchored detector (bead nue; tests below).
     """
-    assert pii_scan.scan_text(value, identity_config=NO_CONFIG) >= 1, label
+    assert pii_scan.scan_text(value, token_config=NO_CONFIG) >= 1, label
 
 
 @pytest.mark.parametrize("value, label", [
@@ -441,7 +442,7 @@ def test_scan_text_detects_postal_address(value, label):
     both PO Box comma forms (the \\s*,?\\s+ lead-in), and the newline-crossing \\s+
     separator (fail-closed widening).
     """
-    assert pii_scan.scan_text(value, identity_config=NO_CONFIG) >= 1, label
+    assert pii_scan.scan_text(value, token_config=NO_CONFIG) >= 1, label
 
 
 def test_scan_text_detects_compatibility_homograph_email():
@@ -452,7 +453,7 @@ def test_scan_text_detects_compatibility_homograph_email():
     confusables, e.g. Cyrillic, are out of scope for the single-operator value boundary.)
     """
     homograph = "reach me op＠gmail.com"
-    assert pii_scan.scan_text(homograph, identity_config=NO_CONFIG) >= 1
+    assert pii_scan.scan_text(homograph, token_config=NO_CONFIG) >= 1
 
 
 @pytest.mark.parametrize("value", [
@@ -491,8 +492,8 @@ def test_scan_text_value_boundary_negative_controls(value):
     assert proves _VALUE_COMPILED is ACTIVE, so a regression that disabled the
     patterns reds here too (not only in the positive-detection test — F-TEST1).
     """
-    assert pii_scan.scan_text("x@protonmail.com", identity_config=NO_CONFIG) >= 1  # patterns live
-    assert pii_scan.scan_text(value, identity_config=NO_CONFIG) == 0
+    assert pii_scan.scan_text("x@protonmail.com", token_config=NO_CONFIG) >= 1  # patterns live
+    assert pii_scan.scan_text(value, token_config=NO_CONFIG) == 0
 
 
 def test_scan_text_postal_accepted_residual_value_final_metric():
@@ -504,7 +505,7 @@ def test_scan_text_postal_accepted_residual_value_final_metric():
     here and forces the residual documentation in _VALUE_PII_PATTERNS to be
     re-evaluated alongside it.
     """
-    assert pii_scan.scan_text("did 3 sets, felt ok, 10000", identity_config=NO_CONFIG) >= 1
+    assert pii_scan.scan_text("did 3 sets, felt ok, 10000", token_config=NO_CONFIG) >= 1
 
 
 def test_scan_text_caps_input_length():
@@ -516,9 +517,32 @@ def test_scan_text_caps_input_length():
     """
     filler = "a" * pii_scan._MAX_SCAN_TEXT_LEN
     # PII past the cap is truncated away -> not found.
-    assert pii_scan.scan_text(filler + " x@protonmail.com", identity_config=NO_CONFIG) == 0
+    assert pii_scan.scan_text(filler + " x@protonmail.com", token_config=NO_CONFIG) == 0
     # Control: the same email within the cap IS found.
-    assert pii_scan.scan_text("x@protonmail.com " + filler, identity_config=NO_CONFIG) >= 1
+    assert pii_scan.scan_text("x@protonmail.com " + filler, token_config=NO_CONFIG) >= 1
+
+
+def test_scan_accepts_deprecated_identity_config_alias(tmp_path):
+    """b9l: `scan(identity_config=...)` still detects AND emits DeprecationWarning.
+
+    The ADR-0005-T1 recipe pins the published `scan` surface under change control;
+    the alias keeps the pre-b9l kwarg working. Reds if the alias is dropped
+    (TypeError) or its DeprecationWarning is removed without Architect review.
+    """
+    root = _scratch_clone(tmp_path)
+    cfg = _identity_config(tmp_path)
+    leak = root / "code.py"
+    leak.write_text(leak.read_text() + PLANTS["identity"])
+    _git(["add", "-A"], root)
+    with pytest.warns(DeprecationWarning):
+        assert scan(_tracked(root), identity_config=cfg) >= 1
+
+
+def test_scan_text_accepts_deprecated_identity_config_alias(tmp_path):
+    """b9l: `scan_text(identity_config=...)` detects AND warns, mirroring scan."""
+    cfg = _identity_config(tmp_path)
+    with pytest.warns(DeprecationWarning):
+        assert pii_scan.scan_text("ask Examplename first", identity_config=cfg) >= 1
 
 
 def test_trunk_scan_stays_gmail_conservative(tmp_path):
@@ -539,4 +563,4 @@ def test_trunk_scan_stays_gmail_conservative(tmp_path):
         + "ship to 123 main st, springfield il 62704\n"
     )
     _git(["add", "-A"], root)
-    assert scan(_tracked(root), identity_config=NO_CONFIG) == 0
+    assert scan(_tracked(root), token_config=NO_CONFIG) == 0

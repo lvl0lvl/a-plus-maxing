@@ -231,7 +231,7 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
                 # passed through; surface the gap at the boundary rather than leak it to
                 # the model (via dispatch) or the render (via assemble). Names the field,
                 # never the value (no PII echo).
-                if pii_scan.scan_text(str(value), identity_config=identity_config):
+                if pii_scan.scan_text(str(value), token_config=identity_config):
                     raise ValueError(
                         f"summarize: pass-through field {field!r} carries raw operator "
                         f"PII; the PII-free-by-store-schema assumption is violated "
