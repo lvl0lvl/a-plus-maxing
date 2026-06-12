@@ -25,16 +25,25 @@
 #     be flagged trunk-wide.
 # Deny if the combined count is >=1.
 #
-# bd auto-stage coverage (eb1, PR#84 HIST-2): the bd pre-commit git hook stages
-# .beads/issues.jsonl INSIDE `git commit`, AFTER this PreToolUse snapshot, so
-# that file is invisible to the staged-set capture. The working-tree bd file is
-# therefore unconditionally appended to the trunk-wide scan set below on every
-# commit, covering bead text ALREADY FLUSHED to .beads/issues.jsonl — the exact
-# vector of the historical operator-email leak (bead 46m). NOT covered here:
-# bead text still pending in .beads/beads.db at scan time — the bd pre-commit
-# hook flushes AND stages it inside `git commit`, after this scan ran, so it
-# commits unscanned at this boundary; the pre-push scan remains the backstop
-# for that window (tracked: bead ycqo).
+# Target repo (29u4): the staged set is read from the repo RECEIVING the commit —
+# the working tree containing the hook input's cwd (a linked worktree's index when
+# the commit is issued there; script-path fallback when cwd is absent/unresolvable).
+# The identity/contact configs are per-checkout (gitignored): a worktree or clone
+# without them scans structural-patterns-only, same as a fresh clone (3lv).
+#
+# bd auto-stage coverage (eb1, PR#84 HIST-2; completed by ycqo): the bd pre-commit
+# git hook flushes pending bead text from .beads/beads.db AND stages
+# .beads/issues.jsonl INSIDE `git commit`, AFTER this PreToolUse snapshot, so that
+# file is invisible to the staged-set capture. Two measures close that: the hook
+# runs `bd sync --flush-only` against the target repo BEFORE reading the jsonl
+# (ycqo — bead text pending in the db at scan time is flushed and scanned; flush
+# failure denies, fail-closed), and the working-tree bd file is unconditionally
+# appended to the trunk-wide scan set on every commit (eb1 — the exact vector of
+# the historical operator-email leak, bead 46m). NOT covered here: human-terminal
+# commits (no PreToolUse boundary), an in-command `cd <elsewhere> && git commit`
+# (the cwd names the tool call's starting directory), and the documented bare
+# top-level-filename pathspec residual — the pre-push scan remains the backstop
+# for those.
 #
 # Fail-closed (Security HIGH-1): any error in the scan path — import fails, scan
 # raises, the python3 -c returns non-zero, or the git/jq plumbing fails — emits
@@ -43,11 +52,16 @@
 # at a distribution boundary.
 #
 # TEST/OVERRIDE ENV (never set in production):
-#   BLOCK_PII_COMMIT_PROJECT_ROOT   — git root for staged-file detection.
+#   BLOCK_PII_COMMIT_PROJECT_ROOT   — FALLBACK git root for staged-file detection,
+#                                     used when the hook input carries no
+#                                     resolvable cwd (29u4).
 #   BLOCK_PII_COMMIT_PII_SCAN_ROOT  — sys.path root for the pii_scan import
-#                                     (default: PROJECT_ROOT). Tests point it at a
-#                                     stub (SEC-01(b)) or an unimportable dir
-#                                     (fail-closed).
+#                                     (default: the resolved target root). Tests
+#                                     point it at a stub (SEC-01(b)) or an
+#                                     unimportable dir (fail-closed).
+#   BLOCK_PII_COMMIT_BD_CMD         — bd command for the flush-before-scan (ycqo;
+#                                     default: bd). Tests substitute flushing/
+#                                     failing/no-op stubs.
 #
 # Exit codes (Claude Code hook convention):
 #   prints deny JSON + exits 0 → deny tool call

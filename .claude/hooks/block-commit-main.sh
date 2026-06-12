@@ -7,8 +7,12 @@
 # (five S2 commits landed on main locally before the gap was noticed; push
 # was correctly blocked but commit was not).
 #
-# Decision: deny if (command is a git commit invocation) AND (current branch
-# is main or master). Detached HEAD passes through (no branch name to match).
+# Decision: deny if (command is a git commit invocation) AND (the TARGET repo's
+# current branch is main or master). The target repo is the working tree containing
+# the hook input's cwd (worktree-aware since 29u4; script-path fallback when cwd is
+# absent/unresolvable). Detached HEAD passes through (no branch name to match). An
+# in-command `cd <elsewhere> && git commit` is checked against the STARTING cwd's
+# repo — block-push-main remains the second-line defense for that shape.
 #
 # Exit codes (Claude Code hook convention):
 #   prints deny JSON + exits 0 → deny tool call
