@@ -236,9 +236,16 @@ fi
 
 if [[ "$SCAN_OUT" -ge 1 ]]; then
     OFFENDERS=$(echo "$SCAN_ERR" | grep '^PII-HIT: ' | sed 's/^PII-HIT: //' | sort -u | head -8)
+    # bd-aware remedy (PR#100 F4): the bd file is flush-managed — "unstage it"
+    # is not workable (it joins the scan set unstaged, and a direct jsonl edit
+    # is overwritten by the next flush), so point at the bd-native fix.
+    REMEDY="Remove the PII or unstage the file before committing."
+    if grep -qxF "$BD_ISSUES" <<< "$OFFENDERS"; then
+        REMEDY="For $BD_ISSUES: edit the offending bead text via 'bd update', then 'bd sync --flush-only' (a direct edit of the jsonl is overwritten by the next flush). For any other offending file: remove the PII or unstage it before committing."
+    fi
     deny "PII-FREE-TRUNK: staged file(s) carry operator PII (pii_scan reported $SCAN_OUT hit(s)). Offending file(s):
 $OFFENDERS
-Remove the PII or unstage the file before committing."
+$REMEDY"
 fi
 
 # No condition blocked and no scan error → allow.
