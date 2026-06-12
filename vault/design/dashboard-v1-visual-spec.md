@@ -154,7 +154,14 @@ taken-counter chip (n/m taken) + checklist rows (name, dose, AM/PM tag, check st
 (incl. `experimental` + evidence-gated), watch-out rows with answer chips or an accent
 Answer button, "View protocol & evidence" link. Reason: PF-S49-01 — the signed visual
 artifact, not a textual interpretation, is the build target; this transcription is the
-in-repo record of the operator-held mock's plan zone.
+in-repo record of the operator-held mock's plan zone. Supersession: the populated-card
+anatomy's labels and tints in this block govern BOTH states — the empty state renders
+the same boxes with em-dash values per the ADR-0009 honest-awaiting rule, and
+`Sets done` is the governing label (the retained empty-state body above is the
+historical signed record, not a competing spec). "Live-state tinted" means: the
+Heart-rate box uses the measured state-tint pair for the metric's current state
+(PALETTE good/watch/concern semantics via the existing measured tint pairs), falling
+back to the neutral chrome tint with an em-dash value when no live reading exists.
 
 ## Zone 4 — Performance & Trends
 
