@@ -88,7 +88,7 @@ Before saying "done" or "complete":
    - `scripts/handoff-audit.sh` — INV-HO-ROTATION + INV-HO-NO-STALE-HASH
    - `scripts/scope-contract-audit.sh --session <N>` — INV-SCOPE-CONTRACT (asserts latest contract matches current session)
    - `scripts/pf-attestation-audit.sh --session <N>` — INV-PF-ATTESTATION (asserts close attestation dated current session)
-   - `scripts/skill-trace-audit.sh --session <N>` — PF-S39/S40/S51 family — asserts the close attestation carries the per-PR gated-skill invocation table; the audit reads the PF log's `## Session <N>` section, so every close writes that section carrying the close attestation plus the per-PR table (or the exact sentence `No PR lifecycles ran this session.`)
+   - `scripts/skill-trace-audit.sh --session <N>` — INV-SKILL-TRACE (PF-S39/S40/S51 family: asserts the close attestation carries the per-PR gated-skill invocation table; the audit reads the PF log's `## Session <N>` section, so every close writes that section carrying the close attestation plus the per-PR table, or the exact sentence `No PR lifecycles ran this session.`)
    - `scripts/branch-completeness-audit.sh` — INV-TRUNK-COMPLETENESS (asserts the checkout holds every deployed agent on `origin/main` + the governance layer; catches branch-write fragmentation, PF-S22-01)
 
    Conditional: for any aplus-research dispatch this session run `scripts/audit-research-provenance.sh <design-work-dir> <slug>` (bda — asserts the mode-required attested gates are PRESENT, then runs `gate_attest.py verify-chain`; closes the vacuous-pass hole where verify-chain alone skips ABSENT gates). This is the INV-RESEARCH-PROVENANCE-DISJOINT enforcement and is mandatory before any specialist's research feeds a wiki write.
