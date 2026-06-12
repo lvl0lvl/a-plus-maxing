@@ -76,6 +76,27 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
+## Status as of 2026-06-12 (S52) — all visual targets signed; hooks worktree-aware; skill-trace audit live
+
+Six PR lifecycles merged (#102-#107; `main` at `e8b0dd8`, suite 489 passed / 2 skipped),
+every gated skill invoked fresh (first mechanically-audited attestation under the new
+INV-SKILL-TRACE + `scripts/skill-trace-audit.sh`, registered this session by operator
+ritual). Landed: router clone-isolation pin (`e3b` T1; T2 wiring verification keeps the
+bead open); store correction path (`store.correct` superseding-append + latest-wins
+`_resolve_latest`, ADR-0002 v1.4); the skill-trace close audit + store-adversarial
+checklist; the 9-entry negative-example denylist default-wired into deploy-gate row 10
+fail-closed — content-reviewed by the deployed Role 4 and adjudicated `conditions-met`
+by Role 7, the first end-to-end run of the three-gate medical pipeline (provenance:
+`vault/decisions/2026-06-12-denylist-role4-review-provenance.md`); and worktree-aware
+commit hooks (`lib/resolve-target-repo.sh` — trunk-scoped gates, db-gated PII
+flush-before-scan closing the `ycqo` pending-text window for main-checkout commits).
+**The S51 design-input debt is cleared: all four visual targets are operator-signed and
+recorded** — `1oh` plan zone + `y0h0`/`i2yw` trend-card v2 in
+`vault/design/dashboard-v1-visual-spec.md` `[AMENDED 2026-06-12]` (projection readout
+dashboard-only by operator decision), and the `nsxy` physician face sheet as
+`vault/design/physician-facesheet-v1-spec.md`. Visual packages A/B/C build S53 from
+those targets. Session detail: `vault/sessions/session-52.md`.
+
 ## Status as of 2026-06-12 (S51) — data/correctness layer hardened (ultracode build fan-out)
 
 Five build units merged through full review lifecycles (PRs #97-#101; `main` at `f0c54ff`,

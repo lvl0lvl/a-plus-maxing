@@ -4,7 +4,7 @@ type: design
 status: approved
 owner: walter
 created: 2026-06-11
-last_reviewed: 2026-06-11
+last_reviewed: 2026-06-12
 depends_on: [dashboard-v1-design.md]
 superseded_by: null
 review_cadence: phase
