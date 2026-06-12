@@ -87,12 +87,13 @@ OPERATOR_CONTACT="op.user@gmail.com"
 printf 'op\\.user@gmail\\.com\n' > "$REPO/vault/meta/operator-contact.txt"
 
 # bd flush stub (ycqo): the hook runs `bd sync --flush-only` before reading the bd
-# jsonl. Real bd exits 1 in a scratch repo carrying .beads/ without a database (the
-# "fresh clone" shape), which would turn every eb1 allow-case into a fail-closed
-# deny — so invoke() pins BLOCK_PII_COMMIT_BD_CMD to a no-op stub. The ycqo cases
-# below substitute flushing/failing stubs inline.
+# jsonl when a database exists. The no-op stub is exported at SUITE scope (F7d) so
+# EVERY hook invocation — including the bare ones that bypass invoke() — is pinned
+# away from the machine's real bd; the flush-seam cases below substitute flushing/
+# failing stubs per-case (deliberate overrides stay per-case).
 BD_NOOP="$TMP/bd-noop.sh"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$BD_NOOP"; chmod +x "$BD_NOOP"
+export BLOCK_PII_COMMIT_BD_CMD="$BD_NOOP"
 
 # invoke(): build the stdin JSON, run the hook against the scratch repo. PROJECT_ROOT
 # is the scratch repo (for staged-file detection); the scanner root is pointed at the
@@ -581,8 +582,18 @@ git -C "$WT" reset -q; rm -f "$WT/docs/clean-wt.md"
 PENDING="$TMP/pending-bead.txt"
 printf '{"id":"x-2","title":"ping %s about labs"}\n' "$OPERATOR_CONTACT" > "$PENDING"
 BD_FLUSH="$TMP/bd-flush.sh"
+TMP_P="$(cd "$TMP" && pwd -P)"   # physical path — the stub guard compares real cwds
 cat > "$BD_FLUSH" <<EOF
 #!/usr/bin/env bash
+# Wrong-root guard (F7c): this stub only ever writes under the suite's TMP. A
+# flush invoked anywhere else means the hook pointed bd at a repo the fixture
+# never targeted — make that a VISIBLE failure (exit 99 -> fail-closed deny),
+# never a silent write into a real checkout.
+set -euo pipefail
+case "\$(pwd -P)" in
+    "$TMP_P"|"$TMP_P"/*) ;;
+    *) echo "bd-flush stub: cwd \$(pwd -P) outside test TMP — refusing to write" >&2; exit 99 ;;
+esac
 cat "$PENDING" >> .beads/issues.jsonl
 exit 0
 EOF
@@ -650,6 +661,91 @@ OUT=$(invoke_bd "git commit -m 'note6'" "$TMP/no-such-bd")
     && ok "ycqo (4) bd unavailable + clean jsonl -> ALLOW (flush guard skips, scan still runs)" \
     || bad "ycqo (4) bd-absent commit wrongly DENIED: $OUT"
 git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note6.md"; rm -rf "$REPO/.beads"
+
+# invoke_full(): like invoke_cwd but with an explicit bd override and stderr
+# capture ($TMP/last-stderr) — the flush-seam cases assert on the skip info lines.
+invoke_full() {  # $1 = command ; $2 = payload cwd ("" = none) ; $3 = bd cmd ; echoes hook stdout
+    local payload
+    if [[ -n "$2" ]]; then
+        payload=$(printf '{"cwd":%s,"tool_input":{"command":%s}}' \
+            "$(printf '%s' "$2" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+            "$(printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')")
+    else
+        payload=$(printf '{"tool_input":{"command":%s}}' \
+            "$(printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')")
+    fi
+    printf '%s' "$payload" \
+        | BLOCK_PII_COMMIT_PROJECT_ROOT="$REPO" BLOCK_PII_COMMIT_PII_SCAN_ROOT="$REAL_ROOT" \
+          BLOCK_PII_COMMIT_BD_CMD="$3" bash "$HOOK" 2>"$TMP/last-stderr"
+}
+
+# ── F7a: target = linked worktree -> flush SKIPPED, main checkout untouched ─────
+# bd resolves the db+jsonl via the common git dir, so a flush issued for a worktree
+# target would mutate the MAIN checkout's jsonl and never feed the worktree scan.
+# The hook must skip it with an info line. The wrong-root-guarded flush stub (F7c)
+# plus the main-jsonl content assertion kill the wrong-root flush mutant: ANY
+# flush — in the worktree (set -e stub, no .beads there -> rc!=0 -> deny), in
+# $REPO (jsonl content changes), or outside $TMP (stub exits 99 -> deny) — reds
+# this case. Reuses the 29u4 worktree $WT.
+mkfile ".beads/issues.jsonl" '{"id":"x-1","title":"routine clean task"}'
+: > "$REPO/.beads/beads.db"
+MAIN_JSONL_BEFORE=$(cat "$REPO/.beads/issues.jsonl")
+printf 'plain worktree note\n' > "$WT/docs/wt-clean.md"
+git -C "$WT" add docs/wt-clean.md
+OUT=$(invoke_full "git commit -m 'wt note'" "$WT" "$BD_FLUSH")
+{ [[ "$OUT" != *'"deny"'* ]] \
+  && grep -q "linked worktree" "$TMP/last-stderr" \
+  && [[ "$(cat "$REPO/.beads/issues.jsonl")" == "$MAIN_JSONL_BEFORE" ]]; } \
+    && ok "F7a worktree target -> flush SKIPPED (info line), main jsonl untouched" \
+    || bad "F7a worktree flush not skipped cleanly (out: $OUT; err: $(cat "$TMP/last-stderr"))"
+git -C "$WT" reset -q; rm -f "$WT/docs/wt-clean.md"; rm -rf "$REPO/.beads"
+
+# ── F7b: .beads/ present, NO db, bd available -> ALLOW with the db-gate skip ────
+# Hermetic dropped-guard kill: the bd command is the FAILING stub, so a mutant
+# that drops the db-existence gate and runs the flush anyway turns this case into
+# a fail-closed deny — no dependence on the machine's real bd.
+mkfile ".beads/issues.jsonl" '{"id":"x-1","title":"routine clean task"}'
+mkfile "docs/clean-note7.md" "Plain note."
+git -C "$REPO" add docs/clean-note7.md
+OUT=$(invoke_full "git commit -m 'note7'" "" "$BD_FAIL")
+{ [[ "$OUT" != *'"deny"'* ]] && grep -q "no beads database" "$TMP/last-stderr"; } \
+    && ok "F7b .beads-without-db + bd available -> ALLOW with skip info (db-gate)" \
+    || bad "F7b db-gate skip missing (out: $OUT; err: $(cat "$TMP/last-stderr"))"
+git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note7.md"; rm -rf "$REPO/.beads"
+
+# ── scope (F4): foreign-repo commit -> ALLOW (the gate guards this trunk only) ──
+# The foreign repo's index carries a WOULD-DENY path (a scaffold-prefix file), so
+# the allow can only come from the scope gate — pre-F4 this denied via condition 1.
+# The this-repo deny directions stay pinned by AC-4/AC-6 (fallback root) and
+# 29u4 (1) (this repo's worktree).
+FOREIGN="$TMP/foreign-repo"
+git init -q -b main "$FOREIGN"
+git -C "$FOREIGN" config user.email t@t.t; git -C "$FOREIGN" config user.name t
+git -C "$FOREIGN" commit -q --allow-empty -m seed
+mkdir -p "$FOREIGN/$(dirname "$SCAFFOLD_VALUE")"
+printf '{"item":"x"}\n' > "$FOREIGN/$SCAFFOLD_VALUE"
+git -C "$FOREIGN" add -f "$SCAFFOLD_VALUE"
+OUT=$(invoke_cwd "git commit -m 'foreign'" "$FOREIGN")
+[[ "$OUT" != *'"deny"'* ]] \
+    && ok "scope (F4) foreign-repo commit with would-deny staged path -> ALLOW" \
+    || bad "scope (F4) foreign repo wrongly gated: $OUT"
+
+# ── F6: resolve-target-repo lib missing -> DENY naming the lib (fail-closed) ───
+# Copy the hook + its OTHER libs to scratch and delete only resolve-target-repo.sh:
+# the commit-matcher / pii-scan-scope guards load fine, so the deny is pinned to
+# the resolve-lib guard specifically (the two allow-on-error sibling hooks pin
+# their warn+fallback posture in their own suites).
+LIBMISS="$TMP/libmiss-pii"; mkdir -p "$LIBMISS/lib"
+cp "$HOOK" "$LIBMISS/"
+cp "$SCRIPT_DIR/../../.claude/hooks/lib/commit-matcher.sh" \
+   "$SCRIPT_DIR/../../.claude/hooks/lib/pii-scan-scope.sh" "$LIBMISS/lib/"
+OUT=$(printf '{"tool_input":{"command":%s}}' \
+        "$(printf '%s' "git commit -m 'x'" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+      | BLOCK_PII_COMMIT_PROJECT_ROOT="$REPO" BLOCK_PII_COMMIT_PII_SCAN_ROOT="$REAL_ROOT" \
+        bash "$LIBMISS/block-pii-commit.sh")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"resolve-target-repo"* ]]; } \
+    && ok "F6 resolve-lib missing -> DENY naming resolve-target-repo (fail-closed)" \
+    || bad "F6 resolve-lib-missing posture wrong: $OUT"
 
 echo
 echo "test_block_pii_commit: ${PASS} passed, ${FAIL} failed"
