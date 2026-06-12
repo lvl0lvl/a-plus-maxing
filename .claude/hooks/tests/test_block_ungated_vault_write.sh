@@ -80,6 +80,12 @@ emit grandfathered | grep -v '^provenance_' > "$REPO/vault/compounds/grandfather
 emit x > "$REPO/vault/compounds/_template.md"
 echo "root readme" > "$REPO/README.md"
 
+# Seed commit: the case-10 worktree needs a resolvable HEAD, and the index +
+# grandfather list must land in worktree checkouts. No case stages these paths,
+# so the existing cases' staged-set semantics are unchanged.
+git add vault/meta/index.md vault/library/_ingest-grandfather.txt
+git commit -q -m "seed wiki infra"
+
 invoke() {  # $1 = command string ; echoes hook stdout
     printf '{"tool_input":{"command":%s}}' \
         "$(printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
@@ -128,6 +134,25 @@ for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commi
         && ok "cvr bypass-form commit recognized -> DENY: ${bypass//$'\n'/\\n}" \
         || bad "cvr bypass NOT recognized: '${bypass//$'\n'/\\n}' got: $OUT"
 done
+
+# Case 10 (29u4): worktree commit staging an ungated page -> DENY via the hook
+# input's cwd. The env override seeds the FALLBACK root ($REPO, whose staged set
+# is left clean), so a deny can only come from resolving the WORKTREE's index.
+# The page reuses the indexed `ungated` slug (absent from HEAD, so absent from
+# the worktree checkout until staged here) to keep the violation provenance-only.
+git reset -q
+WTV="$TMP/wt-vault"
+git -C "$REPO" worktree add -q -b wt-feat "$WTV"
+mkdir -p "$WTV/vault/compounds"
+emit ungated | grep -v '^provenance_' > "$WTV/vault/compounds/ungated.md"
+git -C "$WTV" add vault/compounds/ungated.md
+OUT=$(printf '{"cwd":%s,"tool_input":{"command":%s}}' \
+        "$(printf '%s' "$WTV" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+        "$(printf '%s' "git commit -m 'wt ungated'" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+      | BLOCK_UNGATED_VAULT_PROJECT_ROOT="$REPO" WIKI_BDA_CMD="$TMP/bda.sh" bash "$HOOK")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"INV-WIKI-INGESTION-GATED"* ]]; } \
+    && ok "case10 (29u4): worktree commit staging ungated page DENIED via cwd resolution" \
+    || bad "case10 (29u4): worktree-staged ungated page NOT denied (worktree-blind), got: $OUT"
 
 echo
 echo "test_block_ungated_vault_write: ${PASS} passed, ${FAIL} failed"

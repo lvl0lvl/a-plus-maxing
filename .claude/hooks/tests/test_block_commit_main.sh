@@ -198,6 +198,57 @@ fi
 
 rm -rf "$TMP_REPO"
 
+# ── T25-T26 (29u4): worktree-aware branch check via the hook input's cwd ──────
+# The hook must check the branch of the repo RECEIVING the commit — the working
+# tree containing the hook input's `cwd` — not the checkout the hook script lives
+# in. The env override seeds the FALLBACK root here (standing in for the script-
+# path checkout), so these cases pin both directions: fallback-on-main + worktree-
+# on-fix/* -> ALLOW (the S51 false positive), fallback-off-main + worktree-on-main
+# -> DENY (the vacuous pass).
+echo "T25-T26: worktree-aware branch check (29u4)"
+WT_BASE=$(mktemp -d)
+git -C "$WT_BASE" init -q -b main 2>/dev/null || {
+    git -C "$WT_BASE" init -q
+    git -C "$WT_BASE" symbolic-ref HEAD refs/heads/main
+}
+git -C "$WT_BASE" config user.email t@t.t
+git -C "$WT_BASE" config user.name t
+git -C "$WT_BASE" commit -q --allow-empty -m seed
+
+invoke_with_cwd() {  # $1 = command ; $2 = payload cwd ; fallback root = WT_BASE
+    local payload
+    payload=$(printf '{"cwd":%s,"tool_input":{"command":%s}}' \
+        "$(printf '%s' "$2" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
+        "$(printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')")
+    echo "$payload" | BLOCK_COMMIT_MAIN_PROJECT_ROOT="$WT_BASE" "$HOOK"
+}
+
+# T25: fallback checkout on main, commit issued from a worktree on fix/* -> ALLOW
+WT_FIX="$WT_BASE-wt-fix"
+git -C "$WT_BASE" worktree add -q -b fix/wt-case "$WT_FIX"
+out=$(invoke_with_cwd "git commit -m 'x'" "$WT_FIX")
+if [[ -z "$out" ]]; then
+    echo "  PASS: T25 worktree on fix/* + checkout on main → allow (29u4)"
+    PASS=$((PASS + 1))
+else
+    echo "  FAIL: T25 — expected silent allow, got: $out"
+    FAIL=$((FAIL + 1))
+fi
+
+# T26: fallback checkout moved OFF main, worktree IS on main -> DENY
+git -C "$WT_BASE" checkout -q -b feature/elsewhere
+WT_MAIN="$WT_BASE-wt-main"
+git -C "$WT_BASE" worktree add -q "$WT_MAIN" main
+out=$(invoke_with_cwd "git commit -m 'x'" "$WT_MAIN")
+if [[ "$out" == *'"permissionDecision":"deny"'* ]] && [[ "$out" == *"on 'main' blocked"* ]]; then
+    echo "  PASS: T26 worktree ON main → deny regardless of checkout branch (29u4)"
+    PASS=$((PASS + 1))
+else
+    echo "  FAIL: T26 — expected deny on worktree main, got: $out"
+    FAIL=$((FAIL + 1))
+fi
+rm -rf "$WT_BASE" "$WT_FIX" "$WT_MAIN"
+
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""
 echo "Total: $((PASS + FAIL))"
