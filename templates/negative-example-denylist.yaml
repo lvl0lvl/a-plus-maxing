@@ -15,31 +15,55 @@
 # case-insensitively against the `## Negative Examples` section ONLY, AFTER fenced
 # code blocks and inline `code` spans are stripped (AQ-002). A faithful BAD
 # demonstration belongs inside a fenced block and is therefore NOT counted; unfenced
-# harmful prose in the section is the BLOCK target. Patterns are POSIX ERE (grep -E):
-# digit/space classes are [0-9]/[[:space:]], never \d/\s (those are PCRE-only and the
-# consuming engine is grep -E). The drug+dose entries are order-agnostic on a line.
+# harmful prose in the section is the BLOCK target.
+#
+# Entry geometry: the class-(a) entry is order-agnostic on a line (drug before or
+# after the dose). The three contraindication-pair entries are dose-TRAILING: the
+# drug pair is order-agnostic, but the dose-with-unit must follow both drugs on the
+# line. A dose sitting between the two drugs does not match — a pinned boundary of
+# the starter set.
+#
+# Authoring contract (the extractor — denylist_patterns in
+# scripts/audit-specialist-profile.sh — is line-oriented, not a YAML parser):
+#   - A pattern is ONE single-line single-quoted (or unquoted) YAML scalar on its
+#     own `pattern:` line. Double-quoted scalars, block scalars (| or >), and
+#     inline `# comments` after the value are UNSUPPORTED — they reach grep
+#     verbatim, and the row-10 shape lint BLOCKs on extraction mismatch.
+#   - Patterns are POSIX ERE (grep -E): digit/space classes are [0-9]/[[:space:]],
+#     never \d/\s (PCRE-only). \b is undefined in POSIX ERE and unsupported here —
+#     write the letter-bound idiom (^|[^a-z])X([^a-z]|$) instead: a non-letter or
+#     line edge on each side of X is the word boundary.
+#   - The unit alternation is right-bounded: (mg|mcg|g|iu|ml)([^a-z]|$). Without
+#     the right bound the bare `g` alternative matches the leading g of any word
+#     ("methotrexate 30 grade-3 events" would false-BLOCK as "30 g").
+#   - The dose subpattern [0-9]+[[:space:]]*(mg|mcg|g|iu|ml)([^a-z]|$) appears at
+#     5 sites (twice in class (a), once per contraindication pair) and must be
+#     edited in LOCKSTEP. [[:space:]]* tolerates any spacing between number and
+#     unit ("40 mg", "40mg", "40  mg"). Hyphenated ("40-mg"), pluralized
+#     ("40 mgs"), and spelled-out units ("forty milligrams") are OUT of starter
+#     scope.
 last_reviewed: 2026-06-12
 
 entries:
   # ---- class (a): FDA Pregnancy Category X drug co-occurring with a dosed unit ----
   - class: pregnancy_category_x_dose
-    pattern: '((isotretinoin|thalidomide|warfarin|methotrexate|finasteride|leflunomide|mycophenolate|valproate|valproic acid).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)([^a-z]|$)|[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)([^a-z]|$).*(isotretinoin|thalidomide|warfarin|methotrexate|finasteride|leflunomide|mycophenolate|valproate|valproic acid))'
+    pattern: '((isotretinoin|thalidomide|warfarin|methotrexate|finasteride|leflunomide|mycophenolate|valproate|valproic acid).*[0-9]+[[:space:]]*(mg|mcg|g|iu|ml)([^a-z]|$)|[0-9]+[[:space:]]*(mg|mcg|g|iu|ml)([^a-z]|$).*(isotretinoin|thalidomide|warfarin|methotrexate|finasteride|leflunomide|mycophenolate|valproate|valproic acid))'
     rationale: 'FDA Pregnancy Category X drug shown with a concrete dose-with-unit is a teratogen dosing directive, not a refusal demonstration. Precision note: the historical FDA letter category for mycophenolate was D under a REMS (documented teratogen), retained here for the dosed-teratogen purpose.'
     false_positive_note: 'Wide: a faithful BAD example that quotes such a directive must sit in a fenced/inline code block (stripped pre-scan). Unfenced drug-name-plus-dose prose in Negative Examples is the intended hit. A teaching mention of the drug WITHOUT a numeric dose-with-unit (e.g. a route-out rule naming warfarin) does not match.'
 
   # ---- class (b): common contraindication pairs co-occurring with a dosed unit ----
   - class: contraindication_anticoagulant_nsaid_dose
-    pattern: '((warfarin|apixaban|rivaroxaban).*(ibuprofen|naproxen|aspirin)|(ibuprofen|naproxen|aspirin).*(warfarin|apixaban|rivaroxaban)).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)([^a-z]|$)'
+    pattern: '((warfarin|apixaban|rivaroxaban).*(ibuprofen|naproxen|aspirin)|(ibuprofen|naproxen|aspirin).*(warfarin|apixaban|rivaroxaban)).*[0-9]+[[:space:]]*(mg|mcg|g|iu|ml)([^a-z]|$)'
     rationale: 'Anticoagulant plus an analgesic NSAID with a dose on the same line is a bleeding-risk co-administration directive.'
     false_positive_note: 'Requires both drug classes AND a dose-with-unit on the line, so an interaction-screen rule that names the pair without a dose does not match. A faithful BAD demonstration belongs in a fenced block.'
 
   - class: contraindication_maoi_ssri_dose
-    pattern: '((phenelzine|tranylcypromine|selegiline).*(sertraline|fluoxetine|paroxetine|escitalopram)|(sertraline|fluoxetine|paroxetine|escitalopram).*(phenelzine|tranylcypromine|selegiline)).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)([^a-z]|$)'
+    pattern: '((phenelzine|tranylcypromine|selegiline).*(sertraline|fluoxetine|paroxetine|escitalopram)|(sertraline|fluoxetine|paroxetine|escitalopram).*(phenelzine|tranylcypromine|selegiline)).*[0-9]+[[:space:]]*(mg|mcg|g|iu|ml)([^a-z]|$)'
     rationale: 'MAOI plus SSRI with a dose on the same line is a serotonin-syndrome co-administration directive.'
     false_positive_note: 'Requires both an MAOI and an SSRI AND a dose-with-unit on the line. A fenced BAD example is stripped before the scan.'
 
   - class: contraindication_nitrate_pde5_dose
-    pattern: '((nitroglycerin|isosorbide).*(sildenafil|tadalafil|vardenafil)|(sildenafil|tadalafil|vardenafil).*(nitroglycerin|isosorbide)).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)([^a-z]|$)'
+    pattern: '((nitroglycerin|isosorbide).*(sildenafil|tadalafil|vardenafil)|(sildenafil|tadalafil|vardenafil).*(nitroglycerin|isosorbide)).*[0-9]+[[:space:]]*(mg|mcg|g|iu|ml)([^a-z]|$)'
     rationale: 'Nitrate plus a PDE5 inhibitor with a dose on the same line is a severe-hypotension co-administration directive.'
     false_positive_note: 'Requires both a nitrate and a PDE5 inhibitor AND a dose-with-unit on the line. A fenced BAD example is stripped before the scan.'
 
