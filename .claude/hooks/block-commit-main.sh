@@ -58,6 +58,16 @@ else
     PROJECT_ROOT="$FALLBACK_ROOT"
 fi
 
+# Scope gate: this guard protects THIS trunk only — a commit whose target repo
+# provably belongs to a different repository (a /tmp scratch repo, another
+# project's clone) passes through, even when THAT repo sits on main. Worktrees of
+# this repo share the git common dir and stay gated; an indeterminate target stays
+# gated too. Guarded on the helper existing: on a missing resolve lib the fallback
+# above already pinned PROJECT_ROOT to this checkout, which is trivially in scope.
+if declare -F target_is_this_repo >/dev/null 2>&1; then
+    target_is_this_repo "$PROJECT_ROOT" "$FALLBACK_ROOT" || exit 0
+fi
+
 # Check the target repo's current branch.
 BRANCH=$(git -C "$PROJECT_ROOT" symbolic-ref --short HEAD 2>/dev/null || echo "")
 

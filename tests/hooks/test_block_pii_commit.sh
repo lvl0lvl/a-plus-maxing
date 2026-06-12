@@ -600,7 +600,10 @@ invoke_bd() {  # $1 = command string ; $2 = bd command override ; echoes hook st
 
 # ycqo (1): clean jsonl on disk, dirty text PENDING (db-only) at scan time -> the
 # in-hook flush materializes it BEFORE the jsonl read -> DENY naming the bd file.
+# A db file is seeded: the flush only runs when a database exists (db-gate) —
+# without one nothing can be pending and the flush is skipped.
 mkfile ".beads/issues.jsonl" '{"id":"x-1","title":"routine clean task"}'
+: > "$REPO/.beads/beads.db"
 mkfile "docs/clean-note3.md" "Plain note."
 git -C "$REPO" add docs/clean-note3.md
 OUT=$(invoke_bd "git commit -m 'note3'" "$BD_FLUSH")
@@ -611,8 +614,9 @@ git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note3.md"; rm -rf "$REPO/.beads
 
 # ycqo (2): flush FAILURE -> DENY (fail-closed, matching the git-rc/scan-rc
 # convention and bd's own exit-1-on-flush-failure) — pending text it could not
-# flush cannot be scanned.
+# flush cannot be scanned. Db seeded so the flush path (not the db-gate skip) runs.
 mkfile ".beads/issues.jsonl" '{"id":"x-1","title":"routine clean task"}'
+: > "$REPO/.beads/beads.db"
 mkfile "docs/clean-note4.md" "Plain note."
 git -C "$REPO" add docs/clean-note4.md
 OUT=$(invoke_bd "git commit -m 'note4'" "$BD_FAIL")
@@ -621,10 +625,11 @@ OUT=$(invoke_bd "git commit -m 'note4'" "$BD_FAIL")
     || bad "ycqo (2) flush failure NOT denied (fail-open on flush rc): $OUT"
 git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note4.md"; rm -rf "$REPO/.beads"
 
-# ycqo (3): .beads/ present but NO jsonl yet — the flush CREATES it carrying the
+# ycqo (3): db present but NO jsonl yet — the flush CREATES it carrying the
 # dirty text -> DENY. Pins the ordering: flush runs BEFORE the jsonl existence
 # check, not after (an after-check flush would miss a freshly-created jsonl).
 mkdir -p "$REPO/.beads"
+: > "$REPO/.beads/beads.db"
 mkfile "docs/clean-note5.md" "Plain note."
 git -C "$REPO" add docs/clean-note5.md
 OUT=$(invoke_bd "git commit -m 'note5'" "$BD_FLUSH")
@@ -633,9 +638,11 @@ OUT=$(invoke_bd "git commit -m 'note5'" "$BD_FLUSH")
     || bad "ycqo (3) flush-created jsonl NOT scanned (existence check precedes flush): $OUT"
 git -C "$REPO" reset -q; rm -f "$REPO/docs/clean-note5.md"; rm -rf "$REPO/.beads"
 
-# ycqo (4) control: bd UNAVAILABLE + clean jsonl -> ALLOW (clone semantics — a
-# checkout without bd commits on the as-is jsonl scan, no flush, no per-se deny).
+# ycqo (4) control: bd UNAVAILABLE + clean jsonl -> ALLOW (a checkout without bd
+# commits on the as-is jsonl scan, no flush, no per-se deny). Db seeded so the
+# skip provably comes from the bd-availability guard, not the db-gate.
 mkfile ".beads/issues.jsonl" '{"id":"x-1","title":"routine clean task"}'
+: > "$REPO/.beads/beads.db"
 mkfile "docs/clean-note6.md" "Plain note."
 git -C "$REPO" add docs/clean-note6.md
 OUT=$(invoke_bd "git commit -m 'note6'" "$TMP/no-such-bd")

@@ -38,3 +38,24 @@ resolve_target_repo() {  # $1 = hook stdin JSON ; $2 = fallback root
     fi
     printf '%s\n' "$2"
 }
+
+# target_is_this_repo "<resolved root>" "<fallback root>" — return 1 ONLY when the
+# resolved target PROVABLY belongs to a different repository than the checkout this
+# lib ships in: both roots resolve a `git rev-parse --git-common-dir` AND the real
+# paths differ. Return 0 for the same repo, any of its linked worktrees (they share
+# the common dir), and any INDETERMINATE target (non-git / unresolvable). The
+# indeterminate case deliberately stays IN scope: the consumer's own posture (e.g.
+# block-pii-commit's fail-closed git-plumbing deny) must decide what a broken
+# target means — a scope check that cannot identify the target must not convert
+# that into a silent allow.
+target_is_this_repo() {  # $1 = resolved target root ; $2 = fallback root
+    local t f
+    t=$(git -C "$1" rev-parse --git-common-dir 2>/dev/null) || return 0
+    f=$(git -C "$2" rev-parse --git-common-dir 2>/dev/null) || return 0
+    # rev-parse emits a root-relative path at a main-checkout toplevel (".git") and
+    # an absolute one from a linked worktree — real-path both against their roots
+    # so the two forms compare (and /tmp symlinks on macOS normalize away).
+    t=$(cd "$1" 2>/dev/null && cd "$t" 2>/dev/null && pwd -P) || return 0
+    f=$(cd "$2" 2>/dev/null && cd "$f" 2>/dev/null && pwd -P) || return 0
+    [[ "$t" == "$f" ]]
+}
