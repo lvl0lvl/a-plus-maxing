@@ -902,3 +902,6 @@ def test_operator_text_is_escaped_no_injection(tmp_path):
     # (b) no live tag injected; the raw markup is entity-encoded.
     assert "<script>" not in html, "raw <script> must not be injected into the output"
     assert "&lt;script&gt;" in html, "the operator <script> text must render escaped"
+    # (c) the operator double quotes render entity-encoded (bead vp5p: _escape
+    # covers the full & < > ' " set; a dropped &quot; replace turns this red).
+    assert "&quot;q&quot;" in html, "operator double quotes must render entity-encoded"

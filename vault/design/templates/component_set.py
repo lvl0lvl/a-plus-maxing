@@ -565,10 +565,17 @@ def bar_sparkline(values, state):
 
 
 def _escape(text):
-    """Minimal HTML-escape for interpolated text/attribute content."""
+    """Minimal HTML-escape for interpolated text/attribute content.
+
+    Encodes the full `& < > ' "` set (`&` first, so later entities are not
+    double-encoded). Template attributes are single-quoted by convention, but
+    the double quote is encoded too so a future double-quoted attribute
+    interpolation is not injectable (PR#90 F20/SEC-001).
+    """
     return (
         text.replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace("'", "&#39;")
+        .replace('"', "&quot;")
     )

@@ -28,6 +28,10 @@ self-contained HTML file. Templates are callables `template(store_read) -> html_
 - `component_set.sparkline(values, state)` — polyline SVG (render_views' ADR-0007
   surface). `bar_sparkline(values, state)` (S48) — bottom-aligned rect columns, the
   dashboard's bars-not-paths component. Both: numeric values ONLY (callers route).
+- Escaping convention (bead vp5p, PR#90 F20/SEC-001): all template HTML attributes
+  are SINGLE-QUOTED, and `component_set._escape` is the SOLE escape path (templates
+  never roll their own) encoding the full `& < > ' "` set — `&` first so later
+  entities are not double-encoded.
 - `component_set.ACCENTS` (S49) — the five surface-category chrome colors from the
   approved dashboard design (training/nutrition/supplements/peptides/sleep). Chrome
   ONLY (card headers, glyph dots, tint pills) — never data state; data state stays
