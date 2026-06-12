@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-48)
+title: Scope Contract Archive (Sessions 5-49)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-48. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-49. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 49 (2026-06-10)
+
+Dashboard VISUAL shell built to the approved 7-zone design (post-V1 lighter path; the PF-S48-01 gap closure). Merged PR #91 (S48 close) at open; built + merged PR #92 (ADR-0009 7-zone shell, honest awaiting states) and PR #93 (visual-language pass — restyled to the signed-off Pencil mock after Walter's side-by-side "They are not the same", transcribed in-repo as `vault/design/dashboard-v1-visual-spec.md`); the calendar zone's two further Walter-directed iterations (real month table; in-place month reveal) landed as PR #94 with its review explicitly deferred to S50. AC1-AC5 PASS (AC5's calendar iteration open as PR #94 at close). PF-S49-01 promoted (`AP-BUILT-FROM-SUMMARY-NOT-SOURCE`). **Full contract preserved in git history (main at `a7e0c39`, the pre-S50-close HANDOFF); S49 drift checks + close attestation in `memory/process-failures.md`; summary + AC outcomes in `vault/sessions/session-49.md`** (compacted here at the S50 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 48 (2026-06-10)
 
