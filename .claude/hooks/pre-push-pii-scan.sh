@@ -29,10 +29,12 @@
 #   • Changed paths are scanned from the WORKING TREE (the same disk-content
 #     approximation block-pii-commit.sh uses for the staged set): PII that was
 #     committed AND since removed from disk is not seen here — the history
-#     question belongs to a history audit, not a push gate. This is the layer that
-#     covers the commit hook's bd-auto-stage blind spot (PR#84 HIST-2): bead text
-#     freshly flushed by the bd pre-commit hook is invisible to the commit-time
-#     scan but IS scanned here at push time.
+#     question belongs to a history audit, not a push gate. The commit hook's
+#     historical bd-auto-stage blind spot (PR#84 HIST-2) is closed at the commit
+#     boundary since eb1 (block-pii-commit.sh appends the working-tree
+#     .beads/issues.jsonl to its trunk-wide scan set on every commit); this layer
+#     remains the backstop for human-terminal commits, which bypass the
+#     agent-only commit hook entirely.
 #
 # stdin (git pre-push contract): "<local_ref> <local_sha> <remote_ref> <remote_sha>"
 # per ref being pushed.

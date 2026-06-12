@@ -25,10 +25,12 @@
 #     be flagged trunk-wide.
 # Deny if the combined count is >=1.
 #
-# KNOWN LIMIT (PR#84 HIST-2): the bd pre-commit git hook stages
-# .beads/issues.jsonl INSIDE `git commit`, AFTER this PreToolUse snapshot, so
-# freshly-flushed bead text is not seen here — the pre-push backstop covers it
-# (a commit-time scan of the bd file is tracked separately).
+# bd auto-stage coverage (eb1, closes PR#84 HIST-2): the bd pre-commit git hook
+# stages .beads/issues.jsonl INSIDE `git commit`, AFTER this PreToolUse snapshot,
+# so freshly-flushed bead text — the exact vector of the historical operator-email
+# leak (bead 46m) — is invisible to the staged-set capture. The working-tree bd
+# file is therefore unconditionally appended to the trunk-wide scan set below on
+# every commit; the pre-push backstop remains the human-terminal layer.
 #
 # Fail-closed (Security HIGH-1): any error in the scan path — import fails, scan
 # raises, the python3 -c returns non-zero, or the git/jq plumbing fails — emits
@@ -147,6 +149,26 @@ while IFS= read -r f; do
     [[ -z "$f" ]] && continue
     STAGED+=("$f")
 done <<< "$GIT_OUT"
+
+# bd auto-stage coverage (eb1): the bd pre-commit git hook stages
+# .beads/issues.jsonl INSIDE `git commit`, AFTER the snapshot above, so the
+# working-tree bd file joins the trunk-wide scan set on every commit (dedupe
+# keeps the deny hit-count honest). BEFORE the empty-set exit: a commit with
+# nothing agent-staged still succeeds carrying bd's auto-staged flush, so the
+# scan must run on the bd file alone. The single -f guard preserves clone
+# semantics (a fresh non-beads clone has no .beads/) rather than leaning on the
+# scanner's OSError swallow (the PR#84 BUG-1 fail-open trap class). .beads/ is
+# not a data-bearing prefix — the operator name in bead text is accepted
+# authorship — so the file gets the trunk-wide scope only (structural patterns
+# + contact tokens via scan_scoped).
+BD_ISSUES=".beads/issues.jsonl"
+if [[ -f "$PROJECT_ROOT/$BD_ISSUES" ]]; then
+    BD_SEEN=0
+    for f in ${STAGED[@]+"${STAGED[@]}"}; do
+        [[ "$f" == "$BD_ISSUES" ]] && { BD_SEEN=1; break; }
+    done
+    [[ $BD_SEEN -eq 0 ]] && STAGED+=("$BD_ISSUES")
+fi
 
 [[ ${#STAGED[@]} -eq 0 ]] && exit 0
 
