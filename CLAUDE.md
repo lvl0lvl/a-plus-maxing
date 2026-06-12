@@ -137,7 +137,7 @@ Six PreToolUse hooks are registered (`.claude/settings.json`; the roster is pinn
 - **block-ungated-vault-write.sh** -- Denies committing a `vault/{compounds,biomarkers,library}/` entity page that has not passed the ingestion gate (INV-WIKI-INGESTION-GATED).
 - **enforce-role-inlining.sh** -- Denies a role-context Task dispatch that does not inline the full role profile (INV-ROLE-INLINING).
 - **block-pii-commit.sh** -- Denies a commit that stages a filled-scaffold/store path or whose content carries operator PII (ADR-0005; registered S45, bead 3lv). **Commit-sequencing rule:** stage with `git add` as its own command, then `git commit` separately — the hook denies single-call stage+commit, `git commit -a/--all`, and pathspec `git commit <path>` (their content is invisible to the pre-command staged-set scan).
-- **pre-push-pii-scan.sh** (`.claude/hooks/`, installed to `.git/hooks/pre-push` by `init_instance`, not a settings.json hook) -- Scans the push range as the backstop to the commit-time scan — for human-terminal commits AND for agent commits whose bead text was still pending in `.beads/beads.db` at commit-scan time (the eb1/`ycqo` residual window; bead dv3). `git push --no-verify` bypasses it.
+- **pre-push-pii-scan.sh** (`.claude/hooks/`, installed to `.git/hooks/pre-push` by `init_instance`, not a settings.json hook) -- Scans the push range as the backstop to the commit-time scan — for human-terminal commits AND for agent commits whose bead text was still pending in `.beads/beads.db` at commit-scan time (the eb1/`ycqo` residual window; bead dv3), AND for worktree commits, where the commit-time staged-set scan is currently vacuous (the worktree-blind window; bead `29u4`). `git push --no-verify` bypasses it.
 
 ## Conventions
 
