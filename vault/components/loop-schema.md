@@ -3,7 +3,7 @@ title: loop-schema — stream taxonomy + published store states
 type: reference
 status: active
 created: 2026-06-10
-last_reviewed: 2026-06-10
+last_reviewed: 2026-06-12
 review_cadence: on-change
 permalink: a-plus-maxing/components/loop-schema
 ---
