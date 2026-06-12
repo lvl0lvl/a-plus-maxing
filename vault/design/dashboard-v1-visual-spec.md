@@ -196,6 +196,15 @@ report by operator direction (S52 — an extrapolation must not read as clinical
 Reason: closes the `y0h0` date/range/delta residuals and the `i2yw` projection
 residual against a signed visual target.
 
+[AMENDED 2026-06-12 #110 review]: range bounds render trailing-zero-free via the
+uniform numeric rule (`ref 0 – 3 mg/L`); the mock literal's mixed 0/3.0 formatting
+is not reproducible by one rule. Within-range movement on an in-range-polarity
+marker renders the numeric delta on the neutral tint (v1 rendered a word-"flat"
+pill — the value moved, the judgment did not; the tint is unchanged). The
+projection caption renders only for a strictly-future projected date
+(same-day/zero-interval series render no caption — an extrapolation must be a
+forecast).
+
 ## Zone 5 — Your Care Team
 
 Heading + subtitle: `What each specialist tracks for you — every claim attributed
