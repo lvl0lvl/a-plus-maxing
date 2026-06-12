@@ -138,6 +138,24 @@ goals, attributed to each specialist.`
   - **Peptides:** a protocol-line area: dashed empty-state row only.
 - Stat boxes: 1px border, radius 8px, centered 11px label over 16px value.
 
+[AMENDED 2026-06-12 (bead `1oh`, S52 operator sign-off: "existing mock is good enough for now")]:
+the styled-empty-state bodies above -> the operator-held mock's POPULATED card anatomy
+is the signed `1oh` build target as-is. Slot shapes (sample values describe shape only;
+honesty rule governs rendering): **Workout** — 4 stat boxes (Elapsed / Volume / Sets done
+/ Heart rate, the last live-state tinted), a chips row (steps · kcal burn · exercise
+minutes), an exercise list (rows: name, load × reps, per-set progress dots, per-row
+detail caption), a rest-timer footer line + accent-filled Resume button. **Nutrition** —
+calorie-arithmetic row (Goal − Food + Exercise = Remaining, Remaining tinted), three
+macro tracks with gram FILLS (value/target per track), a "Today's meals · from your
+plan" checklist (rows: meal name, contents caption, per-meal kcal, logged ✓ / up-next /
+Log-chip states, Add-food link), water track (value/target L). **Supplements** — a
+taken-counter chip (n/m taken) + checklist rows (name, dose, AM/PM tag, check state).
+**Peptides** — protocol line (compound · dose · route), week-of-cycle caption, tag chips
+(incl. `experimental` + evidence-gated), watch-out rows with answer chips or an accent
+Answer button, "View protocol & evidence" link. Reason: PF-S49-01 — the signed visual
+artifact, not a textual interpretation, is the build target; this transcription is the
+in-repo record of the operator-held mock's plan zone.
+
 ## Zone 4 — Performance & Trends
 
 Heading + subtitle: `How you're tracking — recent readings per metric.` Legend
@@ -152,6 +170,20 @@ existing sort; wraps). Card anatomy, top to bottom:
 - the **bar sparkline** at the card bottom, full card width (the existing
   bar_sparkline component, state-colored as today).
 Empty store: the zone renders one dashed awaiting card (existing copy).
+
+[AMENDED 2026-06-12 (beads `y0h0` + `i2yw`, S52 operator sign-off: "the new trend cards
+are fine for now")]: the card anatomy above gains, per the signed Trend Card v2 mock:
+a **reading date** top-right on the label row (11px muted, e.g. `Jun 10`); a
+**ref-range/state caption** under the value row (11px muted — `ref 0 – 3.0 mg/L · in
+range` for registered biomarkers, collapsing to `no reference range · performance
+metric` for gym metrics); the **delta chip** becomes NUMERIC in the metric's own unit
+over the trend window (`▼ 0.3`, `▲ 20 lb`), tinted by the polarity-aware semantic
+state; and a **naive-projection caption** under the sparkline (`→ 0.8 by Jul 10 ·
+naive projection`, 11px muted) — the `i2yw` projection-readout residual. The
+projection renders on the DASHBOARD card only: it is excluded from the physician
+report by operator direction (S52 — an extrapolation must not read as clinical data).
+Reason: closes the `y0h0` date/range/delta residuals and the `i2yw` projection
+residual against a signed visual target.
 
 ## Zone 5 — Your Care Team
 
