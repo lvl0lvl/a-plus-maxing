@@ -17,7 +17,8 @@
 # when their input artifact is absent:
 #   • refusal-classes / authority-framing  → templates/refusal-class-taxonomy.yaml
 #   • mode-floor-correctness                → templates/specialist-risk-class.yaml
-#   • negative-examples denylist            → --denylist <path> (pending S-08 bead)
+#   • negative-examples denylist            → templates/negative-example-denylist.yaml
+#                                             (default-wired; --denylist <path> overrides)
 #   • identical-block / differ-jaccard      → --compare-to <slug-dir,...> corpus
 #   • schema-drift                          → --schema <operator-profile-schema>
 #
@@ -48,7 +49,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TAXONOMY="$REPO_ROOT/templates/refusal-class-taxonomy.yaml"
 RISK_TABLE="$REPO_ROOT/templates/specialist-risk-class.yaml"
 PF_LOG="$REPO_ROOT/memory/process-failures.md"
-DENYLIST=""
+DENYLIST="$REPO_ROOT/templates/negative-example-denylist.yaml"
 
 # Operator-bound content markers for R13-6.7 (check_operator_no_writeback).
 # Identity tokens load from the gitignored per-instance config so this tracked
@@ -144,6 +145,26 @@ section_text() {
     ' "$BODY"
 }
 has_frontmatter() { [[ -s "$FM" ]]; }
+
+# Lines of the `## Negative Examples` section, read from the AQ-002-stripped body
+# (fenced + inline code already removed). A faithful BAD demonstration lives in a
+# fenced block and is therefore absent here; only unfenced prose remains.
+neg_examples_stripped() {
+    awk '
+        $0 ~ /^## Negative Examples([ \t]*$)/ {ins=1; next}
+        /^## /{ins=0}
+        ins{print}
+    ' "$STRIPPED"
+}
+
+# Extract the ERE patterns from a YAML denylist into one-per-line grep -f input,
+# stripping the single-quoted YAML scalar quoting. Single-quoted YAML keeps regex
+# backslash classes literal (\b stays \b); POSIX classes ([0-9], [[:space:]]) pass
+# through unchanged.
+denylist_patterns() {
+    grep -E '^[[:space:]]*pattern:' "$1" \
+        | sed -E "s/^[[:space:]]*pattern:[[:space:]]*//; s/^'//; s/'[[:space:]]*$//; s/''/'/g"
+}
 
 # ===========================================================================
 # CHECKS — each maps to a Role 2 §13 row. BLOCK rows call violation();
@@ -343,19 +364,31 @@ check_library_index() { # row 9.5 — BLOCK
     info "library-index: $lines lines, $refs vault/library refs"
 }
 
-check_negative_examples() { # row 10 — WARN (count) + BLOCK (denylist when authored)
+check_negative_examples() { # row 10 — WARN (count) + BLOCK (denylist, default-wired)
     local pairs cites
     pairs="$(grep -cE '^(BAD|GOOD)\b|\*\*(BAD|GOOD)' "$BODY" || true)"
     cites="$(grep -cE '(anti-pattern|Anti-Pattern|§11|AP-?[0-9])' "$BODY" || true)"
     [[ "$pairs" -lt 6 ]] && warn "R13-10" "$pairs BAD/GOOD markers (<3 pairs ≈ <6 markers)"
     [[ "$cites" -lt 1 ]] && warn "R13-10" "negative examples do not cite an anti-pattern"
+    # The denylist (default templates/negative-example-denylist.yaml; --denylist
+    # overrides) scans the Negative Examples section ONLY, stripped of fenced +
+    # inline code per AQ-002. Whole-body scanning false-BLOCKs faithful profiles
+    # that DESCRIBE attack strings (drug+dose facts, "as a physician" jailbreak
+    # demos) in Core Rules / Anti-Patterns prose; the section scope tracks the
+    # row's stated purpose (Negative Examples harmful-content).
     if [[ -n "$DENYLIST" && -f "$DENYLIST" ]]; then
-        local hits
-        hits="$(grep -oEf "$DENYLIST" "$STRIPPED" 2>/dev/null | wc -l | tr -d ' ')"
-        [[ "$hits" -gt 0 ]] && violation "R13-10" "$hits denylist term(s) in prose (code excluded)"
+        local patterns hits
+        patterns="$TMP/denylist-patterns.txt"
+        denylist_patterns "$DENYLIST" > "$patterns"
+        if [[ ! -s "$patterns" ]]; then
+            info "negative-examples: $pairs markers (denylist $DENYLIST has no pattern: entries — BLOCK gate skipped)"
+            return
+        fi
+        hits="$(neg_examples_stripped | grep -oiEf "$patterns" 2>/dev/null | wc -l | tr -d ' ')"
+        [[ "$hits" -gt 0 ]] && violation "R13-10" "$hits denylist term(s) in Negative Examples prose (fenced/inline code excluded per AQ-002)"
         info "negative-examples: $pairs markers, denylist hits=$hits"
     else
-        info "negative-examples: $pairs markers (denylist absent — content pending S-08 bead)"
+        info "negative-examples: $pairs markers (denylist file absent at $DENYLIST — row-10 BLOCK gate skipped)"
     fi
 }
 
