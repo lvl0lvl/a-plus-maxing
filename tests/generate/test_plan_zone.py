@@ -214,15 +214,26 @@ def test_workout_sets_done_overflow_raises(tmp_path):
 
 
 def test_workout_sets_done_unknown_exercise_not_rendered(tmp_path):
-    """A sets_done key matching no plan exercise renders no row; the Sets-done
-    box still sums the snapshot's values over the planned total (contract)."""
+    """A sets_done key matching no plan exercise renders no row and never
+    counts: the Sets-done numerator sums only the PLAN's exercise names (the
+    supplements counter's taken ∩ plan rule), and the unknown key never
+    raises (the overflow check guards plan exercises only)."""
     plan_schema.record_plan("workout", _workout_plan(), _DATE, "coach", tmp_path)
     plan_schema.record_plan_tracking(
-        "workout", {"sets_done": {"Deadlift": 2}}, _DATE, tmp_path
+        "workout", {"sets_done": {"Bench Press": 2, "Deadlift": 6}}, _DATE, tmp_path
     )
     card = _cards(_zones(_render(tmp_path))["Today's Plan"])["training"]
     assert "Deadlift" not in card
-    assert ("stat", "Sets done", "2/7") in _stat_boxes(card)
+    assert ("stat", "Sets done", "2/7") in _stat_boxes(card), (
+        "the numerator counts plan-intersecting keys only"
+    )
+    # An unknown-only snapshot, value far above the plan total: 100 unknown
+    # sets can never inflate the numerator past the denominator — 0/7, no raise.
+    plan_schema.record_plan_tracking(
+        "workout", {"sets_done": {"Deadlift": 100}}, _DATE, tmp_path
+    )
+    card = _cards(_zones(_render(tmp_path))["Today's Plan"])["training"]
+    assert ("stat", "Sets done", "0/7") in _stat_boxes(card)
 
 
 # --- nutrition card ---
@@ -294,6 +305,21 @@ def test_nutrition_fill_clamps_but_caption_carries_true_numbers(tmp_path):
     assert "Protein 200 / 180 g" in _text(card)
     assert "width:100%" in card
     assert not re.search(r"width:1\d\d\.", card), "the fill never exceeds 100%"
+
+
+def test_nutrition_negative_value_renders_zero_width_fill(tmp_path):
+    """A negative tracked macro (bad data bypassing the writer floor via raw
+    store.append) renders width:0.0% fill geometry — a negative width is
+    invalid CSS a browser DROPS, which would render a FULL bar — while the
+    caption carries the true number (the honest display of bad data)."""
+    plan_schema.record_plan("nutrition", _nutrition_plan(), _DATE, "coach", tmp_path)
+    reading = {"item": "plan-track::nutrition", "timepoint": _DATE,
+               "source": "plan-track::raw", "value": {"macros_g": {"protein": -50}}}
+    store.append("plan-track::nutrition", reading, root=tmp_path)
+    card = _cards(_zones(_render(tmp_path))["Today's Plan"])["nutrition"]
+    assert "Protein -50 / 180 g" in _text(card), "the caption keeps the true number"
+    assert "width:0.0%" in card
+    assert "width:-" not in card, "negative geometry must never reach the CSS"
 
 
 # --- supplements card ---
