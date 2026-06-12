@@ -3,11 +3,12 @@
 `run(artifact_name)` is a THIN entry point over the ADR-0004-T1 render engine. It
 reads the cross-item store read model through the published `store.read_all`,
 selects the named template, drives ONE `render.emit` invocation (which writes the
-single self-contained HTML file and returns its path), and returns that path. The SAME code path serves both the
-interactive (on-demand) invocation and the unattended/cron invocation — it reads
-no stdin, prompts for nothing, opens no server, and binds no listening socket
-(run-to-completion-and-exit). It does not swallow `render.emit`'s external-asset
-refusal: that raise surfaces as a non-zero exit rather than a partial artifact.
+single self-contained HTML file and returns its path), and returns that path. The
+SAME code path serves both the interactive (on-demand) invocation and the
+unattended/cron invocation — it reads no stdin, prompts for nothing, opens no
+server, and binds no listening socket (run-to-completion-and-exit). It does not
+swallow `render.emit`'s external-asset refusal: that raise surfaces as a non-zero
+exit rather than a partial artifact.
 
 The cron-/operator-invocable surface is `python -m scripts.generate.generate
 <artifact_name>`, wired through `main` -> `run` -> exit 0.
