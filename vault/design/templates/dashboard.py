@@ -560,10 +560,12 @@ def _workout_populated(plan, tracking):
 
     Slot-level honesty (ADR-0010 D5): every tracked slot renders only from a
     PRESENT tracking field — an absent operand is an em-dash / unfilled dot /
-    omitted chip, never 0. The sets-done box renders the tracked total over
-    the planned total only when the snapshot carries `sets_done`; a per-
-    exercise sets_done above its planned sets raises (never a silently capped
-    claim); sets_done keys matching no plan exercise render no row. The
+    omitted chip, never 0. The sets-done box renders only when the snapshot
+    carries `sets_done`; its numerator sums the snapshot counts for the PLAN's
+    exercise names only (the supplements counter's taken ∩ plan rule — an
+    unknown key never inflates the claim); a per-exercise sets_done above its
+    planned sets raises (never a silently capped claim); sets_done keys
+    matching no plan exercise render no row. The
     heart-rate box is live-state tinted (`_state_stat`); the rest-timer footer
     and Resume button are static inert chrome.
 
@@ -588,7 +590,10 @@ def _workout_populated(plan, tracking):
                     f"sets_done {done} exceeds the planned {exercise['sets']} "
                     f"sets for {exercise['name']!r}"
                 )
-        sets_value = f"{sum(sets_done.values())}/{sum(e['sets'] for e in exercises)}"
+        sets_value = (
+            f"{sum(sets_done.get(e['name'], 0) for e in exercises)}"
+            f"/{sum(e['sets'] for e in exercises)}"
+        )
     else:
         sets_value = "—"
     elapsed = f"{tracking['elapsed_min']} min" if "elapsed_min" in tracking else "—"
@@ -643,7 +648,9 @@ def _fill_track(label, value, target, unit):
 
     The caption carries the TRUE numbers (`{label} {v} / {t} {unit}`; an
     untracked value reads `— / {t}` with no fill — never a 0 default); the
-    fill geometry clamps to 100% (nutrition accent hex, non-text chrome).
+    fill geometry clamps to 0-100% (nutrition accent hex, non-text chrome):
+    a negative width is invalid CSS a browser DROPS, which would render a
+    FULL bar.
     """
     if value is None:
         caption = f"{label} — / {target} {unit}"
@@ -651,7 +658,8 @@ def _fill_track(label, value, target, unit):
     else:
         caption = f"{label} {value} / {target} {unit}"
         bar = cs.track_bar(
-            round(min(100, value / target * 100), 1), cs.ACCENTS["nutrition"]
+            round(max(0.0, min(100, value / target * 100)), 1),
+            cs.ACCENTS["nutrition"],
         )
     return f"<div class='macro'><div class='caption'>{cs._escape(caption)}</div>{bar}</div>"
 
