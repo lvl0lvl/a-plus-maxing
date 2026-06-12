@@ -200,6 +200,10 @@ def derive_watchout_questions(active_protocols):
 
     Returns the questions to ASK the operator, keyed off the active protocols/compounds.
     Derives the question SET only — it stores no answer and compares no value to a cutoff.
+
+    Caller contract: `active_protocols` must be an iterable of protocol names — "no
+    active protocols" is the empty iterable (`[]`), never `None`. Passing `None` is a
+    caller error and raises (`TypeError` on iteration); it is not guarded here.
     """
     questions = set()
     for protocol in active_protocols:

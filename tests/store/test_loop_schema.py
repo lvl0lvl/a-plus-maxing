@@ -12,6 +12,8 @@ import re
 import socket
 from pathlib import Path
 
+import pytest
+
 from scripts.guard.egress_guard import run as egress_run
 from scripts.store import keying, loop_schema
 
@@ -224,6 +226,18 @@ def test_empty_or_unknown_protocols_derive_empty_set():
     """
     assert loop_schema.derive_watchout_questions([]) == set()
     assert loop_schema.derive_watchout_questions(["unknown-compound"]) == set()
+
+
+def test_none_protocols_is_caller_error():
+    """Pin the caller contract: derive_watchout_questions(None) raises (bead r5l).
+
+    None is NOT a valid "no active protocols" signal — that is the empty iterable
+    (tested above). Passing None is a caller-contract violation and must fail loud
+    at the call, per the project's no-defensive-programming convention. RED if a
+    guard (e.g. ``active_protocols or ()``) silently coerces None to the empty set.
+    """
+    with pytest.raises(TypeError):
+        loop_schema.derive_watchout_questions(None)
 
 
 def test_zero_automated_detection_floor():
