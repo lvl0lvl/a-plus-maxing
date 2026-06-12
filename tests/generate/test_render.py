@@ -736,6 +736,12 @@ def test_contrast_and_colorblind(tmp_path):
         tint_pairs.append(("tinted stat sval (ink)", root["ink"], stat_bg))
     today_bg = re.search(r"\.cal \.today \{ background: (#[0-9A-Fa-f]{6})", html).group(1)
     tint_pairs.append(("calendar today cell (ink)", root["ink"], today_bg))
+    # The muted other-month day cells: `.cal .dout` backgrounds carry muted
+    # `.dnum` text — its value is a var() reference, resolved like the rest.
+    dout_bg = resolve(
+        re.search(r"\.cal \.dout \{ background: ([^;]+); \}", html).group(1)
+    )
+    tint_pairs.append(("calendar other-month cell (muted)", root["muted"], dout_bg))
     for what, fg_hex, bg_hex in tint_pairs:
         tint_ratio = _contrast_ratio(_hex_to_rgb(fg_hex), _hex_to_rgb(bg_hex))
         print(f"AC-3 tint contrast {what} {fg_hex}/{bg_hex} = {tint_ratio:.2f} (need >= 4.5)")
