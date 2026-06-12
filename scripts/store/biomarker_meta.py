@@ -1,12 +1,15 @@
 """Curated per-marker biomarker metadata registry (ADR-0008 D1).
 
-The single metadata layer the render (component_set/dashboard) and plan (router)
-surfaces consult for per-marker semantics: units, reference range, and
-good-direction polarity. The registry values are general-adult population
+The single metadata layer the render (component_set/dashboard/render_views) and
+plan (router) surfaces consult for per-marker semantics: units, reference range,
+and good-direction polarity. The registry values are general-adult population
 reference values — operator-agnostic reference data per ADR-0005, not operator
 PII. The v1 ranges are not sex- or lab-specific (ADR-0008 accepted limitation).
 An unknown marker resolves to None everywhere (honest absence, never a
-fabricated range).
+fabricated range). The module also hosts the shared naive-projection seam — the
+`projection_values` derivation and the `PROJECTION_MIN_TIMEPOINTS` floor —
+single-sourced by the `render_views` matrix/projection views and the dashboard
+trend card.
 """
 
 import math

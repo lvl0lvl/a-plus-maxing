@@ -320,6 +320,13 @@ def _metric_card(item, readings):
     naive-projection caption when derivable (dashboard-only — never on the
     physician report). A stream with no numeric value routes to a plain
     value row instead.
+
+    Args:
+        item (str): The store item id (stream prefix tolerated).
+        readings (list): The item's FULL readings in store-read (timepoint)
+            order — dicts carrying at least `timepoint` (ISO string) and
+            `value` (the stored value: numeric, numeric string, or free
+            text).
     """
     # The single numeric-coercion pass: the filtered readings and their float
     # values come from one walk, shared by the chip, sparkline, and projection.
