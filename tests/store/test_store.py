@@ -427,6 +427,26 @@ def test_read_all_empty_root_returns_empty(tmp_path):
     assert store.read_all(root=tmp_path) == []  # exists, holds no item files
 
 
+def test_read_all_propagates_per_item_read_failure(tmp_path):
+    """A per-item read() sort failure PROPAGATES out of read_all (fail-loud).
+
+    The second item file carries two conformant lines (`keying.is_conformant`
+    checks field presence only) whose timepoints are mixed types (str vs int),
+    so read()'s timepoint sort raises TypeError. read_all must let that raise
+    surface, never silently drop the item. RED if read_all wraps its loop body
+    in try/except-continue.
+    """
+    store.append("rhr", _reading("2026-06-01T08:00:00+00:00", 55), root=tmp_path)
+    bad = _item_file(tmp_path, item="hrv")
+    bad.write_text(
+        json.dumps(_reading("2026-06-01T08:00:00+00:00", 71, item="hrv")) + "\n"
+        + json.dumps(_reading(5, 72, item="hrv")) + "\n"
+    )
+
+    with pytest.raises(TypeError):
+        store.read_all(root=tmp_path)
+
+
 def test_read_all_emits_store_skip_for_malformed_line(tmp_path, capfd):
     """read_all delegates through read: a torn line is skipped and STORE-SKIP'd.
 
