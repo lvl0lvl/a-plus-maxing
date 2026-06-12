@@ -475,8 +475,10 @@ S50 close (2026-06-11): **No new PF-class entries this session.** A pure PR-life
 | #97 | YES | YES |
 | #98 | YES | YES |
 | #100 | YES | **NO — substance run from in-session context (violation, recorded above)** |
-| #99 | YES | **NO — same** |
-| #101 | YES | **NO — same** |
+| #99 | YES | **NO — same as #100 (violation, recorded above)** |
+| #101 | YES | **NO — same as #100 (violation, recorded above)** |
+
+_Rows #99/#101 cells clarified S52 — explicit per-row violation markers per scripts/skill-trace-audit.sh; original cells read "NO — same"._
 
 Falsification windows that HELD: **PF-S40-01** (full methodology — profile-less blind triage + profile-less blind verification dispatched for every review, no orchestrator self-triage) HELD ×6 and LOAD-BEARING throughout: the triages independently re-ran every reviewer mutation claim, refuted none falsely, adjudicated the #98 empty-item scope question (published-contract-governs) and the #101 F1 fix shape; the blind verifiers re-ran mutations independently and caught a sibling staleness instance (#99 test-file docstring). **PF-S26-01** (every real finding fixed or beaded, 0 suppressed) HELD — ~36 deduped findings across six reviews, all fixed-and-blind-verified or beaded; reviewer self-suppressed-at-threshold notes were elevated to triage where real (#96). **PF-S25-01** (close after the full PR lifecycle set) HELD — close runs on `fix/s51-close` after all six merges. **PF-S13-01** (session-open executed from the files with real output; HANDOFF + PF log paged in full; baseline RUN) HELD. **PF-S37-01** (DOCUMENT_RUBRIC opened and run at step 8) HELD — this close. **PF-S6-01** (verify-first) HELD and LOAD-BEARING — the 19-agent analysis fan-out verified every bead against live `main` before building (several descriptions were stale); PR states verified via REST before each lifecycle. **PF-S49-01** (build visuals only from signed targets) HELD — the visual packages were correctly NOT built; zero visual code shipped without a target. **PF-S17-01/PF-S36-01** N/A (no `/aplus-research`; the built beads are not `docs/task-plan/` recipes, so `/execute-plan` does not govern them).
 
