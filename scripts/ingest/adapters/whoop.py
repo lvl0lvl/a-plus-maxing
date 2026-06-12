@@ -16,6 +16,10 @@ import json
 from pathlib import Path
 from typing import Iterable
 
+# Typed unwired-scaffold declaration: the scheduler's wired-set discovery
+# excludes any adapter module carrying this attribute (ADR-0003 Risk N2).
+UNWIRED = True
+
 
 class WhoopAdapter:
     """The Whoop source adapter (registered, pluggable, not yet wired).
