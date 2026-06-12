@@ -139,6 +139,17 @@ def test_no_plan_today_state_renders_other_day_copy(tmp_path):
     assert zone.count("No plan on file — record one to fill this card.") == 3
 
 
+def test_future_dated_plan_renders_awaiting_state(tmp_path):
+    """A tomorrow-dated plan leaves the card in the awaiting state — none of
+    its content renders as today's."""
+    plan_schema.record_plan("workout", _workout_plan(), "2026-06-11", "coach", tmp_path)
+    card = _cards(_zones(_render(tmp_path))["Today's Plan"])["training"]
+    assert "Plan on file is for another day — none recorded for today." in card
+    assert "<span class='pill'>awaiting plan</span>" in card
+    assert "Bench Press" not in card, "tomorrow's plan content must not render today"
+    assert "via personal-trainer" in card, "the absence state keeps the default attribution"
+
+
 # --- workout card ---
 
 
@@ -236,6 +247,26 @@ def test_workout_sets_done_unknown_exercise_not_rendered(tmp_path):
     assert ("stat", "Sets done", "0/7") in _stat_boxes(card)
 
 
+def test_workout_zero_values_render_as_claims(tmp_path):
+    """0 is a claim, not absence: zero-valued tracking fields render their
+    boxes and chips with the true 0 — a membership(`in`)→truthiness mutation
+    in the render goes RED here."""
+    plan_schema.record_plan("workout", _workout_plan(), _DATE, "coach", tmp_path)
+    plan_schema.record_plan_tracking("workout", {
+        "elapsed_min": 0, "volume_lb": 0, "steps": 0, "kcal_burned": 0,
+        "sets_done": {},
+    }, _DATE, tmp_path)
+    card = _cards(_zones(_render(tmp_path))["Today's Plan"])["training"]
+    boxes = _stat_boxes(card)
+    assert ("stat", "Elapsed", "0 min") in boxes
+    assert ("stat", "Volume", "0 lb") in boxes
+    assert ("stat", "Sets done", "0/7") in boxes, (
+        "the empty sets_done dict is an explicit zero claim, not absence"
+    )
+    assert "<span class='chip-b'>0 steps</span>" in card
+    assert "<span class='chip-b'>0 kcal</span>" in card
+
+
 # --- nutrition card ---
 
 
@@ -292,6 +323,37 @@ def test_nutrition_missing_operand_remaining_is_em_dash(tmp_path):
         ("stat", "Exercise", "320"), ("stat tinted", "Remaining", "—"),
     ]
     assert "3120" not in card, "a partial Remaining is an invented number"
+
+
+def test_nutrition_missing_exercise_remaining_is_em_dash(tmp_path):
+    """The mirror of the missing-food case: with food_kcal only, Exercise and
+    Remaining read em-dash — never goal − food presented as the remainder."""
+    plan_schema.record_plan("nutrition", _nutrition_plan(), _DATE, "coach", tmp_path)
+    plan_schema.record_plan_tracking("nutrition", {"food_kcal": 1450}, _DATE, tmp_path)
+    card = _cards(_zones(_render(tmp_path))["Today's Plan"])["nutrition"]
+    assert _stat_boxes(card) == [
+        ("stat", "Goal", "2800"), ("stat", "Food", "1450"),
+        ("stat", "Exercise", "—"), ("stat tinted", "Remaining", "—"),
+    ]
+    assert "1350" not in card, "a partial Remaining is an invented number"
+
+
+def test_nutrition_zero_values_render_as_claims(tmp_path):
+    """0 is a claim, not absence: zero-valued operands COMPUTE Remaining and
+    fill the captions with true zeros — a membership(`in`)→truthiness
+    mutation in the render goes RED here."""
+    plan_schema.record_plan("nutrition", _nutrition_plan(), _DATE, "coach", tmp_path)
+    plan_schema.record_plan_tracking("nutrition", {
+        "food_kcal": 0, "exercise_kcal": 0, "macros_g": {"protein": 0},
+        "water_l": 0,
+    }, _DATE, tmp_path)
+    card = _cards(_zones(_render(tmp_path))["Today's Plan"])["nutrition"]
+    assert _stat_boxes(card) == [
+        ("stat", "Goal", "2800"), ("stat", "Food", "0"),
+        ("stat", "Exercise", "0"), ("stat tinted", "Remaining", "2800"),
+    ], "Remaining is COMPUTED from the zero operands: 2800 − 0 + 0"
+    assert "Protein 0 / 180 g" in _text(card)
+    assert "Water 0 / 3 L" in _text(card)
 
 
 def test_nutrition_fill_clamps_but_caption_carries_true_numbers(tmp_path):
@@ -409,12 +471,14 @@ def test_peptides_populated_protocol_watchouts_and_evidence(tmp_path):
     assert "none noticed" in zones["Labs & Bloodwork"]
 
 
-def test_peptides_week_caption_needs_both_cycle_fields(tmp_path):
-    """The week caption renders only when BOTH cycle fields are present."""
-    plan = {k: v for k, v in _peptides_plan().items() if k != "cycle_length_weeks"}
+@pytest.mark.parametrize("dropped", ["cycle_length_weeks", "cycle_week"])
+def test_peptides_week_caption_needs_both_cycle_fields(tmp_path, dropped):
+    """The week caption renders only when BOTH cycle fields are present — and
+    a plan carrying only one of them never raises."""
+    plan = {k: v for k, v in _peptides_plan().items() if k != dropped}
     plan_schema.record_plan("peptides", plan, _DATE, "coach", tmp_path)
     card = _cards(_zones(_render(tmp_path))["Today's Plan"])["peptides"]
-    assert "Week" not in _text(card), "a lone cycle_week renders no week caption"
+    assert "Week" not in _text(card), "a lone cycle field renders no week caption"
 
 
 # --- routing: fail-loud + placement ---
@@ -483,12 +547,13 @@ def test_plan_content_renders_in_zone3_only(tmp_path):
 
 
 def test_production_path_renders_populated_plan_zone(tmp_path):
-    """generate.run('dashboard') over writer-seeded plans dated the REAL today
-    renders the populated zone-3 cards end-to-end (factory wiring, not a
-    template-only seam test)."""
+    """generate.run('dashboard') over writer-seeded plans dated the file's
+    fixed seam date renders the populated zone-3 cards end-to-end through the
+    `_today` seam (factory wiring, not a template-only seam test)."""
     root = tmp_path / "store"
-    _seed_all_domains(root, on_date=datetime.date.today().isoformat())
-    path = generate.run("dashboard", _root=root, _out_dir=tmp_path / "out")
+    _seed_all_domains(root)
+    path = generate.run("dashboard", _root=root, _out_dir=tmp_path / "out",
+                        _today=_TODAY)
     zone = _zones(path.read_text())["Today's Plan"]
     assert zone.count("'>today</span>") == 4, "all four cards resolve populated"
     assert "awaiting plan" not in zone

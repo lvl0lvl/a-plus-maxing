@@ -27,7 +27,7 @@ from vault.design.templates import dashboard, report
 _TEMPLATES = {"dashboard": dashboard, "report": report}
 
 
-def run(artifact_name, *, _root=None, _out_dir=None):
+def run(artifact_name, *, _root=None, _out_dir=None, _today=None):
     """Render the named artifact from the current store state and return its path.
 
     One code path for both the on-demand and the unattended/cron entry mode:
@@ -42,6 +42,9 @@ def run(artifact_name, *, _root=None, _out_dir=None):
             store's `vault/store/`.
         _out_dir (Path, optional): Test-only output-dir seam, forwarded to
             `render.emit`. Defaults to the engine-owned `vault/artifacts/generated/`.
+        _today (datetime.date, optional): Test-only date seam forwarded to the
+            template render's `_today` (the dashboard's calendar + plan
+            resolution). Defaults to the template's real current date.
 
     Returns:
         (Path) The path of the single self-contained HTML file written.
@@ -57,7 +60,15 @@ def run(artifact_name, *, _root=None, _out_dir=None):
     template = _TEMPLATES[artifact_name]
     root = _root if _root is not None else store.DEFAULT_ROOT
     store_read = store.read_all(root)
-    return render.emit(template, store_read, _out_dir=_out_dir)
+    if _today is None:
+        return render.emit(template, store_read, _out_dir=_out_dir)
+
+    def seamed(store_read):
+        return template.render(store_read, _today=_today)
+
+    # Keep emit's module-derived output filename (e.g. `dashboard.html`).
+    seamed.__name__ = template.__name__
+    return render.emit(seamed, store_read, _out_dir=_out_dir)
 
 
 def main(argv=None):

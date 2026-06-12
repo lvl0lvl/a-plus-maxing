@@ -23,13 +23,17 @@ import pytest
 from scripts.generate import generate
 from scripts.store import loop_schema, plan_schema, store
 
+# The fixed seam date the plan resolution compares against (passed through
+# `generate.run`'s `_today` seam): Wednesday 2026-06-10.
+_TODAY = datetime.date(2026, 6, 10)
+
 
 def _seed_mixed_store(root):
     """Seed a tmp store with every routed stream type via the production writers.
 
-    The plan + tracking entries are dated the REAL today: the production path
-    has no `_today` seam, so today-dated plans are what `generate.run` resolves
-    populated.
+    The plan + tracking entries are dated the file's fixed seam date; the
+    populated-plan assertions pass it through `generate.run`'s `_today` seam,
+    so the seeded plans resolve populated regardless of the real date.
     """
     loop_schema.record_biomarker("ferritin", "2026-05-01T00:00:00+00:00", 95, root)
     loop_schema.record_biomarker("ferritin", "2026-05-15T00:00:00+00:00", 110, root)
@@ -40,7 +44,7 @@ def _seed_mixed_store(root):
     loop_schema.record_physician_feedback(
         "discussed at visit", "2026-05-03T00:00:00+00:00", root
     )
-    today = datetime.date.today().isoformat()
+    today = _TODAY.isoformat()
     plan_schema.record_plan(
         "workout",
         {"exercises": [{"name": "Bench Press", "sets": 3, "load": "185 lb"}]},
@@ -89,7 +93,7 @@ def test_mixed_stream_store_renders_through_production_path(tmp_path):
     out = tmp_path / "out"
     _seed_mixed_store(root)
 
-    path = generate.run("dashboard", _root=root, _out_dir=out)
+    path = generate.run("dashboard", _root=root, _out_dir=out, _today=_TODAY)
 
     assert path.exists()
     html = path.read_text()
