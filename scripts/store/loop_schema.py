@@ -15,6 +15,13 @@ The five published states are read 1:1 by ADR-0007-T2's render views:
     no-data             a biomarker never recorded (zero stored timepoints)
     no-prior            a biomarker with exactly one stored timepoint
     answered-over-time  an answer / feedback entry carried into the next generation
+
+A landed panel result is a VALUE returned by ``read_panel``, NOT a fifth published
+state marker — the 4-marker render map is unchanged; the render layer renders a
+result as a value row. ``read_panel`` resolves pending->result ORDER-INDEPENDENTLY:
+the most-recent non-pending value wins regardless of how its timepoint sorts against
+the pending marker's, and the result reading carries a source tag DISTINCT from the
+pending marker's so it cannot dedupe-collide with it.
 """
 
 import hashlib
@@ -28,7 +35,11 @@ NO_PRIOR = "no-prior"
 ANSWERED_OVER_TIME = "answered-over-time"
 
 # Source tags distinguishing the data-in streams within the shared store.
+# _TAG_PANEL_RESULT is DISTINCT from _TAG_PANEL: the dedupe identity
+# (item, timepoint, source) excludes value, so a result reusing the pending
+# marker's tag at the marker's own timepoint would be a silent append no-op.
 _TAG_PANEL = "plan-recommendation"
+_TAG_PANEL_RESULT = "panel-result"
 _TAG_WATCHOUT = "watch-out"
 _TAG_FEEDBACK = "physician-feedback"
 _TAG_BIOMARKER = "manual"
@@ -88,12 +99,45 @@ def record_pending_panel(panel, timepoint, root):
     )
 
 
+def record_panel_result(panel, result, timepoint, root):
+    """Record a landed result for a recommended panel.
+
+    The result reading carries a source tag distinct from the pending marker's
+    (folded through `_content_tag` so two distinct same-timepoint results both
+    persist), because the dedupe identity (item, timepoint, source) excludes
+    value — a result reusing the pending marker's tag at the marker's own
+    timepoint would be silently dropped and the panel would read stuck-pending.
+
+    Args:
+        panel (str): The panel the result lands for.
+        result: The operator-entered result value (stored verbatim).
+        timepoint (str): The result's timepoint.
+        root (str | Path): The store root.
+    """
+    item = f"{_PREFIX_PANEL}{panel}"
+    store.append(
+        item,
+        _reading(item, timepoint, _content_tag(_TAG_PANEL_RESULT, result), result),
+        root=root,
+    )
+
+
 def read_panel(panel, root):
-    """Return a panel's stored state verbatim — "pending" until a result is appended."""
-    readings = store.read(f"{_PREFIX_PANEL}{panel}", root=root)
-    if not readings:
-        return PENDING
-    return readings[-1]["value"]
+    """Resolve a panel's state: the most-recent landed result, else "pending".
+
+    Order-INDEPENDENT pending->result resolution: returns the most-recent reading
+    whose value is not the PENDING marker, regardless of how the result's timepoint
+    sorts against the pending marker's (the store sorts timepoints lexicographically,
+    so a result recorded for an earlier-sorting timepoint must still win). With no
+    result landed — including the empty stream, whose PENDING return is the published
+    default state, not a guard — the panel reads "pending" verbatim, never a
+    fabricated result. A panel re-recommended after a result lands therefore still
+    reads the landed result, not pending.
+    """
+    for reading in reversed(store.read(f"{_PREFIX_PANEL}{panel}", root=root)):
+        if reading["value"] != PENDING:
+            return reading["value"]
+    return PENDING
 
 
 def record_watchout_answer(watchout, answer, timepoint, root):
