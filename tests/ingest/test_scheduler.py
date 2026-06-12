@@ -265,7 +265,8 @@ def test_scheduler_whoop_scan_is_falsifiable():
 
 # --- AC-4 mechanism guards: the typed unwired-marker exclusion, not just today's roster ---
 # Bead a-plus-maxing-7lt: wired-set membership is governed by a typed module
-# attribute (`UNWIRED = True`; absence = wired, the contract's default). This
+# attribute — excluded iff `UNWIRED` is present and truthy (canonical
+# declaration `UNWIRED = True`); a falsy value or absence means wired. This
 # replaced the S40 docstring-substring mechanism, whose prose matching could
 # silently drop a wired adapter that merely MENTIONS "unwired" (fragility i) or
 # silently re-include Whoop on a docstring rewording (fragility ii). These guards
@@ -343,6 +344,46 @@ def test_unwired_marker_governs_wired_set_membership():
                 p.unlink()
             for cached in cache.glob(f"{p.stem}.*"):
                 cached.unlink()
+
+
+def test_falsy_unwired_declaration_stays_wired():
+    """Guard (truthiness clause): a falsy `UNWIRED` declaration does NOT exclude.
+
+    Drops a transient conformant adapter module declaring `UNWIRED = False` into
+    the real adapters/ package and runs the scheduler's ACTUAL `_wired_adapters()`
+    discovery. The adapter must be WIRED: exclusion requires the attribute to be
+    present AND truthy, not merely present. Against a presence-based predicate
+    (`hasattr(module, _UNWIRED_ATTR)`) this REDs — pinning the truthiness clause
+    the declared contract (falsy or absent = wired) promises. Same in-package
+    fixture + cleanup pattern as test_unwired_marker_governs_wired_set_membership.
+    """
+    import importlib
+
+    from scripts.ingest import scheduler
+
+    falsy_mod = ADAPTERS_DIR / "guardfalsy.py"
+    try:
+        falsy_mod.write_text(
+            '"""Guard fixture adapter declaring a falsy UNWIRED."""\n'
+            "from typing import Iterable\n\n"
+            "\nUNWIRED = False\n\n"
+            "\nclass GuardFalsyAdapter:\n"
+            "    def source_tag(self) -> str:\n"
+            '        return "guardfalsy"\n\n'
+            "    def read_readings(self, export_file) -> Iterable[dict]:\n"
+            "        return iter(())\n"
+        )
+        importlib.invalidate_caches()
+        wired = scheduler._wired_adapters()  # the REAL discovery predicate
+        tags = {a.source_tag() for a in wired}
+
+        assert "guardfalsy" in tags  # falsy declaration -> WIRED (truthy predicate)
+    finally:
+        cache = ADAPTERS_DIR / "__pycache__"
+        if falsy_mod.exists():
+            falsy_mod.unlink()
+        for cached in cache.glob("guardfalsy.*"):
+            cached.unlink()
 
 
 def test_docstring_unwired_prose_does_not_exclude():
