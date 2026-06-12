@@ -88,6 +88,23 @@ def test_same_timepoint_result_survives_pending_dedupe(tmp_path):
     assert loop_schema.read_panel("lipid_panel", root=tmp_path) == "results received"
 
 
+def test_most_recent_result_wins_across_timepoints(tmp_path):
+    """PR#99 F2: with two landed results, the LATER-timepoint result wins.
+
+    The later-timepoint result is appended FIRST, so an insertion-order read
+    (last-appended wins) returns "OLD" and turns this RED — as does a
+    forward-iteration (oldest-result-wins) read over the store's timepoint sort.
+    """
+    loop_schema.record_panel_result(
+        "lipid_panel", "NEW", "2026-06-08T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_panel_result(
+        "lipid_panel", "OLD", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+
+    assert loop_schema.read_panel("lipid_panel", root=tmp_path) == "NEW"
+
+
 def test_result_valued_pending_does_not_resurface_stale_result(tmp_path):
     """PR#99 F1: a later result whose VALUE is the "pending" string wins verbatim.
 
