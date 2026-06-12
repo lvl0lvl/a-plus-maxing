@@ -20,9 +20,11 @@
 #      header row names a PR column, a `/review-pr` invoked-fresh column, and
 #      a `/merge` invoked-fresh column (the S51 shape).
 #   3. Every data row's two invocation cells each start with YES, or start
-#      with NO and contain the word "violation" (the S51 convention:
-#      "**NO — ... (violation, recorded ...)**"). A NO cell without the word
-#      "violation" FAILS — an unexplained NO is an unrecorded violation.
+#      with NO and contain the word "violation" ("**NO — ... (violation,
+#      recorded ...)**"). This deliberately TIGHTENS the founding S51 record:
+#      its ditto rows ("**NO — same**") fail this check by design — per-row
+#      self-contained violation markers are the rule. A NO cell without the
+#      word "violation" FAILS — an unexplained NO is an unrecorded violation.
 #   4. The table has >= 1 data row, UNLESS the section carries the exact
 #      zero-PR escape-hatch sentence:
 #          No PR lifecycles ran this session.
@@ -35,7 +37,8 @@
 #   ran-from-cached-context — that distinction is what the table ATTESTS, and
 #   its truthfulness remains the orchestrator's at-close responsibility (the
 #   session transcript is the only ground truth, and this script does not
-#   read it).
+#   read it). The table's row-set COMPLETENESS — that every lifecycle run
+#   in-session has a row — is likewise attested, not audited.
 #
 # Exit codes:
 #   0 — record shape conforms
@@ -46,6 +49,8 @@
 # Usage:
 #   scripts/skill-trace-audit.sh --session 52
 #   scripts/skill-trace-audit.sh --session 52 --file path/to/pf-log.md
+#   No positional file argument — use --file (deliberate divergence from the
+#   sibling audits).
 
 set -uo pipefail
 
@@ -184,7 +189,7 @@ if n not in attest_ns:
 no_lifecycle = bool(re.search(
     r'(?m)^\s*(?:\*{1,2})?No PR lifecycles ran this session\.', body))
 
-# ── Check 2: find per-PR invocation table(s). ─────────────────────────────
+# ── Checks 2 + 3: find per-PR invocation table(s); validate each row. ────
 def cells(line):
     # Split on unescaped pipes only; \| is literal cell text.
     parts = [c.strip() for c in re.split(r'(?<!\\)\|', line.strip())]
@@ -246,6 +251,7 @@ while i < len(section):
             i += 1
             continue
         pr_label = row[pr_col] if pr_col < len(row) else '?'
+        # Check 3: per-cell YES / NO-with-violation-marker validation.
         for col, skill in ((review_col, '/review-pr'), (merge_col, '/merge')):
             cell = row[col]
             v = norm(cell)
@@ -267,7 +273,7 @@ while i < len(section):
             ))
         i += 1
 
-# ── Checks 2 + 4: table existence / row count, escape-hatch-aware. ───────
+# ── Checks 2 + 4 verdicts: table existence / row count, escape-hatch-aware.
 if n_tables == 0 and not no_lifecycle:
     violations.append((
         start + 1,
