@@ -84,8 +84,8 @@ attribute contract; the store publishes `items()`/`read_all()` (single enumerati
 empty-item round-trip fixed, exception propagation pinned); the PII commit boundary scans
 bd bead content (with precisely-scoped headers — the pending-in-db window remains until
 bead `ycqo`, operator-approved for S52) and `scan`/`scan_text` use `token_config` with a
-guarded deprecation alias; the ADR-0007 panel loop has its result side (`record_panel_result`
-+ source-tag-provenance `read_panel`, landed results render as escaped value rows); fail-fast
+guarded deprecation alias; the ADR-0007 panel loop has its result side (`record_panel_result` +
+source-tag-provenance `read_panel`, landed results render as escaped value rows); fail-fast
 storage contracts are docstring+test pinned (`r5l`/`u8u` convention defaults). Eleven build
 beads closed + `2kk` adjudicated closed; operator adjudications recorded on `1vi`/`pka`/
 `pmp`/`e3b`/`juc`/`1ww`. Dashboard zones still awaiting data models (unchanged): plans
