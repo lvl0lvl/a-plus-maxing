@@ -12,8 +12,9 @@ permalink: a-plus-maxing/components/generate-entry
 
 **What:** the thin artifact entry point (ADR-0004-T3). `run(artifact_name)` reads the
 cross-item store read model via `store.read_all`, selects the template
-(`dashboard` | `report`), drives exactly ONE `render.emit`, and returns the written path. One code path for interactive
-and unattended/cron use: no stdin, no prompt, no server, run-to-completion. CLI:
+(`dashboard` | `report`), drives exactly ONE `render.emit`, and returns the written
+path. One code path for interactive and unattended/cron use: no stdin, no prompt, no
+server, run-to-completion. CLI:
 `python -m scripts.generate.generate <artifact> [--root --out-dir]` → prints path,
 exit 0.
 
