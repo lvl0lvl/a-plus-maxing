@@ -73,6 +73,16 @@ def _is_number(value):
     return _is_int(value) or isinstance(value, float)
 
 
+def _is_nonneg_int(value):
+    """Report whether `value` is an int >= 0 (bool excluded)."""
+    return _is_int(value) and value >= 0
+
+
+def _is_nonneg_number(value):
+    """Report whether `value` is an int or float >= 0 (bool excluded)."""
+    return _is_number(value) and value >= 0
+
+
 def _is_nonempty_str(value):
     """Report whether `value` is a non-empty str."""
     return isinstance(value, str) and value != ""
@@ -143,8 +153,30 @@ def _is_str_list(value):
     return isinstance(value, list) and all(isinstance(v, str) for v in value)
 
 
+def _check_unique_names(what, entries):
+    """Reject duplicate entry names within one plan document.
+
+    A duplicate name renders contradictory claims (two same-named exercises
+    fill one counter's dots twice; a duplicate supplement double-checks one
+    row) — rejected at the writer boundary like the typo'd macro key.
+
+    Args:
+        what (str): The entry kind for the error message.
+        entries (list): The validated entry dicts (each carries `name`).
+
+    Raises:
+        ValueError: Two entries share a name.
+    """
+    seen = set()
+    for entry in entries:
+        name = entry["name"]
+        if name in seen:
+            raise ValueError(f"{what} name {name!r} appears more than once")
+        seen.add(name)
+
+
 def _validate_workout_plan(plan):
-    """Validate a workout plan document against its schema table."""
+    """Validate a workout plan document: schema table + unique exercise names."""
     _check_fields(
         "workout plan", plan,
         {"exercises": (_is_dict_list, "a list of >=1 exercise dicts")}, {},
@@ -154,7 +186,10 @@ def _validate_workout_plan(plan):
             "workout plan exercise", exercise,
             {
                 "name": (_is_nonempty_str, "a non-empty str"),
-                "sets": (lambda v: _is_int(v) and v >= 1, "an int >= 1"),
+                # Ceiling 100: unbounded sets drives multi-GB string
+                # materialization in the per-set dot renderer through the
+                # legitimate writer (schema-table bound).
+                "sets": (lambda v: _is_int(v) and 1 <= v <= 100, "an int in 1..100"),
             },
             {
                 "load": (lambda v: isinstance(v, str), "a str"),
@@ -162,10 +197,11 @@ def _validate_workout_plan(plan):
                 "detail": (lambda v: isinstance(v, str), "a str"),
             },
         )
+    _check_unique_names("workout plan exercise", plan["exercises"])
 
 
 def _validate_nutrition_plan(plan):
-    """Validate a nutrition plan document against its schema table."""
+    """Validate a nutrition plan document: schema table + unique meal names."""
     _check_fields(
         "nutrition plan", plan,
         {
@@ -192,10 +228,11 @@ def _validate_nutrition_plan(plan):
                 "kcal": (_is_int, "an int"),
             },
         )
+    _check_unique_names("nutrition plan meal", plan["meals"])
 
 
 def _validate_supplements_plan(plan):
-    """Validate a supplements plan document against its schema table."""
+    """Validate a supplements plan document: schema table + unique item names."""
     _check_fields(
         "supplements plan", plan,
         {"items": (_is_dict_list, "a list of >=1 item dicts")}, {},
@@ -209,6 +246,7 @@ def _validate_supplements_plan(plan):
             },
             {"timing": (lambda v: isinstance(v, str), "a str")},
         )
+    _check_unique_names("supplements plan item", plan["items"])
 
 
 def _validate_peptides_plan(plan):
@@ -246,43 +284,52 @@ def _is_sets_done(value):
 
 
 def _is_macros_g(value):
-    """Report whether `value` is a dict of a protein/carbs/fat subset -> ints.
+    """Report whether `value` is a dict of a protein/carbs/fat subset -> ints >= 0.
 
     Keys outside the three macro names are rejected (a typo'd macro key would
-    otherwise silently never render against its plan target).
+    otherwise silently never render against its plan target); a negative gram
+    count is rejected like every other tracked numeric.
     """
     return isinstance(value, dict) and all(
-        key in ("protein", "carbs", "fat") and _is_int(grams)
+        key in ("protein", "carbs", "fat") and _is_nonneg_int(grams)
         for key, grams in value.items()
     )
 
 
 def _validate_workout_tracking(tracking):
-    """Validate a workout tracking snapshot's known-field types."""
+    """Validate a workout tracking snapshot's known-field types.
+
+    Every numeric field carries a >= 0 floor (the sets_done discipline): a
+    negative tracked value renders a fabricated claim surface.
+    """
     _check_fields(
         "workout tracking", tracking, {},
         {
-            "elapsed_min": (_is_number, "a number"),
-            "volume_lb": (_is_number, "a number"),
+            "elapsed_min": (_is_nonneg_number, "a number >= 0"),
+            "volume_lb": (_is_nonneg_number, "a number >= 0"),
             "sets_done": (_is_sets_done, "a dict of exercise name -> int >= 0"),
-            "heart_rate_bpm": (_is_number, "a number"),
-            "steps": (_is_int, "an int"),
-            "kcal_burned": (_is_int, "an int"),
-            "exercise_min": (_is_int, "an int"),
+            "heart_rate_bpm": (_is_nonneg_number, "a number >= 0"),
+            "steps": (_is_nonneg_int, "an int >= 0"),
+            "kcal_burned": (_is_nonneg_int, "an int >= 0"),
+            "exercise_min": (_is_nonneg_int, "an int >= 0"),
         },
     )
 
 
 def _validate_nutrition_tracking(tracking):
-    """Validate a nutrition tracking snapshot's known-field types."""
+    """Validate a nutrition tracking snapshot's known-field types.
+
+    Every numeric field carries a >= 0 floor (the sets_done discipline): a
+    negative tracked value renders a fabricated claim surface.
+    """
     _check_fields(
         "nutrition tracking", tracking, {},
         {
-            "food_kcal": (_is_int, "an int"),
-            "exercise_kcal": (_is_int, "an int"),
-            "macros_g": (_is_macros_g, "a dict of protein/carbs/fat -> ints"),
+            "food_kcal": (_is_nonneg_int, "an int >= 0"),
+            "exercise_kcal": (_is_nonneg_int, "an int >= 0"),
+            "macros_g": (_is_macros_g, "a dict of protein/carbs/fat -> ints >= 0"),
             "meals_logged": (_is_str_list, "a list of meal names"),
-            "water_l": (_is_number, "a number"),
+            "water_l": (_is_nonneg_number, "a number >= 0"),
         },
     )
 

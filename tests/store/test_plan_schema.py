@@ -111,8 +111,11 @@ _PLAN_BREAKS = [
     ("workout", lambda p: p | {"exercises": [{"sets": 3}]}),                 # no name
     ("workout", lambda p: p | {"exercises": [{"name": "", "sets": 3}]}),     # empty name
     ("workout", lambda p: p | {"exercises": [{"name": "Bench", "sets": 0}]}),
+    ("workout", lambda p: p | {"exercises": [{"name": "Bench", "sets": 101}]}),  # above ceiling
     ("workout", lambda p: p | {"exercises": [{"name": "Bench", "sets": True}]}),
     ("workout", lambda p: p | {"exercises": [{"name": "Bench"}]}),           # no sets
+    ("workout", lambda p: p | {"exercises": [
+        {"name": "Bench", "sets": 3}, {"name": "Bench", "sets": 2}]}),       # duplicate name
     ("workout", lambda p: p | {"exercises": [{"name": "Bench", "sets": 3, "load": 185}]}),
     ("workout", lambda p: p | {"exercises": [{"name": "Bench", "sets": 3, "reps": 1.5}]}),
     ("nutrition", lambda p: {k: v for k, v in p.items() if k != "calorie_goal"}),
@@ -125,12 +128,15 @@ _PLAN_BREAKS = [
     ("nutrition", lambda p: p | {"meals": []}),
     ("nutrition", lambda p: p | {"meals": [{"kcal": 650}]}),                 # no name
     ("nutrition", lambda p: p | {"meals": [{"name": "Lunch", "kcal": "650"}]}),
+    ("nutrition", lambda p: p | {"meals": [{"name": "Lunch"}, {"name": "Lunch"}]}),  # duplicate name
     ("nutrition", lambda p: p | {"water_l": 0}),
     ("supplements", lambda p: {k: v for k, v in p.items() if k != "items"}),
     ("supplements", lambda p: p | {"items": []}),
     ("supplements", lambda p: p | {"items": [{"dose": "5 g"}]}),             # no name
     ("supplements", lambda p: p | {"items": [{"name": "Creatine"}]}),        # no dose
     ("supplements", lambda p: p | {"items": [{"name": "Creatine", "dose": 5}]}),
+    ("supplements", lambda p: p | {"items": [
+        {"name": "Creatine", "dose": "5 g"}, {"name": "Creatine", "dose": "10 g"}]}),  # duplicate name
     ("peptides", lambda p: {k: v for k, v in p.items() if k != "compound"}),
     ("peptides", lambda p: p | {"compound": ""}),
     ("peptides", lambda p: {k: v for k, v in p.items() if k != "dose"}),
@@ -173,19 +179,29 @@ def test_record_plan_extra_keys_permitted_and_preserved(tmp_path):
 
 _TRACKING_BREAKS = [
     ("workout", {"elapsed_min": "42"}),
+    ("workout", {"elapsed_min": -1}),
     ("workout", {"volume_lb": True}),
+    ("workout", {"volume_lb": -0.5}),
     ("workout", {"sets_done": {"Bench": -1}}),
     ("workout", {"sets_done": {"Bench": "2"}}),
     ("workout", {"sets_done": ["Bench"]}),
+    ("workout", {"heart_rate_bpm": -1}),
     ("workout", {"steps": 1.5}),
+    ("workout", {"steps": -1}),
     ("workout", {"kcal_burned": "520"}),
+    ("workout", {"kcal_burned": -1}),
     ("workout", {"exercise_min": None}),
+    ("workout", {"exercise_min": -1}),
     ("nutrition", {"food_kcal": "1450"}),
+    ("nutrition", {"food_kcal": -1}),
     ("nutrition", {"exercise_kcal": 1.5}),
+    ("nutrition", {"exercise_kcal": -1}),
     ("nutrition", {"macros_g": {"protein": "120"}}),
+    ("nutrition", {"macros_g": {"protein": -50}}),  # negative grams rejected
     ("nutrition", {"macros_g": {"protien": 120}}),  # typo'd macro key rejected
     ("nutrition", {"meals_logged": "Breakfast"}),
     ("nutrition", {"water_l": "1.5"}),
+    ("nutrition", {"water_l": -0.1}),
     ("supplements", {}),                       # taken is REQUIRED
     ("supplements", {"taken": "Creatine"}),
     ("supplements", {"taken": [1]}),
