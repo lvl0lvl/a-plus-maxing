@@ -631,6 +631,54 @@ def test_summarize_raises_on_widened_pii_class_in_passthrough(field, value, secr
     assert secret not in str(exc.value)
 
 
+# --- e3b: the caller-binds-clone-root store.read convention ----------------------
+
+
+def test_summarize_with_root_bound_partial_reads_only_the_clone_store(tmp_path, monkeypatch):
+    """e3b: summarize over a caller-bound store.read partial reads ONLY the clone.
+
+    Pins the caller-binds-clone-root convention (S51 adjudication, option b):
+    `summarize` keeps its bare `store_read` callable signature and the CALLER
+    pre-binds the instance root (`functools.partial(store.read, root=...)`),
+    mirroring `generate.run`'s call-site binding (`store.read_all(root)`).
+    Mirrors the init_instance Gate B/C clone-isolation shape: DEFAULT_ROOT is
+    planted with sentinel state that WOULD surface in the summary if read (a
+    1955 DOB + a sentinel goal token). RED-proven: handing summarize the
+    unbound `store.read` (the e3b divergence) reads the DEFAULT_ROOT sentinels
+    and fails the clone-data assertions.
+    """
+    from functools import partial
+
+    from scripts.store import store
+
+    # DEFAULT_ROOT is relative (vault/store); chdir sandboxes it under tmp_path.
+    monkeypatch.chdir(tmp_path)
+    default_sentinels = [
+        {"item": "date-of-birth", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "1955-01-01"},
+        {"item": "goal-targets", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "DEFAULT-ROOT-SENTINEL"},
+    ]
+    for record in default_sentinels:
+        store.append(record["item"], record, root=store.DEFAULT_ROOT)
+
+    # The clone instance store, every field-set field backed with distinct state.
+    clone_root = tmp_path / "clone" / "vault" / "store"
+    for record in _clean_records():
+        store.append(record["item"], record, root=clone_root)
+
+    summary = router.summarize(partial(store.read, root=clone_root))
+
+    # The summary reflects ONLY the clone's data...
+    assert summary["training-age-band"] == "born-1980s"  # clone DOB, not the 1955 plant
+    assert summary["goal-targets"] == "return to pre-Jan-2026 loading"
+    # ...nothing was read from DEFAULT_ROOT (the planted sentinels never surface)...
+    assert "DEFAULT-ROOT-SENTINEL" not in str(summary)
+    assert "born-1950s" not in str(summary)
+    # ...and the clone store backs the FULL field set (no partial-read fallback).
+    assert set(summary.keys()) == set(router.SUMMARY_FIELD_SET)
+
+
 def test_widened_pii_blocks_model_sink_both_paths():
     """g5x AC1 (both sinks): a non-gmail email in a pass-through field never reaches the
     model sink. Built on a COMPLETE clean read with ONLY goal-targets poisoned, so absent

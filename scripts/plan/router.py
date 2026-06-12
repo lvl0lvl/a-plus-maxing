@@ -196,7 +196,12 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
 
     Args:
         store_read (Callable): The store read surface (`store.read`), called per
-            field-set field to source its backing state.
+            field-set field to source its backing state. Caller contract (bead
+            e3b, S51 adjudication): pre-bind the instance root before passing —
+            e.g. `functools.partial(store.read, root=instance_root)` — mirroring
+            `generate.run`'s call-site binding (`store.read_all(root)`). An
+            unbound `store.read` reads `store.DEFAULT_ROOT` (`vault/store/`
+            under the cwd), not the caller's instance.
         identity_config (str | Path, optional): The gitignored operator-identity
             token file for the pass-through PII gate (bead 8j6); absent -> identity
             detection is empty (the value-boundary patterns — any-domain email,
