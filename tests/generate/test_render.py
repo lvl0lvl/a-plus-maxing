@@ -727,10 +727,12 @@ def test_contrast_and_colorblind(tmp_path):
     ratio = _contrast_ratio(fg, bg)
     print(f"AC-3 contrast ratio ink/paper = {ratio:.2f} (need >= 4.5)")
     assert ratio >= 4.5, f"contrast {ratio:.2f} < 4.5"
-    # muted caption color must clear the large-text floor (>= 3.0)
+    # muted caption color must clear the NORMAL-text AA floor (>= 4.5): the
+    # trend card's 11px captions (reading date, range/state, projection) are
+    # normal text, so the large-text 3.0 floor does not apply to them.
     muted_ratio = _contrast_ratio(_hex_to_rgb(root["muted"]), bg)
-    print(f"AC-3 contrast ratio muted/paper = {muted_ratio:.2f} (need >= 3.0)")
-    assert muted_ratio >= 3.0, f"muted contrast {muted_ratio:.2f} < 3.0"
+    print(f"AC-3 contrast ratio muted/paper = {muted_ratio:.2f} (need >= 4.5)")
+    assert muted_ratio >= 4.5, f"muted contrast {muted_ratio:.2f} < 4.5"
 
     # --- rendered tint fg/bg pairs: every pill `.tint-*` rule's text color on
     # its tint background, the tinted stat boxes' label (muted) + value (ink)
