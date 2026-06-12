@@ -718,7 +718,7 @@ def _nutrition_populated(plan, tracking):
             if "contents" in meal else ""
         )
         kcal = (
-            f"<span class='caption'>{meal['kcal']} kcal</span>"
+            f"<span class='caption'>{cs._escape(str(meal['kcal']))} kcal</span>"
             if "kcal" in meal else ""
         )
         rows.append(
@@ -799,8 +799,8 @@ def _peptides_populated(plan, watchout_answers):
     parts = [f"<div class='label'>{cs._escape(protocol)}</div>"]
     if "cycle_week" in plan and "cycle_length_weeks" in plan:
         parts.append(
-            f"<div class='caption'>Week {plan['cycle_week']} of "
-            f"{plan['cycle_length_weeks']}</div>"
+            f"<div class='caption'>Week {cs._escape(str(plan['cycle_week']))} of "
+            f"{cs._escape(str(plan['cycle_length_weeks']))}</div>"
         )
     if plan.get("tags"):
         parts.append(
