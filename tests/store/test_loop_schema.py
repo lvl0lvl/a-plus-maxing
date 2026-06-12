@@ -129,6 +129,28 @@ def test_two_timepoints_not_no_prior(tmp_path):
     assert len(result["timepoints"]) == 2
 
 
+def test_multi_timepoint_reads_none_sentinel(tmp_path):
+    """Bead bhc (W7 consumption-review verdict): the >=2-timepoint state IS None.
+
+    Ratifies the published multi-timepoint sentinel: ADR-0007-T2 as built branches on
+    `state is not None` (render_views._matrix_units) with no named TREND symbol, so
+    the bead's contract-amendment trigger (a consumer needing a named marker) never
+    fired and the None sentinel is the published contract value. Pinning `is None`
+    (not merely != NO_PRIOR) turns a renamed/tokenized sentinel RED before the render
+    view misroutes it — the 2-decision-contract direction.
+    """
+    loop_schema.record_biomarker(
+        "ferritin", "2026-06-01T08:00:00+00:00", 45, root=tmp_path
+    )
+    loop_schema.record_biomarker(
+        "ferritin", "2026-06-08T08:00:00+00:00", 52, root=tmp_path
+    )
+
+    result = loop_schema.read_biomarker("ferritin", root=tmp_path)
+    assert result["state"] is None
+    assert len(result["timepoints"]) >= 2
+
+
 def test_never_recorded_biomarker_reads_no_data(tmp_path):
     """F5: a never-recorded biomarker (0 timepoints) reads a DISTINCT "no-data" marker.
 
