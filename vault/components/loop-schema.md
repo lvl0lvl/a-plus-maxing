@@ -37,6 +37,11 @@ protocols; raises no automated signal.
   source tag, since the store dedupe identity excludes value).
 - The store is the carry-forward medium: answers/feedback recorded in one generation are
   next-generation inputs (nothing expires or is overwritten).
+- All readers inherit `store.read`'s latest-wins identity resolution (bead 1vi): an
+  explicit `store.correct` superseding append reads back as the corrected value with the
+  timepoint COUNT unchanged, so the published states (no-data / no-prior) never flip on
+  a correction. Content-tagged streams (watch-out / feedback / panel results) carry
+  per-value source tags, so their carry-forward lists are untouched by the resolution.
 
 **Called by (production):** `render_views` (typed reads), the type-routed dashboard
 template (stream-prefix routing over `store.read_all`'s flat read model), the
