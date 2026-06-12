@@ -56,8 +56,9 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="${BLOCK_PII_COMMIT_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
-PII_SCAN_ROOT="${BLOCK_PII_COMMIT_PII_SCAN_ROOT:-$PROJECT_ROOT}"
+# Fallback root when the hook input carries no resolvable cwd (see resolve-target-repo
+# below). The env override lets tests seed it. Never set in production.
+FALLBACK_ROOT="${BLOCK_PII_COMMIT_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 deny() {  # $1 = reason string
     jq -nc --arg r "$1" \
@@ -79,7 +80,13 @@ declare -F is_git_commit >/dev/null 2>&1 || deny "PII-FREE-TRUNK: commit-matcher
 source "$SCRIPT_DIR/lib/pii-scan-scope.sh" 2>/dev/null
 [[ -n "${STORE_PREFIX:-}" ]] || deny "PII-FREE-TRUNK: pii-scan-scope lib failed to load (path prefixes undefined). Failing closed — commit blocked."
 
-COMMAND=$(jq -r '.tool_input.command // empty' < /dev/stdin)
+# Target-repo resolution single-sourced (bead 29u4): the staged-set scan must read
+# the index of the repo RECEIVING the commit (a worktree's, when the commit is
+# issued there), not the checkout this script ships in.
+source "$SCRIPT_DIR/lib/resolve-target-repo.sh" 2>/dev/null
+
+HOOK_INPUT=$(cat)
+COMMAND=$(jq -r '.tool_input.command // empty' <<< "$HOOK_INPUT")
 JQ_RC=$?
 # Fail-closed (F-BUG1): jq rc != 0 means stdin was not valid JSON — deny. The empty-
 # COMMAND early-exit below must NOT swallow that case (it would ALLOW on a parse fail).
@@ -92,6 +99,18 @@ fi
 
 # Only a git commit is our concern — detection single-sourced in lib/commit-matcher.sh (mic).
 is_git_commit "$COMMAND" || exit 0
+
+# Resolve the repo receiving the commit (29u4); a missing/corrupt lib falls back to
+# the pre-29u4 root — never weaker — with a loud warning (broken install). The
+# scanner-import default follows the resolved root (a worktree checkout carries the
+# tracked scripts/guard/pii_scan.py); tests always pin it explicitly.
+if declare -F resolve_target_repo >/dev/null 2>&1; then
+    PROJECT_ROOT=$(resolve_target_repo "$HOOK_INPUT" "$FALLBACK_ROOT")
+else
+    echo "block-pii-commit: resolve-target-repo lib failed to load; scanning the script-path root." >&2
+    PROJECT_ROOT="$FALLBACK_ROOT"
+fi
+PII_SCAN_ROOT="${BLOCK_PII_COMMIT_PII_SCAN_ROOT:-$PROJECT_ROOT}"
 
 # ── Condition 0: in-command staging defeats the snapshot -> deny (sequencing) ───
 # This PreToolUse hook snapshots the staged set BELOW, BEFORE the command runs, so

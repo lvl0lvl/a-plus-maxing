@@ -86,6 +86,14 @@ printf 'Walter|McGivney\n' > "$REPO/vault/meta/operator-identity.txt"
 OPERATOR_CONTACT="op.user@gmail.com"
 printf 'op\\.user@gmail\\.com\n' > "$REPO/vault/meta/operator-contact.txt"
 
+# bd flush stub (ycqo): the hook runs `bd sync --flush-only` before reading the bd
+# jsonl. Real bd exits 1 in a scratch repo carrying .beads/ without a database (the
+# "fresh clone" shape), which would turn every eb1 allow-case into a fail-closed
+# deny — so invoke() pins BLOCK_PII_COMMIT_BD_CMD to a no-op stub. The ycqo cases
+# below substitute flushing/failing stubs inline.
+BD_NOOP="$TMP/bd-noop.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$BD_NOOP"; chmod +x "$BD_NOOP"
+
 # invoke(): build the stdin JSON, run the hook against the scratch repo. PROJECT_ROOT
 # is the scratch repo (for staged-file detection); the scanner root is pointed at the
 # REAL repo so `from scripts.guard.pii_scan import scan` resolves to the real scanner
@@ -94,7 +102,8 @@ printf 'op\\.user@gmail\\.com\n' > "$REPO/vault/meta/operator-contact.txt"
 invoke() {  # $1 = command string ; echoes hook stdout
     printf '{"tool_input":{"command":%s}}' \
         "$(printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
-        | BLOCK_PII_COMMIT_PROJECT_ROOT="$REPO" BLOCK_PII_COMMIT_PII_SCAN_ROOT="$REAL_ROOT" bash "$HOOK"
+        | BLOCK_PII_COMMIT_PROJECT_ROOT="$REPO" BLOCK_PII_COMMIT_PII_SCAN_ROOT="$REAL_ROOT" \
+          BLOCK_PII_COMMIT_BD_CMD="$BD_NOOP" bash "$HOOK"
 }
 
 mkfile() {  # $1 = relpath ; $2 = contents
@@ -520,6 +529,46 @@ for bypass in "EDITOR=vim git commit -m x" "/usr/bin/git commit -m x" "git commi
         || bad "cvr bypass NOT denied (matcher gap): '${bypass//$'\n'/\\n}' got: $OUT"
 done
 git -C "$REPO" reset -q; rm -f "$REPO/docs/leak6.md"
+
+# ── 29u4: worktree-aware target-repo resolution via the hook input's cwd ───────
+# A commit issued from a linked worktree lands on THAT worktree's index; the scan
+# must run there. The env override seeds the FALLBACK root ($REPO, staged set left
+# clean), so a deny can only come from resolving the worktree. The identity/contact
+# configs are per-checkout (gitignored), so the worktree seeds its own copies —
+# mirroring a real worktree, where an absent config degrades to structural-only
+# (clone semantics, same as 3lv (ii)).
+WT="$TMP/wt"
+git -C "$REPO" worktree add -q -b wt-feat "$WT"
+mkdir -p "$WT/vault/meta"
+printf 'Walter|McGivney\n' > "$WT/vault/meta/operator-identity.txt"
+printf 'op\\.user@gmail\\.com\n' > "$WT/vault/meta/operator-contact.txt"
+
+invoke_cwd() {  # $1 = command string ; $2 = payload cwd ; echoes hook stdout
+    printf '{"cwd":%s,"tool_input":{"command":%s}}' \
+        "$(printf '%s' "$2" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+        "$(printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" \
+        | BLOCK_PII_COMMIT_PROJECT_ROOT="$REPO" BLOCK_PII_COMMIT_PII_SCAN_ROOT="$REAL_ROOT" \
+          BLOCK_PII_COMMIT_BD_CMD="$BD_NOOP" bash "$HOOK"
+}
+
+# 29u4 (1): PII staged in the WORKTREE -> DENY (the vacuous-pass case)
+mkdir -p "$WT/docs"
+printf 'contact %s\n' "$OPERATOR_CONTACT" > "$WT/docs/leak-wt.md"
+git -C "$WT" add docs/leak-wt.md
+OUT=$(invoke_cwd "git commit -m 'wt leak'" "$WT")
+{ [[ "$OUT" == *'"permissionDecision":"deny"'* ]] && [[ "$OUT" == *"docs/leak-wt.md"* ]]; } \
+    && ok "29u4 (1) worktree-staged PII -> DENY naming the file (cwd resolution)" \
+    || bad "29u4 (1) worktree-staged PII NOT denied (worktree-blind scan), got: $OUT"
+git -C "$WT" reset -q; rm -f "$WT/docs/leak-wt.md"
+
+# 29u4 (2) control: clean worktree staged set -> ALLOW (resolution must not over-block)
+printf 'plain worktree note\n' > "$WT/docs/clean-wt.md"
+git -C "$WT" add docs/clean-wt.md
+OUT=$(invoke_cwd "git commit -m 'wt clean'" "$WT")
+[[ "$OUT" != *'"deny"'* ]] \
+    && ok "29u4 (2) clean worktree staged set -> ALLOW" \
+    || bad "29u4 (2) clean worktree commit wrongly DENIED: $OUT"
+git -C "$WT" reset -q; rm -f "$WT/docs/clean-wt.md"
 
 echo
 echo "test_block_pii_commit: ${PASS} passed, ${FAIL} failed"

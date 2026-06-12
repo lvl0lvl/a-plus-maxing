@@ -23,7 +23,11 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="${BLOCK_UNGATED_VAULT_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+# Fallback root when the hook input carries no resolvable cwd (see resolve-target-repo
+# below). The env override lets tests seed it. Never set in production. The lint
+# SCRIPT stays script-relative — it ships with this checkout; only the CONTENT root
+# (staged pages, index, grandfather list) follows the target repo.
+FALLBACK_ROOT="${BLOCK_UNGATED_VAULT_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 INGEST_LINT="$SCRIPT_DIR/../../scripts/wiki-ingest-lint.sh"
 
 # git-commit detection is single-sourced (bead mic). Allow-on-error guard (wiki-ingest-lint
@@ -35,11 +39,26 @@ declare -F is_git_commit >/dev/null 2>&1 || {
     exit 0
 }
 
-COMMAND=$(jq -r '.tool_input.command // empty' < /dev/stdin)
+# Target-repo resolution single-sourced (bead 29u4): the staged-page check must read
+# the index of the repo RECEIVING the commit (a worktree's, when the commit is issued
+# there), not the checkout this script ships in.
+source "$SCRIPT_DIR/lib/resolve-target-repo.sh" 2>/dev/null
+
+HOOK_INPUT=$(cat)
+COMMAND=$(jq -r '.tool_input.command // empty' <<< "$HOOK_INPUT")
 [[ -z "$COMMAND" ]] && exit 0
 
 # Only a git commit is our concern — detection single-sourced in lib/commit-matcher.sh (mic).
 is_git_commit "$COMMAND" || exit 0
+
+# Resolve the repo receiving the commit (29u4); a missing/corrupt lib falls back to
+# the pre-29u4 root — never weaker — with a loud warning (broken install).
+if declare -F resolve_target_repo >/dev/null 2>&1; then
+    PROJECT_ROOT=$(resolve_target_repo "$HOOK_INPUT" "$FALLBACK_ROOT")
+else
+    echo "block-ungated-vault-write: resolve-target-repo lib failed to load; using the script-path root." >&2
+    PROJECT_ROOT="$FALLBACK_ROOT"
+fi
 
 # Collect staged gated-dir pages (added/copied/modified; deletions are not gated).
 # bash 3.2 — no mapfile; the case '*' spans '/', so nested library pages match.
