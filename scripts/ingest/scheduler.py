@@ -15,8 +15,10 @@ The wired set is DATA-DRIVEN: a further adapter is added by dropping a new
 conformant adapter module into `adapters/`, with 0 edits to this file. A
 registered-but-unwired scaffold adapter is excluded by the wired-set membership
 rule, NOT by a hardcoded per-adapter call list and NOT by naming any source here
-— its own module declares itself an unwired scaffold, and the discovery skips any
-adapter whose module so declares (the marker the wired adapters do not carry).
+— its own module declares itself an unwired scaffold via a typed module
+attribute (`UNWIRED = True`, the marker the wired adapters do not carry), and
+the discovery skips any adapter whose module so declares. Docstring prose never
+affects membership.
 """
 
 import importlib
@@ -29,11 +31,13 @@ from scripts.ingest.adapter import Adapter
 _ADAPTERS_DIR = Path(__file__).resolve().parent / "adapters"
 _ADAPTERS_PKG = "scripts.ingest.adapters"
 
-# An adapter module that declares itself a not-yet-wired scaffold (in its module
-# docstring) is excluded from the wired set — the membership marker the wired
-# adapters do not carry. Matching the generic declaration, not a source name,
-# keeps the wired set data-driven and this file free of any per-source token.
-_UNWIRED_MARKER = "unwired"
+# An adapter module that declares itself a not-yet-wired scaffold (a module-level
+# `UNWIRED = True`) is excluded from the wired set — the membership marker the
+# wired adapters do not carry. A typed attribute, not docstring prose: prose that
+# merely mentions the word never affects membership. Matching the generic
+# declaration, not a source name, keeps the wired set data-driven and this file
+# free of any per-source token.
+_UNWIRED_ATTR = "UNWIRED"
 
 
 def _wired_adapters():
@@ -41,9 +45,8 @@ def _wired_adapters():
 
     Iterates every adapter module in `adapters/`, yields one instance per module
     exposing a conformant `Adapter` class, and skips any module that declares
-    itself an unwired scaffold (its module docstring carries the unwired marker).
-    Data-driven: a new conformant adapter module joins the wired set with no edit
-    to this file.
+    itself an unwired scaffold (a module-level `UNWIRED = True`). Data-driven: a
+    new conformant adapter module joins the wired set with no edit to this file.
 
     Returns:
         (list) One conformant `Adapter` instance per wired adapter module.
@@ -53,7 +56,9 @@ def _wired_adapters():
         if module_path.stem.startswith("_"):
             continue
         module = importlib.import_module(f"{_ADAPTERS_PKG}.{module_path.stem}")
-        if _UNWIRED_MARKER in (module.__doc__ or "").lower():
+        # The getattr default IS the membership contract: absence of the typed
+        # declaration means wired (wired-by-default), not a defensive fallback.
+        if getattr(module, _UNWIRED_ATTR, False):
             continue
         for _, obj in inspect.getmembers(module, inspect.isclass):
             if obj.__module__ == module.__name__ and issubclass(obj, Adapter):
