@@ -12,6 +12,28 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 52 (2026-06-12)
+
+> Confirmed by Walter ("yes, proceed that way, and both hook edits are authorized. the scope contract is approved"). Ultracode on for the session — BUILD phase only; the gated skills (`/review-pr`, `/merge`) run as themselves in full, invoked fresh per PR (PF-S39/S40 family; per-PR invocation table at close). **Hook-edit authorizations GRANTED this session:** (1) `ycqo` — `.claude/hooks/block-pii-commit.sh` flush-before-scan (operator approval also recorded in the bead at S51 close); (2) `29u4` — worktree-aware PROJECT_ROOT resolution in `block-commit-main.sh` + `block-pii-commit.sh` + (same pattern, per the bead's fix direction) `block-ungated-vault-write.sh`. AC2 shape per Walter's clarified direction: I design each missing zone in Pencil, he signs off on screen, the signed target is recorded, THEN code — no screenshots owed by the operator. Not a `v1-build` recipe task (beads, not `docs/task-plan/` recipes), so wave/checkpoint attestation N/A.
+
+Goal: Land the S51 close PR, batch the outstanding design inputs via Pencil mockups with Walter, then build the adjudicated non-visual beads and as many signed visual packages as capacity allows — each through full review/merge lifecycles.
+
+Acceptance criteria:
+- [ ] AC1: PR #102 reviewed (docs 3-agent subset, full methodology) and rebase-merged, with BOTH `/review-pr` and `/merge` invoked fresh via the Skill tool; post-merge suite green.
+- [ ] AC2 (design-input batch, Pencil-first): for each visual target (`1oh` Today's-Plan zone + nutrition card content, `y0h0` trend-card residuals, `i2yw` projection readout, `nsxy` physician report) — a Pencil mockup reviewed by Walter on screen, his sign-off obtained, and the signed target recorded in `vault/design/dashboard-v1-visual-spec.md` (or a report-spec note) BEFORE any visual code (PF-S49-01).
+- [ ] AC3 (adjudicated builds, ultracode BUILD-phase fan-out, file-disjoint units): Unit H `ycqo`+`29u4` (hooks, authorized above); Unit P `lz01`+`pka` (skill-trace close audit + store-adversarial builder checklist); Unit S `1vi` (superseding-append correction + latest-wins consumer sweep + ADR-0002 amendment); Unit R `e3b` (caller-binds-clone-root pin + ADR-0006-T1 amendment); Unit D `pmp` (starter denylist + default-wire, content-reviewed by the deployed medical-safety-reviewer BEFORE merge) — each through full 6-agent `/review-pr` + `/merge`, sequential merges; suite green after each.
+- [ ] AC4 (visual packages, capacity-bound): of A (`1oh`), B (`y0h0`+`i2yw`), C (`nsxy`) — as many as signed targets + capacity allow; sequential merges (shared `component_set.py`). Any not completed carry with their signed targets recorded.
+- [ ] AC5 (documentation guarantee): every new schema/surface gets a `vault/components` entry; decision-bearing choices get ADR amendments under the inline-amendment convention; beads closed with reasons; `vault/meta/overview.md` updated.
+- [ ] AC6: Session close per protocol (4 audits, rotation, PF attestation with the per-PR invocation table, close PR), with the summary explicitly attesting the full close protocol ran.
+
+Files I WILL touch: `.claude/hooks/block-pii-commit.sh`, `.claude/hooks/block-commit-main.sh`, `.claude/hooks/block-ungated-vault-write.sh` (the authorized Unit-H set) + `.claude/hooks/tests/`; `scripts/**` + `scripts/tests/**` + `tests/**` for the builds; `templates/` (pmp denylist); `docs/task-plan/` (ADR-0006-T1 inline amendment) + `docs/adr/` (ADR-0002 inline amendment); `vault/design/dashboard-v1-visual-spec.md` (signed targets) + `vault/design/templates/` (visual packages); `vault/components/`; `.beads/issues.jsonl` via `bd`; HANDOFF/vault at close.
+
+Files I will NOT touch: `.claude/settings.json`; any hook beyond the Unit-H authorized set; INVARIANTS.md rows; deployed roster `.claude/agents/*`; `main` directly; `PALETTE`/`SERIES`/`ACCENTS` (ADR-0009 locked).
+
+NOT doing: library research (`/aplus-research` track); LM-02/03/04 data-gated work; `1ww` (keep-deferred per the S51 adjudication); the `juc` build (design conversation only, if reached).
+
+Invariants at risk: none structurally; the close set enforced by the audits. The Unit-H hook edits are the mechanical-enforcement surface of INV-BRANCH-NOT-MAIN / INV-WIKI-INGESTION-GATED / the PII boundary — their smoke suites must stay green and gain worktree fixtures (the bead's own AC).
+
 ## Scope Contract — Session 51 (2026-06-11)
 
 > Confirmed by Walter ("confirmed, and yes to the eb1 authorization"). Ultracode (dynamic workflow orchestration) explicitly enabled for this session via `/effort` — BUILD phase only; the gated skills (`/review-pr`, `/merge`) run as themselves in full, never substituted (PF-S39/S40 family + standing feedback memory). `eb1` hook-edit authorization GRANTED for `.claude/hooks/block-pii-commit.sh` only. Not a `v1-build` recipe task (remaining work is beads, not `docs/task-plan/` recipes — V1 plan complete 18/18), so wave/checkpoint attestation N/A.
