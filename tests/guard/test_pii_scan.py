@@ -545,6 +545,22 @@ def test_scan_text_accepts_deprecated_identity_config_alias(tmp_path):
         assert pii_scan.scan_text("ask Examplename first", identity_config=cfg) >= 1
 
 
+def test_both_token_kwargs_raise_typeerror(tmp_path):
+    """PR#100 F2: `token_config` + `identity_config` together raise TypeError.
+
+    The pre-fix alias-wins resolution silently discarded the caller's
+    `token_config`, masking a caller bug. Both functions refuse the pair. Reds
+    if either function resolves the conflict silently again.
+    """
+    root = _scratch_clone(tmp_path)
+    cfg = _identity_config(tmp_path)
+    with pytest.raises(TypeError, match="not both"):
+        scan(_tracked(root), token_config=cfg, identity_config=cfg)
+    with pytest.raises(TypeError, match="not both"):
+        pii_scan.scan_text("ask Examplename first", token_config=cfg,
+                           identity_config=cfg)
+
+
 def test_trunk_scan_stays_gmail_conservative(tmp_path):
     """g5x AC2: the trunk-wide `scan` is NOT widened — clonability is preserved.
 
