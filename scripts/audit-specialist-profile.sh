@@ -17,10 +17,14 @@
 # when their input artifact is absent:
 #   • refusal-classes / authority-framing  → templates/refusal-class-taxonomy.yaml
 #   • mode-floor-correctness                → templates/specialist-risk-class.yaml
-#   • negative-examples denylist            → templates/negative-example-denylist.yaml
-#                                             (default-wired; --denylist <path> overrides)
 #   • identical-block / differ-jaccard      → --compare-to <slug-dir,...> corpus
 #   • schema-drift                          → --schema <operator-profile-schema>
+#
+# The negative-examples denylist (templates/negative-example-denylist.yaml;
+# --denylist <path> overrides) is NOT in the degrade-to-skip class — it ships
+# with the script. The row-10 gate fails CLOSED: default path absent → R13-10
+# BLOCK; an explicit --denylist path that does not exist → usage error (exit 2,
+# matching the missing-profile precedent).
 #
 # AQ-002 (mention-aware, bead 3y6): the voice-register and denylist checks strip
 # fenced code blocks and inline-code spans BEFORE counting banned-modal tokens,
@@ -66,6 +70,7 @@ fi
 COMPARE_TO=""
 SCHEMA=""
 ONLY_CHECK=""
+DENYLIST_EXPLICIT=0
 
 # WARN lines are tracked separately from BLOCK violations so they never flip
 # the exit code.
@@ -88,7 +93,7 @@ while [[ $# -gt 0 ]]; do
         --check)       ONLY_CHECK="${2:-}"; shift 2 ;;
         --taxonomy)    TAXONOMY="${2:-}"; shift 2 ;;
         --role-table)  RISK_TABLE="${2:-}"; shift 2 ;;
-        --denylist)    DENYLIST="${2:-}"; shift 2 ;;
+        --denylist)    DENYLIST="${2:-}"; DENYLIST_EXPLICIT=1; shift 2 ;;
         --compare-to)  COMPARE_TO="${2:-}"; shift 2 ;;
         --schema)      SCHEMA="${2:-}"; shift 2 ;;
         -h|--help)     usage ;;
@@ -113,6 +118,12 @@ else
 fi
 if [[ ! -f "$PROFILE" ]]; then
     echo "audit-specialist-profile: agent.md not found at $PROFILE" >&2
+    exit 2
+fi
+# An EXPLICIT --denylist that points nowhere is an operator typo, not a
+# fail-closed condition — usage error, matching the missing-profile precedent.
+if [[ "$DENYLIST_EXPLICIT" -eq 1 && ! -f "$DENYLIST" ]]; then
+    echo "audit-specialist-profile: denylist not found: $DENYLIST" >&2
     exit 2
 fi
 
@@ -158,12 +169,15 @@ neg_examples_stripped() {
 }
 
 # Extract the ERE patterns from a YAML denylist into one-per-line grep -f input,
-# stripping the single-quoted YAML scalar quoting. Single-quoted YAML keeps regex
-# backslash classes literal (\b stays \b); POSIX classes ([0-9], [[:space:]]) pass
-# through unchanged.
+# stripping the single-quoted YAML scalar quoting and dropping blank/whitespace-only
+# lines (a blank line in a grep -f file matches EVERY line — fail-open). POSIX
+# classes ([0-9], [[:space:]]) pass through unchanged. \b is undefined in POSIX
+# ERE and must not be relied on — patterns use the letter-bound idiom
+# (^|[^a-z])...([^a-z]|$) as the word-boundary substitute.
 denylist_patterns() {
     grep -E '^[[:space:]]*pattern:' "$1" \
-        | sed -E "s/^[[:space:]]*pattern:[[:space:]]*//; s/^'//; s/'[[:space:]]*$//; s/''/'/g"
+        | sed -E "s/^[[:space:]]*pattern:[[:space:]]*//; s/^'//; s/'[[:space:]]*$//; s/''/'/g" \
+        | grep -vE '^[[:space:]]*$'
 }
 
 # ===========================================================================
@@ -364,7 +378,7 @@ check_library_index() { # row 9.5 — BLOCK
     info "library-index: $lines lines, $refs vault/library refs"
 }
 
-check_negative_examples() { # row 10 — WARN (count) + BLOCK (denylist, default-wired)
+check_negative_examples() { # row 10 — WARN (count) + BLOCK (denylist, default-wired, fail-closed)
     local pairs cites
     pairs="$(grep -cE '^(BAD|GOOD)\b|\*\*(BAD|GOOD)' "$BODY" || true)"
     cites="$(grep -cE '(anti-pattern|Anti-Pattern|§11|AP-?[0-9])' "$BODY" || true)"
@@ -376,20 +390,55 @@ check_negative_examples() { # row 10 — WARN (count) + BLOCK (denylist, default
     # that DESCRIBE attack strings (drug+dose facts, "as a physician" jailbreak
     # demos) in Core Rules / Anti-Patterns prose; the section scope tracks the
     # row's stated purpose (Negative Examples harmful-content).
-    if [[ -n "$DENYLIST" && -f "$DENYLIST" ]]; then
-        local patterns hits
-        patterns="$TMP/denylist-patterns.txt"
-        denylist_patterns "$DENYLIST" > "$patterns"
-        if [[ ! -s "$patterns" ]]; then
-            info "negative-examples: $pairs markers (denylist $DENYLIST has no pattern: entries — BLOCK gate skipped)"
-            return
-        fi
-        hits="$(neg_examples_stripped | grep -oiEf "$patterns" 2>/dev/null | wc -l | tr -d ' ')"
-        [[ "$hits" -gt 0 ]] && violation "R13-10" "$hits denylist term(s) in Negative Examples prose (fenced/inline code excluded per AQ-002)"
-        info "negative-examples: $pairs markers, denylist hits=$hits"
-    else
-        info "negative-examples: $pairs markers (denylist file absent at $DENYLIST — row-10 BLOCK gate skipped)"
+    #
+    # The gate fails CLOSED: a missing default denylist, a pattern-less or
+    # extraction-mismatched denylist, invalid ERE, an unbalanced strip surface,
+    # or a non-canonical section heading each BLOCK — a gate that cannot run
+    # must not pass. (An explicit --denylist that points nowhere already exited
+    # 2 at startup.)
+    if [[ ! -f "$DENYLIST" ]]; then
+        violation "R13-10" "denylist missing at $DENYLIST — BLOCK gate cannot run"
+        return
     fi
+    local patterns key_count pat_count ere_rc fences hits
+    patterns="$TMP/denylist-patterns.txt"
+    denylist_patterns "$DENYLIST" > "$patterns"
+    # Shape lint: every pattern: key must survive extraction as one non-empty
+    # line, else a quoting/format change silently dropped patterns (fail-open).
+    key_count="$(grep -cE '^[[:space:]]*pattern:' "$DENYLIST" || true)"
+    pat_count="$(grep -c . "$patterns" || true)"
+    if [[ "$key_count" -ne "$pat_count" ]]; then
+        violation "R13-10" "denylist pattern extraction mismatch ($key_count keys, $pat_count patterns) — gate cannot run"
+        return
+    fi
+    if [[ ! -s "$patterns" ]]; then
+        violation "R13-10" "denylist $DENYLIST has no pattern: entries — gate cannot run"
+        return
+    fi
+    # ERE pre-validation: grep exits 2 on a malformed pattern file (its error
+    # text stays visible on stderr as the diagnostic).
+    ere_rc=0
+    grep -qiEf "$patterns" /dev/null || ere_rc=$?
+    if [[ "$ere_rc" -eq 2 ]]; then
+        violation "R13-10" "denylist is not valid ERE — gate cannot run"
+        return
+    fi
+    # Strip-surface integrity: an odd fence count means the AQ-002 stripper
+    # swallowed an unknown span — the scan surface is unreliable.
+    fences="$(grep -cE '^```' "$BODY" || true)"
+    if [[ $((fences % 2)) -ne 0 ]]; then
+        violation "R13-10" "unbalanced code fences — strip surface unreliable, denylist gate cannot scan"
+        return
+    fi
+    # Scan-surface presence: the canonical heading must survive the strip, else
+    # neg_examples_stripped scans nothing and the gate passes vacuously.
+    if ! grep -qE $'^## Negative Examples[ \t]*$' "$STRIPPED"; then
+        violation "R13-10" "Negative Examples heading not found or non-canonical — denylist gate cannot scan"
+        return
+    fi
+    hits="$(neg_examples_stripped | grep -oiEf "$patterns" | wc -l | tr -d ' ')"
+    [[ "$hits" -gt 0 ]] && violation "R13-10" "$hits denylist term(s) in Negative Examples prose (fenced/inline code excluded per AQ-002)"
+    info "negative-examples: $pairs markers, denylist hits=$hits"
 }
 
 check_pf_resolution() { # row 11 — BLOCK
