@@ -14,12 +14,13 @@ relates_to: null
 ## Decision
 
 The ingest scheduler's wired-set membership marker is a **typed module-level
-attribute**: an adapter module in `scripts/ingest/adapters/` is excluded from the
-unattended wired set iff it declares `UNWIRED = True`. **Absence of the
-declaration means wired** — the `getattr(module, "UNWIRED", False)` default in
+attribute**: an adapter module in `scripts/ingest/adapters/` is excluded from
+the unattended wired set iff its module-level `UNWIRED` attribute is present
+and truthy. The canonical declaration is `UNWIRED = True`. **A falsy value or
+absence means wired** — the `getattr(module, "UNWIRED", False)` default in
 `scheduler._wired_adapters()` IS the contract's default-membership clause
-(wired-by-default, identical semantics to the prior absence-of-marker rule), not
-a defensive fallback. Docstring prose never affects membership.
+(wired-by-default, identical semantics to the prior absence-of-marker rule),
+not a defensive fallback. Docstring prose never affects membership.
 
 This replaces the S40 mechanism, which excluded any adapter whose module
 docstring contained the substring `"unwired"` (`_UNWIRED_MARKER` in

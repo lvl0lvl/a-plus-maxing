@@ -16,8 +16,10 @@ import json
 from pathlib import Path
 from typing import Iterable
 
-# Typed unwired-scaffold declaration: the scheduler's wired-set discovery
-# excludes any adapter module carrying this attribute (ADR-0003 Risk N2).
+# Typed unwired-scaffold declaration (the canonical `UNWIRED = True` form): the
+# scheduler's wired-set discovery excludes any adapter module whose `UNWIRED`
+# attribute is present and truthy; a falsy value or absence means wired
+# (ADR-0003 Risk N2).
 UNWIRED = True
 
 
