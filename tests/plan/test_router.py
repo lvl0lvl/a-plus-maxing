@@ -631,6 +631,30 @@ def test_summarize_raises_on_widened_pii_class_in_passthrough(field, value, secr
     assert secret not in str(exc.value)
 
 
+def test_widened_pii_blocks_model_sink_both_paths():
+    """g5x AC1 (both sinks): a non-gmail email in a pass-through field never reaches the
+    model sink. Built on a COMPLETE clean read with ONLY goal-targets poisoned, so absent
+    the widening summarize would COMPLETE and dispatch WOULD send — making this
+    failing-capable (the sink IS called on the gmail-only scan_text). The widened gate
+    raises at the summarize boundary, upstream of BOTH dispatch (model) and assemble
+    (render); the `goal-targets` in the message pins the raise as the PII gate, not the
+    partial-summary fail-closed.
+    """
+    records = _clean_records()
+    for record in records:
+        if record["item"] == "goal-targets":
+            record["value"] = "reach me x@protonmail.com"
+    sink_calls = []
+    with pytest.raises(ValueError) as exc:
+        # The model path: summarize feeds dispatch; the raise precedes any send.
+        router.dispatch(
+            router.summarize(_store_read_factory(records)),
+            sink=lambda p: sink_calls.append(p),
+        )
+    assert "goal-targets" in str(exc.value)  # the PII gate, not the partial-summary guard
+    assert not sink_calls, "widened-PII value must not reach the model sink"
+
+
 # --- e3b: the caller-binds-clone-root store.read convention ----------------------
 
 
@@ -679,25 +703,44 @@ def test_summarize_with_root_bound_partial_reads_only_the_clone_store(tmp_path, 
     assert set(summary.keys()) == set(router.SUMMARY_FIELD_SET)
 
 
-def test_widened_pii_blocks_model_sink_both_paths():
-    """g5x AC1 (both sinks): a non-gmail email in a pass-through field never reaches the
-    model sink. Built on a COMPLETE clean read with ONLY goal-targets poisoned, so absent
-    the widening summarize would COMPLETE and dispatch WOULD send — making this
-    failing-capable (the sink IS called on the gmail-only scan_text). The widened gate
-    raises at the summarize boundary, upstream of BOTH dispatch (model) and assemble
-    (render); the `goal-targets` in the message pins the raise as the PII gate, not the
-    partial-summary fail-closed.
+def test_summarize_clone_missing_item_never_falls_back_to_default_root(tmp_path, monkeypatch):
+    """e3b sibling: a clone-missing item is OMITTED, never DEFAULT_ROOT-filled.
+
+    Closes the hole the full-clone sibling leaves open: a per-item fallback
+    mutant in `summarize` (empty bound read -> unbound `store.read(item)`)
+    PASSES that test, because its clone backs every field-set field and the
+    fallback never fires. Here the clone store is `_clean_records()` MINUS the
+    `hard-limits` record (`hard-limits` is a pass-through field — in
+    `SUMMARY_FIELD_SET`, not in `_RAW_TO_FIELD`) while DEFAULT_ROOT plants a
+    `hard-limits` sentinel: a faithful `summarize` OMITS the field; the mutant
+    surfaces the sentinel and reds the absence assertions. The partial summary
+    then trips `dispatch`'s fail-closed refusal, which names the missing field
+    — wrong-instance data never silently completes a model-bound payload.
     """
-    records = _clean_records()
-    for record in records:
-        if record["item"] == "goal-targets":
-            record["value"] = "reach me x@protonmail.com"
-    sink_calls = []
-    with pytest.raises(ValueError) as exc:
-        # The model path: summarize feeds dispatch; the raise precedes any send.
-        router.dispatch(
-            router.summarize(_store_read_factory(records)),
-            sink=lambda p: sink_calls.append(p),
-        )
-    assert "goal-targets" in str(exc.value)  # the PII gate, not the partial-summary guard
-    assert not sink_calls, "widened-PII value must not reach the model sink"
+    from functools import partial
+
+    from scripts.store import store
+
+    # DEFAULT_ROOT is relative (vault/store); chdir sandboxes it under tmp_path.
+    monkeypatch.chdir(tmp_path)
+    store.append(
+        "hard-limits",
+        {"item": "hard-limits", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "DEFAULT-ROOT-HARD-LIMIT"},
+        root=store.DEFAULT_ROOT,
+    )
+
+    # The clone instance store, every field-set field EXCEPT hard-limits.
+    clone_root = tmp_path / "clone" / "vault" / "store"
+    for record in _clean_records():
+        if record["item"] != "hard-limits":
+            store.append(record["item"], record, root=clone_root)
+
+    summary = router.summarize(partial(store.read, root=clone_root))
+
+    # The clone-missing field is absent — not filled from DEFAULT_ROOT...
+    assert "hard-limits" not in summary
+    assert "DEFAULT-ROOT-HARD-LIMIT" not in str(summary)
+    # ...and the partial summary trips the fail-closed dispatch refusal by name.
+    with pytest.raises(ValueError, match="hard-limits"):
+        router.dispatch(summary)
