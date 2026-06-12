@@ -39,7 +39,7 @@ def _seed_store(root):
     """Seed a tmp store root with two items via the published store.append writer.
 
     Two items, so the cross-item read model assembled by `generate.run` spans more
-    than one `.ndjson` file — exercising the enumeration helper over a real layout.
+    than one `.ndjson` file — exercising `store.read_all` over a real layout.
     """
     readings = [
         {"item": "rhr", "timepoint": "2026-05-01T00:00:00+00:00", "source": "whoop", "value": 52},
