@@ -64,6 +64,16 @@ else
     PROJECT_ROOT="$FALLBACK_ROOT"
 fi
 
+# Scope gate: the ingestion gate guards THIS trunk's wiki only — a commit whose
+# target repo provably belongs to a different repository passes through (another
+# project's vault/ layout is not this gate's concern). Worktrees of this repo
+# share the git common dir and stay gated; an indeterminate target stays gated.
+# Guarded on the helper existing: on a missing resolve lib the fallback above
+# already pinned PROJECT_ROOT to this checkout, which is trivially in scope.
+if declare -F target_is_this_repo >/dev/null 2>&1; then
+    target_is_this_repo "$PROJECT_ROOT" "$FALLBACK_ROOT" || exit 0
+fi
+
 # Collect staged gated-dir pages (added/copied/modified; deletions are not gated).
 # bash 3.2 — no mapfile; the case '*' spans '/', so nested library pages match.
 PAGES=()

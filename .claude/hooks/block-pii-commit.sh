@@ -94,10 +94,16 @@ declare -F is_git_commit >/dev/null 2>&1 || deny "PII-FREE-TRUNK: commit-matcher
 source "$SCRIPT_DIR/lib/pii-scan-scope.sh" 2>/dev/null
 [[ -n "${STORE_PREFIX:-}" ]] || deny "PII-FREE-TRUNK: pii-scan-scope lib failed to load (path prefixes undefined). Failing closed — commit blocked."
 
-# Target-repo resolution single-sourced (bead 29u4): the staged-set scan must read
-# the index of the repo RECEIVING the commit (a worktree's, when the commit is
-# issued there), not the checkout this script ships in.
+# Target-repo resolution + trunk-scope helper single-sourced (bead 29u4): the
+# staged-set scan must read the index of the repo RECEIVING the commit (a
+# worktree's, when the commit is issued there), not the checkout this script ships
+# in. Fail-CLOSED like this hook's other lib loads (Security HIGH-1, matching the
+# commit-matcher and pii-scan-scope guards above): a hook that cannot resolve WHICH
+# repo receives the commit cannot scope its scan either. The two allow-on-error
+# sibling hooks keep their warn+fallback posture.
 source "$SCRIPT_DIR/lib/resolve-target-repo.sh" 2>/dev/null
+declare -F resolve_target_repo >/dev/null 2>&1 \
+    || deny "PII-FREE-TRUNK: resolve-target-repo lib failed to load (resolve_target_repo undefined). Failing closed — commit blocked."
 
 HOOK_INPUT=$(cat)
 COMMAND=$(jq -r '.tool_input.command // empty' <<< "$HOOK_INPUT")
@@ -114,17 +120,14 @@ fi
 # Only a git commit is our concern — detection single-sourced in lib/commit-matcher.sh (mic).
 is_git_commit "$COMMAND" || exit 0
 
-# Resolve the repo receiving the commit (29u4); a missing/corrupt lib falls back to
-# the pre-29u4 root — never weaker — with a loud warning (broken install). The
-# scanner-import default follows the resolved root (a worktree checkout carries the
-# tracked scripts/guard/pii_scan.py); tests always pin it explicitly.
-if declare -F resolve_target_repo >/dev/null 2>&1; then
-    PROJECT_ROOT=$(resolve_target_repo "$HOOK_INPUT" "$FALLBACK_ROOT")
-else
-    echo "block-pii-commit: resolve-target-repo lib failed to load; scanning the script-path root." >&2
-    PROJECT_ROOT="$FALLBACK_ROOT"
-fi
-PII_SCAN_ROOT="${BLOCK_PII_COMMIT_PII_SCAN_ROOT:-$PROJECT_ROOT}"
+# Resolve the repo receiving the commit (29u4; the lib-load guard above already
+# denied on a missing/corrupt lib). The scanner imports from the SCRIPT-PATH root,
+# not the resolved target: the scan POLICY ships with this checkout, while the
+# staged set and file contents keep following the target — the same split the
+# vault hook documents for its lint script (script-relative) vs content root
+# (target-following). Tests always pin the scanner root explicitly.
+PROJECT_ROOT=$(resolve_target_repo "$HOOK_INPUT" "$FALLBACK_ROOT")
+PII_SCAN_ROOT="${BLOCK_PII_COMMIT_PII_SCAN_ROOT:-$FALLBACK_ROOT}"
 
 # ── Condition 0: in-command staging defeats the snapshot -> deny (sequencing) ───
 # This PreToolUse hook snapshots the staged set BELOW, BEFORE the command runs, so
@@ -159,6 +162,18 @@ if printf '%s' "$SEQ_CMD" | grep -qE "(^|[;&|[:space:]])git[[:space:]]+${SEQ_SUB
     deny "PII-FREE-TRUNK: committing a pathspec ('git commit <path>') commits that file's working-tree content, which this scan (keyed on the staged set) cannot see. 'git add <path>' first as its own command, then 'git commit'."
 fi
 
+# ── Scope gate: this gate guards THIS trunk only ────────────────────────────────
+# A commit whose target repo provably belongs to a DIFFERENT repository (a /tmp
+# scratch repo, another project's clone, a test fixture) is not this trunk's
+# concern — allow it through untouched. Worktrees of this repo share the git
+# common dir and stay gated; an indeterminate target (non-git root) also stays
+# gated so the fail-closed plumbing below decides. Placed AFTER the condition-0
+# sequencing detectors deliberately: those are pure command-text checks that
+# predate target-repo resolution, and keeping them first preserves their pre-PR
+# behavior (sequencing guidance fires for ANY repo) while the staged-set machinery
+# below is trunk-scoped.
+target_is_this_repo "$PROJECT_ROOT" "$FALLBACK_ROOT" || exit 0
+
 # Staged set git will actually commit — NOT git ls-files (the HEAD/tracked set), so a
 # git add-ed file absent from HEAD is scanned (Fix 3). Filter ACMRT covers Added,
 # Copied, Modified, Renamed, Type-changed: R/T must be included or a high-similarity
@@ -188,14 +203,26 @@ while IFS= read -r f; do
 done <<< "$GIT_OUT"
 
 # bd auto-stage coverage (eb1 + ycqo): the bd pre-commit git hook flushes pending
-# bead text from .beads/beads.db AND stages .beads/issues.jsonl INSIDE `git
+# bead text from the beads database AND stages .beads/issues.jsonl INSIDE `git
 # commit`, AFTER the snapshot above. Two measures close that:
 #   • flush-before-scan (ycqo): run `bd sync --flush-only` against the target repo
 #     BEFORE the jsonl is read, so bead text still pending in the db at scan time
 #     is materialized and scanned. DENY on flush failure — fail-closed, matching
 #     this hook's git-rc/scan-rc convention and the bd hook's own exit-1-on-flush-
-#     failure. Guarded on bd being invocable and the target repo carrying .beads/
-#     (a non-beads clone commits without bd; the guard preserves clone semantics).
+#     failure. The flush runs ONLY when something CAN be pending: it is skipped
+#     (with an info line, never a deny) when
+#       - the target is a LINKED WORKTREE: bd resolves the db and jsonl via the
+#         common git dir, so a flush issued here would mutate the MAIN checkout's
+#         jsonl and never feed THIS worktree's scan (bd's own pre-commit hook
+#         skips staging in worktrees for the same reason); the pre-push scan
+#         covers worktree pending-bead text. The db-existence check below would
+#         also skip a worktree incidentally (the db lives only in the main
+#         checkout's working dir) — the explicit check documents the intent.
+#       - the target carries NO beads database (.beads/*.db — bd's db filename is
+#         configurable, hence the glob): nothing can be pending, so the jsonl is
+#         scanned as-is. This is what lets a FRESH CLONE of this repo commit
+#         cleanly without `bd init` (the tracked jsonl alone used to drive bd to
+#         a flush failure -> false deny).
 #     The flush precedes the -f check below because it may CREATE the jsonl.
 #   • working-tree append (eb1): the bd file joins the trunk-wide scan set on
 #     every commit (dedupe keeps the deny hit-count honest), BEFORE the empty-set
@@ -207,11 +234,23 @@ done <<< "$GIT_OUT"
 #     scope only (structural patterns + contact tokens via scan_scoped).
 BD_ISSUES=".beads/issues.jsonl"
 BD_CMD="${BLOCK_PII_COMMIT_BD_CMD:-bd}"
-if command -v "$BD_CMD" >/dev/null 2>&1 && [[ -d "$PROJECT_ROOT/.beads" ]]; then
+BD_DB_PRESENT=0
+for _db in "$PROJECT_ROOT"/.beads/*.db; do
+    [[ -e "$_db" ]] && { BD_DB_PRESENT=1; break; }
+done
+# Linked-worktree detection: --git-dir differs from --git-common-dir only in a
+# linked worktree; real-path both so relative (".git") and absolute forms compare.
+BD_TARGET_GIT_DIR=$(cd "$PROJECT_ROOT" 2>/dev/null && cd "$(git rev-parse --git-dir 2>/dev/null)" 2>/dev/null && pwd -P)
+BD_TARGET_COMMON=$(cd "$PROJECT_ROOT" 2>/dev/null && cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd -P)
+if [[ -n "$BD_TARGET_GIT_DIR" && "$BD_TARGET_GIT_DIR" != "$BD_TARGET_COMMON" ]]; then
+    echo "block-pii-commit: target is a linked worktree — skipping the bd flush (a flush here would mutate the main checkout via the common git dir, never this scan's jsonl); jsonl scanned as-is, pending bead text is covered by the pre-push scan." >&2
+elif [[ $BD_DB_PRESENT -eq 0 ]]; then
+    echo "block-pii-commit: no beads database in the target (.beads/*.db absent) — nothing can be pending; jsonl scanned as-is." >&2
+elif command -v "$BD_CMD" >/dev/null 2>&1; then
     BD_FLUSH_OUT=$( (cd "$PROJECT_ROOT" && "$BD_CMD" sync --flush-only) 2>&1 )
     BD_FLUSH_RC=$?
     if [[ $BD_FLUSH_RC -ne 0 ]]; then
-        deny "PII-FREE-TRUNK: bd flush-before-scan failed (bd sync --flush-only rc=$BD_FLUSH_RC) — bead text pending in .beads/beads.db cannot be scanned. Failing closed — commit blocked. Detail: ${BD_FLUSH_OUT:-no output}"
+        deny "PII-FREE-TRUNK: bd flush-before-scan failed (bd sync --flush-only rc=$BD_FLUSH_RC) — bead text pending in the beads database cannot be scanned. Failing closed — commit blocked. Detail: ${BD_FLUSH_OUT:-no output}"
     fi
 fi
 if [[ -f "$PROJECT_ROOT/$BD_ISSUES" ]]; then
