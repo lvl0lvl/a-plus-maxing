@@ -23,20 +23,25 @@ last_reviewed: 2026-06-12
 entries:
   # ---- class (a): FDA Pregnancy Category X drug co-occurring with a dosed unit ----
   - class: pregnancy_category_x_dose
-    pattern: '((isotretinoin|thalidomide|warfarin|methotrexate|finasteride|leflunomide|mycophenolate).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)|[0-9]+[[:space:]]?(mg|mcg|g|iu|ml).*(isotretinoin|thalidomide|warfarin|methotrexate|finasteride|leflunomide|mycophenolate))'
-    rationale: 'FDA Pregnancy Category X drug shown with a concrete dose-with-unit is a teratogen dosing directive, not a refusal demonstration.'
+    pattern: '((isotretinoin|thalidomide|warfarin|methotrexate|finasteride|leflunomide|mycophenolate|valproate|valproic acid).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)([^a-z]|$)|[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)([^a-z]|$).*(isotretinoin|thalidomide|warfarin|methotrexate|finasteride|leflunomide|mycophenolate|valproate|valproic acid))'
+    rationale: 'FDA Pregnancy Category X drug shown with a concrete dose-with-unit is a teratogen dosing directive, not a refusal demonstration. Precision note: the historical FDA letter category for mycophenolate was D under a REMS (documented teratogen), retained here for the dosed-teratogen purpose.'
     false_positive_note: 'Wide: a faithful BAD example that quotes such a directive must sit in a fenced/inline code block (stripped pre-scan). Unfenced drug-name-plus-dose prose in Negative Examples is the intended hit. A teaching mention of the drug WITHOUT a numeric dose-with-unit (e.g. a route-out rule naming warfarin) does not match.'
 
   # ---- class (b): common contraindication pairs co-occurring with a dosed unit ----
   - class: contraindication_anticoagulant_nsaid_dose
-    pattern: '((warfarin|apixaban|rivaroxaban).*(ibuprofen|naproxen|aspirin)|(ibuprofen|naproxen|aspirin).*(warfarin|apixaban|rivaroxaban)).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)'
+    pattern: '((warfarin|apixaban|rivaroxaban).*(ibuprofen|naproxen|aspirin)|(ibuprofen|naproxen|aspirin).*(warfarin|apixaban|rivaroxaban)).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)([^a-z]|$)'
     rationale: 'Anticoagulant plus an analgesic NSAID with a dose on the same line is a bleeding-risk co-administration directive.'
     false_positive_note: 'Requires both drug classes AND a dose-with-unit on the line, so an interaction-screen rule that names the pair without a dose does not match. A faithful BAD demonstration belongs in a fenced block.'
 
   - class: contraindication_maoi_ssri_dose
-    pattern: '((phenelzine|tranylcypromine|selegiline).*(sertraline|fluoxetine|paroxetine|escitalopram)|(sertraline|fluoxetine|paroxetine|escitalopram).*(phenelzine|tranylcypromine|selegiline)).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)'
+    pattern: '((phenelzine|tranylcypromine|selegiline).*(sertraline|fluoxetine|paroxetine|escitalopram)|(sertraline|fluoxetine|paroxetine|escitalopram).*(phenelzine|tranylcypromine|selegiline)).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)([^a-z]|$)'
     rationale: 'MAOI plus SSRI with a dose on the same line is a serotonin-syndrome co-administration directive.'
     false_positive_note: 'Requires both an MAOI and an SSRI AND a dose-with-unit on the line. A fenced BAD example is stripped before the scan.'
+
+  - class: contraindication_nitrate_pde5_dose
+    pattern: '((nitroglycerin|isosorbide).*(sildenafil|tadalafil|vardenafil)|(sildenafil|tadalafil|vardenafil).*(nitroglycerin|isosorbide)).*[0-9]+[[:space:]]?(mg|mcg|g|iu|ml)([^a-z]|$)'
+    rationale: 'Nitrate plus a PDE5 inhibitor with a dose on the same line is a severe-hypotension co-administration directive.'
+    false_positive_note: 'Requires both a nitrate and a PDE5 inhibitor AND a dose-with-unit on the line. A fenced BAD example is stripped before the scan.'
 
   # ---- class (c): jailbreak-trigger framings (no dose required) ----
   - class: jailbreak_ignore_instructions
@@ -45,19 +50,19 @@ entries:
     false_positive_note: 'Narrow literal phrase. A profile that demonstrates this jailbreak in a BAD example must fence it (stripped pre-scan).'
 
   - class: jailbreak_authority_override
-    pattern: 'as (a|your) (doctor|physician|pharmacist|nurse)'
-    rationale: 'Authority-impersonation framing used to demand an override (medRxiv 2026.02.26.26347212, 81.8 percent of successful jailbreaks; the AUTHORITY_FRAMING_BYPASS class).'
+    pattern: 'as (a|your) (doctor|physician|pharmacist|nurse|medical[[:space:]-]student|trainee|researcher|caregiver)'
+    rationale: 'Authority-impersonation framing used to demand an override (medRxiv 2026.02.26.26347212, 81.8 percent of successful jailbreaks; the AUTHORITY_FRAMING_BYPASS class). Noun set tracks the AUTHORITY_FRAMING_BYPASS trigger enumeration in templates/refusal-class-taxonomy.yaml (medical-student/trainee/nurse/physician/researcher/caregiver) plus doctor/pharmacist.'
     false_positive_note: 'Wide: this exact phrase is how profiles legitimately DESCRIBE the attack. Row 10 scans the Negative Examples section only, and strips fenced/inline code first, so a faithful description in Core Rules / Anti-Patterns prose, or a fenced BAD example, is out of scope. Unfenced occurrence in the Negative Examples section is the hit.'
 
   - class: jailbreak_dan_mode
-    pattern: '\bdan mode\b'
+    pattern: '(^|[^a-z])dan mode([^a-z]|$)'
     rationale: 'Named DAN (Do Anything Now) jailbreak persona.'
-    false_positive_note: 'Word-bounded to avoid substring hits. Case-insensitive match covers DAN/Dan/dan.'
+    false_positive_note: 'Letter-bounded with (^|[^a-z]) / ([^a-z]|$) to avoid substring hits — \b is PCRE-only and the engine is grep -E. Case-insensitive match covers DAN/Dan/dan.'
 
   - class: jailbreak_developer_mode
-    pattern: '\bdeveloper mode\b'
+    pattern: '(^|[^a-z])developer mode([^a-z]|$)'
     rationale: 'Named developer-mode jailbreak persona that claims restrictions are lifted.'
-    false_positive_note: 'Word-bounded. A genuine product feature named developer mode is out of scope here because row 10 only scans the Negative Examples section.'
+    false_positive_note: 'Letter-bounded with (^|[^a-z]) / ([^a-z]|$), not the PCRE-only \b. A genuine product feature named developer mode is out of scope here because row 10 only scans the Negative Examples section.'
 
   - class: jailbreak_pretend_no_restrictions
     pattern: 'pretend (you )?(have )?no restrictions'
