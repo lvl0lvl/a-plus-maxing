@@ -851,3 +851,71 @@ def test_contrast_and_colorblind(tmp_path):
 
     # --- @media print present (print-safe)
     assert "@media print" in html, "emitted file must carry an @media print block"
+
+
+def test_facesheet_rendered_pairs_measure_aa(tmp_path):
+    """AC-3 extension (bead nsxy): every NEW text/background pair the face
+    sheet ships computes >= 4.5 (WCAG AA normal text) over the EMITTED file.
+
+    The gate's tint-rule walk already measures `.tint-watch` (watch-text on
+    watch-tint) and the asks card's ink/muted on nutrition-tint ride the
+    already-measured pc-nutrition stat pairs; this test grounds and measures
+    the face-sheet-specific pairs: each fg/bg pair is asserted as a COMPUTED
+    ratio, and each production-rendered pair's marker is asserted present in
+    the emitted report so the measurement cannot drift from the render. The
+    two helper-only pairs (the populated triage-row anatomy, awaiting LM-01)
+    are measured without a marker — their markup is pinned in
+    test_facesheet.py.
+    """
+    import datetime
+
+    from scripts.store import loop_schema, plan_schema
+    from scripts.generate import generate
+
+    root = tmp_path / "store"
+    today = datetime.date(2026, 6, 12)
+    loop_schema.record_biomarker("crp", "2026-05-12T00:00:00+00:00", 6.1, root)
+    loop_schema.record_biomarker("crp", "2026-06-11T00:00:00+00:00", 7.3, root)
+    loop_schema.record_biomarker("rhr", "2026-06-11T00:00:00+00:00", 52, root)
+    plan_schema.record_plan(
+        "peptides",
+        {"compound": "bpc-157", "dose": "250 mcg", "route": "subq",
+         "tags": ["experimental"]},
+        today.isoformat(), "peptide-specialist", root,
+    )
+    html = generate.run(
+        "report", _root=root, _out_dir=tmp_path / "out", _today=today
+    ).read_text()
+
+    c, p = component_set.CHROME, component_set.PALETTE
+    pairs = (
+        ("watch chip text (watch-text/watch-tint)",
+         c["watch-text"], c["watch-tint"], "pill tint-watch"),
+        ("experimental row detail (watch-text/paper)",
+         c["watch-text"], p["paper"], "fs-exp"),
+        ("triage card title (training-text/training-tint)",
+         c["training-text"], c["training-tint"], "fs-triage"),
+        ("abnormal marker name (concern/concern-tint)",
+         p["concern"], c["concern-tint"], "fs-marker"),
+        ("abnormal row detail (ink/concern-tint)",
+         p["ink"], c["concern-tint"], "fs-abrow"),
+        ("in-range strip (good/good-tint)",
+         p["good"], c["good-tint"], "fs-strip"),
+        ("footer lab-grade word (training-text/paper)",
+         c["training-text"], p["paper"], ">lab-grade</span>"),
+        ("footer wearable word (supplements-text/paper)",
+         c["supplements-text"], p["paper"], ">consumer wearable</span>"),
+        # Helper-only populated triage rows (production renders the
+        # first-visit copy until LM-01): improving rides good on the card's
+        # training-tint; attention rides the measured watch pair.
+        ("triage improving row (good/training-tint)",
+         p["good"], c["training-tint"], None),
+        ("triage attention row (watch-text/watch-tint)",
+         c["watch-text"], c["watch-tint"], None),
+    )
+    for what, fg, bg, marker in pairs:
+        if marker is not None:
+            assert marker in html, f"pair {what}: marker {marker!r} not rendered"
+        ratio = _contrast_ratio(_hex_to_rgb(fg), _hex_to_rgb(bg))
+        print(f"AC-3 facesheet pair {what} {fg}/{bg} = {ratio:.2f} (need >= 4.5)")
+        assert ratio >= 4.5, f"{what}: {fg} on {bg} computes {ratio:.2f} < 4.5"
