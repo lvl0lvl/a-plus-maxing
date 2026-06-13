@@ -10,6 +10,7 @@ tokens", not "block known-bad fields".
 import pytest
 
 from scripts.plan import router
+from scripts.store import biomarker_meta
 
 
 # --- store-read fakes ----------------------------------------------------------
@@ -744,3 +745,179 @@ def test_summarize_clone_missing_item_never_falls_back_to_default_root(tmp_path,
     # ...and the partial summary trips the fail-closed dispatch refusal by name.
     with pytest.raises(ValueError, match="hard-limits"):
         router.dispatch(summary)
+
+
+# --- juc: registry-driven worst-wins recent-trend-direction (2026-06-12) --------
+
+
+def _stream_series(stream, prev, latest):
+    """A two-reading series for a `biomarker::` feed stream (prev then latest)."""
+    return [
+        {"item": stream, "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "lab", "value": prev},
+        {"item": stream, "timepoint": "2026-02-01T00:00:00+00:00",
+         "source": "lab", "value": latest},
+    ]
+
+
+def test_polarity_feed_is_registry_driven():
+    """Decision §1: the feed is EXACTLY the registered-polarity markers, biomarker::.
+
+    Non-tautological membership: registered-polarity markers IN; polarity-less
+    markers OUT; every source under the biomarker:: namespace. A hand-typed feed
+    that dropped a polarity marker or added a polarity-less one reds here.
+    """
+    feed = set(router._POLARITY_FEED)
+    # Every registered-polarity marker is present (incl. the v1 daily-cadence set).
+    for marker in ("ferritin", "vitamin-d", "crp", "alt", "hdl", "ldl",
+                   "fasting-glucose", "rhr", "hrv", "sleep-hours"):
+        assert f"biomarker::{marker}" in feed, marker
+    # Every polarity-less marker is absent (good_direction is None).
+    for marker in ("bodyweight", "est-1rm", "steps"):
+        assert f"biomarker::{marker}" not in feed, marker
+    # Every source is biomarker::-namespaced and resolves to a registered marker.
+    for stream in feed:
+        assert stream.startswith("biomarker::")
+        meta = biomarker_meta.get(stream)
+        assert meta is not None and meta["good_direction"] is not None
+
+
+def test_recent_trend_worst_wins_regressing_dominates():
+    """Decision §2: any regressing stream wins over improving + flat streams."""
+    store_read = _store_read_factory(
+        _stream_series("biomarker::alt", 30, 50)       # down marker rising -> regressing
+        + _stream_series("biomarker::hdl", 40, 60)     # up marker rising  -> improving
+        + _stream_series("biomarker::crp", 1, 1)       # no change         -> flat
+    )
+    assert router._recent_trend_direction(store_read) == "regressing"
+
+
+def test_recent_trend_improving_when_no_regressing():
+    """Decision §2: any improving wins when no stream regresses (improving > flat)."""
+    store_read = _store_read_factory(
+        _stream_series("biomarker::hdl", 40, 60)       # improving
+        + _stream_series("biomarker::crp", 1, 1)       # flat
+    )
+    assert router._recent_trend_direction(store_read) == "improving"
+
+
+def test_recent_trend_flat_when_all_streams_flat():
+    """Decision §2: with only flat streams, the reduction is flat."""
+    store_read = _store_read_factory(
+        _stream_series("biomarker::crp", 1, 1)
+        + _stream_series("biomarker::ferritin", 100, 100)
+    )
+    assert router._recent_trend_direction(store_read) == "flat"
+
+
+def test_recent_trend_zero_stream_is_flat():
+    """Decision §4: no feed signal at all reduces to the no-signal `flat`."""
+    empty = _store_read_factory([])  # no readings for any stream
+    assert router._recent_trend_direction(empty) == "flat"
+
+
+def test_recent_trend_insufficient_stream_contributes_no_false_signal():
+    """Decision §2/§4: a <2-reading stream yields no affirmative trend.
+
+    A single-reading stream alone -> flat (never a fabricated improving); the
+    same single-reading stream alongside one regressing stream -> regressing
+    (the insufficient stream is the worst-wins floor, not a vote).
+    """
+    one_reading = [{"item": "biomarker::hdl", "timepoint": "2026-01-01T00:00:00+00:00",
+                    "source": "lab", "value": 50}]
+    assert router._recent_trend_direction(_store_read_factory(one_reading)) == "flat"
+    assert router._recent_trend_direction(_store_read_factory(
+        one_reading + _stream_series("biomarker::alt", 30, 50)
+    )) == "regressing"
+
+
+def test_recent_trend_resolves_polarity_per_stream_via_registry():
+    """Decision §2: each stream's trend is its own registry polarity.
+
+    A rising down-marker (alt) regresses; a rising up-marker (hdl) improves;
+    a rising in-range marker moving out of range (fasting-glucose) regresses.
+    Each asserted in isolation (only that stream has data).
+    """
+    assert router._recent_trend_direction(
+        _store_read_factory(_stream_series("biomarker::alt", 30, 50))) == "regressing"
+    assert router._recent_trend_direction(
+        _store_read_factory(_stream_series("biomarker::hdl", 40, 60))) == "improving"
+    assert router._recent_trend_direction(
+        _store_read_factory(_stream_series("biomarker::hrv", 50, 60))) == "improving"
+
+
+def test_recent_trend_output_pinned_to_trend_directions():
+    """Decision §3: every reduction output is in the closed TREND_DIRECTIONS vocab.
+
+    Pins the function's actual outputs to the locked vocabulary (the load-time
+    assert pins the declared `_TREND_REDUCTION_OUTPUTS`; this ties the function to
+    it). Reds if a future edit returns an off-vocabulary token like 'rising'.
+    """
+    assert set(router._TREND_REDUCTION_OUTPUTS) <= set(router.TREND_DIRECTIONS)
+    for records in (
+        [],
+        _stream_series("biomarker::alt", 30, 50),
+        _stream_series("biomarker::hdl", 40, 60),
+        _stream_series("biomarker::crp", 1, 1),
+    ):
+        out = router._recent_trend_direction(_store_read_factory(records))
+        assert out in router.TREND_DIRECTIONS
+        assert out in router._TREND_REDUCTION_OUTPUTS
+
+
+def test_recent_trend_boundary_disposition_decision_3():
+    """Decision §3: raw-lab-values is de-plumbed but stays the boundary promise.
+
+    The raw-lab-values -> recent-trend-direction mapping is REMOVED from
+    _RAW_TO_FIELD; raw-lab-values REMAINS in EXCLUDED_RAW_PII; the biomarker::
+    feed streams do NOT join EXCLUDED_RAW_PII and are not field-set fields.
+    """
+    assert "raw-lab-values" not in router._RAW_TO_FIELD
+    assert "raw-lab-values" in router.EXCLUDED_RAW_PII
+    assert set(router._POLARITY_FEED).isdisjoint(router.EXCLUDED_RAW_PII)
+    assert set(router._POLARITY_FEED).isdisjoint(router.SUMMARY_FIELD_SET)
+    # recent-trend-direction is no longer a raw-PII-derived field.
+    assert "recent-trend-direction" not in router._FIELD_DERIVATION
+    assert "recent-trend-direction" not in router._RAW_TO_FIELD.values()
+
+
+def test_summarize_recent_trend_from_biomarker_feed_worst_wins():
+    """End-to-end: summarize derives recent-trend-direction worst-wins from the feed.
+
+    A complete clean state PLUS one regressing biomarker stream -> the summary's
+    recent-trend-direction is `regressing`, and the full summary dispatches.
+    """
+    records = _clean_records() + _stream_series("biomarker::alt", 30, 50)
+    summary = router.summarize(_store_read_factory(records))
+    assert summary["recent-trend-direction"] == "regressing"
+    # The whole summary still dispatches (the field is a clean scalar token).
+    result = router.dispatch(summary)
+    assert result.payload["recent-trend-direction"] == "regressing"
+
+
+def test_summarize_recent_trend_present_and_flat_with_no_lab_data():
+    """Decision §4 at the summarize boundary: a fresh operator gets `flat`, not partial.
+
+    The clean state has NO biomarker:: streams. recent-trend-direction must be
+    PRESENT and `flat` (the no-signal token) — NOT omitted. Failing-capable: a
+    revert to the old `if readings`-gated population would omit the field, and the
+    dispatch below would raise the partial-summary refusal instead of routing.
+    """
+    summary = router.summarize(_clean_store_read())
+    assert summary["recent-trend-direction"] == "flat"
+    result = router.dispatch(summary)  # must NOT raise partial
+    assert result.lane == router.NO_TRAIN_LANE
+    assert result.payload["recent-trend-direction"] == "flat"
+
+
+def test_summarize_reads_feed_through_injected_store_read():
+    """e3b: the feed streams are read via the INJECTED store_read, not a global.
+
+    Asserts the biomarker:: feed streams appear in the fake read's recorded calls
+    — so `_recent_trend_direction` honors the caller-bound clone-root partial that
+    `summarize` documents (the feed reads ride the same bound surface, bead e3b).
+    """
+    store_read = _clean_store_read()
+    router.summarize(store_read)
+    for stream in router._POLARITY_FEED:
+        assert stream in store_read.calls, stream
