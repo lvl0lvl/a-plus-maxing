@@ -3,7 +3,7 @@ title: juc — recent-trend-direction per-marker polarity design (adopted)
 type: decision
 owner: Walter McGivney
 created: 2026-06-12
-last_reviewed: 2026-06-12
+last_reviewed: 2026-06-13
 status: active
 permalink: a-plus-maxing/decisions/2026-06-12-juc-trend-polarity-design
 ---
