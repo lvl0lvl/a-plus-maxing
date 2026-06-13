@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-51)
+title: Scope Contract Archive (Sessions 5-52)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-51. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-52. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 52 (2026-06-12)
+
+Second ultracode build fan-out: five file-disjoint units merged through six full PR lifecycles (#102 S51-close docs, #103 router clone-isolation `e3b`-T1, #105 store `store.correct` superseding-append + latest-wins ADR-0002 v1.4, #104 `skill-trace-audit.sh` + INV-SKILL-TRACE register row, #106 negative-example denylist default-wired to deploy-gate row 10 via the three-gate medical pipeline, #107 worktree-aware hooks + `lib/resolve-target-repo.sh`); final main `e8b0dd8`, suite 489/2. AC1/AC3/AC5/AC6 PASS; AC2 PASS (all four visual targets operator-signed: `1oh` plan zone, `y0h0`+`i2yw` trend-card v2, `nsxy` face sheet — recorded in `dashboard-v1-visual-spec.md` + `physician-facesheet-v1-spec.md`); AC4 PASS under its carry-with-targets-recorded carve-out (zero visual code built, all three carried to S53). Two operator-approved amendments (INV-SKILL-TRACE registration ritual; the `nsxy` three-round Pencil redesign). No new PF-class entries; INV-SKILL-TRACE's first mechanically-audited attestation green (6 rows all-YES). **Full contract preserved in git history (main at `739cb0e`, the #111 merge); S52 drift checks + close attestation (with the per-PR #102-#107 invocation table) in `memory/process-failures.md` (Session 52 section); summary in `vault/sessions/session-52.md`** (compacted here at the S53 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 51 (2026-06-11)
 

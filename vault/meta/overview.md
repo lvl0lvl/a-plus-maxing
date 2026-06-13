@@ -4,7 +4,7 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-06-12
+last_reviewed: 2026-06-13
 depends_on: []
 superseded_by: null
 review_cadence: monthly
@@ -75,6 +75,28 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - No diet app — LLM computes macros/micros from `protocols/meal-template.md`
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
+
+## Status as of 2026-06-13 (S53) — all three visual packages SHIPPED; stats+plans+tracking completion bar met
+
+Five PR lifecycles merged (#108-#112; `main` at `a148316`, suite 697 passed / 2 skipped,
++208 from session open), every gated skill invoked fresh (second full session under
+INV-SKILL-TRACE, green). The three signed visual packages shipped: **Package A** (`1oh`) —
+`scripts/store/plan_schema.py` per-domain `plan::`/`plan-track::` day-keyed plan + tracking
+schemas (ADR-0010) feeding the populated zone-3 plan cards (workout/nutrition/supplements/
+peptides); **Package B** (`y0h0`+`i2yw`) — zone-4 trend cards carrying reading date,
+ref-range/state caption, numeric polarity-tinted delta, and a dashboard-only naive
+projection (derivation single-sourced as `biomarker_meta.projection_values`); **Package C**
+(`nsxy`) — `report.py` redesigned as the standalone physician face sheet on the v3
+standardized token set. The design system gained additive SYSTEM tokens (`SECTION_ACCENTS`
+biomarkers/goals + CHROME `watch-text`/`watch-tint`) — locked `PALETTE`/`SERIES`/`ACCENTS`
+byte-identical, dashboard + report unified on one token vocabulary, AA gate extended to
+non-text WCAG 1.4.11 pairs. The `juc` per-marker trend-polarity design was adjudicated and
+recorded (`vault/decisions/2026-06-12-juc-trend-polarity-design.md`); the worst-wins router
+mechanism it specifies is DECIDED, not yet built (S54). **Walter's completion bar — a
+dashboard that presents stats AND plans AND tracking, plus a physician handout — is met.**
+Remaining: the `juc` router mechanism, the 30-day-aggregate/goal/wearable data models, the
+architecture-debt beads (`y91q`/`z2d0`), the correctness/governance tail, and the
+library-population track. Session detail: `vault/sessions/session-53.md`.
 
 ## Status as of 2026-06-12 (S52) — all visual targets signed; hooks worktree-aware; skill-trace audit live
 
