@@ -533,7 +533,8 @@ def _pending_panels(panels):
     Delegates the per-panel test to `loop_schema.panel_pending` (the published
     provenance predicate) so this surface no longer imports the private
     `_TAG_PANEL` tag or re-derives `read_panel`'s scan: a panel is pending iff
-    every reading is the plan-recommendation pending marker.
+    no result has landed OR it was re-recommended after the latest result
+    (bead z2d0).
     """
     return [
         item

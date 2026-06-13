@@ -528,6 +528,31 @@ def test_asks_pending_valued_result_is_not_pending(tmp_path):
     assert "none pending" in order
 
 
+def test_asks_re_recommended_panel_renders_order_chip(tmp_path):
+    """z2d0 at the report boundary: a panel re-recommended after a result IS an
+    Order-today chip again.
+
+    Mirrors `test_asks_pending_chips_provenance_resolved`'s production render
+    path. The panel carries recommend -> result -> RE-recommend, so it is
+    pending again (a re-draw). Fail-capable: under the OLD predicate
+    `all(r["source"] == _TAG_PANEL for r in readings)` the result reading would
+    exclude the panel from `_pending_panels`, dropping its chip — this would go
+    RED. The recurrence-aware `panel_pending` keeps it.
+    """
+    root = tmp_path / "store"
+    loop_schema.record_pending_panel("lipid-panel", "2026-06-01T00:00:00+00:00", root)
+    loop_schema.record_panel_result(
+        "lipid-panel", "complete", "2026-06-05T00:00:00+00:00", root
+    )
+    loop_schema.record_pending_panel("lipid-panel", "2026-06-10T00:00:00+00:00", root)
+    html = _emit(root, tmp_path)
+    section = _between(html, "Asks &amp; agenda", "fs-foot")
+    order = _between(section, "Order today:", "Patient questions:")
+    assert "<span class='chip-b'>Lipid Panel</span>" in order, (
+        "a re-recommended panel is a pending draw again"
+    )
+
+
 def test_asks_questions_derived_minus_answered(tmp_path):
     """`Patient questions:` carries the active protocol's watch-out questions
     that have no stored answer; answered questions drop off the line."""
@@ -800,6 +825,9 @@ def test_report_imports_no_private_cross_module_symbols():
     assert "dashboard import" not in import_lines  # no private dashboard helper import
     assert "_TAG_PANEL" not in import_lines  # no private loop_schema tag import
     assert "panel_pending" in import_lines  # uses the published predicate
+    # Catches module-import-then-body-use evasion: `from ... import dashboard`
+    # followed by a body-level `dashboard._private` reference.
+    assert "dashboard._" not in source
     assert "cs.format_number" in source and "cs.MONTH_NAMES" in source
 
 
