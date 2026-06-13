@@ -95,7 +95,7 @@ identically — the shared store-trusts-writer posture; the fix would be unappro
 defensive programming) and caught two false mutation-RED test docstrings (the source-field
 dedupe contribution was untested) — fixed + re-proven RED. PII boundary unchanged
 (`SUMMARY_FIELD_SET`+`EXCLUDED_RAW_PII` byte-identical); `PALETTE`/`SERIES`/`ACCENTS`
-byte-identical. Bead `1oag` closed; HIST-2 filed (promote `loop_schema._reading` to a
+byte-identical. Bead `1oag` closed; HIST-2 filed (bead `dqyv` — promote `loop_schema._reading` to a
 public store constructor — the two-consumer trigger). Next: the calendar-event (zone 2) +
 30-day-rollup (zone 5) data models, then the correctness/governance tail. Session detail:
 `vault/sessions/session-56.md`.
