@@ -57,7 +57,7 @@ import math
 
 # Aliased: this module's template surface is itself named `render`.
 from scripts.generate import render as render_engine
-from scripts.store import biomarker_meta, goal_schema, loop_schema, plan_schema
+from scripts.store import biomarker_meta, calendar_schema, goal_schema, loop_schema, plan_schema
 from vault.design.templates import component_set as cs
 
 # Trend word -> the semantic state coloring it: a registered-polarity verdict is
@@ -472,7 +472,7 @@ def _navbtn(symbol):
     return f"<span class='navbtn'>{cs._escape(symbol)}</span>"
 
 
-def _month_calendar(today):
+def _month_calendar(today, events_by_date):
     """Render zone 2's ONE month calendar — the week row IS a month row.
 
     The full grid of `today`'s month in the week strip's Mon-Sun order: a
@@ -480,14 +480,18 @@ def _month_calendar(today):
     real week from the Monday on/before the 1st through the Sunday on/after
     the month's last day. Every row is the SAME 7-cell markup (`dcell`, day
     number top-corner): leading/trailing other-month days muted (`dout`),
-    today's cell tinted with the bolded `{day} · Today` marker, every cell
-    empty of events (none exist yet). The current week's row carries `wk-now`
-    (always visible); every other row carries `wk-hide` (hidden until the
-    header caret's `:checked` rule reveals them in place — visual spec zone 2,
-    amended 2026-06-11 Walter iteration 2).
+    today's cell tinted with the bolded `{day} · Today` marker, and each day's
+    events landed as category-tinted pills (`evlist`) inside the cell — a cell
+    with no events stays the bare day-number markup (the empty-store path the
+    calendar tests pin). The current week's row carries `wk-now` (always
+    visible); every other row carries `wk-hide` (hidden until the header
+    caret's `:checked` rule reveals them in place — visual spec zone 2, amended
+    2026-06-11 Walter iteration 2).
 
     Args:
         today (datetime.date): The date whose month the calendar renders.
+        events_by_date (dict): Date string -> list of `{category, label}` event
+            dicts (`calendar_schema.resolve_events`); empty -> no pills.
     """
     monday = today - datetime.timedelta(days=today.weekday())
     first = today.replace(day=1)
@@ -509,14 +513,22 @@ def _month_calendar(today):
             if day == today:
                 klass += " today"
                 num += " · Today"
-            cells.append(f"<div class='{klass}'><span class='dnum'>{num}</span></div>")
+            day_events = events_by_date.get(day.isoformat(), [])
+            evlist = (
+                "<div class='evlist'>"
+                + "".join(cs.pill(e["label"], e["category"]) for e in day_events)
+                + "</div>"
+            ) if day_events else ""
+            cells.append(
+                f"<div class='{klass}'><span class='dnum'>{num}</span>{evlist}</div>"
+            )
         row_klass = "wkrow wk-now" if week == monday else "wkrow wk-hide"
         rows.append(f"<div class='{row_klass}'>{''.join(cells)}</div>")
         week += datetime.timedelta(days=7)
     return f"<div class='cal'>{''.join(rows)}</div>"
 
 
-def _calendar_zone(today):
+def _calendar_zone(today, events_by_date):
     """Render zone 2 — the month calendar collapsed to `today`'s Mon-Sun week.
 
     Per the visual spec as amended 2026-06-11, Walter iteration 2: "the week
@@ -530,12 +542,15 @@ def _calendar_zone(today):
     default; the caret's hidden checkbox `:checked` sibling rule reveals them
     in place — zero scripts (ADR-0004 single-file rule intact), normal
     document flow, so expanding pushes every zone beneath DOWN, never
-    overlays. The muted awaiting caption stays under the grid. Date math is
-    real data from the seam; the events stay an awaiting state until a
-    calendar/event model exists.
+    overlays. Date math is real data from the seam; events land as
+    category-tinted pills in their day cells (`calendar_schema`), and the muted
+    awaiting caption under the grid shows ONLY while no events are stored
+    (ADR-0009 honest-absence).
 
     Args:
         today (datetime.date): The date whose week the calendar renders.
+        events_by_date (dict): Date string -> list of `{category, label}` event
+            dicts (`calendar_schema.resolve_events`); empty -> the awaiting caption.
     """
     monday = today - datetime.timedelta(days=today.weekday())
     week_range = _week_range(monday, monday + datetime.timedelta(days=6))
@@ -557,13 +572,15 @@ def _calendar_zone(today):
         "</div>"
     )
     caption = (
-        "<div class='caption'>No scheduled events — the calendar model is "
+        ""
+        if events_by_date
+        else "<div class='caption'>No scheduled events — the calendar model is "
         "pending.</div>"
     )
     return cs.zone(
         "This Week",
         f"<div class='card calcard'>{toggle}{wknav}{evlegend}"
-        f"{_month_calendar(today)}{caption}</div>",
+        f"{_month_calendar(today, events_by_date)}{caption}</div>",
     )
 
 
@@ -1100,6 +1117,7 @@ def render(store_read, _today=None):
     biomarkers, panels, watchouts, feedback, other = [], [], [], [], []
     plan_readings, track_readings, watchout_answers = {}, {}, {}
     goal_readings = {}
+    events_by_date = {}
     for item in sorted(by_item):
         readings = by_item[item]
         values = [r["value"] for r in readings]
@@ -1132,6 +1150,8 @@ def render(store_read, _today=None):
             plan_readings[domain] = readings
         elif item.startswith("goal::"):
             goal_readings[item[len("goal::"):]] = readings
+        elif item == "calendar::events":
+            events_by_date = calendar_schema.resolve_events(readings)
         elif "::" in item:
             prefix = item.split("::", 1)[0] + "::"
             raise KeyError(
@@ -1167,7 +1187,7 @@ def render(store_read, _today=None):
     today = _today if _today is not None else datetime.date.today()
     zones = (
         _hero_zone(store_read),
-        _calendar_zone(today),
+        _calendar_zone(today, events_by_date),
         _plan_zone(plan_readings, track_readings, watchout_answers, today),
         cs.zone(
             "Performance & Trends",

@@ -298,6 +298,7 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .cal .dcell {{ min-height: 180px; padding: 6px; font-size: 12px; border-top: 1px solid var(--card-border); border-right: 1px solid var(--card-border); }}
 .cal .mhead:last-child, .cal .dcell:last-child {{ border-right: none; }}
 .cal .dnum {{ font-size: 11px; color: var(--muted); }}
+.cal .evlist {{ margin-top: 6px; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }}
 .cal .dout {{ background: var(--page-bg); }}
 .cal .today {{ background: {c['today-tint']}; }}
 .cal .today .dnum {{ color: var(--ink); font-size: 12px; font-weight: 700; }}
