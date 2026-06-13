@@ -12,6 +12,28 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 55 (2026-06-13)
+
+> Confirmed by Walter ("proceed with your recommended path"; "only ask questions that really need me to weigh — no performative questions"). Executes the S55 resume checklist from the S54 close: merge the S54 close PR, then pay down the #112 architecture debt (`y91q`/`z2d0`) + the `juc` validity pin (`smei`). Not a `v1-build` recipe task (beads, not `docs/task-plan/` recipes), so wave/checkpoint attestation N/A. No hook-edit authorization requested this session.
+
+Goal: Merge the owed S54 close PR, then pay down the #112 architecture debt (`report.py`'s five private cross-module imports + the panel-pending coupling) + the `juc` in-range `reference_range` validity pin, each through a full gated `/review-pr` + `/merge` lifecycle.
+
+Acceptance criteria:
+- [ ] AC1: PR #115 (S54 close) reviewed (docs 3-agent `/review-pr` subset, full methodology) and REST rebase-merged — both `/review-pr` and `/merge` invoked fresh via the Skill tool; post-merge baseline green (710/2).
+- [ ] AC2 (`y91q`): promote `vault/design/templates/dashboard.py`'s four formatting helpers (`_format_number`/`_reading_date`/`_short_date`/`_MONTH_NAMES`) to `component_set` as PUBLIC names; publish a pure panel-pending predicate from `loop_schema`; rewire `report.py` off the five private imports (4 from `dashboard` + `_TAG_PANEL` from `loop_schema`) + the mirrored `read_panel` provenance scan; a test pins the cross-module coupling.
+- [ ] AC3 (`z2d0`): recurrence-aware panel pending — a pending marker recorded after the latest landed result reads `pending` again, WITHOUT breaking `read_panel`'s documented order-independence + result-wins-at-same-timepoint + dedupe-collision guarantees; covered by a test that fails with the fix removed.
+- [ ] AC4 (`smei`): a load-time assert that every in-range `_POLARITY_FEED` marker carries a `reference_range` (router.py tripwire), so a future registry edit can't silently fail-close the plan summary.
+- [ ] AC5: full 6-agent `/review-pr` + `/merge` on the implementation PR; every legitimate finding fixed + blind-verified, 0 suppressed; suite green after merge.
+- [ ] AC6: full session close per protocol — all FIVE audits incl. `skill-trace-audit.sh --session 55`, 6-clause rotation, PF attestation with the per-PR invocation table, close PR.
+
+Files I WILL touch: `vault/design/templates/{dashboard.py, component_set.py, report.py}`; `scripts/store/loop_schema.py` (publish the pure panel-pending predicate + the `z2d0` recurrence-aware fix); `scripts/plan/router.py` (smei tripwire) + `scripts/store/biomarker_meta.py` (read-only for the `reference_range` check); `tests/`; `vault/components/`; `.beads/issues.jsonl` via `bd`; HANDOFF/vault at close.
+
+Files I will NOT touch: `.claude/hooks/*` and `.claude/settings.json` (no hook authorization this session); INVARIANTS.md rows; deployed roster `.claude/agents/*`; `main` directly; `PALETTE`/`SERIES`/`ACCENTS` values (ADR-0009 locked); `SUMMARY_FIELD_SET` + `EXCLUDED_RAW_PII` membership (Security MEDIUM-2 lock); the `juc` worst-wins router mechanism (stays as built S54).
+
+NOT doing: the correctness/governance tail (`e3b`, `b6um`, `r3pq`, `5zfk`, `02pe`, `rn3v`/`imev`/`tdre`/`vjsw`/`dt0t`, `1ww`); LM-04; the library-population `/aplus-research` track — conditional filler only if substantial capacity remains.
+
+Invariants at risk: none structurally. INV-SKILL-TRACE binds PR #115 + the implementation PR (per-PR table at close). AC2 REDUCES the unpinned-coupling risk (Top-3 #1). Store-surface caution: `loop_schema` is a store-surface module — the `z2d0` `read_panel` change must preserve the append-only + provenance-resolution + dedupe-collision contracts (`docs/checklists/store-adversarial-tests.md` applies, Tier-1 + Tier-2 QA).
+
 ## Scope Contract — Session 54 (2026-06-13)
 
 > Confirmed by Walter ("proceed with your recommended path"). Executes the S54 resume checklist from the S53 close: merge the S53 close PR, then build the `juc` worst-wins trend-summary router EXACTLY per the recorded decision note. Not a `v1-build` recipe task (beads, not `docs/task-plan/` recipes), so wave/checkpoint attestation N/A. No hook-edit authorization requested this session.
