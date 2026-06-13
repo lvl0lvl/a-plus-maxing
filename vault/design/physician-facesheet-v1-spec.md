@@ -47,6 +47,11 @@ as named constants (a report-token set beside `ACCENTS`/`CHROME` in
 gate; the Goals bar's reuse of the data-state green as section chrome is recorded as
 a signed-mock exception to the chrome/data-state separation.
 
+**[AMENDED 2026-06-12, S53 (bead `nsxy`): the nine-token framing, the BUILD
+OBLIGATION above, and the Goals-bar exception are SUPERSEDED by the
+standardized-token blocks below — the v3 bindings govern; this paragraph is the
+historical signed-v2 record.]**
+
 ## Page-one sections, in order
 
 1. **Header** — `A+ Maxing — Physician Face Sheet` (20px/700) + prepared-date/visit
@@ -94,8 +99,8 @@ report-state tokens and AA-measures every text/background pair they form (the sa
 obligation as the Page frame's report-local tokens). The dashboard and report share
 one language only at the ACCENTS category-bar level, not at the data-state level.
 
-**[AMENDED 2026-06-12]: report-local color tokens -> standardized system tokens.
-Reason: operator direction at S53 ("shouldn't the colors for the platform be
+**[AMENDED 2026-06-12 (bead `nsxy`)]: report-local color tokens -> standardized
+system tokens. Reason: operator direction at S53 ("shouldn't the colors for the platform be
 standardized so future builds operate within the design theme? If the facesheet does
 not match the dashboard, that seems like an issue") — supersedes the report-local
 adjudication paragraph above and the Page frame's nine-report-local-token framing.**
@@ -107,7 +112,8 @@ adjudication paragraph above and the Page frame's nine-report-local-token framin
   text token on tints — never raw `#DDAA33` text on white); improving/in-range
   stays PALETTE good `#117733`; the in-range collapse strip uses the measured good
   tint pair. The red-family/amber hexes (`#B42318` as a data state, `#7A2E22`,
-  `#FBEAE8`, `#B7791F`, `#8A6D1F`, `#EFF6F0`) do NOT ship.
+  `#FBEAE8`, `#B7791F` as text, `#8A6D1F`) and the report-local in-range strip
+  green `#EFF6F0` do NOT ship.
 - **Chrome/data-state separation holds everywhere — no signed-mock exception:** the
   Goals bar does not use data-state green as chrome; it and the Biomarkers bar get
   section-accent tokens registered in the SYSTEM token set (`component_set.py`,
@@ -123,25 +129,39 @@ adjudication paragraph above and the Page frame's nine-report-local-token framin
   Package C starts with an updated Pencil render + operator sign-off BEFORE any
   `report.py` code; this amendment is the recorded direction, not the signed visual.
 
-**[AMENDED 2026-06-12, S53 — the v3 standardized render is SIGNED]:** the Pencil
-re-render carrying this re-map ("Physician Face Sheet — v3 (standardized tokens)")
+**[AMENDED 2026-06-12, S53 (bead `nsxy`) — the v3 standardized render is
+SIGNED]:** the Pencil re-render carrying this re-map ("Physician Face Sheet — v3 (standardized tokens)")
 was reviewed on screen and operator-approved ("approved and saved"); the signed v3
 mock is operator-held per ADR-0005. The v3 token bindings, exact:
 
 - **New system tokens to register in `component_set.py` at build (all rendered
-  pairs gate-measured):** `labs` section accent `#B42318` (the v2 crimson, kept —
-  now a SYSTEM section accent); `goals` section accent `#2E8B57` (replaces the
-  data-state green as section chrome); `watch-text` `#8A6D1F` (the AA-dark form of
-  PALETTE watch — supersedes the "does NOT ship" listing of this hex above: it
-  ships as the registered watch-text token, not as an ad-hoc amber; also the fix
-  vehicle for the `b6um` sub-AA watch-text class); `watch-tint` `#FAF3E0` (exact
-  value gate-measured at build against `watch-text`).
+  pairs gate-measured):** `biomarkers` section accent `#B42318` (the v2 crimson,
+  kept — now a SYSTEM section accent; named for the section it colors, distinct
+  from the `lab-draw-*` event tints and the lab-grade source tier); `goals`
+  section accent `#2E8B57` (replaces the data-state green as section chrome);
+  `watch-text` `#8A6D1F` (the AA-dark form of PALETTE watch — supersedes the
+  "does NOT ship" listing of this hex above: it ships as the registered
+  watch-text token, not as an ad-hoc amber; also the fix vehicle for the `b6um`
+  sub-AA watch-text class); `watch-tint` `#FCF7EA` (pre-measured at the #111
+  review: 4.58:1 with `watch-text` `#8A6D1F` — the originally recorded `#FAF3E0`
+  computed 4.42, below the 4.5 floor; the signed text amber is kept, the tint
+  lightened). Registration shape: the section accents land in a NEW named
+  constant (e.g. `SECTION_ACCENTS`) beside `ACCENTS` — NOT as new `ACCENTS`
+  keys: `component_set._TINTABLE` is built from `*ACCENTS` and `_tint_rules()`
+  indexes `CHROME[name+'-tint']`/`CHROME[name+'-text']` for every tintable name,
+  so an ACCENTS key without its CHROME pair KeyErrors every render.
 - **Re-mapped to existing measured tokens:** abnormal rows -> concern `#882255` on
   concern-tint `#F3E9EE`; in-range strip + adherence chips -> good-tint `#E7F1EB`;
   triage card -> training-tint `#EAF1FD` with `training-text` `#1D67DB` title;
   asks card -> nutrition-tint `#FDF3EB`; borders -> card-border `#E5E7EB`; small
   captions -> muted `#555555`; footer source-tier legend text -> the `*-text`
-  shades (`#1D67DB` lab-grade, `#0B787F` wearable, `#8A6D1F` self-reported).
+  shades (`#1D67DB` lab-grade, `#0B787F` wearable, `#8A6D1F` self-reported (the
+  NEW `watch-text` token above, not a pre-existing CHROME entry)). Source-tier
+  colors everywhere (section-4 row glyphs, section-6 stat-box top edges + tier
+  glyphs, footer legend): tier TEXT renders the `*-text` triple
+  `#1D67DB`/`#0B787F`/`#8A6D1F`; non-text tier edges and glyph fills keep the
+  base triple `#1F6FEB`/`#0E9AA3`/`#B7791F` as source-tier chrome (per the
+  signed v3 mock) — `#B7791F` ships ONLY as non-text tier chrome, never as text.
 - **Unchanged (correct usages):** improving/in-range data states PALETTE good
   `#117733`; the ACCENTS section bars (supplements teal, sleep indigo, nutrition
   orange) + the training-blue header rule; glyph shapes ◆/●/○.
@@ -178,6 +198,6 @@ rows with operator answers live here too.
 
 ADR-0004 single-file zero-script artifacts; the print contract; `PALETTE`/`SERIES`/
 `ACCENTS` (locked — their VALUES are untouched; per the [AMENDED 2026-06-12]
-standardization the report draws on the locked sets plus system-registered
-section-accent tokens, with no report-local color vocabulary); the dashboard's own
-spec.
+standardization the report draws on the locked sets plus the four v3-registered
+system tokens (two section accents + the watch-text/watch-tint data-state pair),
+with no report-local color vocabulary); the dashboard's own spec.
