@@ -577,3 +577,53 @@ def test_recurrence_lone_later_marker_still_resolves_to_result(tmp_path):
     assert loop_schema.read_panel("lipid_panel", root=tmp_path) == "results received"
     readings = store.read("panel::lipid_panel", root=tmp_path)
     assert loop_schema.panel_pending(readings) is False
+
+
+def test_recurrence_second_result_resolves_again(tmp_path):
+    """z2d0: recommend -> result -> re-recommend -> SECOND result resolves again.
+
+    The recurrence-FULFILLED case: the re-draw lands a result dated STRICTLY
+    AFTER the re-recommendation, so the latest result is no longer bracketed on
+    BOTH sides and the panel resolves to the second result. Distinct from the
+    BUG-001 backdated-result limitation (result2 dated BEFORE the re-
+    recommendation), a documented limitation (bead pq7m) — here result2 lands
+    after the re-recommendation, the genuine completed re-draw.
+    """
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_panel_result(
+        "lipid_panel", "R1", "2026-06-08T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-20T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_panel_result(
+        "lipid_panel", "R2", "2026-06-21T08:00:00+00:00", root=tmp_path
+    )
+
+    assert loop_schema.read_panel("lipid_panel", root=tmp_path) == "R2"
+    readings = store.read("panel::lipid_panel", root=tmp_path)
+    assert loop_schema.panel_pending(readings) is False
+
+
+def test_recurrence_marker_at_result_timepoint_stays_resolved(tmp_path):
+    """z2d0 boundary: a pending marker AT the result's own timepoint stays resolved.
+
+    A second pending marker recorded AT the result's timepoint (not strictly
+    after) is not a re-draw — pins the strict `>` in `_re_recommended`. RED if
+    `>` becomes `>=`: a same-timepoint marker would then falsely trigger pending.
+    """
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_panel_result(
+        "lipid_panel", "R", "2026-06-08T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-08T08:00:00+00:00", root=tmp_path
+    )
+
+    assert loop_schema.read_panel("lipid_panel", root=tmp_path) == "R"
+    readings = store.read("panel::lipid_panel", root=tmp_path)
+    assert loop_schema.panel_pending(readings) is False

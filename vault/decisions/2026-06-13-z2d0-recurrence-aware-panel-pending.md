@@ -60,12 +60,30 @@ literal string `"pending"` is a result, not a pending state (the r3pq render-bou
 residual stays the render layer's concern). `SUMMARY_FIELD_SET`, the keying Line Field
 Set, and the four published render states are UNCHANGED.
 
-## Accepted limitation
+## Accepted limitations
 
-A re-recommendation with **no** prior recommendation at-or-before the result (a result,
-then a single later pending marker, no earlier marker) is the same store shape as a
-backdated result and — per the pinned contract — resolves to the result, not pending.
-This is the documented cost of the store not retaining append order.
+Both are the documented cost of the store not retaining append order: a read-model
+heuristic cannot pair recommendations to results, so two histories with identical
+{pending-timepoints} + {result-timepoints} multisets but different append orders are
+indistinguishable yet have different correct answers. The store-schema/sequence
+alternative (below) is the only full resolution.
+
+1. **No prior recommendation.** A re-recommendation with **no** prior recommendation
+   at-or-before the result (a result, then a single later pending marker, no earlier
+   marker) is the same store shape as a backdated result and — per the pinned
+   `test_pending_panel_reads_result_once_landed` contract — resolves to the result,
+   not pending.
+2. **Backdated second result (bead `pq7m`; surfaced by the PR #116 6-agent review,
+   blind-triaged DEFERRED).** A panel recommended → resulted → re-recommended →
+   resulted-again, where the SECOND result's timepoint is backdated before its own
+   re-recommendation marker (`rec@06-01 → R1@06-08 → rerec@06-20 → R2@06-19`), reads
+   PENDING though R2 has landed. This history is read-model-IDENTICAL to
+   `rec@06-01 → R1@06-08 → R2@06-19 → rerec@06-20` (a genuine re-recommendation after
+   the last result), which correctly reads pending — so no timepoint/count heuristic
+   resolves both. The both-sides rule resolves the genuine re-recommendation; the
+   count-rule (`#pending > #results`) would resolve the backdated case but regresses
+   recommend-undrawn-twice-then-draw-once. LATENT in v1 (the panel loop has no
+   production writer yet). Resolved only by the store append-order/sequence field below.
 
 ## Alternative considered (rejected for v1)
 
