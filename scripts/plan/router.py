@@ -249,6 +249,20 @@ assert set(_POLARITY_FEED).isdisjoint(SUMMARY_FIELD_SET)
 assert set(_POLARITY_FEED).isdisjoint(EXCLUDED_RAW_PII)
 assert set(_TREND_REDUCTION_OUTPUTS) <= set(TREND_DIRECTIONS)
 
+# smei validity pin (juc decision cross-system note): every "in-range"-polarity
+# feed marker MUST carry a reference_range. `biomarker_meta.trend` judges an
+# in-range marker by distance-to-range, so an in-range marker with no range
+# returns None -> `_trend_token` hits its unknown-polarity raise -> the WHOLE
+# plan summary fail-closes. ("up"/"down" markers judge by rising/falling and
+# need no range — e.g. hrv/sleep-hours.) Pinned at load so a future registry
+# edit (an in-range marker added without a range, or a range nulled) trips here,
+# not silently at the operator's runtime.
+assert all(
+    biomarker_meta.get(_s)["reference_range"] is not None
+    for _s in _POLARITY_FEED
+    if biomarker_meta.get(_s)["good_direction"] == "in-range"
+)
+
 
 def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
     """Derive the plan-reasoning summary from store-read state.
