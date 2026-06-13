@@ -12,6 +12,28 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 57 (2026-06-13)
+
+> Confirmed by Walter ("open the session and proceed with your recommendations"). My S56-close recommendation was the 30-day-rollup "first (most self-contained)"; verify-first this session FALSIFIED that — the rollup (Zone 5) needs two UNSIGNED design decisions (the 16-specialist→tracked-store-item mapping + the 30-day aggregation/status rule; the spec only signs "a colored per-domain status line"). Calendar-events (Zone 2) is by contrast FULLY signed (the 4 event categories + their CHROME tints are in `component_set` + AA-measured; "event pills land in the cells"). So S57 pivots to calendar-events (the genuine goals-parallel, signed-anatomy build); the rollup defers to a design-then-build session. Not a `v1-build` recipe task (post-build product work, a bead, not a `docs/task-plan/` recipe). No hook-edit authorization requested this session.
+
+Goal: Merge the owed S56 close PR #119, then build the calendar-event data model (Zone 2 — This Week) — a `calendar::events` store schema + the Zone 2 render placing category-tinted event pills in the month-calendar cells per the signed `dashboard-v1-visual-spec.md` — advancing the no-placeholder-dashboard ("done") path, through a full gated `/review-pr` + `/merge` lifecycle.
+
+Acceptance criteria:
+- [ ] AC1: PR #119 (S56 close docs) reviewed (3-agent docs subset, full methodology) + REST rebase-merged; both `/review-pr` and `/merge` invoked fresh via the Skill tool; baseline green after (760/2).
+- [ ] AC2: `scripts/store/calendar_schema.py` — a `calendar::events` store stream (per-event `{category ∈ {training,lab-draw,check-in,appointment}, label}`, date-keyed `timepoint`, content-tagged source so distinct same-date events both persist) on the append/correct + `plan-track` content-tag pattern; unit tests incl. the store-adversarial battery (`docs/checklists/store-adversarial-tests.md` — store-surface task).
+- [ ] AC3: Zone 2 render places category-tinted event pills (`cs.pill(label, category)`) in the matching month-calendar day cells per the signed spec; the honest awaiting caption holds when no events ("No scheduled events — the calendar model is pending."); demo'd with synthetic events.
+- [ ] AC4: AA/honesty gates hold (event-category pills ride the already-measured CHROME tint pairs — no new gated pair; the empty-calendar caption stays clean); locked sets untouched.
+- [ ] AC5: full 6-agent `/review-pr` + `/merge` on the implementation PR; every legitimate finding fixed + blind-verified, 0 suppressed; suite green after merge.
+- [ ] AC6: full session close per protocol — all FIVE audits incl. `skill-trace-audit.sh --session 57`, 6-clause rotation, PF attestation with the per-PR table (incl. the #119 HIST-1 off-main-archive-SHA recurrence, count=2 watch + bead), close PR.
+
+Files I WILL touch: `scripts/store/calendar_schema.py` (new); `vault/design/templates/dashboard.py` (Zone 2 render — event-pill placement in cells + `calendar::` routing); `tests/store/test_calendar_schema.py` + `tests/generate/` (Zone 2); `vault/components/` (schema doc); `.beads/issues.jsonl` via `bd`; HANDOFF/vault at close. `vault/design/templates/component_set.py` ONLY if a shared event-pill-in-cell helper is genuinely needed (the `pill()` + CHROME tints already exist, so likely NOT — flag if so).
+
+Files I will NOT touch: `.claude/hooks/*` + `.claude/settings.json` (no hook auth this session); INVARIANTS.md rows; `.claude/agents/*`; `main` directly; `PALETTE`/`SERIES`/`ACCENTS` values (ADR-0009 locked); `SUMMARY_FIELD_SET`+`EXCLUDED_RAW_PII` (Security MEDIUM-2 lock); `report.py`; the other dashboard zones (1, 3–7); `goal_schema`/`loop_schema`/`plan_schema` (unless a shared store util genuinely needs it — flag).
+
+NOT doing: the 30-day-rollup (Zone 5 — deferred to a design-then-build session; its specialist→metric mapping + aggregation rule are unsigned); the correctness/governance tail (`b6um`/`e3b`/`02pe`/`r3pq`/`5zfk`/`rn3v`/`imev`/`tdre`/`vjsw`/`dt0t`/`1ww`) — exception: `b6um` folds in ONLY if it touches the exact AA gate I extend (flagged, not pre-adopted); `pq7m`; the `dqyv` (`loop_schema._reading` promotion) + the archive-SHA-check bead (governance follow-ups); LM-02/LM-04; the library-population track.
+
+Invariants at risk: none structurally. INV-SKILL-TRACE binds PR #119 + the implementation PR (per-PR table at close). Store-surface caution: `calendar_schema` triggers `docs/checklists/store-adversarial-tests.md` (Tier-1 + Tier-2 QA). PF-S49-01: build strictly from the signed Zone 2 anatomy. AC3 reduces the awaiting-zone count.
+
 ## Scope Contract — Session 56 (2026-06-13)
 
 > Confirmed by Walter ("proceed with goals", after confirming the done-path-before-correctness-tail ordering and reviewing the S56 open findings). Leads with the done path per his prior steer; goals (Zone 6) chosen first — most completely signed populated anatomy, most self-contained model, most directly surfaces July-visit progress. Verify-first established the Zone 6 populated design is already signed in `dashboard-v1-visual-spec.md` (no new Pencil round; PF-S49-01 satisfied by the spec, the Package A/B/C basis). Not a `v1-build` recipe task (the build plan is drained 18/18; this is post-build product work tracked as a bead, not a `docs/task-plan/` recipe), so wave/checkpoint attestation N/A. No hook-edit authorization requested this session.
