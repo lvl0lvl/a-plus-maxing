@@ -30,7 +30,7 @@ Acceptance criteria:
 
 Files I WILL touch: `vault/design/templates/` (dashboard.py, component_set.py, report.py and siblings); `scripts/` store/ingest/generate files the plan schemas and polarity metadata require; `tests/`; `vault/components/`; `docs/adr/` (inline amendments); `vault/decisions/` (juc decision note); `.beads/issues.jsonl` via `bd`; HANDOFF/vault at close.
 
-Files I will NOT touch: `.claude/hooks/*` and `.claude/settings.json` (no hook authorization requested this session); INVARIANTS.md rows; deployed roster `.claude/agents/*`; `main` directly; `PALETTE`/`SERIES`/`ACCENTS` values (ADR-0009 locked — the face sheet reuses ACCENTS where categories overlap; its report-local tokens are registered as NEW constants, not edits to the locked sets).
+Files I will NOT touch: `.claude/hooks/*` and `.claude/settings.json` (no hook authorization requested this session); INVARIANTS.md rows; deployed roster `.claude/agents/*`; `main` directly; `PALETTE`/`SERIES`/`ACCENTS` values (ADR-0009 locked — the face sheet reuses ACCENTS where categories overlap; its report-local tokens are registered as NEW constants, not edits to the locked sets [superseded 2026-06-12 mid-session: the facesheet standardization retired the report-local vocabulary — the binding form is now the four v3-registered SYSTEM tokens (facesheet spec v3 block), additions only, no value edits; to be evaluated CHANGED at close]).
 
 NOT doing: library research (`/aplus-research` track — operator-deferred); LM-02/03/04 data-gated work; the correctness/governance tail (`e3b` T2 wiring, `b6um`, `rn3v`, `imev`, `tdre`, `vjsw`, `dt0t`, `1ww`) unless capacity remains after the packages — conditional filler only.
 

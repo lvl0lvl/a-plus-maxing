@@ -1,6 +1,6 @@
 ---
 title: juc — recent-trend-direction per-marker polarity design (adopted)
-type: note
+type: decision
 owner: Walter McGivney
 created: 2026-06-12
 last_reviewed: 2026-06-12
@@ -41,7 +41,12 @@ the daily-cadence streams (rhr, hrv, sleep-hours) in the v1 feed.
    plumbing). No generic-stream fallback feed (it could never produce a labeled
    trend; speculative machinery). Boundary promise unchanged and strengthened:
    only the derived closed-vocabulary token crosses the PII boundary, never a
-   lab value.
+   lab value. The registry-polarity `biomarker::` stream names do NOT join
+   `EXCLUDED_RAW_PII` — that set enumerates raw-PII item classes, the new
+   streams never enter `_RAW_TO_FIELD`, the dispatch whitelist already rejects
+   them as payload fields, and the new mechanism's tripwire owns their
+   disjointness from `SUMMARY_FIELD_SET`. This resolves the second half of S51
+   sub-question (c).
 4. **Zero-lab-stream operator:** emit the no-signal `flat` instead of the
    partial-summary block. Rationale (required, since this touches a deliberate
    S39 behavior): the surviving fail-closed raises both prevent WRONG
@@ -72,8 +77,10 @@ the daily-cadence streams (rhr, hrv, sleep-hours) in the v1 feed.
   a review note from this decision forward.
 - **Surface disagreement is by design:** the dashboard shows per-marker grain;
   the summary shows the worst-wins aggregate (eight improving chips can coexist
-  with a `regressing` summary). Stated in the operator-facing visual spec at the
-  Package B build.
+  with a `regressing` summary). To be stated in the operator-facing visual spec
+  when the worst-wins summary token ships (the `juc` router build — the
+  disagreement only materializes once the aggregate exists; Package B's
+  per-marker cards landed without it, correctly).
 - **Registry validity pin justified non-speculative:** every `in-range` entry
   must carry a `reference_range` (an in-range marker without one is a
   polarity-bearing feed marker producing an unlabelable trend).
