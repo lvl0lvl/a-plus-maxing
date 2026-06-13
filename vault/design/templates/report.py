@@ -193,6 +193,29 @@ def _read_profile():
     return fields
 
 
+def _long_date(day):
+    """Format a date in the face sheet's long form, e.g. `June 12, 2026`."""
+    return f"{_MONTH_NAMES[day.month - 1]} {day.day}, {day.year}"
+
+
+def _tier_markup(tier, with_word=False):
+    """Render a tier's glyph span in its base chrome, plus a trailing space.
+
+    Args:
+        tier (str): A `_TIER_CHROME` key.
+        with_word (bool, optional): Append the tier word in its AA `*-text`
+            shade (the page-2 captions and the footer legend form).
+
+    Returns:
+        (str) The assembled tier markup.
+    """
+    glyph, base, text = _TIER_CHROME[tier]
+    markup = f"<span style='color:{base}'>{glyph}</span> "
+    if with_word:
+        markup += f"<span style='color:{text}'>{tier}</span>"
+    return markup
+
+
 def _section(title, bar_hex, body_html, card_class=None):
     """Return one face-sheet section: 4x16 accent bar + 13px/700 title + body.
 
@@ -223,9 +246,7 @@ def _header_block(today):
     next visit stay em-dash until LM-01 visit anchoring lands.
     """
     profile = _read_profile()
-    prepared = (
-        f"{_MONTH_NAMES[today.month - 1]} {today.day}, {today.year}"
-    )
+    prepared = _long_date(today)
     status_line = (
         f"Patient {profile['initials'] or '—'}"
         f" · age band {profile['age_band'] or '—'}"
@@ -376,8 +397,7 @@ def _tier_glyph(source):
     tier = _SOURCE_TIERS.get(source)
     if tier is None:
         return ""
-    glyph, base, _text = _TIER_CHROME[tier]
-    return f"<span style='color:{base}'>{glyph}</span> "
+    return _tier_markup(tier)
 
 
 def _numeric_readings(readings):
@@ -493,10 +513,9 @@ def _signals_section():
     their structure — wearable-tier top edge, tier glyph + label row, em-dash
     value — with no invented number and no direction arrow.
     """
-    glyph, base, _text = _TIER_CHROME["consumer wearable"]
     boxes = "".join(
         "<div class='fs-sig'>"
-        f"<div class='fs-tier'><span style='color:{base}'>{glyph}</span> consumer wearable</div>"
+        f"<div class='fs-tier'>{_tier_markup('consumer wearable')}consumer wearable</div>"
         "<div class='fs-sigval'>—</div>"
         f"<div class='caption'>{cs._escape(label)}</div>"
         "</div>"
@@ -568,11 +587,9 @@ def _asks_section(panels, plan_readings, answered_watchouts, today):
 def _footer(today):
     """Render the footer: the colored source-tier legend + the honesty line."""
     legend = " · ".join(
-        f"<span style='color:{base}'>{glyph}</span> "
-        f"<span style='color:{text}'>{tier}</span>"
-        for tier, (glyph, base, text) in _TIER_CHROME.items()
+        _tier_markup(tier, with_word=True) for tier in _TIER_CHROME
     )
-    generated = f"{_MONTH_NAMES[today.month - 1]} {today.day}, {today.year}"
+    generated = _long_date(today)
     return (
         "<div class='fs-foot'>"
         f"<span>{legend}</span>"
@@ -612,11 +629,7 @@ def _item_caption(item, readings):
     parts = []
     tier = _SOURCE_TIERS.get(readings[-1]["source"])
     if tier is not None:
-        glyph, base, text = _TIER_CHROME[tier]
-        parts.append(
-            f"<span style='color:{base}'>{glyph}</span> "
-            f"<span style='color:{text}'>{tier}</span>"
-        )
+        parts.append(_tier_markup(tier, with_word=True))
     meta = biomarker_meta.get(item)
     if meta is not None and meta["reference_range"] is not None:
         low, high = meta["reference_range"]
@@ -728,7 +741,10 @@ def render(store_read, _today=None):
                     f"unrouted plan:: domain {domain!r}: routing for a new "
                     f"stream type is added deliberately, never by silent fallthrough"
                 )
-            plan_readings[domain] = readings
+            # Only the regimen/asks consumers' domains; workout/nutrition
+            # plans render page-2 verbatim only (via by_item).
+            if domain in ("supplements", "peptides"):
+                plan_readings[domain] = readings
         elif item.startswith("plan-track::"):
             pass  # page-2 verbatim table only
         elif item.startswith("panel::"):
@@ -760,8 +776,6 @@ def render(store_read, _today=None):
     )
     return (
         "<!doctype html><html lang='en'>"
-        "<head><meta charset='utf-8'>"
-        "<title>A+ Maxing — Physician Face Sheet</title>"
-        f"{cs._style_block()}{_report_style()}</head>"
+        f"{cs.head('A+ Maxing — Physician Face Sheet', _report_style())}"
         f"<body>{body}</body></html>"
     )
