@@ -529,3 +529,51 @@ def test_panel_pending_is_provenance_not_value(tmp_path):
     )
     readings = store.read("panel::lipid_panel", root=tmp_path)
     assert loop_schema.panel_pending(readings) is False
+
+
+# --- z2d0: recurrence-aware panel pending (re-recommend after a result) ---
+
+
+def test_recurrence_re_recommended_panel_reads_pending(tmp_path):
+    """z2d0: recommend -> result -> RE-recommend reads "pending" again.
+
+    A pending marker recorded AFTER the latest result, given the original
+    recommendation before it, is a re-draw: read_panel and panel_pending both
+    read pending. Fail-capable: the old "any landed result always wins" behavior
+    returns the stale result value here and turns this RED.
+    """
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_panel_result(
+        "lipid_panel", "results received", "2026-06-08T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-20T08:00:00+00:00", root=tmp_path
+    )
+
+    assert loop_schema.read_panel("lipid_panel", root=tmp_path) == loop_schema.PENDING
+    readings = store.read("panel::lipid_panel", root=tmp_path)
+    assert loop_schema.panel_pending(readings) is True
+
+
+def test_recurrence_lone_later_marker_still_resolves_to_result(tmp_path):
+    """z2d0 boundary: a result then a SINGLE later pending marker stays resolved.
+
+    With no prior recommendation at-or-before the result, a lone later-sorting
+    pending marker is the order-independent backdated / no-prior case — it
+    resolves to the result, NOT pending (preserving the pinned
+    `test_pending_panel_reads_result_once_landed` contract). Fail-capable: a
+    naive "latest pending timepoint > latest result -> pending" rule returns
+    PENDING here and turns this RED.
+    """
+    loop_schema.record_panel_result(
+        "lipid_panel", "results received", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-08T08:00:00+00:00", root=tmp_path
+    )
+
+    assert loop_schema.read_panel("lipid_panel", root=tmp_path) == "results received"
+    readings = store.read("panel::lipid_panel", root=tmp_path)
+    assert loop_schema.panel_pending(readings) is False
