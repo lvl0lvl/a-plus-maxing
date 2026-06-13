@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from scripts.generate import generate
-from scripts.store import loop_schema, plan_schema
+from scripts.store import loop_schema, plan_schema, store
 from vault.design.templates import component_set as cs
 from vault.design.templates import report
 
@@ -54,6 +54,14 @@ def _seed_biomarkers(root):
     loop_schema.record_biomarker("crp", "2026-06-11T00:00:00+00:00", 7.3, root)
     loop_schema.record_biomarker("rhr", "2026-06-11T00:00:00+00:00", 52, root)
     loop_schema.record_biomarker("vitamin-d", "2026-06-11T00:00:00+00:00", 45, root)
+    loop_schema.record_biomarker("hrv", "2026-06-11T00:00:00+00:00", 71, root)
+
+
+def _seed_multi_abnormal(root):
+    """Seed TWO concern markers (crp, vitamin-d) + rhr good + hrv neutral."""
+    loop_schema.record_biomarker("crp", "2026-06-11T00:00:00+00:00", 7.3, root)
+    loop_schema.record_biomarker("vitamin-d", "2026-06-11T00:00:00+00:00", 12, root)
+    loop_schema.record_biomarker("rhr", "2026-06-11T00:00:00+00:00", 52, root)
     loop_schema.record_biomarker("hrv", "2026-06-11T00:00:00+00:00", 71, root)
 
 
@@ -193,6 +201,23 @@ def test_header_age_band_bounds_dob_and_zero(tmp_path, monkeypatch):
         assert "age band 1980s" not in html and "age band 0s" not in html
 
 
+def test_header_partial_profile_mixes_filled_and_awaiting(tmp_path, monkeypatch):
+    """A partially-filled profile renders its filled fields beside em-dash
+    awaiting slots — the scaffold prompt text never leaks into the render."""
+    profile = tmp_path / "profile.md"
+    profile.write_text(
+        "# Operator Profile — Walter McGivney\n\n"
+        "## Demographics\n"
+        "- **Age:** 44\n\n"
+        "## January 2026 health issue\n"
+        "- **Current status:** <resolved | improving | stable | ongoing>\n"
+    )
+    monkeypatch.setattr(report, "_PROFILE_PATHS", (profile,))
+    html = _emit(tmp_path / "store", tmp_path)
+    assert "Patient WM · age band 40s · issue status —" in html
+    assert "resolved | improving" not in html, "the prompt text must not leak"
+
+
 # --------------------------------------------------------------------------- #
 # Section 2 — since your last review (triage)
 # --------------------------------------------------------------------------- #
@@ -312,6 +337,23 @@ def test_regimen_experimental_row_watch_text_disclosure(tmp_path):
     assert "disclosure attached" not in plain
 
 
+def test_regimen_supplements_only_day(tmp_path):
+    """A supplements-only day renders its rows with no experimental note,
+    and the questions line renders its none-state (no active protocol)."""
+    root = tmp_path / "store"
+    plan_schema.record_plan(
+        "supplements",
+        {"items": [{"name": "Creatine", "dose": "5 g"}]},
+        _ISO, "supplement-specialist", root,
+    )
+    html = _emit(root, tmp_path)
+    section = _between(html, "Current regimen — with adherence", "Biomarkers —")
+    assert "Creatine — 5 g" in section
+    assert "fs-exp" not in section and "disclosure attached" not in section
+    questions = _between(html, "Patient questions:", "</div>")
+    assert "none queued" in questions
+
+
 def test_regimen_awaiting_when_no_plan_today(tmp_path):
     """A plan dated another day renders the digit-free awaiting line, no rows."""
     root = tmp_path / "store"
@@ -375,6 +417,44 @@ def test_in_range_strip_count_is_real(tmp_path):
     assert "✓ 1 marker in range — full table with sparklines on page 2" in one
 
 
+def test_multi_abnormal_rows_and_chips(tmp_path):
+    """TWO concern markers render two name-sorted abnormal rows and exactly
+    two watch chips; the good/neutral markers render none of either."""
+    root = tmp_path / "store"
+    _seed_multi_abnormal(root)
+    html = _emit(root, tmp_path)
+    assert html.count("pill tint-watch") == 2, "one chip per concern marker"
+    section = _between(html, "Biomarkers — out of range or trending", "Goals &amp; trajectory")
+    assert section.count("fs-abrow") == 2
+    crp = section.index("<span class='fs-marker'>CRP</span>")
+    vitamin_d = section.index("<span class='fs-marker'>Vitamin D</span>")
+    assert crp < vitamin_d, "abnormal rows render name-sorted"
+    assert "✓ 1 marker in range" in section
+
+
+def test_abnormal_detail_segments_render_only_with_data(tmp_path):
+    """A single concern reading renders NO delta segment (drawn still
+    renders); an unparseable timepoint drops the drawn segment too — never a
+    fabricated segment."""
+    root = tmp_path / "store"
+    loop_schema.record_biomarker("crp", "2026-06-11T00:00:00+00:00", 7.3, root)
+    html = _emit(root, tmp_path)
+    row = _between(html, "<div class='fs-abrow'>", "</div>")
+    assert "<span>7.3 mg/L · ref 0 – 3 · drawn Jun 11</span>" in row
+
+    raw_root = tmp_path / "raw"
+    store.append(
+        "biomarker::crp",
+        {"item": "biomarker::crp", "timepoint": "someday", "source": "manual",
+         "value": 7.3},
+        root=raw_root,
+    )
+    raw = _emit(raw_root, tmp_path / "raw-out")
+    row = _between(raw, "<div class='fs-abrow'>", "</div>")
+    assert "<span>7.3 mg/L · ref 0 – 3</span>" in row
+    assert "drawn" not in row
+
+
 def test_no_biomarkers_renders_awaiting_line(tmp_path):
     """An empty biomarker layer renders one digit-free awaiting line — no
     abnormal rows, no strip, no invented zero."""
@@ -433,6 +513,21 @@ def test_asks_pending_chips_provenance_resolved(tmp_path):
     assert "Lipid Panel" not in order, "a landed result is not a pending draw"
 
 
+def test_asks_pending_valued_result_is_not_pending(tmp_path):
+    """A landed result whose VALUE is the string "pending" is still a landed
+    result — resolution is source provenance, never a value sentinel: no
+    Order-today chip, the none-state renders."""
+    root = tmp_path / "store"
+    loop_schema.record_pending_panel("ferritin", "2026-06-01T00:00:00+00:00", root)
+    loop_schema.record_panel_result(
+        "ferritin", "pending", "2026-06-05T00:00:00+00:00", root
+    )
+    html = _emit(root, tmp_path)
+    order = _between(html, "Order today:", "Patient questions:")
+    assert "Ferritin" not in order, "a landed result is not a pending draw"
+    assert "none pending" in order
+
+
 def test_asks_questions_derived_minus_answered(tmp_path):
     """`Patient questions:` carries the active protocol's watch-out questions
     that have no stored answer; answered questions drop off the line."""
@@ -486,20 +581,26 @@ def test_footer_tier_legend_and_honesty_line(tmp_path):
 
 
 def test_page2_abnormal_first_ordering(tmp_path):
-    """Page-2 sections order concern items first, then the rest by item."""
+    """Page-2 sections order concern items first, then the rest by item.
+
+    Seeded with TWO concern items so the capability is falsifiable: vitamin-d
+    (concern) must lead hrv/rhr (good/neutral), so a plain alphabetical item
+    sort — the capability-removal mutation — goes RED here.
+    """
     root = tmp_path / "store"
-    _seed_biomarkers(root)
+    _seed_multi_abnormal(root)
     _seed_plans(root)
     html = _emit(root, tmp_path)
     page2 = html[html.index("fs-page2"):]
     order = re.findall(r"<h2>([^<]*)</h2>", page2)
     decoded = [html_lib.unescape(h) for h in order]
-    assert decoded[0] == "biomarker::crp", "the concern item leads page 2"
-    assert set(decoded[1:]) == {
-        "biomarker::hrv", "biomarker::rhr", "biomarker::vitamin-d",
+    assert decoded[:2] == ["biomarker::crp", "biomarker::vitamin-d"], (
+        "the concern items lead page 2 — before any good item"
+    )
+    assert decoded[2:] == [
+        "biomarker::hrv", "biomarker::rhr",
         "plan::peptides", "plan::supplements",
-    }
-    assert decoded[1:] == sorted(decoded[1:]), "non-abnormal items stay item-sorted"
+    ], "non-abnormal items stay item-sorted"
 
 
 def test_page2_heading_caption_glyph_and_ref_range(tmp_path):
@@ -517,8 +618,6 @@ def test_page2_heading_caption_glyph_and_ref_range(tmp_path):
 def test_page2_unknown_source_states_no_tier(tmp_path):
     """An unmapped reading source renders NO tier claim — gaps stated, never
     inferred. Seeded via the raw store reading shape (legacy direct append)."""
-    from scripts.store import store
-
     root = tmp_path / "store"
     store.append(
         "biomarker::crp",
@@ -574,8 +673,6 @@ def test_page2_table_renders_raw_non_string_cells(tmp_path):
     """A raw-appended non-string timepoint/source renders its text through
     the production path — never a sheet-wide crash (the value cell already
     coerced)."""
-    from scripts.store import store
-
     root = tmp_path / "store"
     store.append(
         "biomarker::crp",
@@ -597,8 +694,6 @@ def test_page2_table_renders_raw_non_string_cells(tmp_path):
 def test_unrouted_stream_prefix_raises(tmp_path):
     """An unknown `::` prefix KeyErrors naming the prefix — routing for a new
     stream type is added deliberately, never by silent fallthrough."""
-    from scripts.store import store
-
     root = tmp_path / "store"
     store.append(
         "goal::weight",
@@ -612,8 +707,6 @@ def test_unrouted_stream_prefix_raises(tmp_path):
 
 def test_unrouted_plan_domain_raises(tmp_path):
     """An unknown `plan::` domain suffix KeyErrors naming the domain."""
-    from scripts.store import store
-
     root = tmp_path / "store"
     store.append(
         "plan::mystery",
