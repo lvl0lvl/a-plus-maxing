@@ -322,6 +322,7 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .fill {{ height: 8px; border-radius: 999px; }}
 .macro {{ margin: 8px 0; }}
 .goal-row {{ margin: 0 0 10px; }}
+.goal-row .ghead {{ display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 600; }}
 .hero {{ display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }}
 .hero .headline {{ font-size: 16px; font-weight: 700; }}
 .hero .chips {{ margin-top: 10px; }}
