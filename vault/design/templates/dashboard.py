@@ -57,7 +57,7 @@ import math
 
 # Aliased: this module's template surface is itself named `render`.
 from scripts.generate import render as render_engine
-from scripts.store import biomarker_meta, loop_schema, plan_schema
+from scripts.store import biomarker_meta, goal_schema, loop_schema, plan_schema
 from vault.design.templates import component_set as cs
 
 # Trend word -> the semantic state coloring it: a registered-polarity verdict is
@@ -1013,6 +1013,71 @@ def _care_team_zone():
     )
 
 
+# The landmark note card under zone 6's goal rows (visual spec): the project's
+# active North-Star landmark (LM-01, vault/meta/landmarks.md). Static honest
+# copy — the exact visit date is operator-TBD; renders ONLY in the populated
+# state, never the empty state (which stays digit-free, ADR-0009 D2).
+_LANDMARK_NOTE = (
+    "July 2026 doctor visit — the first baseline these goals build toward."
+)
+
+
+def _goal_row(resolved):
+    """Render one zone-6 goal row: label + percent, then a good-green fill track.
+
+    The percent and the bar width are the SAME derived value (`goal_schema`
+    clamps it 0-100); the fill is PALETTE good — a non-text progress graphic, not
+    a data-state semantic.
+    """
+    pct = resolved["percent"]
+    return (
+        "<div class='goal-row'>"
+        "<div class='ghead'>"
+        f"<span class='glabel'>{cs._escape(resolved['label'])}</span>"
+        f"<span>{cs.format_number(pct)}%</span>"
+        "</div>"
+        f"{cs.track_bar(pct, cs.PALETTE['good'])}"
+        "</div>"
+    )
+
+
+def _landmark_note():
+    """Render zone 6's bottom landmark note card (visual spec, populated state)."""
+    return (
+        "<div class='card'>"
+        "<div class='label'>Next milestone</div>"
+        f"<div class='body'>{cs._escape(_LANDMARK_NOTE)}</div>"
+        "</div>"
+    )
+
+
+def _goals_zone(goal_readings):
+    """Render zone 6 — goal-progress rows + the landmark note, honest when empty.
+
+    Each routed ``goal::<slug>`` item resolves through `goal_schema.resolve_goal`
+    to its current percent (latest-dated snapshot wins); rows render in slug
+    order. With goals on file, the landmark note card follows the rows. With
+    none, the designed empty state holds: one unfilled progress-track row + the
+    digit-free awaiting copy, NO percent and NO landmark card (visual spec
+    "Honest state"; keeps the zone digit-free for the empty-store guard).
+
+    Args:
+        goal_readings (dict): slug -> the goal item's readings (one entry per
+            routed ``goal::`` item; each has >= 1 reading).
+    """
+    rows = [
+        _goal_row(goal_schema.resolve_goal(goal_readings[slug]))
+        for slug in sorted(goal_readings)
+    ]
+    body = (
+        "".join(rows) + _landmark_note()
+        if rows
+        else f"<div class='goal-row'>{cs.track_bar()}</div>"
+        + cs.awaiting("No goals on file — the goal-progress model is pending.")
+    )
+    return cs.zone("Goals & Progress", body, subtitle="Where each goal stands.")
+
+
 def render(store_read, _today=None):
     """Assemble the 7-zone type-routed dashboard HTML from the shared component set.
 
@@ -1034,6 +1099,7 @@ def render(store_read, _today=None):
     by_item = _readings_by_item(store_read)
     biomarkers, panels, watchouts, feedback, other = [], [], [], [], []
     plan_readings, track_readings, watchout_answers = {}, {}, {}
+    goal_readings = {}
     for item in sorted(by_item):
         readings = by_item[item]
         values = [r["value"] for r in readings]
@@ -1064,6 +1130,8 @@ def render(store_read, _today=None):
                     f"stream type is added deliberately, never by silent fallthrough"
                 )
             plan_readings[domain] = readings
+        elif item.startswith("goal::"):
+            goal_readings[item[len("goal::"):]] = readings
         elif "::" in item:
             prefix = item.split("::", 1)[0] + "::"
             raise KeyError(
@@ -1107,12 +1175,7 @@ def render(store_read, _today=None):
             subtitle="How you're tracking — recent readings per metric.",
         ),
         _care_team_zone(),
-        cs.zone(
-            "Goals & Progress",
-            f"<div class='goal-row'>{cs.track_bar()}</div>"
-            + cs.awaiting("No goals on file — the goal-progress model is pending."),
-            subtitle="Where each goal stands.",
-        ),
+        _goals_zone(goal_readings),
         cs.zone(
             "Labs & Bloodwork",
             labs_body,
