@@ -58,6 +58,8 @@ goals are LM-04-gated (no artifact generates until `generate.run` is fed real da
 
 **Adversarial tests:** `tests/store/test_goal_schema.py` covers the store-adversarial
 battery — cross-stream isolation, same-key dedupe / dedupe-key boundary, correction path,
-and a mutation battery proven RED (drop the `goal::` prefix → cross-stream test red; widen
-the dedupe key to include value → dedupe tests red). `tests/generate/test_goals_zone.py`
-pins the populated/empty render.
+and a mutation battery proven RED with each `(item, timepoint, source)` dedupe-identity
+field covered: drop the `goal::` prefix → cross-stream test red; drop the timepoint →
+boundary test red; drop the source → source-field test red; give `record_goal` overwrite
+behavior → rerecord-noop test red. `tests/generate/test_goals_zone.py` pins the
+populated/empty render.
