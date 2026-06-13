@@ -21,7 +21,10 @@ A landed panel result is a VALUE returned by ``read_panel``, NOT a fifth
 renders a result as a value row. ``read_panel`` resolves pending->result by source PROVENANCE,
 order-independently: the most-recent result reading wins regardless of how its
 timepoint sorts against the pending marker's, and the result reading carries a source
-tag DISTINCT from the pending marker's so it cannot dedupe-collide with it.
+tag DISTINCT from the pending marker's so it cannot dedupe-collide with it. A
+re-recommended panel — a pending marker bracketing the latest result on both sides
+by timepoint (recommend->result->re-recommend) — reads "pending" again (bead z2d0);
+``panel_pending`` shares that resolution for the render-side pending test.
 """
 
 import hashlib
@@ -122,45 +125,84 @@ def record_panel_result(panel, result, timepoint, root):
     )
 
 
+def _latest_result(readings):
+    """Return ``(timepoint, value)`` of the most-recent result reading, or None.
+
+    A result reading is any reading NOT under the pending marker's source tag
+    (``_TAG_PANEL``); the most-recent by timepoint wins, order-independently over
+    the store's lexicographic timepoint sort. None means no result has landed.
+    """
+    latest = None
+    for reading in readings:
+        if reading["source"] != _TAG_PANEL and (
+            latest is None or reading["timepoint"] >= latest[0]
+        ):
+            latest = (reading["timepoint"], reading["value"])
+    return latest
+
+
+def _re_recommended(readings, result_timepoint):
+    """Whether a pending marker brackets the latest result on BOTH sides (bead z2d0).
+
+    A re-recommendation is a pending marker recorded STRICTLY AFTER the latest
+    result, GIVEN a pending marker AT-OR-BEFORE it (the recommendation that result
+    fulfilled). This both-sides timepoint bracket distinguishes a genuine re-draw
+    — recommend -> result -> re-recommend — from a single later-sorting pending
+    marker, which stays the order-independent backdated-result case and resolves
+    to the result (the pinned ``test_pending_panel_reads_result_once_landed``
+    contract). The store sorts by timepoint and does NOT retain append order, so
+    the both-sides bracket is the available signal: a re-recommendation with no
+    prior recommendation before the result is the same shape as a backdated
+    result and resolves to the result, not pending.
+    """
+    pending = [r["timepoint"] for r in readings if r["source"] == _TAG_PANEL]
+    return any(tp > result_timepoint for tp in pending) and any(
+        tp <= result_timepoint for tp in pending
+    )
+
+
 def read_panel(panel, root):
     """Resolve a panel's state: the most-recent landed result, else "pending".
 
-    Resolution is by source PROVENANCE, not a value sentinel: the pending marker is
-    the only reading written under the plan-recommendation tag, so the most-recent
-    result reading wins (its value returned verbatim — even a result whose value
-    equals the "pending" string) and a panel with only pending markers reads
-    pending. The provenance scan stays order-independent across the store's
-    lexicographic timepoint sort: a result recorded for an earlier-sorting
-    timepoint still wins over a later pending marker, and the empty stream's
-    PENDING return is the published default state, not a guard. The render
-    boundary still routes a result VALUE equal to "pending" to the pending marker
-    row — a known residual tracked as bead r3pq.
+    Resolution is by source PROVENANCE, not a value sentinel: results carry a
+    source tag DISTINCT from the pending marker's, so the most-recent result wins
+    (its value returned verbatim — even a result whose value equals the "pending"
+    string) and a panel with only pending markers reads pending. The provenance
+    scan is order-independent across the store's lexicographic timepoint sort: a
+    result recorded for an earlier-sorting timepoint still wins over a later
+    pending marker, and the empty stream's PENDING return is the published
+    default, not a guard. EXCEPT recurrence (bead z2d0): a panel recommended,
+    resulted, then RE-recommended reads "pending" again — a pending marker
+    bracketing the latest result on both sides by timepoint (see
+    ``_re_recommended``). The render boundary still routes a result VALUE equal to
+    "pending" to the pending marker row — a known residual tracked as bead r3pq.
     """
-    for reading in reversed(store.read(f"{_PREFIX_PANEL}{panel}", root=root)):
-        if reading["source"] != _TAG_PANEL:
-            return reading["value"]
-    return PENDING
+    readings = store.read(f"{_PREFIX_PANEL}{panel}", root=root)
+    result = _latest_result(readings)
+    if result is None or _re_recommended(readings, result[0]):
+        return PENDING
+    return result[1]
 
 
 def panel_pending(readings):
-    """Return whether a panel's readings are still awaiting a result.
+    """Return whether a panel's readings are still awaiting a (re-)draw.
 
     The pure provenance predicate published so callers resolve pending state
-    WITHOUT importing the private ``_TAG_PANEL`` source tag or re-deriving
-    ``read_panel``'s scan. A panel is pending iff NO reading carries a
-    landed-result source — i.e. every reading is the plan-recommendation pending
-    marker. Provenance-based, not value-based (consistent with ``read_panel``):
-    a panel with a landed result is not pending even if that result's value is
-    the literal "pending" string (the r3pq render-boundary residual is the
-    render layer's, not this predicate's).
+    WITHOUT importing the private ``_TAG_PANEL`` tag or re-deriving ``read_panel``'s
+    scan, sharing its resolution exactly: a panel is pending iff NO result has
+    landed OR it was re-recommended after the latest result (bead z2d0, via
+    ``_re_recommended``). Provenance-based, never value-based: a landed result
+    valued the literal "pending" string is a result, not a pending state (the
+    r3pq render-boundary residual is the render layer's, not this predicate's).
 
     Args:
         readings (list): The panel's stored readings (the per-item read model).
 
     Returns:
-        (bool) True iff every reading is the pending marker.
+        (bool) True iff the panel is awaiting a (re-)draw.
     """
-    return all(reading["source"] == _TAG_PANEL for reading in readings)
+    result = _latest_result(readings)
+    return result is None or _re_recommended(readings, result[0])
 
 
 def record_watchout_answer(watchout, answer, timepoint, root):

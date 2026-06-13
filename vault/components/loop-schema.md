@@ -3,7 +3,7 @@ title: loop-schema — stream taxonomy + published store states
 type: reference
 status: active
 created: 2026-06-10
-last_reviewed: 2026-06-12
+last_reviewed: 2026-06-13
 review_cadence: on-change
 permalink: a-plus-maxing/components/loop-schema
 ---
@@ -32,7 +32,12 @@ protocols; raises no automated signal.
   (returns `{state, timepoints}` — state None when ≥2 timepoints), `read_panel`
   (order-independent pending→result resolution: the most-recent reading under a
   non-pending source tag wins (its value returned verbatim) regardless of timepoint
-  sort, else `pending`), `read_watchout(_answers)`,
+  sort, else `pending`; EXCEPT a re-recommendation — a pending marker bracketing the
+  latest result on both sides by timepoint — reads `pending` again, bead z2d0),
+  `panel_pending(readings)` (the published pure provenance predicate sharing
+  read_panel's resolution: pending iff no result landed OR re-recommended after the
+  latest result; consumed by the report's "Order today" list so it no longer imports
+  the private `_TAG_PANEL` tag — bead y91q), `read_watchout(_answers)`,
   `read_physician_feedback`.
 - Same-timepoint distinct values persist via `_content_tag` (value-hash folded into the
   source tag, since the store dedupe identity excludes value).
@@ -48,7 +53,8 @@ protocols; raises no automated signal.
 
 **Called by (production):** `render_views` (typed reads), the type-routed dashboard
 template (stream-prefix routing over `store.read_all`'s flat read model), the
-plan loop.
+physician face-sheet `report` template (`panel_pending` for the "Order today" list),
+the plan loop.
 
 **Governing ADR:** ADR-0007 (placement: loop state = store schema; matrix/projection =
 render-time views).
