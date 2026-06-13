@@ -89,8 +89,19 @@ the daily-cadence streams (rhr, hrv, sleep-hours) in the v1 feed.
 
 ## Build
 
-The build brief lives on bead `a-plus-maxing-juc` (notes). The router mechanism
-build is separable from Package B (different surface: plan dispatch vs dashboard
-render); it is scheduled as its own unit when capacity allows. Decisions 1+2
-also bind Package B's trend-card rendering semantics (per-marker grain via
-`biomarker_meta.trend`, consistent with the summary's per-stream rule).
+**BUILT 2026-06-13 (S54, bead `juc`).** The router mechanism shipped exactly the
+four decisions in `scripts/plan/router.py`: `_POLARITY_FEED` (decision 1),
+`_recent_trend_direction` worst-wins reuse of `_trend_token` (decision 2), the
+distinct mechanism + load-time juc tripwire with `raw-lab-values` de-plumbed from
+`_RAW_TO_FIELD` but kept in `EXCLUDED_RAW_PII` (decision 3), and the always-present
+zero-stream `flat` wired into `summarize` (decision 4). `SUMMARY_FIELD_SET`
+unchanged. Tests: the juc battery in `tests/plan/test_router.py`; ADR-0008 D4 +
+Consequences amended `[2026-06-13]`. The in-range-`reference_range` registry
+validity pin (cross-system note) was scoped OUT of this build as a separate
+follow-up (the current registry is valid; the failure mode is loud, not silent).
+
+The build brief lived on bead `a-plus-maxing-juc` (notes). The router mechanism
+was separable from Package B (different surface: plan dispatch vs dashboard
+render). Decisions 1+2 also bind Package B's trend-card rendering semantics
+(per-marker grain via `biomarker_meta.trend`, consistent with the summary's
+per-stream rule).
