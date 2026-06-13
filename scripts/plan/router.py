@@ -61,11 +61,14 @@ TRAIN_ELIGIBLE_LANE = "train-eligible"
 # Raw store item -> field-set field. A field-set field backed by a raw-PII source
 # item is derived from it via the band/class transformation; the rest read from a
 # store item of the same name. Identity fields (legal-name, etc.) have no entry —
-# they are dropped, never reaching the summary.
+# they are dropped, never reaching the summary. `recent-trend-direction` is NOT
+# here: it is registry-derived (juc, 2026-06-12 decision) from the `biomarker::`
+# polarity feed, not from any raw-PII item — see `_recent_trend_direction`.
+# `raw-lab-values` stays a named-excluded raw-PII class (the boundary promise) but
+# is no longer derivation plumbing.
 _RAW_TO_FIELD = {
     "date-of-birth": "training-age-band",
     "postal-address": "equipment-access-class",
-    "raw-lab-values": "recent-trend-direction",
     "raw-symptom-free-text": "active-issue-class",
     "clinical-notes": "active-issue-class",
 }
@@ -86,6 +89,19 @@ class Dispatch:
 
 # Closed `recent-trend-direction` vocabulary (ADR-0006-T0 spike lines 32-33).
 TREND_DIRECTIONS = ("improving", "flat", "regressing")
+
+# The juc registry-driven recent-trend-direction feed (2026-06-12 decision §1):
+# every registered-polarity marker (non-None `good_direction`), read under the
+# `biomarker::` namespace only. Version-controlled VIA the registry — never
+# hand-retyped, never store-enumerated, never goal-filtered. A `good_direction`
+# edit re-shapes this feed AND the dashboard chips (dual-surface; registry
+# polarity edits carry a review note from the juc decision forward). Daily-cadence
+# streams (rhr/hrv/sleep-hours) are included for v1 per the adopted sub-call.
+_POLARITY_FEED = tuple(
+    f"biomarker::{marker}"
+    for marker, meta in biomarker_meta.METADATA.items()
+    if meta["good_direction"] is not None
+)
 
 
 def _age_band(readings):
@@ -108,19 +124,18 @@ def _trend_token(readings):
     no single-marker trend, so a cross-item comparison RAISES naming both
     items (fail-closed — never the values).
 
-    The per-marker good-direction gap is closable per marker via
-    `scripts/store/biomarker_meta.py` (ADR-0008 D4): a registered-polarity
-    marker's directional change resolves to `improving`/`regressing` through
-    the registry (rising ALT regresses; rising HDL improves). An UNREGISTERED
-    marker — including the generic `raw-lab-values` stream, unregistered by
-    design — keeps the fail-closed raise: a determinable directional change
-    with unknown polarity surfaces at the boundary rather than fabricate a
-    value-judgment. Per-marker lab trends for the summary are the Track-2
-    residual (`juc`). `flat` is emitted for genuine no-change, for an
-    insufficient/missing series (the no-signal token — missing data is NEVER
-    a false `improving`), and — since ADR-0008 — for an in-range-polarity
-    marker whose movement keeps the same distance-to-range (the value moved,
-    the judgment did not).
+    Reused by `_recent_trend_direction` as the per-stream deriver over the juc
+    registry-polarity feed (2026-06-12 decision): each feed stream is a single
+    registered-polarity marker, so the cross-item raise cannot trip and the
+    registry resolves the polarity through `biomarker_meta.trend` (rising ALT
+    regresses; rising HDL improves). The cross-item and unknown-polarity raises
+    remain as fail-closed safety nets — a determinable directional change with
+    unknown polarity surfaces at the boundary rather than fabricate a
+    value-judgment. `flat` is emitted for genuine no-change, for an
+    insufficient/missing series (the no-signal token — missing data is NEVER a
+    false `improving`), and — since ADR-0008 — for an in-range-polarity marker
+    whose movement keeps the same distance-to-range (the value moved, the
+    judgment did not).
     """
     pairs = [
         (r["item"], n)
@@ -149,6 +164,35 @@ def _trend_token(readings):
     )
 
 
+def _recent_trend_direction(store_read):
+    """Derive `recent-trend-direction` by worst-wins over the polarity feed.
+
+    juc decision §2 (2026-06-12): each registered-polarity `biomarker::` stream
+    (`_POLARITY_FEED`) contributes its own trend — its last two numeric readings
+    via `_trend_token` over that one stream's series, so each stream's
+    cross-item/unknown-polarity fail-closed raises still guard it. The per-stream
+    trends reduce WORST-WINS: any `regressing` wins; else any `improving`; else
+    `flat`. A stream with an insufficient/missing series yields `flat`
+    (`_trend_token`'s no-signal token), which is the worst-wins floor — so a feed
+    with no lab signal at all reduces to `flat` (decision §4: the operator-fresh
+    state emits the no-signal `flat`, never a partial-summary block). The output
+    is one of the closed `TREND_DIRECTIONS` (juc tripwire below).
+
+    Args:
+        store_read (Callable): The store read surface, called per feed stream.
+            Caller-bound to the instance root exactly as `summarize` documents.
+
+    Returns:
+        (str) `improving`, `flat`, or `regressing`.
+    """
+    trends = [_trend_token(store_read(stream)) for stream in _POLARITY_FEED]
+    if "regressing" in trends:
+        return "regressing"
+    if "improving" in trends:
+        return "improving"
+    return "flat"
+
+
 def _issue_class(readings):
     """Map raw symptom/clinical free-text to a coarse body-region issue class."""
     text = str(readings[-1]["value"]).lower()
@@ -171,7 +215,6 @@ def _region_class(readings):
 # token only — the raw value never appears in the emitted token (Finding 4-1).
 _FIELD_DERIVATION = {
     "training-age-band": _age_band,
-    "recent-trend-direction": _trend_token,
     "active-issue-class": _issue_class,
     "equipment-access-class": _region_class,
 }
@@ -183,6 +226,24 @@ _FIELD_DERIVATION = {
 # trips this at module load.
 assert set(_RAW_TO_FIELD) <= set(EXCLUDED_RAW_PII)
 assert set(SUMMARY_FIELD_SET).isdisjoint(set(EXCLUDED_RAW_PII))
+
+# juc change-control tripwire (2026-06-12 decision §3): the registry-driven
+# recent-trend-direction feed is EXACTLY the registered-polarity marker set read
+# under `biomarker::` — every source resolves to a registered marker with a
+# non-None good_direction, so a hand-edited off-registry source trips this; no
+# feed source is a Summary Field-Set field (the feed produces the derived token,
+# it is not itself a field) and none joins the named-excluded raw-PII set (the
+# streams are derivation inputs, never raw-PII classes — resolving the second half
+# of S51 sub-question (c)); and the worst-wins reduction's outputs are pinned to
+# the locked TREND_DIRECTIONS vocabulary.
+_TREND_REDUCTION_OUTPUTS = ("regressing", "improving", "flat")
+assert all(
+    (_m := biomarker_meta.get(_s)) is not None and _m["good_direction"] is not None
+    for _s in _POLARITY_FEED
+)
+assert set(_POLARITY_FEED).isdisjoint(SUMMARY_FIELD_SET)
+assert set(_POLARITY_FEED).isdisjoint(EXCLUDED_RAW_PII)
+assert set(_TREND_REDUCTION_OUTPUTS) <= set(TREND_DIRECTIONS)
 
 
 def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
@@ -224,6 +285,13 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
     """
     summary = {}
     for field in SUMMARY_FIELD_SET:
+        if field == "recent-trend-direction":
+            # juc: registry-driven worst-wins over the `biomarker::` polarity feed
+            # — neither a raw-PII-backed field nor a store item of its own name.
+            # ALWAYS set (zero feed signal -> the no-signal `flat`, decision §4),
+            # so a fresh operator never trips dispatch's partial-summary raise.
+            summary[field] = _recent_trend_direction(store_read)
+            continue
         # A raw-PII source item backs this field via the band/class map...
         source_items = [raw for raw, f in _RAW_TO_FIELD.items() if f == field]
         if source_items:
