@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-52. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-53. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 53 (2026-06-12)
+
+Operator-adopted plan from the S52 close: merge the S52 close PR, resolve the `juc` polarity design with Walter, then build visual packages A → B → C from the recorded signed targets, each through a full review/merge lifecycle. Five PR lifecycles merged (#108 S52-close docs, #109 Package A — `plan_schema.py` per-domain `plan::`/`plan-track::` day-keyed schemas ADR-0010 + populated zone-3 plan cards, #110 Package B — zone-4 trend-card v2 + single-sourced `biomarker_meta.projection_values`, #111 mid-session docs of the S53 contract + `juc` note + signed v3 facesheet tokens, #112 Package C — `report.py` physician face sheet on the v3 standardized tokens); final main `3d04aae` (S53 close commit), suite 697/2. AC1-AC8 all PASS. One task-drift clause CHANGED (the report-local-tokens NOT-touch line superseded by Walter's token-standardization direction — the design system gained additive `SECTION_ACCENTS` + CHROME `watch-text`/`watch-tint`, locked `PALETTE`/`SERIES`/`ACCENTS` byte-identical) + one justified scope add (#111). The `juc` worst-wins router was DECIDED, not built (carried to S54, built + merged there as #114). No new PF-class entries; INV-SKILL-TRACE green (5 rows all-YES — first full session under the mechanized audit). **Full contract preserved in git history (the S53-close commit `3d04aae`, rebased onto `main` at the #113 merge); S53 drift checks + close attestation (with the per-PR #108-#112 invocation table) in `memory/process-failures.md` (Session 53 section); summary in `vault/sessions/session-53.md`** (compacted here at the S54 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 52 (2026-06-12)
 

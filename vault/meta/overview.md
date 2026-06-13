@@ -76,6 +76,27 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
+## Status as of 2026-06-13 (S54) — the juc worst-wins recent-trend-direction router SHIPPED
+
+Two PR lifecycles merged (#113 S53-close docs, #114 the `juc` router; `main` at `13f5814`,
+suite 710 passed / 2 skipped, +13 from session open), every gated skill invoked fresh (third
+full session under INV-SKILL-TRACE, green). The one decided-but-unbuilt mechanism carried out
+of S53 is now built: the plan-reasoning summary's `recent-trend-direction` is derived
+registry-driven WORST-WINS (regressing > improving > flat) over the `biomarker::` polarity
+feed — `_POLARITY_FEED` = every `biomarker_meta.METADATA` marker with a non-None
+`good_direction` — via `router._recent_trend_direction` reusing `_trend_token` untouched, with
+a load-time juc tripwire (feed within the registry-polarity set, disjoint from
+`SUMMARY_FIELD_SET` + `EXCLUDED_RAW_PII`, output pinned to `TREND_DIRECTIONS`). This unblocks
+plan-reasoning over changing labs (the S39 fail-closed raise). The PII boundary is unchanged in
+posture: `SUMMARY_FIELD_SET` + `EXCLUDED_RAW_PII` byte-identical, `_trend_token` AST
+byte-identical, `raw-lab-values` de-plumbed from `_RAW_TO_FIELD` but retained as a
+named-excluded class. The registry is now DUAL-SURFACE — a `good_direction` edit changes both
+the dashboard chips and the model-bound summary token. Bead `juc` closed; follow-up `smei`
+(in-range feed-marker `reference_range` validity pin) filed. Built EXACTLY from the signed
+decision note `vault/decisions/2026-06-12-juc-trend-polarity-design.md`; ADR-0008 D4 +
+Consequences amended `[2026-06-13]`; `vault/components/plan-layer.md` reconciled. Next:
+the `y91q`/`z2d0` architecture debt + the correctness/governance tail.
+
 ## Status as of 2026-06-13 (S53) — all three visual packages SHIPPED; stats+plans+tracking completion bar met
 
 Five PR lifecycles merged (#108-#112; `main` at `a148316`, suite 697 passed / 2 skipped,
