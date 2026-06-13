@@ -844,6 +844,19 @@ def test_recent_trend_resolves_polarity_per_stream_via_registry():
         _store_read_factory(_stream_series("biomarker::hdl", 40, 60))) == "improving"
     assert router._recent_trend_direction(
         _store_read_factory(_stream_series("biomarker::hrv", 50, 60))) == "improving"
+    assert router._recent_trend_direction(_store_read_factory(
+        _stream_series("biomarker::fasting-glucose", 90, 200))) == "regressing"
+
+
+def test_recent_trend_in_range_marker_staying_in_range_is_flat():
+    """Decision §2: an in-range marker moving but staying in range -> flat.
+
+    fasting-glucose 90 -> 95 are both inside (70, 99): distance-to-range stays
+    0, so the trend is the no-change `flat` (the in-range polarity branch
+    through the feed reduction, distinct from the trivial equal-value case).
+    """
+    assert router._recent_trend_direction(_store_read_factory(
+        _stream_series("biomarker::fasting-glucose", 90, 95))) == "flat"
 
 
 def test_recent_trend_output_pinned_to_trend_directions():
