@@ -10,14 +10,16 @@ vault/decisions palette entry — not from the production component_set module �
 so the gate is falsifiable if the production palette drifts.
 """
 
+import datetime
 import math
 import re
 from pathlib import Path
 
 import pytest
 
-from scripts.generate import render
+from scripts.generate import generate, render
 from scripts.generate.render import emit
+from scripts.store import loop_schema, plan_schema
 from vault.design.templates import component_set
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -867,11 +869,6 @@ def test_facesheet_rendered_pairs_measure_aa(tmp_path):
     are measured without a marker — their markup is pinned in
     test_facesheet.py.
     """
-    import datetime
-
-    from scripts.store import loop_schema, plan_schema
-    from scripts.generate import generate
-
     root = tmp_path / "store"
     today = datetime.date(2026, 6, 12)
     loop_schema.record_biomarker("crp", "2026-05-12T00:00:00+00:00", 6.1, root)

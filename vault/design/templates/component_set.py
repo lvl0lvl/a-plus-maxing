@@ -121,7 +121,7 @@ _EVENT_TINTS = ("lab-draw", "check-in", "appointment")
 # has a rendered CSS rule (and vice versa — they cannot diverge). `today-tint`
 # stays calendar-cell CHROME (the today day-cell background), NOT pill-tintable.
 # "watch" joined at the facesheet build (v3 bindings): its rule pairs
-# watch-tint with the AA-dark watch-text shade below.
+# watch-tint with the AA-dark CHROME["watch-text"] shade above.
 _TINTABLE = frozenset({"good", "concern", "neutral", "watch", *ACCENTS, *_EVENT_TINTS})
 
 # The semantic-state tints' text colors (the :root custom properties); an
@@ -303,12 +303,18 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 </style>"""
 
 
-def head(title):
-    """Return the `<head>` block: charset, title, and the shared style block."""
+def head(title, extra_style=""):
+    """Return the `<head>` block: charset, title, and the shared style block.
+
+    Args:
+        title (str): The document title (escaped).
+        extra_style (str, optional): A template's own `<style>` block, included
+            verbatim AFTER the shared block (the report's page styles).
+    """
     return (
         "<head><meta charset='utf-8'>"
         f"<title>{_escape(title)}</title>"
-        f"{_style_block()}</head>"
+        f"{_style_block()}{extra_style}</head>"
     )
 
 

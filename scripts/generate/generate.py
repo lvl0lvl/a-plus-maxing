@@ -44,6 +44,7 @@ def run(artifact_name, *, _root=None, _out_dir=None, _today=None):
             `render.emit`. Defaults to the engine-owned `vault/artifacts/generated/`.
         _today (datetime.date, optional): Test-only date seam forwarded to the
             template render's `_today` (the dashboard's calendar + plan
+            resolution; the report's prepared/generated dates + plan
             resolution). Defaults to the template's real current date.
 
     Returns:
