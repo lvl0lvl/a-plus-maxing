@@ -777,3 +777,44 @@ def test_facesheet_inert_and_print_native(tmp_path):
     assert "@media print" in html
     assert ".fs-page2 { page-break-before: always; }" in html
     assert ".fs-page { max-width: 100%; margin: 0; border: none; padding: 0; }" in html
+
+
+# --- y91q: report consumes the published API, not private cross-module symbols ---
+
+
+def test_report_imports_no_private_cross_module_symbols():
+    """y91q: report.py imports the PUBLIC component_set / loop_schema API only.
+
+    The five-private-symbol coupling (`dashboard._format_number`/`_reading_date`/
+    `_short_date`/`_MONTH_NAMES` + `loop_schema._TAG_PANEL`) is the regression
+    this guards: report imports the public names, so a rename of a private helper
+    can no longer silently break the report. Checks the IMPORT lines (a docstring
+    may still name `_TAG_PANEL` to explain the history) — RED if report
+    re-imports a private dashboard helper or the private panel tag.
+    """
+    source = Path(report.__file__).read_text()
+    import_lines = "\n".join(
+        line for line in source.splitlines()
+        if line.startswith(("import ", "from "))
+    )
+    assert "dashboard import" not in import_lines  # no private dashboard helper import
+    assert "_TAG_PANEL" not in import_lines  # no private loop_schema tag import
+    assert "panel_pending" in import_lines  # uses the published predicate
+    assert "cs.format_number" in source and "cs.MONTH_NAMES" in source
+
+
+def test_component_set_public_formatting_api():
+    """y91q: the promoted formatting helpers are the public component_set contract.
+
+    Pins format_number (no float noise / no trailing zeros), reading_date (ISO
+    date or None on unparseable / non-string), short_date, and the month tuples
+    — the API report.py and dashboard.py now both consume from one home.
+    """
+    assert cs.format_number(3.0) == "3"
+    assert cs.format_number(0.1 + 0.2) == "0.3"
+    assert cs.reading_date("2026-06-10T08:00:00+00:00") == datetime.date(2026, 6, 10)
+    assert cs.reading_date("not-a-date") is None
+    assert cs.reading_date(None) is None
+    assert cs.short_date(datetime.date(2026, 6, 10)) == "Jun 10"
+    assert cs.MONTH_NAMES[5] == "June"
+    assert cs.MONTH_ABBR[5] == "Jun"

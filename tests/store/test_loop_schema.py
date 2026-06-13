@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from scripts.guard.egress_guard import run as egress_run
-from scripts.store import keying, loop_schema
+from scripts.store import keying, loop_schema, store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE = REPO_ROOT / "scripts" / "store" / "loop_schema.py"
@@ -477,3 +477,55 @@ def test_sec03_injected_outbound_fails_guard(tmp_path):
         srv.close()
 
     assert not result  # falsy == FAIL: the injected outbound call was intercepted
+
+
+# --- panel_pending: the published provenance predicate (bead y91q) ---
+
+
+def test_panel_pending_true_when_only_markers(tmp_path):
+    """y91q: a panel with only pending markers reads panel_pending True.
+
+    The published predicate agrees with read_panel: a never-resulted panel
+    resolves to PENDING and every reading is the pending marker.
+    """
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+    readings = store.read("panel::lipid_panel", root=tmp_path)
+    assert loop_schema.panel_pending(readings) is True
+    assert loop_schema.read_panel("lipid_panel", root=tmp_path) == loop_schema.PENDING
+
+
+def test_panel_pending_false_once_result_landed(tmp_path):
+    """y91q: a panel with a landed result reads panel_pending False.
+
+    A result reading carries a non-pending source, so the predicate is False —
+    consistent with read_panel resolving to the result value.
+    """
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_panel_result(
+        "lipid_panel", "results received", "2026-06-02T08:00:00+00:00", root=tmp_path
+    )
+    readings = store.read("panel::lipid_panel", root=tmp_path)
+    assert loop_schema.panel_pending(readings) is False
+    assert loop_schema.read_panel("lipid_panel", root=tmp_path) != loop_schema.PENDING
+
+
+def test_panel_pending_is_provenance_not_value(tmp_path):
+    """y91q: a result whose VALUE is the "pending" string is NOT panel_pending.
+
+    The predicate keys on the result's SOURCE tag, not its value, so a landed
+    result valued "pending" reads False even though read_panel returns "pending"
+    verbatim (the r3pq render-boundary residual is the render layer's, not the
+    predicate's). A value-based predicate would wrongly read True here.
+    """
+    loop_schema.record_pending_panel(
+        "lipid_panel", "2026-06-01T08:00:00+00:00", root=tmp_path
+    )
+    loop_schema.record_panel_result(
+        "lipid_panel", "pending", "2026-06-02T08:00:00+00:00", root=tmp_path
+    )
+    readings = store.read("panel::lipid_panel", root=tmp_path)
+    assert loop_schema.panel_pending(readings) is False

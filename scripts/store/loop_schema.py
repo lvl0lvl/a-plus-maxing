@@ -142,6 +142,27 @@ def read_panel(panel, root):
     return PENDING
 
 
+def panel_pending(readings):
+    """Return whether a panel's readings are still awaiting a result.
+
+    The pure provenance predicate published so callers resolve pending state
+    WITHOUT importing the private ``_TAG_PANEL`` source tag or re-deriving
+    ``read_panel``'s scan. A panel is pending iff NO reading carries a
+    landed-result source — i.e. every reading is the plan-recommendation pending
+    marker. Provenance-based, not value-based (consistent with ``read_panel``):
+    a panel with a landed result is not pending even if that result's value is
+    the literal "pending" string (the r3pq render-boundary residual is the
+    render layer's, not this predicate's).
+
+    Args:
+        readings (list): The panel's stored readings (the per-item read model).
+
+    Returns:
+        (bool) True iff every reading is the pending marker.
+    """
+    return all(reading["source"] == _TAG_PANEL for reading in readings)
+
+
 def record_watchout_answer(watchout, answer, timepoint, root):
     """Record an operator's watch-out check-in answer."""
     item = f"{_PREFIX_WATCHOUT}{watchout}"
