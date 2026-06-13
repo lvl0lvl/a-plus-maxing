@@ -934,3 +934,49 @@ def test_summarize_reads_feed_through_injected_store_read():
     router.summarize(store_read)
     for stream in router._POLARITY_FEED:
         assert stream in store_read.calls, stream
+
+
+# --- smei: in-range feed markers must carry a reference_range ---
+
+
+def test_smei_in_range_feed_markers_all_carry_a_range():
+    """smei: every in-range-polarity feed marker carries a reference_range.
+
+    `biomarker_meta.trend` judges an in-range marker by distance-to-range, so an
+    in-range feed marker with no range yields None -> `_trend_token` raises ->
+    the WHOLE plan summary fail-closes. Pins the invariant the load-time tripwire
+    guards; RED if a future registry edit adds an in-range feed marker with no
+    range.
+    """
+    for stream in router._POLARITY_FEED:
+        meta = biomarker_meta.get(stream)
+        if meta["good_direction"] == "in-range":
+            assert meta["reference_range"] is not None, stream
+
+
+def test_smei_in_range_without_range_trips_load_assert():
+    """smei: an in-range feed marker with no range trips the load-time tripwire.
+
+    Fail-capable: inject an in-range marker with reference_range=None into the
+    registry and reload router; the smei tripwire must raise AssertionError. A
+    removed/weakened assert lets the reload succeed and turns this RED. The
+    finally clause restores the real registry and reloads a clean router for the
+    rest of the suite.
+    """
+    import importlib
+
+    original = biomarker_meta.METADATA
+    try:
+        biomarker_meta.METADATA = {
+            **original,
+            "smei-probe": {
+                "units": "x",
+                "reference_range": None,
+                "good_direction": "in-range",
+            },
+        }
+        with pytest.raises(AssertionError):
+            importlib.reload(router)
+    finally:
+        biomarker_meta.METADATA = original
+        importlib.reload(router)
