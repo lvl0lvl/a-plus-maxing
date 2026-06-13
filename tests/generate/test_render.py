@@ -20,7 +20,7 @@ import pytest
 from scripts.generate import generate, render
 from scripts.generate.render import emit
 from scripts.store import loop_schema, plan_schema
-from vault.design.templates import component_set
+from vault.design.templates import component_set, report
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DECISION_ENTRY = REPO_ROOT / "vault/decisions/2026-06-05-render-colorblind-safe-palette.md"
@@ -896,6 +896,8 @@ def test_facesheet_rendered_pairs_measure_aa(tmp_path):
          p["concern"], c["concern-tint"], "fs-marker"),
         ("abnormal row detail (ink/concern-tint)",
          p["ink"], c["concern-tint"], "fs-abrow"),
+        ("triage body copy (ink/training-tint)",
+         p["ink"], c["training-tint"], "fs-trow"),
         ("in-range strip (good/good-tint)",
          p["good"], c["good-tint"], "fs-strip"),
         ("footer lab-grade word (training-text/paper)",
@@ -916,3 +918,23 @@ def test_facesheet_rendered_pairs_measure_aa(tmp_path):
         ratio = _contrast_ratio(_hex_to_rgb(fg), _hex_to_rgb(bg))
         print(f"AC-3 facesheet pair {what} {fg}/{bg} = {ratio:.2f} (need >= 4.5)")
         assert ratio >= 4.5, f"{what}: {fg} on {bg} computes {ratio:.2f} < 4.5"
+
+    # --- non-text contrast (WCAG 1.4.11, >= 3.0): the meaningful non-text
+    # chrome the face sheet ships — the two SECTION_ACCENTS bars on paper and
+    # the self-reported tier glyph (_SELF_REPORTED_BASE, the one sanctioned
+    # non-token hex) on paper and on the abnormal row's concern-tint (3.07 —
+    # the close one; a darker tint regresses it below the floor).
+    nontext_pairs = (
+        ("biomarkers section bar (SECTION_ACCENTS/paper)",
+         component_set.SECTION_ACCENTS["biomarkers"], p["paper"]),
+        ("goals section bar (SECTION_ACCENTS/paper)",
+         component_set.SECTION_ACCENTS["goals"], p["paper"]),
+        ("self-reported glyph (base/paper)",
+         report._SELF_REPORTED_BASE, p["paper"]),
+        ("self-reported glyph (base/concern-tint)",
+         report._SELF_REPORTED_BASE, c["concern-tint"]),
+    )
+    for what, fg, bg in nontext_pairs:
+        ratio = _contrast_ratio(_hex_to_rgb(fg), _hex_to_rgb(bg))
+        print(f"AC-3 facesheet non-text {what} {fg}/{bg} = {ratio:.2f} (need >= 3.0)")
+        assert ratio >= 3.0, f"{what}: {fg} on {bg} computes {ratio:.2f} < 3.0"
