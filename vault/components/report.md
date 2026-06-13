@@ -20,10 +20,14 @@ the production entry (the `_today` seam mirrors the dashboard's).
 **Page one (the 90-second scan layer), in section order:**
 1. Header — title 20px/700, `Prepared <date>` caption (the `_today` seam),
    2px training-blue rule, and the status line: operator INITIALS only
-   (parsed from `vault/meta/operator-profile.md`'s title — the full name
-   never renders), age BAND + issue status only when the profile fields are
-   filled (`_PROFILE_PATH` is the test seam; unfilled/missing -> em-dash
-   slots), last review + next visit em-dash (LM-01 gated).
+   (parsed from the profile title — the full name never renders), age BAND
+   (bounded `0 < years < 120` — a DOB-shaped or zero Age reads absent) +
+   issue status only when the profile fields are filled. The profile is the
+   FIRST existing `_PROFILE_PATHS` entry (the test seam): the ADR-0005
+   filled-scaffold copy `vault/scaffold/filled/operator-profile.md` when
+   present, else the tracked scaffold `vault/meta/operator-profile.md`
+   (unfilled/missing -> em-dash slots). Last review + next visit em-dash
+   (LM-01 gated).
 2. Since your last review — training-tint card, training-text title. The
    production path renders the first-visit copy (`No prior review — full
    baseline below`, which doubles as the LM-01 awaiting state per the spec);
@@ -34,8 +38,11 @@ the production entry (the `_today` seam mirrors the dashboard's).
 3. Current regimen — with adherence (supplements-teal bar): rows from
    TODAY's `plan::supplements` (`name — dose`) and `plan::peptides`
    (`compound · dose · route`; an `experimental` tag renders the detail in
-   watch-text + `experimental — disclosure attached`), `since` = the plan
-   reading's timepoint. Adherence = em-dash per row (the 30-day adherence
+   watch-text + `experimental — disclosure attached`), `since` = the date of
+   the EARLIEST stored plan whose value carries the item (supplements: an
+   `items[].name` match; peptides: the compound match) — an item keeps its
+   start date across re-recorded plans; an unparseable earliest timepoint
+   reads `since —`. Adherence = em-dash per row (the 30-day adherence
    aggregate model does not exist; never a fabricated %). No plan today ->
    one digit-free awaiting line.
 4. Biomarkers — out of range or trending (`SECTION_ACCENTS["biomarkers"]`
@@ -67,7 +74,9 @@ the production entry (the `_today` seam mirrors the dashboard's).
 heading+table routing (ADR-0010 D5 — no KPI/sparkline); a stream with NO
 numeric reading routes table-only (strings never reach numeric viz — the
 pre-redesign report crashed on string streams); numeric streams keep
-KPI + polyline sparkline + table.
+KPI + polyline sparkline + table, the sparkline/KPI state judged from the
+RAW latest reading (ONE state basis sheet-wide — a string latest claims no
+concern anywhere; the numeric history plots neutral).
 
 **Contracts:**
 - The naive projection NEVER renders here (S52 operator decision; pinned by

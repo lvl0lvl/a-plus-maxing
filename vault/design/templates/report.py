@@ -16,7 +16,9 @@ same reason. The naive projection NEVER renders here (S52 operator decision).
 The honesty rule (ADR-0009 D2) governs every slot: model-gated sections
 (deltas/LM-01, adherence aggregates, signals/LM-02, goals) render em-dash or
 digit-free awaiting copy, never an invented number; the header's age band and
-issue status read `vault/meta/operator-profile.md` only when those fields are
+issue status read the ADR-0005 filled-scaffold copy
+(`vault/scaffold/filled/operator-profile.md`) when present, else the tracked
+scaffold (`vault/meta/operator-profile.md`), only when those fields are
 filled, and the operator renders as INITIALS only — never the full name.
 
 All markup and colors come from `component_set` tokens (PALETTE, CHROME,
@@ -47,10 +49,16 @@ from vault.design.templates.dashboard import (
     _short_date,
 )
 
-# The operator-profile scaffold the header status line reads (age band +
-# issue status when filled; initials from the title). Module constant so
-# tests can point it at a filled fixture.
-_PROFILE_PATH = Path("vault/meta/operator-profile.md")
+# The operator-profile sources the header status line reads (age band +
+# issue status when filled; initials from the title), in preference order:
+# the ADR-0005-compliant filled copy (`vault/scaffold/filled/` — gitignored,
+# the pinned filled-scaffold-value path) when it exists, else the tracked
+# scaffold (unfilled prompts -> em-dash awaiting slots). Module constant so
+# tests can point it at fixtures.
+_PROFILE_PATHS = (
+    Path("vault/scaffold/filled/operator-profile.md"),
+    Path("vault/meta/operator-profile.md"),
+)
 
 # The self-reported tier's base amber — the v3 spec's ONE unregistered hex:
 # non-text tier chrome only (glyph fills, stat-box top edges), never text
@@ -143,23 +151,26 @@ def _readings_by_item(store_read):
 
 
 def _read_profile():
-    """Parse the operator-profile scaffold's header-relevant fields.
+    """Parse the operator profile's header-relevant fields.
 
-    Returns initials (from the profile title — never the full name), the age
-    BAND (decade, e.g. `40s`, derived from a filled Age field — the exact age
-    never renders), and the January-issue status (a filled Current status
-    field). An unfilled scaffold prompt (`<...>`) reads None, and a missing
-    profile file reads all-None — the header renders its em-dash awaiting
-    slots either way (ADR-0009 D2 honest absence; a fresh clone still
-    generates).
+    Reads the FIRST existing `_PROFILE_PATHS` entry: the gitignored filled
+    copy under `vault/scaffold/filled/` (ADR-0005's pinned filled-scaffold
+    path) wins over the tracked scaffold. Returns initials (from the profile
+    title — never the full name), the age BAND (decade, e.g. `40s`, derived
+    from a filled Age field — the exact age never renders), and the
+    January-issue status (a filled Current status field). An unfilled
+    scaffold prompt (`<...>`) reads None, and no profile file at all reads
+    all-None — the header renders its em-dash awaiting slots either way
+    (ADR-0009 D2 honest absence; a fresh clone still generates).
 
     Returns:
         (dict) Keys `initials`, `age_band`, `issue_status`; None = unfilled.
     """
     fields = {"initials": None, "age_band": None, "issue_status": None}
-    if not _PROFILE_PATH.exists():
+    path = next((p for p in _PROFILE_PATHS if p.exists()), None)
+    if path is None:
         return fields
-    text = _PROFILE_PATH.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8")
     title = re.search(r"^# Operator Profile — (.+)$", text, re.M)
     if title:
         initials = "".join(
@@ -169,7 +180,10 @@ def _read_profile():
     age = re.search(r"^- \*\*Age:\*\* (.+)$", text, re.M)
     if age:
         years = re.match(r"(\d+)", age.group(1).strip())
-        if years:
+        # Plausible-age bound: a DOB-shaped value ("1982-03-15" -> 1982) or a
+        # zero is not an age in years — render the em-dash, never a fabricated
+        # band like "1980s" (ADR-0009 D2).
+        if years and 0 < int(years.group(1)) < 120:
             fields["age_band"] = f"{int(years.group(1)) // 10 * 10}s"
     status = re.search(r"^- \*\*Current status:\*\* (.+)$", text, re.M)
     if status:
@@ -275,21 +289,41 @@ def _triage_section():
     )
 
 
-def _regimen_rows(resolved_supplements, resolved_peptides, today):
+def _since_text(readings, match):
+    """Derive a regimen row's `since` from the item's EARLIEST stored plan.
+
+    Scans the domain's stored plan readings in `store.read` (timepoint) order
+    for the first whose plan value `match`es the rendered item — the item has
+    been part of the regimen since that plan's date, not merely since today's
+    re-recording. An unparseable earliest timepoint renders `since —` (honest
+    absence, never an invented date).
+    """
+    earliest = next(r for r in readings if match(r["value"]))
+    day = _reading_date(earliest["timepoint"])
+    return f"since {_short_date(day)}" if day is not None else "since —"
+
+
+def _regimen_rows(plan_readings, resolved_supplements, resolved_peptides):
     """Render the regimen rows from the day's resolved plans.
 
     Supplements rows render `name — dose`; the peptides row renders
     `compound · dose · route`, with an "experimental" tag switching the row
-    detail to watch-text plus the disclosure note. `since` is the plan
-    reading's timepoint (today — plans resolve by date equality). The
+    detail to watch-text plus the disclosure note. `since` is the date of the
+    EARLIEST stored plan whose value carries the same item (supplements: an
+    items[].name match; peptides: the compound match) — `_since_text`. The
     adherence column stays an honest em-dash per row: the 30-day adherence
     aggregate model does not exist, and a fabricated % is a claim.
     """
-    since = f"since {_short_date(today)}"
     adherence = "<span class='fs-adh caption'>adherence —</span>"
     rows = []
     if resolved_supplements["state"] is None:
         for entry in resolved_supplements["plan"]["items"]:
+            since = _since_text(
+                plan_readings["supplements"],
+                lambda v, name=entry["name"]: any(
+                    i["name"] == name for i in v["items"]
+                ),
+            )
             rows.append(
                 "<div class='fs-row'>"
                 f"<span class='fs-rowname'>{cs._escape(entry['name'])} — {cs._escape(entry['dose'])}</span>"
@@ -299,6 +333,10 @@ def _regimen_rows(resolved_supplements, resolved_peptides, today):
     if resolved_peptides["state"] is None:
         plan = resolved_peptides["plan"]
         detail = f"{plan['compound']} · {plan['dose']} · {plan['route']}"
+        since = _since_text(
+            plan_readings["peptides"],
+            lambda v: v["compound"] == plan["compound"],
+        )
         if "experimental" in plan.get("tags", ()):
             name = (
                 f"<span class='fs-rowname fs-exp'>{cs._escape(detail)}</span>"
@@ -319,7 +357,7 @@ def _regimen_section(plan_readings, today):
     on_date = today.isoformat()
     supplements = plan_schema.resolve_plan(plan_readings.get("supplements", []), on_date)
     peptides = plan_schema.resolve_plan(plan_readings.get("peptides", []), on_date)
-    body = _regimen_rows(supplements, peptides, today)
+    body = _regimen_rows(plan_readings, supplements, peptides)
     if not body:
         body = cs.awaiting(
             "No supplement or peptide plan recorded for today — "
@@ -544,11 +582,15 @@ def _footer(today):
 
 
 def _table(readings):
-    """Return a comparison table (timepoint, source, value) for one item's readings."""
+    """Return a comparison table (timepoint, source, value) for one item's readings.
+
+    All three cells coerce through `str` — a raw-appended non-string timepoint
+    or source must render its text, never crash the whole sheet.
+    """
     rows = "".join(
         "<tr>"
-        f"<td>{cs._escape(r['timepoint'])}</td>"
-        f"<td>{cs._escape(r['source'])}</td>"
+        f"<td>{cs._escape(str(r['timepoint']))}</td>"
+        f"<td>{cs._escape(str(r['source']))}</td>"
         f"<td>{cs._escape(str(r['value']))}</td>"
         "</tr>"
         for r in readings
@@ -594,9 +636,10 @@ def _item_section(item, readings):
     `plan::`/`plan-track::` items keep the verbatim heading + readings table
     (ADR-0010 D5 — no KPI, no sparkline). A stream with numeric readings
     renders the full anatomy: heading, tier/ref caption, latest-value KPI,
-    polyline sparkline over ONLY the numeric values (state registry-driven),
-    and the table. A stream with NO numeric reading routes table-only — a
-    string must never reach numeric viz.
+    polyline sparkline over ONLY the numeric values (state judged from the
+    RAW latest reading — the page-1 abnormal gate's basis), and the table. A
+    stream with NO numeric reading routes table-only — a string must never
+    reach numeric viz.
     """
     if item.startswith(("plan::", "plan-track::")):
         return (
@@ -614,7 +657,11 @@ def _item_section(item, readings):
             f"{caption}{_table(readings)}"
             "</section>"
         )
-    state = cs.state_for(item, numeric[-1])
+    # ONE state basis sheet-wide: the RAW latest value — the same basis as the
+    # page-1 abnormal gate and the page-2 ordering key. A stream whose latest
+    # reading is non-numeric claims NO current concern anywhere; the sparkline
+    # still plots the numeric history, tinted neutral.
+    state = cs.state_for(item, readings[-1]["value"])
     return (
         "<section>"
         f"<h2>{cs._escape(item)}</h2>"
@@ -661,16 +708,27 @@ def render(store_read, _today=None):
     Returns:
         (str) The assembled face-sheet HTML (single document, inline styling,
         zero scripts).
+
+    Raises:
+        KeyError: An item carries a `::` prefix outside the routed stream
+            types, or an unknown plan:: domain suffix (fail-loud; the
+            dashboard's ADR-0008 D3 contract, mirrored).
     """
     today = _today if _today is not None else datetime.date.today()
     by_item = _readings_by_item(store_read)
     plan_readings, panels, biomarkers = {}, {}, {}
     answered_watchouts = set()
     for item, readings in by_item.items():
-        if item.startswith("plan::"):
+        if item.startswith("biomarker::"):
+            biomarkers[item] = readings
+        elif item.startswith("plan::"):
             domain = item[len("plan::"):]
-            if domain in plan_schema.PLAN_DOMAINS:
-                plan_readings[domain] = readings
+            if domain not in plan_schema.PLAN_DOMAINS:
+                raise KeyError(
+                    f"unrouted plan:: domain {domain!r}: routing for a new "
+                    f"stream type is added deliberately, never by silent fallthrough"
+                )
+            plan_readings[domain] = readings
         elif item.startswith("plan-track::"):
             pass  # page-2 verbatim table only
         elif item.startswith("panel::"):
@@ -679,6 +737,12 @@ def render(store_read, _today=None):
             answered_watchouts.add(item[len("watch-out::"):])
         elif item.startswith("feedback::"):
             pass  # page-2 table only
+        elif "::" in item:
+            prefix = item.split("::", 1)[0] + "::"
+            raise KeyError(
+                f"unrouted stream prefix {prefix!r}: routing for a new stream "
+                f"type is added deliberately, never by silent fallthrough"
+            )
         else:
             biomarkers[item] = readings
     body = (
