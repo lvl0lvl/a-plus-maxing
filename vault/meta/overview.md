@@ -76,6 +76,28 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
+## Status as of 2026-06-13 (S57) — the calendar-event data model SHIPPED (zone 2 This Week)
+
+Two PR lifecycles merged (#119 S56-close docs, #120 the calendar-event data model; `main` at
+`b74ee0f`, suite 785 passed / 2 skipped, +25 from session open), every gated skill invoked fresh
+(sixth full session under INV-SKILL-TRACE, green). The second of the three remaining "done"-path
+dashboard data models shipped: `scripts/store/calendar_schema.py` is a new `calendar::events`
+content-tagged store stream (`{category ∈ training/lab-draw/check-in/appointment, label}`, date-keyed;
+distinct same-date events persist, identical re-entry idempotent; corrections by re-recording; the
+store-adversarial battery proven RED per dedupe field), and the dashboard routes `calendar::events`
+into zone 2 — category-tinted event pills land in each matching month-calendar day cell, the honest
+awaiting caption shows only when no events are stored — built strictly from the signed
+`dashboard-v1-visual-spec.md` zone-2 anatomy. The awaiting-zone count dropped by one (calendar events
+now render from data). The session PIVOTED from the operator-recommended 30-day-rollup to
+calendar-events after verify-first found the rollup needs UNSIGNED design (the specialist→metric
+mapping + aggregation rule; the spec signs only "a colored per-domain status line") — PF-S6-01 +
+PF-S49-01 working. The #119 review caught + fixed an off-main-archive-SHA recurrence (count=2 watch +
+a structural-fix bead); the #120 6-agent panel (Security 0, Bug Hunter 0, Contracts 7 positive)
+correctly REFUTED two of its own findings. PII boundary unchanged; `PALETTE`/`SERIES`/`ACCENTS`
+byte-identical. Bead `86vu` closed; `dqyv` updated (calendar = 3rd `_reading` consumer, the trigger
+fired); the archive-SHA-check bead filed. Next: the 30-day-rollup (zone 5 — a DESIGN-then-build), then
+the correctness/governance tail. Session detail: `vault/sessions/session-57.md`.
+
 ## Status as of 2026-06-13 (S56) — the goal data model SHIPPED (zone 6 Goals & Progress)
 
 Two PR lifecycles merged (#117 S55-close docs, #118 the goal data model; `main` at

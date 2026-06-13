@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-55)
+title: Scope Contract Archive (Sessions 5-56)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-55. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-56. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 56 (2026-06-13)
+
+S56 resume plan from the S55 close: merge the S55 close PR, then build the goal data model (zone 6 Goals & Progress) — the first of the three remaining "done"-path dashboard data models — through a full lifecycle (operator: "proceed with goals"). Two PR lifecycles merged (#117 S55-close docs — F1, the S53 skill-trace ordinal contradiction, DEFERRED-but-fixed-forward; #118 the goal model `1oag` — `scripts/store/goal_schema.py` `goal::<slug>` stream with a read-derived direction-agnostic clamped percent that never rounds up to a false "100%" + the zone-6 populated render: label/percent/good-green fill + the July-visit landmark note card, per the signed visual spec); final main `8455608`, suite 760/2 (+38). AC1-AC6 all PASS. The #118 6-agent review REFUTED its own impact-5 BUG-1 (a malformed-conformant-line render crash — `plan_schema` crashes identically, the store-trusts-writer posture; the guard would be unapproved defensive programming) and caught two FALSE mutation-RED test docstrings (the source-field dedupe contribution was untested) — fixed + re-proven RED per dedupe field; 7 LEGITIMATE fixed + blind-verified 7/7, HIST-2 beaded (`dqyv`). `PALETTE`/`SERIES`/`ACCENTS` + `SUMMARY_FIELD_SET`/`EXCLUDED_RAW_PII` byte-identical. New component doc `vault/components/goal-schema.md`. No new PF-class entries; INV-SKILL-TRACE green (2 rows all-YES). **Full contract preserved in git history (the on-main #119 lifecycle is the S56-close commit `3488a10` + the review-nit fix `fd885df`, the rebased `main` tip; the repo rebase-merges, so the pre-rebase `fix/s56-close` tips `3b71bc6`/`c7dd6b4` are GC-eligible); S56 drift checks + close attestation (with the per-PR #117/#118 invocation table) in `memory/process-failures.md` (Session 56 section); summary in `vault/sessions/session-56.md`** (compacted here at the S57 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 55 (2026-06-13)
 
