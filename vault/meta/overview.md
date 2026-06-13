@@ -76,6 +76,30 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
+## Status as of 2026-06-13 (S56) — the goal data model SHIPPED (zone 6 Goals & Progress)
+
+Two PR lifecycles merged (#117 S55-close docs, #118 the goal data model; `main` at
+`8455608`, suite 760 passed / 2 skipped, +38 from session open), every gated skill invoked
+fresh (fifth full session under INV-SKILL-TRACE, green). The first of the three remaining
+"done"-path dashboard data models shipped: `scripts/store/goal_schema.py` is a new
+`goal::<slug>` store stream (label/baseline/current/target[/unit]; a read-derived
+direction-agnostic percent clamped 0-100 and never rounding up to a false "100%";
+append/correct split; the store-adversarial battery proven RED per dedupe-identity field),
+and the dashboard routes `goal::` into zone 6 — populated rows (label / percent /
+good-green fill) + the July-visit landmark note card, the honest empty state otherwise —
+built strictly from the signed `dashboard-v1-visual-spec.md` zone-6 anatomy (no new Pencil
+round). The awaiting-zone count dropped by one (goals now populates from data). The #118
+6-agent review was load-bearing: it raised an impact-5 BUG-1 (render-crash on a
+malformed-conformant store line) that the blind triage REFUTED (plan_schema crashes
+identically — the shared store-trusts-writer posture; the fix would be unapproved
+defensive programming) and caught two false mutation-RED test docstrings (the source-field
+dedupe contribution was untested) — fixed + re-proven RED. PII boundary unchanged
+(`SUMMARY_FIELD_SET`+`EXCLUDED_RAW_PII` byte-identical); `PALETTE`/`SERIES`/`ACCENTS`
+byte-identical. Bead `1oag` closed; HIST-2 filed (promote `loop_schema._reading` to a
+public store constructor — the two-consumer trigger). Next: the calendar-event (zone 2) +
+30-day-rollup (zone 5) data models, then the correctness/governance tail. Session detail:
+`vault/sessions/session-56.md`.
+
 ## Status as of 2026-06-13 (S55) — the #112 architecture debt PAID DOWN (y91q/z2d0/smei)
 
 Two PR lifecycles merged (#115 S54-close docs, #116 the #112 architecture debt + the `juc`

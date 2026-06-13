@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-54)
+title: Scope Contract Archive (Sessions 5-55)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-54. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-55. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 55 (2026-06-13)
+
+S55 resume plan from the S54 close: merge the S54 close PR, then pay down the #112 architecture debt (`y91q`/`z2d0`) + the `juc` in-range `reference_range` validity pin (`smei`), each through a full review/merge lifecycle. Two PR lifecycles merged (#115 S54-close docs — 1 LEGITIMATE off-main archive SHA fixed; #116 `y91q`+`z2d0`+`smei` — `report.py` rewired off the 5 private cross-module imports onto the public `component_set`/`loop_schema.panel_pending` API, `read_panel`/`panel_pending` made recurrence-aware via the both-sides timepoint bracket, a `smei` load-time `reference_range` tripwire); final main `b0e1a52`, suite 722/2 (+12). AC1-AC6 all PASS. The #116 6-agent review surfaced BUG-001 (a backdated-second-result false-pending in z2d0, PROVEN unfixable by any read-model heuristic — the store drops append order) → blind-triaged DEFERRED, beaded `pq7m`, documented as the z2d0 decision note's second known limitation; 4 LEGITIMATE test gaps fixed + blind-verified 4/4. `PALETTE`/`SERIES`/`ACCENTS` + `SUMMARY_FIELD_SET`/`EXCLUDED_RAW_PII` byte-identical. New decision note `vault/decisions/2026-06-13-z2d0-recurrence-aware-panel-pending.md`. No new PF-class entries; INV-SKILL-TRACE green (2 rows all-YES). **Full contract preserved in git history (main at `cccfd5c`, the rebased tip of the #117 lifecycle — the S55-close commit `3104fcc` + the review-nit fix `69b372a`; the repo rebase-merges, so there is no merge commit); S55 drift checks + close attestation (with the per-PR #115/#116 invocation table) in `memory/process-failures.md` (Session 55 section); summary in `vault/sessions/session-55.md`** (compacted here at the S56 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 54 (2026-06-13)
 
