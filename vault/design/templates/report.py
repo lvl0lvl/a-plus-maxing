@@ -36,18 +36,13 @@ import re
 from pathlib import Path
 
 from scripts.store import biomarker_meta, plan_schema
-from scripts.store.loop_schema import _TAG_PANEL, derive_watchout_questions
+from scripts.store.loop_schema import derive_watchout_questions, panel_pending
 from vault.design.templates import component_set as cs
 
-# Shared date/number formatting — reused from the dashboard template (the one
-# other consumer) rather than re-derived: locale-independent month names, the
-# `.10g` number form, and the ISO-timepoint date parse.
-from vault.design.templates.dashboard import (
-    _MONTH_NAMES,
-    _format_number,
-    _reading_date,
-    _short_date,
-)
+# Shared date/number formatting (`cs.MONTH_NAMES`, `cs.format_number`,
+# `cs.reading_date`, `cs.short_date`) and the pending-panel predicate
+# (`panel_pending`) are consumed from their published homes — `component_set`
+# and `loop_schema` — never the templates' private helpers (bead y91q).
 
 # The operator-profile sources the header status line reads (age band +
 # issue status when filled; initials from the title), in preference order:
@@ -195,7 +190,7 @@ def _read_profile():
 
 def _long_date(day):
     """Format a date in the face sheet's long form, e.g. `June 12, 2026`."""
-    return f"{_MONTH_NAMES[day.month - 1]} {day.day}, {day.year}"
+    return f"{cs.MONTH_NAMES[day.month - 1]} {day.day}, {day.year}"
 
 
 def _tier_markup(tier, with_word=False):
@@ -320,8 +315,8 @@ def _since_text(readings, match):
     absence, never an invented date).
     """
     earliest = next(r for r in readings if match(r["value"]))
-    day = _reading_date(earliest["timepoint"])
-    return f"since {_short_date(day)}" if day is not None else "since —"
+    day = cs.reading_date(earliest["timepoint"])
+    return f"since {cs.short_date(day)}" if day is not None else "since —"
 
 
 def _regimen_rows(plan_readings, resolved_supplements, resolved_peptides):
@@ -424,21 +419,21 @@ def _abnormal_detail(item, readings):
     low, high = meta["reference_range"]
     parts = [
         f"{latest} {meta['units']}",
-        f"ref {_format_number(low)} – {_format_number(high)}",
+        f"ref {cs.format_number(low)} – {cs.format_number(high)}",
     ]
     numeric_readings, numeric = _numeric_readings(readings)
     if len(numeric) >= 2:
         delta = numeric[-1] - numeric[-2]
         sign = "+" if delta > 0 else ""
-        delta_text = f"{sign}{_format_number(delta)}"
-        last_day = _reading_date(numeric_readings[-1]["timepoint"])
-        prev_day = _reading_date(numeric_readings[-2]["timepoint"])
+        delta_text = f"{sign}{cs.format_number(delta)}"
+        last_day = cs.reading_date(numeric_readings[-1]["timepoint"])
+        prev_day = cs.reading_date(numeric_readings[-2]["timepoint"])
         if last_day is not None and prev_day is not None:
             delta_text += f"/{(last_day - prev_day).days}d"
         parts.append(delta_text)
-    drawn = _reading_date(readings[-1]["timepoint"])
+    drawn = cs.reading_date(readings[-1]["timepoint"])
     if drawn is not None:
-        parts.append(f"drawn {_short_date(drawn)}")
+        parts.append(f"drawn {cs.short_date(drawn)}")
     return " · ".join(parts)
 
 
@@ -535,14 +530,15 @@ def _signals_section():
 def _pending_panels(panels):
     """Return the panel items still pending, by source provenance.
 
-    Mirrors `loop_schema.read_panel`'s resolution over the read model: the
-    pending marker is the only reading written under the plan-recommendation
-    tag, so a panel is pending iff NO reading carries another source.
+    Delegates the per-panel test to `loop_schema.panel_pending` (the published
+    provenance predicate) so this surface no longer imports the private
+    `_TAG_PANEL` tag or re-derives `read_panel`'s scan: a panel is pending iff
+    every reading is the plan-recommendation pending marker.
     """
     return [
         item
         for item, readings in sorted(panels.items())
-        if all(r["source"] == _TAG_PANEL for r in readings)
+        if panel_pending(readings)
     ]
 
 
@@ -635,7 +631,7 @@ def _item_caption(item, readings):
         low, high = meta["reference_range"]
         parts.append(
             cs._escape(
-                f"ref {_format_number(low)} – {_format_number(high)} {meta['units']}"
+                f"ref {cs.format_number(low)} – {cs.format_number(high)} {meta['units']}"
             )
         )
     if not parts:

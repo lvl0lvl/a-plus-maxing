@@ -65,20 +65,12 @@ from vault.design.templates import component_set as cs
 # carries no judgment and reads neutral.
 _TREND_STATE = {"improving": "good", "flat": "neutral", "regressing": "concern"}
 
-# Locale-independent date names: weekday abbreviations for the week-calendar
-# grid, full day/month names for the header bar's long-form date, and month
-# abbreviations for the calendar's week range.
+# Locale-independent weekday names: abbreviations for the week-calendar grid +
+# full day names for the header bar's long-form date. Month names/abbreviations
+# moved to `component_set.MONTH_NAMES`/`MONTH_ABBR` (bead y91q).
 _WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 _DAY_NAMES = (
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
-)
-_MONTH_NAMES = (
-    "January", "February", "March", "April", "May", "June", "July",
-    "August", "September", "October", "November", "December",
-)
-_MONTH_ABBR = (
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 )
 
 # Hero readout chips: (display label, registry marker). Each renders ONLY when
@@ -171,36 +163,6 @@ def _plain_row(label, value):
     return f"<div class='kpi-row'>{cs.kpi(label, value)}</div>"
 
 
-def _format_number(number):
-    """Format a numeric for card chips/captions: no float noise, no trailing zeros.
-
-    `.10g` keeps health-scale magnitudes in plain decimal while collapsing
-    float artifacts (`0.30000000000000004` -> `0.3`) and integral floats
-    (`3.0` -> `3`, `20.0` -> `20`).
-    """
-    return f"{number:.10g}"
-
-
-def _reading_date(timepoint):
-    """Parse a stored timepoint's date part, or None when not ISO-parseable.
-
-    Store timepoints are ISO `YYYY-MM-DD[Thh:mm:ss…]` strings; the date is the
-    first 10 chars (the render_views date-axis convention) parsed with the
-    house `datetime.date.fromisoformat`. An unparseable — or non-string —
-    timepoint reads None: the card renders NO date, never a raw string and
-    never a crash (honest absence).
-    """
-    try:
-        return datetime.date.fromisoformat(timepoint[:10])
-    except (TypeError, ValueError):
-        return None
-
-
-def _short_date(day):
-    """Format a date as the card's short form, e.g. `Jun 10`."""
-    return f"{_MONTH_ABBR[day.month - 1]} {day.day}"
-
-
 def _delta_chip(item, prev, latest):
     """Render the numeric delta chip for a >=2-point numeric series.
 
@@ -227,7 +189,7 @@ def _delta_chip(item, prev, latest):
     unit = f" {meta['units']}" if meta else ""
     return (
         f"<span class='pill tint-{state}'>{arrow} "
-        f"{cs._escape(f'{_format_number(abs(latest - prev))}{unit}')}</span>"
+        f"{cs._escape(f'{cs.format_number(abs(latest - prev))}{unit}')}</span>"
     )
 
 
@@ -249,7 +211,7 @@ def _range_caption(item, latest):
         state = biomarker_meta.state_for(item, latest)
         suffix = {"good": " · in range", "concern": " · out of range"}.get(state, "")
         text = (
-            f"ref {_format_number(low)} – {_format_number(high)} "
+            f"ref {cs.format_number(low)} – {cs.format_number(high)} "
             f"{meta['units']}{suffix}"
         )
     return f"<div class='caption'>{cs._escape(text)}</div>"
@@ -279,15 +241,15 @@ def _projection_caption(numeric_readings, numeric, day):
             per numeric reading, tail-windowed to the per-view cap; the
             projection slope reads only the last two).
         day (datetime.date | None): The card's latest-reading date — the
-            `_reading_date(readings[-1])` the label row renders top-right —
+            `cs.reading_date(readings[-1])` the label row renders top-right —
             or None when that timepoint is unparseable.
     """
     if len(numeric_readings) < biomarker_meta.PROJECTION_MIN_TIMEPOINTS:
         return ""
     if day is None:
         return ""
-    latest = _reading_date(numeric_readings[-1]["timepoint"])
-    prev = _reading_date(numeric_readings[-2]["timepoint"])
+    latest = cs.reading_date(numeric_readings[-1]["timepoint"])
+    prev = cs.reading_date(numeric_readings[-2]["timepoint"])
     if latest is None or prev is None:
         return ""
     projected = biomarker_meta.projection_values(numeric)[-1]
@@ -300,8 +262,8 @@ def _projection_caption(numeric_readings, numeric, day):
     if projected_day <= day:
         return ""
     text = (
-        f"→ {_format_number(projected)} by "
-        f"{_short_date(projected_day)} · naive projection"
+        f"→ {cs.format_number(projected)} by "
+        f"{cs.short_date(projected_day)} · naive projection"
     )
     return f"<div class='caption'>{cs._escape(text)}</div>"
 
@@ -348,8 +310,8 @@ def _metric_card(item, readings):
         shown = f"{latest_reading} {meta['units']}"
     else:
         shown = str(latest_reading)
-    day = _reading_date(readings[-1]["timepoint"])
-    top_right = _short_date(day) if day is not None else None
+    day = cs.reading_date(readings[-1]["timepoint"])
+    top_right = cs.short_date(day) if day is not None else None
     state = cs.state_for(item, numeric[-1])
     chip = _delta_chip(item, numeric[-2], numeric[-1]) if len(numeric) >= 2 else ""
     projection = _projection_caption(numeric_readings, numeric, day)
@@ -439,7 +401,7 @@ def _topbar(today):
         today (datetime.date): The seam date the long-form date renders.
     """
     date_text = (
-        f"{_DAY_NAMES[today.weekday()]} · {_MONTH_NAMES[today.month - 1]} "
+        f"{_DAY_NAMES[today.weekday()]} · {cs.MONTH_NAMES[today.month - 1]} "
         f"{today.day}, {today.year}"
     )
     return (
@@ -498,10 +460,10 @@ def _week_range(monday, sunday):
     A month-spanning week names both months (`Jun 29 – Jul 5`).
     """
     if monday.month == sunday.month:
-        return f"{_MONTH_ABBR[monday.month - 1]} {monday.day} – {sunday.day}"
+        return f"{cs.MONTH_ABBR[monday.month - 1]} {monday.day} – {sunday.day}"
     return (
-        f"{_MONTH_ABBR[monday.month - 1]} {monday.day} – "
-        f"{_MONTH_ABBR[sunday.month - 1]} {sunday.day}"
+        f"{cs.MONTH_ABBR[monday.month - 1]} {monday.day} – "
+        f"{cs.MONTH_ABBR[sunday.month - 1]} {sunday.day}"
     )
 
 

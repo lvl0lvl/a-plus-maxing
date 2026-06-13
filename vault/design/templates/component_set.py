@@ -19,6 +19,8 @@ palette MUST match that recorded decision (the gate reads its expected values
 from the decision, not from here).
 """
 
+import datetime
+
 from scripts.store import biomarker_meta
 
 # Colorblind-safe semantic palette. good/watch/concern are the three semantic
@@ -170,6 +172,51 @@ def state_for(item, value=None):
     """
     state = biomarker_meta.state_for(item, value)
     return state if state is not None else "neutral"
+
+
+# --- Shared date/number formatting (promoted from dashboard, bead y91q) ---
+# Locale-independent month names/abbreviations plus the numeric/date formatters
+# the dashboard and report templates both render. PUBLIC so report.py consumes
+# this stable component_set API instead of importing dashboard's private
+# helpers (a dashboard rename can no longer silently break the report).
+MONTH_NAMES = (
+    "January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December",
+)
+MONTH_ABBR = (
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+)
+
+
+def format_number(number):
+    """Format a numeric for card chips/captions: no float noise, no trailing zeros.
+
+    `.10g` keeps health-scale magnitudes in plain decimal while collapsing
+    float artifacts (`0.30000000000000004` -> `0.3`) and integral floats
+    (`3.0` -> `3`, `20.0` -> `20`).
+    """
+    return f"{number:.10g}"
+
+
+def reading_date(timepoint):
+    """Parse a stored timepoint's date part, or None when not ISO-parseable.
+
+    Store timepoints are ISO `YYYY-MM-DD[Thh:mm:ss…]` strings; the date is the
+    first 10 chars (the render_views date-axis convention) parsed with the
+    house `datetime.date.fromisoformat`. An unparseable — or non-string —
+    timepoint reads None: the caller renders NO date, never a raw string and
+    never a crash (honest absence).
+    """
+    try:
+        return datetime.date.fromisoformat(timepoint[:10])
+    except (TypeError, ValueError):
+        return None
+
+
+def short_date(day):
+    """Format a date as the card's short form, e.g. `Jun 10`."""
+    return f"{MONTH_ABBR[day.month - 1]} {day.day}"
 
 
 def _style_block():
