@@ -12,6 +12,28 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 56 (2026-06-13)
+
+> Confirmed by Walter ("proceed with goals", after confirming the done-path-before-correctness-tail ordering and reviewing the S56 open findings). Leads with the done path per his prior steer; goals (Zone 6) chosen first — most completely signed populated anatomy, most self-contained model, most directly surfaces July-visit progress. Verify-first established the Zone 6 populated design is already signed in `dashboard-v1-visual-spec.md` (no new Pencil round; PF-S49-01 satisfied by the spec, the Package A/B/C basis). Not a `v1-build` recipe task (the build plan is drained 18/18; this is post-build product work tracked as a bead, not a `docs/task-plan/` recipe), so wave/checkpoint attestation N/A. No hook-edit authorization requested this session.
+
+Goal: Merge the owed S55 close PR #117, then build the goal data model (Zone 6 — Goals & Progress) — a `goal::` store schema + the populated zone-6 render per the signed `dashboard-v1-visual-spec.md` — advancing the no-placeholder-dashboard ("done") path, through a full gated `/review-pr` + `/merge` lifecycle.
+
+Acceptance criteria:
+- [ ] AC1: PR #117 (S55 close docs) reviewed (3-agent docs subset, full methodology) + REST rebase-merged; both `/review-pr` and `/merge` invoked fresh via the Skill tool; baseline green after (722/2).
+- [ ] AC2: `scripts/store/goal_schema.py` — a `goal::`-keyed store schema (label + target + current → percent) following the append-only `plan_schema`/`loop_schema` patterns; unit tests incl. the store-adversarial battery (`docs/checklists/store-adversarial-tests.md` — store-surface task).
+- [ ] AC3: Zone 6 render reads the goal schema → populated rows (label left / percent right / thin good-green progress-bar fill) + the landmark note card, per the signed spec; honest-awaiting state preserved when empty (ADR-0009); demo'd with synthetic sample data (real operator data stays LM-04-gated).
+- [ ] AC4: AA/honesty gates hold (no fabricated percent; fill uses PALETTE good-green; render AA gate covers any new tint pair); locked sets untouched.
+- [ ] AC5: full 6-agent `/review-pr` + `/merge` on the implementation PR; every legitimate finding fixed + blind-verified, 0 suppressed; suite green after merge.
+- [ ] AC6: full session close per protocol — all FIVE audits incl. `skill-trace-audit.sh --session 56`, 6-clause rotation, PF attestation with the per-PR table, close PR.
+
+Files I WILL touch: `scripts/store/goal_schema.py` (new); `vault/design/templates/dashboard.py` (Zone 6 render only); `vault/design/templates/component_set.py` ONLY if a shared goal-row/progress-fill helper is genuinely needed (flagged if so); `tests/store/test_goal_schema.py` + `tests/generate/` (Zone 6); `vault/components/` (schema doc); `.beads/issues.jsonl` via `bd`; HANDOFF/vault at close.
+
+Files I will NOT touch: `.claude/hooks/*` + `.claude/settings.json` (no hook auth this session); INVARIANTS.md rows; `.claude/agents/*`; `main` directly; `PALETTE`/`SERIES`/`ACCENTS` values (ADR-0009 locked); `SUMMARY_FIELD_SET`+`EXCLUDED_RAW_PII` (Security MEDIUM-2 lock); `report.py` (physician sheet — Zone 6 is dashboard-only); the other dashboard zones (1–5, 7); `loop_schema`/`plan_schema` (unless a shared store util genuinely needs it — flag).
+
+NOT doing: the calendar-event (Zone 2) + 30-day-rollup (Zone 5) models (subsequent sessions, one model each); the correctness/governance tail (`b6um`/`e3b`/`02pe`/`r3pq`/`5zfk`/`rn3v`/`imev`/`tdre`/`vjsw`/`dt0t`/`1ww`) — exception: `b6um` folds in ONLY if it touches the exact AA gate I extend (flagged, not pre-adopted); `pq7m` (store-schema-gated); LM-02/LM-04; the library-population track; a new Pencil round (Zone 6 anatomy already signed).
+
+Invariants at risk: none structurally. INV-SKILL-TRACE binds PR #117 + the implementation PR (per-PR table at close). Store-surface caution: `goal_schema` triggers `docs/checklists/store-adversarial-tests.md` (Tier-1 + Tier-2 QA). PF-S49-01: build strictly from the signed Zone 6 anatomy. AC3 reduces the awaiting-zone count.
+
 ## Scope Contract — Session 55 (2026-06-13)
 
 > Confirmed by Walter ("proceed with your recommended path"; "only ask questions that really need me to weigh — no performative questions"). Executes the S55 resume checklist from the S54 close: merge the S54 close PR, then pay down the #112 architecture debt (`y91q`/`z2d0`) + the `juc` validity pin (`smei`). Not a `v1-build` recipe task (beads, not `docs/task-plan/` recipes), so wave/checkpoint attestation N/A. No hook-edit authorization requested this session.
