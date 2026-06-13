@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-52)
+title: Scope Contract Archive (Sessions 5-54)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-53. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-54. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 54 (2026-06-13)
+
+S54 resume plan from the S53 close: merge the S53 close PR, then build the `juc` worst-wins `recent-trend-direction` router EXACTLY per the recorded decision note, through a full review/merge lifecycle. Two PR lifecycles merged (#113 S53-close docs; #114 the `juc` router — `scripts/plan/router.py` `_POLARITY_FEED` registry-driven `biomarker::` feed + `_recent_trend_direction` worst-wins reusing `_trend_token` untouched + a distinct mechanism with a load-time juc tripwire + the zero-stream `flat`); final main `13f5814`, suite 710/2 (+13). AC1-AC5 all PASS. `SUMMARY_FIELD_SET` + `EXCLUDED_RAW_PII` byte-unchanged (no Security MEDIUM-2 event); `_trend_token` AST byte-identical. The in-range `reference_range` validity pin was deliberately scoped OUT → bead `smei` (built S55). No new PF-class entries; INV-SKILL-TRACE green (2 rows all-YES). **Full contract preserved in git history (main at `32b1da0`, the rebased tip of the #115 lifecycle — the S54-close commit `51c86c8` + the review-nit fix `32b1da0`; the repo rebase-merges, so there is no merge commit); S54 drift checks + close attestation (with the per-PR #113/#114 invocation table) in `memory/process-failures.md` (Session 54 section); summary in `vault/sessions/session-54.md`** (compacted here at the S55 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 53 (2026-06-12)
 

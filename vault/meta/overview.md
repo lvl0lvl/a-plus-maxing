@@ -76,6 +76,27 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
+## Status as of 2026-06-13 (S55) — the #112 architecture debt PAID DOWN (y91q/z2d0/smei)
+
+Two PR lifecycles merged (#115 S54-close docs, #116 the #112 architecture debt + the `juc`
+validity pin; `main` at `b0e1a52`, suite 722 passed / 2 skipped, +12 from session open), every
+gated skill invoked fresh (fourth full session under INV-SKILL-TRACE, green). The
+report↔dashboard↔loop_schema coupling debt (Top-3 #1 for two sessions) is PAID DOWN: `report.py`
+no longer imports five private cross-module symbols — `dashboard.py`'s four formatters
+(+ `MONTH_ABBR`) are now the PUBLIC `component_set` API and `loop_schema.panel_pending` is the
+published pending predicate, both pinned by a regression test (`y91q`). `read_panel`/
+`panel_pending` are recurrence-aware — a re-recommended panel reads `pending` again — via the
+both-sides timepoint bracket single-sourced through `_latest_result`+`_re_recommended`; all 5
+pinned `read_panel` contracts preserved (`z2d0`). A load-time tripwire pins that every in-range
+`_POLARITY_FEED` marker carries a `reference_range` (`smei`). The #116 6-agent review found
+BUG-001 — a backdated-second-result false-pending in z2d0, PROVEN unfixable by any read-model
+heuristic (the store sorts by timepoint and drops append order) — blind-triaged DEFERRED, beaded
+`pq7m`, documented as the z2d0 decision note's second known limitation; LATENT (the panel data-in
+loop has no production writer). PII boundary unchanged (`SUMMARY_FIELD_SET`+`EXCLUDED_RAW_PII`
+byte-identical); `PALETTE`/`SERIES`/`ACCENTS` byte-identical. Beads `y91q`/`z2d0`/`smei` closed;
+`pq7m` filed. Next: the correctness/governance tail + the goal / calendar-event / 30-day-rollup
+data models (the remaining "awaiting" dashboard zones).
+
 ## Status as of 2026-06-13 (S54) — the juc worst-wins recent-trend-direction router SHIPPED
 
 Two PR lifecycles merged (#113 S53-close docs, #114 the `juc` router; `main` at `13f5814`,
