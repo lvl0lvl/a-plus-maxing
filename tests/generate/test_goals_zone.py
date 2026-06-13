@@ -50,6 +50,10 @@ def test_goals_zone_renders_rows_with_percent_and_good_fill():
     # the good-green fill at 50% width, PALETTE good — never an accent/data-state color
     assert f"width:50.0%;background:{component_set.PALETTE['good']}" in zone
     assert "class='ghead'" in zone
+    # the row is percent-ONLY: the raw baseline/current/target/unit never reach the
+    # DOM, so a resolve_goal regression that corrupts them (while the derived percent
+    # coincidentally matches) cannot hide behind the percent assertion above.
+    assert all(raw not in zone for raw in ("225", "250", "275", "lb"))
 
 
 def test_goals_zone_percent_keeps_decimals_and_clamps():

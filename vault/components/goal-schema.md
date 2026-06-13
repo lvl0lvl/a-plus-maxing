@@ -23,7 +23,8 @@ file I/O only; 0 model-bound send.
   tag (one snapshot per slug+date by design); `value` = `{label, baseline, current,
   target[, unit]}`. The `::` separator keeps prefixed ids direct children of the store
   root (`store._item_path` guard). Disjoint from `biomarker::`/`panel::`/`plan::`/
-  `watch-out::`/`feedback::` — a shared bare name never cross-reads.
+  `plan-track::`/`watch-out::` and the fixed `feedback::physician-feedback` item —
+  a shared bare name never cross-reads.
 - **Value schema (closed-required, open-extras — the ADR-0006-T2 seam):** `label`
   non-empty str; `baseline`/`current`/`target` numbers (bool excluded); `unit` optional
   str; unknown extra keys permitted and ignored. **`baseline` != `target`** is a writer
