@@ -126,6 +126,18 @@ def test_percent_clamps_to_floor_and_ceiling(tmp_path):
     assert goal_schema.read_goal("over", tmp_path)["percent"] == 100.0
 
 
+def test_percent_never_rounds_up_to_a_false_complete():
+    """99.95% reads 99.9 (no fabricated "100%"); 100 shows only at true completion.
+
+    The ADR-0009 no-fabricated-completion edge: a sub-completion fraction must not
+    round up to a full bar / "100%". Overshoot and true completion still read 100.
+    """
+    assert goal_schema._percent(0, 0.9995, 1) == 99.9    # 99.95% must NOT read 100
+    assert goal_schema._percent(0, 1.0, 1) == 100.0      # true completion
+    assert goal_schema._percent(0, 1.5, 1) == 100.0      # overshoot
+    assert goal_schema._percent(0, 0.0001, 1) == 0.0     # ~0 reads 0
+
+
 def test_resolve_goal_latest_snapshot_wins_order_independent():
     """The max-timepoint snapshot wins regardless of list order (not positional)."""
     readings = [
@@ -183,10 +195,13 @@ def test_correct_goal_unstored_identity_raises(tmp_path):
 
 
 def test_dedupe_boundary_single_field_difference_does_not_collide(tmp_path):
-    """A different date persists alongside; same (slug, date) re-record collides.
+    """A different date persists alongside; a same (slug, date) re-record collides.
 
-    Mutation check: widening the dedupe key to include value (both same-key
-    snapshots persist) or dropping the source from the identity turns this RED.
+    Mutation check: dropping the TIMEPOINT from the dedupe identity collapses the
+    two dated snapshots into one — turns this RED. (The VALUE field's contribution
+    is covered by `test_rerecord_changed_value_is_dedupe_noop`; the SOURCE field's
+    by `test_dedupe_source_field_contributes_to_identity` — the goal writer's
+    constant source means this test alone cannot exercise those two fields.)
     """
     goal_schema.record_goal("bench", _goal(current=250), "2026-06-10", tmp_path)
     goal_schema.record_goal("bench", _goal(current=260), "2026-06-11", tmp_path)
@@ -194,6 +209,21 @@ def test_dedupe_boundary_single_field_difference_does_not_collide(tmp_path):
     # Same (slug, date) again — collides, dropped (the silent-drop boundary):
     goal_schema.record_goal("bench", _goal(current=250), "2026-06-10", tmp_path)
     assert len(store.read("goal::bench", root=tmp_path)) == 2
+
+
+def test_dedupe_source_field_contributes_to_identity(tmp_path):
+    """Two readings sharing (item, timepoint) but differing SOURCE both persist.
+
+    The goal writer hardcodes the source (one snapshot per slug+date), so this
+    drives `store.append` directly to prove the source field's contribution to
+    the `(item, timepoint, source)` dedupe identity (checklist category 3 — the
+    field `record_goal` cannot vary). Mutation check: dropping `source` from
+    `keying.DEDUPE_FIELDS` collapses the two to one — turns this RED.
+    """
+    item = "goal::bench"
+    store.append(item, loop_schema._reading(item, "2026-06-10", "src-a", _goal(current=250)), root=tmp_path)
+    store.append(item, loop_schema._reading(item, "2026-06-10", "src-b", _goal(current=260)), root=tmp_path)
+    assert len(store.read(item, root=tmp_path)) == 2
 
 
 def test_distinct_slugs_same_date_both_persist(tmp_path):

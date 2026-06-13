@@ -719,14 +719,17 @@ def test_page2_table_renders_raw_non_string_cells(tmp_path):
 def test_unrouted_stream_prefix_raises(tmp_path):
     """An unknown `::` prefix KeyErrors naming the prefix — routing for a new
     stream type is added deliberately, never by silent fallthrough."""
+    # A never-routed sentinel prefix: `goal::` is now a real routed prefix on the
+    # dashboard (S56), so using it here would make this test a tautology the moment
+    # goals are ever added to the report — `future::` is routed nowhere (PR #118).
     root = tmp_path / "store"
     store.append(
-        "goal::weight",
-        {"item": "goal::weight", "timepoint": "2026-06-11T00:00:00+00:00",
+        "future::thing",
+        {"item": "future::thing", "timepoint": "2026-06-11T00:00:00+00:00",
          "source": "manual", "value": 185},
         root=root,
     )
-    with pytest.raises(KeyError, match="unrouted stream prefix 'goal::'"):
+    with pytest.raises(KeyError, match="unrouted stream prefix 'future::'"):
         _emit(root, tmp_path)
 
 

@@ -43,7 +43,7 @@ from scripts.store.loop_schema import _reading
 # (one goal per slug, so the source needs no content discriminator — a same
 # (slug, date) re-record is an idempotent dedupe no-op, a revision is a
 # `correct_goal`).
-GOAL_PREFIX = "goal::"
+_PREFIX_GOAL = "goal::"
 _TAG_GOAL = "goal-progress"
 
 # Day-keyed timepoints are date-only by contract: a malformed date would sort
@@ -123,11 +123,18 @@ def _percent(baseline, current, target):
     """Return the progress percent toward target, direction-agnostic, 0-100.
 
     The fraction of the way from `baseline` to `target` the `current` value has
-    moved, floored at 0 and ceiled at 100. `baseline` != `target` is a writer
-    invariant, so the denominator is never 0 for a stored goal.
+    moved. `baseline` != `target` is a writer invariant, so the denominator is
+    never 0 for a stored goal. 100.0 is returned ONLY at true completion
+    (`current` reaching/passing `target`) and 0.0 only at/below `baseline`; a
+    sub-completion fraction never ROUNDS UP to a false "100%" (99.95% reads 99.9)
+    — the ADR-0009 no-fabricated-completion rule.
     """
     fraction = (current - baseline) / (target - baseline)
-    return round(max(0.0, min(1.0, fraction)) * 100, 1)
+    if fraction >= 1:
+        return 100.0
+    if fraction <= 0:
+        return 0.0
+    return min(99.9, round(fraction * 100, 1))
 
 
 def record_goal(slug, goal, on_date, root):
@@ -152,7 +159,7 @@ def record_goal(slug, goal, on_date, root):
             schema field.
     """
     _check_goal_args(slug, goal, on_date)
-    item = f"{GOAL_PREFIX}{slug}"
+    item = f"{_PREFIX_GOAL}{slug}"
     store.append(item, _reading(item, on_date, _TAG_GOAL, goal), root=root)
 
 
@@ -175,7 +182,7 @@ def correct_goal(slug, goal, on_date, root):
             carries the (slug, date) identity.
     """
     _check_goal_args(slug, goal, on_date)
-    item = f"{GOAL_PREFIX}{slug}"
+    item = f"{_PREFIX_GOAL}{slug}"
     store.correct(item, _reading(item, on_date, _TAG_GOAL, goal), root=root)
 
 
@@ -226,7 +233,7 @@ def read_goal(slug, root):
     """
     if not _is_nonempty_str(slug):
         raise ValueError(f"slug must be a non-empty str, got {slug!r}")
-    return resolve_goal(store.read(f"{GOAL_PREFIX}{slug}", root=root))
+    return resolve_goal(store.read(f"{_PREFIX_GOAL}{slug}", root=root))
 
 
 def read_goals(root):
@@ -245,8 +252,8 @@ def read_goals(root):
     """
     out = []
     for item in store.items(root):
-        if item.startswith(GOAL_PREFIX):
+        if item.startswith(_PREFIX_GOAL):
             resolved = resolve_goal(store.read(item, root=root))
             if resolved is not None:
-                out.append((item[len(GOAL_PREFIX):], resolved))
+                out.append((item[len(_PREFIX_GOAL):], resolved))
     return out
