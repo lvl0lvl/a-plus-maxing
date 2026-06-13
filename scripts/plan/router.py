@@ -235,7 +235,11 @@ assert set(SUMMARY_FIELD_SET).isdisjoint(set(EXCLUDED_RAW_PII))
 # it is not itself a field) and none joins the named-excluded raw-PII set (the
 # streams are derivation inputs, never raw-PII classes — resolving the second half
 # of S51 sub-question (c)); and the worst-wins reduction's outputs are pinned to
-# the locked TREND_DIRECTIONS vocabulary.
+# the locked TREND_DIRECTIONS vocabulary. `_TREND_REDUCTION_OUTPUTS` is that
+# declared output set, kept distinct from the unordered vocabulary `TREND_DIRECTIONS`
+# because it is ORDERED by worst-wins precedence (regressing > improving > flat,
+# mirroring the reduction's return order); a future change to the reduction's outputs
+# that drifts off this set reds the final assert below.
 _TREND_REDUCTION_OUTPUTS = ("regressing", "improving", "flat")
 assert all(
     (_m := biomarker_meta.get(_s)) is not None and _m["good_direction"] is not None
