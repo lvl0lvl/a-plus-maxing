@@ -51,6 +51,19 @@ ACCENTS = {
     "sleep": "#5B5BD6",
 }
 
+# Report-section accent chrome (`vault/design/physician-facesheet-v1-spec.md`,
+# v3 signed bindings): the face sheet's Biomarkers and Goals section bars,
+# whose categories have no ACCENTS entry. A SEPARATE constant — NOT new
+# ACCENTS keys — because `_TINTABLE` is built from `*ACCENTS` and
+# `_tint_rules()` indexes `CHROME[name+'-tint']`/`CHROME[name+'-text']` for
+# every tintable name, so an ACCENTS key without its CHROME pair KeyErrors
+# every render. Chrome ONLY (4x16 section bars), never data state and never
+# text: no text/background pair to measure.
+SECTION_ACCENTS = {
+    "biomarkers": "#B42318",
+    "goals": "#2E8B57",
+}
+
 # Neutral app-surface chrome (`vault/design/dashboard-v1-visual-spec.md`) —
 # chrome, NOT data state: the gray page frame, card/sheet borders, and the
 # ~10% tint backgrounds the pills / stat boxes / calendar use. Tints are fixed
@@ -61,6 +74,7 @@ CHROME = {
     "card-border": "#E5E7EB",      # card/sheet/track borders + ring track
     "good-tint": "#E7F1EB",        # PALETTE good #117733
     "concern-tint": "#F3E9EE",     # PALETTE concern #882255
+    "watch-tint": "#FCF7EA",       # PALETTE watch #DDAA33 (4.58 with watch-text — facesheet spec v3, #111 review measurement)
     "neutral-tint": "#EEEEEE",     # PALETTE muted #555555
     "training-tint": "#EAF1FD",    # ACCENTS training #1F6FEB
     "nutrition-tint": "#FDF3EB",   # ACCENTS nutrition #E8833A
@@ -91,6 +105,11 @@ CHROME = {
     "lab-draw-text": "#955F0D",    # lab-draw #B45309 darkened (4.68 on lab-draw-tint)
     "check-in-text": "#9333EA",    # = check-in base (4.65 on check-in-tint unchanged)
     "appointment-text": "#127A3B", # appointment #15803D darkened (4.74 on appointment-tint)
+    # The AA-dark form of PALETTE watch (facesheet spec v3 signed bindings; the
+    # b6um sub-AA watch-text fix vehicle): raw #DDAA33 measures < 4.5 as text
+    # everywhere, so watch-state TEXT renders this shade — measured 4.58 on
+    # watch-tint and 4.90 on paper; the gate computes both.
+    "watch-text": "#8A6D1F",       # PALETTE watch #DDAA33 darkened (4.58 on watch-tint)
 }
 
 # The calendar legend's event categories beyond training (which reuses the
@@ -101,10 +120,14 @@ _EVENT_TINTS = ("lab-draw", "check-in", "appointment")
 # `.tint-*` rule generation read this one set, so a guard-accepted name always
 # has a rendered CSS rule (and vice versa — they cannot diverge). `today-tint`
 # stays calendar-cell CHROME (the today day-cell background), NOT pill-tintable.
-_TINTABLE = frozenset({"good", "concern", "neutral", *ACCENTS, *_EVENT_TINTS})
+# "watch" joined at the facesheet build (v3 bindings): its rule pairs
+# watch-tint with the AA-dark watch-text shade below.
+_TINTABLE = frozenset({"good", "concern", "neutral", "watch", *ACCENTS, *_EVENT_TINTS})
 
 # The semantic-state tints' text colors (the :root custom properties); an
 # accent-category tint takes its text color from the CHROME `*-text` hex.
+# "watch" is deliberately ABSENT: raw PALETTE watch text is sub-AA on its
+# tint, so the .tint-watch rule falls through to CHROME["watch-text"].
 _STATE_TINT_TEXT = {
     "good": "var(--good)",
     "concern": "var(--concern)",
