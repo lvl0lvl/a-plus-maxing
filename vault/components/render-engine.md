@@ -3,7 +3,7 @@ title: render-engine — emit pipeline + component set + templates
 type: reference
 status: active
 created: 2026-06-10
-last_reviewed: 2026-06-11
+last_reviewed: 2026-06-12
 review_cadence: on-change
 permalink: a-plus-maxing/components/render-engine
 ---
@@ -68,8 +68,9 @@ self-contained HTML file. Templates are callables `template(store_read) -> html_
   replaced when a rollup model lands); goals (unfilled track + awaiting); labs strip
   card (panel → Pending-draws chip w/ state-marker; watch-out → answers; feedback →
   notes — real). Routing stays total: unknown `::` prefix raises (ADR-0008 D3
-  preserved verbatim). `report.py` — the physician-facing summary template (shares
-  the restyled sheet frame; no redesign).
+  preserved verbatim). `report.py` — the Physician Face Sheet (redesigned S53,
+  bead `nsxy`; own page identity + v3 token bindings — see
+  `vault/components/report.md`).
 
 **Called by (production):** `generate.run` (dashboard/report), `render_views` (per-page
 emit).
