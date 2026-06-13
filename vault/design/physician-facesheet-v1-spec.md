@@ -64,6 +64,9 @@ historical signed-v2 record.]**
    improving = good green `#117733` with ▲/▼, attention items (new compounds,
    experimental flags) = amber `#8A6D1F` with ●, neutral = ink. Rows sorted by clinical
    urgency. First-visit state: the card reads `No prior review — full baseline below`.
+   **[AMENDED 2026-06-12, S53 build (bead `nsxy`): attention rows ride the measured
+   watch pair (watch-tint ground + watch-text) — watch-text directly on the card's
+   training-tint computes 4.31 < the 4.5 AA floor (measured at build).]**
 3. **Current regimen — with adherence** (teal bar `#0E9AA3`): rows of
    `name — dose · since <date>` left, adherence right (`100%` green; below threshold =
    amber `#B7791F` with missed-count, e.g. `94% · 2 missed`). Experimental compounds
