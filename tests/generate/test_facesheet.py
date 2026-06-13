@@ -14,6 +14,7 @@ sink, and the single-file inert contract. Colors are asserted as
 import datetime
 import html as html_lib
 import re
+from pathlib import Path
 
 import pytest
 
@@ -126,7 +127,7 @@ def test_header_unfilled_profile_renders_em_dash_slots(tmp_path, monkeypatch):
     """An unfilled scaffold renders em-dash awaiting slots, never a guess."""
     profile = tmp_path / "profile.md"
     profile.write_text(_SCAFFOLD_PROFILE)
-    monkeypatch.setattr(report, "_PROFILE_PATH", profile)
+    monkeypatch.setattr(report, "_PROFILE_PATHS", (profile,))
     html = _emit(tmp_path / "store", tmp_path)
     assert "Patient W · age band — · issue status — · last review — · next visit —" in html
 
@@ -139,7 +140,7 @@ def test_header_filled_profile_initials_and_band_only(tmp_path, monkeypatch):
     """
     profile = tmp_path / "profile.md"
     profile.write_text(_FILLED_PROFILE)
-    monkeypatch.setattr(report, "_PROFILE_PATH", profile)
+    monkeypatch.setattr(report, "_PROFILE_PATHS", (profile,))
     html = _emit(tmp_path / "store", tmp_path)
     assert "Patient WM · age band 40s · issue status improving" in html
     assert "Walter" not in html, "the operator name must never render"
@@ -149,9 +150,47 @@ def test_header_filled_profile_initials_and_band_only(tmp_path, monkeypatch):
 
 def test_header_missing_profile_renders_awaiting(tmp_path, monkeypatch):
     """A missing profile file renders the awaiting slots, not a crash."""
-    monkeypatch.setattr(report, "_PROFILE_PATH", tmp_path / "absent.md")
+    monkeypatch.setattr(report, "_PROFILE_PATHS", (tmp_path / "absent.md",))
     html = _emit(tmp_path / "store", tmp_path)
     assert "Patient — · age band — · issue status —" in html
+
+
+def test_header_filled_scaffold_copy_preferred(tmp_path, monkeypatch):
+    """The ADR-0005 filled copy wins over the tracked scaffold when both
+    exist; an absent filled copy falls back to the scaffold's awaiting state.
+
+    The production tuple leads with the pinned filled-scaffold-value path.
+    """
+    assert report._PROFILE_PATHS[0] == Path(
+        "vault/scaffold/filled/operator-profile.md"
+    )
+    assert report._PROFILE_PATHS[1] == Path("vault/meta/operator-profile.md")
+
+    filled = tmp_path / "filled.md"
+    filled.write_text(_FILLED_PROFILE)
+    scaffold = tmp_path / "scaffold.md"
+    scaffold.write_text(_SCAFFOLD_PROFILE)
+    monkeypatch.setattr(report, "_PROFILE_PATHS", (filled, scaffold))
+    html = _emit(tmp_path / "store", tmp_path)
+    assert "Patient WM · age band 40s · issue status improving" in html
+
+    monkeypatch.setattr(report, "_PROFILE_PATHS", (tmp_path / "absent.md", scaffold))
+    html = _emit(tmp_path / "store", tmp_path / "fallback")
+    assert "Patient W · age band — · issue status —" in html
+
+
+def test_header_age_band_bounds_dob_and_zero(tmp_path, monkeypatch):
+    """A DOB-shaped Age value and a zero age render the em-dash band — never
+    a fabricated `1980s`/`0s` claim (the band needs 0 < years < 120)."""
+    for slug, value in (("dob", "1982-03-15"), ("zero", "0")):
+        profile = tmp_path / f"profile-{slug}.md"
+        profile.write_text(
+            f"# Operator Profile — Walter\n\n- **Age:** {value}\n"
+        )
+        monkeypatch.setattr(report, "_PROFILE_PATHS", (profile,))
+        html = _emit(tmp_path / "store", tmp_path / slug)
+        assert "age band —" in html, f"Age {value!r} must read absent"
+        assert "age band 1980s" not in html and "age band 0s" not in html
 
 
 # --------------------------------------------------------------------------- #
@@ -203,8 +242,9 @@ def test_triage_row_populated_anatomy():
 
 
 def test_regimen_rows_from_todays_plans(tmp_path):
-    """Today's plan items render as regimen rows with the plan-date `since`
-    and an em-dash adherence slot per row — never a fabricated percent."""
+    """Today's plan items render as regimen rows with the earliest-plan
+    `since` (= today here: every item first appears in today's plan) and an
+    em-dash adherence slot per row — never a fabricated percent."""
     root = tmp_path / "store"
     _seed_plans(root)
     html = _emit(root, tmp_path)
@@ -215,6 +255,36 @@ def test_regimen_rows_from_todays_plans(tmp_path):
     assert section.count("since Jun 12") == 3
     assert section.count("adherence —") == 3
     assert "%" not in _body(html), "no fabricated adherence percentage anywhere"
+
+
+def test_regimen_since_is_earliest_plan_carrying_the_item(tmp_path):
+    """`since` derives from the EARLIEST stored plan whose value carries the
+    item — a long-running item keeps its start date across re-recorded plans;
+    an item first appearing in today's plan reads today."""
+    root = tmp_path / "store"
+    creatine = {"name": "Creatine", "dose": "5 g"}
+    plan_schema.record_plan(
+        "supplements", {"items": [creatine]}, "2026-06-08",
+        "supplement-specialist", root,
+    )
+    plan_schema.record_plan(
+        "supplements", {"items": [creatine]}, "2026-06-10",
+        "supplement-specialist", root,
+    )
+    plan_schema.record_plan(
+        "supplements",
+        {"items": [creatine, {"name": "Magnesium", "dose": "400 mg"}]},
+        _ISO, "supplement-specialist", root,
+    )
+    peptide = {"compound": "bpc-157", "dose": "250 mcg", "route": "subq"}
+    plan_schema.record_plan("peptides", peptide, "2026-06-10", "peptide-specialist", root)
+    plan_schema.record_plan("peptides", peptide, _ISO, "peptide-specialist", root)
+
+    html = _emit(root, tmp_path)
+    section = _between(html, "Current regimen — with adherence", "Biomarkers —")
+    assert "Creatine — 5 g</span><span class='caption'>since Jun 8</span>" in section
+    assert "Magnesium — 400 mg</span><span class='caption'>since Jun 12</span>" in section
+    assert "bpc-157 · 250 mcg · subq</span><span class='caption'>since Jun 10</span>" in section
 
 
 def test_regimen_experimental_row_watch_text_disclosure(tmp_path):
@@ -475,6 +545,86 @@ def test_page2_string_stream_routes_table_only(tmp_path):
     assert "none observed" in section
 
 
+def test_one_state_basis_string_latest_claims_no_concern(tmp_path):
+    """A stream whose LATEST reading is non-numeric claims NO current concern
+    anywhere — one state basis sheet-wide (the raw latest): no page-1
+    abnormal row, an honest zero in-range count, a neutral (never concern)
+    page-2 sparkline over the numeric history, and the string verbatim in the
+    KPI. Anatomy pin: sparkline points = numeric count, table rows = all
+    readings."""
+    root = tmp_path / "store"
+    loop_schema.record_biomarker("crp", "2026-05-12T00:00:00+00:00", 6.1, root)
+    loop_schema.record_biomarker(
+        "crp", "2026-06-11T00:00:00+00:00", "retest pending", root
+    )
+    html = _emit(root, tmp_path)
+    assert "fs-abrow" not in _body(html), "a string latest is not an abnormal claim"
+    assert "✓ 0 markers in range" in html
+    section = _between(html, "<h2>biomarker::crp</h2>", "</section>")
+    assert "aria-label='neutral sparkline'" in section
+    assert f"stroke='{cs.PALETTE['muted']}'" in section
+    assert f"stroke='{cs.PALETTE['concern']}'" not in section
+    assert "<div class='value'>retest pending</div>" in section
+    points = re.search(r"points='([^']*)'", section).group(1)
+    assert len(points.split()) == 1, "the sparkline plots ONLY the numeric history"
+    assert _between(section, "<tbody>", "</tbody>").count("<tr>") == 2
+
+
+def test_page2_table_renders_raw_non_string_cells(tmp_path):
+    """A raw-appended non-string timepoint/source renders its text through
+    the production path — never a sheet-wide crash (the value cell already
+    coerced)."""
+    from scripts.store import store
+
+    root = tmp_path / "store"
+    store.append(
+        "biomarker::crp",
+        {"item": "biomarker::crp", "timepoint": 20260611, "source": 12345,
+         "value": 7.3},
+        root=root,
+    )
+    html = _emit(root, tmp_path)
+    section = _between(html, "<h2>biomarker::crp</h2>", "</section>")
+    assert "<td>20260611</td>" in section
+    assert "<td>12345</td>" in section
+
+
+# --------------------------------------------------------------------------- #
+# Stream classification — fail-loud routing (the dashboard contract, mirrored)
+# --------------------------------------------------------------------------- #
+
+
+def test_unrouted_stream_prefix_raises(tmp_path):
+    """An unknown `::` prefix KeyErrors naming the prefix — routing for a new
+    stream type is added deliberately, never by silent fallthrough."""
+    from scripts.store import store
+
+    root = tmp_path / "store"
+    store.append(
+        "goal::weight",
+        {"item": "goal::weight", "timepoint": "2026-06-11T00:00:00+00:00",
+         "source": "manual", "value": 185},
+        root=root,
+    )
+    with pytest.raises(KeyError, match="unrouted stream prefix 'goal::'"):
+        _emit(root, tmp_path)
+
+
+def test_unrouted_plan_domain_raises(tmp_path):
+    """An unknown `plan::` domain suffix KeyErrors naming the domain."""
+    from scripts.store import store
+
+    root = tmp_path / "store"
+    store.append(
+        "plan::mystery",
+        {"item": "plan::mystery", "timepoint": "2026-06-12",
+         "source": "plan::nobody", "value": {"x": 1}},
+        root=root,
+    )
+    with pytest.raises(KeyError, match="unrouted plan:: domain 'mystery'"):
+        _emit(root, tmp_path)
+
+
 # --------------------------------------------------------------------------- #
 # Escaping — adversarial content through every new interpolated sink
 # --------------------------------------------------------------------------- #
@@ -504,7 +654,7 @@ def test_adversarial_content_escapes_through_new_sections(tmp_path, monkeypatch)
         "- **Age:** 44\n"
         "- **Current status:** improving <b>now\n"
     )
-    monkeypatch.setattr(report, "_PROFILE_PATH", profile)
+    monkeypatch.setattr(report, "_PROFILE_PATHS", (profile,))
 
     html = _emit(root, tmp_path)
     assert "&amp;" in html, "the ampersand must render entity-escaped"

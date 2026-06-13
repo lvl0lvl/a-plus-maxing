@@ -192,7 +192,9 @@ rows with operator answers live here too.
   which is still an unfilled scaffold (the Demographics age and January-issue status
   prompts are blank) — gated with em-dash awaiting slots until the profile is filled;
   last review + next visit are gated on LM-01 visit anchoring, also em-dash awaiting
-  slots.
+  slots. **[AMENDED 2026-06-12, S53 build (bead `nsxy`): the header fields source
+  from the ADR-0005 filled-scaffold copy (`vault/scaffold/filled/operator-profile.md`)
+  when present, else the tracked scaffold's awaiting state.]**
 - **Section 2 awaiting state:** until LM-01 visit anchoring lands, the card renders
   the first-visit copy (`No prior review — full baseline below`), which is literally
   true in both the first-visit and model-not-landed conditions — the first-visit copy
