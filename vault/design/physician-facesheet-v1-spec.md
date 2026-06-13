@@ -183,7 +183,11 @@ rows with operator answers live here too.
 - **Gating (honest awaiting states until the model lands):** renderable today —
   abnormal-first biomarkers, source tiers, watch-outs, pending draws, patient questions;
   gated — regimen+adherence (`1oh` plan schemas), since-last-review deltas (LM-01 visit
-  anchoring), signal aggregates (LM-02 wearable baseline), goals (goal model). Header
+  anchoring), signal aggregates (LM-02 wearable baseline), goals (goal model).
+  **[AMENDED 2026-06-12, S53 build (bead `nsxy`): the regimen gate is PARTIALLY
+  satisfied — the `1oh` plan schemas landed, so plan CONTENT renders from today's
+  `plan::supplements`/`plan::peptides`; the adherence % column stays an em-dash
+  awaiting state until the 30-day adherence aggregate model exists.]** Header
   status line: age band + issue status source from `vault/meta/operator-profile.md`,
   which is still an unfilled scaffold (the Demographics age and January-issue status
   prompts are blank) — gated with em-dash awaiting slots until the profile is filled;
