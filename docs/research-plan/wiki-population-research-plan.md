@@ -48,7 +48,7 @@ research, in what order, by what method, populated correctly, and verified corre
 
 | Built | Where | Don't |
 |---|---|---|
-| The gated research skill (`/aplus-research`, 7 attested gates) | `.claude/skills/aplus-research/` | re-implement gates; invoke the skill |
+| The gated research skill (`/aplus-research`, 7 blocking gates — 6 attestation-chained; 2.75 is schema-only) | `.claude/skills/aplus-research/` | re-implement gates; invoke the skill |
 | The wiki schema + 16-specialist consumer roster | `vault/WIKI.md` | redefine entity types |
 | Entity templates (compound, biomarker) | `vault/{compounds,biomarkers}/_template.md` | invent a page shape |
 | Source whitelist + 12-tag type enum + admissibility matrix | `vault/library/_source-whitelist.md` | cite off-list sources as anything but `anecdote_aggregate` |
@@ -93,7 +93,8 @@ biomarker reference set the visit's labs will be read against comes first; (b) t
 given the post-January-2026 recovery; (c) breadth (other compound classes) follows depth.
 
 > Counts below are the *implied target set* from `vault/library/peptides/_triage.md`
-> (30 peptides / 7 classes), `goals.md` (the named blood panel), and the
+> (~30 peptide bullets across 7 classes; **29 unique** — Humanin is listed under both
+> Immune/longevity and Mitochondrial), `goals.md` (the named blood panel), and the
 > per-specialist library-index namespaces. They are a research surface, not a
 > commitment — §8 Decision D1 asks the operator to confirm/trim before Wave 2+.
 
@@ -124,12 +125,12 @@ layers gates; those are compound-only). ~20 entries, grouped:
 The peptides `_triage.md` flags as the highest-priority first deep passes given the
 post-illness deconditioning + immune recovery. `target.type=compound` → **mode: deep**
 (peptides are the high-risk class; deep fires the 6-CRITIQUE gate + 7.5 + 8.5):
-- **Healing/soft-tissue:** TB-500, GHK-Cu (BPC-157 ✓ already done).
+- **Healing/soft-tissue:** TB-500, GHK-Cu, KPV, LL-37 (BPC-157 ✓ already done) — the full `_triage.md` healing class, the top-priority post-illness recovery cluster.
 - **Immune/recovery:** Thymosin Alpha-1 (triage: "strongest post-illness immune candidate").
 - **GH secretagogues (paired with the IGF-1 biomarker from Wave 1):** Ipamorelin, CJC-1295 (no-DAC).
 
 ### Wave 3 — the rest of the triaged peptide library (breadth)
-The remaining ~22 `_triage.md` peptides by class — GH secretagogues (Tesamorelin,
+The remaining ~21 `_triage.md` peptides by class (29 unique − Wave 0's 1 − Wave 2's 7) — GH secretagogues (Tesamorelin,
 Sermorelin, Hexarelin, MK-677), metabolic (Semaglutide, Tirzepatide, Retatrutide,
 AOD-9604), cognitive (Selank, Semax, Cerebrolysin, Dihexa, …), sexual/dopaminergic
 (PT-141, Melanotan II, Kisspeptin-10), immune/longevity (Epitalon, FOXO4-DRI, Humanin),
