@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-57)
+title: Scope Contract Archive (Sessions 5-58)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-57. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58; S58 at S59) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-58. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 58 (2026-06-13)
+
+S58 resume plan from the S57 close: merge the S57 close PR, then the done path's LAST awaiting-zone model — the 30-day care-team rollup (zone 5), a DESIGN-then-build (the signed spec signs only "a colored per-domain status line", NOT the specialist→stream mapping nor the 30-day rule). Walter confirmed option (a) — all 16 cards, honest grey on the streamless. Two PR lifecycles merged (#121 S57-close docs — 0 findings; #122 the care-team rollup `ektw` — `scripts/store/care_team_rollup.py`, a per-specialist 30-day RECORDED-DATA freshness read-model [green ≤30d / amber 31–60d / grey >60d-or-none; future events excluded] + the zone-5 `_care_team_zone` render: a data-state status dot [PALETTE good/watch/muted, never an accent] + a muted recency caption, all 16 cards with honest grey on the 10 streamless, per the signed visual spec + the new decision note `2026-06-13-care-team-rollup-zone5-mapping`); final main `afd40a8`, suite 821/2 (+36). AC1-AC6 all PASS. The #122 6-agent review (Security 0, Contracts 0) caught a real HONESTY defect in the orchestrator's OWN same-session decision note (a future scheduled event read "updated today") → refined to exclude future from freshness + flagged to Walter; 3 doc/test nits fixed + blind-verified. `PALETTE`/`SERIES`/`ACCENTS` + `SUMMARY_FIELD_SET`/`EXCLUDED_RAW_PII` byte-identical. No new PF promoted; one observed PF-S51-01-shape concurrent-mutation window (review agents mutating the shared tree — tree verified pristine, no harm); INV-SKILL-TRACE green (2 rows all-YES). **The dashboard "done" path is COMPLETE** (all 3 awaiting zones shipped; wearable LM-02-gated). **Full contract preserved in git history (the on-main #123 lifecycle is the S58-close commit `fdd4193`, verified on-main via `git merge-base --is-ancestor`; the repo rebase-merges, so the pre-rebase `fix/s58-close` tip `371f87b` is GC-eligible); S58 drift checks + close attestation (with the per-PR #121/#122 invocation table) in `memory/process-failures.md` (Session 58 section); summary in `vault/sessions/session-58.md`** (compacted here at the S59 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 57 (2026-06-13)
 

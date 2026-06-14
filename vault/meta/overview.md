@@ -4,7 +4,7 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-06-13
+last_reviewed: 2026-06-14
 depends_on: []
 superseded_by: null
 review_cadence: monthly
@@ -75,6 +75,28 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - No diet app — LLM computes macros/micros from `protocols/meal-template.md`
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
+
+## Status as of 2026-06-14 (S59) — the sub-AA legend (b6um) FIXED; the render AA gate hardened
+
+Two PR lifecycles merged (#123 S58-close docs, #124 the `b6um` AA fix; `main` at `7253af7`, suite
+821 passed / 2 skipped, unchanged — a CSS-token + test change), every gated skill invoked fresh
+(eighth full session under INV-SKILL-TRACE, green). With the dashboard "done" path complete (S58),
+forward work shifted to the correctness/governance tail, starting with `b6um`: the semantic legend's
+`.state-watch` text was `watch #DDAA33` on white = 2.13:1 — sub-AA, violating ADR-0004's unqualified
+WCAG-AA commitment. It now renders the AA-dark `watch-text #8A6D1F` (4.90:1) via a new `--watch-text`
+`:root` var (= the existing `CHROME["watch-text"]`, no new colour); the legend SWATCH keeps the true
+`--watch` amber (the data-state colour cue), pinned by a new test assertion. The render AA gate
+(`test_render.py::test_contrast_and_colorblind`) was extended from `good`-only to all three
+state-text-on-paper pairs (mutation-proven RED) so the sub-AA-state-text class cannot reship.
+`PALETTE`/`SERIES`/`ACCENTS` byte-unchanged. Verify-first found the bead's "the gate does not measure
+state-text pairs" partially stale (it measured `good`-only by deliberate design). The #124 6-agent
+review (Security/Bug/Quality/Contracts/Historical 0) confirmed the locked-set immutability + ADR-0004/
+ADR-0009-D3 consistency; the test-coverage reviewer caught 2 real coverage gaps (the swatch true-colour
+unpinned; a gate-comment failure-mode error) — both fixed + blind-verified. The S58 PF-S51-01
+concurrent-mutation watch was MITIGATED (Phase-1 review agents dispatched read-only; the tree stayed
+pristine). Bead `b6um` closed. Next: the correctness/governance tail (`d3w` mechanize-close-step-8,
+`10h` HALT-filter, `1ww` append-race, `e3b` Wave-5 wiring) + the deferred follow-ups; the July-visit
+prep (LM-01) unblocks once the visit date firms up. Session detail: `vault/sessions/session-59.md`.
 
 ## Status as of 2026-06-13 (S58) — the care-team rollup SHIPPED (zone 5); the dashboard "done" path is COMPLETE
 
