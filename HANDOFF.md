@@ -12,6 +12,28 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 59 (2026-06-14)
+
+> Confirmed by Walter ("open the session" → on the forward-priority question I surfaced [the dashboard done-path is complete; the backlog is the correctness/governance tail], **"b6um, then proceed"**). The dashboard "done" path completed at S58 (all 3 awaiting zones shipped); forward work shifts off the done-path. `b6um` is a real WCAG-AA defect in the now-complete dashboard. Verify-first (PF-S6-01) found the bead's "the gate does not measure state-text pairs" is PARTIALLY STALE — `tests/generate/test_render.py::test_contrast_and_colorblind` DOES measure `.state-good` text but DELIBERATELY excludes watch/concern (`for state in ("good",)`, with a comment that they are "never a standalone text marker, only glyph+swatch-paired"). The real fix is a DESIGN decision (per ADR-0004's UNQUALIFIED WCAG-AA): the legend's "monitor" WORD is sub-AA text (watch #DDAA33 on #FFFFFF = 2.13:1) regardless of its glyph+swatch, so darken the watch legend text to the AA-dark `watch-text #8A6D1F` (4.90:1) AND extend the gate to measure all three state-text pairs. Not a `v1-build` recipe task. No hook-edit authorization requested.
+
+Goal: Merge the owed S58 close PR #123, then fix `b6um` — the sub-AA state-colored legend text (`.state-watch` "monitor" = 2.13:1 on paper) — by rendering the watch legend text in the AA-dark `watch-text` shade (the swatch keeps the true `--watch` color) AND extending the render AA gate to measure all three `.state-*` text-on-paper pairs so the class cannot reship, through a full gated `/review-pr` + `/merge` lifecycle.
+
+Acceptance criteria:
+- [ ] AC1: PR #123 (S58 close docs) reviewed (3-agent docs subset, full methodology) + REST rebase-merged; both `/review-pr` and `/merge` invoked fresh via the Skill tool; baseline green after (821/2).
+- [ ] AC2: `.state-watch` legend text renders the AA-dark `watch-text #8A6D1F` (≥4.5:1 on paper) via a new `--watch-text` `:root` var sourced from the existing `CHROME["watch-text"]`; the legend swatch keeps the true `--watch #DDAA33` (non-text chrome); `.state-good`/`.state-concern` unchanged (already AA, 5.66 / 8.73).
+- [ ] AC3: the render AA gate (`test_render.py::test_contrast_and_colorblind`) extends its measured state-text-on-paper set from `good`-only to all three states (good/watch/concern), each asserted ≥4.5; the gate goes RED on the pre-fix `.state-watch` (mutation proven) so the sub-AA-legend class cannot reship.
+- [ ] AC4: locked sets untouched — `PALETTE`/`SERIES`/`ACCENTS` byte-unchanged (the fix reuses the existing `CHROME["watch-text"]`, adds no new color); the render output is unchanged except the legend's watch text color; the existing AA-gate assertions (ink/muted/tints/series ΔE) still pass.
+- [ ] AC5: full 6-agent `/review-pr` + `/merge` on the implementation PR; every legitimate finding fixed + blind-verified, 0 suppressed; suite green after merge.
+- [ ] AC6: full session close per protocol — all FIVE audits incl. `skill-trace-audit.sh --session 59`, 6-clause rotation, PF attestation with the per-PR table.
+
+Files I WILL touch: `vault/design/templates/component_set.py` (the `--watch-text` `:root` var + the `.state-watch` rule); `tests/generate/test_render.py` (extend the state-text AA gate); `.beads/issues.jsonl` via `bd` (close `b6um`); HANDOFF/vault at close.
+
+Files I will NOT touch: `.claude/hooks/*` + `.claude/settings.json` (no hook auth this session); INVARIANTS.md rows; `.claude/agents/*`; `main` directly; `PALETTE`/`SERIES`/`ACCENTS` values (ADR-0009 locked — byte-unchanged); `SUMMARY_FIELD_SET`+`EXCLUDED_RAW_PII` (Security MEDIUM-2 lock); `report.py`; `vault/design/templates/dashboard.py` (the legend lives in `component_set`; b6um does not touch the render routing); the store layer.
+
+NOT doing: the rest of the correctness/governance tail (`e3b`/`02pe`/`r3pq`/`5zfk`/`rn3v`/`imev`/`tdre`/`vjsw`/`dt0t`/`1ww`) — separate sessions; `pq7m`; `dqyv` + the archive-SHA-check; redesigning the legend (the swatch+glyph+word anatomy stays — only the watch text color changes); LM-02/LM-04; the library-population track.
+
+Invariants at risk: none structurally. INV-SKILL-TRACE binds PR #123 + the implementation PR (per-PR table at close). ADR-0004 (unqualified WCAG-AA) is the basis; the fix STRENGTHENS the render AA gate (catches the state-text-on-paper class). PF-S6-01: the bead's stale "gate doesn't measure state-text" claim was verified against the live gate before building.
+
 ## Scope Contract — Session 58 (2026-06-13)
 
 > Confirmed by Walter ("open the session" → then, on the one genuinely-open product decision Q I surfaced — how Zone 5 should present given only ~7 of 16 specialists have any data stream — "'a' sounds right": show all 16, honest grey "no data yet" on the empty domains, colored recency status on the data-backed ones). He did not redirect the proposed specialist→stream mapping nor the freshness-based color rule, so both are accepted-by-default and locked in the decision note (AC2) for a concrete final check during the build. The 30-day-rollup (Zone 5 — "Your Care Team") is a DESIGN-then-build: the signed `dashboard-v1-visual-spec.md:208` signs only the card anatomy + "when a rollup model lands this line carries the colored per-domain status" — NOT which data drives each specialist's status, NOR what the color means. Verify-first at S57 close established this (the pivot to calendar-events); S58 records the decision THEN builds. Not a `v1-build` recipe task (post-build product work, a bead, not a `docs/task-plan/` recipe). No hook-edit authorization requested this session.
