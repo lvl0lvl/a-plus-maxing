@@ -23,7 +23,7 @@ honest state: `no rollup yet` muted; when a rollup model lands this line carries
 per-domain status)."* It does NOT sign:
 
 1. **Which data drives each specialist's status** — the `_SPECIALISTS` tuple
-   (`dashboard.py:122`) carries 16 `(slug, name, free-text tracks-line)` rows; there is no
+   (in `dashboard.py`) carries 16 `(slug, name, free-text tracks-line)` rows; there is no
    structured specialist→store-stream mapping.
 2. **What the color means** — no aggregation rule, no status semantics, no 30-day window
    definition.
@@ -34,8 +34,8 @@ the fully-signed calendar-events). S58 records the decision here, THEN builds.
 ## Decision 1 — the specialist→store-stream mapping (v1)
 
 Each specialist's status is derived from the store streams ALREADY attributed to it through
-existing wiring (the `_PLAN_CARDS` `default_specialist` at `dashboard.py:85`, the labs streams,
-the physician-note stream), plus the calendar event categories by their natural owner. Streams
+existing wiring (the `_PLAN_CARDS` `default_specialist` wiring in `dashboard.py`, the labs
+streams, the physician-note stream), plus the calendar event categories by their natural owner. Streams
 read directly from the same `store_read` the dashboard already groups (`_readings_by_item`).
 
 | Specialist | Streams |
@@ -62,13 +62,15 @@ the dates of its mapped calendar event categories). Store timepoints are ISO str
 reduced to its nominal calendar date via the house `datetime.date.fromisoformat(timepoint[:10])`
 (the `render_views` date-axis convention, mirroring `component_set.reading_date`; an unparseable
 or non-string timepoint contributes nothing — the same honest-absence degrade the trend card
-takes, never a crash). Let `latest = max(dates)` and `days = (today -
-latest).days` (a future `latest` — an upcoming scheduled event — yields `days <= 0`, treated as
-current). The status:
+takes, never a crash). **Future timepoints are EXCLUDED** — an upcoming scheduled event is
+activity (already shown in Zone 2 This Week), not recorded data, and labeling it "updated today"
+would assert a data update that never happened. So `latest = max(dates on or before today)`; a
+specialist whose only mapped reading is in the future (like one with no mapped reading) is
+`none`. With `latest` never in the future, `days = (today - latest).days >= 0`. The status:
 
 | Status | Condition | Dot color (data-state) | Caption (muted) |
 |---|---|---|---|
-| `current` | has data, `days <= 30` (incl. future/today) | PALETTE `good` (green) | `updated {days}d ago` / `updated today` |
+| `current` | recorded data, `days <= 30` | PALETTE `good` (green) | `updated {days}d ago` / `updated today` |
 | `stale` | has data, `31 <= days <= 60` | PALETTE `watch` (amber) | `updated {days}d ago` |
 | `dormant` | has data, `days > 60` | PALETTE `muted` (grey) | `updated {days}d ago` |
 | `none` | no data in any mapped stream | PALETTE `muted` (grey) | `no data yet` |
@@ -96,7 +98,7 @@ honest zone-level empty state, unchanged).
 ## AA / chrome-separation rationale
 
 The status indicator is a **data-state dot** (a small colored circle on the status line), NOT
-the name's leading glyph dot. ADR-0009 D3 (`component_set.py:44`) reserves ACCENTS for category
+the name's leading glyph dot. ADR-0009 D3 (the `ACCENTS` block in `component_set.py`) reserves ACCENTS for category
 chrome and PALETTE `good`/`watch`/`concern`/`muted` for data state — so the freshness dot uses
 PALETTE data-state hexes, and the name's category glyph dot is untouched. The dot is non-text
 chrome (like the goal good-green fill, S56) → it adds NO new AA-gated text pair; the recency
