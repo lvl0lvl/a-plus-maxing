@@ -153,7 +153,7 @@ check_biomarker() {
     require_sections "$f" "$rel" Metadata "Target Range" "Current Value" "Affected By" Relations
     check_enum  "$f" "$rel" category   "blood wearable functional subjective"
     require_field "$f" "$rel" unit
-    check_enum  "$f" "$rel" source     "lab oura manual calculation"
+    check_enum  "$f" "$rel" source     "lab wearable manual calculation"
     check_enum  "$f" "$rel" confidence "established supported provisional"
     check_date  "$f" "$rel" last_verified
 }

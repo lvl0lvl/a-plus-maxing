@@ -4,7 +4,7 @@ type: biomarker
 permalink: a-plus-maxing/biomarkers/<slug>
 category: blood | wearable | functional | subjective
 unit: <e.g., mg/dL, ms, bpm, %>
-source: lab | oura | manual | calculation
+source: lab | wearable | manual | calculation
 confidence: established | supported | provisional
 created: YYYY-MM-DD
 last_verified: YYYY-MM-DD
@@ -30,7 +30,7 @@ review_cadence: monthly | quarterly | per-lab-panel
 ## Current Value
 - value:               # x (YYYY-MM-DD)
 - trend:               # improving | stable | declining (over last N measurements)
-- history pointer:     # [[labs/YYYY-MM-DD]] or [[daily/YYYY-MM-DD]] or oura export path
+- history pointer:     # [[labs/YYYY-MM-DD]] or [[daily/YYYY-MM-DD]] or wearable export path
 
 ## Affected By
 - [[protocols/<name>]]

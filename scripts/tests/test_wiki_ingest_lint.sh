@@ -21,6 +21,8 @@
 #   12 minimal valid library layer page                        -> PASS
 #   13 non-gated file (_template.md)                           -> PASS (skipped)
 #   14 valid page w/ unresolved forward-ref link               -> PASS (link advisory, non-blocking)
+#   15 biomarker source: wearable (ADR-0011 D4 generalized enum) -> PASS
+#   16 biomarker source: oura (ADR-0011 D4 retired the device token) -> FAIL (enum)
 
 set -uo pipefail
 PASS=0; FAIL=0
@@ -254,6 +256,17 @@ printf '\n- [[biomarkers/does-not-exist-yet]]\n' >> "$CP/test-compound.md"
 run "$TMP/bda-pass.sh" vault/compounds/test-compound.md
 { [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "advisory"; } \
     && ok "unresolved forward-ref link is advisory, non-blocking" || { bad "case14 expected rc0+advisory got $RC"; echo "$OUT"; }
+
+# Case 15: biomarker source: wearable -> PASS (ADR-0011 D4: source enum generalized oura->wearable)
+emit_biomarker test-marker | sed 's/^source: lab/source: wearable/' > "$BM/test-marker.md"
+run "$TMP/bda-pass.sh" vault/biomarkers/test-marker.md
+[ "$RC" -eq 0 ] && ok "biomarker source: wearable PASSes (D4 generalized enum)" || { bad "case15 expected rc0 got $RC"; echo "$OUT"; }
+
+# Case 16: biomarker source: oura -> FAIL (ADR-0011 D4 retired the device-specific token; non-tautological vs case 15)
+emit_biomarker test-marker | sed 's/^source: lab/source: oura/' > "$BM/test-marker.md"
+run "$TMP/bda-pass.sh" vault/biomarkers/test-marker.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "source: oura"; } \
+    && ok "biomarker source: oura FAILs (D4 retired the oura token)" || { bad "case16 expected rc1+source: oura got $RC"; echo "$OUT"; }
 
 echo
 echo "test_wiki_ingest_lint: ${PASS} passed, ${FAIL} failed"
