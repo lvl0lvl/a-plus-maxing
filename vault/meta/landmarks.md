@@ -3,7 +3,7 @@ title: Landmark Register
 type: reference
 status: active
 created: 2026-05-25
-last_reviewed: 2026-06-12
+last_reviewed: 2026-06-14
 review_cadence: session
 permalink: a-plus-maxing/meta/landmarks
 ---
@@ -32,7 +32,7 @@ Append-only register of project landmarks. Each landmark declares relevant scope
 ## Active landmarks
 
 ### LM-01 — First MD visit (July 2026 doctor appointment)
-- **date:** 2026-07-XX (target — exact date TBD; see operator-profile.md)
+- **date:** 2026-07-13 (confirmed by operator S60-context, 2026-06-14; 14-day window opens 2026-06-29, 7-day 2026-07-06)
 - **relevant_scopes:**
   - `vault/meta/operator-profile.md` (especially January 2026 health-issue section + medications + allergies)
   - `vault/compounds/*` where `risk_tier: medium+` or `risk_tier: experimental`

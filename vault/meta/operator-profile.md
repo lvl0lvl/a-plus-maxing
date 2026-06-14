@@ -4,7 +4,7 @@ type: note
 permalink: a-plus-maxing/meta/operator-profile
 status: scaffold
 created: 2026-05-23
-last_reviewed: 2026-05-23
+last_reviewed: 2026-06-14
 review_cadence: quarterly (or on material change)
 ---
 
@@ -70,7 +70,7 @@ Source: 23andMe raw file → parsed in `vault/dna/analysis.md` when ingested.
 - **Work demands:** <sedentary / physical / cognitive load>
 
 ## Medical relationship
-- **Primary care MD:** <name | none — first visit July 2026 per HANDOFF>
+- **Primary care MD:** <name | none — first visit 2026-07-13 (LM-01) per HANDOFF>
 - **Insurance coverage status:** <relevant for Rx access — full | limited | cash-pay>
 - **Compounding pharmacy access:** <yes/no, vendor names if yes>
 - **Bloodwork access:** <MD-ordered | direct-to-consumer (Marek, Function, Empower) | both>
