@@ -66,7 +66,7 @@ orchestrator's own work:
   honest zeros (strain=0). Fixed: honest-zero retention test; mutation-proven.
 - 7 LEGITIMATE fixed + blind-verified 7/7; 2 OUT_OF_SCOPE beaded (`crgz`); BUG-1 beaded (`ienx`);
   the rest NOT_A_BUG/NOT_ACTIONABLE with documented evidence (the triage correctly rejected BUG-1 as
-  V1-single-strap-bounded and HIST-3 option-b as unapproved defensive code).
+  V1-single-strap-bounded, BUG-3 as speculative, and HIST-3 option-b as unapproved defensive code).
 
 ## Governance / discipline
 
