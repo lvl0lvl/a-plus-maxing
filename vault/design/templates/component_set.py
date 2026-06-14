@@ -330,6 +330,10 @@ caption, .caption {{ color: var(--muted); font-size: 13px; }}
 .hero .chips .chip-b {{ margin-right: 8px; }}
 .ring {{ display: inline-block; text-align: center; margin-right: 16px; }}
 .dot {{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); vertical-align: middle; margin-right: 6px; }}
+.sdot {{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }}
+.sdot-current {{ background: var(--good); }}
+.sdot-stale {{ background: var(--watch); }}
+.sdot-none {{ background: var(--muted); }}
 .pchead {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
 .pchead .ptitle {{ font-size: 14px; font-weight: 600; }}
 .pchead .pill {{ margin-left: auto; }}

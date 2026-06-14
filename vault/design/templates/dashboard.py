@@ -57,7 +57,14 @@ import math
 
 # Aliased: this module's template surface is itself named `render`.
 from scripts.generate import render as render_engine
-from scripts.store import biomarker_meta, calendar_schema, goal_schema, loop_schema, plan_schema
+from scripts.store import (
+    biomarker_meta,
+    calendar_schema,
+    care_team_rollup,
+    goal_schema,
+    loop_schema,
+    plan_schema,
+)
 from vault.design.templates import component_set as cs
 
 # Trend word -> the semantic state coloring it: a registered-polarity verdict is
@@ -1007,21 +1014,68 @@ def _plan_zone(plan_readings, track_readings, watchout_answers, today):
     )
 
 
-def _care_team_zone():
-    """Render zone 5 — the 16 domain-specialist compact cards, 4-column grid.
+# Zone-5 freshness state -> status-dot class. The dot is data-state chrome
+# (PALETTE good/watch/muted via the .sdot-* rules); the caption rides muted ink,
+# so no AA-gated text pair is added. `none` and `dormant` share the grey dot,
+# distinguished by the caption text (decision 2026-06-13-care-team-rollup).
+_STATUS_DOT = {
+    "current": "sdot-current",
+    "stale": "sdot-stale",
+    "dormant": "sdot-none",
+    "none": "sdot-none",
+}
 
-    Per-card anatomy (visual spec zone 5): glyph dot + name, tracks line,
-    status line. The status stays the muted "no rollup yet" until a
-    per-specialist rollup model exists (ADR-0009 zone 5).
+
+def _status_caption(status):
+    """The muted recency caption for a rollup status (None -> no mapped data)."""
+    if status is None:
+        return "no data yet"
+    days = status["days"]
+    return "updated today" if days == 0 else f"updated {days}d ago"
+
+
+def _care_team_card(name, tracks, status):
+    """Render one populated zone-5 card: name + tracks line + status line.
+
+    `status` is `care_team_rollup`'s `{state, days}` for this specialist, or None
+    when the specialist has no mapped data (the honest "no data yet" grey state).
     """
-    cards = "".join(
+    state = status["state"] if status is not None else "none"
+    return (
         "<div class='card'>"
         f"<div class='label'><span class='dot'></span>{cs._escape(name)}</div>"
         f"<div class='body'>{cs._escape(tracks)}</div>"
-        "<div class='caption'>no rollup yet</div>"
+        f"<div class='caption'><span class='sdot {_STATUS_DOT[state]}'></span>"
+        f"{_status_caption(status)}</div>"
         "</div>"
-        for _slug, name, tracks in _SPECIALISTS
     )
+
+
+def _care_team_zone(rollup):
+    """Render zone 5 — the 16 domain-specialist compact cards, 4-column grid.
+
+    Per-card anatomy (visual spec zone 5): glyph dot + name, tracks line, status
+    line carrying the colored per-domain freshness status (a data-state status
+    dot + muted recency text). `rollup` is `care_team_rollup.resolve_rollup`'s
+    slug -> status map; a specialist absent from it has no mapped data ("no data
+    yet"). An ALL-empty rollup (no specialist has any data) keeps the pre-data
+    static "no rollup yet" caption — the honest zone-level empty state that the
+    calendar-shell / zone tests pin (ADR-0009 zone 5).
+    """
+    if not rollup:
+        cards = "".join(
+            "<div class='card'>"
+            f"<div class='label'><span class='dot'></span>{cs._escape(name)}</div>"
+            f"<div class='body'>{cs._escape(tracks)}</div>"
+            "<div class='caption'>no rollup yet</div>"
+            "</div>"
+            for _slug, name, tracks in _SPECIALISTS
+        )
+    else:
+        cards = "".join(
+            _care_team_card(name, tracks, rollup.get(slug))
+            for slug, name, tracks in _SPECIALISTS
+        )
     return cs.zone(
         "Your Care Team",
         f"<div class='grid4'>{cards}</div>",
@@ -1185,6 +1239,7 @@ def render(store_read, _today=None):
         or cs.awaiting("No lab results, watch-outs, or notes on file yet.")
     )
     today = _today if _today is not None else datetime.date.today()
+    rollup = care_team_rollup.resolve_rollup(store_read, today)
     zones = (
         _hero_zone(store_read),
         _calendar_zone(today, events_by_date),
@@ -1194,7 +1249,7 @@ def render(store_read, _today=None):
             trends_body,
             subtitle="How you're tracking — recent readings per metric.",
         ),
-        _care_team_zone(),
+        _care_team_zone(rollup),
         _goals_zone(goal_readings),
         cs.zone(
             "Labs & Bloodwork",
