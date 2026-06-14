@@ -76,6 +76,29 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
+## Status as of 2026-06-13 (S58) — the care-team rollup SHIPPED (zone 5); the dashboard "done" path is COMPLETE
+
+Two PR lifecycles merged (#121 S57-close docs, #122 the care-team rollup; `main` at `afd40a8`,
+suite 821 passed / 2 skipped, +36 from session open), every gated skill invoked fresh (seventh full
+session under INV-SKILL-TRACE, green). The THIRD and LAST of the three remaining "done"-path
+dashboard data models shipped: `scripts/store/care_team_rollup.py` is a READ-MODEL (no new store
+stream) attributing each store reading to a specialist (by stream prefix or calendar event category)
+and reducing it to a per-specialist 30-day RECORDED-DATA freshness status (green ≤30d / amber 31–60d /
+grey >60d-or-none; future scheduled events excluded — they are activity in Zone 2, not recorded data).
+The dashboard `_care_team_zone` renders a data-state status dot (PALETTE good/watch/muted, never an
+accent — ADR-0009 D3) + a muted recency caption; all 16 specialist cards render, the ~10 streamless
+read the honest grey "no data yet", an all-empty store keeps the static "no rollup yet". Built from the
+signed zone-5 anatomy + the new decision note `decisions/2026-06-13-care-team-rollup-zone5-mapping.md`
+(the design-then-build recorded the unsigned specialist→stream mapping + the 30-day rule BEFORE
+building); Walter confirmed option (a) — all-16, honest grey. **With this the dashboard is
+no-placeholder except the wearable surface (LM-02, operator-gated on Walter's Oura data).** The #122
+6-agent review (Security 0, Contracts 0) caught a real HONESTY defect in the orchestrator's own
+same-session decision note (a future event made a specialist read "updated today") → refined to exclude
+future from freshness + flagged to Walter; 3 doc/test nits fixed + blind-verified. PII boundary
+unchanged; `PALETTE`/`SERIES`/`ACCENTS` byte-identical. Bead `ektw` closed. Next: the
+correctness/governance tail + the deferred follow-ups (`dqyv`, the archive-SHA-check) — the done-path
+dashboard is complete. Session detail: `vault/sessions/session-58.md`.
+
 ## Status as of 2026-06-13 (S57) — the calendar-event data model SHIPPED (zone 2 This Week)
 
 Two PR lifecycles merged (#119 S56-close docs, #120 the calendar-event data model; `main` at
