@@ -283,7 +283,7 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 1. **The correctness/governance tail.** Strong P2 candidates: `d3w` (mechanize close-step-8 DocRubric as `scripts/session-close-audit.sh` — would mechanically catch the PF-S13-01/S37-01 attest-without-run class, the highest-leverage rigor compounder); `10h` (the HALT filter trusts a specialist-supplied category — a safety-gate bug); `1ww` (`store.append` non-atomic check-then-act dedupe race); `e3b` (Wave-5 clone-scoped store-root threading). Plus `02pe`/`r3pq`/`5zfk`/`rn3v`/`imev`/`tdre`/`vjsw`/`dt0t` (P3). Each a full review/merge lifecycle; verify-first against the live code (bead text can name pre-refactor paths).
 2. **The deferred follow-ups.** `dqyv` (promote `loop_schema._reading`/`_content_tag` public — 3-consumer trigger fired at S57); the **archive-SHA-check** bead (mechanize the on-main-SHA check for `scope-contract-archive.md` — off-main-SHA class is count=2; promote + build at N=3). Opportunistic.
-3. **Operator-gated.** `pq7m` store-schema-gated; the **July-visit prep track (LM-01 / the `c6k` epic)** unblocks once the visit date firms up (the 14-day window opens ~June 17 if July 1); LM-02 (Oura wearable — the last dashboard surface) + LM-04 gated on Walter's data; the library-population `/aplus-research` track operator-deferred.
+3. **Operator-gated.** `pq7m` store-schema-gated; the **July-visit prep track (LM-01 / the `c6k` epic)** is date-fixed (visit 2026-07-13; the 14-day window opens 2026-06-29, the 7-day 2026-07-06); LM-02 (Oura wearable — the last dashboard surface) + LM-04 gated on Walter's data; the library-population `/aplus-research` track operator-deferred.
 
 ## Landmark window check (close step 8.7)
 
