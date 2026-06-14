@@ -12,6 +12,14 @@ after init lands untracked via the ADR-0005-T1 `.gitignore` boundary, so a clone
 carries no operator data (the accepted no-VC-backup trade-off — see
 docs/clone-init.md).
 
+`run` deliberately does NOT initialize the project issue tracker (`bd` / the
+gitignored `.beads/*.db`): that tracker is dev-tooling outside the fillable-instance
+contract, irrelevant to a health-app operator. bd rebuilds its database from the
+tracked `.beads/issues.jsonl` on first use, and a contributor who wants it runs
+`bd init --from-jsonl` (see docs/clone-init.md). Keeping bd out of `run` preserves
+this THIN-LEAF entry's 0-outgoing-dependency design (ADR-0005-T2) — adding a `bd`
+subprocess would couple the pure product-init to the dev tracker.
+
 This is a THIN LEAF entry point (ADR-0005-T2 has 0 outgoing dependency edges); it
 CONSUMES the store (`store.read` / `vault/store/` root), and at Wave 4 the dashboard
 generation runs through the ADR-0004-T1 `render.emit`. It publishes no new shared

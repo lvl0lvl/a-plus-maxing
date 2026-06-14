@@ -44,3 +44,22 @@ store and filled scaffolds are never committed, they have no version-control
 history or backup. **Keep a separate local backup of your `vault/store/` data and
 filled scaffolds** — if the working copy is lost, that data cannot be recovered
 from git.
+
+## The project issue tracker (`.beads/`) — dev tooling, not part of your instance
+
+The repository ships `.beads/` — the a-plus-maxing **dev issue tracker** (the
+`a-plus-maxing-*` issues that track building the project, not your health data). A
+fresh clone carries the tracked issue records (`.beads/issues.jsonl`) but **not** the
+SQLite database (`.beads/*.db` is gitignored): the database is a per-machine local
+cache rebuilt from the tracked JSONL, never shared between clones.
+
+If you are running a-plus-maxing as your own health instance, you can **ignore
+`.beads/` entirely** — `init_instance.run()` does not touch it, and nothing in the
+fillable instance depends on it.
+
+If you are contributing and want the issue tracker, run **`bd init --from-jsonl`**
+once from the clone root to build the local database from the tracked records. Most
+`bd` commands (`bd list`, `bd ready`, `bd create`) also rebuild the database
+automatically on first use; only `bd sync --flush-only` requires the database to
+exist first (it is the one command that does not auto-import, so it errors with
+`no beads database found` on a never-initialized clone).
