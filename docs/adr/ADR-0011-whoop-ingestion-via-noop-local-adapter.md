@@ -1,6 +1,6 @@
 # ADR-0011 — WHOOP wearable ingestion via noop: a local, subscription-free source adapter
 
-**Status:** Proposed (2026-06-14, S60-followup) — awaiting operator ratification
+**Status:** Accepted (2026-06-14, S60-followup) — operator-ratified
 **Owner:** Walter McGivney
 **Relates to:** ADR-0003 (source-extensible ingestion interface — this is the WHOOP adapter that plugs into its seam), ADR-0001 (no-train PII trust boundary — ingestion routes no reading through a model step), ADR-0002 (local-first store — the (item, timepoint) dedupe key the adapter inherits), `vault/meta/landmarks.md` LM-02 (the wearable-baseline landmark, re-anchored here Oura→Whoop)
 
@@ -185,3 +185,4 @@ begins (the PolyForm-Noncommercial boundary forces a different ingestion).
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-06-14 | Initial draft (v1.0) — **Proposed**, awaiting operator ratification | Walter McGivney (drafted by Claude) |
+| 2026-06-14 | v1.1 — **Accepted** (operator ratified "ratify it"; the D2 CSV-export recommendation stands; D3/D4 propagation = follow-up build work) | Walter McGivney |
