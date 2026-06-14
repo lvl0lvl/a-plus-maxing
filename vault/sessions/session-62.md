@@ -1,5 +1,5 @@
 ---
-title: Session 62 — owed S61 close merged + ADR-0011 D3/D4 propagated (Oura→Whoop)
+title: Session 62 — owed S61 close + ADR-0011 D3/D4 propagated + D2 re-decided (noop-source review)
 type: note
 owner: Walter McGivney
 created: 2026-06-14
@@ -10,11 +10,11 @@ permalink: a-plus-maxing/sessions/session-62
 
 # Session 62 (2026-06-14)
 
-Walter: "merge #131 and proceed with (b)". Two PR lifecycles, both merged to `main`
-(`736575c`); suite 823/2 (Python) + 16/16 wiki-ingest. **The session's headline is process:
-the PF-S39-01 gated-skill falsification window HELD** — both PRs got BOTH `/review-pr` AND
-`/merge` invoked fresh via the Skill tool, the explicit test the S61 close set after its
-disclosed partial recurrence.
+Walter directed: "merge #131 and proceed with (b)", "clear the e64j bead", then a first-party
+noop-repo review. Four PR lifecycles, all merged to `main` (`d2ec74c`); suite 823/2 (Python) +
+16/16 wiki-ingest. **The session's headline is process: the PF-S39-01 gated-skill falsification
+window HELD** — all four PRs got BOTH `/review-pr` AND `/merge` invoked fresh via the Skill tool,
+the explicit test the S61 close set after its disclosed partial recurrence.
 
 ## What shipped (all on `main`)
 
@@ -62,12 +62,14 @@ disclosed partial recurrence.
 - **PF-S6-01 family — a prior (S61) miss SURFACED + remediated:** ADR-0011 v1 authored from noop's
   README (secondary source) → wrong D2; surfaced by Walter, remediated by the #135 source review.
   Disclosed, not promoted (the verify-first discipline + per-PR review caught it within one session).
-- **PF-S40-01 HELD ×2 and LOAD-BEARING** — the #131 triage found QUAL-004 LEGITIMATE; the #132
-  triage classified HIST-001 OUT_OF_SCOPE→bead `e64j` + QUAL-001 NOT_A_BUG. **PF-S26-01 HELD**
+- **PF-S40-01 HELD ×4 and LOAD-BEARING** — the #131 triage found QUAL-004 LEGITIMATE; the #132
+  triage classified HIST-001 OUT_OF_SCOPE→bead `e64j` + QUAL-001 NOT_A_BUG; the #134 triage found
+  its HIST-001 LEGITIMATE; the #135 triage confirmed the orchestrator's own `[VERIFIED — ADR-0003]`
+  over-claim was unsupported. **PF-S26-01 HELD**
   (every legitimate fixed, 0 suppressed; the OUT_OF_SCOPE finding beaded not dropped).
   **PF-S6-01 HELD + LOAD-BEARING** (verify-first: read the live enum sites + ADR-0011 D3/D4 +
   ADR-0003 + the current-state premise before editing; proved the tests RED before GREEN;
-  verified the merged-main production state). **PF-S51-01 HELD** (both review panels read-only).
+  verified the merged-main production state). **PF-S51-01 HELD** (all four review panels read-only).
   **PF-S13-01/S37-01 did NOT recur** (DOCUMENT_RUBRIC + landmarks re-opened from the files at
   8/8.7). Off-main-archive-SHA HELD (S61 contract archived at its on-main #131-close commit;
   count stays 2).
@@ -87,6 +89,6 @@ external rigor-framework project per Walter S60; `10h`/`1ww`/`e3b` deferred-by-d
 
 Merge the S62 close PR, then pick the forward work: execute one of the 3 S61 plans (the wiki
 research [a parallel session; resolve §8 D3 — the §8 D2/enum question is already RESOLVED + the
-plan reconciled via #134], the local-model eval [gated on operator inputs D2/D3/D5], or the
-ADR-0011 live-SQLite noop adapter [OQ-2, evidence-gated]) OR the correctness/governance tail. LM-01
+plan reconciled via #134], the local-model eval [gated on operator inputs D2/D3/D5], or build
+the WHOOP/noop adapter against noop's read-only MCP server [ADR-0011 v2 D2; beaded]) OR the correctness/governance tail. LM-01
 visit prep (2026-07-13) — the 14-day window opens 2026-06-29. Baseline 823/2.
