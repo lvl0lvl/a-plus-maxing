@@ -196,8 +196,14 @@ wiki well. Survey, on the same eval:
 
 ## 7. Operator inputs / decisions (resolve before scoring)
 
-- **D1 — Hardware.** What machine runs the local model (CPU/GPU, VRAM, RAM, OS)? This
-  gates the entire run-it axis + the candidate size ceiling. *(Blocks §4b.)*
+- **D1 — Hardware [RESOLVED 2026-06-14].** Two Apple-Silicon machines: a **Mac M2 Studio,
+  64GB unified — the PREFERRED target** — and a **128GB M-series laptop as the fallback** if a
+  survivor model needs more headroom at its usable quantization. Implication: 64GB unified
+  memory comfortably runs the 3B/7B candidates and well beyond (up to ~70B at Q4), so the eval
+  is **not memory-constrained** for the named candidates or most survey models — capability,
+  not size, is the binding constraint. Use Apple-Silicon-native inference (Ollama / llama.cpp
+  Metal / MLX). Target the M2 Studio; fall to the 128GB machine only if a ranked survivor needs
+  >~64GB at the quantization that preserves its 4a scores.
 - **D2 — The gold standard.** Who/what defines "correct" for the diagnostic + planning +
   medical-facts dimensions — Claude-authored references, an operator/doctor-validated set,
   a published medical-QA benchmark, or a mix? *(Blocks §5 scoring.)*
