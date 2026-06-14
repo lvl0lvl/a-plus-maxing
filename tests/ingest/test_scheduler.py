@@ -2,8 +2,9 @@
 
 Covers AC-1..AC-7: unattended invocation over the wired adapter set (exit 0, 0
 prompts, stdin closed), delta-only append on a second run, idempotent no-new
-re-run, Whoop-unwired exclusion (dynamic invoked-set + the static `whoop`-token
-scan that discharges ADR-0003-T2's deferred command), 0 outbound egress over a
+re-run, Whoop now WIRED (ADR-0011 D2 — the data-driven discovery includes it once
+whoop.py drops its UNWIRED marker) while scheduler.py still carries 0 `whoop`
+tokens (the static scan), 0 outbound egress over a
 REAL `scheduler.run()`, and the data-driven 0-edit-on-adapter-add proof. All
 store writes go to a tmp_path-based root so no test touches the real
 `vault/store/`; the wired adapters read in-test sample exports, not real exports.
@@ -28,8 +29,38 @@ SCHEDULER_PATH = REPO_ROOT / "scripts" / "ingest" / "scheduler.py"
 ADAPTERS_DIR = REPO_ROOT / "scripts" / "ingest" / "adapters"
 
 # The wired set the scheduler must invoke `ingest.run` over (AC-1, AC-4a). Whoop
-# is the registered-but-unwired scaffold the scheduler must NOT invoke.
-WIRED_SOURCES = {"healthkit", "oura", "garmin"}
+# joined the wired set at ADR-0011 D2 (its UNWIRED marker removed); it is invoked
+# when an export is provided, like every other wired adapter.
+WIRED_SOURCES = {"healthkit", "oura", "garmin", "whoop"}
+
+
+def _write_whoop_sqlite(path, rows):
+    """Build a synthetic noop `whoop.sqlite` (`dailyMetric`) the Whoop adapter reads.
+
+    Minimal mirror of noop's documented schema (`docs/DATA_MODEL.md`,
+    schemaVersion 9) — enough columns for the scheduler's wired-set invocation
+    test. `rows` is a list of `{day, <metric>: value}` dicts; omitted metric
+    columns default to NULL.
+    """
+    import sqlite3
+
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute(
+            "CREATE TABLE dailyMetric ("
+            "deviceId TEXT NOT NULL, day TEXT NOT NULL, "
+            "efficiency REAL, restingHr INTEGER, avgHrv REAL, recovery REAL, "
+            "strain REAL, spo2Pct REAL, skinTempDevC REAL, respRateBpm REAL, "
+            "PRIMARY KEY (deviceId, day))"
+        )
+        for r in rows:
+            conn.execute(
+                "INSERT INTO dailyMetric (deviceId, day, recovery) VALUES (?, ?, ?)",
+                ("dev1", r["day"], r.get("recovery")),
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _write_json_export(path, records):
@@ -194,16 +225,17 @@ def test_rerun_no_new_appends_zero_lines(tmp_path):
     assert second - first == 0  # idempotent: no line appended on the no-new run
 
 
-# --- AC-4: Whoop unwired adapter NOT invoked (two halves) ---
+# --- AC-4 (updated, ADR-0011 D2): Whoop is now WIRED + invoked; scheduler.py still names no whoop ---
 
 
-def test_whoop_not_invoked(tmp_path, monkeypatch):
-    """AC-4a (dynamic): the run's invoked-adapter set is exactly the wired set.
+def test_wired_set_invoked_includes_whoop(tmp_path, monkeypatch):
+    """AC-4a (ADR-0011 D2): the run's invoked-adapter set now INCLUDES whoop.
 
-    Spies on ingest.run to record which adapters scheduler.run() actually invokes
-    `ingest.run` over, and asserts the invoked source set equals {healthkit, oura,
-    garmin} and does NOT contain whoop. Reds if the scheduler's wired set ever
-    includes/invokes Whoop.
+    Spies on ingest.run to record which adapters scheduler.run() invokes. With
+    whoop.py's UNWIRED marker removed, the data-driven discovery includes Whoop, so
+    a run with a whoop.sqlite export invokes ingest.run over it. Inverts the prior
+    unwired-exclusion assertion: the invoked source set is the full wired set
+    INCLUDING whoop. Reds if a regression drops Whoop from the wired set.
     """
     from scripts.ingest import ingest, scheduler
 
@@ -213,6 +245,9 @@ def test_whoop_not_invoked(tmp_path, monkeypatch):
         oura_records=[_ou("hrv", "2026-01-01", 55)],
         garmin_records=[_ga("stress", "2026-01-01", 30)],
     )
+    whoop_db = tmp_path / "whoop.sqlite"
+    _write_whoop_sqlite(whoop_db, [{"day": "2026-01-01", "recovery": 66.0}])
+    exports["whoop"] = whoop_db
     store_root = tmp_path / "store"
 
     real_run = ingest.run
@@ -226,7 +261,9 @@ def test_whoop_not_invoked(tmp_path, monkeypatch):
     scheduler.run(exports=exports, root=store_root)
 
     assert set(invoked) == WIRED_SOURCES
-    assert "whoop" not in invoked
+    assert "whoop" in invoked
+    # The whoop adapter actually ingested its reading (not merely discovered).
+    assert len(store.read("recovery", root=store_root)) == 1
 
 
 def test_scheduler_carries_no_whoop_reference():
@@ -274,20 +311,18 @@ def test_scheduler_whoop_scan_is_falsifiable():
 # in production.
 
 
-def test_whoop_carries_unwired_attribute():
-    """Guard: whoop.py declares the typed unwired marker (`UNWIRED is True`).
+def test_whoop_carries_no_unwired_marker():
+    """Guard (ADR-0011 D2): whoop.py no longer declares the UNWIRED marker — it is WIRED.
 
-    The scheduler excludes the Whoop scaffold ONLY because whoop.py carries the
-    typed `UNWIRED = True` module attribute. If a future edit deletes the
-    attribute, the scheduler would silently re-include Whoop in the wired set
-    (the DANGEROUS direction AC-4 exists to prevent) while test_whoop_not_invoked
-    might still pass against a stale roster — this test REDs first. Guard value:
-    were the attribute deleted from whoop.py, the assertion below turns RED
-    (AttributeError).
+    Inverts the prior unwired-scaffold guard. With the marker removed, the
+    scheduler's data-driven discovery includes Whoop. A regression that re-adds
+    `UNWIRED = True` to whoop.py would silently drop Whoop from the unattended run
+    (the DANGEROUS direction) — this REDs first: the attribute must be absent or
+    falsy.
     """
     from scripts.ingest.adapters import whoop
 
-    assert whoop.UNWIRED is True
+    assert getattr(whoop, "UNWIRED", False) is False
 
 
 def test_unwired_marker_governs_wired_set_membership():

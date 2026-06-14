@@ -242,11 +242,22 @@ bond · the commercial GP product track begins (PolyForm boundary forces a diffe
 | # | Question | Owner | Resolve by | Impact |
 |---|----------|-------|-----------|--------|
 | OQ-1 | ~~Does `noop`'s CSV export include the computed metrics?~~ **RESOLVED (S62) — YES.** noop's "Export CSV…" re-serializes the computed `dailyMetric` (recovery/strain/HRV/RHR/sleep) into the WHOOP 4-CSV shape [VERIFIED — `WhoopCsvExporter.cyclesCSV`]. | — | resolved | — |
-| OQ-2 | ~~Is `noop`'s data location stable enough to read live?~~ **RESOLVED (S62) — YES.** Fixed documented path (`~/Library/.../OpenWhoop/whoop.sqlite`, `docs/DATA_MODEL.md` + `DatabasePathResolver`) + a first-party read-only API. **New residual:** which mechanism — subprocess `noop-local-access` MCP vs Python read-only `sqlite3` over the documented schema. | build session | first WHOOP adapter build | Build-time mechanism choice; both are first-party-documented + license-safe. |
-| OQ-3 | Does `noop-local-access` expose a non-interactive query mode usable from Python (beyond the MCP stdio loop), or must a-plus-maxing run a minimal MCP stdio client? | build session | first WHOOP adapter build | Shapes the adapter's invocation of noop. |
+| OQ-2 | ~~Is `noop`'s data location stable enough to read live?~~ **RESOLVED (S62) — YES.** Fixed documented path (`~/Library/.../OpenWhoop/whoop.sqlite`, `docs/DATA_MODEL.md` + `DatabasePathResolver`) + a first-party read-only API. ~~**New residual:** which mechanism — subprocess MCP vs Python read-only `sqlite3`.~~ **RESOLVED (S63) — read-only `sqlite3`.** The build chose a Python read-only `sqlite3` read of `whoop.sqlite` (`mode=ro`) over the documented `dailyMetric` schema, NOT the MCP subprocess: the adapter contract is file-based (`read_readings(export_file)`), so the DB-file read fits the ADR-0003 seam with **0 shared-routine edits**, is Python-native, and is license-safe (path (a)). MCP is the documented fallback if the schema read proves insufficient. | build session | ~~first WHOOP adapter build~~ resolved S63 | Build-time mechanism choice; both are first-party-documented + license-safe. |
+| OQ-3 | ~~Does `noop-local-access` expose a non-interactive query mode usable from Python (beyond the MCP stdio loop), or must a-plus-maxing run a minimal MCP stdio client?~~ **RESOLVED (S63) — moot.** The read-only `sqlite3` mechanism (OQ-2) needs no MCP stdio client; a-plus-maxing reads the documented `whoop.sqlite` directly. Re-opens only if a future build falls back to the MCP path. | build session | resolved S63 | Shaped the adapter's invocation of noop. |
 
 ## Amendments
 
+- [BUILD 2026-06-14 (S63)]: **OQ-2/OQ-3 resolved at the first WHOOP adapter build** (the
+  ADR delegated the mechanism choice to "the build session"). Mechanism = **read-only `sqlite3`**
+  over the documented `dailyMetric` schema (not the MCP subprocess): `scripts/ingest/adapters/whoop.py`
+  opens `whoop.sqlite` with `mode=ro` and maps each `dailyMetric` row's non-null metrics
+  (recovery / strain[0–21] / hrv / rhr / sleep-efficiency / spo2 / resp-rate / skin-temp-dev) to
+  `source: whoop` store readings, wired into the scheduler with **0 edits** to the shared routine
+  (the Confirmation criteria). Built + tested against documented-schema fixtures + the
+  store-adversarial battery; **end-to-end validation against the operator's real `whoop.sqlite`
+  remains the open tail of bead `mdzq`** (gated on the operator bonding the strap to noop). The
+  store reading carries `source: whoop` (device provenance, dedupe-distinct); the biomarker-page
+  `source: wearable` enum (D4) is the separate page-layer concern.
 - [AMENDED 2026-06-14 (S62)]: **D2 re-decided** — "manually export a CSV + parse it" → "consume
   noop's first-party read-only local-access surface (the `noop-local-access` MCP server / read-only
   `whoop.sqlite`)"; the CSV path is demoted to the documented fallback. **Reason:** the v1 D2 (and its
