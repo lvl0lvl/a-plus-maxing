@@ -42,12 +42,26 @@ disclosed partial recurrence.
   HIST-001** — my own reconciliation left a §4 line-122 "see §8 D2" open-decision pointer stale
   (the same AP-INCOMPLETE-PROPAGATION class the PR existed to close) → fixed + blind-verified.
   Fresh `/merge`; `e64j` closed. Folded into this close (fix/s62-close rebased onto post-#134 main).
+- **#135 — ADR-0011 v2 (D2 RE-DECIDED)** (on-main `d2ec74c`). Walter flagged that ADR-0011 v1 was
+  authored from noop's README only ("you wrote the ADR from the readme?"). A first-party review of the
+  noop repo (clone @ `a3f5e39`; 3 critique agents + orchestrator adjudication that REJECTED one agent's
+  overreach) found noop ships a documented schema (`docs/DATA_MODEL.md`) + a first-party **read-only MCP
+  server** (`NoopLocalAccess`, macOS-only) the README never mentions. So **D2 flipped: "manual CSV
+  export" → "consume noop's read-only MCP server"** (CSV demoted to fallback) + 10 corrected facts
+  (0–21 strain scale, license a/b/c paths, single-device BLE bond, the fabricated `whoop.py` scaffold);
+  OQ-1/OQ-2 resolved. 3-agent `/review-pr` caught the orchestrator's own `[VERIFIED — ADR-0003]`
+  over-claim (the fix nearly repeating the README-miss class) + a landmark propagation residue → fixed +
+  blind-verified 3/3. The real adapter is **beaded** (gated on a real noop data sample). Folded into
+  this close (rebase onto post-#135 main).
 
 ## Governance / discipline
 
 - **PF-S39-01 falsification window HELD** — the disclosed S61 partial recurrence did NOT recur;
-  all three PRs (#131/#132/#134) got both gated skills fresh via the Skill tool (the REST merge ran
+  all four PRs (#131/#132/#134/#135) got both gated skills fresh via the Skill tool (the REST merge ran
   inside a fresh `Skill(merge)` invocation with the full-40-char-SHA guard). Count stays 2.
+- **PF-S6-01 family — a prior (S61) miss SURFACED + remediated:** ADR-0011 v1 authored from noop's
+  README (secondary source) → wrong D2; surfaced by Walter, remediated by the #135 source review.
+  Disclosed, not promoted (the verify-first discipline + per-PR review caught it within one session).
 - **PF-S40-01 HELD ×2 and LOAD-BEARING** — the #131 triage found QUAL-004 LEGITIMATE; the #132
   triage classified HIST-001 OUT_OF_SCOPE→bead `e64j` + QUAL-001 NOT_A_BUG. **PF-S26-01 HELD**
   (every legitimate fixed, 0 suppressed; the OUT_OF_SCOPE finding beaded not dropped).

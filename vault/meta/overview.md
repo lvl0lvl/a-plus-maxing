@@ -76,22 +76,27 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
-## Status as of 2026-06-14 (S62) — owed S61 close merged + ADR-0011 D3/D4 propagated (Oura→Whoop)
+## Status as of 2026-06-14 (S62) — owed S61 close + ADR-0011 D3/D4 propagated + D2 re-decided (noop-source review)
 
-S62 ran three PR lifecycles, all merged to `main` (`91172f1`; suite 823/2 + 16/16 wiki-ingest).
-Walter: "merge #131 and proceed with (b)", then "clear the e64j bead". (1) **#131** — the owed S61
-close docs (3-agent subset; 1 LEGITIMATE quality fix blind-verified). (2) **#132 — ADR-0011 D3/D4
-propagation**: the biomarker `source` enum is now device-agnostic `wearable` (was `oura`) across all
-three lockstep sites (`scripts/wiki-ingest-lint.sh` gate + `vault/biomarkers/_template.md` +
-`vault/WIKI.md` schema doc), mutation-proven RED→GREEN; LM-02 + `current-state.md` re-anchored
-Oura→Whoop; the Oura *adapter* preserved (valid unwired ADR-0003 slot). The 6-agent review surfaced +
-beaded `e64j`. (3) **#134 — cleared `e64j`**: the research plan reconciled to the ADR-0011 D4 enum
-(its docs still showed `source: oura`); the 3-agent review caught a §4 D2-open pointer my own fix
-left stale (fixed + blind-verified). **Process headline: the PF-S39-01 gated-skill falsification
-window HELD** — all three PRs got both `/review-pr` AND `/merge` fresh via the Skill tool (the
-disclosed S61 partial recurrence did NOT recur; count stays 2). Next: execute one of the 3 S61 plans
-(wiki research [resolve §8 D3], local-model eval [operator inputs D2/D3/D5], or the ADR-0011
-live-SQLite adapter [OQ-2]) or the correctness/governance tail. Session detail:
+S62 ran four PR lifecycles, all merged to `main` (`d2ec74c`; suite 823/2 + 16/16 wiki-ingest).
+Walter: "merge #131 and proceed with (b)", "clear the e64j bead", then a first-party noop-repo review.
+(1) **#131** — the owed S61 close docs (3-agent subset; 1 LEGITIMATE quality fix blind-verified).
+(2) **#132 — ADR-0011 D3/D4 propagation**: the biomarker `source` enum is now device-agnostic
+`wearable` (was `oura`) across all three lockstep sites (`scripts/wiki-ingest-lint.sh` gate +
+`vault/biomarkers/_template.md` + `vault/WIKI.md` schema doc), mutation-proven RED→GREEN; LM-02 +
+`current-state.md` re-anchored Oura→Whoop; the Oura *adapter* preserved. (3) **#134 — cleared `e64j`**:
+the research plan reconciled to the ADR-0011 D4 enum. (4) **#135 — ADR-0011 v2 (D2 RE-DECIDED)**: Walter
+flagged that ADR-0011 v1 was authored from noop's README only; a first-party review (noop@`a3f5e39`; 3
+critique agents + adjudication) found noop ships a documented schema + a first-party **read-only MCP
+server** (`NoopLocalAccess`) the README missed — so **D2 flipped from "manual CSV export" → "consume
+noop's read-only MCP server"** (CSV = fallback) + 10 corrected facts (0–21 strain scale, license a/b/c,
+single-device bond, fabricated `whoop.py`); the real adapter is beaded. **Process headline: the
+PF-S39-01 gated-skill window HELD** — all four PRs got both `/review-pr` AND `/merge` fresh via the
+Skill tool (the disclosed S61 recurrence did NOT recur). A prior PF-S6-01-family miss (the
+ADR-from-README authoring) was surfaced + remediated, recorded honestly. Next: execute one of the 3 S61
+plans (wiki research [resolve §8 D3], local-model eval [operator inputs D2/D3/D5]) or **build the
+WHOOP/noop adapter** (beaded — consume noop's read-only MCP, gated on a real noop data sample) or the
+correctness/governance tail. Session detail:
 `vault/sessions/session-62.md`.
 
 ## Status as of 2026-06-14 (S61) — three forward plans recorded (wiki research, Whoop/noop ADR, local-model eval)
