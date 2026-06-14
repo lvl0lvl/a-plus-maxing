@@ -38,9 +38,10 @@ def _write_whoop_sqlite(path, rows):
     """Build a synthetic noop `whoop.sqlite` (`dailyMetric`) the Whoop adapter reads.
 
     Minimal mirror of noop's documented schema (`docs/DATA_MODEL.md`,
-    schemaVersion 9) — enough columns for the scheduler's wired-set invocation
-    test. `rows` is a list of `{day, <metric>: value}` dicts; omitted metric
-    columns default to NULL.
+    schemaVersion 9) — the columns the wired-set invocation test needs. `rows` is a
+    list of `{day, recovery}` dicts (recovery is the one metric this scheduler test
+    asserts on to prove invocation); the other declared columns stay NULL. (The full
+    column→item mapping is exercised in `tests/ingest/test_adapters.py`.)
     """
     import sqlite3
 

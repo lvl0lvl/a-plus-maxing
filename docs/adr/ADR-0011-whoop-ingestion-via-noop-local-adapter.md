@@ -222,8 +222,11 @@ noop's "Export CSV…" and the adapter parses the 4-CSV zip.
 - A WHOOP adapter reads via `noop-local-access` (or a read-only `whoop.sqlite` read) into the store with
   **0 edits** to the shared ADR-0003 routine/dedupe/scheduler (diff the shared routine → 0 lines).
 - The WHOOP-derived metrics (HRV, RHR, sleep efficiency, recovery, strain[0–21]) land as
-  `source: wearable` readings on the (item, timepoint) key with `confidence` reflecting imported vs
-  noop-computed; the `category: wearable` biomarker entries render the dashboard readiness data.
+  `source: whoop` readings on the `(item, timepoint, source)` key (device provenance, dedupe-distinct;
+  the `category`/`source: wearable` biomarker *page* enum (D4) is the separate page layer). The
+  imported-vs-noop-computed `confidence` carry is **deferred** (the store Line-Field-Set has no
+  `confidence` field — see the S63 amendment); the `category: wearable` biomarker entries render the
+  dashboard readiness data.
 - Re-running over an unchanged source appends **0 duplicate** readings (ADR-0002/0003 idempotency).
 - Strain is stored/rendered on the 0–21 scale (a fixture pins a 0–21 value through to the store).
 
@@ -257,7 +260,10 @@ bond · the commercial GP product track begins (PolyForm boundary forces a diffe
   store-adversarial battery; **end-to-end validation against the operator's real `whoop.sqlite`
   remains the open tail of bead `mdzq`** (gated on the operator bonding the strap to noop). The
   store reading carries `source: whoop` (device provenance, dedupe-distinct); the biomarker-page
-  `source: wearable` enum (D4) is the separate page-layer concern.
+  `source: wearable` enum (D4) is the separate page-layer concern. **Deferred (D4 `confidence`
+  carry):** the store Line-Field-Set (ADR-0002) has no `confidence` field, so the
+  imported-vs-`APPROXIMATE` provenance D4 says to carry is NOT in V1 — tracked on bead `mdzq`'s open
+  tail (determining noop's per-day provenance signal needs a real data sample anyway).
 - [AMENDED 2026-06-14 (S62)]: **D2 re-decided** — "manually export a CSV + parse it" → "consume
   noop's first-party read-only local-access surface (the `noop-local-access` MCP server / read-only
   `whoop.sqlite`)"; the CSV path is demoted to the documented fallback. **Reason:** the v1 D2 (and its
