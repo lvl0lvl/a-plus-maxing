@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-58)
+title: Scope Contract Archive (Sessions 5-59)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58; S58 at S59) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-58. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58; S58 at S59; S59 at S60) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-59. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 59 (2026-06-14)
+
+S59 resume plan from the S58 close: merge the S58 close PR, then fix `b6um` — the sub-AA state-colored legend text. Walter: "b6um, then proceed". Two PR lifecycles merged (#123 S58-close docs — 3-agent subset, 0 LEGITIMATE [1 DECISION, 1 NOT_A_BUG]; #124 the `b6um` AA fix — full 6-agent): the legend's `.state-watch` text rebound from raw `--watch #DDAA33` (2.13:1, sub-AA, violating ADR-0004's unqualified WCAG-AA) to the AA-dark `--watch-text #8A6D1F` (4.90:1, the existing `CHROME["watch-text"]`), the SWATCH keeping true `--watch` (pinned by a positive+negative test assertion), and the render AA gate (`test_render.py::test_contrast_and_colorblind`) extended from `good`-only to all three state-text-on-paper pairs (mutation-proven RED). `PALETTE`/`SERIES`/`ACCENTS` byte-identical (no new colour — reused `CHROME["watch-text"]`); `SUMMARY_FIELD_SET`/`EXCLUDED_RAW_PII`/`report.py` untouched. AC1-AC6 all PASS. The #124 review caught 2 real test-coverage gaps (the swatch true-colour unpinned; a gate-comment failure-mode error) — both fixed + blind-verified 2/2. PF-S51-01 mitigation APPLIED (the 6 Phase-1 agents dispatched read-only; the shared tree stayed pristine). Verify-first found the bead's "gate doesn't measure state-text" PARTIALLY STALE (it measured `good`-only by deliberate design). LM-01 MD-visit date set 2026-07-13. **PF-S13-01/S37-01 did NOT cleanly hold at the close read-and-judge steps 8 + 8.7** (the DOCUMENT_RUBRIC Rule-4 checks ran with cited evidence but `DOCUMENT_RUBRIC.md` was not re-opened; `landmarks.md` read at open not re-read at 8.7 — operator-surfaced, the 2nd time on this surface after S57, remediated same-turn; feeds the `d3w` mechanize-close-step-8 case). On-main #125 lifecycle is the S59-close commit `43aae47` (verified on-main via `git merge-base --is-ancestor`; the repo rebase-merges, so the pre-rebase `fix/s59-close` tips are GC-eligible). Full S59 drift checks + close attestation (with the per-PR #123/#124 invocation table) in `memory/process-failures.md` (Session 59 section); summary in `vault/sessions/session-59.md`.
 
 ## Scope Contract — Session 58 (2026-06-13)
 

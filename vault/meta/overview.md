@@ -76,6 +76,32 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
+## Status as of 2026-06-14 (S60) — the clone-init bd contract documented (vjsw); the correctness tail advances
+
+Two PR lifecycles merged (#125 S59-close docs, #126 the `vjsw` clone-init bd contract; `main` at
+`2c49ea8`, suite 823 passed / 2 skipped, +2 from the two new clone tests), every gated skill invoked
+fresh (ninth full session under INV-SKILL-TRACE, green). With the dashboard "done" path complete (S58),
+forward work continues on the correctness/governance tail; Walter redirected from the governance item
+`d3w` to "the correctness tail", and `vjsw` was the one unconditional, cleanly-buildable item
+(verify-first deferred `10h`/`1ww`/`e3b` as deferred-by-design). `vjsw`: a fresh clone shipped `.beads/`
+without a database (`*.db` gitignored) and the clone contract had zero bd references. Verify-first
+against live bd 0.49.0 found the bead's `bd-init-step`/`no-db` fork both wrong — bd self-heals via
+auto-import on normal commands (only `bd sync --flush-only` fails first-command), clone commits are
+already safe (the PR #107 hook flush-skip), bd is dev-tooling, and `init_instance` is a THIN LEAF
+(ADR-0005-T2). So **Option C** (operator-confirmed "C sounds right"): DOCUMENT that `.beads/` is
+db-less-by-design dev-tooling (the operator ignores it; a contributor runs `bd init --from-jsonl`);
+`init_instance` deliberately leaves bd alone (docstring-only, no subprocess). Recorded in
+`docs/clone-init.md`, the `init_instance` docstring, and `decisions/2026-06-14-clone-init-bd-contract.md`;
+2 non-tautological tests (mutation-proven RED). The #125 review caught a real residue (the S59
+close-correction had missed `session-59.md`, leaving it claiming the close "HELD" while HANDOFF + the
+PF log recorded the soft PF-S13-01/S37-01 recurrence) — 3 LEGITIMATE fixed + blind-verified; the #126
+review's 5 agents independently verified the Option-C contract's claims against live bd + the hook
+source (0 legitimate). The S57/S59 close-step-8/8.7 from-memory miss did NOT recur (this close re-opened
+DOCUMENT_RUBRIC + landmarks from the files). Bead `vjsw` closed. Next: the correctness/governance tail
+(`d3w` mechanize-close-step-8, `02pe` plan-track revert, `dqyv` 3-consumer promotion, `ofn0`
+archive-SHA-check) + P3s; the July-visit prep (LM-01) is date-fixed (visit 2026-07-13; 14-day window
+opens 2026-06-29). Session detail: `vault/sessions/session-60.md`.
+
 ## Status as of 2026-06-14 (S59) — the sub-AA legend (b6um) FIXED; the render AA gate hardened
 
 Two PR lifecycles merged (#123 S58-close docs, #124 the `b6um` AA fix; `main` at `7253af7`, suite
