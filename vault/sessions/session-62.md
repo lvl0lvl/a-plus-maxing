@@ -16,7 +16,7 @@ the PF-S39-01 gated-skill falsification window HELD** — both PRs got BOTH `/re
 `/merge` invoked fresh via the Skill tool, the explicit test the S61 close set after its
 disclosed partial recurrence.
 
-## What shipped (both on `main`)
+## What shipped (all on `main`)
 
 - **#131 — the owed S61 close docs** (on-main `00f4316`). Fresh `/review-pr` (3-agent docs
   subset): contracts + historical clean (they independently ran the handoff/pf-attestation/
@@ -36,12 +36,18 @@ disclosed partial recurrence.
     `current-state.md` Wearable section re-anchored Oura→Whoop (strap owned; baseline-start
     pending). The Oura *adapter* (`scripts/ingest/adapters/oura.py`) deliberately preserved —
     a valid unwired ADR-0003 slot per ADR-0011 D3. No `source: oura` remains anywhere in `vault/`.
+- **#134 — clear `e64j`** (on-main `91172f1`). Walter directed "clear the e64j bead" after the
+  close; the research plan reconciled to ADR-0011 D4 (§5 `source` enum `oura`→`wearable`; §8 D2
+  flipped open→RESOLVED). 3-agent `/review-pr`: code-quality + contracts `[]`; **historical caught
+  HIST-001** — my own reconciliation left a §4 line-122 "see §8 D2" open-decision pointer stale
+  (the same AP-INCOMPLETE-PROPAGATION class the PR existed to close) → fixed + blind-verified.
+  Fresh `/merge`; `e64j` closed. Folded into this close (fix/s62-close rebased onto post-#134 main).
 
 ## Governance / discipline
 
 - **PF-S39-01 falsification window HELD** — the disclosed S61 partial recurrence did NOT recur;
-  both PRs got both gated skills fresh via the Skill tool (the REST merge ran inside a fresh
-  `Skill(merge)` invocation with the full-40-char-SHA guard). Count stays 2.
+  all three PRs (#131/#132/#134) got both gated skills fresh via the Skill tool (the REST merge ran
+  inside a fresh `Skill(merge)` invocation with the full-40-char-SHA guard). Count stays 2.
 - **PF-S40-01 HELD ×2 and LOAD-BEARING** — the #131 triage found QUAL-004 LEGITIMATE; the #132
   triage classified HIST-001 OUT_OF_SCOPE→bead `e64j` + QUAL-001 NOT_A_BUG. **PF-S26-01 HELD**
   (every legitimate fixed, 0 suppressed; the OUT_OF_SCOPE finding beaded not dropped).
@@ -57,16 +63,16 @@ disclosed partial recurrence.
 
 ## Beads
 
-New: `e64j` (P2) — reconcile `docs/research-plan/wiki-population-research-plan.md` to the
-ADR-0011 D4 enum (it still documents `source: oura`; gates the parallel research session). No
-bead closed this session (the ADR-0011 propagation was scope-contract work, not a tracked bead).
+`e64j` (P2) — created by the #132 review AND CLOSED this session via #134 (the research plan
+reconciled to the ADR-0011 D4 enum: §5 enum `oura`→`wearable` + §8 D2 RESOLVED + the §4 line-122
+pointer). The ADR-0011 D3/D4 propagation itself was scope-contract work, not a tracked bead.
 Still OPEN: the correctness/governance tail (`02pe`/`dqyv`/`ofn0` + P3s; `d3w` left to the
 external rigor-framework project per Walter S60; `10h`/`1ww`/`e3b` deferred-by-design).
 
 ## Next (S63)
 
 Merge the S62 close PR, then pick the forward work: execute one of the 3 S61 plans (the wiki
-research [a parallel session; resolve §8 D3 + clear `e64j` first], the local-model eval [gated on
-operator inputs D2/D3/D5], or the ADR-0011 live-SQLite noop adapter [OQ-2, evidence-gated]) OR
-the correctness/governance tail (`e64j` is the smallest unblocker). LM-01 visit prep
-(2026-07-13) — the 14-day window opens 2026-06-29. Baseline 823/2.
+research [a parallel session; resolve §8 D3 — the §8 D2/enum question is already RESOLVED + the
+plan reconciled via #134], the local-model eval [gated on operator inputs D2/D3/D5], or the
+ADR-0011 live-SQLite noop adapter [OQ-2, evidence-gated]) OR the correctness/governance tail. LM-01
+visit prep (2026-07-13) — the 14-day window opens 2026-06-29. Baseline 823/2.

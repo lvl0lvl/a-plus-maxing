@@ -78,19 +78,21 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 
 ## Status as of 2026-06-14 (S62) — owed S61 close merged + ADR-0011 D3/D4 propagated (Oura→Whoop)
 
-S62 ran two PR lifecycles, both merged to `main` (`736575c`; suite 823/2 + 16/16 wiki-ingest).
-Walter: "merge #131 and proceed with (b)". (1) **#131** — the owed S61 close docs (3-agent subset;
-1 LEGITIMATE quality fix blind-verified). (2) **#132 — ADR-0011 D3/D4 propagation**: the biomarker
-`source` enum is now device-agnostic `wearable` (was `oura`) across all three lockstep sites
-(`scripts/wiki-ingest-lint.sh` gate + `vault/biomarkers/_template.md` + `vault/WIKI.md` schema doc),
-mutation-proven RED→GREEN; LM-02 + `current-state.md` re-anchored Oura→Whoop; the Oura *adapter*
-preserved (valid unwired ADR-0003 slot). The 6-agent review surfaced + beaded `e64j` (P2 — the
-research plan still documents the old enum; gates the parallel research session). **Process headline:
-the PF-S39-01 gated-skill falsification window HELD** — both PRs got both `/review-pr` AND `/merge`
-fresh via the Skill tool (the disclosed S61 partial recurrence did NOT recur; count stays 2). Next:
-execute one of the 3 S61 plans (wiki research [resolve §8 D3 + clear `e64j` first], local-model eval
-[operator inputs D2/D3/D5], or the ADR-0011 live-SQLite adapter [OQ-2]) or the correctness/governance
-tail. Session detail: `vault/sessions/session-62.md`.
+S62 ran three PR lifecycles, all merged to `main` (`91172f1`; suite 823/2 + 16/16 wiki-ingest).
+Walter: "merge #131 and proceed with (b)", then "clear the e64j bead". (1) **#131** — the owed S61
+close docs (3-agent subset; 1 LEGITIMATE quality fix blind-verified). (2) **#132 — ADR-0011 D3/D4
+propagation**: the biomarker `source` enum is now device-agnostic `wearable` (was `oura`) across all
+three lockstep sites (`scripts/wiki-ingest-lint.sh` gate + `vault/biomarkers/_template.md` +
+`vault/WIKI.md` schema doc), mutation-proven RED→GREEN; LM-02 + `current-state.md` re-anchored
+Oura→Whoop; the Oura *adapter* preserved (valid unwired ADR-0003 slot). The 6-agent review surfaced +
+beaded `e64j`. (3) **#134 — cleared `e64j`**: the research plan reconciled to the ADR-0011 D4 enum
+(its docs still showed `source: oura`); the 3-agent review caught a §4 D2-open pointer my own fix
+left stale (fixed + blind-verified). **Process headline: the PF-S39-01 gated-skill falsification
+window HELD** — all three PRs got both `/review-pr` AND `/merge` fresh via the Skill tool (the
+disclosed S61 partial recurrence did NOT recur; count stays 2). Next: execute one of the 3 S61 plans
+(wiki research [resolve §8 D3], local-model eval [operator inputs D2/D3/D5], or the ADR-0011
+live-SQLite adapter [OQ-2]) or the correctness/governance tail. Session detail:
+`vault/sessions/session-62.md`.
 
 ## Status as of 2026-06-14 (S61) — three forward plans recorded (wiki research, Whoop/noop ADR, local-model eval)
 
