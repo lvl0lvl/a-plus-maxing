@@ -74,7 +74,7 @@ Measurable values: blood panels, wearable metrics, functional tests, subjective 
 ## Metadata
 - category: blood | wearable | functional | subjective
 - unit: e.g., mg/dL, ms, bpm, %
-- source: lab | oura | manual | calculation
+- source: lab | wearable | manual | calculation
 - confidence: established | supported | provisional
 - last_verified: YYYY-MM-DD
 - review_cadence: monthly | quarterly | per-lab-panel

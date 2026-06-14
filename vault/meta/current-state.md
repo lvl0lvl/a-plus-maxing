@@ -16,7 +16,7 @@ The research agent reads this to anchor "given Walter's CURRENT biomarkers and a
 
 Update at:
 - Every new lab panel
-- Every weekly Oura summary
+- Every weekly Whoop summary
 - Every protocol change (start/stop a compound, change training block)
 - Every session close (if anything material changed)
 
@@ -33,7 +33,7 @@ _(none yet — first panel July 2026 via new MD)_
 When populated, link each entry to `vault/biomarkers/<name>.md` and `vault/labs/<date>.md`:
 - [[biomarkers/<name>]]: value (unit) — date — trend — in-range/alert
 
-### Wearable (Oura — pending purchase)
+### Wearable (Whoop — owned; baseline pending)
 _(none yet)_
 
 Future structure:
@@ -42,7 +42,7 @@ Future structure:
 - Sleep duration: <hr> (7-day avg)
 - Sleep efficiency: <%>
 - Body temp deviation: <°C>
-- Readiness score: <0-100>
+- Recovery score: <0-100%>
 
 ### Functional
 - Bodyweight: <kg/lbs> — date
@@ -87,7 +87,7 @@ Things waiting on data or a session to resolve. One-liners, link to fuller note 
 
 - Vault git tracking (HANDOFF.md Open Issues): pending Walter decision
 - 23andMe raw file ingest: pending Walter at desktop
-- Oura purchase: pending
+- Whoop 30-day baseline: pending (strap owned)
 - First MD visit / labs: scheduled <date>
 
 ## Recent material changes (rolling — last 4 weeks)
