@@ -119,7 +119,7 @@ layers gates; those are compound-only). ~20 entries, grouped:
 - **Thyroid:** TSH, free T3, free T4.
 - **Hormones (endocrine-specialist class):** total testosterone, free testosterone, estradiol, cortisol (AM), DHEA-S, IGF-1, SHBG.
 - **Vitamins/minerals:** vitamin D (25-OH), ferritin, B12, magnesium (RBC).
-- **Wearable (Whoop — see §8 D2; NOT lab-gated, buildable now):** HRV, resting HR, sleep efficiency, respiratory rate, recovery/strain (the Whoop-derived markers, `category: wearable`).
+- **Wearable (Whoop via ADR-0011 `noop`; `source: wearable`, `category: wearable`; NOT lab-gated, buildable now):** HRV, resting HR, sleep efficiency, respiratory rate, recovery/strain (the Whoop-derived markers).
 
 ### Wave 2 — recovery + immune peptides (operator-relevant; triage-flagged top class)
 The peptides `_triage.md` flags as the highest-priority first deep passes given the
