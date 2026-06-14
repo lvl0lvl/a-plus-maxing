@@ -449,3 +449,44 @@ def test_init_without_hook_source_still_runs(tmp_path):
     pages = run(clone)
     assert (clone / ".git" / "hooks" / "pre-push").exists() is False
     assert pages  # the scaffold surface still works
+
+
+# --------------------------------------------------------------------------- #
+# Cycle 3 — bd dev-tracker contract (vjsw): bd is db-less-by-design dev tooling,
+# NOT initialized by run() (Option C, vault/decisions/2026-06-14-clone-init-bd-contract.md)
+# --------------------------------------------------------------------------- #
+
+
+def test_init_does_not_initialize_bd(tmp_path):
+    """vjsw: run() leaves the project issue tracker (bd) db-less — it is dev-tooling
+    outside the fillable-instance contract (Option C, 2026-06-14 decision note).
+
+    A clone ships `.beads/issues.jsonl` tracked but no database (`.beads/*.db` is
+    gitignored). run() must NOT create `.beads/beads.db`: bd is not part of the
+    fillable instance, and keeping it out of run preserves the THIN-LEAF
+    0-outgoing-dependency design. REDs if a bd-init step is ever added to run(),
+    forcing a conscious decision-reversal.
+    """
+    clone = _make_scratch_clone(tmp_path)
+    beads = clone / ".beads"
+    beads.mkdir()
+    (beads / "issues.jsonl").write_text('{"id":"a-plus-maxing-1","title":"x"}\n')
+
+    run(clone)
+
+    dbs = list(beads.glob("*.db"))
+    assert dbs == [], f"run() initialized the bd database (must leave bd alone): {dbs}"
+
+
+def test_clone_readme_documents_bd_tracker_contract():
+    """vjsw: docs/clone-init.md documents the `.beads/` dev-tracker contract.
+
+    The clone-init guide had ZERO bd references (the vjsw gap). It must now name
+    `.beads/` as the dev issue tracker, state that it is db-less-by-design, and give
+    `bd init --from-jsonl` as the contributor activation. REDs if the section is dropped.
+    """
+    text = CLONE_README.read_text()
+    lower = text.lower()
+    assert ".beads" in text, "clone guide does not mention the .beads tracker"
+    assert "bd init --from-jsonl" in text, "clone guide omits the bd activation command"
+    assert "issue tracker" in lower, "clone guide does not frame .beads as the dev issue tracker"
