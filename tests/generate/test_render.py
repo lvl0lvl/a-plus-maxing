@@ -782,16 +782,20 @@ def test_contrast_and_colorblind(tmp_path):
             f"tint pair {what} {fg_hex} on {bg_hex} computes {tint_ratio:.2f} < 4.5"
         )
 
-    # --- state TEXT on paper: each `.state-*` color the dashboard renders as
-    # a standalone text glyph must compute >= 4.5 on paper, so a future
-    # PALETTE retune cannot silently regress the rendered glyphs. The zone-3
-    # ✓ markers (logged meals, taken supplements) ride `.state-good`;
-    # watch/concern render only glyph+swatch-paired legend entries and trend
-    # words on measured tint pairs, never a standalone text marker.
+    # --- state TEXT on paper: each `.state-*` color the legend renders as a
+    # WORD ("in range" / "monitor" / "out of range") must compute >= 4.5 on
+    # paper. ADR-0004 commits artifacts to UNQUALIFIED WCAG-AA: the glyph+swatch
+    # give colorblind redundancy but do NOT make the word readable for low-vision
+    # users, so the legend word itself must clear the normal-text floor (bead
+    # b6um — `.state-watch` rode the raw watch #DDAA33 at 2.13:1 until it was
+    # darkened to `--watch-text`, the swatch keeping the true --watch color).
+    # The `[a-z-]` name class captures the hyphenated `--watch-text`; a `[a-z]+`
+    # class would silently skip `.state-watch` and the gate would never re-catch
+    # this class. The zone-3 ✓ markers also ride `.state-good`.
     state_rules = dict(
-        re.findall(r"\.state-([a-z]+) \{ color: var\(--([a-z]+)\); \}", html)
+        re.findall(r"\.state-([a-z]+) \{ color: var\(--([a-z-]+)\); \}", html)
     )
-    for state in ("good",):
+    for state in ("good", "watch", "concern"):
         marker_hex = root[state_rules[state]]
         marker_ratio = _contrast_ratio(_hex_to_rgb(marker_hex), bg)
         print(f"AC-3 state-{state} text on paper = {marker_ratio:.2f} (need >= 4.5)")

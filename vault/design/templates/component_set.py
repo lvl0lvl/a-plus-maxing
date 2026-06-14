@@ -240,6 +240,7 @@ def _style_block():
   --muted: {p['muted']};
   --page-bg: {c['page-bg']};
   --card-border: {c['card-border']};
+  --watch-text: {c['watch-text']};
 }}
 html, body {{
   margin: 0;
@@ -259,7 +260,7 @@ html, body {{
 .legend span {{ margin-right: 16px; font-size: 13px; }}
 .swatch {{ display: inline-block; width: 12px; height: 12px; vertical-align: middle; margin-right: 4px; }}
 .state-good {{ color: var(--good); }}
-.state-watch {{ color: var(--watch); }}
+.state-watch {{ color: var(--watch-text); }}
 .state-concern {{ color: var(--concern); }}
 .state-neutral {{ color: var(--muted); }}
 caption, .caption {{ color: var(--muted); font-size: 13px; }}
