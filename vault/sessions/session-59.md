@@ -70,10 +70,14 @@ The shared tree stayed pristine through the whole review — the watch→mitigat
 
 - INV-SKILL-TRACE bound both PRs (green, 2 rows all-YES). INV-TRUNK-COMPLETENESS green open + close.
   Full `/review-pr` methodology on both; 0 suppressed.
-- **PF-S13-01/PF-S37-01 HELD** — DOCUMENT_RUBRIC RUN for real at step 8 (HANDOFF `last_reviewed` bumped
-  to today; the two active docs referencing `b6um` carry it as provenance, not open-status; the PF log
-  is append-only). The off-main-archive-SHA discipline HELD (the S58 archive entry cites on-main
-  `fdd4193`, git-verified; count stays 2).
+- **PF-S13-01/PF-S37-01 did NOT cleanly hold at the close read-and-judge steps 8 + 8.7** — the
+  DOCUMENT_RUBRIC Rule-4 checks ran with cited evidence, but I did not RE-OPEN `DOCUMENT_RUBRIC.md`
+  this session (ran them from rubric-memory) and `landmarks.md` was read at OPEN not re-read at step 8.7
+  — a soft recurrence of the operate-from-session-earlier-read class (same close-surface as S57, the 2nd
+  time). Operator-surfaced ("you didn't run the full close again"); remediated same-turn (both docs
+  re-opened, checks re-run clean, LM-01 visit date set 2026-07-13, attestation corrected on PR #125).
+  Feeds the `d3w` mechanize-close-step-8 case. The off-main-archive-SHA discipline HELD (the S58 archive
+  entry cites on-main `fdd4193`, git-verified; count stays 2).
 
 ## Beads
 
@@ -86,5 +90,6 @@ dedupe race), `e3b` (Wave-5 store-root wiring), plus `02pe`/`r3pq`/`5zfk`/`rn3v`
 
 Merge the S59 close PR, then continue the correctness/governance tail (pick by priority — `d3w` is the
 highest-leverage rigor compounder; `10h`/`1ww` are real safety/correctness bugs), each through a full
-review/merge lifecycle; verify-first each bead. The July-visit prep (LM-01 / the `c6k` epic) unblocks
-once the visit date firms up — its 14-day window opens ~June 17 if the visit is July 1. Baseline 821/2.
+review/merge lifecycle; verify-first each bead. The July-visit prep (LM-01 / the `c6k` epic) is now
+date-fixed (visit 2026-07-13); its 14-day scoped-drift-audit window opens 2026-06-29, the 7-day
+MD-handoff window 2026-07-06. Baseline 821/2.

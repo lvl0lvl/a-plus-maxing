@@ -85,7 +85,7 @@ forward work shifted to the correctness/governance tail, starting with `b6um`: t
 `.state-watch` text was `watch #DDAA33` on white = 2.13:1 — sub-AA, violating ADR-0004's unqualified
 WCAG-AA commitment. It now renders the AA-dark `watch-text #8A6D1F` (4.90:1) via a new `--watch-text`
 `:root` var (= the existing `CHROME["watch-text"]`, no new colour); the legend SWATCH keeps the true
-`--watch` amber (the data-state colour cue), pinned by a new test assertion. The render AA gate
+`--watch` amber (the data-state colour cue), pinned by a new positive+negative test assertion pair. The render AA gate
 (`test_render.py::test_contrast_and_colorblind`) was extended from `good`-only to all three
 state-text-on-paper pairs (mutation-proven RED) so the sub-AA-state-text class cannot reship.
 `PALETTE`/`SERIES`/`ACCENTS` byte-unchanged. Verify-first found the bead's "the gate does not measure
@@ -96,7 +96,7 @@ unpinned; a gate-comment failure-mode error) — both fixed + blind-verified. Th
 concurrent-mutation watch was MITIGATED (Phase-1 review agents dispatched read-only; the tree stayed
 pristine). Bead `b6um` closed. Next: the correctness/governance tail (`d3w` mechanize-close-step-8,
 `10h` HALT-filter, `1ww` append-race, `e3b` Wave-5 wiring) + the deferred follow-ups; the July-visit
-prep (LM-01) unblocks once the visit date firms up. Session detail: `vault/sessions/session-59.md`.
+prep (LM-01) is date-fixed (visit 2026-07-13; 14-day window opens 2026-06-29). Session detail: `vault/sessions/session-59.md`.
 
 ## Status as of 2026-06-13 (S58) — the care-team rollup SHIPPED (zone 5); the dashboard "done" path is COMPLETE
 
