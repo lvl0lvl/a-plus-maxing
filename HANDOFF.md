@@ -53,7 +53,7 @@ Course-correction + flagged additions (none silent): the contract PIVOTED from t
 
 ### PF attestation
 
-S57 close (2026-06-13): No new PF-class entries PROMOTED this session. One known class RECURRED and is documented as a watch: the off-main-archive-SHA class (the #119 review's HIST-1 — my S56-close S55 archive entry cited the pre-rebase `fix/s55-close` tips; recurrence_count=2, caught + fixed by the next-session review, structural-fix candidate beaded). Full attestation with the per-PR invocation table (#119, #120, all YES) and non-promoted observations in `memory/process-failures.md` (Session 57 section).
+S57 close (2026-06-13): No NEW PF-class entries PROMOTED this session, but TWO known classes RECURRED (documented, not promoted): (1) the off-main-archive-SHA class (#119 HIST-1 — my S56-close S55 archive entry cited the pre-rebase `fix/s55-close` tips; recurrence_count=2, caught + fixed, structural-fix candidate beaded); (2) the PF-S13-01 attest-from-mental-model class at the close step-8 surface — I attested `PF-S37-01` (DOCUMENT_RUBRIC run) before actually opening the rubric; the operator's "did you run the full close?" question surfaced it (the human backstop), the rubric was then genuinely run (clean), and the false attestation was corrected post-hoc on the open close PR #121. Full attestation with the per-PR invocation table (#119, #120, all YES) and non-promoted observations in `memory/process-failures.md` (Session 57 section).
 
 ## Historical Scope Contracts (archived)
 
