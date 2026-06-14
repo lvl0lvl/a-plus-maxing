@@ -1,9 +1,10 @@
 """Tests for the four per-source ingestion adapters (ADR-0003-T2).
 
 Covers AC-1..AC-7: HealthKit + Oura mapping (AC-1/AC-2), the Garmin 0-shared-
-routine-edit extensibility proof + functional import (AC-3/AC-4), the Whoop
-registered-but-unwired scaffold (AC-5), and the simulated format-rename
-re-validation 0-edit proof on a distinct baseline (AC-6). Every store write
+routine-edit extensibility proof + functional import (AC-3/AC-4), the Whoop wired
+read-only-SQLite adapter (ADR-0011 D2 v2) + its store-adversarial battery
+(replacing the former registered-but-unwired scaffold), and the simulated
+format-rename re-validation 0-edit proof on a distinct baseline (AC-6). Every store write
 goes to a tmp_path-based root via the `store_root` fixture so no test touches
 the real `vault/store/`.
 
@@ -13,7 +14,6 @@ committed-tree baselines built by `_baseline_ref`; see that function for the
 fork-point/distinctness rationale.
 """
 
-import re
 import subprocess
 from pathlib import Path
 
@@ -269,44 +269,63 @@ def test_zero_edit_gate_reds_on_committed_routine_edit(tmp_path):
         subprocess.run(["git", "checkout", "--", str(ingest)], cwd=REPO_ROOT, check=True)
 
 
-# --- Cycle 3: Whoop registered-but-unwired scaffold (AC-5) ---
-
-# The PRODUCTION modules THIS task creates, EXCLUDING whoop.py itself. The
-# Whoop-unwired scan reads these: a Whoop import/registration here would be
-# wiring the scaffold into the shipped adapter code. whoop.py is excluded — it
-# IS the scaffold (it legitimately names "whoop"); "unwired" is the absence of a
-# scheduler/wired-set reference ELSEWHERE. This test file is also excluded: a
-# test importing the whoop adapter to verify conformance is test scaffolding,
-# not production wiring (it MUST import whoop to test it).
-WIRING_SCAN_FILES = (
-    "scripts/ingest/adapters/healthkit.py",
-    "scripts/ingest/adapters/oura.py",
-    "scripts/ingest/adapters/garmin.py",
-)
-
-# A "Whoop wiring/invocation" reference: importing the whoop adapter module
-# (bare `import whoop`, dotted `import scripts.ingest.adapters.whoop as w`, or
-# `from ... import whoop`) or naming its adapter class — i.e. registering it into
-# a wired/scheduler set.
-_WHOOP_WIRING_PATTERN = re.compile(
-    r"import\s+[\w.]*\bwhoop\b|adapters\s+import\s+(?:[^\n]*\b)?whoop\b|WhoopAdapter"
-)
+# --- Cycle 3: Whoop wired read-only-SQLite adapter (ADR-0011 D2 v2) ---
+#
+# The former registered-but-unwired JSON scaffold (`{metric_name,cycle_start,
+# score}` — a fabricated shape matching no real noop/WHOOP artifact, ADR-0011) is
+# replaced by an adapter that reads noop's documented on-device SQLite
+# (`docs/DATA_MODEL.md` `dailyMetric`, schemaVersion 9). These tests build a
+# synthetic `whoop.sqlite` matching that schema so the adapter exercises its real
+# read path, then run the store-adversarial battery
+# (`docs/checklists/store-adversarial-tests.md`) over the whoop write path.
 
 
-def _whoop_wiring_count(text):
-    """Count Whoop wiring/invocation references in a single source string."""
-    return len(_WHOOP_WIRING_PATTERN.findall(text))
+def _write_whoop_sqlite(path, rows):
+    """Build a synthetic noop `whoop.sqlite` with a `dailyMetric` table + rows.
+
+    Mirrors noop's documented schema (`docs/DATA_MODEL.md`, schemaVersion 9): one
+    row per calendar `day`, every metric column nullable. `rows` is a list of
+    dicts keyed by the `dailyMetric` columns the adapter reads
+    (`day` + recovery/strain/avgHrv/restingHr/efficiency/spo2Pct/respRateBpm/
+    skinTempDevC); an omitted column defaults to NULL. Building the real schema
+    (not a stand-in shape) keeps the test exercising the adapter's actual SQL read.
+    """
+    import sqlite3
+
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute(
+            "CREATE TABLE dailyMetric ("
+            "deviceId TEXT NOT NULL, day TEXT NOT NULL, "
+            "totalSleepMin REAL, efficiency REAL, deepMin REAL, remMin REAL, "
+            "lightMin REAL, disturbances INTEGER, restingHr INTEGER, avgHrv REAL, "
+            "recovery REAL, strain REAL, exerciseCount INTEGER, spo2Pct REAL, "
+            "skinTempDevC REAL, respRateBpm REAL, "
+            "PRIMARY KEY (deviceId, day))"
+        )
+        cols = (
+            "deviceId", "day", "recovery", "strain", "avgHrv", "restingHr",
+            "efficiency", "spo2Pct", "respRateBpm", "skinTempDevC",
+        )
+        for r in rows:
+            values = [r.get("deviceId", "dev1"), r["day"]] + [r.get(c) for c in cols[2:]]
+            placeholders = ", ".join("?" for _ in values)
+            conn.execute(
+                f"INSERT INTO dailyMetric ({', '.join(cols)}) VALUES ({placeholders})",
+                values,
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def test_whoop_scaffold_conforms_to_adapter_interface(tmp_path, store_root):
-    """AC-5 half (a): whoop.py is importable and conforms to the Adapter contract.
+def test_whoop_reads_daily_metric_from_readonly_sqlite(tmp_path, store_root):
+    """ADR-0011 D2: the Whoop adapter maps noop's `dailyMetric` into field-set readings.
 
-    Asserts the Whoop adapter exposes `source_tag` + `read_readings(export_file)`
-    (the @runtime_checkable Adapter Protocol) AND that `read_readings` actually
-    maps a sample export through the UNCHANGED ingest.run — so a crippled stub
-    (e.g. one raising NotImplementedError) would fail this half, not just an
-    absent module. The scaffold is structurally a full adapter; only its wiring
-    is absent.
+    Builds a synthetic noop `whoop.sqlite` (documented schema), runs it through the
+    UNCHANGED ingest.run, and asserts each non-null metric lands on its own
+    (item, day, "whoop") stream carrying every Line Field Set field. Conforms to
+    the @runtime_checkable Adapter contract.
     """
     from scripts.ingest import ingest
     from scripts.ingest.adapter import Adapter
@@ -316,64 +335,206 @@ def test_whoop_scaffold_conforms_to_adapter_interface(tmp_path, store_root):
     assert isinstance(adapter, Adapter)  # exposes the frozen contract surface
     assert adapter.source_tag() == "whoop"
 
-    # Not crippled: read_readings maps a real Whoop-shaped export into the store.
-    export = tmp_path / "whoop.json"
-    _write_json_export(
-        export,
-        [{"metric_name": "hrv", "cycle_start": "2026-01-04T08:00", "score": 62}],
+    db = tmp_path / "whoop.sqlite"
+    _write_whoop_sqlite(
+        db,
+        [
+            {
+                "day": "2026-02-01", "recovery": 66.0, "strain": 14.5, "avgHrv": 58.0,
+                "restingHr": 52, "efficiency": 91.0, "spo2Pct": 97.0,
+                "respRateBpm": 14.2, "skinTempDevC": -0.3,
+            }
+        ],
     )
-    ingest.run(adapter, export, root=store_root)
+    ingest.run(adapter, db, root=store_root)
+
+    recovery = store.read("recovery", root=store_root)
     hrv = store.read("hrv", root=store_root)
-    assert len(hrv) == 1
-    assert set(hrv[0]) >= set(store.keying.LINE_FIELDS)
-    assert hrv[0]["source"] == "whoop" and hrv[0]["value"] == 62
+    assert len(recovery) == 1 and len(hrv) == 1
+    for reading in (*recovery, *hrv):
+        assert set(reading) >= set(store.keying.LINE_FIELDS)
+        assert reading["source"] == "whoop"
+        assert reading["timepoint"] == "2026-02-01"
+    assert recovery[0]["value"] == 66.0 and hrv[0]["value"] == 58.0
+    # All eight mapped metrics landed on their own item streams (column -> item).
+    for item in (
+        "recovery", "strain", "hrv", "rhr", "sleep-efficiency",
+        "spo2", "resp-rate", "skin-temp-dev",
+    ):
+        assert len(store.read(item, root=store_root)) == 1, item
 
 
-def test_whoop_unwired_no_scheduler_reference():
-    """AC-5 half (b): no file THIS task creates wires/invokes Whoop.
+def test_whoop_strain_stays_on_0_to_21_scale(tmp_path, store_root):
+    """AC2 (mutation guard): strain is carried through on WHOOP's 0-21 scale.
 
-    The T2-ownable form of the spec's `rg "whoop" scripts/ingest/scheduler.py`=0:
-    scheduler.py is ADR-0003-T3's deliverable and does not exist at this task's
-    entry point, so the literal command errors (exit 2) on the missing file and
-    is deferred to the Wave 4->5 boundary. Here we assert the in-task invariant:
-    no PRODUCTION module this task ships introduces a Whoop wiring/invocation
-    reference (an `import whoop` / `WhoopAdapter` registration into a wired/
-    scheduler set). The scaffold whoop.py and this test file are excluded — the
-    scaffold IS the registered adapter, and a test importing it to verify
-    conformance is test scaffolding, not production wiring; unwired-ness is the
-    absence of a reference in the SHIPPED adapter code. Teeth proven by
-    `test_whoop_unwired_gate_is_falsifiable`.
+    A 0-100 render of Day Strain is ~5x wrong (ADR-0011; noop's
+    `dayStrainToEffortScale = 100/21`). This pins the raw 0-21 value end-to-end: a
+    fixture strain of 14.5 must store as 14.5, NOT rescaled to ~69 (14.5*100/21) or
+    ~3.0 (14.5*21/100). Were `read_readings` to rescale strain, this REDs (the
+    deliberate-break mutation for the value-mapping surface).
     """
-    for rel in WIRING_SCAN_FILES:
-        text = (REPO_ROOT / rel).read_text()
-        assert _whoop_wiring_count(text) == 0, (
-            f"{rel} introduces a Whoop wiring/invocation reference; the scaffold "
-            f"must stay unwired (no scheduler/wired-set entry point imports Whoop)"
-        )
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import whoop
+
+    db = tmp_path / "whoop.sqlite"
+    _write_whoop_sqlite(db, [{"day": "2026-02-02", "strain": 14.5}])
+    ingest.run(whoop.WhoopAdapter(), db, root=store_root)
+
+    strain = store.read("strain", root=store_root)
+    assert len(strain) == 1
+    assert strain[0]["value"] == 14.5  # 0-21 scale, unscaled
 
 
-def test_whoop_unwired_gate_is_falsifiable():
-    """Negative control for AC-5 half (b): the no-wiring scan turns RED on real wiring.
+def test_whoop_skips_null_metrics(tmp_path, store_root):
+    """A NULL `dailyMetric` column yields no reading (honest absence, no fabricated value)."""
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import whoop
 
-    Runs the SAME `_whoop_wiring_count` scan against the distinct wiring forms a
-    scheduler/wired-set entry point this task COULD create — the dotted-module
-    `import scripts.ingest.adapters.whoop as w`, the `from ... import whoop`, and a
-    `WhoopAdapter()` registry line — and asserts each is counted. This proves the
-    unwired gate catches actual wiring (in every import shape), not merely the
-    absence of a file: were any Whoop import/registration to land in one of this
-    task's files, `test_whoop_unwired_no_scheduler_reference` would turn RED.
+    db = tmp_path / "whoop.sqlite"
+    # Only recovery present this day; the other seven mapped columns are NULL.
+    _write_whoop_sqlite(db, [{"day": "2026-02-03", "recovery": 70.0}])
+    ingest.run(whoop.WhoopAdapter(), db, root=store_root)
+
+    assert len(store.read("recovery", root=store_root)) == 1
+    assert store.read("strain", root=store_root) == []
+    assert store.read("hrv", root=store_root) == []
+
+
+def test_whoop_read_is_readonly_does_not_mutate_db(tmp_path, store_root):
+    """The adapter opens noop's DB read-only — the source file is byte-identical after.
+
+    `mode=ro` opens O_RDONLY, so the import path cannot write noop's `whoop.sqlite`
+    (ADR-0011 license path (a): parse a file the operator owns; the read is one-way).
     """
-    # Each form is a real wiring shape; the broadened pattern must count every one.
-    assert _whoop_wiring_count("import scripts.ingest.adapters.whoop as w\n") > 0
-    assert _whoop_wiring_count("from scripts.ingest.adapters import whoop\n") > 0
-    assert _whoop_wiring_count("WIRED = [WhoopAdapter()]\n") > 0
-    # And the combined scheduler entry point counts all of them together.
-    planted_scheduler = (
-        "import scripts.ingest.adapters.whoop as w\n"
-        "from scripts.ingest.adapters import whoop\n"
-        "WIRED = [whoop.WhoopAdapter()]\n"
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import whoop
+
+    db = tmp_path / "whoop.sqlite"
+    _write_whoop_sqlite(db, [{"day": "2026-02-04", "recovery": 60.0}])
+    before = db.read_bytes()
+    ingest.run(whoop.WhoopAdapter(), db, root=store_root)
+    assert db.read_bytes() == before  # source DB unchanged by the read
+
+
+# --- Store-adversarial battery on the whoop path (docs/checklists/store-adversarial-tests.md) ---
+
+
+def test_whoop_cross_stream_no_collision(tmp_path, store_root):
+    """Adversarial (1: cross-stream): a recovery read never returns a strain value.
+
+    recovery and strain share a day but are distinct items; store.read("recovery")
+    returns only recovery, store.read("strain") only strain — the cross-stream
+    namespacing the S41 fabricated-biomarker case exists to prevent, exercised over
+    the whoop write path.
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import whoop
+
+    db = tmp_path / "whoop.sqlite"
+    _write_whoop_sqlite(db, [{"day": "2026-02-05", "recovery": 66.0, "strain": 14.5}])
+    ingest.run(whoop.WhoopAdapter(), db, root=store_root)
+
+    recovery = store.read("recovery", root=store_root)
+    strain = store.read("strain", root=store_root)
+    assert [r["value"] for r in recovery] == [66.0]
+    assert [r["value"] for r in strain] == [14.5]
+    assert all(r["item"] == "recovery" for r in recovery)
+    assert all(r["item"] == "strain" for r in strain)
+
+
+def test_whoop_rerun_appends_zero_duplicates(tmp_path, store_root):
+    """Adversarial (2: same-key dedupe): re-running the same DB appends 0 duplicate lines.
+
+    Idempotent on the (item, day, "whoop") key — a second ingest over the unchanged
+    DB adds nothing (inherited from store.append's shared-key dedupe).
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import whoop
+
+    db = tmp_path / "whoop.sqlite"
+    _write_whoop_sqlite(
+        db,
+        [{"day": "2026-02-06", "recovery": 66.0}, {"day": "2026-02-07", "recovery": 70.0}],
     )
-    assert _whoop_wiring_count(planted_scheduler) >= 3
+    ingest.run(whoop.WhoopAdapter(), db, root=store_root)
+    first = len(store.read("recovery", root=store_root))
+    ingest.run(whoop.WhoopAdapter(), db, root=store_root)
+    second = len(store.read("recovery", root=store_root))
+    assert first == 2
+    assert second - first == 0
+
+
+def test_whoop_distinct_days_both_persist(tmp_path, store_root):
+    """Adversarial (2/4: same-key + mutation): two recovery readings on distinct days persist.
+
+    Distinct (item, day) identities must NOT dedupe-collapse — the complement of
+    the idempotent re-run. This is also the keying mutation guard for the whoop
+    path: were `read_readings` to map every row to one constant timepoint, the two
+    days would collide on (item, timepoint, source) and one would silently drop,
+    reding this assertion (len 2 -> 1).
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import whoop
+
+    db = tmp_path / "whoop.sqlite"
+    _write_whoop_sqlite(
+        db,
+        [{"day": "2026-02-08", "recovery": 60.0}, {"day": "2026-02-09", "recovery": 75.0}],
+    )
+    ingest.run(whoop.WhoopAdapter(), db, root=store_root)
+    recovery = store.read("recovery", root=store_root)
+    assert {r["timepoint"] for r in recovery} == {"2026-02-08", "2026-02-09"}
+    assert len(recovery) == 2
+
+
+def test_whoop_same_identity_changed_value_drops_second(tmp_path, store_root):
+    """Adversarial (3: dedupe-key boundary — value): same (item, day, source), new value
+    -> second write dropped, first value wins (value is EXCLUDED from the key).
+
+    noop upserts `dailyMetric` (latest value wins on-device), so a day's recovery
+    can change between runs; on normal ingest the store keeps the FIRST stored
+    value (a real revision uses store.correct, ADR-0002 v1.4). Pins that `value`
+    is not part of the dedupe identity. A mutation widening the key to include
+    `value` would keep BOTH (len 2) and red this.
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import whoop
+
+    db1 = tmp_path / "whoop1.sqlite"
+    _write_whoop_sqlite(db1, [{"day": "2026-02-10", "recovery": 60.0}])
+    ingest.run(whoop.WhoopAdapter(), db1, root=store_root)
+
+    db2 = tmp_path / "whoop2.sqlite"  # same day, recomputed value
+    _write_whoop_sqlite(db2, [{"day": "2026-02-10", "recovery": 80.0}])
+    ingest.run(whoop.WhoopAdapter(), db2, root=store_root)
+
+    recovery = store.read("recovery", root=store_root)
+    assert len(recovery) == 1  # same identity -> second dropped
+    assert recovery[0]["value"] == 60.0  # first stored value wins
+
+
+def test_whoop_distinct_source_from_other_wearable_does_not_collide(tmp_path, store_root):
+    """Adversarial (3: dedupe-key boundary — source): a Whoop hrv and an Oura hrv at the
+    same (item, day) BOTH persist; `source` distinguishes device provenance.
+
+    This is exactly WHY the adapter emits source="whoop" (device-specific) rather
+    than a shared "wearable" tag — a shared tag would collide the two on
+    (item, day, source) and silently drop one (the S41 dropped-reading class).
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import oura, whoop
+
+    db = tmp_path / "whoop.sqlite"
+    _write_whoop_sqlite(db, [{"day": "2026-02-11", "avgHrv": 58.0}])
+    ingest.run(whoop.WhoopAdapter(), db, root=store_root)
+
+    oura_export = tmp_path / "oura.json"
+    _write_json_export(oura_export, [{"metric": "hrv", "day": "2026-02-11", "average": 61}])
+    ingest.run(oura.OuraAdapter(), oura_export, root=store_root)
+
+    hrv = store.read("hrv", root=store_root)
+    assert len(hrv) == 2
+    assert {r["source"] for r in hrv} == {"whoop", "oura"}
 
 
 # --- Cycle 4: simulated format-rename re-validation 0-edit proof (AC-6) ---
