@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-61)
+title: Scope Contract Archive (Sessions 5-62)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58; S58 at S59; S59 at S60; S60 at S61; S61 at S62) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-61. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58; S58 at S59; S59 at S60; S60 at S61; S61 at S62; S62 at S63) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-62. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 62 (2026-06-14)
+
+S62 resume from the S61 close: merge the owed S61 close PR, then propagate ADR-0011 D3/D4 (the operator-chosen forward track "(b)"); Walter then directed "clear the e64j bead" and a first-party noop-repo review. Four PR lifecycles merged: #131 (owed S61 close docs — 3-agent subset, 1 LEGITIMATE quality fix blind-verified), #132 (ADR-0011 D3/D4 propagation — the biomarker `source` enum generalized `oura`→`wearable` across the gate + `vault/biomarkers/_template.md` + `vault/WIKI.md` schema doc, mutation-proven RED→GREEN cases 15/16; LM-02 + `current-state.md` re-anchored Oura→Whoop; the Oura *adapter* preserved as a valid unwired ADR-0003 slot), #134 (cleared `e64j` — the research plan reconciled to the D4 enum), #135 (**ADR-0011 v2 — D2 RE-DECIDED**: a first-party review of noop@`a3f5e39` [3 critique agents + orchestrator adjudication] found noop ships a documented schema (`docs/DATA_MODEL.md`) + a first-party read-only MCP server (`NoopLocalAccess`) the README missed → D2 flipped from "manual CSV export" to "consume noop's read-only local-access surface" + 10 corrected facts). AC1-AC5 PASS. **PF-S39-01 falsification window HELD** — all four PRs got BOTH `/review-pr` AND `/merge` fresh via the Skill tool (the disclosed S61 partial recurrence did NOT recur; count stays 2). **A prior-session (S61) PF-S6-01-family miss was SURFACED + remediated** — ADR-0011 v1 had been authored from noop's README (a secondary source) → wrong D2; disclosed, not promoted (the verify-first discipline + per-PR review caught it within one session). Off-main-archive-SHA HELD (S61 contract archived at on-main #131-close `00f4316`). On-main #133 close lifecycle is the S62-close commit `ea9adcb` (verified on-main via `git merge-base --is-ancestor`; the repo rebase-merges, so the pre-rebase `fix/s62-close` tip is GC-eligible). Full S62 drift checks + close attestation (with the four-PR #131/#132/#134/#135 per-PR table) in `memory/process-failures.md` (Session 62 section); summary in `vault/sessions/session-62.md`.
 
 ## Scope Contract — Session 61 (2026-06-14)
 

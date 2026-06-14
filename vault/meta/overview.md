@@ -76,6 +76,29 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
+## Status as of 2026-06-14 (S63) — WHOOP/noop ingestion adapter built + wired (read-only sqlite) + model-eval noop-AI-Coach prior art
+
+S63 ran one substantive PR lifecycle (#136) + the close PR, merged to `main` (`9cfbfef`; suite 833/2,
++10 net new whoop tests). Walter: "build the whoop. also, update the model-eval plan to consider
+noop's local AI Coach approach." (1) **The WHOOP/noop ingestion adapter is BUILT + WIRED** (`mdzq`
+build half) — `scripts/ingest/adapters/whoop.py` replaces the fabricated JSON scaffold with a
+read-only (`sqlite3` `mode=ro`) read of noop's documented `whoop.sqlite` `dailyMetric` table, mapping
+each non-null metric → `source: whoop` store readings (recovery / strain[0–21] / hrv / rhr /
+sleep-efficiency / spo2 / resp-rate / skin-temp-dev). **Mechanism (OQ-2/OQ-3) = read-only sqlite, NOT
+MCP** (the file-based `read_readings` contract fits with 0 edits to the ADR-0003 shared
+routine/scheduler — the first live-source adapter). Wired by removing the `UNWIRED` marker.
+(2) **The model-eval plan** gained §3.5 (+ §4b/§8 pointers): noop's AI Coach (BYO-provider protocol +
+OpenAI-compatible local endpoint à la Ollama + consent-gated compact-summary context) as integration
+prior art, license-honest (reference, not vendor). (3) **The #136 6-agent review was LOAD-BEARING** —
+it caught a real read-only-bypass (URI `mode=ro` defeated by a `?`/`#` in the path; a `#` opened the
+wrong file) + two mutation-survive-green test holes (a transposed column→item mapping; the untested
+`is None` NULL-skip), all 7 LEGITIMATE fixed + blind-verified, both new guards mutation-proven.
+**`mdzq` stays OPEN** — the real-data E2E validation tail (gated on the operator bonding the strap to
+noop + a sample) remains; the build + fixture tests + adversarial battery are merged. Beads `crgz`
+(doc-freshness: supersede stale whoop-unwired gates) + `ienx` (multi-device fail-loud) created; `1uav`
+closed. Next: the adapter's real-data validation, the review beads, the remaining S61 plans, or the
+correctness/governance tail. Session detail: `vault/sessions/session-63.md`.
+
 ## Status as of 2026-06-14 (S62) — owed S61 close + ADR-0011 D3/D4 propagated + D2 re-decided (noop-source review)
 
 S62 ran four PR lifecycles, all merged to `main` (`d2ec74c`; suite 823/2 + 16/16 wiki-ingest).
