@@ -213,8 +213,8 @@ A researched entry becomes a wiki page that MUST pass the commit-time gate
 
 **Biomarker page** (`vault/biomarkers/<slug>.md`):
 - frontmatter: `category` (blood|wearable|functional|subjective), `unit`, `source`
-  (lab|oura|manual|calculation — note `oura`/`manual`; Whoop maps to `manual`/`wearable`
-  pending §8 D2 enum decision), `confidence` (established|supported|provisional),
+  (lab|wearable|manual|calculation — Whoop-derived markers use `source: wearable`, the
+  specific device recorded in the entry body per ADR-0011 D4), `confidence` (established|supported|provisional),
   `last_verified`.
 - required `## ` sections (gate-enforced): Metadata, Target Range, Current Value,
   Affected By, Relations.
@@ -313,12 +313,13 @@ These block specific waves; get the operator's call before proceeding past them.
   compounds he is actually considering (for the July visit + his goals) so the deep passes
   (expensive) target the real shortlist, not all 30. The wiki entries stay goal-agnostic;
   only the *order/selection* is operator-informed.
-- **D2 — Whoop biomarker mapping (blocks the Wave 1 wearable markers).** The biomarker
-  `source` enum is `lab|oura|manual|calculation` and `category` includes `wearable`. The
-  operator is switching Oura→Whoop (he owns the Whoop). Decide: does `source` gain a
-  `whoop` value (an enum change → the `wiki-ingest-lint.sh` `check_biomarker` enum + a
-  change-discipline note), or do Whoop-derived markers use `source: manual`/`wearable`
-  until an ingestion path exists? (This ties to the separate "noop / Whoop data" item.)
+- **D2 — Whoop biomarker mapping — RESOLVED by ADR-0011 D4 (propagated S62).** The biomarker
+  `source` enum was generalized `oura`→`wearable` (device-agnostic); Whoop-derived markers use
+  `source: wearable`, with the specific device (Whoop via noop) recorded in the entry
+  body/metadata, not the enum. The propagation landed at S62 — `wiki-ingest-lint.sh`
+  `check_biomarker` + the biomarker template + `vault/WIKI.md` all carry
+  `lab|wearable|manual|calculation`, and `category: wearable` already exists. No further enum
+  change is needed; the ingestion path is ADR-0011's noop CSV-export adapter.
 - **D3 — Context-file fill (blocks ALL standard+ dispatches).** Gate 2.75 HALTs with
   `context-load-missing` if `operator-profile.md` / `goals.md` / `current-state.md` are
   unreadable. They are currently scaffolds. For *library* (goal-agnostic) dispatches they
