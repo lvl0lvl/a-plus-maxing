@@ -789,9 +789,12 @@ def test_contrast_and_colorblind(tmp_path):
     # users, so the legend word itself must clear the normal-text floor (bead
     # b6um — `.state-watch` rode the raw watch #DDAA33 at 2.13:1 until it was
     # darkened to `--watch-text`, the swatch keeping the true --watch color).
-    # The `[a-z-]` name class captures the hyphenated `--watch-text`; a `[a-z]+`
-    # class would silently skip `.state-watch` and the gate would never re-catch
-    # this class. The zone-3 ✓ markers also ride `.state-good`.
+    # The `[a-z-]` name class captures the hyphenated `--watch-text`. A `[a-z]+`
+    # value class would fail to match the `.state-watch` rule, dropping "watch"
+    # from `state_rules`, so `state_rules["watch"]` below would raise KeyError —
+    # a hard RED error, not a silent pass; the widening lets the gate READ the
+    # post-fix value, it does not change WHETHER a regression is caught. The
+    # zone-3 ✓ markers also ride `.state-good`.
     state_rules = dict(
         re.findall(r"\.state-([a-z]+) \{ color: var\(--([a-z-]+)\); \}", html)
     )
@@ -802,6 +805,18 @@ def test_contrast_and_colorblind(tmp_path):
         assert marker_ratio >= 4.5, (
             f"state-{state} text {marker_hex} on paper computes {marker_ratio:.2f} < 4.5"
         )
+
+    # b6um, the symmetric guard: only the watch WORD/glyph darkened to
+    # --watch-text; the legend SWATCH must keep the TRUE --watch amber (the
+    # data-state color cue). A swatch silently degraded to --watch-text would
+    # lose that cue while the text gate above stayed green, so pin it directly.
+    assert (
+        "<span class='state-watch'><span class='swatch' style='background:var(--watch)'>"
+        in html
+    ), "watch legend swatch must keep the true --watch amber, not --watch-text"
+    assert "swatch' style='background:var(--watch-text)'" not in html, (
+        "no legend swatch may use the AA-dark --watch-text as its fill"
+    )
 
     roles = ("good", "watch", "concern")
 
