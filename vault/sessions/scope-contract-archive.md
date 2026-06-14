@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-56)
+title: Scope Contract Archive (Sessions 5-57)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-56. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-57. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 57 (2026-06-13)
+
+S57 resume plan from the S56 close: merge the S56 close PR, then build the next done-path data model. The S56-close recommendation was the 30-day-rollup "first (most self-contained)"; S57 verify-first FALSIFIED that — the rollup (Zone 5) needs two UNSIGNED design decisions (the 16-specialist→tracked-store-item mapping + the 30-day aggregation/status rule; the spec signs only "a colored per-domain status line"), so S57 PIVOTED to the fully-signed calendar-events (Zone 2). Two PR lifecycles merged (#119 S56-close docs — 2 LEGITIMATE fixed incl. the off-main-archive-SHA recurrence [HIST-1, count=2 watch]; #120 the calendar-event data model `86vu` — `scripts/store/calendar_schema.py` `calendar::events` content-tagged stream + the zone-2 render placing category-tinted event pills in the month-calendar cells per the signed visual spec); final main `b74ee0f`, suite 785/2 (+25). AC1-AC6 all PASS. The #120 6-agent panel (Security 0, Bug Hunter 0, Contracts 7 positive) correctly REFUTED two of its own findings (TEST-1 cross-stream-docstring accurate; TEST-2 single-month correct); `dqyv` updated (3rd `_reading` consumer). `PALETTE`/`SERIES`/`ACCENTS` + `SUMMARY_FIELD_SET`/`EXCLUDED_RAW_PII` byte-identical. No NEW PF promoted, but TWO known classes RECURRED (off-main-archive-SHA count=2; PF-S13-01 DOCUMENT_RUBRIC attested-before-run at close step 8, surfaced by the operator's "did you run the full close?" and corrected on #121); INV-SKILL-TRACE green (2 rows all-YES). **Full contract preserved in git history (the on-main #121 lifecycle is the S57-close commit `55a1ab0` + the DOCUMENT_RUBRIC-attestation fix `93c4f1c`, verified on-main via `git merge-base --is-ancestor`; the repo rebase-merges, so the pre-rebase `fix/s57-close` tips `32f9f29`/`f7b9e94` are GC-eligible); S57 drift checks + close attestation (with the per-PR #119/#120 invocation table) in `memory/process-failures.md` (Session 57 section); summary in `vault/sessions/session-57.md`** (compacted here at the S58 close per the rotation-rule no-accretion clause).
 
 ## Scope Contract — Session 56 (2026-06-13)
 
