@@ -76,6 +76,25 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
+## Status as of 2026-06-14 (S61) — three forward plans recorded (wiki research, Whoop/noop ADR, local-model eval)
+
+S61 was a PLANNING session (no production code) — Walter directed three forward artifacts, each
+reviewed + merged to `main` (`0aed727`, which also carries the S60 close; suite 823/2 unchanged):
+(1) `docs/research-plan/wiki-population-research-plan.md` — the executable wiki-population plan
+(wave-ordered backlog + `/aplus-research` methodology + ingestion contract + per-entry verification
+gate) for a parallel session to run; (2) **ADR-0011** — WHOOP ingestion via `noop` (subscription-free,
+fully-local; the adapter reads noop's CSV export, plugging into ADR-0003's adapter seam), Accepted;
+(3) `docs/model-eval/local-model-evaluation-plan.md` — choose/train the local model for the off-cloud
+PII personalization, framed as a **supersession of ADR-0001** (which routes PII to a no-train commercial
+API over summaries + explicitly rejected fully-local for V1). The #130 review was LOAD-BEARING — it caught
+the eval plan misframing `hil` as an open gap (it is CLOSED by ADR-0001); reframed + blind-verified 5/5.
+The #128 review caught 3 accuracy gaps (fixed). The owed S60 close (#127) merged. **Skill-trace deviation
+disclosed** (PF-S39-01 recurrence: #129 + #127 merged without a `/review-pr` panel; some merges REST-direct
+without a fresh `Skill(merge)` — recorded honestly, not over-attested). Next: execute one of the three
+plans (the wiki research [a parallel session], the ADR-0011 D3/D4 propagation build, or the local-model
+eval [gated on operator inputs]) or the correctness/governance tail. Session detail:
+`vault/sessions/session-61.md`.
+
 ## Status as of 2026-06-14 (S60) — the clone-init bd contract documented (vjsw); the correctness tail advances
 
 Two PR lifecycles merged (#125 S59-close docs, #126 the `vjsw` clone-init bd contract; `main` at

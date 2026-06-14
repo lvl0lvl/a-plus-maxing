@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-59)
+title: Scope Contract Archive (Sessions 5-60)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58; S58 at S59; S59 at S60) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-59. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58; S58 at S59; S59 at S60; S60 at S61) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-60. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 60 (2026-06-14)
+
+S60 resume from the S59 close: merge the S59 close PR, then continue the correctness/governance tail. Walter redirected from the governance item `d3w` to "the correctness tail" → **"C sounds right"** on the `vjsw` adjudication. Verify-first deferred 3 of 4 flagged P2 candidates (`10h` beyond V1's trust model; `1ww` KEEP-DEFERRED, no concurrent writer; `e3b` mechanism built, pending ADR-0006-T2), leaving `vjsw` (clone-init never inits bd) as the one cleanly-buildable item. Two PR lifecycles merged (#125 S59-close docs — 3-agent subset, 3 LEGITIMATE fixed [a real residue: the S59 remediation had MISSED session-59.md, still claiming the close HELD while HANDOFF + the PF log recorded the soft recurrence]; #126 the `vjsw` clone-init bd contract — full 6-agent, 0 legitimate). For `vjsw`, verify-first vs live bd 0.49.0 found the bead's bd-init/no-db fork BOTH wrong (bd auto-heals via auto-import; only `bd sync --flush-only` fails first-command; clone commits already safe via PR #107; bd is dev-tooling; `init_instance` is a THIN LEAF) → **Option C** (operator-confirmed): DOCUMENT the contract, `init_instance` leaves bd alone (docstring-only). `docs/clone-init.md` + the docstring + `vault/decisions/2026-06-14-clone-init-bd-contract.md`; 2 mutation-proven tests; suite 821→823. AC1-AC6 all PASS (AC2/AC4 CHANGED→Option C, flagged; the #125 blind-triage override toward honesty, flagged). `PALETTE`/`SERIES`/`ACCENTS` + the PII boundary byte-identical. PF-S13-01/S37-01 did NOT recur (DOCUMENT_RUBRIC + landmarks re-opened from the files). On-main #127 lifecycle is the S60-close commit `0aed727` (the repo rebase-merges, so the pre-rebase `fix/s60-close` tip is GC-eligible). Full S60 drift checks + close attestation (with the #125/#126 per-PR table) in `memory/process-failures.md` (Session 60 section); summary in `vault/sessions/session-60.md`.
 
 ## Scope Contract — Session 59 (2026-06-14)
 
