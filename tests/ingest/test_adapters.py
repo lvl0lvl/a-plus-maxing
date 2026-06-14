@@ -355,13 +355,19 @@ def test_whoop_reads_daily_metric_from_readonly_sqlite(tmp_path, store_root):
         assert set(reading) >= set(store.keying.LINE_FIELDS)
         assert reading["source"] == "whoop"
         assert reading["timepoint"] == "2026-02-01"
-    assert recovery[0]["value"] == 66.0 and hrv[0]["value"] == 58.0
-    # All eight mapped metrics landed on their own item streams (column -> item).
-    for item in (
-        "recovery", "strain", "hrv", "rhr", "sleep-efficiency",
-        "spo2", "resp-rate", "skin-temp-dev",
-    ):
-        assert len(store.read(item, root=store_root)) == 1, item
+    # Each column maps to its OWN item stream carrying the CORRECT value. Pinning
+    # the value per stream (not just presence) REDs a transposed column->item
+    # mapping (e.g. spo2Pct<->respRateBpm), which would land a wrong physiological
+    # value on the wrong stream — the S41 fabricated-biomarker class.
+    expected = {
+        "recovery": 66.0, "strain": 14.5, "hrv": 58.0, "rhr": 52,
+        "sleep-efficiency": 91.0, "spo2": 97.0, "resp-rate": 14.2,
+        "skin-temp-dev": -0.3,
+    }
+    for item, value in expected.items():
+        readings = store.read(item, root=store_root)
+        assert len(readings) == 1, item
+        assert readings[0]["value"] == value, item
 
 
 def test_whoop_strain_stays_on_0_to_21_scale(tmp_path, store_root):
@@ -398,6 +404,56 @@ def test_whoop_skips_null_metrics(tmp_path, store_root):
     assert len(store.read("recovery", root=store_root)) == 1
     assert store.read("strain", root=store_root) == []
     assert store.read("hrv", root=store_root) == []
+
+
+def test_whoop_retains_honest_zero_values(tmp_path, store_root):
+    """A legitimate 0 metric is RETAINED — the skip is `value is None`, not falsy.
+
+    A zero-strain rest day or a 0.0 skin-temp deviation are real readings, not
+    absences. Pins that the NULL-skip discriminates None from a falsy 0: a
+    `if not value:` regression would silently DROP honest zeros (the S41
+    dropped-reading class) — this REDs under that mutation.
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import whoop
+
+    db = tmp_path / "whoop.sqlite"
+    _write_whoop_sqlite(db, [{"day": "2026-02-12", "strain": 0, "skinTempDevC": 0.0}])
+    ingest.run(whoop.WhoopAdapter(), db, root=store_root)
+
+    strain = store.read("strain", root=store_root)
+    skin = store.read("skin-temp-dev", root=store_root)
+    assert len(strain) == 1 and strain[0]["value"] == 0
+    assert len(skin) == 1 and skin[0]["value"] == 0.0
+
+
+@pytest.mark.parametrize("make_bad", ["missing", "not-sqlite", "no-table"])
+def test_whoop_read_fails_loud_on_bad_db(tmp_path, make_bad):
+    """The documented fail-loud paths RAISE (never silently import nothing).
+
+    A missing file, a non-SQLite file, and a SQLite DB without `dailyMetric` each
+    raise rather than yielding 0 readings. `read_readings` is a generator, so the
+    raise fires on consumption — `list(...)` forces it. Guards the docstring's
+    fail-loud contract against a future swallow-everything refactor.
+    """
+    import sqlite3
+
+    from scripts.ingest.adapters import whoop
+
+    if make_bad == "missing":
+        path = tmp_path / "nope.sqlite"
+    elif make_bad == "not-sqlite":
+        path = tmp_path / "junk.sqlite"
+        path.write_bytes(b"not a sqlite file at all")
+    else:  # no-table: a valid sqlite DB lacking the dailyMetric table
+        path = tmp_path / "empty.sqlite"
+        conn = sqlite3.connect(path)
+        conn.execute("CREATE TABLE other (x INTEGER)")
+        conn.commit()
+        conn.close()
+
+    with pytest.raises(sqlite3.Error):
+        list(whoop.WhoopAdapter().read_readings(path))
 
 
 def test_whoop_read_is_readonly_does_not_mutate_db(tmp_path, store_root):

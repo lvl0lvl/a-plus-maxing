@@ -77,7 +77,11 @@ class WhoopAdapter:
         Args:
             export_file (str | Path): Path to noop's `whoop.sqlite`.
         """
-        uri = f"file:{Path(export_file).resolve()}?mode=ro"
+        # `as_uri()` percent-encodes the path (incl. `?`/`#`) so the appended
+        # `?mode=ro` query cannot be defeated by a special char in the path — a raw
+        # f-string would let a `?` in the path swallow the read-only flag (open
+        # writable) or a `#` truncate to the wrong file.
+        uri = Path(export_file).resolve().as_uri() + "?mode=ro"
         conn = sqlite3.connect(uri, uri=True)
         try:
             conn.row_factory = sqlite3.Row
