@@ -145,6 +145,56 @@ wiki well. Survey, on the same eval:
 
 ---
 
+## 3.5 Prior art — noop's AI Coach (the local-inference integration seam, already built)
+
+noop (the WHOOP companion this project now ingests from, ADR-0011) ships an **AI Coach**
+that is a working reference for the *integration* this eval's survivor has to slot into —
+not for the model choice, and not for the safety bar. Read it before building the §5
+harness. [Source: `noop@a3f5e39` — `Strand/AI/AICoach.swift`, `Strand/AI/AIProvider.swift`,
+`Strand/AI/Providers/`.]
+
+**What it is — a bring-your-own-provider seam with a local path.** noop defines an
+`AIProviderClient` protocol (`send` + `fetchModels`) with four implementations: OpenAI,
+Anthropic, Gemini, and **Custom (OpenAI-compatible)**. The Custom provider points at any
+OpenAI-compatible base URL and its own docstring names the target: *"a local LLM server such
+as Ollama / LM Studio / llama.cpp: `http://localhost:11434/v1`"* — keyless allowed (local
+servers usually need none), and `refreshModels()` pulls the server's `/models`. **This is
+exactly the §4b "Integration via Ollama / llama.cpp / LM Studio server" line, demonstrated:**
+a provider-abstraction + an OpenAI-compatible local endpoint is the seam, and it is a solved,
+small surface.
+
+**What it validates for this plan:**
+- **The integration shape.** The local-inference layer ADR-0001's supersession needs is a
+  provider client behind an OpenAI-compatible endpoint at `localhost`. noop proves the pattern
+  with one `CustomClient`; a-plus-maxing's Python harness can mirror it (its own code — see
+  the license note) rather than re-derive it.
+- **The privacy posture matches ours.** noop is offline-by-default; the coach is *"the one
+  networked feature"*, gated behind an explicit `dataConsent` toggle (OFF by default), and
+  sends only a **compact text summary** (`buildContext()`), never raw streams. Point the Custom
+  provider at `localhost` and *nothing leaves the box* — the on-device PII posture ADR-0001
+  wants, and the concrete demonstration that a local substrate **lifts the summaries-not-raw
+  constraint** (§1's benefit-to-weigh).
+- **A context-builder template (§5.6).** `buildContext()` assembles last-~14-days + 30-day
+  averages of recovery / strain / sleep-hours / HRV / RHR / SpO2 / respiration / skin-temp-dev
+  / steps, kept under ~1500 tokens — over the *same* `dailyMetric` fields a-plus-maxing now
+  ingests via the WHOOP adapter (ADR-0011). It is a ready model for the harness's
+  context-injection step (a-plus-maxing's adds the wiki-RAG entries + the operator profile +
+  the role frame on top).
+
+**The boundaries — what it is NOT prior art for:**
+- **Not the model choice.** noop's defaults are *cloud* APIs (gpt-4o-mini, claude-sonnet, gemini-flash);
+  its local path is the Custom escape hatch, not an evaluated local model. This plan still picks the
+  model on the §4/§5 scored result.
+- **Not the safety bar.** noop's coach is explicitly *"NOT a doctor — never diagnose"* with a single
+  autoregulation system prompt. a-plus-maxing's bar is higher: wiki-RAG grounding, the specialist HALT/
+  refusal rules, the medical-liaison doctor queue (§1). Use noop's prompt as a *coaching-tone* reference
+  only, never as the safety frame.
+- **License (PolyForm Noncommercial — ADR-0011).** a-plus-maxing may **reference** noop's approach as
+  design prior art but must **not vendor or link its Swift code**; the harness is a-plus-maxing's own
+  (Python). Documentary citation here carries no license consequence.
+
+---
+
 ## 4. The evaluation — two axes (both required)
 
 ### 4a. Quality (capability) — facts AND reasoning
@@ -164,7 +214,7 @@ wiki well. Survey, on the same eval:
 | **Hardware fit** | Does it fit the operator's machine (§7 D1: the M2 Studio's **64GB unified-memory** budget — preferred — or the 128GB fallback)? At what quantization (Q4/Q5/Q8/FP16, via Metal/MLX)? |
 | **Quantization quality delta** | Re-run 4a at the quantization the hardware forces — quantization can degrade reasoning; measure the drop, not just "it loads." |
 | **Latency / throughput** | Time-to-first-token + tokens/sec for a representative specialist dispatch. Is an interactive turn tolerable? |
-| **Integration** | How a specialist dispatch invokes it locally (Ollama / llama.cpp / LM Studio server) so the operator PII never leaves the box; the harness that injects the wiki RAG + the operator profile + the role frame. |
+| **Integration** | How a specialist dispatch invokes it locally (Ollama / llama.cpp / LM Studio server) so the operator PII never leaves the box; the harness that injects the wiki RAG + the operator profile + the role frame. **noop's AI Coach Custom provider (§3.5) is a working reference for exactly this** — an OpenAI-compatible local endpoint (e.g. Ollama `:11434/v1`) behind a provider client. |
 | **Cost** | Local = compute/electricity (no API $). If the fine-tune path: the one-time training cost (GPU-hours) + the maintenance of a custom checkpoint. |
 
 ---
@@ -258,6 +308,12 @@ wiki well. Survey, on the same eval:
   gate, which would instead gate the local model itself as a deployed component).
 - **Needs the wiki.** The RAG dimensions improve as the research plan populates the wiki;
   a richer library is a better substrate for the local model — the two plans compound.
+- **The integration seam already has a reference (§3.5).** noop's AI Coach demonstrates the
+  local-inference seam this plan needs — a BYO-provider client behind an OpenAI-compatible
+  local endpoint (Ollama/LM-Studio/llama.cpp), consent-gated, sending only a compact summary —
+  over the *same* on-device WHOOP data a-plus-maxing now ingests via the ADR-0011 adapter. It is
+  prior art for the *integration + context-builder*, not the model choice or the safety bar, and
+  is reference-only under noop's PolyForm license (the harness is a-plus-maxing's own Python).
 - **The result SUPERSEDES ADR-0001.** Picking the local inference layer reverses ADR-0001's V1
   plan-reasoning routing (exercising its Alternative-C revisit trigger); record it as an ADR
   that supersedes ADR-0001 once the eval recommends.
