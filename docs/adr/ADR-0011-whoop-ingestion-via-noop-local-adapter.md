@@ -1,6 +1,6 @@
 # ADR-0011 — WHOOP wearable ingestion via noop: a local, subscription-free source adapter
 
-**Status:** Accepted (2026-06-14, S60-followup) — operator-ratified. **D2 RE-DECIDED 2026-06-14 (S62)** after a first-party review of noop's actual source (the v1 ADR was authored from noop's README only) — operator-ratified ("proceed with your recommendations"). See Revision History.
+**Status:** Accepted (2026-06-14, S60-followup) — operator-ratified; **amended S62** (D2 re-decided after a first-party noop-source review — see Amendments + Revision History).
 **Owner:** Walter McGivney
 **Relates to:** ADR-0003 (source-extensible ingestion interface — this is the WHOOP adapter that plugs into its seam), ADR-0001 (no-train PII trust boundary — ingestion routes no reading through a model step), ADR-0002 (local-first store — the (item, timepoint) dedupe key the adapter inherits), `vault/meta/landmarks.md` LM-02 (the wearable-baseline landmark, re-anchored here Oura→Whoop)
 
@@ -62,11 +62,13 @@ The forces:
   noop's mature macOS app *and* its macOS-only read-only MCP server can co-reside on the one box
   the agent already runs on. This is the single strongest fact for the integration, and the v1 ADR
   missed it.
-- **ADR-0003's adapter model is export-file-based**, but it already contemplated a **live
-  local-source** adapter variant as the unattended upgrade. noop's read-only access surface
-  realizes exactly that variant with a *documented, first-party, read-only* contract — so the
-  "different adapter shape" concern is a known, bounded extension, not a seam break. [VERIFIED —
-  ADR-0003 Consequences]
+- **ADR-0003's adapter model is export-file-based** [VERIFIED — ADR-0003 Decision + Consequences].
+  A live read of noop's read-only access surface is therefore a *different adapter shape* than
+  ADR-0003 contemplated — ADR-0003 does **not** specify a live/local-source variant (the v1 of this
+  ADR said so honestly). This ADR introduces that live-source shape as a **bounded extension** of the
+  same seam, not a new architecture: the shared routine, the (item, timepoint) dedupe, and the
+  scheduler stay untouched — the Validation "0 edits to the shared routine" criterion is the test
+  that keeps it a seam extension rather than a seam break.
 - **The wiki has 0 biomarker entries today** [VERIFIED — `vault/biomarkers/` holds only
   `_template.md`], so the biomarker `source` enum change (D4, already propagated S62) was
   zero-migration.
@@ -209,8 +211,9 @@ noop's "Export CSV…" and the adapter parses the 4-CSV zip.
 - *Supporting:* documented, first-party, read-only, no-network, unattended, schema-insulated,
   macOS-native, MCP-agent-native, license-safe as a separate process; exposes the computed metrics +
   `data_freshness` directly.
-- *Cost:* a live-source adapter shape (a known ADR-0003 variant, not a seam break); requires the
-  operator to run the macOS binary (or a Python read-only SQLite read against the documented schema).
+- *Cost:* a live-source adapter shape — a NEW shape this ADR introduces (not a pre-existing ADR-0003
+  variant), kept a bounded seam extension by the "0 edits to the shared routine" criterion; requires
+  the operator to run the macOS binary (or a Python read-only SQLite read against the documented schema).
 - **Chosen as D2.**
 
 ## Validation Approach
@@ -241,6 +244,21 @@ bond · the commercial GP product track begins (PolyForm boundary forces a diffe
 | OQ-1 | ~~Does `noop`'s CSV export include the computed metrics?~~ **RESOLVED (S62) — YES.** noop's "Export CSV…" re-serializes the computed `dailyMetric` (recovery/strain/HRV/RHR/sleep) into the WHOOP 4-CSV shape [VERIFIED — `WhoopCsvExporter.cyclesCSV`]. | — | resolved | — |
 | OQ-2 | ~~Is `noop`'s data location stable enough to read live?~~ **RESOLVED (S62) — YES.** Fixed documented path (`~/Library/.../OpenWhoop/whoop.sqlite`, `docs/DATA_MODEL.md` + `DatabasePathResolver`) + a first-party read-only API. **New residual:** which mechanism — subprocess `noop-local-access` MCP vs Python read-only `sqlite3` over the documented schema. | build session | first WHOOP adapter build | Build-time mechanism choice; both are first-party-documented + license-safe. |
 | OQ-3 | Does `noop-local-access` expose a non-interactive query mode usable from Python (beyond the MCP stdio loop), or must a-plus-maxing run a minimal MCP stdio client? | build session | first WHOOP adapter build | Shapes the adapter's invocation of noop. |
+
+## Amendments
+
+- [AMENDED 2026-06-14 (S62)]: **D2 re-decided** — "manually export a CSV + parse it" → "consume
+  noop's first-party read-only local-access surface (the `noop-local-access` MCP server / read-only
+  `whoop.sqlite`)"; the CSV path is demoted to the documented fallback. **Reason:** the v1 D2 (and its
+  deferral of the live path) was authored from noop's README only and rested on a "noop's schema is
+  undocumented, version-volatile; a third-party app's internals are not an API" premise that a
+  first-party review of noop@`a3f5e39` (three adversarial agents + orchestrator adjudication against
+  source) **refuted** — noop ships a documented schema (`docs/DATA_MODEL.md`) **and** a public
+  read-only MCP server (`NoopLocalAccess`, macOS-only). Also corrected in the same amendment: the 0–21
+  Day-Strain scale, the license × integration-path (a/b/c) analysis, the single-device BLE-bond cost,
+  the macOS-platform alignment, the imported-vs-`APPROXIMATE` provenance, and the fabricated `whoop.py`
+  scaffold note; OQ-1 + OQ-2 resolved. Operator-ratified ("proceed with your recommendations"). Full
+  provenance in the Revision History v2.0 row.
 
 ## Revision History
 
