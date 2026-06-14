@@ -4,7 +4,7 @@ type: note
 permalink: a-plus-maxing/meta/current-state
 status: scaffold
 created: 2026-05-23
-last_reviewed: 2026-05-23
+last_reviewed: 2026-06-14
 review_cadence: weekly (or on new lab/wearable data)
 ---
 

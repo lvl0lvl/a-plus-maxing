@@ -1,5 +1,5 @@
 ---
-title: Scope Contract Archive (Sessions 5-60)
+title: Scope Contract Archive (Sessions 5-61)
 type: reference
 status: archived
 created: 2026-06-05
@@ -10,9 +10,13 @@ permalink: a-plus-maxing/sessions/scope-contract-archive
 
 Historical session scope contracts + their close-time evaluations / drift checks /
 PF attestations, moved out of `HANDOFF.md` at session close (the S5-31 set at S32,
-2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58; S58 at S59; S59 at S60; S60 at S61) to keep the active handoff lean. The CURRENT session's scope
-contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-60. Newest
+2026-06-05; S32 at S33; S33 at S34; S34 at S35; S35 at S36; S36 at S37; S37 at S38; S38 at S39; S39 at S40; S40 at S41; S41 at S42; S42 at S43; S43 at S44; S44 + S45 at S46 — S44 had been missed at the S45 close; S46 at S47; S47 at S48; S48 at S49; S49 at S50; S50 at S51; S51 at S52; S52 at S53; S53 at S54; S54 at S55; S55 at S56; S56 at S57; S57 at S58; S58 at S59; S59 at S60; S60 at S61; S61 at S62) to keep the active handoff lean. The CURRENT session's scope
+contract stays in `HANDOFF.md`; this file is the archaeology for Sessions 5-61. Newest
 first. (Two `Session 5` blocks are preserved as they existed in the handoff.)
+
+## Scope Contract — Session 61 (2026-06-14)
+
+S61 (no formal open — three operator-directed conversational steps): produce the wiki-population research plan, the WHOOP/noop ingestion ADR, and the local-model eval plan, and merge the owed S60 close. Four PRs merged: #128 (wiki research plan — 3-agent subset, 3 LEGITIMATE accuracy fixes blind-verified), #129 (ADR-0011 Whoop/noop, **Accepted** — narrowed to the source contract since the adapter architecture is ADR-0003; merged WITHOUT a `/review-pr` panel, right-sized on "ratify it", skill-trace NO), #130 (model-eval plan — 3-agent; **the session's LOAD-BEARING catch:** the plan misframed `hil` as an open gap when it is CLOSED by ADR-0001, reframed as a proposed SUPERSESSION of ADR-0001 + 4 more, 5 fixed/blind-verified 5/5), #127 (the owed S60 close — merged WITHOUT a panel, content already passed the S60-close 5-audit gate, skill-trace NO). AC1-AC5 PASS. Zero production code (planning docs + one ADR). **PF-S39-01 PARTIALLY RECURRED — disclosed, not over-attested:** the per-PR `/review-pr`+`/merge` discipline was applied unevenly (#129/#127 no panel; #127/#128/#129 merges REST-direct without a fresh `Skill(merge)`); the over-attest half did NOT recur (the skill-trace table marks every NO cell "violation"). Off-main-archive-SHA HELD (S60 contract archived at on-main `0aed727`). On-main #131 close lifecycle is the S61-close commit `00f4316` (the repo rebase-merges, so the pre-rebase `fix/s61-close` tip is GC-eligible). Full S61 drift checks + close attestation (with the #127-#130 per-PR table) in `memory/process-failures.md` (Session 61 section); summary in `vault/sessions/session-61.md`.
 
 ## Scope Contract — Session 60 (2026-06-14)
 
