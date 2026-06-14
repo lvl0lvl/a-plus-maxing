@@ -80,15 +80,15 @@ def _status(latest, today):
     """Classify a specialist's latest mapped timepoint into a freshness status.
 
     Args:
-        latest (datetime.date): The most-recent mapped timepoint.
+        latest (datetime.date): The most-recent recorded-data timepoint (on or
+            before `today` — `resolve_rollup` excludes future timepoints).
         today (datetime.date): The reference date for the freshness window.
 
     Returns:
         (dict) `{state, days}` — state is `current` | `stale` | `dormant`; days
-        is the age `today - latest` clamped at 0 (a future timepoint reads 0
-        days, i.e. current).
+        is the age `today - latest` (>= 0 since `latest` is never in the future).
     """
-    days = max(0, (today - latest).days)
+    days = (today - latest).days
     if days <= CURRENT_MAX_DAYS:
         state = "current"
     elif days <= STALE_MAX_DAYS:
@@ -103,16 +103,20 @@ def resolve_rollup(store_read, today):
 
     Pure over the store read model. Each reading is attributed to at most one
     specialist (by item prefix, or by calendar event category); the specialist's
-    status is taken from its most-recent mapped timepoint. Specialists with no
-    mapped reading are ABSENT from the result (the Zone 5 render fills the honest
-    "no data yet" state for them).
+    status is taken from its most-recent RECORDED-DATA timepoint. Future-dated
+    timepoints are EXCLUDED — an upcoming scheduled event is activity (shown in
+    Zone 2 This Week), not recorded data, and labeling it "updated today" would
+    assert a data update that never happened. So a specialist whose only mapped
+    reading is a future event, like one with no mapped reading at all, is ABSENT
+    from the result (the Zone 5 render fills the honest "no data yet" state).
 
     Args:
         store_read (list): The store read model (list of reading dicts).
         today (datetime.date): The reference date for the freshness window.
 
     Returns:
-        (dict) specialist slug -> `{state, days}` for every specialist with data.
+        (dict) specialist slug -> `{state, days}` for every specialist with
+        recorded data on or before `today`.
     """
     latest = {}
     for reading in store_read:
@@ -124,7 +128,7 @@ def resolve_rollup(store_read, today):
         if slug is None:
             continue
         day = _timepoint_date(reading["timepoint"])
-        if day is None:
+        if day is None or day > today:
             continue
         if slug not in latest or day > latest[slug]:
             latest[slug] = day

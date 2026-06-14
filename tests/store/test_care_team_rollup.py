@@ -11,10 +11,11 @@ read-model's own boundary analogue:
   * 30/60-day threshold boundary — the freshness bands keyed at exactly 30 and 60
     days (`test_freshness_band_boundaries`).
   * mutation-style verification — the threshold + mapping tests FAIL when the
-    rule is broken; the per-test docstrings name the mutation. Both mutations
+    rule is broken; the per-test docstrings name the mutation. The mutations
     were run RED during the build (CURRENT_MAX_DAYS=999 reds the band test; a
-    removed `plan::workout` prefix reds the cross-stream + mapping tests) and
-    reverted.
+    removed `plan::workout` prefix reds the mapping test; a last-write-wins
+    reduction reds the reversed-order latest-wins case — the cross-stream tests
+    carry their own per-test mutation note) and reverted.
 
 Timepoints are reduced to their nominal calendar date via the house parser, so
 the tests mix the date-only (plan/calendar) and full-datetime (loop) forms the
@@ -99,24 +100,42 @@ def test_freshness_band_boundaries(days_ago, state):
     assert rollup["personal-trainer"] == {"state": state, "days": days_ago}
 
 
-def test_future_timepoint_clamps_to_current():
-    """A future-dated reading (an upcoming scheduled event) reads `current`, days
-    clamped at 0 — never a negative age."""
+def test_future_only_event_is_excluded_from_freshness():
+    """A future-dated event is scheduled activity (Zone 2), NOT recorded data, so a
+    specialist whose only mapped reading is in the future is absent — 'no data yet',
+    never a false 'updated today' (review BUG-1 / decision note Decision 2)."""
     future = (_TODAY + datetime.timedelta(days=12)).isoformat()
     rollup = care_team_rollup.resolve_rollup([_r("calendar::events", future,
         value={"category": "appointment", "label": "MD"})], _TODAY)
-    assert rollup["medical-liaison"] == {"state": "current", "days": 0}
+    assert rollup == {}
 
 
-def test_latest_timepoint_wins_across_mixed_formats():
-    """A specialist's status comes from its MOST-RECENT mapped timepoint, comparing
-    correctly across the date-only (plan) and full-datetime (loop/track) forms."""
+def test_future_event_does_not_mask_past_data_recency():
+    """A future scheduled event never overrides a specialist's real recorded-data
+    recency: a 50-day-old physician note + a future appointment (both medical-liaison)
+    reads `stale` from the note, not `current` from the appointment."""
     readings = [
-        _r("plan::workout", _day(45)),               # date-only, older
-        _r("plan-track::workout", _dt(1)),           # datetime, newer -> wins
+        {"item": "feedback::physician-feedback", "timepoint": _day(50),
+         "source": "m", "value": "x"},
+        _r("calendar::events", (_TODAY + datetime.timedelta(days=20)).isoformat(),
+           value={"category": "appointment", "label": "MD"}),
     ]
     rollup = care_team_rollup.resolve_rollup(readings, _TODAY)
-    assert rollup["personal-trainer"] == {"state": "current", "days": 1}
+    assert rollup["medical-liaison"] == {"state": "stale", "days": 50}
+
+
+def test_latest_timepoint_wins_across_mixed_formats_and_order():
+    """A specialist's status comes from its MOST-RECENT mapped timepoint, comparing
+    correctly across the date-only (plan) and full-datetime (loop/track) forms AND
+    independent of input order (the max-reduction, not last-write-wins).
+
+    Mutation-RED: replacing the `day > latest[slug]` max-reduction with an
+    unconditional `latest[slug] = day` (last-write-wins) reds the reverse case."""
+    forward = [_r("plan::workout", _day(45)), _r("plan-track::workout", _dt(1))]
+    reverse = [_r("plan-track::workout", _dt(1)), _r("plan::workout", _day(45))]
+    current_day1 = {"state": "current", "days": 1}
+    assert care_team_rollup.resolve_rollup(forward, _TODAY)["personal-trainer"] == current_day1
+    assert care_team_rollup.resolve_rollup(reverse, _TODAY)["personal-trainer"] == current_day1
 
 
 # --- absence: streamless / excluded / empty ---
