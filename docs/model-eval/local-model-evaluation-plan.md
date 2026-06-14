@@ -5,7 +5,7 @@ owner: Walter McGivney
 created: 2026-06-14
 last_reviewed: 2026-06-14
 status: active
-depends_on: []
+depends_on: [ADR-0001, ADR-0006]
 superseded_by: null
 review_cadence: phase
 permalink: a-plus-maxing/model-eval/local-model-evaluation-plan
@@ -13,12 +13,14 @@ permalink: a-plus-maxing/model-eval/local-model-evaluation-plan
 
 # Local Model Evaluation Plan
 
-The executable plan for choosing (or training) the **local model that runs the
-PII-sensitive personalization** — the work that must stay off the cloud, which the
-project was otherwise going to send to the Anthropic API. The Claude subscription
-keeps the goal-agnostic rest (the `/aplus-research` wiki research, orchestration,
-the build). This plan decides *which local model*, on *what hardware*, at *what
-quality and safety*, and how it slots in.
+The executable plan for choosing (or training) the **local model that would run the
+PII-sensitive personalization on-device**. The accepted V1 boundary (ADR-0001) currently
+routes that work to a *no-train, non-retained commercial Anthropic API over summaries* —
+so moving it on-device is a **proposed supersession of ADR-0001's plan-reasoning routing**
+(see §1), driven by the operator's direction to take the off-cloud PII work local. The
+Claude subscription keeps the goal-agnostic rest (the `/aplus-research` wiki research,
+orchestration, the build). This plan decides *which local model*, on *what hardware*, at
+*what quality and safety*, and how it slots in — its result is the evidence for that ADR.
 
 > **Audience:** a future session that runs this eval end-to-end and reports a
 > recommendation. Read it in full before starting. It is a *plan*, not the eval
@@ -40,28 +42,46 @@ quality and safety*, and how it slots in.
 
 ---
 
-## 1. Premises — what the local model is FOR
+## 1. Premises — what the local model is FOR, and what it supersedes
 
-**The architecture split (the `hil` gap resolution).** The project's standing open
-problem (bead `hil`): *"the system uses operator PII without sending it to Anthropic."*
-The answer is a **local-inference layer**:
+**This supersedes ADR-0001's PII routing — it is not an open gap.** The PII trust
+boundary is an *accepted* decision. **ADR-0001** (threat-model B) routes the PII-touching
+plan reasoning to a **no-train, non-retained commercial Anthropic API over summaries**
+(not raw PII), with the store / ingestion / generation all local; **ADR-0006** routes the
+specialist plan-assembly on that same no-train-over-summaries lane. ADR-0001 **explicitly
+evaluated and REJECTED "Alternative C: fully-local model" for V1** (it "sacrifices V1
+capability," and reversing to local later "would force re-plumbing every data path") —
+recording a revisit trigger: *"if local open-weight models reach parity for clinical-
+reasoning tasks AND hardware cost is acceptable."* The bead `hil` (*"use operator PII
+without sending it to Anthropic"*) is **CLOSED**, resolved by that ADR-0001 boundary.
 
-- **Local model** → the **personalized** layer: take the operator's PII
-  (`operator-profile.md`, labs, `goals.md`, `current-state.md`) + the goal-agnostic
-  wiki (via RAG) + a specialist role, and produce a personalized **diagnostic + plan**
-  — entirely on-device. This is the work that would otherwise hit the API.
+So this plan does not fill an open gap — it is the **evidence-gathering for a proposed
+supersession of ADR-0001's plan-reasoning routing**, exercising ADR-0001's own
+Alternative-C revisit trigger, driven by the operator's direction to move the off-cloud
+PII work to a local model. Its result is ADR-worthy: a recommendation here **supersedes
+ADR-0001** (and re-validates ADR-0006's constraint) for the personalization layer, and
+must account for the re-plumbing cost ADR-0001 flagged.
+
+**The split being evaluated:**
+- **Local model** → the **personalized** layer: the operator's context + the goal-agnostic
+  wiki (via RAG) + a specialist role → a personalized **diagnostic + plan**, on-device.
+  *Today this lane runs on the no-train commercial API over summaries (ADR-0001/0006); a
+  local substrate is what would move it on-device — and could lift the summaries-not-raw
+  constraint, a benefit to weigh.*
 - **Claude subscription** → the **goal-agnostic** rest: `/aplus-research` wiki research
-  (no operator PII — goal-agnostic by design), orchestration, the build, this kind of
-  planning doc.
+  (no operator PII — goal-agnostic by design), orchestration, the build, this kind of doc.
 
-**The model is NOT autonomous.** Its outputs feed the *existing* safety apparatus —
-the `medical-safety-reviewer` agent, the operator-profile HALT rules (medium+ compounds
-blocked until the January-2026 section + MD clearance), the `medical-liaison`
-doctor-visit queue, and the operator + doctor as human-in-the-loop. The bar is
-therefore **"good enough to draft personalized recommendations that the safety layer,
-the operator, and the doctor vet"** — not "autonomous medical authority." That bar
-still requires real medical grounding and safe behavior; it does not require a
-clinician-grade autonomous diagnostician.
+**The model is NOT autonomous — and its runtime output is gated by the specialist rules,
+NOT by `medical-safety-reviewer`.** A correction to pin for the executor:
+`medical-safety-reviewer` is a **pre-deployment gate** over `agent.md` profiles / wiki
+entries (it emits DEPLOY/BLOCK) — it does NOT review per-dispatch plan output. The
+**runtime** safety surfaces the model's output actually feeds are: the specialist agents'
+own HALT / refusal rules (the compound-write HALT on unpopulated hard-limit fields; medium+
+compounds blocked pre-MD by the operator-profile rule), the `medical-liaison` doctor-visit
+queue + HIGH/MEDIUM adjudication, and the operator + doctor as human-in-the-loop. The bar is
+**"good enough to draft recommendations that those runtime gates + the operator + the doctor
+vet"** — not autonomous medical authority. (Distinct, secondary: `medical-safety-reviewer`
+*could* gate the local model itself as a deployed component, profile-level.)
 
 **It has the library (RAG).** The model reads the wiki at inference, so it does not
 need to *memorize* the compound/biomarker corpus. **But medical facts still matter and
@@ -77,7 +97,10 @@ operator's data. Facts *and* reasoning, both scored.
 The eval measures the model on the **specialist personalization task** it will run:
 
 ```
-INPUT:  operator PII (profile + labs + goals + current-state)
+INPUT:  operator context — TODAY summaries (ADR-0001/0006 route plan-reasoning over
+        SUMMARIES, not raw PII; the as-built specialist profiles "author the read
+        instruction, never the content"); a local on-device substrate is what could
+        admit richer/raw operator context — the proposed change to weigh
       + the relevant wiki entries (RAG: compounds / biomarkers / library)
       + a specialist role frame (e.g. peptide-specialist, labs-specialist)
 TASK:   produce a personalized assessment + plan —
@@ -85,11 +108,12 @@ TASK:   produce a personalized assessment + plan —
         - respect contraindications, the HALT rules, and the goal/limit anchors,
         - cite the wiki entry it grounds each recommendation in,
         - HALT / escalate to the doctor-visit queue where the rules require.
-OUTPUT: a diagnostic + plan the safety layer + operator + doctor then vet.
+OUTPUT: a diagnostic + plan the runtime gates + operator + doctor then vet.
 ```
 
-This is exactly what the deployed specialist `agent.md` profiles describe — the eval is
-"can a local model run that role acceptably, given the wiki + the operator profile."
+This is the specialist plan-reasoning task the deployed `agent.md` profiles run — TODAY on
+the no-train commercial API over summaries (ADR-0006). The eval tests whether a local model
+can take that lane acceptably (and whether it can do so over richer on-device context).
 
 ---
 
@@ -137,7 +161,7 @@ wiki well. Survey, on the same eval:
 
 | Check | Measure |
 |---|---|
-| **Hardware fit** | Does it run on the operator's machine (§7 D1: VRAM/RAM/CPU/GPU)? At what quantization (Q4/Q5/Q8/FP16)? |
+| **Hardware fit** | Does it fit the operator's machine (§7 D1: the M2 Studio's **64GB unified-memory** budget — preferred — or the 128GB fallback)? At what quantization (Q4/Q5/Q8/FP16, via Metal/MLX)? |
 | **Quantization quality delta** | Re-run 4a at the quantization the hardware forces — quantization can degrade reasoning; measure the drop, not just "it loads." |
 | **Latency / throughput** | Time-to-first-token + tokens/sec for a representative specialist dispatch. Is an interactive turn tolerable? |
 | **Integration** | How a specialist dispatch invokes it locally (Ollama / llama.cpp / LM Studio server) so the operator PII never leaves the box; the harness that injects the wiki RAG + the operator profile + the role frame. |
@@ -169,7 +193,7 @@ wiki well. Survey, on the same eval:
 6. **The harness.** A minimal local-inference runner (Ollama/llama.cpp) that, per task,
    loads the model, injects (role frame + operator fixture + retrieved wiki entries +
    the task), captures the output + latency. Reusable across candidates. This harness is
-   the seed of the eventual production local-inference layer (`hil`).
+   the seed of the eventual production local-inference layer (the ADR-0001-superseding PII lane).
 
 > Dependency: the RAG dimensions need *some* wiki content. The eval can run on the
 > existing BPC-157 entry + a handful of fixtures, or in parallel with the research
@@ -189,8 +213,9 @@ wiki well. Survey, on the same eval:
   gate (esp. safety or RAG-faithfulness), evaluate the fine-tune-your-own path before
   concluding "no local model is viable."
 - **Output:** a recommendation = the model + quantization + the run-it profile + the
-  scored evidence, for operator ratification (an ADR-worthy decision: it sets the local
-  inference layer).
+  scored evidence, for operator ratification — an ADR that **supersedes ADR-0001's
+  plan-reasoning routing** (the PII layer moves on-device), accounting for the re-plumbing
+  cost ADR-0001 flagged.
 
 ---
 
@@ -209,20 +234,30 @@ wiki well. Survey, on the same eval:
   a published medical-QA benchmark, or a mix? *(Blocks §5 scoring.)*
 - **D3 — Fine-tuning in scope?** Is the train-your-own path (Unsloth, on the project's own
   data) a candidate, or off-the-shelf only? (Affects cost + timeline.)
-- **D4 — Quality floor.** What is "good enough to draft for the safety layer to vet" — the
+- **D4 — Quality floor.** What is "good enough to draft for the runtime gates to vet" — the
   pass bar on the 4a dimensions? (Calibrate after the first candidate, but set a draft
   floor: e.g. ≥ general-7B-instruct on reasoning/RAG, 0 safety-battery failures.)
+- **D5 — 4a dimension weights.** The relative weights for ranking the §4a quality dimensions
+  (medical-facts + RAG-faithfulness + diagnostic + planning) — §6 ranks by a *weighted* 4a
+  score, so this resolves the "weighted, per operator direction" reference (§4a). Default if
+  unset: medical-facts + RAG-faithfulness weighted at least as high as diagnostic + planning
+  (the grounding + the no-fabrication property are load-bearing); safety is a hard gate, not
+  a weighted dimension. Set the split before §6 ranking.
 
 ---
 
 ## 8. Relationship to the rest of the system
 
-- **Replaces the API for PII work, not Claude entirely.** Claude (subscription) keeps the
-  goal-agnostic research + orchestration; the local model takes the personalization. The
-  eval decides the latter only.
-- **Feeds, doesn't bypass, the safety apparatus.** The chosen model's outputs still go
-  through `medical-safety-reviewer` + the operator-profile HALT rules + the doctor queue.
+- **Supersedes ADR-0001's PII routing, not Claude entirely.** Claude (subscription) keeps the
+  goal-agnostic research + orchestration; the local model takes the personalization lane that
+  ADR-0001/0006 currently route to the no-train commercial API over summaries. The eval decides
+  the latter only.
+- **Feeds the RUNTIME gates, doesn't bypass them.** The chosen model's per-dispatch output is
+  gated by the specialist HALT/refusal rules + the operator-profile HALT + the `medical-liaison`
+  doctor queue + the operator/doctor — NOT by `medical-safety-reviewer` (a pre-deployment profile
+  gate, which would instead gate the local model itself as a deployed component).
 - **Needs the wiki.** The RAG dimensions improve as the research plan populates the wiki;
   a richer library is a better substrate for the local model — the two plans compound.
-- **The result is ADR-worthy.** Picking the local inference layer is an architecture
-  decision (it resolves `hil`); record it as an ADR once the eval recommends.
+- **The result SUPERSEDES ADR-0001.** Picking the local inference layer reverses ADR-0001's V1
+  plan-reasoning routing (exercising its Alternative-C revisit trigger); record it as an ADR
+  that supersedes ADR-0001 once the eval recommends.
