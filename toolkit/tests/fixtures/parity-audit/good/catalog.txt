@@ -1,0 +1,4 @@
+# kind name
+skill alpha
+role architect
+command alpha

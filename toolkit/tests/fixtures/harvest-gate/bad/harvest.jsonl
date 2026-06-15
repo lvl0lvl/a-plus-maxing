@@ -1,0 +1,2 @@
+{"id":"FAIL-RIGOR-001","class":"enforcement-gap","source_refs":["memory/process-failures.md:FAIL-RIGOR-001"],"recurrence_count":2,"detection_mode":"mechanical-audit"}
+{"id":"FAIL-RIGOR-003","class":"continuity", "source_refs":[

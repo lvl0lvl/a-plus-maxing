@@ -12,6 +12,23 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 64 (2026-06-15)
+
+Goal: Adopt the Rigor Framework v1.0.0 toolkit into a-plus-maxing as the re-tightened governance floor (closing the PF-S63-02 class), taking the delta we lack while preserving our more-evolved domain layer — Wave A this session; Waves B–D beaded.
+
+Acceptance criteria: (Wave A)
+- [x] AC1: `toolkit/` vendored (copied pristine from `frameworks/rigor/toolkit/`, chmod +x); `toolkit/tests/run-all-tests.sh` green (14/14).
+- [x] AC2: `rigor_version: 1.0.0` pinned in CLAUDE.md with the Discipline-11 pull-cadence note + vendoring rationale.
+- [x] AC3 (CHANGED): `enforce-heartbeat-clause.sh` vendored + documented (its toolkit negative test passes); live-wiring DEFERRED + beaded (`a-plus-maxing-0qf6`) — the hook fires on every Task dispatch and would deny `/review-pr`+`/aplus-research` internal dispatches; couples to the Wave D skills sync + a dispatch convention. Flagged, not silent.
+- [x] AC4: self-improvement loop seeded — `harvest.jsonl` + vendored `pf-ingest.sh`/`harvest-gate.sh`/`harvest-record.md`; PF-S63-02 back-filled as the first gate-valid record + bead `a-plus-maxing-71s4` (NO PF-S63-01 exists — back-filled the one real post-close PF only; flagged). `harvest-gate` verified PASS (3-layer) + bites on a missing layer.
+- [x] AC5: `scripts/close-audit.sh` adopted as the single fail-closed close gate (toolkit pattern, a-plus roster), `scripts/tests/run-all-tests.sh` aggregator added, `scripts/tests/test_close_audit.sh` proves it bites (8/8); CLAUDE.md close step 8.5 repointed + 8.6 harvest gate added.
+- [x] AC6: `scripts/lib/audit-helpers.sh` gained `skipped()`/FATAL-on-skip (F-008) backward-compatibly; `test_audit_helpers.sh` 23/23; the 9 existing audits unaffected.
+
+Files I WILL touch: new `toolkit/` (vendored); `scripts/lib/audit-helpers.sh`; `scripts/close-audit.sh` (new); `scripts/tests/{run-all-tests,test_audit_helpers,test_close_audit}.sh`; `CLAUDE.md`; new `harvest.jsonl`; HANDOFF/`.beads` at close.
+Files I will NOT touch: product code (`scripts/store/`, `scripts/ingest/`, `scripts/plan/`, `scripts/generate/`); `aplus-research` skill internals; deployed agents (plan-integrity is Wave C); wiki/PII hooks (`block-ungated-vault-write`, `block-pii-commit`, `pre-push-pii-scan`) + the 6 wired hooks' logic; the vendored toolkit scripts (no forking); `main` directly.
+NOT doing: replacing bespoke audits with toolkit generics; building the core plan-generation path (the next program, run under this rigor — bead `71s4`); Waves B (ledgers + core-capability gate), C (plan-integrity role + INVARIANTS rows), D (global skills sync) — beaded.
+Invariants at risk: INV-BRANCH-NOT-MAIN (on `feature/rigor-toolkit-adoption`); INV-SKILL-TRACE (adoption PR gets `/review-pr` + `/merge` fresh at close); INV-HO-ROTATION/PF-ATTESTATION at close. New INV rows for the adopted gates are Wave C (change-discipline ritual, user-approved).
+
 ## Scope Contract — Session 63 (2026-06-14)
 
 Goal: Build the real WHOOP/noop ingestion adapter (replace the fabricated scaffold with a read-only `whoop.sqlite` reader, wired into the scheduler) and update the model-eval plan to weigh noop's AI Coach as integration prior art. Bead: `mdzq` (build half; the real-data E2E validation tail stays open). Not a `docs/task-plan/` recipe — bead-tracked feature build, built directly with Tier-1 self-check + the store-adversarial battery, `/review-pr` (6-agent) + `/merge` at close.

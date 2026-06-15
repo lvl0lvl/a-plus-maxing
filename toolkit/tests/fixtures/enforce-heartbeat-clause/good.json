@@ -1,0 +1,6 @@
+{
+  "tool_name": "Task",
+  "tool_input": {
+    "prompt": "You are a sub-agent.\n\n## Heartbeat / liveness protocol\n1. Create heartbeat-worker.jsonl as your first action.\n2. After each step, append a status record with progress n/total.\n3. In your final reply, report the heartbeat record count.\n4. If the heartbeat is not maintained the orchestrator will presume a drop and re-dispatch."
+  }
+}

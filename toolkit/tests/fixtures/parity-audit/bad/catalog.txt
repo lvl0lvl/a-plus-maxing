@@ -1,0 +1,3 @@
+skill beta
+skill ghost
+role architect
