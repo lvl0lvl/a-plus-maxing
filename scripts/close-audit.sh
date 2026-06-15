@@ -27,10 +27,13 @@
 # EXIT:  0 PASS / 1 FAIL (a constituent violation) / 2 FATAL (a constituent or
 #        the floor could not run — fail-closed).
 #
-# Test hooks (NEVER set in production):
+# Test hooks (NEVER set in production — a loud WARNING is emitted if any is set,
+# PR #139 SEC-002/F2):
 #   CLOSE_AUDIT_SKIP_FLOOR=1   skip the run-all-tests floor (unit-test isolation)
 #   CLOSE_AUDIT_ROSTER         newline list of "script|args" (override roster)
 #   CLOSE_AUDIT_ROSTER_DIR     dir holding roster scripts (default: this dir)
+#   CLOSE_AUDIT_FLOORS         newline list of floor scripts (override; default =
+#                              toolkit + a-plus run-all-tests.sh) — F7 testability
 #   CLOSE_AUDIT_FLOOR_EXCLUDE / _REASON  forwarded to the a-plus floor's
 #                              RUN_ALL_TESTS_EXCLUDE (documented pre-existing red)
 
@@ -46,12 +49,19 @@ SESSION=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --session)    shift; SESSION="${1:-}"; [ -n "$SESSION" ] || { echo "close-audit: --session needs a value" >&2; exit 2; } ;;
-    --session=*)  SESSION="${1#*=}" ;;
+    --session=*)  SESSION="${1#*=}"; [ -n "$SESSION" ] || { echo "close-audit: --session= needs a value" >&2; exit 2; } ;;
     --allow-skip) AUDIT_ALLOW_SKIP=1 ;;
-    -h|--help)    sed -n '2,40p' "$0"; exit 0 ;;
+    -h|--help)    sed -n '2,46p' "$0"; exit 0 ;;
     *)            echo "close-audit: unknown arg: $1" >&2; exit 2 ;;
   esac
   shift
+done
+
+# F2 (PR #139 SEC-002): surface accidental production use of a test-hook env var.
+for _thv in CLOSE_AUDIT_SKIP_FLOOR CLOSE_AUDIT_ROSTER CLOSE_AUDIT_ROSTER_DIR CLOSE_AUDIT_FLOORS CLOSE_AUDIT_FLOOR_EXCLUDE; do
+  if [ -n "${!_thv:-}" ]; then
+    echo "close-audit: WARNING: test-hook env var ${_thv} is active (intended for tests/CI only — NOT a production close)" >&2
+  fi
 done
 
 # --- FLOOR: prove the audits can still FAIL on bad input (F-007) -------------
@@ -60,8 +70,15 @@ done
 export RUN_ALL_TESTS_EXCLUDE="${CLOSE_AUDIT_FLOOR_EXCLUDE:-test_audit_research_provenance.sh}"
 export RUN_ALL_TESTS_EXCLUDE_REASON="${CLOSE_AUDIT_FLOOR_EXCLUDE_REASON:-pre-existing environmental failure: gate_attest verify-chain needs jsonschema (absent here); tracked by bead. Tests a CONDITIONAL audit, not a per-close roster member.}"
 
+# Floors are injectable (CLOSE_AUDIT_FLOORS, newline list) so the negative test
+# can drive a failing / missing floor without disabling the block (F7/TEST-001).
+DEFAULT_FLOORS="${REPO_ROOT}/toolkit/tests/run-all-tests.sh
+${SELF_DIR}/tests/run-all-tests.sh"
+FLOORS="${CLOSE_AUDIT_FLOORS:-$DEFAULT_FLOORS}"
+
 if [ "${CLOSE_AUDIT_SKIP_FLOOR:-0}" != "1" ]; then
-  for floor in "$REPO_ROOT/toolkit/tests/run-all-tests.sh" "$SELF_DIR/tests/run-all-tests.sh"; do
+  while IFS= read -r floor; do
+    [ -n "$floor" ] || continue
     if [ ! -f "$floor" ]; then
       skipped "negative-test floor missing: $floor"
       continue
@@ -71,7 +88,9 @@ if [ "${CLOSE_AUDIT_SKIP_FLOOR:-0}" != "1" ]; then
     else
       violation INV-CLOSE-AUDIT "negative-test floor FAILED: ${floor} (an audit cannot prove it goes RED — a green close cannot be trusted)"
     fi
-  done
+  done <<EOF
+$FLOORS
+EOF
 fi
 
 # --- per-close roster --------------------------------------------------------
@@ -85,7 +104,7 @@ ROSTER="${CLOSE_AUDIT_ROSTER:-$DEFAULT_ROSTER}"
 ROSTER_DIR="${CLOSE_AUDIT_ROSTER_DIR:-$SELF_DIR}"
 
 run_one() {
-  entry="$1"
+  local entry="$1" script args path rc=0
   script="${entry%%|*}"
   args="${entry#"$script"}"; args="${args#|}"
   case "$args" in
@@ -102,12 +121,11 @@ run_one() {
     skipped "constituent missing: ${script} (${path}) — cannot run, cannot attest"
     return
   fi
-  rc=0
   # word-split $args intentionally (heterogeneous per-audit flags)
   # shellcheck disable=SC2086
   bash "$path" $args >/dev/null 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
-    info "PASS: ${script} ${args}"
+    info "PASS: ${script}${args:+ $args}"
   elif [ "$rc" -eq 1 ]; then
     violation INV-CLOSE-AUDIT "constituent FAILed: ${script} ${args} (exit 1)"
   else
