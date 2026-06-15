@@ -804,3 +804,32 @@ Caught this session: 4.
 - Scope-contract-audit label/checkbox mismatch on the S64 contract — detection: gate (`scope-contract-audit` + its negative test went RED); surfaced_by: self (fixed same-cycle).
 - Branch-state mutation by a `/review-pr` #140 agent (left the repo on `main`) — detection: self (the post-review fix-script failure + diagnosis); surfaced_by: self. **This one PROMOTED to PF-S64-01** (the only candidate this session that crossed into a new PF class).
 Of these, 0 reached the operator only because they asked. All were caught by self/gate before any operator catch — the intended detection direction.
+
+## Session 65 (2026-06-15)
+
+### Per-PR gated-skill invocation table (INV-SKILL-TRACE)
+
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
+|----|----------------------------|------------------------|---------|
+| #141 — Rigor adoption Waves B+C | YES — 6-agent (security/bug/quality/test/contracts/historical) → dedup → profile-less blind triage → fix → profile-less blind verify | YES — merge-methodology read fresh; REST rebase under GraphQL throttle, full-40-char-SHA head guard (`822f4c0…` → on-main `1aeeb64`) | 6 agents → 10 distinct findings → 9 LEGITIMATE (fixed + blind-verified 9/9) + 1 OUT_OF_SCOPE (`7may`). The review caught real defects in this PR's own new code (F-A awk prefix-match where `## Session 6` bleeds `65`; F-B `.venv` exit-127 abort vs the comment's "fails closed"; F-G/F-K self-introduced stale-doc claims). |
+| S65 close-finalize (this PR) | YES — docs 3-agent subset → blind triage → blind verify | YES — merge-methodology read fresh; REST rebase, full-40-char-SHA head guard (recorded at close, pre-merge) | session-continuity finalization (HANDOFF volatile rotation + this S65 PF section + the session note). |
+
+### PF attestation
+
+S65 close (2026-06-15): **No new PF-class entries this session.** A governance/adoption build (Rigor Framework Waves B+C). Every candidate event was either the layered-review mechanism working as designed (caught before `main`) or in-flight tooling friction caught immediately — none crossed into a new process-failure class. The falsification-scan advisory (newly wired this session) ran over this very section at close — advisory, non-gating.
+
+Falsification windows that HELD: **the verify-first discipline (the S6 act-before-verify family) HELD + load-bearing** — I read the actual `.venv` structure (pyvenv.cfg, isolation), the provenance audit's python invocations, and the framework F-014 / falsification-scan / plan-integrity sources, and confirmed `plan/assemble.py` has no production caller + no model client BEFORE writing the core-capability-gate prose, rather than asserting from memory. **The profile-less blind triage + blind verification discipline (the S40 family) HELD + load-bearing** — an independent triage classified 9 LEGITIMATE + 1 OUT_OF_SCOPE (correctly rejecting the pre-existing interpolation seam as unchanged by this PR), and an independent blind-verify (never shown the fixes) reported 9/9 RESOLVED; I did NOT self-triage. **The review-agents-read-only / git-state-untouched discipline (the S51 + S64 family) HELD** — every review/triage/verify agent was dispatched Read/Grep-only with an explicit no-`gh`/no-branch-mutating-git prohibition (the S64 mitigation, dogfooded); the tree + branch stayed put. **Every legitimate finding fixed, 0 suppressed (the S26 family) HELD** — 9 fixed + verified, 2 beaded, none dropped by severity. The change-discipline ritual HELD — the 2 new INVARIANTS rows were presented with evidence + obtained explicit operator approval BEFORE being appended.
+
+Observed, NOT promoted: (a) **the #141 review found 9 legitimate findings in my own new code** — incl. F-A (awk prefix-match) + F-B (`.venv` exit-127 abort, the comment over-claiming "fails closed"). The layered review + blind triage/verify working exactly as designed — every defect caught before `main`, the two correctness fixes mutation-proven by new tests (C15/C16) — not an orchestrator PF. (b) **F-G/F-K were self-introduced stale cross-references** — I dropped the `d1kc` exclusion in `close-audit.sh`/`run-all-tests.sh` but left the stale claim in CLAUDE.md step 8.5 + the adoption-log Issue #7. The AP-INCOMPLETE-PROPAGATION class (a change not propagated across all surfaces), caught by the historical-context lens. Same class observed S13/S14/S15, caught by the correct mechanism each time; recurrence-watch, not promoted (nothing escaped). (c) **the HANDOFF scope-contract Edit failed twice** on exact-string mismatch (an em-dash-adjacent `, user-approved` clause; a backtick around `jsonschema`) — tooling friction, caught immediately by re-reading, no rigor impact. (d) **the bd daemon repo-id mismatch** (`.beads/daemon-error`, db `da7de06e` ≠ current `8c8973cb`) is a pre-existing LOCAL-env condition — verified `bd sync --flush-only` is non-destructive (206→206) + the repo-id is local-only (not in the tracked jsonl), so harmless for this session; flagged for a future beads-env cleanup, not a PF.
+
+### Disclosure ledger (S65 close) — failures caught that the operator did NOT flag (framework Discipline 8 / F-013)
+
+Caught this session: 11 (9 review findings + 2 self-caught).
+- F-A awk prefix-match (`## Session 6` bleeds `## Session 65`) — detection: gate (the 6-agent review + blind triage); surfaced_by: self.
+- F-B `.venv`-python exit-127 abort vs the comment's "fails closed" + mis-diagnosis as a fabricated gate — detection: gate (review); surfaced_by: self.
+- F-C jsonschema dep had no tracked manifest (a fresh-clone close would FATAL) — detection: gate (review); surfaced_by: self.
+- F-D / F-E test-coverage gaps (non-zero scan exit; advisory no-section + missing-FSCAN branches) — detection: gate (review); surfaced_by: self.
+- F-G / F-K self-introduced stale cross-references (CLAUDE.md step 8.5 + adoption-log Issue #7) — detection: gate (review); surfaced_by: self.
+- F-I forbidden word in an INV row + F-J F2 hook-list omission — detection: gate (review); surfaced_by: self.
+- The scope-contract Edit failures + the bd daemon-error mismatch — detection: self; surfaced_by: self.
+Of these, 0 reached the operator only because they asked — all were caught by the review/gate before any operator catch (Walter approved the merge AFTER seeing the triaged + fixed + verified results). The intended detection direction.
