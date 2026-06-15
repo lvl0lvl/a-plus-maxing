@@ -9,13 +9,11 @@
 # themselves, so an audit that lost its ability to FAIL is caught before it can
 # grant a false pass.
 #
-# DIRECT INVOCATION NOTE (PR #139 / F16): run directly with NO RUN_ALL_TESTS_EXCLUDE,
-# this includes test_audit_research_provenance.sh, a TRACKED pre-existing
-# environmental red (gate_attest verify-chain needs jsonschema, absent here; bead
-# a-plus-maxing-d1kc) — so a bare `bash run-all-tests.sh` exits 1 on that one test.
-# The canonical close baseline is `scripts/close-audit.sh`, which excludes that
-# test LOUDLY with its reason. To reproduce the close-gate floor here, run:
-#   RUN_ALL_TESTS_EXCLUDE=test_audit_research_provenance.sh bash scripts/tests/run-all-tests.sh
+# DIRECT INVOCATION NOTE: a bare `bash run-all-tests.sh` runs the FULL suite with no
+# exclusions and is expected to pass — including test_audit_research_provenance.sh,
+# whose former environmental red (gate_attest verify-chain needed jsonschema) was
+# fixed S65 (bead a-plus-maxing-d1kc: jsonschema installed into .venv + the audit
+# points at the .venv python). close-audit.sh carries no default exclusion either.
 #
 # Exclusions (NEVER silent — F-009 "no silent caps"): a documented, tracked
 # pre-existing failure may be excluded via:

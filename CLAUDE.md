@@ -46,6 +46,10 @@ Per Rigor Framework Discipline 7 + PF-S3-01. When you catch yourself producing o
 - "Re-dispatching would be expensive given how much I've already dispatched"
 - "The agent's prose summary has the answer; the gate JSON is just bookkeeping"
 
+### Core-capability-first gate (PF-S63-02)
+
+Before adopting any secondary-work scope, answer in writing: **does the core capability — generating a followable health plan, end-to-end — work yet?** (As of S65: NO — there is no model/API client in `scripts/`, `plan/assemble.py` has no production caller, `generate.run` renders only dashboard/report; bead `71s4`.) Secondary work (substrate, polish, adapters, governance) does NOT proceed on the strength of "the components each pass their own tests" — that is the exact PF-S63-02 drift. If a session's goal is legitimately secondary, the scope contract states the core-capability answer explicitly and why the secondary work is the right next step anyway. The MECHANICAL form of this gate (a script asserting the path is wired) lands WITH the `71s4` build, since its checks depend on the path's shape. **Guard-loosening corollary (PF-S63-02):** treat any recommendation to LOOSEN a drift-guard as itself a red flag — name the failure class the guard prevents and obtain explicit informed sign-off before acting; never default-accept.
+
 ## Session Close Protocol
 
 Before saying "done" or "complete":
@@ -57,7 +61,7 @@ Before saying "done" or "complete":
    - **Architecture drift:** Read INVARIANTS.md (or the project's architecture-invariants doc). For each invariant, ask: "Did this session's work move the project closer to violating this invariant?" If yes for any invariant, flag it with the invariant ID.
    - **Vision drift:** In one sentence, state what the system IS after this session's changes. Compare against the first sentence of `design/vision.md` (or the project's vision doc). If they describe different systems, that is drift.
    Write all three checks explicitly. Do not skip any. Do not combine them into a summary.
-4. **Update HANDOFF.md** with What Changed, Current State, What Is Next, Key References, and the **Top-3 active failure modes** pointer (VOLATILE — rotates each session). **Mandatory PF attestation:** either append a new entry to `memory/process-failures.md`, OR add an explicit line at the close: `S{N} close (YYYY-MM-DD): No new PF-class entries this session.` followed by 1-2 sentences of rationale listing what was observed but did NOT promote (and why). **Silence is NOT equivalent to absence.** This enforces INV-PF-ATTESTATION.
+4. **Update HANDOFF.md** with What Changed, Current State, What Is Next, Key References, and the **Top-3 active failure modes** pointer (VOLATILE — rotates each session). **Mandatory PF attestation:** either append a new entry to `memory/process-failures.md`, OR add an explicit line at the close: `S{N} close (YYYY-MM-DD): No new PF-class entries this session.` followed by 1-2 sentences of rationale listing what was observed but did NOT promote (and why). **Silence is NOT equivalent to absence.** This enforces INV-PF-ATTESTATION. **Disclosure ledger (Rigor Framework Discipline 8 / F-013, formalized S65):** the close attestation also carries a `Disclosure ledger (S{N} close)` block — every failure caught this session that the operator did NOT flag, each with its detection mode (`self`/`gate`) + `surfaced_by`, plus a count of how many reached the operator only because they asked (target: 0 — self/gate should catch them first). An empty ledger is stated explicitly (`Caught this session: 0`), never omitted.
 5. **Apply the rotation rule to every VOLATILE-labeled section** (mandatory at session close).
 
    The rotation rule applies to:
@@ -84,7 +88,7 @@ Before saying "done" or "complete":
 6. **Update memory** -- Write vault notes for any decisions, patterns, or open questions.
 7. **Update beads** -- `bd close` completed issues, `bd sync --flush-only`.
 8. **Review documents** -- Run the Document Freshness Rubric (see DOCUMENT_RUBRIC.md). Flag or archive stale docs.
-8.5. **Run the close gate** -- `scripts/close-audit.sh --session <N>` is the single mandatory close gate (Rigor Framework v1.0.0 Discipline 1 step 7 / F-008 fail-closed; adopted S64). It runs the negative-test FLOOR first — `toolkit/tests/run-all-tests.sh` + `scripts/tests/run-all-tests.sh`, proving each audit can still go RED on bad input (F-007) — then the per-close roster below, FATALing (exit 2) if any constituent could not RUN (a skipped check never reads as clean). On any non-zero exit: do NOT commit until fixed or explicit user-adjudicated path-extension granted. Roster (also run `branch-completeness-audit.sh` at session OPEN too):
+8.5. **Run the close gate** -- `scripts/close-audit.sh --session <N>` is the single mandatory close gate (Rigor Framework v1.0.0 Discipline 1 step 7 / F-008 fail-closed; adopted S64). It runs the negative-test FLOOR first — `toolkit/tests/run-all-tests.sh` + `scripts/tests/run-all-tests.sh`, proving each audit can still go RED on bad input (F-007) — then the per-close roster below, FATALing (exit 2) if any constituent could not RUN (a skipped check never reads as clean). It additionally runs a NON-GATING `falsification-scan` advisory (vendored `toolkit/scripts/falsification-scan.sh`, Wave B / S65) over THIS session's `## Session <N>` PF note — WARN-only, never affecting the gate verdict; review any surfaced anti-pattern (increment-by-default / framework-circularity / a-priori-by-construction / soft-confirmation-laundering) and confirm or dismiss it in the close attestation. On any non-zero exit: do NOT commit until fixed or explicit user-adjudicated path-extension granted. Roster (also run `branch-completeness-audit.sh` at session OPEN too):
    - `scripts/handoff-audit.sh` — INV-HO-ROTATION + INV-HO-NO-STALE-HASH
    - `scripts/scope-contract-audit.sh --session <N>` — INV-SCOPE-CONTRACT (asserts latest contract matches current session)
    - `scripts/pf-attestation-audit.sh --session <N>` — INV-PF-ATTESTATION (asserts close attestation dated current session)
@@ -93,6 +97,29 @@ Before saying "done" or "complete":
 
    The gate default-excludes one tracked pre-existing red from the a-plus floor — `test_audit_research_provenance.sh` (environmental: `gate_attest verify-chain` needs `jsonschema`, absent here; bead `a-plus-maxing-d1kc`); the exclusion is printed loudly, never silent. Conditional: for any aplus-research dispatch this session run `scripts/audit-research-provenance.sh <design-work-dir> <slug>` (bda — asserts the mode-required attested gates are PRESENT, then runs `gate_attest.py verify-chain`; closes the vacuous-pass hole where verify-chain alone skips ABSENT gates). This is the INV-RESEARCH-PROVENANCE-DISJOINT enforcement and is mandatory before any specialist's research feeds a wiki write.
 8.6. **Run the harvest gate (self-improvement loop, F-017)** -- For any process failure logged this session, `toolkit/scripts/harvest-gate.sh --pf memory/process-failures.md --harvest harvest.jsonl --beads .beads/issues.jsonl --session <N>` must pass: every session failure is captured in ALL of the PF log + `harvest.jsonl` + a bead, or the close fails. Seed a missing harvest record by hand-authoring a FAIL record conforming to `toolkit/schemas/harvest-record.md` (gate-required keys: `id`, `class`, `source_refs`, `detection_mode`, `recurrence_count` — set `id` to the PF-id token, e.g. `PF-S63-02`, so `harvest-gate` discovers it) and appending it to `harvest.jsonl`. `toolkit/scripts/pf-ingest.sh` is the COMPANION transform — it emits the anti-pattern / negative-example STUB that feeds `/upgrade-agent` (role) or `/upgrade-skill` (skill) so the failure permanently hardens the artifact that caused it (Loop A). NOTE: pf-ingest's emitted JSONL is NOT yet harvest-gate-valid (it uses `pf_id`/`record_type`, not the FAIL schema), so promote it to the schema before appending — a tracked toolkit rough edge, bead `po4x`. A zero-failure session passes vacuously ("nothing to gate"); reference PRIOR PFs DESCRIPTIVELY in the close attestation, not by bare `PF-S{N}-{NN}` token, or harvest-gate treats them as this-session failures (also `po4x`). Loop B (cross-deployment harvest) is a future discipline.
+
+   **Close-attestation template (harvest-gate / skill-trace clean BY CONSTRUCTION — S65, bead `po4x`).** The upstream toolkit rough edges are not ours to patch (the vendored scripts are not forked); the a-plus-side mitigation is to author the session's PF section in this exact shape so both gates pass first time:
+
+   ```markdown
+   ## Session <N> (YYYY-MM-DD)
+
+   ### Per-PR gated-skill invocation table (INV-SKILL-TRACE)
+   | PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
+   |----|----------------------------|------------------------|---------|
+   | #NNN — <what> | YES — <how> | YES — <how> | <result> |
+   <!-- if NO PR lifecycle ran this session, omit the table and instead put this -->
+   <!-- EXACT sentence on its OWN line (line-anchored; optional leading **): -->
+   No PR lifecycles ran this session.
+
+   ### PF attestation
+   S<N> close (YYYY-MM-DD): <One new PF promoted — PF-S<N>-NN | No new PF-class entries this session>. <rationale>. Prior PFs referenced DESCRIPTIVELY ("the verify-first discipline held"), NEVER by bare `PF-S{M}-NN` token.
+
+   ### Disclosure ledger (S<N> close)
+   Caught this session: <K>.   <!-- or exactly: Caught this session: 0 -->
+   - <failure> — detection: <self|gate>; surfaced_by: <self|operator>.
+   ```
+
+   Two hard constraints this shape satisfies: (a) the skill-trace escape sentence is LINE-ANCHORED (own line); (b) the ONLY bare `PF-S<N>-NN` tokens in the section are genuine this-session promotions that ARE captured in `harvest.jsonl` + a bead — so harvest-gate's token-grep finds no uncaptured token.
 8.7. **Landmark window check** -- Re-read `vault/meta/landmarks.md`. For each `active` landmark whose trigger window opened during this session, verify the corresponding action was performed.
 9. **Commit and push** to your short-lived working branch (`feature/*` or `fix/*` off `main`). Open a PR to `main` if ready; never commit to `main` directly.
 
@@ -108,7 +135,8 @@ Each fact lives in exactly one document. If you find duplication, the table belo
 | Current session continuity (what's next) | HANDOFF.md | VOLATILE |
 | Scope contract for current session | HANDOFF.md | VOLATILE |
 | Step-12 context-package pointer | HANDOFF.md | VOLATILE; rotation rule applies |
-| What Did NOT Work (failed approaches) | `memory/process-failures.md` | HANDOFF.md carries pointer only |
+| What Did NOT Work (failed PROCESS approaches) | `memory/process-failures.md` | Protocol violations / near-misses; HANDOFF.md carries pointer only. EXCLUDES failed technical experiments |
+| Failed TECHNICAL approaches (dead-end designs) | `vault/approaches/` | F-014 negative-knowledge ledger (adopted S65); query by tag before a non-trivial approach. See `vault/approaches/README.md` |
 | Architectural decisions — product pipeline | `docs/adr/` (+ `docs/prd/`) | Numbered ADRs from `/create-adr` (V1 set: ADR-0001…0007); HANDOFF.md does NOT carry decision rationale |
 | Architectural decisions — vault-native (governance / knowledge graph) | `vault/decisions/` | Date-named vault decisions; HANDOFF.md does NOT carry decision rationale |
 | Component interfaces / parameters | `vault/components/`, `vault/parameters/` | Read source first, never write from memory |
@@ -125,6 +153,7 @@ This project uses a basic-memory vault at `vault/` for structured knowledge trac
 - **CLAUDE.md** -- Static project instructions (loaded every session)
 - **HANDOFF.md** -- Session-to-session continuity (what happened, what's next)
 - **vault/** -- Structured knowledge graph (entities, decisions, relations) viewable in Obsidian
+- **vault/approaches/** -- Negative-knowledge ledger (F-014, adopted S65): one file per ABANDONED technical approach (dead-end designs, rejected optimizations). Query by tag before committing to a non-trivial approach; append on abandon, never delete. See `vault/approaches/README.md`
 - **DOCUMENT_RUBRIC.md** -- Rules for document lifecycle management
 
 Query the vault: `mcp__basic-memory__search` with project `a-plus-maxing`.
@@ -165,6 +194,7 @@ The V1 build executes the approved 7-wave plan `docs/build-plan/build-plan-v1-fu
 - **Project path-mapping** (the skill's defaults differ): recipes = `docs/task-plan/<task-id>.md` (not `specs/recipes/`); build plan = `docs/build-plan/build-plan-v1-full.md` (not `specs/build-plans/`); role profiles = `~/Documents/Projects/skills_library/roles/<role>/agent.md` (the canonical project source per INV-ROLE-INLINING; the skill's default `~/.claude/roles/` is a symlink to the same target on the dev machine — use the skills_library path explicitly), inlined in full.
 - **The wave is the unit.** Build in build-plan wave order; a wave is not done until ALL its tasks are built, its per-wave **checkpoint Go/No-Go ran green** (the cross-spec integration gates in the build plan), AND its PR merged. "Wave N" everywhere means the build-plan topological wave, NOT an ADR-family label (reconciled S36; bead `orl`).
 - **Three-tier review** (per execute-plan): Tier-1 SE self-check (recipe verification checklist) → Tier-2 wave review (QA always; Architect/Security conditional, over the whole-wave diff) → Tier-3 `/review-pr` (6-agent) before merge. No tier is skippable.
+- **Build-plan integrity** is verified by the `plan-integrity` role (`~/Documents/Projects/skills_library/roles/plan-integrity/agent.md`, inlined in full per INV-ROLE-INLINING; adopted S65 / Rigor Framework v1.0.0). Before a wave builds, it grounds every task's inputs against the LIVE tree (`stat`/`grep`, never the plan's own description), confirms the dependency map is an acyclic DAG with artifact-named edges, and confirms each wave's checkpoint is runnable; as the build executes, it gates each wave transition (a wave advances only when its checkpoint Go/No-Go RAN green — executed, not reasoned). It is a READ-ONLY verification role — reports findings + routes repairs, never authors the fix — so it does NOT deploy as an a-plus agent (it is correctly absent from `branch-completeness-audit`'s deployed-roster check) and is dispatched as a review lens alongside the Tier-2/Tier-3 reviewers.
 - **Store-surface tasks:** any task writing to or reading from `scripts/store/` MUST satisfy `docs/checklists/store-adversarial-tests.md` (adversarial cross-stream + dedupe-collision + mutation battery; bead `pka`, S37-S41 pattern) — checked at Tier-1 self-check AND in the Tier-2 QA dispatch.
 - **Per session:** one wave (or the remaining tasks of an open wave) → checkpoint → `/review-pr` → `/merge` → close. Each wave is a natural session boundary.
 - **Live wave-state** (which tasks built/open) lives in `vault/meta/overview.md` (the phase-state owner — not here, to keep CLAUDE.md static). Out-of-order builds (S32-S35, PF-S36-01) left earlier waves partial; re-entry completes the open waves in order.

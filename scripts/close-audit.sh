@@ -65,10 +65,14 @@ for _thv in CLOSE_AUDIT_SKIP_FLOOR CLOSE_AUDIT_ROSTER CLOSE_AUDIT_ROSTER_DIR CLO
 done
 
 # --- FLOOR: prove the audits can still FAIL on bad input (F-007) -------------
-# Default-exclude the one tracked pre-existing environmental red from the a-plus
-# floor, LOUDLY (RUN_ALL_TESTS prints the EXCLUDED line + reason — never silent).
-export RUN_ALL_TESTS_EXCLUDE="${CLOSE_AUDIT_FLOOR_EXCLUDE:-test_audit_research_provenance.sh}"
-export RUN_ALL_TESTS_EXCLUDE_REASON="${CLOSE_AUDIT_FLOOR_EXCLUDE_REASON:-pre-existing environmental failure: gate_attest verify-chain needs jsonschema (absent here); tracked by bead. Tests a CONDITIONAL audit, not a per-close roster member.}"
+# No default exclusion (S65): the former tracked red — test_audit_research_provenance
+# (gate_attest verify-chain needed jsonschema) — was FIXED (bead d1kc: jsonschema
+# installed into .venv + the audit points at the .venv python), so the full floor now
+# runs green. The override remains for any FUTURE tracked pre-existing red, LOUDLY
+# (RUN_ALL_TESTS prints the EXCLUDED line + reason; a stale exclusion fails the run,
+# so it can never rot silently).
+export RUN_ALL_TESTS_EXCLUDE="${CLOSE_AUDIT_FLOOR_EXCLUDE:-}"
+export RUN_ALL_TESTS_EXCLUDE_REASON="${CLOSE_AUDIT_FLOOR_EXCLUDE_REASON:-no reason given}"
 
 # Floors are injectable (CLOSE_AUDIT_FLOORS, newline list) so the negative test
 # can drive a failing / missing floor without disabling the block (F7/TEST-001).
@@ -139,6 +143,32 @@ while IFS= read -r entry; do
 done <<EOF
 $ROSTER
 EOF
+
+# --- ADVISORY: falsification-scan over THIS session's PF note (Wave B) --------
+# NON-GATING by design (framework Failure-Mode Discipline). falsification-scan is
+# a heuristic prose matcher — WARN-only. It surfaces the four falsification anti-
+# patterns (increment-by-default / framework-circularity / a-priori-by-construction
+# / soft-confirmation-laundering) for the operator/reviewer to confirm or dismiss;
+# it NEVER changes this gate's verdict. Scanned over ONLY the current session's PF
+# section — scanning the whole log would false-WARN on historical entries that
+# quote an anti-pattern in order to refute it. The vendored toolkit script is
+# invoked, never edited. Its exit code is intentionally discarded (info-only).
+FSCAN="${CLOSE_AUDIT_FSCAN:-${REPO_ROOT}/toolkit/scripts/falsification-scan.sh}"
+PFLOG="${CLOSE_AUDIT_PFLOG:-${REPO_ROOT}/memory/process-failures.md}"
+if [ -n "$SESSION" ] && [ -f "$FSCAN" ] && [ -f "$PFLOG" ]; then
+  pf_section="$(awk -v s="## Session ${SESSION}" '
+    index($0, s) == 1 { grab = 1 }
+    grab && /^## Session / && index($0, s) != 1 { exit }
+    grab { print }
+  ' "$PFLOG")"
+  if [ -n "$pf_section" ]; then
+    fs_out="$(printf '%s\n' "$pf_section" | bash "$FSCAN" --allow-skip 2>&1)" || true
+    info "falsification-scan (ADVISORY, non-gating) over Session ${SESSION} PF note:"
+    while IFS= read -r _l; do [ -n "$_l" ] && info "  fscan: ${_l}"; done <<< "$fs_out"
+  else
+    info "falsification-scan (ADVISORY): no '## Session ${SESSION}' PF section to scan yet"
+  fi
+fi
 
 audit_summary
 audit_exit
