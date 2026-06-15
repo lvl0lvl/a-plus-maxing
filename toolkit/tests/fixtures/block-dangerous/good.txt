@@ -1,0 +1,7 @@
+rm -rf ./build
+git reset --soft HEAD~1
+git stash
+git push --force-with-lease origin main
+git clean -n
+ls -la /
+rm -rf /tmp/scratch-dir

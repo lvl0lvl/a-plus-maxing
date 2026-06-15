@@ -1,0 +1,10 @@
+rm -rf /
+rm -fr /
+rm -r -f /
+sudo rm -rf /
+git reset --hard HEAD
+git reset --hard origin/main
+git push --force origin main
+git push -f origin main
+git clean -fd
+git clean -df

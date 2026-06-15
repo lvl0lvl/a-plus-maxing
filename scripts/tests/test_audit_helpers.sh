@@ -165,6 +165,67 @@ echo "T9: source twice does not error"
 ) 2>/dev/null
 assert_eq "exit code after double-source" "0" "$?"
 
+# ── T10: skipped() forces FATAL (exit 2) — F-008 fail-closed ──────────
+echo "T10: a skip with no violation exits 2 (FATAL, fail-closed)"
+out=$(
+    (
+        source "$LIB"
+        audit_init "t10"
+        skipped "jq missing — hook check not run"
+        audit_summary
+        audit_exit
+    ) 2>&1
+)
+rc=$?
+assert_eq "exit code" "2" "$rc"
+assert_contains "skipped line"  "t10: SKIPPED: jq missing — hook check not run" "$out"
+assert_contains "summary count" "t10: 0 violation(s), 1 skipped" "$out"
+
+# ── T11: AUDIT_ALLOW_SKIP=1 downgrades a skip to non-blocking (exit 0) ─
+echo "T11: AUDIT_ALLOW_SKIP=1 lets a skip pass (exit 0)"
+(
+    source "$LIB"
+    audit_init "t11"
+    skipped "optional dep absent"
+    AUDIT_ALLOW_SKIP=1 audit_exit
+) 2>/dev/null
+assert_eq "exit code" "0" "$?"
+
+# ── T12: a violation takes precedence over a skip (exit 1, not 2) ──────
+echo "T12: violation precedence over skip exits 1"
+(
+    source "$LIB"
+    audit_init "t12"
+    violation INV-FOO "real problem"
+    skipped "and a check could not run"
+    audit_exit
+) 2>/dev/null
+assert_eq "exit code" "1" "$?"
+
+# ── T13: skipped_count accessor reads the skip counter ────────────────
+echo "T13: skipped_count() reads counter"
+out=$(
+    (
+        source "$LIB"
+        audit_init "t13"
+        skipped "one"
+        skipped "two"
+        skipped_count
+    ) 2>/dev/null
+)
+assert_eq "skipped_count output" "2" "$out"
+
+# ── T14: audit_init resets the skip counter too ───────────────────────
+echo "T14: audit_init resets skip state"
+(
+    source "$LIB"
+    audit_init "first"
+    skipped "skip in first"
+    audit_init "second"
+    audit_exit
+) 2>/dev/null
+assert_eq "exit code after reset" "0" "$?"
+
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""
 echo "Total: $((PASS + FAIL)) tests"

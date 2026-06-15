@@ -1,0 +1,6 @@
+{
+  "tool_name": "Task",
+  "tool_input": {
+    "prompt": "You are a sub-agent.\n\n## Heartbeat\nPlease emit a progress status after each step so I can see liveness. Thanks!"
+  }
+}
