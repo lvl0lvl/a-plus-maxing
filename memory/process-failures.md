@@ -4,7 +4,7 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-06-14
+last_reviewed: 2026-06-15
 depends_on: []
 superseded_by: null
 review_cadence: session
@@ -769,3 +769,23 @@ Observed, NOT promoted: (a) **a flagged-optional scope expansion had an unantici
 - **Agent's note (added per the operator's allowance):** The agent's own view is that the proximate trigger — *recommending* the relaxation — and the sustained drift — a week of secondary work without ever surfacing that the core capability was unbuilt — are the agent's responsibility; the operator's act was trusting that advice. Either attribution points to the SAME recurrence-preventing mechanism, which is what the guards below encode: an agent recommended loosening a guard that existed to prevent a known failure class, and that class recurred. The lesson binds both parties — operator: do not loosen a drift-guard on agent advice; agent: do not recommend it without naming the prevented class and forcing informed sign-off.
 - **Fix / mitigation:** (1) Re-instate the Rigor Framework's core-deliverable-first discipline — no substrate/polish/secondary work proceeds without a standing, checked answer to "does the core capability (generate a followable plan, end-to-end) work yet?" (2) Treat any agent recommendation to LOOSEN a guard that exists to prevent a known failure class as itself a red flag that triggers the failure-mode check + requires explicit informed operator sign-off naming the class the guard prevents — never a default-accept. (3) Build the actual plan-generation path next; the existing substrate (store, summary/PII routing, `assemble`, render) now supports it.
 - **Recurrence guard:** A session-level "core capability works end-to-end?" gate answered before any secondary work; an agent prohibition on recommending guard-relaxation without naming the prevented failure class and obtaining informed sign-off.
+
+## Session 64 (2026-06-15)
+
+**Per-PR gated-skill invocation table (INV-SKILL-TRACE):**
+
+No PR lifecycles ran this session. (Wave A of the Rigor Framework toolkit adoption was committed to `feature/rigor-toolkit-adoption` (`56c0ab9`); the PR + `/review-pr` + `/merge` are the next step, pending operator go. Per the heartbeat-hook deferral, the PR lifecycle is deliberately run AFTER `enforce-heartbeat-clause` wiring so the gated-skill dispatches are not denied — bead `0qf6`.)
+
+### PF attestation
+
+S64 close (2026-06-15): **No new PF-class entries this session.** This session adopted the Rigor Framework v1.0.0 toolkit (Wave A) — a governance build, not a product build. Every candidate event was implementation friction handled in-flight, a flagged scope adjustment, or a pre-existing condition, none promoting to a new process-failure class. **Observed, did NOT promote:** (a) **AC3 changed in-flight** (heartbeat-hook wiring deferred) — discovered the hook fires on every Task dispatch and would deny `/review-pr`+`/aplus-research` internal dispatches; flagged as CHANGED (not silent), beaded `0qf6`. This is correct sequencing (don't switch on a dispatch-gating hook before dispatch templates satisfy it), not a failure. (b) **Seven implementation issues** (heartbeat scope, settings-path test prefix, audit-helpers interface divergence, close-audit heterogeneous args, pf-ingest↔harvest-gate schema mismatch, scope-contract label/checkbox format, pre-existing provenance red) — all resolved or beaded, logged in `docs/rigor-adoption-log.md` §5 (the Loop-B harvest ledger). Issues #1 and #5 are candidate convergent toolkit/adoption rough edges for the cross-deployment harvest. (c) **Verify-first (the S6 `AP-ACT-BEFORE-VERIFY` discipline) HELD + LOAD-BEARING** — I did NOT assume the post-close S63 PF claims or the heartbeat-hook behavior; I read the actual code (`assemble.py`, `generate.run`, the heartbeat hook source) and isolated the provenance-test failure to HEAD (proving it pre-existing) before acting. (d) **The S63 post-close PF was dogfooded** — back-filled as the first `harvest.jsonl` record + bead `71s4`, exercising the very loop being adopted.
+
+> Note (harvest-gate compatibility, adoption Issue #8): prior-session PF ids are referenced DESCRIPTIVELY above, not as bare `PF-S{N}-{NN}` tokens, because `harvest-gate.sh` token-greps this session section and treats every PF-id token as a this-session failure requiring 3-layer capture. The one bare token here (`PF-S63-02`) IS captured (harvest.jsonl + bead `71s4`). A "No new PF" close that cites prior PFs by token would false-fail the gate — logged as a toolkit rough edge in `docs/rigor-adoption-log.md` §5/§9 (bead pending).
+
+### Disclosure ledger (S64 close) — failures caught that the operator did NOT flag (framework Discipline 1 step 5)
+
+Caught this session: 3.
+- Heartbeat-hook-fires-on-every-dispatch (would break the close's own `/review-pr`) — detection: self; surfaced_by: self (caught by reading the hook source before wiring, pre-empting the footgun).
+- Pre-existing `test_audit_research_provenance` red (env `jsonschema` dep) — detection: gate (the new `run-all-tests.sh` aggregator surfaced it); surfaced_by: self (isolated to HEAD, beaded `d1kc`).
+- Scope-contract-audit label/checkbox mismatch on the S64 contract — detection: gate (`scope-contract-audit` + its negative test went RED); surfaced_by: self (fixed same-cycle).
+Of these, 0 reached the operator only because they asked. All were caught by self/gate before any operator catch — the intended detection direction.
