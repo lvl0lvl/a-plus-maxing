@@ -777,6 +777,7 @@ Observed, NOT promoted: (a) **a flagged-optional scope expansion had an unantici
 | PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
 |----|----------------------------|------------------------|---------|
 | #139 — Wave A (Rigor toolkit adoption) | YES — 6-agent (security/bug/quality/test/contracts/historical) → synthesis+dedup → profile-less blind triage → fix → profile-less blind verify | YES — merge-methodology read fresh; REST (GraphQL throttled), full-40-char-SHA head guard | 18 findings → 14 LEGITIMATE (fixed + blind-verified 14/14) + 4 NOT_A_BUG; vendored `toolkit/` excluded as pristine. `enforce-heartbeat-clause` stayed UNWIRED (bead `0qf6`) so `/review-pr`'s own agent dispatches were not denied — the deferral was load-bearing for this lifecycle. |
+| S64 close-finalize (this PR) | YES — docs 3-agent subset (code-quality/contracts/historical) → blind triage | YES — REST rebase, full-40-char-SHA head guard | continuity-doc finalization (HANDOFF What-Is-Next + Top-3 rotation after Wave A landed); legitimate findings fixed before merge. |
 
 ### PF attestation
 
