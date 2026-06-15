@@ -43,12 +43,12 @@ the standing self-improvement system takes over (PF log + `harvest.jsonl` + `har
 
 | Wave | Scope | State |
 |---|---|---|
-| **A** | Mechanical floor + version pin + self-improvement loop + close gate | **DONE (S64, commit `56c0ab9`, branch `feature/rigor-toolkit-adoption`)** — PR lifecycle pending |
-| B | Approaches + disclosure ledgers + `falsification-scan` advisory + core-capability-first session gate | beaded (part of `71s4`) — not started |
-| C | `plan-integrity` role adoption + INVARIANTS rows for the new gates (change-discipline ritual) | not started |
-| D | Sync stale global `~/.claude/skills` + `~/.claude/commands` to the library | not started |
+| **A** | Mechanical floor + version pin + self-improvement loop + close gate | **DONE + MERGED (S64, PR #139 → `main`)** |
+| **B** | Approaches ledger + disclosure ledger + `falsification-scan` advisory + core-capability-first forcing function | **DONE (S65)** — mechanical core-capability gate script deferred WITH `71s4` (its checks depend on the path shape) |
+| **C** | `plan-integrity` role wiring + INVARIANTS rows for the new gates (change-discipline ritual) | **DONE in-repo (S65)** — `INV-CLOSE-AUDIT` + `INV-HARVEST-CAPTURE` registered (Walter-approved); plan-integrity wired into V1 Build Execution |
+| D | Sync stale global `~/.claude/skills` + `~/.claude/commands` to the library | **DEFERRED — its own session** (`ckl1`; touches `~/.claude/`, machine-wide blast radius; couples with `0qf6`) |
 
-Deferred items with beads: `0qf6` (wire heartbeat hook), `d1kc` (fix provenance test `jsonschema` dep), `71s4` (build the core deliverable + core-capability gate).
+Deferred items with beads: `ckl1` (Wave D global skills sync — its own session), `0qf6` (wire heartbeat hook — couples with Wave D), `71s4` (build the core deliverable + the core-capability MECHANICAL gate). **`d1kc` FIXED S65** (jsonschema installed into `.venv` + the provenance audit repointed at the `.venv` python; floor exclusion dropped). `po4x` a-plus-side mitigation landed S65 (the close-attestation template, clean by construction); the upstream toolkit fix remains a framework-harvest (Loop-B) item.
 
 ---
 
@@ -242,6 +242,37 @@ that another adopter's first close will also hit:
   implementation skill to pre-empt with a close-attestation template that is harvest-gate /
   skill-trace-clean by construction, and for the framework harvest to consider tightening
   `harvest-gate`'s extraction so a `Recurrence:` reference is not read as a this-session failure.
+  **(S65: a-plus-side mitigation landed — the close-attestation template is now in CLAUDE.md close
+  step 8.6, clean by construction; bead `po4x` stays open for the UPSTREAM toolkit fix.)**
+
+### Issue #9 — the governance script called system `python3`, but the dep lived in the project venv. **(Wave B/C deferred fix `d1kc`; fixed S65)**
+`scripts/audit-research-provenance.sh` delegates chain-integrity to `gate_attest.py verify-chain`,
+which imports `jsonschema`. The audit called bare `python3` (homebrew, `/opt/homebrew/bin/python3`)
+— a SEPARATE interpreter from the project's `.venv` (an isolated venv, `include-system-site-packages
+= false`). Neither carried `jsonschema`, so 2 valid-chain test cases failed and the close gate
+default-excluded the test (Issue #7).
+- **Resolution:** install `jsonschema` into `.venv` (`.venv/bin/python -m pip install jsonschema`)
+  and resolve a `PY="$REPO_ROOT/.venv/bin/python"` once in the audit, using it for all three python
+  invocations — the project's canonical runtime is `.venv` (CLAUDE.md; the whole pytest baseline uses
+  it), so no fallback chain is needed (a missing `.venv` fails the governance check CLOSED, which is
+  correct). Test → 8/8; the close-gate floor exclusion was then dropped (full floor 13/13).
+- **Extrapolation:** a vendored gate with a third-party dependency must run under the interpreter that
+  actually carries the dep. If your test baseline already uses a venv, point every governance script's
+  python at that SAME venv (not bare `python3`) — a split interpreter is the silent cause of "the audit
+  can't import X here." A NEW aggregator surfacing this (Issue #7) is the same story from the other end.
+
+### Issue #10 — wiring an ADVISORY check into a FAIL-CLOSED gate. **(Wave B; build choice)**
+`falsification-scan` is WARN-only by design (heuristic prose match; the framework keeps it advisory so
+operators don't route around a noisy hard-fail). But `close-audit.sh` maps every constituent's exit
+≥2 → FATAL — so adding the scan to the blocking roster would FATAL exactly when there is no note to
+scan, and its WARNs (exit 0) would be invisible. Advisory ≠ roster member.
+- **Resolution:** a clearly-marked NON-GATING block in `close-audit.sh` AFTER the roster — it extracts
+  ONLY the current session's `## Session <N>` PF section (scanning the whole log false-WARNs on
+  historical entries that quote an anti-pattern to refute it), pipes it to the vendored scan, and
+  `info`-logs the result with the exit code intentionally DISCARDED. A negative-test case (C14) proves
+  a PF section that trips an anti-pattern still exits 0 AND that the WARN is surfaced.
+- **Extrapolation:** integrate advisory checks OUTSIDE the pass/fail roster and prove non-gating with a
+  test. Scope the scan to the current unit (this session's note), never the whole historical log.
 
 ---
 
@@ -257,10 +288,11 @@ that another adopter's first close will also hit:
 ---
 
 ## 7. Deferred / open (beaded)
-- `0qf6` (P2) — wire `enforce-heartbeat-clause` (+ extend `test_settings_hook_paths.sh`) once dispatch flows carry the liveness clause; couple with Wave D.
-- `d1kc` (P2) — install `jsonschema` (and have the provenance audit invoke `.venv/bin/python`), then drop the close-gate exclusion.
-- `71s4` (P1) — build the core plan-generation path + add the core-capability-first session gate (the actual PF-S63-02 fix; Wave B precondition).
-- Wave B / C / D — to be beaded at the start of each.
+- `ckl1` (P2) — **Wave D:** sync stale global `~/.claude/skills` + `~/.claude/commands` to the library (parity-audit verified). Its own focused session — touches `~/.claude/` (machine-wide, every project on the box), so it cannot ride the in-repo PR.
+- `0qf6` (P2) — wire `enforce-heartbeat-clause` (+ extend `test_settings_hook_paths.sh` for the `toolkit/hooks/` prefix) once the dispatch flows (the synced skills + a dispatch convention) carry the liveness clause; couples with Wave D. Wiring it earlier would deny every Task dispatch incl. `/review-pr`'s own.
+- `71s4` (P1) — build the core plan-generation path + the core-capability MECHANICAL gate (the actual PF-S63-02 fix; the forcing-function half landed S65).
+- `po4x` (P3) — the UPSTREAM toolkit fix (harvest-gate over-extraction + pf-ingest↔harvest-gate schema drift). The a-plus-side workaround (close-attestation template) landed S65; stays open as a framework-harvest (Loop-B) input.
+- `d1kc` — **CLOSED S65** (`jsonschema` in `.venv` + the provenance audit repointed at the `.venv` python; close-gate floor exclusion dropped; full floor 13/13).
 
 ---
 
@@ -290,3 +322,4 @@ and it is itself a standing discipline rather than a thing we babysit.
 |---|---|---|---|---|
 | 2026-06-15 | S64 | A | Vendored toolkit, pinned `rigor_version 1.0.0`, built close gate + self-improvement loop + `skipped()`/FATAL-on-skip; committed `56c0ab9`. Close ran clean: `close-audit --session 64` 0 violations, `harvest-gate` PASS, pytest 833/2. | #1 heartbeat-on-every-dispatch (deferred `0qf6`), #5 pf-ingest↔harvest-gate schema mismatch, #7 pre-existing provenance red `d1kc`, **#8 harvest-gate/skill-trace close-attestation format constraints `po4x` (hit at the first close)**. |
 | 2026-06-15 | S64 | A | **Landed Wave A** — opened PR #139, ran `/review-pr` (6-agent, blind triage + blind verify) + `/merge`. Review found 18 findings → 14 LEGITIMATE fixed + blind-verified 14/14, 4 NOT_A_BUG. The fixes hardened the new code: F1 closed a real fail-OPEN (an exported `AUDIT_ALLOW_SKIP=1` defeating F-008 across constituents — `unset` on lib source); F3 `local` in `run_one`; F5 `--session=` empty→exit 2; F7/F8/F9 added floor-path + allow-skip-vs-FAIL + stale-exclusion test coverage (the gates' RED paths now bite); F15/F16/F17 doc corrections (pf-ingest seeding wording, direct-invocation note, `rigor_version` file created). | The review earned its keep — a real fail-open (F1) and several untested gate paths (F7/F8/F9) that the first close had not exercised. Confirms the value of running `/review-pr` even on a governance PR. |
+| 2026-06-15 | S65 | B + C | **Landed Waves B + C (in-repo).** Wave B: vendored `falsification-scan` wired as a NON-GATING close advisory (scans only the current session's PF section; test C14 proves non-gating; close-audit 15/15); approaches ledger created (`vault/approaches/` + `_template.md` + `README.md` + 1 genuine seed — the S63 `biomarker_meta` wearable-marker revert); disclosure ledger formalized as a named close step (CLAUDE.md step 4); core-capability-first FORCING FUNCTION adopted as a session-open step (mechanical gate deferred WITH `71s4`). Wave C: `plan-integrity` role wired into V1 Build Execution (read-only review role, NOT a deployed agent — correctly absent from branch-completeness); `INV-CLOSE-AUDIT` + `INV-HARVEST-CAPTURE` registered via the Walter-approved change-discipline ritual. `d1kc` FIXED (jsonschema in `.venv` + audit repointed; floor exclusion dropped, full floor 13/13); `po4x` a-plus-side template landed (CLAUDE.md step 8.6). | #9 split python interpreter (system `python3` vs project `.venv` — the dep lived only in the venv); #10 advisory-in-a-fail-closed-gate (advisory ≠ roster member; integrate outside the pass/fail roster + prove non-gating with a test). |

@@ -12,47 +12,30 @@ review_cadence: weekly
 
 # Session Handoff
 
-## Scope Contract — Session 64 (2026-06-15)
+## Scope Contract — Session 65 (2026-06-15)
 
-Goal: Adopt the Rigor Framework v1.0.0 toolkit into a-plus-maxing as the re-tightened governance floor (closing the PF-S63-02 class), taking the delta we lack while preserving our more-evolved domain layer — Wave A this session; Waves B–D beaded.
+Goal: Finish the in-repo Rigor Framework adoption (Waves B + C) plus the small deferred fixes, and complete the adoption log as a reference artifact for other projects — leaving only the genuinely-external/coupled tail (global skills sync + heartbeat wiring) beaded.
 
-Acceptance criteria: (Wave A)
-- [x] AC1: `toolkit/` vendored (copied pristine from `frameworks/rigor/toolkit/`, chmod +x); `toolkit/tests/run-all-tests.sh` green (14/14).
-- [x] AC2: `rigor_version: 1.0.0` pinned in CLAUDE.md with the Discipline-11 pull-cadence note + vendoring rationale.
-- [x] AC3 (CHANGED): `enforce-heartbeat-clause.sh` vendored + documented (its toolkit negative test passes); live-wiring DEFERRED + beaded (`a-plus-maxing-0qf6`) — the hook fires on every Task dispatch and would deny `/review-pr`+`/aplus-research` internal dispatches; couples to the Wave D skills sync + a dispatch convention. Flagged, not silent.
-- [x] AC4: self-improvement loop seeded — `harvest.jsonl` + vendored `pf-ingest.sh`/`harvest-gate.sh`/`harvest-record.md`; PF-S63-02 back-filled as the first gate-valid record + bead `a-plus-maxing-71s4` (NO PF-S63-01 exists — back-filled the one real post-close PF only; flagged). `harvest-gate` verified PASS (3-layer) + bites on a missing layer.
-- [x] AC5: `scripts/close-audit.sh` adopted as the single fail-closed close gate (toolkit pattern, a-plus roster), `scripts/tests/run-all-tests.sh` aggregator added, `scripts/tests/test_close_audit.sh` proves it bites (8/8); CLAUDE.md close step 8.5 repointed + 8.6 harvest gate added.
-- [x] AC6: `scripts/lib/audit-helpers.sh` gained `skipped()`/FATAL-on-skip (F-008) backward-compatibly; `test_audit_helpers.sh` 23/23; the 9 existing audits unaffected.
+Acceptance criteria:
+- [ ] AC1 (Wave B — falsification-scan advisory): `toolkit/scripts/falsification-scan.sh` wired as an ADVISORY (non-blocking, WARN-only) close check over the session PF-log note; documented in CLAUDE.md close protocol; run against the actual S65 close note.
+- [ ] AC2 (Wave B — approaches ledger): `vault/approaches/` created with the framework F-014 template + README; the discipline documented in CLAUDE.md (memory stack + Cross-Document Ownership Matrix + recovery read cadence). Seeded only with a genuine abandoned-approach entry if one exists (no fabricated entries — the inclusion test gates it).
+- [ ] AC3 (Wave B — disclosure ledger formalized): the disclosure ledger made a NAMED standing close step in CLAUDE.md (per framework Discipline 8 / F-013; already practiced S64).
+- [ ] AC4 (Wave B — core-capability forcing function): the session-level "does the core capability work end-to-end?" question adopted as a session-OPEN protocol step in CLAUDE.md (PF-S63-02 recurrence guard); the MECHANICAL gate script DEFERRED to the 71s4 build (flagged, not silent — its checks depend on the path shape).
+- [ ] AC5 (Wave C — plan-integrity role wiring): the plan-integrity role (`${SKILLS_LIBRARY}/roles/plan-integrity/`) wired into CLAUDE.md V1 Build Execution as the build-plan integrity verifier at wave checkpoints; confirmed it does NOT trip branch-completeness-audit (review role, not a deployed agent).
+- [ ] AC6 (Wave C — INVARIANTS rows, APPROVAL-GATED): INV rows + evidence prepared for the new gates (close-audit meta-gate; harvest-gate self-improvement capture); Walter's change-discipline approval obtained in-flight BEFORE appending; Change Log rows appended.
+- [ ] AC7 (po4x a-plus-side convention): a close-attestation template that is harvest-gate/skill-trace-clean by construction documented (the upstream toolkit fix stays a framework-harvest item — vendored scripts NOT edited).
+- [ ] AC8 (d1kc): jsonschema installed into `.venv`; `scripts/audit-research-provenance.sh` pointed at the `.venv` python; `scripts/tests/test_audit_research_provenance.sh` green; the close-gate floor exclusion dropped.
+- [ ] AC9 (finalize adoption log): `docs/rigor-adoption-log.md` Change Log rows appended for Waves B/C; Status table updated; in-repo adoption marked complete; the external/coupled tail (Wave D + 0qf6) scoped with beads.
+- [ ] AC10 (land via PR + close): one adoption PR → `/review-pr` (fresh) → fix legitimate → `/merge` (fresh); full session close, `close-audit.sh --session 65` green.
 
-Files I WILL touch: new `toolkit/` (vendored); `scripts/lib/audit-helpers.sh`; `scripts/close-audit.sh` (new); `scripts/tests/{run-all-tests,test_audit_helpers,test_close_audit}.sh`; `CLAUDE.md`; new `harvest.jsonl`; HANDOFF/`.beads` at close.
-Files I will NOT touch: product code (`scripts/store/`, `scripts/ingest/`, `scripts/plan/`, `scripts/generate/`); `aplus-research` skill internals; deployed agents (plan-integrity is Wave C); wiki/PII hooks (`block-ungated-vault-write`, `block-pii-commit`, `pre-push-pii-scan`) + the 6 wired hooks' logic; the vendored toolkit scripts (no forking); `main` directly.
-NOT doing: replacing bespoke audits with toolkit generics; building the core plan-generation path (the next program, run under this rigor — bead `71s4`); Waves B (ledgers + core-capability gate), C (plan-integrity role + INVARIANTS rows), D (global skills sync) — beaded.
-Invariants at risk: INV-BRANCH-NOT-MAIN (on `feature/rigor-toolkit-adoption`); INV-SKILL-TRACE (adoption PR gets `/review-pr` + `/merge` fresh — deferred WITH the heartbeat wiring, see AC3); INV-HO-ROTATION/PF-ATTESTATION at close. New INV rows for the adopted gates are Wave C (change-discipline ritual, user-approved).
-
-### S64 Scope Contract Evaluation (2026-06-15, volatile)
-
-- **AC1 (vendor `toolkit/`) — PASS.** Copied pristine (96 files), chmod +x; `toolkit/tests/run-all-tests.sh` 14/14.
-- **AC2 (`rigor_version: 1.0.0`) — PASS.** New CLAUDE.md "Rigor Framework (vendored toolkit)" section + Discipline-11 pull cadence.
-- **AC3 (heartbeat hook) — CHANGED (flagged, not silent).** Vendored + documented; live-wiring DEFERRED + beaded `0qf6` — the hook fires on every Task dispatch and would deny `/review-pr`+`/aplus-research` internal dispatches. Couples to the Wave D skills sync + a dispatch convention. Correct sequencing, not a drop.
-- **AC4 (self-improvement loop) — PASS, with a correction.** `harvest.jsonl` + vendored `pf-ingest`/`harvest-gate`/schema; PF-S63-02 back-filled + bead `71s4`; `harvest-gate` verified 3-layer PASS + bites on a missing layer. **Correction (flagged):** the contract said "PF-S63-01 + PF-S63-02" — there is NO PF-S63-01, so the one real post-close PF (PF-S63-02) was back-filled.
-- **AC5 (close gate) — PASS.** `scripts/close-audit.sh` + `scripts/tests/run-all-tests.sh` aggregator + `test_close_audit.sh` 8/8; CLAUDE.md close 8.5 repointed + 8.6 harvest gate.
-- **AC6 (`skipped()`/FATAL-on-skip) — PASS.** `audit-helpers.sh` upgraded backward-compatibly; `test_audit_helpers.sh` 23/23; 9 existing audits unaffected.
-
-**CHANGED / flagged (none silent):** AC3 deferred (above). One pre-existing red surfaced by the new aggregator — `test_audit_research_provenance.sh` (env `jsonschema` dep) — isolated to HEAD (not caused by this session), beaded `d1kc`, excluded LOUDLY from the close gate's floor.
-
-### Drift checks (S64 close)
-
-- **Task drift:** all 6 Wave-A ACs evaluated (5 PASS + AC3 CHANGED, flagged). One AC4 wording correction (no PF-S63-01), flagged. Waves B–D explicitly deferred + beaded in the contract. No silent drift.
-- **Architecture drift:** toward LESS violation — the governance floor is re-tightened (a single fail-closed close gate, a self-improvement loop, FATAL-on-skip audit semantics) directly closing the PF-S63-02 drift class. Bespoke audits kept (toolkit = upstream); product code untouched (`scripts/store|ingest|plan|generate` byte-identical). INV-BRANCH-NOT-MAIN held (feature branch); INV-SCOPE-CONTRACT/INV-HO-ROTATION/INV-PF-ATTESTATION satisfied this close; INV-SKILL-TRACE = escape sentence (no PR lifecycle ran — PR is the next step). New INV rows deferred to Wave C (change-discipline ritual).
-- **Vision drift:** none. What the system IS after S64: the same local-first health tracking + planning system, now running on the re-tightened Rigor Framework v1.0.0 governance floor — the precondition for rebuilding the still-unbuilt core deliverable (plan generation, bead `71s4`) under rigor. Matches `design/vision.md`.
-
-### PF attestation
-
-S64 close (2026-06-15): **No new PF-class entries this session** (a governance build; every candidate event was in-flight friction, a flagged scope change, or a pre-existing condition). Full attestation + the disclosure ledger (3 self/gate-caught items, 0 operator-caught) + the per-PR table (escape sentence: no PR lifecycle ran) in `memory/process-failures.md` Session 64. The seven implementation issues are logged in `docs/rigor-adoption-log.md` §5 (the Loop-B harvest ledger).
+Files I WILL touch: `CLAUDE.md`; new `vault/approaches/` (dir + `_template.md` + `README.md`); `scripts/close-audit.sh` (add falsification-scan as an advisory, non-FATAL invocation); `INVARIANTS.md` (register rows + Change Log, post-approval); `docs/rigor-adoption-log.md`; `scripts/audit-research-provenance.sh` + `scripts/tests/test_audit_research_provenance.sh` (d1kc); `.venv` (jsonschema install — gitignored runtime); HANDOFF/`.beads` at close.
+Files I will NOT touch: the vendored `toolkit/` scripts (no fork — forks the pull line); product code (`scripts/store/`, `scripts/ingest/`, `scripts/plan/`, `scripts/generate/`); `aplus-research` skill internals (the d1kc change is to the provenance AUDIT in `scripts/`, not the skill); the 6 wired hooks' logic + `enforce-heartbeat-clause` (no wiring — 0qf6 deferred); `~/.claude/` global skills/commands (Wave D is its own session); `main` directly; the core plan-generation path (71s4 — parked pending design + Pencil).
+NOT doing: Wave D global skills sync (its own focused session — machine-wide blast radius, couples with 0qf6); wiring `enforce-heartbeat-clause` (0qf6 — would deny this session's own `/review-pr`+`/merge` at close); building the core-capability MECHANICAL gate script (deferred WITH 71s4); building the plan-generation path (71s4 parked); editing vendored toolkit scripts; chasing the beads daemon-error repo-id mismatch beyond confirming flush-only is safe.
+Invariants at risk: INV-BRANCH-NOT-MAIN (on `feature/rigor-adoption-waves-bc`); INV-SKILL-TRACE (adoption PR gets `/review-pr` + `/merge` fresh; per-PR table at close); the new INV rows go through the change-discipline ritual (AC6, Walter's approval); INV-HO-ROTATION/PF-ATTESTATION at close.
 
 ## Historical Scope Contracts (archived)
 
-Scope contracts for Sessions 5-63 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S61 archived S60; S62 archived S61; S63 archived S62; S64 archived S63) to keep this handoff lean. The current (S64) scope contract is above; the archive holds the prior-session archaeology.
+Scope contracts for Sessions 5-64 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S62 archived S61; S63 archived S62; S64 archived S63; S65 archived S64) to keep this handoff lean. The current (S65) scope contract is above; the archive holds the prior-session archaeology.
 
 ## Session 4 close — 2026-05-25
 
