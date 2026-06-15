@@ -72,6 +72,10 @@ SLUG="$2"
 [ -d "$WORKDIR" ] || die "design-work dir not found: $WORKDIR"
 [ -f "$RISK_TABLE" ] || die "risk table not found: $RISK_TABLE"
 [ -f "$GATE_ATTEST" ] || die "gate_attest.py not found: $GATE_ATTEST"
+# Fail closed CLEANLY (exit 2) if the .venv python is missing, rather than letting
+# the first `$PY` call abort with exit 127 under `set -e` (PR #141 F-B) or be
+# mis-diagnosed as a fabricated-gate attestation failure. Build .venv + install deps.
+[ -x "$PY" ] || die "project .venv python not found at $PY (carries jsonschema for verify-chain) — build .venv + pip install -r requirements.txt"
 
 audit_init "audit-research-provenance($SLUG)"
 

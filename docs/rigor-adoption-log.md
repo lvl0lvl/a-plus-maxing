@@ -220,7 +220,9 @@ it). Root cause: `gate_attest.py verify-chain` needs `jsonschema`, absent from b
 `python3`. It tests a *conditional* audit, not a per-close roster member.
 - **Resolution:** bead `d1kc`; the close gate **default-excludes** it from the a-plus floor with
   a printed reason (`RUN_ALL_TESTS_EXCLUDE` is loud — a stale exclusion naming a missing test
-  fails the run, so exclusions can't rot silently).
+  fails the run, so exclusions can't rot silently). **(S65: FIXED via `d1kc` — `jsonschema`
+  installed into `.venv` + the audit repointed at the `.venv` python; the default exclusion was
+  DROPPED, full floor 13/13 green. See Issue #9.)**
 - **Extrapolation:** a new aggregator often surfaces pre-existing reds. Don't chase them inside
   the adoption (scope discipline) — isolate, bead, and exclude *loudly with a reason*, never silently.
 

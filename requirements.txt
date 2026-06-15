@@ -1,0 +1,9 @@
+# a-plus-maxing — .venv runtime dependencies (the gitignored, per-instance
+# Python 3.14 runtime). Provision a fresh clone with:
+#   python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
+#
+# pytest     — the V1 Python test baseline (.venv/bin/python -m pytest -q)
+# jsonschema — gate_attest.py verify-chain, used by the research-provenance audit
+#              (scripts/audit-research-provenance.sh) + the aplus-research gates
+pytest>=9.0
+jsonschema>=4.26
