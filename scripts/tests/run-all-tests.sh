@@ -9,13 +9,26 @@
 # themselves, so an audit that lost its ability to FAIL is caught before it can
 # grant a false pass.
 #
+# DIRECT INVOCATION NOTE (PR #139 / F16): run directly with NO RUN_ALL_TESTS_EXCLUDE,
+# this includes test_audit_research_provenance.sh, a TRACKED pre-existing
+# environmental red (gate_attest verify-chain needs jsonschema, absent here; bead
+# a-plus-maxing-d1kc) — so a bare `bash run-all-tests.sh` exits 1 on that one test.
+# The canonical close baseline is `scripts/close-audit.sh`, which excludes that
+# test LOUDLY with its reason. To reproduce the close-gate floor here, run:
+#   RUN_ALL_TESTS_EXCLUDE=test_audit_research_provenance.sh bash scripts/tests/run-all-tests.sh
+#
 # Exclusions (NEVER silent — F-009 "no silent caps"): a documented, tracked
 # pre-existing failure may be excluded via:
 #   RUN_ALL_TESTS_EXCLUDE         space-separated test basenames to skip
 #   RUN_ALL_TESTS_EXCLUDE_REASON  reason string printed for each exclusion
 # Each excluded test that exists is printed as a loud EXCLUDED line so the drop
-# is visible, never hidden. An excluded name that does NOT exist is itself an
-# error (stale exclusion) and fails the run.
+# is visible. An excluded name that does NOT exist is a stale exclusion and fails
+# the run (a silent cap that no longer applies must not pass quietly).
+#
+# Test hook (NOT for production): RUN_ALL_TESTS_DIR overrides the directory the
+# test_*.sh files are discovered from (default: this script's dir), so the runner's
+# own exclusion / stale-exclusion logic can be tested against a fixture dir without
+# recursing into the live suite (F9).
 #
 # Exit: 0 all non-excluded tests passed / 1 one or more failed (or a stale
 #       exclusion names a missing test).
@@ -23,6 +36,7 @@
 set -uo pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TESTS_DIR="${RUN_ALL_TESTS_DIR:-$SELF_DIR}"
 EXCLUDE=" ${RUN_ALL_TESTS_EXCLUDE:-} "
 EXCLUDE_REASON="${RUN_ALL_TESTS_EXCLUDE_REASON:-no reason given}"
 
@@ -35,14 +49,14 @@ failed_names=()
 
 # Verify every excluded name actually exists (a stale exclusion is a silent cap).
 for ex in ${RUN_ALL_TESTS_EXCLUDE:-}; do
-  if [ ! -e "$SELF_DIR/$ex" ]; then
+  if [ ! -e "$TESTS_DIR/$ex" ]; then
     echo "[run-all] ERROR: excluded test does not exist: $ex (stale exclusion)"
     failed=$((failed + 1))
     failed_names+=("stale-exclusion:$ex")
   fi
 done
 
-for t in "$SELF_DIR"/test_*.sh; do
+for t in "$TESTS_DIR"/test_*.sh; do
   [ -e "$t" ] || continue
   b="$(basename "$t")"
   if is_excluded "$b"; then
@@ -62,7 +76,7 @@ done
 
 echo "[run-all] RESULT: ${passed} passed, ${failed} failed, ${excluded} excluded"
 if [ "$failed" -ne 0 ]; then
-  printf '[run-all] failed: %s\n' "${failed_names[*]}"
+  printf '[run-all] failed: %s\n' "${failed_names[@]}"
   exit 1
 fi
 exit 0

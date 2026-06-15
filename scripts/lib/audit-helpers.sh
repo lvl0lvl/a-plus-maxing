@@ -46,6 +46,13 @@ if [[ "${_AUDIT_HELPERS_LOADED:-0}" == "1" ]]; then
 fi
 _AUDIT_HELPERS_LOADED=1
 
+# F1 (PR #139 SEC-001): never inherit the fail-closed opt-out from the calling
+# environment. AUDIT_ALLOW_SKIP is a per-run flag a caller sets LOCALLY *after*
+# sourcing (e.g. close-audit.sh --allow-skip). An exported value from an outer
+# shell must not silently downgrade a sourcing audit's skips to non-blocking and
+# defeat F-008. Scrub it on source; a deliberate opt-out is re-set post-source.
+unset AUDIT_ALLOW_SKIP
+
 # Globals reset by audit_init. Underscore prefix marks them private.
 _AUDIT_NAME=""
 _AUDIT_COUNT=0
@@ -105,6 +112,9 @@ audit_exit() {
     #             violation is never masked by a concurrent skip).
     #   2 FATAL — a check was skipped (could not run) and AUDIT_ALLOW_SKIP != 1.
     #   0 PASS  — ran clean, nothing skipped.
+    # Exit 2 is a first-class "could not run / must not pass" outcome (F-008), not
+    # an arg-error-only code: scripts also exit 2 on usage errors, and both mean
+    # "do not treat this as a clean pass" to a caller like close-audit.sh.
     if [[ ${_AUDIT_COUNT} -gt 0 ]]; then
         exit 1
     fi

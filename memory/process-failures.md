@@ -774,7 +774,9 @@ Observed, NOT promoted: (a) **a flagged-optional scope expansion had an unantici
 
 **Per-PR gated-skill invocation table (INV-SKILL-TRACE):**
 
-No PR lifecycles ran this session. (Wave A of the Rigor Framework toolkit adoption was committed to `feature/rigor-toolkit-adoption` (`56c0ab9`); the PR + `/review-pr` + `/merge` are the next step, pending operator go. Per the heartbeat-hook deferral, the PR lifecycle is deliberately run AFTER `enforce-heartbeat-clause` wiring so the gated-skill dispatches are not denied — bead `0qf6`.)
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
+|----|----------------------------|------------------------|---------|
+| #139 — Wave A (Rigor toolkit adoption) | YES — 6-agent (security/bug/quality/test/contracts/historical) → synthesis+dedup → profile-less blind triage → fix → profile-less blind verify | YES — merge-methodology read fresh; REST (GraphQL throttled), full-40-char-SHA head guard | 18 findings → 14 LEGITIMATE (fixed + blind-verified 14/14) + 4 NOT_A_BUG; vendored `toolkit/` excluded as pristine. `enforce-heartbeat-clause` stayed UNWIRED (bead `0qf6`) so `/review-pr`'s own agent dispatches were not denied — the deferral was load-bearing for this lifecycle. |
 
 ### PF attestation
 
