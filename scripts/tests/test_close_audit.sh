@@ -23,6 +23,14 @@ assert_rc() {
     echo "  FAIL: $label (expected $expected, got $actual)"; FAIL=$((FAIL + 1))
   fi
 }
+assert_contains() {
+  local label="$1" needle="$2" hay="$3"
+  if [[ "$hay" == *"$needle"* ]]; then
+    echo "  PASS: $label"; PASS=$((PASS + 1))
+  else
+    echo "  FAIL: $label (missing: $needle)"; FAIL=$((FAIL + 1))
+  fi
+}
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -97,6 +105,19 @@ CLOSE_AUDIT_ROSTER_DIR="$TMP" CLOSE_AUDIT_ROSTER="alpha-audit.sh" \
   CLOSE_AUDIT_FLOORS="$TMP/floor-ok.sh" \
   bash "$CLOSE_AUDIT" --session 64 >/dev/null 2>&1
 assert_rc "a passing floor + clean roster passes (0)" 0 $?
+
+# C14 (Wave B): the falsification-scan advisory is NON-GATING. A PF section that
+#     trips an anti-pattern (increment-by-default) WARNs but must NOT change the
+#     gate verdict — a clean roster + clean floor still exits 0, and the WARN is
+#     surfaced (advisory ran, info-only). Uses the REAL vendored toolkit scan.
+printf '## Session 64 (2026-06-15)\nWe decided every clean run advances n regardless of region.\n' > "$TMP/pf-fixture.md"
+out=$(CLOSE_AUDIT_ROSTER_DIR="$TMP" CLOSE_AUDIT_ROSTER="alpha-audit.sh" \
+  CLOSE_AUDIT_FLOORS="$TMP/floor-ok.sh" \
+  CLOSE_AUDIT_FSCAN="$SCRIPT_DIR/../../toolkit/scripts/falsification-scan.sh" \
+  CLOSE_AUDIT_PFLOG="$TMP/pf-fixture.md" \
+  bash "$CLOSE_AUDIT" --session 64 2>&1)
+assert_rc "falsification advisory does not gate a clean close" 0 $?
+assert_contains "advisory surfaced the anti-pattern WARN" "increment-by-default" "$out"
 
 echo ""
 echo "test_close_audit: $PASS passed, $FAIL failed"

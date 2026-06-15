@@ -57,6 +57,11 @@ source "$SCRIPT_DIR/lib/audit-helpers.sh"
 
 RISK_TABLE="$REPO_ROOT/templates/specialist-risk-class.yaml"
 GATE_ATTEST="$REPO_ROOT/.claude/skills/aplus-research/lib/gate_attest.py"
+# The project's canonical Python runtime is .venv (CLAUDE.md — the pytest baseline +
+# gate_attest's jsonschema dep live there, NOT in the system python3; bead d1kc). Use
+# it for every python invocation so verify-chain can import jsonschema. If .venv is
+# absent the check fails closed (correct — it cannot verify).
+PY="$REPO_ROOT/.venv/bin/python"
 
 die() { echo "audit-research-provenance: $*" >&2; exit 2; }
 
@@ -119,7 +124,7 @@ esac
 # drops a safety floor. (gate-2.75.json presence is independently required at line ~129.)
 TARGET_TYPE=""
 if [ -f "$WORKDIR/gates/gate-2.75.json" ]; then
-    TARGET_TYPE="$(python3 -c "
+    TARGET_TYPE="$("$PY" -c "
 import json
 try:
     d = json.load(open('$WORKDIR/gates/gate-2.75.json'))
@@ -168,7 +173,7 @@ for g in $required; do
     fi
     # Must carry a non-null attestation_chain — an orchestrator-fabricated gate
     # JSON without one is exactly what PF-S3-01 forbids.
-    if ! python3 -c "
+    if ! "$PY" -c "
 import json,sys
 try:
     d=json.load(open('$gj'))
@@ -184,7 +189,7 @@ done
 # --- delegate chain-integrity (source files exist + sha256 match) to gate_attest.py ---
 # verify-chain validates every attested gate that IS present; combined with the
 # presence checks above, absent-AND-tampered are both now caught.
-vc_out="$(python3 "$GATE_ATTEST" verify-chain --base "$WORKDIR" 2>&1)" && vc_rc=0 || vc_rc=$?
+vc_out="$("$PY" "$GATE_ATTEST" verify-chain --base "$WORKDIR" 2>&1)" && vc_rc=0 || vc_rc=$?
 if [ "$vc_rc" -ne 0 ]; then
     while IFS= read -r line; do
         [ -n "$line" ] && violation "INV-RESEARCH-GATE-ATTESTATION" "verify-chain: $line"
