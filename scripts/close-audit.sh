@@ -36,6 +36,8 @@
 #                              toolkit + a-plus run-all-tests.sh) — F7 testability
 #   CLOSE_AUDIT_FLOOR_EXCLUDE / _REASON  forwarded to the a-plus floor's
 #                              RUN_ALL_TESTS_EXCLUDE (documented pre-existing red)
+#   CLOSE_AUDIT_FSCAN          override the falsification-scan binary (advisory)
+#   CLOSE_AUDIT_PFLOG          override the PF-log path the advisory scans
 
 set -uo pipefail
 
@@ -58,7 +60,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 # F2 (PR #139 SEC-002): surface accidental production use of a test-hook env var.
-for _thv in CLOSE_AUDIT_SKIP_FLOOR CLOSE_AUDIT_ROSTER CLOSE_AUDIT_ROSTER_DIR CLOSE_AUDIT_FLOORS CLOSE_AUDIT_FLOOR_EXCLUDE; do
+for _thv in CLOSE_AUDIT_SKIP_FLOOR CLOSE_AUDIT_ROSTER CLOSE_AUDIT_ROSTER_DIR CLOSE_AUDIT_FLOORS CLOSE_AUDIT_FLOOR_EXCLUDE CLOSE_AUDIT_FSCAN CLOSE_AUDIT_PFLOG; do
   if [ -n "${!_thv:-}" ]; then
     echo "close-audit: WARNING: test-hook env var ${_thv} is active (intended for tests/CI only — NOT a production close)" >&2
   fi
@@ -156,9 +158,12 @@ EOF
 FSCAN="${CLOSE_AUDIT_FSCAN:-${REPO_ROOT}/toolkit/scripts/falsification-scan.sh}"
 PFLOG="${CLOSE_AUDIT_PFLOG:-${REPO_ROOT}/memory/process-failures.md}"
 if [ -n "$SESSION" ] && [ -f "$FSCAN" ] && [ -f "$PFLOG" ]; then
-  pf_section="$(awk -v s="## Session ${SESSION}" '
-    index($0, s) == 1 { grab = 1 }
-    grab && /^## Session / && index($0, s) != 1 { exit }
+  # Match the session header EXACTLY (number followed by a non-digit or EOL) so
+  # `## Session 6` does not prefix-match `## Session 65`; stop at the next
+  # `## Session ` header of any number (PR #141 F-A).
+  pf_section="$(awk -v n="${SESSION}" '
+    $0 ~ ("^## Session " n "([^0-9]|$)") { grab = 1; print; next }
+    grab && /^## Session / { exit }
     grab { print }
   ' "$PFLOG")"
   if [ -n "$pf_section" ]; then

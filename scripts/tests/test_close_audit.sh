@@ -119,6 +119,50 @@ out=$(CLOSE_AUDIT_ROSTER_DIR="$TMP" CLOSE_AUDIT_ROSTER="alpha-audit.sh" \
 assert_rc "falsification advisory does not gate a clean close" 0 $?
 assert_contains "advisory surfaced the anti-pattern WARN" "increment-by-default" "$out"
 
+# C15 (PR #141 F-D): a scan that EXITS NON-ZERO must still not gate — proving the
+#     `|| true` exit-discard is load-bearing (the C14 real-scan exits 0, so it could
+#     not exercise this). Inject a stub fscan that emits a WARN and `exit 2`s.
+printf '#!/usr/bin/env bash\necho "increment-by-default (stub)"; exit 2\n' > "$TMP/fscan-exit2.sh"
+chmod +x "$TMP/fscan-exit2.sh"
+out=$(CLOSE_AUDIT_ROSTER_DIR="$TMP" CLOSE_AUDIT_ROSTER="alpha-audit.sh" \
+  CLOSE_AUDIT_FLOORS="$TMP/floor-ok.sh" \
+  CLOSE_AUDIT_FSCAN="$TMP/fscan-exit2.sh" \
+  CLOSE_AUDIT_PFLOG="$TMP/pf-fixture.md" \
+  bash "$CLOSE_AUDIT" --session 64 2>&1)
+assert_rc "advisory scan exiting 2 does NOT gate the close (|| true is load-bearing)" 0 $?
+
+# C16 (PR #141 F-A): exact-session scoping — `--session 6` must NOT bleed `## Session 65`.
+#     The increment-by-default phrase lives ONLY in Session 65; Session 6 is clean. The
+#     old prefix-match awk would over-grab 65 and surface the WARN under session 6.
+printf '## Session 6 (2026-01-01)\nClean session, no anti-patterns here.\n\n## Session 65 (2026-06-15)\nWe decided every clean run advances n regardless of region.\n' > "$TMP/pf-multi.md"
+out=$(CLOSE_AUDIT_ROSTER_DIR="$TMP" CLOSE_AUDIT_ROSTER="alpha-audit.sh" \
+  CLOSE_AUDIT_FLOORS="$TMP/floor-ok.sh" \
+  CLOSE_AUDIT_FSCAN="$SCRIPT_DIR/../../toolkit/scripts/falsification-scan.sh" \
+  CLOSE_AUDIT_PFLOG="$TMP/pf-multi.md" \
+  bash "$CLOSE_AUDIT" --session 6 2>&1)
+assert_rc "exact session match keeps the close clean" 0 $?
+if [[ "$out" != *"increment-by-default"* ]]; then
+  echo "  PASS: --session 6 scan does not bleed --session 65 content"; PASS=$((PASS + 1))
+else
+  echo "  FAIL: --session 6 scan bled session 65 (awk prefix-match regression)"; FAIL=$((FAIL + 1))
+fi
+
+# C17 (PR #141 F-E): the advisory's no-matching-section and missing-FSCAN branches are
+#     non-gating too (advisory ABSENT != close failure).
+out=$(CLOSE_AUDIT_ROSTER_DIR="$TMP" CLOSE_AUDIT_ROSTER="alpha-audit.sh" \
+  CLOSE_AUDIT_FLOORS="$TMP/floor-ok.sh" \
+  CLOSE_AUDIT_FSCAN="$SCRIPT_DIR/../../toolkit/scripts/falsification-scan.sh" \
+  CLOSE_AUDIT_PFLOG="$TMP/pf-fixture.md" \
+  bash "$CLOSE_AUDIT" --session 999 2>&1)
+assert_rc "advisory with no matching session section does not gate" 0 $?
+assert_contains "no-section path is surfaced" "no '## Session 999' PF section" "$out"
+CLOSE_AUDIT_ROSTER_DIR="$TMP" CLOSE_AUDIT_ROSTER="alpha-audit.sh" \
+  CLOSE_AUDIT_FLOORS="$TMP/floor-ok.sh" \
+  CLOSE_AUDIT_FSCAN="$TMP/nonexistent-fscan.sh" \
+  CLOSE_AUDIT_PFLOG="$TMP/pf-fixture.md" \
+  bash "$CLOSE_AUDIT" --session 64 >/dev/null 2>&1
+assert_rc "advisory with a missing FSCAN binary does not gate" 0 $?
+
 echo ""
 echo "test_close_audit: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1
