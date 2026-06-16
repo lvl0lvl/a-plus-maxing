@@ -833,3 +833,27 @@ Caught this session: 11 (9 review findings + 2 self-caught).
 - F-I forbidden word in an INV row + F-J F2 hook-list omission — detection: gate (review); surfaced_by: self.
 - The scope-contract Edit failures + the bd daemon-error mismatch — detection: self; surfaced_by: self.
 Of these, 0 reached the operator only because they asked — all were caught by the review/gate before any operator catch (Walter approved the merge AFTER seeing the triaged + fixed + verified results). The intended detection direction.
+
+## Session 66 (2026-06-15)
+
+### Per-PR gated-skill invocation table (INV-SKILL-TRACE)
+
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
+|----|----------------------------|------------------------|---------|
+| S66 Wave-D close (this PR) | YES — docs 3-agent subset → blind triage → blind verify | YES — merge-methodology read fresh; REST rebase, full-40-char-SHA head guard (recorded at close, pre-merge) | in-repo bookkeeping for the global Wave D sync (adoption-log freeze + Issue #11, HANDOFF S66 rotation, session note, `ckl1` close). |
+
+### PF attestation
+
+S66 close (2026-06-15): **No new PF-class entries this session.** Wave D was a global-tooling sync (no a-plus product/governance code touched — the a-plus repo change is bookkeeping only). The candidate events were the deploy mechanism working as designed or in-flight friction caught immediately.
+
+Falsification windows that HELD: **verify-first (the S6 act-before-verify family) HELD + load-bearing** — before the destructive machine-wide mirror I read the library's `deploy-and-verify` spec IN FULL, confirmed the divergence DIRECTION (global April 9 vs library June 15, by mtime + diff), and confirmed the 9 local-only skills were not library-iterated — rather than assuming the sync was safe. **The reversibility discipline HELD** — a backup tarball was taken BEFORE any change, and operator GO was obtained AFTER surfacing that Wave D was a 50-shadow machine-wide mirror (materially bigger than the bead's one-liner), not silently barreling ahead into a destructive op.
+
+Observed, NOT promoted: (a) **a verify-logic near-miss.** The post-mirror integrity check first used `[ -d ] && [ ! -L ]` (a real-dir assumption) and FALSE-alarmed that 7 local skills were "missing"; they are `~/.agents/skills/` symlinks the mirror never touched. Nothing was lost (the loop iterated only library-named items; the backup held). Lesson: verify a destructive op with a RESOLVE check (`[ -e ]` + `readlink`), not a structural-type assumption. First occurrence, caught immediately, no harm → watch, not promote. (b) **the `ckl1` bead under-described Wave D** (a few stale files → actually a 50-shadow mirror) — surfaced + operator-confirmed before the destructive step; a scope reality-check, not a drift. (c) **a combined `gh api -f …` / `git push` Bash command was denied** by `block-dangerous` (it false-matched `push` + `-f` as `--force`); split into separate commands — a hook false-positive, no rigor impact (added to the Top-3 standing mechanics).
+
+### Disclosure ledger (S66 close) — failures caught that the operator did NOT flag (framework Discipline 8 / F-013)
+
+Caught this session: 3 (all self/gate-caught).
+- The verify-logic false-alarm (`[ -d ]` vs the `.agents` symlinks) — detection: self (post-mirror integrity check); surfaced_by: self.
+- The 2 pre-existing library `upgrade-skill` parity cracks (transient staging-path refs) — detection: gate (`parity-audit` rc=1); surfaced_by: self (isolated as library-side, not a-plus's).
+- The `gh api -f` / `git push` hook false-match — detection: self (the denied command); surfaced_by: self.
+Of these, 0 reached the operator only because they asked. The Wave D scope reality-check (the 50-shadow mirror) WAS surfaced to the operator for the GO — by design, since it crossed into a machine-wide destructive decision.

@@ -4,8 +4,8 @@ type: ledger
 owner: Walter McGivney
 created: 2026-06-15
 last_reviewed: 2026-06-15
-status: active
-review_cadence: per-adoption-session
+status: complete
+review_cadence: frozen-post-adoption
 rigor_version_adopting: 1.0.0
 permalink: a-plus-maxing/rigor-adoption-log
 ---
@@ -46,9 +46,11 @@ the standing self-improvement system takes over (PF log + `harvest.jsonl` + `har
 | **A** | Mechanical floor + version pin + self-improvement loop + close gate | **DONE + MERGED (S64, PR #139 → `main`)** |
 | **B** | Approaches ledger + disclosure ledger + `falsification-scan` advisory + core-capability-first forcing function | **DONE (S65)** — mechanical core-capability gate script deferred WITH `71s4` (its checks depend on the path shape) |
 | **C** | `plan-integrity` role wiring + INVARIANTS rows for the new gates (change-discipline ritual) | **DONE in-repo (S65)** — `INV-CLOSE-AUDIT` + `INV-HARVEST-CAPTURE` registered (Walter-approved); plan-integrity wired into V1 Build Execution |
-| D | Sync stale global `~/.claude/skills` + `~/.claude/commands` to the library | **DEFERRED — its own session** (`ckl1`; touches `~/.claude/`, machine-wide blast radius; couples with `0qf6`) |
+| **D** | Sync stale global `~/.claude/skills` + `~/.claude/commands` to the library | **DONE (S66)** via the library's own `deploy-and-verify` (anchor + symlink-deploy + parity), then a full mirror of the 50 stale-April shadows → library symlinks; 9 local-only skills preserved; 0 dead symlinks |
 
-Deferred items with beads: `ckl1` (Wave D global skills sync — its own session), `0qf6` (wire heartbeat hook — couples with Wave D), `71s4` (build the core deliverable + the core-capability MECHANICAL gate). **`d1kc` FIXED S65** (jsonschema installed into `.venv` + the provenance audit repointed at the `.venv` python; floor exclusion dropped). `po4x` a-plus-side mitigation landed S65 (the close-attestation template, clean by construction); the upstream toolkit fix remains a framework-harvest (Loop-B) item.
+**All four waves complete (S64–S66). This log is now FROZEN** (`status: complete`) and retained as the Loop-B harvest input; the standing self-improvement system (PF log + `harvest.jsonl` + `harvest-gate` + the close-disclosure ledger) takes over. The ONLY ongoing discipline is the Discipline-11 **pull cadence** (§8).
+
+Post-adoption follow-ons (tracked by the standing system, NOT this log): `0qf6` (wire `enforce-heartbeat-clause` once a dispatch convention carries the liveness clause), `po4x` (UPSTREAM toolkit harvest-gate/pf-ingest fix — framework-side), `p5wx` (init_instance auto-provision `.venv`), `7may` (provenance-audit interpolation hardening). The core deliverable `71s4` (plan generation + the mechanical core-capability gate) is parked pending design + Pencil. **`d1kc` / `ckl1` / `eyn4` / `4hmo` CLOSED.** Library-side parity residual (not a-plus's): `upgrade-skill.md` references 2 transient staging paths that aren't deployed at rest (a skills_library artifact-repair item).
 
 ---
 
@@ -276,6 +278,33 @@ scan, and its WARNs (exit 0) would be invisible. Advisory ≠ roster member.
 - **Extrapolation:** integrate advisory checks OUTSIDE the pass/fail roster and prove non-gating with a
   test. Scope the scan to the current unit (this session's note), never the whole historical log.
 
+### Issue #11 — Wave D "sync" was a 50-shadow machine-wide MIRROR, not a few stale files. **(S66; the bead under-described the scope)**
+The `ckl1` bead read "sync stale global `~/.claude/skills`+`commands` to the library." The reality:
+the global dirs were 40 real skills + 33 real commands, of which **50 were stale-April real copies
+SHADOWING the now-current (June) library** (the library had caught up 72 commits at adoption), plus
+**9 genuinely-local skills** (UI/quant, some symlinked into a separate `~/.agents/skills/` collection)
+that must be PRESERVED. A blind symlink-swap or overwrite would have lost the 9 local skills.
+- **Resolution:** use the library's OWN sanctioned mechanism — the `deploy-and-verify` command
+  (idempotent, non-clobbering, fail-closed via `parity-audit`): it established the
+  `~/.claude/skills_library` anchor, symlinked the entirely-missing library items, and SKIP-reported
+  the 50 shadows (never clobbering). Then, after confirming the shadows were stale-old not locally-edited
+  (global `review-pr.md` mtime 2026-04-09 vs library `skills/` last commit 2026-06-15; the diffs were the
+  72 commits), a **full mirror** replaced the 50 shadows with library symlinks under a pre-made backup
+  tarball. The 9 local-only skills were never iterated (not library-named) → preserved. End state:
+  43 library skills + 33 commands as symlinks (track the library, no future staleness), 0 dead links.
+- **Extrapolation:** a mature project's global skills/commands almost always carry BOTH stale shared
+  copies AND genuinely-local items. NEVER blind-overwrite. Use `deploy-and-verify` (non-clobbering) to
+  surface the shadows, confirm direction (stale vs local-edit, by mtime/diff), back up, then mirror. The
+  symlink model (matching how `roles`/`library` already deploy) ends staleness permanently.
+- **Issues left as library-side residual (NOT the adopter's):** `parity-audit` stays `rc=1` on
+  `upgrade-skill.md`'s references to 2 transient staging paths (`.upgrade-skill.in-progress`,
+  `upgrade-skill.md.staged`) that exist only DURING an upgrade-skill run — a skills_library artifact;
+  `deploy-and-verify`'s own spec says to report these as remaining library work, not a deploy failure.
+- **Near-miss noted (no harm):** the post-mirror integrity check first used `[ -d ] && [ ! -L ]` to
+  assert the local skills survived, which FALSE-alarmed on the 7 `~/.agents/skills/` symlinks (they are
+  symlinks, not real dirs). Nothing was lost (the loop never touched them); the lesson is to verify a
+  destructive op with a RESOLVE check (`[ -e ]` + `readlink`), not a structural-type assumption.
+
 ---
 
 ## 6. Verification evidence (S64 / Wave A)
@@ -325,3 +354,4 @@ and it is itself a standing discipline rather than a thing we babysit.
 | 2026-06-15 | S64 | A | Vendored toolkit, pinned `rigor_version 1.0.0`, built close gate + self-improvement loop + `skipped()`/FATAL-on-skip; committed `56c0ab9`. Close ran clean: `close-audit --session 64` 0 violations, `harvest-gate` PASS, pytest 833/2. | #1 heartbeat-on-every-dispatch (deferred `0qf6`), #5 pf-ingest↔harvest-gate schema mismatch, #7 pre-existing provenance red `d1kc`, **#8 harvest-gate/skill-trace close-attestation format constraints `po4x` (hit at the first close)**. |
 | 2026-06-15 | S64 | A | **Landed Wave A** — opened PR #139, ran `/review-pr` (6-agent, blind triage + blind verify) + `/merge`. Review found 18 findings → 14 LEGITIMATE fixed + blind-verified 14/14, 4 NOT_A_BUG. The fixes hardened the new code: F1 closed a real fail-OPEN (an exported `AUDIT_ALLOW_SKIP=1` defeating F-008 across constituents — `unset` on lib source); F3 `local` in `run_one`; F5 `--session=` empty→exit 2; F7/F8/F9 added floor-path + allow-skip-vs-FAIL + stale-exclusion test coverage (the gates' RED paths now bite); F15/F16/F17 doc corrections (pf-ingest seeding wording, direct-invocation note, `rigor_version` file created). | The review earned its keep — a real fail-open (F1) and several untested gate paths (F7/F8/F9) that the first close had not exercised. Confirms the value of running `/review-pr` even on a governance PR. |
 | 2026-06-15 | S65 | B + C | **Landed Waves B + C (in-repo).** Wave B: vendored `falsification-scan` wired as a NON-GATING close advisory (scans only the current session's PF section; test C14 proves non-gating; close-audit 15/15); approaches ledger created (`vault/approaches/` + `_template.md` + `README.md` + 1 genuine seed — the S63 `biomarker_meta` wearable-marker revert); disclosure ledger formalized as a named close step (CLAUDE.md step 4); core-capability-first FORCING FUNCTION adopted as a session-open step (mechanical gate deferred WITH `71s4`). Wave C: `plan-integrity` role wired into V1 Build Execution (read-only review role, NOT a deployed agent — correctly absent from branch-completeness); `INV-CLOSE-AUDIT` + `INV-HARVEST-CAPTURE` registered via the Walter-approved change-discipline ritual. `d1kc` FIXED (jsonschema in `.venv` + audit repointed; floor exclusion dropped, full floor 13/13); `po4x` a-plus-side template landed (CLAUDE.md step 8.6). | #9 split python interpreter (system `python3` vs project `.venv` — the dep lived only in the venv); #10 advisory-in-a-fail-closed-gate (advisory ≠ roster member; integrate outside the pass/fail roster + prove non-gating with a test). |
+| 2026-06-15 | S66 | D | **Landed Wave D — the global skills/commands sync (machine-wide, not in-repo).** Ran the library's `deploy-and-verify` (anchor `~/.claude/skills_library` + non-clobbering symlink-deploy + `parity-audit`), then a full mirror of the 50 stale-April shadows → library symlinks (backup tarball pre-made; confirmed stale-not-local-edit by mtime/diff). 9 local-only skills preserved, 0 dead symlinks. **All 4 waves complete → this log FROZEN** (`status: complete`). `ckl1` closed. | #11 (Wave D was a 50-shadow mirror, not a few files — use `deploy-and-verify` non-clobbering + back up + mirror); library-side `upgrade-skill` parity residual (2 transient staging-path refs, not the adopter's); a verify-logic near-miss (use a resolve-check, not `[ -d ]`, after a destructive op). |

@@ -12,55 +12,45 @@ review_cadence: weekly
 
 # Session Handoff
 
-## Scope Contract — Session 65 (2026-06-15)
+## Scope Contract — Session 66 (2026-06-15)
 
-Goal: Finish the in-repo Rigor Framework adoption (Waves B + C) plus the small deferred fixes, and complete the adoption log as a reference artifact for other projects — leaving only the genuinely-external/coupled tail (global skills sync + heartbeat wiring) beaded.
+Goal: Execute Wave D — sync the stale global `~/.claude/skills` + `~/.claude/commands` to the now-current skills_library, ending machine-wide staleness while preserving the local-only skills; then close the adoption (freeze the log).
 
 Acceptance criteria:
-- [ ] AC1 (Wave B — falsification-scan advisory): `toolkit/scripts/falsification-scan.sh` wired as an ADVISORY (non-blocking, WARN-only) close check over the session PF-log note; documented in CLAUDE.md close protocol; run against the actual S65 close note.
-- [ ] AC2 (Wave B — approaches ledger): `vault/approaches/` created with the framework F-014 template + README; the discipline documented in CLAUDE.md (memory stack + Cross-Document Ownership Matrix + recovery read cadence). Seeded only with a genuine abandoned-approach entry if one exists (no fabricated entries — the inclusion test gates it).
-- [ ] AC3 (Wave B — disclosure ledger formalized): the disclosure ledger made a NAMED standing close step in CLAUDE.md (per framework Discipline 8 / F-013; already practiced S64).
-- [ ] AC4 (Wave B — core-capability forcing function): the session-level "does the core capability work end-to-end?" question adopted as a session-OPEN protocol step in CLAUDE.md (PF-S63-02 recurrence guard); the MECHANICAL gate script DEFERRED to the 71s4 build (flagged, not silent — its checks depend on the path shape).
-- [ ] AC5 (Wave C — plan-integrity role wiring): the plan-integrity role (`${SKILLS_LIBRARY}/roles/plan-integrity/`) wired into CLAUDE.md V1 Build Execution as the build-plan integrity verifier at wave checkpoints; confirmed it does NOT trip branch-completeness-audit (review role, not a deployed agent).
-- [ ] AC6 (Wave C — INVARIANTS rows, APPROVAL-GATED): INV rows + evidence prepared for the new gates (close-audit meta-gate; harvest-gate self-improvement capture); Walter's change-discipline approval obtained in-flight BEFORE appending; Change Log rows appended.
-- [ ] AC7 (po4x a-plus-side convention): a close-attestation template that is harvest-gate/skill-trace-clean by construction documented (the upstream toolkit fix stays a framework-harvest item — vendored scripts NOT edited).
-- [ ] AC8 (d1kc): jsonschema installed into `.venv`; `scripts/audit-research-provenance.sh` pointed at the `.venv` python; `scripts/tests/test_audit_research_provenance.sh` green; the close-gate floor exclusion dropped.
-- [ ] AC9 (finalize adoption log): `docs/rigor-adoption-log.md` Change Log rows appended for Waves B/C; Status table updated; in-repo adoption marked complete; the external/coupled tail (Wave D + 0qf6) scoped with beads.
-- [ ] AC10 (land via PR + close): one adoption PR → `/review-pr` (fresh) → fix legitimate → `/merge` (fresh); full session close, `close-audit.sh --session 65` green.
+- [x] AC1: back up `~/.claude/{skills,commands}` before any change.
+- [x] AC2: deploy via the library's sanctioned `deploy-and-verify` (anchor + non-clobbering symlink-deploy + parity-audit), then full-mirror the stale shadows → library symlinks.
+- [x] AC3: the 9 local-only skills PRESERVED (not iterated; verified resolvable); 0 dead symlinks.
+- [x] AC4: in-repo bookkeeping — freeze `docs/rigor-adoption-log.md` (status: complete) + Issue #11 + Change Log; close `ckl1`.
+- [x] AC5: full session close, `close-audit.sh --session 66` green; land the in-repo close via PR (`/review-pr` docs subset → `/merge`).
 
-Files I WILL touch: `CLAUDE.md`; new `vault/approaches/` (dir + `_template.md` + `README.md`); `scripts/close-audit.sh` (add falsification-scan as an advisory, non-FATAL invocation); `INVARIANTS.md` (register rows + Change Log, post-approval); `docs/rigor-adoption-log.md`; `scripts/audit-research-provenance.sh` + `scripts/tests/test_audit_research_provenance.sh` (d1kc); `.venv` (jsonschema install — gitignored runtime); HANDOFF/`.beads` at close.
-Files I will NOT touch: the vendored `toolkit/` scripts (no fork — forks the pull line); product code (`scripts/store/`, `scripts/ingest/`, `scripts/plan/`, `scripts/generate/`); `aplus-research` skill internals (the d1kc change is to the provenance AUDIT in `scripts/`, not the skill); the 6 wired hooks' logic + `enforce-heartbeat-clause` (no wiring — 0qf6 deferred); `~/.claude/` global skills/commands (Wave D is its own session); `main` directly; the core plan-generation path (71s4 — parked pending design + Pencil).
-NOT doing: Wave D global skills sync (its own focused session — machine-wide blast radius, couples with 0qf6); wiring `enforce-heartbeat-clause` (0qf6 — would deny this session's own `/review-pr`+`/merge` at close); building the core-capability MECHANICAL gate script (deferred WITH 71s4); building the plan-generation path (71s4 parked); editing vendored toolkit scripts; chasing the beads daemon-error repo-id mismatch beyond confirming flush-only is safe.
-Invariants at risk: INV-BRANCH-NOT-MAIN (on `feature/rigor-adoption-waves-bc`); INV-SKILL-TRACE (adoption PR gets `/review-pr` + `/merge` fresh; per-PR table at close); the new INV rows go through the change-discipline ritual (AC6, Walter's approval); INV-HO-ROTATION/PF-ATTESTATION at close.
+Files I WILL touch: `~/.claude/skills`, `~/.claude/commands`, new `~/.claude/skills_library` anchor (GLOBAL — not the a-plus repo); `docs/rigor-adoption-log.md`; HANDOFF/`.beads` at close.
+Files I will NOT touch: the a-plus product/governance code (Wave D is global-only — no `scripts/`/`vault/`/`toolkit/` change); `enforce-heartbeat-clause` wiring (0qf6 separate); the 9 local-only global skills; `main` directly; 71s4.
+NOT doing: wiring `enforce-heartbeat-clause` (0qf6 — needs a dispatch convention first); fixing the library-side `upgrade-skill` parity residual (skills_library artifact, not a-plus's); building 71s4.
+Invariants at risk: INV-BRANCH-NOT-MAIN (on `fix/s66-waved`); INV-SKILL-TRACE (the close PR gets `/review-pr` + `/merge`; per-PR table at close); INV-HO-ROTATION/PF-ATTESTATION at close.
 
-### S65 Scope Contract Evaluation (2026-06-15, volatile)
+### S66 Scope Contract Evaluation (2026-06-15, volatile)
 
-- **AC1 (falsification-scan advisory) — PASS.** Non-gating block in `close-audit.sh` (scoped to the current session's PF note); C14 proves non-gating + surfaces the WARN; documented CLAUDE.md close 8.5.
-- **AC2 (approaches ledger) — PASS.** `vault/approaches/` + `_template.md` + `README.md` + one genuine seed (S63 `biomarker_meta` revert); documented in CLAUDE.md.
-- **AC3 (disclosure ledger formalized) — PASS.** Named close step (CLAUDE.md step 4).
-- **AC4 (core-capability forcing function) — PASS.** Session-start discipline in CLAUDE.md; mechanical gate DEFERRED with `71s4` (flagged).
-- **AC5 (plan-integrity wiring) — PASS.** Wired into CLAUDE.md V1 Build Execution; confirmed NOT in branch-completeness roster (0 absent).
-- **AC6 (INVARIANTS rows) — PASS.** `INV-CLOSE-AUDIT` + `INV-HARVEST-CAPTURE` registered after explicit operator approval; Change Log rows appended.
-- **AC7 (po4x convention) — PASS.** Close-attestation template (clean by construction) in CLAUDE.md step 8.6; upstream toolkit fix stays beaded (`po4x`).
-- **AC8 (d1kc) — PASS.** jsonschema in `.venv` + audit repointed; provenance test 8/8; floor exclusion dropped (full floor 13/13). The review HARDENED it (F-B clean fail-closed precondition; F-C `requirements.txt` capture).
-- **AC9 (finalize adoption log) — PASS.** Status table + Issues #9/#10 + §7/§9 finalized; Wave D + 0qf6 scoped as the external/coupled tail.
-- **AC10 (land via PR + close) — PASS.** PR #141 → `/review-pr` (6-agent; 9 LEGITIMATE fixed+verified) → `/merge` (rebase, on-main `1aeeb64`); this close-finalize PR carries the close.
+- **AC1 (backup) — PASS.** `~/.claude/_backup-skills-commands-20260615-195826.tgz` (908K) taken before any change.
+- **AC2 (deploy-and-verify + mirror) — PASS.** Anchor `~/.claude/skills_library → library` created; `deploy-and-verify` symlinked the missing library items + reported the 50 shadows non-clobberingly; confirmed stale-not-local (global `review-pr.md` Apr 9 vs library `skills/` Jun 15) → full mirror replaced the shadows with library symlinks. 43 skills + 33 commands now symlinks.
+- **AC3 (local-only preserved, no dead links) — PASS.** All 9 local-only skills resolve (7 `~/.agents/skills/` symlinks + 2 real dirs), never iterated by the library-named loop; 0 dead symlinks.
+- **AC4 (bookkeeping) — PASS.** Adoption log FROZEN (`status: complete`) + Issue #11 + Change Log S66 row; `ckl1` closed.
+- **AC5 (close) — PASS.** `close-audit --session 66` green; this close PR (docs review → merge) carries it.
 
-**CHANGED / flagged (none silent):** review-surfaced IN-SCOPE additions — `requirements.txt` (new, F-C dependency capture), the F-A/F-B correctness fixes + C15/C16/C17 tests, the F-G/F-I/F-J/F-K doc fixes. Two companion files beyond the literal WILL-touch list (`scripts/tests/test_close_audit.sh` C14+, `scripts/tests/run-all-tests.sh` note) — the negative-test + note for scripts I modified (F-007 obligation). Two follow-up beads: `p5wx` (init_instance auto-provision), `7may` (interpolation hardening).
+**CHANGED / flagged (none silent):** the `ckl1` bead UNDER-DESCRIBED Wave D — it was a 50-shadow machine-wide mirror, not a few files; flagged + executed under a pre-made backup with explicit operator GO. Parity stays `rc=1` on a PRE-EXISTING library `upgrade-skill` residual (2 transient staging-path refs) — library-side, not a-plus's. A verify-logic near-miss (an over-strict `[ -d ]` integrity check false-alarmed on the `.agents` symlinks) caught immediately, no harm — backup held.
 
-### Drift checks (S65 close)
+### Drift checks (S66 close)
 
-- **Task drift:** all 10 ACs PASS. Scope additions were review-surfaced fixes — flagged, not silent. No AC silently changed.
-- **Architecture drift:** toward LESS violation — the in-repo governance floor is now complete (advisory + ledgers + the two registered gate invariants); the d1kc fix removed the last floor exclusion (full floor 13/13). The vendored `toolkit/` stayed pristine (no fork); product code (`scripts/store|ingest|plan|generate`) byte-identical. INV-BRANCH-NOT-MAIN held (feature + close branches); INV-SKILL-TRACE bound #141 + this close PR; INV-CLOSE-AUDIT/INV-HARVEST-CAPTURE newly registered + green.
-- **Vision drift:** none. After S65 the same local-first health tracking + planning system on the COMPLETE in-repo Rigor Framework v1.0.0 floor (only the external Wave D + heartbeat wiring remain, beaded). The core deliverable (`71s4`) is still unbuilt + parked pending design + Pencil — the forcing-function gate now stands to guard its build. Matches `design/vision.md`.
+- **Task drift:** all 5 ACs PASS. The one scope reality-check (Wave D = 50-shadow mirror) was surfaced + operator-confirmed before the destructive step. No silent drift.
+- **Architecture drift:** none in the a-plus repo (Wave D is global-only — zero `scripts/`/`vault/`/`toolkit/` change; product + governance code byte-identical). The GLOBAL deployment model improved: skills/commands now symlink the library (like `roles`/`library` already did), ending staleness. INV-BRANCH-NOT-MAIN held (`fix/s66-waved`); INV-SKILL-TRACE binds the close PR.
+- **Vision drift:** none. The Rigor Framework adoption (all 4 waves A–D) is COMPLETE; the same local-first health system now runs on the fully-deployed, no-longer-stale governance toolchain. The core deliverable (`71s4`) remains parked pending design + Pencil. Matches `design/vision.md`.
 
 ### PF attestation
 
-S65 close (2026-06-15): **No new PF-class entries this session.** Full attestation + the per-PR skill-trace table (#141 + this close PR) + the disclosure ledger (11 caught: 9 review findings + 2 self-caught; 0 operator-only) in `memory/process-failures.md` Session 65. Review-surfaced findings + the two follow-up beads also logged in `docs/rigor-adoption-log.md` §5 (Issues #9/#10) + §9.
+S66 close (2026-06-15): **No new PF-class entries this session.** Full attestation + the per-PR skill-trace table (this close PR) + the disclosure ledger in `memory/process-failures.md` Session 66. The Wave D experience (50-shadow mirror), the library-side parity residual, and the verify-logic near-miss are logged in `docs/rigor-adoption-log.md` §5 (Issue #11) + §9.
 
 ## Historical Scope Contracts (archived)
 
-Scope contracts for Sessions 5-64 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S62 archived S61; S63 archived S62; S64 archived S63; S65 archived S64) to keep this handoff lean. The current (S65) scope contract is above; the archive holds the prior-session archaeology.
+Scope contracts for Sessions 5-65 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S63 archived S62; S64 archived S63; S65 archived S64; S66 archived S65) to keep this handoff lean. The current (S66) scope contract is above; the archive holds the prior-session archaeology.
 
 ## Session 4 close — 2026-05-25
 
@@ -262,38 +252,37 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **The core deliverable is STILL UNBUILT — the forcing-function gate now guards it (PF-S63-02 / bead `71s4`).** No end-to-end plan generation: no model/API client in `scripts/`, `plan/assemble.py` has no production caller, `generate.run` renders only dashboard/report (re-verified S65). `71s4` is PARKED pending design discussion + Pencil screen work (operator decision, S65) — do NOT start it without that. The CLAUDE.md session-start core-capability gate now forces "does plan generation work end-to-end yet?" (today: NO) before any secondary work.
-2. **Only the EXTERNAL/coupled adoption tail remains — Wave D (`ckl1`) + heartbeat wiring (`0qf6`).** Wave D syncs the stale global `~/.claude/skills`+`commands` to the library — it touches `~/.claude/` (machine-wide, EVERY project on the box), so it is its OWN focused session, never an in-repo PR. `0qf6` (wire `enforce-heartbeat-clause`) couples with Wave D: the hook DENYs every Task dispatch lacking a liveness clause (no role-gating) → it would break `/review-pr`+`/aplus-research`; wire it ONLY after those flows + a dispatch convention carry the clause, and extend `test_settings_hook_paths.sh` for the `toolkit/hooks/` prefix then. Until then PR lifecycles run with the hook OFF.
-3. **The rigor floor's newest mechanisms are LIVE but lightly exercised — don't treat them as proven.** This close exercised the new falsification advisory + `INV-CLOSE-AUDIT`/`INV-HARVEST-CAPTURE` for the first time (green). STILL untested: (a) the Discipline-11 pull cadence has never run a real pull (root `rigor_version` 1.0.0 == library `VERSION` today, so no delta); (b) `enforce-heartbeat-clause` stays UNWIRED (`0qf6`); (c) `po4x` a-plus-side mitigation landed (the close-attestation template) but the UPSTREAM toolkit fix is unverified (`po4x` open). Standing mechanics: REST `gh api` full-40-char SHA for PR ops (GraphQL throttled ALL session); stage `git add` separately from `git commit`; the bd daemon repo-id mismatch (`.beads/daemon-error`) is benign for `--flush-only` but wants a future env cleanup.
+1. **The core deliverable is STILL UNBUILT — the forcing-function gate now guards it (PF-S63-02 / bead `71s4`).** No end-to-end plan generation: no model/API client in `scripts/`, `plan/assemble.py` has no production caller, `generate.run` renders only dashboard/report. `71s4` is PARKED pending design discussion + Pencil screen work (operator decision) — do NOT start it without that. The CLAUDE.md session-start core-capability gate forces "does plan generation work end-to-end yet?" (today: NO) before any secondary work.
+2. **The Rigor adoption is COMPLETE (all 4 waves) — only `0qf6` (heartbeat wiring) remains as post-adoption hardening.** Wave D (S66) synced the global `~/.claude/skills`+`commands` to the library (symlink model, no more staleness). `0qf6` (wire `enforce-heartbeat-clause`) is NOT done: the hook DENYs every Task dispatch lacking a liveness clause (no role-gating) → it would break `/review-pr`+`/aplus-research`. Wire it ONLY after the dispatch flows + a dispatch convention carry the clause, and extend `test_settings_hook_paths.sh` for the `toolkit/hooks/` prefix then. Until then PR lifecycles run with the hook OFF.
+3. **The rigor floor's newest mechanisms are LIVE but lightly exercised — don't treat them as proven.** S65/S66 exercised the falsification advisory + `INV-CLOSE-AUDIT`/`INV-HARVEST-CAPTURE` + the global deploy (green). STILL untested: (a) the Discipline-11 pull cadence has never run a real pull (root `rigor_version` 1.0.0 == library `VERSION` today — no delta); (b) `enforce-heartbeat-clause` stays UNWIRED (`0qf6`); (c) NEW from Wave D — the global skills now SYMLINK `~/.claude/skills_library → the library checkout`, so moving/deleting that checkout breaks EVERY project's skills (keep the anchor valid). Standing mechanics: REST `gh api` full-40-char SHA for PR ops (GraphQL throttled); stage `git add` separately from `git commit`; run `gh api -f …` and `git push` as SEPARATE Bash commands (block-dangerous false-matches `push`+`-f` as `--force`); the bd `.beads/daemon-error` mismatch is benign for `--flush-only` but wants an env cleanup.
 
 ## Current State (volatile)
 
-- **S65 (2026-06-15) finished the in-repo Rigor Framework v1.0.0 adoption (Waves B+C) and LANDED it — PR #141 `/review-pr` (6-agent → blind triage → blind verify; 9 LEGITIMATE fixed+verified, incl. F-A awk prefix-match + F-B `.venv` exit-127 abort) + `/merge` (rebase) to `main` (`1aeeb64`).** Walter: "finish the implementation of the rigor framework/skills library + complete the implementation sheet so other projects can reference it; park the new path for discussion + Pencil screens."
-- **What landed (Waves B+C):** falsification-scan wired as a non-gating close advisory (C14-C17 prove non-gating + exact-session scoping); approaches ledger `vault/approaches/` (F-014) + 1 genuine seed; disclosure ledger + core-capability forcing function as named protocol steps; `plan-integrity` role wired into V1 Build Execution; `INV-CLOSE-AUDIT` + `INV-HARVEST-CAPTURE` registered (Walter-approved); `d1kc` FIXED (jsonschema in `.venv` + audit repointed; `requirements.txt` added; floor 13/13, 0 excluded); `po4x` a-plus-side template. pytest 833/2 unaffected.
-- **Adoption log:** `docs/rigor-adoption-log.md` — Status table marks Waves A-C done; §5 Issues #9/#10; §9 Change Log. In-repo adoption COMPLETE; only the external Wave D + `0qf6` tail remains, then the log freezes as the Loop-B harvest input.
-- **Skills library (this machine):** `~/Documents/Projects/skills_library` on `origin/main` (rigor v1.0.0 == root `rigor_version` — no pull-cadence delta today); `~/.claude/roles`+`library` symlinks serve it. The GLOBAL `~/.claude/skills`+`commands` are still STALE (Wave D `ckl1`, external — touches `~/.claude/`, not the repo).
-- **Beads:** `71s4` (P1, core plan-generation — PARKED pending design + Pencil); external tail `ckl1` (Wave D) + `0qf6` (heartbeat); follow-ups `p5wx` (init_instance auto-provision), `7may` (interpolation hardening), `po4x` (UPSTREAM toolkit fix). `d1kc` / `eyn4` (Wave B) / `4hmo` (Wave C) CLOSED.
+- **S66 (2026-06-15) executed Wave D — synced the stale global `~/.claude/skills`+`commands` to the skills_library, COMPLETING all 4 adoption waves.** Walter: "do wave D now." Ran the library's `deploy-and-verify` (anchor + non-clobbering symlink-deploy + parity-audit), then a full mirror of the 50 stale-April shadows → library symlinks (backup tarball pre-made; confirmed stale-not-local by mtime/diff); the 9 local-only skills preserved; 0 dead symlinks.
+- **Adoption COMPLETE + FROZEN:** `docs/rigor-adoption-log.md` `status: complete` (all 4 waves A-D), Issue #11 (the Wave D 50-shadow mirror) + the §9 S66 Change Log row. Retained as the Loop-B harvest input; the standing self-improvement system takes over.
+- **Global deployment (this machine):** `~/.claude/skills_library → skills_library` anchor created; 43 library skills + 33 commands now SYMLINK the library (track it, no future staleness — matching how `roles`/`library` already deploy). The 9 local-only skills (UI/quant) untouched. Parity residual: 2 pre-existing library `upgrade-skill` cracks (transient staging-path refs) — skills_library-side, not a-plus's.
+- **a-plus repo: UNCHANGED by Wave D** (global-only — zero `scripts/`/`vault/`/`toolkit/` change); pytest 833/2, full negative floor 13/13 still green.
+- **Beads:** `71s4` (P1, core plan-generation — PARKED pending design + Pencil); `0qf6` (heartbeat — post-adoption hardening); follow-ups `9etx`/`p5wx`/`7may`/`po4x`. `ckl1` (Wave D) / `d1kc` / `eyn4` (Wave B) / `4hmo` (Wave C) CLOSED.
 - **Active landmarks:** LM-01 (First MD visit) **2026-07-13** — 14-day scoped-drift-audit window opens **2026-06-29** (not open today). LM-02 Whoop baseline date-TBD.
 
-**Historical (kept for reference):** `vault/sessions/session-65.md`.
+**Historical (kept for reference):** `vault/sessions/session-66.md`.
 
 ## What Is Next (volatile)
 
-### Resume checklist — next session (S66) open
+### Resume checklist — next session (S67) open
 
-Open normally (Session Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline `main` 833/2 + the full negative floor 13/13). **The in-repo Rigor adoption is COMPLETE + MERGED** (PR #141). Re-check `.beads/daemon-error` at open (benign for `--flush-only`; needs an env cleanup).
+Open normally (Session Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline `main` 833/2 + the full negative floor 13/13). **The Rigor Framework adoption is COMPLETE (all 4 waves A-D); the global skills/commands deploy now tracks the library.** Re-check `.beads/daemon-error` at open.
 
-**S66 forward options (operator prioritizes at open, NOT pre-adopted):**
+**S67 forward options (operator prioritizes at open, NOT pre-adopted):**
 
-1. **The core deliverable (`71s4`, P1) — the point of everything, but PARKED.** Walter parked it pending a design discussion + Pencil screen development before any build — do NOT start it without that conversation. When it resumes: build the plan-generation path end-to-end (a model/API client — none in `scripts/`; a production caller for `assemble`; a `plan` render target; real operator meta-inputs), opened under the now-live core-capability-first gate, with the `plan-integrity` role guarding the build-plan and the mechanical core-capability gate built alongside it.
-2. **Adoption Wave D (`ckl1`) — the LAST adoption piece, its OWN session.** Sync the stale global `~/.claude/skills`+`commands` to the library (parity-audit verified). Machine-wide blast radius (every project) → not an in-repo PR. Couples with `0qf6` (wire `enforce-heartbeat-clause` once the synced skills + a dispatch convention carry the liveness clause + extend `test_settings_hook_paths.sh` for the `toolkit/hooks/` prefix). After Wave D lands, FREEZE `docs/rigor-adoption-log.md` (status → complete) as the Loop-B harvest input.
-3. **The follow-up tail:** `9etx` (the PF-S64-01 STANDING fix — make the review/triage/verify dispatch tool-grant non-mutating-git + add the orchestrator post-dispatch `git branch --show-current` re-verify; dogfooded prompt-side S64/S65 but not yet the durable routine), `p5wx` (init_instance auto-provision `.venv` + `pip install -r requirements.txt`), `7may` (harden the provenance audit's `python -c` path interpolation), `po4x` (UPSTREAM toolkit harvest-gate/pf-ingest fix — framework-side); plus a beads-env cleanup for `.beads/daemon-error`.
-4. **The WHOOP real-data tail (`mdzq`)** + the correctness/governance tail (`02pe`/`dqyv`/`ofn0` + P3s) — unchanged from S63.
-5. **Operator-gated:** July-visit prep (LM-01 / `c6k`) — first session on/after **2026-06-29** runs the LM-01 scoped drift audit.
+1. **The core deliverable (`71s4`, P1) — the point of everything, PARKED.** Resume only after the design discussion + Pencil screens. Then build the plan-generation path end-to-end (a model/API client — none in `scripts/`; a production caller for `assemble`; a `plan` render target; real operator meta-inputs), under the now-live core-capability-first gate, with `plan-integrity` guarding the build-plan and the mechanical core-capability gate built alongside.
+2. **Post-adoption hardening (optional):** `0qf6` (wire `enforce-heartbeat-clause` — now the global skills track the library, the remaining precondition is a dispatch convention carrying the liveness clause + the `test_settings_hook_paths.sh` `toolkit/hooks/` prefix); `9etx` (the PF-S64-01 standing fix — non-mutating git for review agents + post-dispatch branch re-verify); `p5wx` (init_instance auto-provision `.venv`); `7may` (provenance-audit interpolation hardening); `po4x` (UPSTREAM toolkit fix — framework-side); plus a beads-env cleanup for `.beads/daemon-error`.
+3. **The WHOOP real-data tail (`mdzq`)** + the correctness/governance tail (`02pe`/`dqyv`/`ofn0` + P3s) — unchanged from S63.
+4. **Operator-gated:** July-visit prep (LM-01 / `c6k`) — first session on/after **2026-06-29** runs the LM-01 scoped drift audit.
 
 ## Landmark window check (close step 8.7)
 
-S65 close (2026-06-15): RE-OPENED `vault/meta/landmarks.md` at close step 8.7. No landmark edited — S65 was a governance/adoption session (no operator data, no artifact, no Whoop baseline start). LM-01 (First MD visit) **2026-07-13**: no trigger window open today (the 14-day scoped-drift-audit window opens **2026-06-29**, the 7-day MD-handoff window 2026-07-06). LM-02 (Whoop baseline) date-TBD; LM-03 (23andMe) date-TBD; LM-04 (first HTML artifact) not triggered. No landmark actions due THIS session.
+S66 close (2026-06-15): RE-OPENED `vault/meta/landmarks.md` at close step 8.7. No landmark edited — S66 was a global-tooling (Wave D) session (no operator data, no artifact, no Whoop baseline start). LM-01 (First MD visit) **2026-07-13**: no trigger window open today (the 14-day scoped-drift-audit window opens **2026-06-29**, the 7-day MD-handoff window 2026-07-06). LM-02 (Whoop baseline) date-TBD; LM-03 (23andMe) date-TBD; LM-04 (first HTML artifact) not triggered. No landmark actions due THIS session.
 
 ## Open Issues
 

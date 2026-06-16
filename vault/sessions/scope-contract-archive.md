@@ -2044,3 +2044,28 @@ Invariants at risk: INV-BRANCH-NOT-MAIN (on `feature/rigor-toolkit-adoption`); I
 ### PF attestation
 
 S64 close (2026-06-15): **No new PF-class entries this session** (a governance build; every candidate event was in-flight friction, a flagged scope change, or a pre-existing condition). Full attestation + the disclosure ledger (3 self/gate-caught items, 0 operator-caught) + the per-PR table (escape sentence: no PR lifecycle ran) in `memory/process-failures.md` Session 64. The seven implementation issues are logged in `docs/rigor-adoption-log.md` §5 (the Loop-B harvest ledger).
+
+## Scope Contract — Session 65 (2026-06-15)
+
+Goal: Finish the in-repo Rigor Framework adoption (Waves B + C) plus the small deferred fixes, and complete the adoption log as a reference artifact for other projects — leaving only the genuinely-external/coupled tail (global skills sync + heartbeat wiring) beaded.
+
+Acceptance criteria:
+- [x] AC1 (Wave B — falsification-scan advisory): wired non-gating into `close-audit.sh`; documented CLAUDE.md 8.5; run on the S65 note.
+- [x] AC2 (Wave B — approaches ledger): `vault/approaches/` + template + README + 1 genuine seed; documented in CLAUDE.md.
+- [x] AC3 (Wave B — disclosure ledger formalized): named close step (CLAUDE.md step 4).
+- [x] AC4 (Wave B — core-capability forcing function): session-start step in CLAUDE.md; mechanical gate deferred with `71s4`.
+- [x] AC5 (Wave C — plan-integrity role wiring): wired into V1 Build Execution; not in branch-completeness roster.
+- [x] AC6 (Wave C — INVARIANTS rows): `INV-CLOSE-AUDIT` + `INV-HARVEST-CAPTURE` registered (Walter-approved).
+- [x] AC7 (po4x convention): close-attestation template in CLAUDE.md step 8.6.
+- [x] AC8 (d1kc): jsonschema in `.venv`; audit repointed; test 8/8; floor exclusion dropped.
+- [x] AC9 (finalize adoption log): Status + Issues #9/#10 + §7/§9.
+- [x] AC10 (land via PR + close): PR #141 `/review-pr` + `/merge`; full close.
+
+Files I WILL touch: `CLAUDE.md`; new `vault/approaches/`; `scripts/close-audit.sh`; `INVARIANTS.md`; `docs/rigor-adoption-log.md`; `scripts/audit-research-provenance.sh` + its test; `.venv`; HANDOFF/`.beads` at close.
+Files I will NOT touch: vendored `toolkit/`; product code; aplus-research skill internals; the 6 wired hooks + `enforce-heartbeat-clause`; `~/.claude/` global skills/commands (Wave D); `main` directly; 71s4.
+NOT doing: Wave D global skills sync; wiring `enforce-heartbeat-clause`; the core-capability mechanical gate; building the plan path (71s4); editing vendored toolkit; chasing the daemon-error mismatch.
+Invariants at risk: INV-BRANCH-NOT-MAIN; INV-SKILL-TRACE; the new INV rows via change-discipline (AC6); INV-HO-ROTATION/PF-ATTESTATION at close.
+
+### S65 Scope Contract Evaluation (2026-06-15)
+
+All 10 ACs PASS. Review-surfaced IN-SCOPE additions (flagged): `requirements.txt` (F-C), the F-A/F-B correctness fixes + C15-C17, the F-G/F-I/F-J/F-K doc fixes; 2 companion files (`test_close_audit.sh` C14+, `run-all-tests.sh` note); 2 follow-up beads (`p5wx`, `7may`). PR #141 (6-agent review, 9 LEGITIMATE fixed+verified) → merge (`1aeeb64`); close-finalize PR #142 (3-agent docs review, 2 LEGITIMATE: CLAUDE.md stale-Deferred + 9etx pointer). Drift checks + PF attestation (No new PF; disclosure ledger 11 caught/0 operator-only) in `memory/process-failures.md` Session 65.
