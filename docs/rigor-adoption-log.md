@@ -50,7 +50,7 @@ the standing self-improvement system takes over (PF log + `harvest.jsonl` + `har
 
 **All four waves complete (S64–S66). This log is now FROZEN** (`status: complete`) and retained as the Loop-B harvest input; the standing self-improvement system (PF log + `harvest.jsonl` + `harvest-gate` + the close-disclosure ledger) takes over. The ONLY ongoing discipline is the Discipline-11 **pull cadence** (§8).
 
-Post-adoption follow-ons (tracked by the standing system, NOT this log): `0qf6` (wire `enforce-heartbeat-clause` once a dispatch convention carries the liveness clause), `po4x` (UPSTREAM toolkit harvest-gate/pf-ingest fix — framework-side), `p5wx` (init_instance auto-provision `.venv`), `7may` (provenance-audit interpolation hardening). The core deliverable `71s4` (plan generation + the mechanical core-capability gate) is parked pending design + Pencil. **`d1kc` / `ckl1` / `eyn4` / `4hmo` CLOSED.** Library-side parity residual (not a-plus's): `upgrade-skill.md` references 2 transient staging paths that aren't deployed at rest (a skills_library artifact-repair item).
+Post-adoption follow-ons (tracked by the standing system, NOT this log): `0qf6` (wire `enforce-heartbeat-clause` once a dispatch convention carries the liveness clause), `9etx` (the PF-S64-01 standing fix — non-mutating git for review agents + post-dispatch branch re-verify), `po4x` (UPSTREAM toolkit harvest-gate/pf-ingest fix — framework-side), `p5wx` (init_instance auto-provision `.venv`), `7may` (provenance-audit interpolation hardening). The core deliverable `71s4` (plan generation + the mechanical core-capability gate) is parked pending design + Pencil. **`d1kc` / `ckl1` / `eyn4` / `4hmo` CLOSED.** Library-side parity residual (not a-plus's): `upgrade-skill.md` references 2 transient staging paths that aren't deployed at rest (a skills_library artifact-repair item).
 
 ---
 
@@ -281,9 +281,12 @@ scan, and its WARNs (exit 0) would be invisible. Advisory ≠ roster member.
 ### Issue #11 — Wave D "sync" was a 50-shadow machine-wide MIRROR, not a few stale files. **(S66; the bead under-described the scope)**
 The `ckl1` bead read "sync stale global `~/.claude/skills`+`commands` to the library." The reality:
 the global dirs were 40 real skills + 33 real commands, of which **50 were stale-April real copies
-SHADOWING the now-current (June) library** (the library had caught up 72 commits at adoption), plus
-**9 genuinely-local skills** (UI/quant, some symlinked into a separate `~/.agents/skills/` collection)
-that must be PRESERVED. A blind symlink-swap or overwrite would have lost the 9 local skills.
+SHADOWING the now-current (June) library** (the 50 span 31 library-overlapping skills + 19 commands;
+the library had caught up 72 commits at adoption), plus **9 genuinely-local skills** (UI/quant, some
+symlinked into a separate `~/.agents/skills/` collection) that must be PRESERVED. A blind symlink-swap
+or overwrite would have lost the 9 local skills. (The library also held 12 skills the global dir lacked
+entirely — `deploy-and-verify` symlinked those in cleanly, which is why the end-state 43 library skills
+exceeds the 40 the global started with.)
 - **Resolution:** use the library's OWN sanctioned mechanism — the `deploy-and-verify` command
   (idempotent, non-clobbering, fail-closed via `parity-audit`): it established the
   `~/.claude/skills_library` anchor, symlinked the entirely-missing library items, and SKIP-reported
