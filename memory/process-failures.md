@@ -857,3 +857,25 @@ Caught this session: 3 (all self/gate-caught).
 - The 2 pre-existing library `upgrade-skill` parity cracks (transient staging-path refs) — detection: gate (`parity-audit` rc=1); surfaced_by: self (isolated as library-side, not a-plus's).
 - The `gh api -f` / `git push` hook false-match — detection: self (the denied command); surfaced_by: self.
 Of these, 0 reached the operator only because they asked. The Wave D scope reality-check (the 50-shadow mirror) WAS surfaced to the operator for the GO — by design, since it crossed into a machine-wide destructive decision.
+
+## Session 67 (2026-06-16)
+
+### Per-PR gated-skill invocation table (INV-SKILL-TRACE)
+
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
+|----|----------------------------|------------------------|---------|
+| S67 pull-cadence-log (this PR) | YES — docs 3-agent subset → blind triage → blind verify | YES — merge-methodology read fresh; REST rebase, full-40-char-SHA head guard (recorded at close, pre-merge) | the adoption-log update (per-instance identity note + §10 pull-cadence log) + HANDOFF S67 rotation + the `lczu` bead. |
+
+### PF attestation
+
+S67 close (2026-06-16): **No new PF-class entries this session.** An operator-requested pull-cadence check + a doc/bead follow-up; no a-plus code touched (only the adoption-log doc). The candidate events were the pull cadence working as designed and a documentation update.
+
+Falsification windows that HELD: **the verify-first discipline (the S6 act-before-verify family) HELD** — before deciding whether to pull, I confirmed the divergence direction (origin +19, VERSION unchanged) AND that the drifted toolkit audits are vendored-but-unused by a-plus (grep), rather than reflexively pulling the upstream delta. **The version-pin discipline (Discipline 11) HELD + was load-bearing** — the pin correctly held at 1.0.0 against 19 unversioned upstream commits; pulling the unversioned `toolkit/` drift would have corrupted the meaning of "pinned at 1.0.0", so it was HELD + beaded (`lczu`) rather than silently adopted.
+
+Observed, NOT promoted: (a) **the upstream library has unversioned `toolkit/` drift** — toolkit scripts changed on `main` without a VERSION/CHANGELOG bump. This is an UPSTREAM (skills_library) Discipline-11 slip, not an a-plus failure; a-plus's response (HOLD the pin + bead the watch) is the correct posture. Beaded `lczu` + logged in the adoption log §10. (b) **the ff-merge of the local skills_library refreshed the global skills machine-wide** — a low-risk non-destructive consequence of the Wave D symlink model (verified 0 dead symlinks, no new cracks); the intended behaviour, not a drift.
+
+### Disclosure ledger (S67 close) — failures caught that the operator did NOT flag (framework Discipline 8 / F-013)
+
+Caught this session: 1 (gate-caught).
+- The upstream unversioned-`toolkit/`-drift gap (the VERSION-keyed pull cadence would miss it) — detection: gate (the pull-cadence diff + the `cmp` of a-plus's vendored toolkit vs origin); surfaced_by: self. Beaded `lczu`.
+Of these, 0 reached the operator only because they asked. (The operator REQUESTED the remote check; the unversioned-drift finding within it was self/gate-surfaced and reported back.)

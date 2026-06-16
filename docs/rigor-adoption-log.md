@@ -12,6 +12,14 @@ permalink: a-plus-maxing/rigor-adoption-log
 
 # Rigor Framework Adoption Log — a-plus-maxing
 
+> **Instance identity (read first).** This is the **a-plus-maxing** adoption instance — one project's
+> deployment record. **Each project that adopts the Rigor Framework keeps its OWN adoption log** with
+> its own deployment specifics, issues, and version pin. When the Discipline-11 / Loop-B harvest lays
+> these side by side, they are compared as DISTINCT instances — do NOT merge, generalize, or copy this
+> log's a-plus-specifics into another project's log. The framework-generic patterns (what recurs across
+> ≥2 instances) belong in the framework doc / a future implementation skill, NOT here. a-plus pinned
+> `rigor_version: 1.0.0` (root `rigor_version`); another instance may pin a different version.
+
 **What this is.** A living, project-specific record of how a-plus-maxing adopted the
 Rigor Framework v1.0.0 toolkit (`~/Documents/Projects/skills_library/frameworks/rigor/`):
 the method, the per-step implementation, the issues hit (especially the ones that forced
@@ -358,3 +366,33 @@ and it is itself a standing discipline rather than a thing we babysit.
 | 2026-06-15 | S64 | A | **Landed Wave A** — opened PR #139, ran `/review-pr` (6-agent, blind triage + blind verify) + `/merge`. Review found 18 findings → 14 LEGITIMATE fixed + blind-verified 14/14, 4 NOT_A_BUG. The fixes hardened the new code: F1 closed a real fail-OPEN (an exported `AUDIT_ALLOW_SKIP=1` defeating F-008 across constituents — `unset` on lib source); F3 `local` in `run_one`; F5 `--session=` empty→exit 2; F7/F8/F9 added floor-path + allow-skip-vs-FAIL + stale-exclusion test coverage (the gates' RED paths now bite); F15/F16/F17 doc corrections (pf-ingest seeding wording, direct-invocation note, `rigor_version` file created). | The review earned its keep — a real fail-open (F1) and several untested gate paths (F7/F8/F9) that the first close had not exercised. Confirms the value of running `/review-pr` even on a governance PR. |
 | 2026-06-15 | S65 | B + C | **Landed Waves B + C (in-repo).** Wave B: vendored `falsification-scan` wired as a NON-GATING close advisory (scans only the current session's PF section; test C14 proves non-gating; close-audit 15/15); approaches ledger created (`vault/approaches/` + `_template.md` + `README.md` + 1 genuine seed — the S63 `biomarker_meta` wearable-marker revert); disclosure ledger formalized as a named close step (CLAUDE.md step 4); core-capability-first FORCING FUNCTION adopted as a session-open step (mechanical gate deferred WITH `71s4`). Wave C: `plan-integrity` role wired into V1 Build Execution (read-only review role, NOT a deployed agent — correctly absent from branch-completeness); `INV-CLOSE-AUDIT` + `INV-HARVEST-CAPTURE` registered via the Walter-approved change-discipline ritual. `d1kc` FIXED (jsonschema in `.venv` + audit repointed; floor exclusion dropped, full floor 13/13); `po4x` a-plus-side template landed (CLAUDE.md step 8.6). | #9 split python interpreter (system `python3` vs project `.venv` — the dep lived only in the venv); #10 advisory-in-a-fail-closed-gate (advisory ≠ roster member; integrate outside the pass/fail roster + prove non-gating with a test). |
 | 2026-06-15 | S66 | D | **Landed Wave D — the global skills/commands sync (machine-wide, not in-repo).** Ran the library's `deploy-and-verify` (anchor `~/.claude/skills_library` + non-clobbering symlink-deploy + `parity-audit`), then a full mirror of the 50 stale-April shadows → library symlinks (backup tarball pre-made; confirmed stale-not-local-edit by mtime/diff). 9 local-only skills preserved, 0 dead symlinks. **All 4 waves complete → this log FROZEN** (`status: complete`). `ckl1` closed. | #11 (Wave D was a 50-shadow mirror, not a few files — use `deploy-and-verify` non-clobbering + back up + mirror); library-side `upgrade-skill` parity residual (2 transient staging-path refs, not the adopter's); a verify-logic near-miss (use a resolve-check, not `[ -d ]`, after a destructive op). |
+
+---
+
+## 10. Pull-cadence log (post-adoption, ongoing — the ONE discipline that survives the freeze)
+
+The adoption (§0–§9) is FROZEN. The Discipline-11 **pull cadence** is the one ongoing discipline (§8):
+at each drift-audit boundary, diff the pinned `rigor_version` against the library `VERSION`, read the
+`CHANGELOG` delta, and pull the `toolkit/` delta (re-running `toolkit/tests/run-all-tests.sh` first),
+then bump the root `rigor_version`. This section logs each real run — it is the high-value reference
+content for other adopters (the cadence's behaviour under real upstream drift).
+
+| Date | Pinned | Library `VERSION` | Origin delta | Action | Outcome |
+|---|---|---|---|---|---|
+| 2026-06-15 (S66 post-close) | 1.0.0 | 1.0.0 | origin/main **+19 commits** ahead of the adopted `86a1a26` → `9b8b721` | **HELD the pin** (no versioned delta); ff-merged the LOCAL skills_library checkout to origin/main (refreshes the global `~/.claude` symlinks from Wave D — non-destructive; 0 new unlinked items, 0 dead symlinks) | **First real pull-cadence run.** The version pin worked AS DESIGNED — a-plus did NOT get pulled by 19 unversioned main commits. |
+
+**Finding from the first run (the reference lesson — bead `lczu`):** the library shipped **toolkit
+changes WITHOUT a `VERSION`/`CHANGELOG` bump** — `frameworks/rigor/toolkit/{consistency-audit,role-completeness-audit}.sh`
++ a new test changed (+326 lines) while `VERSION` stayed `1.0.0`. Because the a-plus pull cadence is
+**keyed on `VERSION`**, it correctly reported "no delta" and held — BUT a version-pinned consumer will
+therefore **MISS toolkit changes until the library cuts a versioned release**. For a-plus this is benign
+(those two audits are library-tree-scoped, vendored-but-unused — `close-audit`/`harvest-gate`/`falsification-scan`
+unaffected), and pulling unversioned mid-`main` changes would corrupt the meaning of "pinned at 1.0.0",
+so the correct posture is to HOLD.
+
+**Extrapolation for other adopters:** your version-keyed pull cadence is only as reliable as the
+upstream's version discipline. If the library lets `toolkit/` drift on `main` without bumping `VERSION`,
+your cadence silently won't see it. Mitigation: at the drift-audit boundary, ALSO `git fetch` the
+library and check whether `main` is ahead of your adopted SHA (not just whether `VERSION` moved); if the
+delta touches `toolkit/`, flag it upstream to bump `VERSION` rather than pulling unversioned changes.
+(a-plus tracks this as bead `lczu`; the upstream fix is the library bumping `VERSION` + a `CHANGELOG` row.)

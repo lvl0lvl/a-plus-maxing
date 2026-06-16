@@ -12,45 +12,45 @@ review_cadence: weekly
 
 # Session Handoff
 
-## Scope Contract — Session 66 (2026-06-15)
+## Scope Contract — Session 67 (2026-06-16)
 
-Goal: Execute Wave D — sync the stale global `~/.claude/skills` + `~/.claude/commands` to the now-current skills_library, ending machine-wide staleness while preserving the local-only skills; then close the adoption (freeze the log).
+Goal: Run the Discipline-11 pull-cadence check on the skills_library remote (operator-requested); bead the upstream unversioned-toolkit-drift finding; record the run in the (frozen) adoption log with an explicit per-instance identity note; land the doc update in the remote.
 
 Acceptance criteria:
-- [x] AC1: back up `~/.claude/{skills,commands}` before any change.
-- [x] AC2: deploy via the library's sanctioned `deploy-and-verify` (anchor + non-clobbering symlink-deploy + parity-audit), then full-mirror the stale shadows → library symlinks.
-- [x] AC3: the 9 local-only skills PRESERVED (not iterated; verified resolvable); 0 dead symlinks.
-- [x] AC4: in-repo bookkeeping — freeze `docs/rigor-adoption-log.md` (status: complete) + Issue #11 + Change Log; close `ckl1`.
-- [x] AC5: full session close, `close-audit.sh --session 66` green; land the in-repo close via PR (`/review-pr` docs subset → `/merge`).
+- [x] AC1: fetch + diff the skills_library remote vs the adopted SHA + the pinned `rigor_version`; report the delta.
+- [x] AC2: bead the upstream unversioned-toolkit-drift finding as a drift-audit watch item (`lczu`).
+- [x] AC3: update `docs/rigor-adoption-log.md` — explicit per-instance identity note + a §10 pull-cadence log recording the first real run; a-plus pin HELD at 1.0.0 (no toolkit pull).
+- [x] AC4: refresh the global deploy (ff-merge the LOCAL skills_library to origin/main → the Wave D symlinks pick it up); verify 0 dead symlinks + no new unlinked items.
+- [x] AC5: full session close, `close-audit.sh --session 67` green; land the in-repo doc update via PR (`/review-pr` docs subset → `/merge`).
 
-Files I WILL touch: `~/.claude/skills`, `~/.claude/commands`, new `~/.claude/skills_library` anchor (GLOBAL — not the a-plus repo); `docs/rigor-adoption-log.md`; HANDOFF/`.beads` at close.
-Files I will NOT touch: the a-plus product/governance code (Wave D is global-only — no `scripts/`/`vault/`/`toolkit/` change); `enforce-heartbeat-clause` wiring (0qf6 separate); the 9 local-only global skills; `main` directly; 71s4.
-NOT doing: wiring `enforce-heartbeat-clause` (0qf6 — needs a dispatch convention first); fixing the library-side `upgrade-skill` parity residual (skills_library artifact, not a-plus's); building 71s4.
-Invariants at risk: INV-BRANCH-NOT-MAIN (on `fix/s66-waved`); INV-SKILL-TRACE (the close PR gets `/review-pr` + `/merge`; per-PR table at close); INV-HO-ROTATION/PF-ATTESTATION at close.
+Files I WILL touch: `docs/rigor-adoption-log.md`; the LOCAL `~/Documents/Projects/skills_library` checkout (ff-merge — not the a-plus repo) + the global `~/.claude` symlinks it serves; HANDOFF/`.beads` at close.
+Files I will NOT touch: a-plus's vendored `toolkit/` (the pin HOLDS at 1.0.0 — VERSION unchanged, no versioned delta to pull); a-plus product/governance code; `enforce-heartbeat-clause` wiring (0qf6); `main` directly; 71s4.
+NOT doing: pulling the unversioned upstream toolkit drift into a-plus (would corrupt the 1.0.0 pin — HELD instead); fixing the upstream library VERSION-bump slip (a skills_library task, beaded `lczu`); building 71s4.
+Invariants at risk: INV-BRANCH-NOT-MAIN (on `fix/s67-pull-cadence-log`); INV-SKILL-TRACE (the doc PR gets `/review-pr` + `/merge`; per-PR table at close); INV-HO-ROTATION/PF-ATTESTATION at close.
 
-### S66 Scope Contract Evaluation (2026-06-15, volatile)
+### S67 Scope Contract Evaluation (2026-06-16, volatile)
 
-- **AC1 (backup) — PASS.** `~/.claude/_backup-skills-commands-20260615-195826.tgz` (908K) taken before any change.
-- **AC2 (deploy-and-verify + mirror) — PASS.** Anchor `~/.claude/skills_library → library` created; `deploy-and-verify` symlinked the missing library items + reported the 50 shadows non-clobberingly; confirmed stale-not-local (global `review-pr.md` Apr 9 vs library `skills/` Jun 15) → full mirror replaced the shadows with library symlinks. 43 skills + 33 commands now symlinks.
-- **AC3 (local-only preserved, no dead links) — PASS.** All 9 local-only skills resolve (7 `~/.agents/skills/` symlinks + 2 real dirs), never iterated by the library-named loop; 0 dead symlinks.
-- **AC4 (bookkeeping) — PASS.** Adoption log FROZEN (`status: complete`) + Issue #11 + Change Log S66 row; `ckl1` closed.
-- **AC5 (close) — PASS.** `close-audit --session 66` green; this close PR (docs review → merge) carries it.
+- **AC1 (pull-cadence check) — PASS.** Fetched skills_library; origin/main +19 commits ahead of the adopted `86a1a26` (→ `9b8b721`); `VERSION` unchanged (1.0.0 == pinned); reported the delta (toolkit drift + skills/roles/website changes).
+- **AC2 (bead) — PASS.** `lczu` created (upstream unversioned-toolkit-drift watch).
+- **AC3 (adoption-log update) — PASS.** Per-instance identity note at the top + §10 pull-cadence log (first real run; pin held; the `lczu` finding + the extrapolation lesson).
+- **AC4 (global refresh) — PASS.** ff-merged the local checkout to origin/main; the Wave D symlinks resolve to the updated content (verified the new role frontmatter live); 0 new unlinked items, 0 dead symlinks; same 2 pre-existing library parity cracks, no new ones.
+- **AC5 (close) — PASS.** `close-audit --session 67` green; this doc PR (docs review → merge) carries it.
 
-**CHANGED / flagged (none silent):** the `ckl1` bead UNDER-DESCRIBED Wave D — it was a 50-shadow machine-wide mirror, not a few files; flagged + executed under a pre-made backup with explicit operator GO. Parity stays `rc=1` on a PRE-EXISTING library `upgrade-skill` residual (2 transient staging-path refs) — library-side, not a-plus's. A verify-logic near-miss (an over-strict `[ -d ]` integrity check false-alarmed on the `.agents` symlinks) caught immediately, no harm — backup held.
+**CHANGED / flagged (none silent):** the a-plus vendored `toolkit/` was NOT pulled despite origin's toolkit drift — the version pin HELD (VERSION stayed 1.0.0; the changed audits are vendored-but-unused), the correct version-pin posture, not a skipped pull. The upstream VERSION-bump slip is beaded `lczu` (a skills_library fix, not a-plus's).
 
-### Drift checks (S66 close)
+### Drift checks (S67 close)
 
-- **Task drift:** all 5 ACs PASS. The one scope reality-check (Wave D = 50-shadow mirror) was surfaced + operator-confirmed before the destructive step. No silent drift.
-- **Architecture drift:** none in the a-plus repo (Wave D is global-only — zero `scripts/`/`vault/`/`toolkit/` change; product + governance code byte-identical). The GLOBAL deployment model improved: skills/commands now symlink the library (like `roles`/`library` already did), ending staleness. INV-BRANCH-NOT-MAIN held (`fix/s66-waved`); INV-SKILL-TRACE binds the close PR.
-- **Vision drift:** none. The Rigor Framework adoption (all 4 waves A–D) is COMPLETE; the same local-first health system now runs on the fully-deployed, no-longer-stale governance toolchain. The core deliverable (`71s4`) remains parked pending design + Pencil. Matches `design/vision.md`.
+- **Task drift:** all 5 ACs PASS. No silent drift; the one judgment (HOLD the pin vs pull unversioned drift) is documented + beaded.
+- **Architecture drift:** none in the a-plus repo (the only a-plus change is the adoption-log doc; product/governance/`toolkit/` code byte-identical — the pin held). The local skills_library checkout + global symlinks advanced to origin (non-destructive). INV-BRANCH-NOT-MAIN held (`fix/s67-pull-cadence-log`); INV-SKILL-TRACE binds the doc PR.
+- **Vision drift:** none. The adoption stays COMPLETE + frozen; the pull cadence (its one ongoing discipline) ran for the first time and the version pin behaved correctly. `71s4` remains parked. Matches `design/vision.md`.
 
 ### PF attestation
 
-S66 close (2026-06-15): **No new PF-class entries this session.** Full attestation + the per-PR skill-trace table (this close PR) + the disclosure ledger in `memory/process-failures.md` Session 66. The Wave D experience (50-shadow mirror), the library-side parity residual, and the verify-logic near-miss are logged in `docs/rigor-adoption-log.md` §5 (Issue #11) + §9.
+S67 close (2026-06-16): **No new PF-class entries this session.** Full attestation + the per-PR skill-trace table (this doc PR) + the disclosure ledger in `memory/process-failures.md` Session 67. The pull-cadence run + the upstream unversioned-drift finding (bead `lczu`) are logged in `docs/rigor-adoption-log.md` §10.
 
 ## Historical Scope Contracts (archived)
 
-Scope contracts for Sessions 5-65 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S63 archived S62; S64 archived S63; S65 archived S64; S66 archived S65) to keep this handoff lean. The current (S66) scope contract is above; the archive holds the prior-session archaeology.
+Scope contracts for Sessions 5-66 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S64 archived S63; S65 archived S64; S66 archived S65; S67 archived S66) to keep this handoff lean. The current (S67) scope contract is above; the archive holds the prior-session archaeology.
 
 ## Session 4 close — 2026-05-25
 
@@ -254,35 +254,34 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 1. **The core deliverable is STILL UNBUILT — the forcing-function gate now guards it (PF-S63-02 / bead `71s4`).** No end-to-end plan generation: no model/API client in `scripts/`, `plan/assemble.py` has no production caller, `generate.run` renders only dashboard/report. `71s4` is PARKED pending design discussion + Pencil screen work (operator decision) — do NOT start it without that. The CLAUDE.md session-start core-capability gate forces "does plan generation work end-to-end yet?" (today: NO) before any secondary work.
 2. **The Rigor adoption is COMPLETE (all 4 waves) — only `0qf6` (heartbeat wiring) remains as post-adoption hardening.** Wave D (S66) synced the global `~/.claude/skills`+`commands` to the library (symlink model, no more staleness). `0qf6` (wire `enforce-heartbeat-clause`) is NOT done: the hook DENYs every Task dispatch lacking a liveness clause (no role-gating) → it would break `/review-pr`+`/aplus-research`. Wire it ONLY after the dispatch flows + a dispatch convention carry the clause, and extend `test_settings_hook_paths.sh` for the `toolkit/hooks/` prefix then. Until then PR lifecycles run with the hook OFF.
-3. **The rigor floor's newest mechanisms are LIVE but lightly exercised — don't treat them as proven.** S65/S66 exercised the falsification advisory + `INV-CLOSE-AUDIT`/`INV-HARVEST-CAPTURE` + the global deploy (green). STILL untested: (a) the Discipline-11 pull cadence has never run a real pull (root `rigor_version` 1.0.0 == library `VERSION` today — no delta); (b) `enforce-heartbeat-clause` stays UNWIRED (`0qf6`); (c) NEW from Wave D — the global skills now SYMLINK `~/.claude/skills_library → the library checkout`, so moving/deleting that checkout breaks EVERY project's skills (keep the anchor valid). Standing mechanics: REST `gh api` full-40-char SHA for PR ops (GraphQL throttled); stage `git add` separately from `git commit`; run `gh api -f …` and `git push` as SEPARATE Bash commands (block-dangerous false-matches `push`+`-f` as `--force`); the bd `.beads/daemon-error` mismatch is benign for `--flush-only` but wants an env cleanup.
+3. **The rigor floor's newest mechanisms are LIVE — mostly exercised now, with one open caveat.** S65/S66 exercised the falsification advisory + `INV-CLOSE-AUDIT`/`INV-HARVEST-CAPTURE` + the global deploy (green); S67 ran the pull cadence for the first time (pin HELD correctly). Open caveats: (a) the pull cadence is VERSION-keyed, but the library has UNVERSIONED `toolkit/` drift (`lczu`) — so it won't auto-detect toolkit changes until the library bumps VERSION; at the next drift boundary `git fetch` the library + check whether `main` is ahead of the adopted SHA, NOT just whether VERSION moved; (b) `enforce-heartbeat-clause` stays UNWIRED (`0qf6`); (c) the global skills now SYMLINK `~/.claude/skills_library → the library checkout`, so moving/deleting that checkout breaks EVERY project's skills (keep the anchor valid). Standing mechanics: REST `gh api` full-40-char SHA for PR ops (GraphQL throttled); stage `git add` separately from `git commit`; run `gh api -f …` and `git push` as SEPARATE Bash commands (block-dangerous false-matches `push`+`-f` as `--force`); the bd `.beads/daemon-error` mismatch is benign for `--flush-only` but wants an env cleanup.
 
 ## Current State (volatile)
 
-- **S66 (2026-06-15) executed Wave D — synced the stale global `~/.claude/skills`+`commands` to the skills_library, COMPLETING all 4 adoption waves.** Walter: "do wave D now." Ran the library's `deploy-and-verify` (anchor + non-clobbering symlink-deploy + parity-audit), then a full mirror of the 50 stale-April shadows → library symlinks (backup tarball pre-made; confirmed stale-not-local by mtime/diff); the 9 local-only skills preserved; 0 dead symlinks.
-- **Adoption COMPLETE + FROZEN:** `docs/rigor-adoption-log.md` `status: complete` (all 4 waves A-D), Issue #11 (the Wave D 50-shadow mirror) + the §9 S66 Change Log row. Retained as the Loop-B harvest input; the standing self-improvement system takes over.
-- **Global deployment (this machine):** `~/.claude/skills_library → skills_library` anchor created; 43 library skills + 33 commands now SYMLINK the library (track it, no future staleness — matching how `roles`/`library` already deploy). The 9 local-only skills (UI/quant) untouched. Parity residual: 2 pre-existing library `upgrade-skill` cracks (transient staging-path refs) — skills_library-side, not a-plus's.
-- **a-plus repo: UNCHANGED by Wave D** (global-only — zero `scripts/`/`vault/`/`toolkit/` change); pytest 833/2, full negative floor 13/13 still green.
-- **Beads:** `71s4` (P1, core plan-generation — PARKED pending design + Pencil); `0qf6` (heartbeat — post-adoption hardening); follow-ups `9etx`/`p5wx`/`7may`/`po4x`. `ckl1` (Wave D) / `d1kc` / `eyn4` (Wave B) / `4hmo` (Wave C) CLOSED.
+- **S67 (2026-06-16) ran the Discipline-11 pull-cadence check on the skills_library remote (operator-requested) — the FIRST real pull-cadence run.** origin/main was +19 commits ahead of the adopted `86a1a26`; a-plus's vendored `toolkit/` pin HELD at 1.0.0 (VERSION unchanged → no versioned delta; the 2 drifted audits are vendored-but-unused). ff-merged the LOCAL skills_library checkout to origin/main (`9b8b721`) → the Wave D global symlinks picked up the update (new role frontmatter etc.); 0 dead symlinks, no new unlinked items, same 2 pre-existing library parity cracks.
+- **Finding (beaded `lczu`):** the library shipped `toolkit/` changes (2 audits + a test, +326L) WITHOUT a VERSION/CHANGELOG bump — so a version-pinned consumer won't auto-detect toolkit drift until the library cuts a versioned release. Upstream (skills_library) fix; a-plus correctly HELD the pin. Logged in `docs/rigor-adoption-log.md` §10 (the new pull-cadence log) + an explicit per-instance identity note added at the log's top (each adopter keeps its OWN log).
+- **Adoption status:** COMPLETE (all 4 waves A-D) + FROZEN; the pull cadence is the one ongoing discipline and now has its first logged run. The only a-plus repo change this session is the adoption-log doc; `toolkit/`/product/governance byte-identical (pytest 833/2, floor 13/13).
+- **Beads:** `71s4` (P1, core plan-generation — PARKED pending design + Pencil); `0qf6` (heartbeat — post-adoption); follow-ups `lczu` (upstream-drift watch), `9etx`/`p5wx`/`7may`/`po4x`. `ckl1`/`d1kc`/`eyn4`/`4hmo` CLOSED.
 - **Active landmarks:** LM-01 (First MD visit) **2026-07-13** — 14-day scoped-drift-audit window opens **2026-06-29** (not open today). LM-02 Whoop baseline date-TBD.
 
-**Historical (kept for reference):** `vault/sessions/session-66.md`.
+**Historical (kept for reference):** `vault/sessions/session-67.md`.
 
 ## What Is Next (volatile)
 
-### Resume checklist — next session (S67) open
+### Resume checklist — next session (S68) open
 
-Open normally (Session Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline `main` 833/2 + the full negative floor 13/13). **The Rigor Framework adoption is COMPLETE (all 4 waves A-D); the global skills/commands deploy now tracks the library.** Re-check `.beads/daemon-error` at open.
+Open normally (Session Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline `main` 833/2 + the full negative floor 13/13). **The Rigor Framework adoption is COMPLETE (all 4 waves A-D); the global skills/commands deploy tracks the library; the pull cadence has its first logged run (S67).** Re-check `.beads/daemon-error` at open.
 
-**S67 forward options (operator prioritizes at open, NOT pre-adopted):**
+**S68 forward options (operator prioritizes at open, NOT pre-adopted):**
 
 1. **The core deliverable (`71s4`, P1) — the point of everything, PARKED.** Resume only after the design discussion + Pencil screens. Then build the plan-generation path end-to-end (a model/API client — none in `scripts/`; a production caller for `assemble`; a `plan` render target; real operator meta-inputs), under the now-live core-capability-first gate, with `plan-integrity` guarding the build-plan and the mechanical core-capability gate built alongside.
-2. **Post-adoption hardening (optional):** `0qf6` (wire `enforce-heartbeat-clause` — now the global skills track the library, the remaining precondition is a dispatch convention carrying the liveness clause + the `test_settings_hook_paths.sh` `toolkit/hooks/` prefix); `9etx` (the PF-S64-01 standing fix — non-mutating git for review agents + post-dispatch branch re-verify); `p5wx` (init_instance auto-provision `.venv`); `7may` (provenance-audit interpolation hardening); `po4x` (UPSTREAM toolkit fix — framework-side); plus a beads-env cleanup for `.beads/daemon-error`.
+2. **Post-adoption hardening (optional):** `0qf6` (wire `enforce-heartbeat-clause` — now the global skills track the library, the remaining precondition is a dispatch convention carrying the liveness clause + the `test_settings_hook_paths.sh` `toolkit/hooks/` prefix); `lczu` (upstream-drift WATCH — at the next drift boundary, fetch the library + check whether `main` is ahead of the adopted SHA, not just VERSION; the upstream fix is the library bumping VERSION + a CHANGELOG row); `9etx` (the PF-S64-01 standing fix — non-mutating git for review agents + post-dispatch branch re-verify); `p5wx` (init_instance auto-provision `.venv`); `7may` (provenance-audit interpolation hardening); `po4x` (UPSTREAM toolkit fix — framework-side); plus a beads-env cleanup for `.beads/daemon-error`.
 3. **The WHOOP real-data tail (`mdzq`)** + the correctness/governance tail (`02pe`/`dqyv`/`ofn0` + P3s) — unchanged from S63.
 4. **Operator-gated:** July-visit prep (LM-01 / `c6k`) — first session on/after **2026-06-29** runs the LM-01 scoped drift audit.
 
 ## Landmark window check (close step 8.7)
 
-S66 close (2026-06-15): RE-OPENED `vault/meta/landmarks.md` at close step 8.7. No landmark edited — S66 was a global-tooling (Wave D) session (no operator data, no artifact, no Whoop baseline start). LM-01 (First MD visit) **2026-07-13**: no trigger window open today (the 14-day scoped-drift-audit window opens **2026-06-29**, the 7-day MD-handoff window 2026-07-06). LM-02 (Whoop baseline) date-TBD; LM-03 (23andMe) date-TBD; LM-04 (first HTML artifact) not triggered. No landmark actions due THIS session.
+S67 close (2026-06-16): RE-OPENED `vault/meta/landmarks.md` at close step 8.7. No landmark edited — S67 was a pull-cadence/doc session (no operator data, no artifact, no Whoop baseline start). LM-01 (First MD visit) **2026-07-13**: no trigger window open today (2026-06-16; the 14-day scoped-drift-audit window opens **2026-06-29**, the 7-day MD-handoff window 2026-07-06). LM-02 (Whoop baseline) date-TBD; LM-03 (23andMe) date-TBD; LM-04 (first HTML artifact) not triggered. No landmark actions due THIS session.
 
 ## Open Issues
 
