@@ -379,7 +379,7 @@ content for other adopters (the cadence's behaviour under real upstream drift).
 
 | Date | Pinned | Library `VERSION` | Origin delta | Action | Outcome |
 |---|---|---|---|---|---|
-| 2026-06-15 (S66 post-close) | 1.0.0 | 1.0.0 | origin/main **+19 commits** ahead of the adopted `86a1a26` → `9b8b721` | **HELD the pin** (no versioned delta); ff-merged the LOCAL skills_library checkout to origin/main (refreshes the global `~/.claude` symlinks from Wave D — non-destructive; 0 new unlinked items, 0 dead symlinks) | **First real pull-cadence run.** The version pin worked AS DESIGNED — a-plus did NOT get pulled by 19 unversioned main commits. |
+| 2026-06-16 (S67; fetch/ff-merge executed 2026-06-15 post-S66-merge, logged + beaded in S67) | 1.0.0 | 1.0.0 | origin/main **+19 commits** ahead of the adopted `86a1a26` → `9b8b721` | **HELD the pin** (no versioned delta); ff-merged the LOCAL skills_library checkout to origin/main (refreshes the global `~/.claude` symlinks from Wave D — non-destructive; 0 new unlinked items, 0 dead symlinks) | **First real pull-cadence run.** The version pin worked AS DESIGNED — a-plus did NOT get pulled by 19 unversioned main commits. |
 
 **Finding from the first run (the reference lesson — bead `lczu`):** the library shipped **toolkit
 changes WITHOUT a `VERSION`/`CHANGELOG` bump** — `frameworks/rigor/toolkit/{consistency-audit,role-completeness-audit}.sh`
