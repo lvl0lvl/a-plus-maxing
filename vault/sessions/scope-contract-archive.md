@@ -2069,3 +2069,18 @@ Invariants at risk: INV-BRANCH-NOT-MAIN; INV-SKILL-TRACE; the new INV rows via c
 ### S65 Scope Contract Evaluation (2026-06-15)
 
 All 10 ACs PASS. Review-surfaced IN-SCOPE additions (flagged): `requirements.txt` (F-C), the F-A/F-B correctness fixes + C15-C17, the F-G/F-I/F-J/F-K doc fixes; 2 companion files (`test_close_audit.sh` C14+, `run-all-tests.sh` note); 2 follow-up beads (`p5wx`, `7may`). PR #141 (6-agent review, 9 LEGITIMATE fixed+verified) → merge (`1aeeb64`); close-finalize PR #142 (3-agent docs review, 2 LEGITIMATE: CLAUDE.md stale-Deferred + 9etx pointer). Drift checks + PF attestation (No new PF; disclosure ledger 11 caught/0 operator-only) in `memory/process-failures.md` Session 65.
+
+## Scope Contract — Session 66 (2026-06-15)
+
+Goal: Execute Wave D — sync the stale global `~/.claude/skills`+`commands` to the now-current skills_library, ending machine-wide staleness while preserving the local-only skills; then close the adoption (freeze the log).
+
+Acceptance criteria:
+- [x] AC1: back up `~/.claude/{skills,commands}` before any change.
+- [x] AC2: deploy via the library's `deploy-and-verify` (anchor + non-clobbering symlink-deploy + parity) then full-mirror the stale shadows → library symlinks.
+- [x] AC3: the 9 local-only skills PRESERVED; 0 dead symlinks.
+- [x] AC4: freeze `docs/rigor-adoption-log.md` (status: complete) + Issue #11 + Change Log; close `ckl1`.
+- [x] AC5: full close, `close-audit --session 66` green; land via PR.
+
+### S66 Scope Contract Evaluation (2026-06-15)
+
+All 5 ACs PASS. Wave D = a 50-shadow machine-wide mirror (the `ckl1` bead under-described it; surfaced + operator-confirmed before the destructive step, under a pre-made 908K backup). `deploy-and-verify` (anchor + non-clobbering symlink-deploy + parity) + a full mirror → 43 skills + 33 commands now library symlinks, 9 local-only preserved, 0 dead symlinks. Parity residual: 2 pre-existing library `upgrade-skill` cracks (library-side). A verify-logic near-miss (`[ -d ]` false-alarm on the `.agents` symlinks) caught immediately, no harm. Drift + PF attestation (No new PF; disclosure ledger 3 caught/0 operator-only) in `memory/process-failures.md` Session 66; the adopter-facing Wave D experience in `docs/rigor-adoption-log.md` §5 Issue #11. PR #143 (docs 3-agent review → merge `75d21f7`).
