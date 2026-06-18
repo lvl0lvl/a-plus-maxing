@@ -2102,3 +2102,12 @@ ACs (all PASS): AC1 open (Start Protocol; branch-completeness 0; baseline 833/2)
 ### S68 Scope Contract Evaluation (2026-06-17)
 
 All 5 ACs PASS. Runtime + topology captured in `vault/design/plan-generation-pipeline-v1.md` (4 plan-authors + 12 advisors + the dependency phase order). 4 directions + design-reviewer ranking; operator chose Clinical Light and iterated by hand (tabbed insights card, 16-specialist Care Team, calendar fit). Two PFs promoted (PF-S68-01 solo design; PF-S68-02 rebuild-for-edit), both operator-caught, 3-layer (beads `56r9`/`9jdo`). CHANGED: the scope was written retroactively at close (no contract at open) — flagged, not concealed. No `scripts/` touched; pytest 833/2; core-capability still NO. Commits `0b42751`/`dab098c`/`8262d41`/`851f069`/`428e331`; no PR (design mid-iteration).
+
+## Scope Contract — Session 69 (2026-06-18)
+
+Goal: technical-instrument STYLE iteration of the approved Clinical Light dashboard (re-skin only, zero layout change) — origination via the design agent team, application by hand.
+ACs (all PASS): AC1 theme system originated via ui-designer from the moodboard; AC2 themed frame a DUPLICATE (theme-conditional `clin-*` tokens, clinical pinned pixel-identical); AC3 clean render, true-circle gauges; AC4 operator sign-off, iterated by hand; AC5 commit + close.
+
+### S69 Scope Contract Evaluation (2026-06-18)
+
+All 5 ACs PASS. `DIR Clinical Instrument` (`nJ4f1`) re-skinned via theme-conditional `clin-*` tokens + by-hand edits; clinical frame pixel-identical. Gauges fixed to true circles (top-left rotation-pivot bug, `rotation = 360−θ`). One PF (PF-S69-01: design-critic-after-present + verify-first-on-render, operator-caught), 3-layer (bead `bibc`). No `scripts/` touched; pytest 833/2; core-capability still NO. Design committed `4f71bd9` + close `ef3d509`; no PR at S69 (design locked, merged later in PR #145 at S70).

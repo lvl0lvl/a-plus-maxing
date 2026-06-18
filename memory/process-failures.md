@@ -937,3 +937,33 @@ Caught this session: 3 (ALL operator-caught — the miss direction the ledger ex
 - Readiness gauges rendered elliptical, not circular — detection: operator ("the circles are wrong, they're ellipses"); surfaced_by: operator. I had rationalized it as a `get_screenshot` artifact and presented twice before the controlled probe found the real top-left-pivot bug.
 - "Log day" button clipped by the card edge — detection: operator; surfaced_by: operator.
 All 3 reached the operator before self/gate — 3 operator-only this session (target: 0). The mitigations (design-critic-before-present; controlled-probe-before-artifact-claim) are now in the PF log to prevent recurrence (PF-S69-01).
+
+## Session 70 (2026-06-18)
+
+### Per-PR gated-skill invocation table (INV-SKILL-TRACE)
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
+|----|----------------------------|------------------------|---------|
+| #145 — core plan-generation slice (71s4) + design-branch reconcile | YES — Skill tool; full 6-agent (security/bug/quality/test/contracts/historical) → synthesis + dedup → profile-less blind triage → fix → profile-less blind verify (the one finding re-verified in isolation after a confounded first verdict) | YES — Skill tool; `merge-methodology.md` read fresh; REST rebase under GraphQL throttle, full-40-char-SHA `sha` guard → on-main `15ca1e9` | 6 agents → 13 deduped findings → 3 LEGITIMATE (fixed + blind-verified) + 6 NOT_A_BUG + 1 NOT_ACTIONABLE + 3 OUT_OF_SCOPE→beads (`bwbw`/`32gy`/`bc9z`). Gate PASS. |
+| S70 close (this PR) | YES — Skill tool; docs 3-agent subset → blind triage → blind verify | YES — Skill tool; `merge-methodology.md` read fresh; REST rebase, full-40-char-SHA guard (recorded at close, pre-merge) | the S70 close continuity (HANDOFF S70 rotation + this PF section + the session note), authored in an isolated `git worktree` (the PF-S70-01 mitigation). |
+
+### PF-S70-01 (2026-06-18) — Committed to the wrong branch after the operator switched the shared working tree; did not re-verify the current branch before committing
+- **Recurrence:** recurrence_count = 2 in the act-on-stale-branch-state class. The predecessor is the S64 incident (a dispatched review agent left the repo checked out on `main` and the orchestrator nearly resumed branch-dependent work against the wrong tree) — same root (acting on an unverified branch state), different trigger: there an agent switched the branch, here the operator did.
+- **What happened:** Mid-session the operator switched the shared working tree to their dashboard-reskin branch to work in parallel. I then staged + committed the `INV-CORE-CAPABILITY` governance wiring without re-checking `git branch --show-current`; the commit landed on the operator's reskin branch instead of the PR branch. I caught it immediately from the commit output (`[feature/dashboard-reskin …]`), diagnosed the state (`git branch -vv` + `merge-base`), and relocated cleanly — fast-forwarded the PR branch to include the commit, restored the reskin branch to its base; both commits preserved, no work lost.
+- **Why it broke:** two work streams (code/governance + the dashboard reskin) shared ONE working tree, so the current branch was shared mutable state either party could change between my actions, and I assumed it was unchanged since my last commit rather than re-verifying.
+- **Detection mode:** self (the commit-output branch name + diagnosis). surfaced_by: self.
+- **Fix / mitigation:** (1) re-verify `git branch --show-current` immediately before EVERY commit (extends the S64 re-verify-the-branch discipline from after-agent-dispatch to also cover operator-initiated switches); (2) STRUCTURAL (the real fix at recurrence 2): run parallel work streams in separate `git worktree`s so neither can change the other's branch state — adopted this close (authored in an isolated `fix/s70-close` worktree) and recommended to the operator for the reskin. Captured 3-layer (this entry + `harvest.jsonl` + bead `bsqz`) per INV-HARVEST-CAPTURE.
+- **Recurrence guard:** before any commit in a potentially-shared tree, confirm the branch; default to per-stream worktrees so the shared-state hazard cannot arise.
+
+### PF attestation
+
+S70 close (2026-06-18): **One new PF entry promoted this session — PF-S70-01** (wrong-branch commit after an operator tree-switch; self-caught + relocated, no loss). The build path itself held its disciplines: the 6-agent `/review-pr` profile-less blind triage + blind verification ran independently (and the verify-first discipline held — I re-verified the one finding in isolation rather than accept a confounded STILL_PRESENT verdict); every legitimate finding was fixed or beaded, none suppressed; the two safety gates (clearance, struck-rec) were mutation-proven RED; the production path was verified end-to-end with a real author dispatch, not just unit tests. The core-deliverable-first discipline (the S63 post-close drift lesson) is now SATISFIED for the workout domain — the core capability is built and mechanically guarded by `INV-CORE-CAPABILITY`. Falsification-scan (advisory, non-gating) runs over this section at the close gate; any WARN is reviewed there.
+
+### Disclosure ledger (S70 close) — failures caught + their detection direction (framework Discipline 8 / F-013)
+
+Caught this session: 5 (all self/gate-caught — the intended direction).
+- Wrong-branch commit after the operator tree-switch (PF-S70-01) — detection: self; surfaced_by: self.
+- BUG-001 — the gate self-test wrote into the real `vault/artifacts/generated/` (`_out_dir` omitted) — detection: gate (the 6-agent `/review-pr`); surfaced_by: self.
+- The negative test did not prove the `record_plan` structural check fires independently (F-007) — detection: gate (review); surfaced_by: self.
+- Two dead imports in the new test file — detection: gate (review); surfaced_by: self.
+- A blind-verifier false positive (a confounded STILL_PRESENT on the `_out_dir` fix) — detection: self (empirical re-check + an isolated second verifier); surfaced_by: self.
+0 reached the operator only because they asked — the branch near-miss was disclosed proactively in the merge report. The intended detection direction held.
