@@ -19,7 +19,7 @@
 #   bespoke audits are kept (more evolved / domain-specific); this gate
 #   orchestrates them. Per-close blocking roster = CLAUDE.md close step 8.5:
 #     handoff-audit, scope-contract-audit, pf-attestation-audit,
-#     skill-trace-audit, branch-completeness-audit.
+#     skill-trace-audit, branch-completeness-audit, core-capability-audit.
 #   audit-research-provenance is CONDITIONAL (run separately per step 8.5 only
 #   when an aplus-research dispatch occurred), so it is NOT in this roster.
 #
@@ -104,7 +104,8 @@ DEFAULT_ROSTER="handoff-audit.sh
 scope-contract-audit.sh|--session {SESSION}
 pf-attestation-audit.sh|--session {SESSION}
 skill-trace-audit.sh|--session {SESSION}
-branch-completeness-audit.sh"
+branch-completeness-audit.sh
+core-capability-audit.sh"
 
 ROSTER="${CLOSE_AUDIT_ROSTER:-$DEFAULT_ROSTER}"
 ROSTER_DIR="${CLOSE_AUDIT_ROSTER_DIR:-$SELF_DIR}"
