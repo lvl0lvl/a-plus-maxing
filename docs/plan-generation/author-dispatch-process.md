@@ -131,7 +131,9 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
 
 - **workout** — `{"reconciliation": {"energy_cost_kcal": <int>}}` (the session's estimated training cost).
 - **nutrition** — `{"reconciliation": {"energy_budget": {"sustains": <bool>, "sustainable_training_kcal":
-  <int>, "maintenance_kcal": <int>}}}` (the nutritionist's verdict, given the workout cost).
+  <int>, "maintenance_kcal": <int>, "bounce_reason"?: <str>}}}` (the nutritionist's verdict, given the
+  workout cost). `bounce_reason` is an OPTIONAL human-readable note a `sustains:false` verdict may carry;
+  the reconciler reads only `sustains` + `sustainable_training_kcal`, so it is annotation, not a contract key.
 - any author — `{"reconciliation": {"conflicts": [{"with_domain": ..., "with": ..., "reason": ...}]}}`
   declares a known cross-domain conflict for the report.
 
