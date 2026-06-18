@@ -163,7 +163,7 @@ def _to_nutrition_plan(recommendations, gates):
         if "water_l" in payload:
             water_l = payload["water_l"]
         meal = payload.get("meal")
-        if isinstance(meal, dict):
+        if meal is not None:  # present -> pass through; record_plan validates the shape (fail-loud)
             meals.append(meal)
     if calorie_goal is None or macros is None or not meals:
         return None
@@ -259,9 +259,11 @@ _PLAN_TRANSLATORS = {
     "peptides": _to_peptides_plan,
 }
 
-# domain -> safety veto(recommendations, gates) -> reason str | None. An OWNED pre-translation
-# screen (pipeline Phase 0.5) that withholds the whole plan for safety, distinct from a coverage
-# gap or empty authorship. nutrition owns the RED-S/LEA critical-floor screen.
+# domain -> safety veto(recommendations, gates) -> reason str | None. Every gate here MUST
+# share that signature (the call site invokes them without per-domain branching). Use
+# _DOMAIN_GATES for a pre-translation WHOLE-domain veto — a critical safety short-circuit that
+# records no plan at all (e.g. nutrition's RED-S/LEA screen); use an in-translator check for
+# per-rec suppression that still records a plan (e.g. workout's clearance gate dropping `load`).
 _DOMAIN_GATES = {
     "nutrition": _nutrition_safety_gate,
 }
@@ -294,8 +296,9 @@ def generate_plan(domain, author_output, store_read, root, *, plan_date, gates=N
     Returns:
         (dict) A result record: `domain`, `specialist`, `recorded` (bool), `plan`
         (dict | None), `section` (the assembled section), `reason` (str | None — the
-        coverage-gap kind, a domain safety-veto reason (e.g. the RED-S/LEA clinical-routing
-        short-circuit), or `no-actionable-recommendation` when nothing was recorded).
+        coverage-gap kind, a domain safety-veto reason (the nutrition Phase-0.5 screen returns
+        `RED_S_LEA_CLINICAL_ROUTING` == `'red-s-lea-clinical-routing'`), or
+        `no-actionable-recommendation` when nothing was recorded).
 
     Raises:
         KeyError: `domain` has no registered translator.
@@ -313,12 +316,10 @@ def generate_plan(domain, author_output, store_read, root, *, plan_date, gates=N
     section = assemble([domain], summary, roster)["sections"][0]
     specialist = section.get("specialist")
 
-    if section.get("coverage_gap"):
-        return {
-            "domain": domain, "specialist": specialist, "recorded": False,
-            "plan": None, "section": section, "reason": section["coverage_gap"],
-        }
-
+    # Phase-0.5 owned safety veto runs BEFORE any content evaluation (including coverage
+    # gaps): a tripped critical-floor screen short-circuits to clinical-care routing
+    # regardless of what the author produced, so the veto reason is preserved rather than
+    # masked by a coincident coverage-gap kind.
     domain_gate = _DOMAIN_GATES.get(domain)
     if domain_gate is not None:
         veto = domain_gate(section.get("recommendations", []), gates)
@@ -327,6 +328,12 @@ def generate_plan(domain, author_output, store_read, root, *, plan_date, gates=N
                 "domain": domain, "specialist": specialist, "recorded": False,
                 "plan": None, "section": section, "reason": veto,
             }
+
+    if section.get("coverage_gap"):
+        return {
+            "domain": domain, "specialist": specialist, "recorded": False,
+            "plan": None, "section": section, "reason": section["coverage_gap"],
+        }
 
     plan = _PLAN_TRANSLATORS[domain](section.get("recommendations", []), gates)
     if plan is None:
@@ -350,6 +357,11 @@ def _self_test():
     renders the dashboard and asserts the workout card is populated from the recorded plan.
     Deterministic (no agent dispatch) so it runs in CI. Returns 0 on a wired path, 1 on any
     break.
+
+    Scope: this proves the SHARED path shape (author -> assemble -> record_plan -> render)
+    via the workout instance — the infrastructure every domain rides. Per-domain translation
+    + render coverage (nutrition / supplements / peptides) is held by the `tests/plan/` E2E
+    suite, not duplicated into this gate.
     """
     import datetime
     import tempfile
