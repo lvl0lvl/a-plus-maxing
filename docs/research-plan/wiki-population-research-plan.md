@@ -360,3 +360,25 @@ set (operator-trimmed per D1) has a green `bda` provenance chain, passed the com
 carries real cited values to template, is registered in the index, and survives the periodic
 `wiki-lint.sh` — at which point the 16 specialists have a knowledge base to reason over and
 the July-visit handout has real entries to draw from.
+
+---
+
+## 10. Active research claims — cross-session coordination
+
+Two sessions are populating the wiki in parallel. **Before picking a subject, read this
+table; after picking, append your claim** so the two tracks don't duplicate. A claim is
+(session, subject/cluster, wave, mode, status, date).
+
+| Session | Subject / cluster | Wave | Mode | Status | Date |
+|---|---|---|---|---|---|
+| `feature/wiki-research` worktree | **Lipids / CV-risk biomarkers** — ApoB, Lp(a), LDL-C, HDL-C, triglycerides, GlycA, hs-CRP (7 entries) | 1 | standard | claimed — research begins next session | 2026-06-18 |
+
+**Still open (Wave 1 remaining clusters, for the other session):** Metabolic panel
+(glucose, HbA1c, insulin, HOMA-IR, CMP) · Thyroid (TSH, fT3, fT4) · Hormones (total/free
+testosterone, estradiol, cortisol, DHEA-S, IGF-1, SHBG) · Vitamins/minerals (vit D, ferritin,
+B12, RBC-Mg) · Wearable (HRV, RHR, sleep-efficiency, respiratory rate, recovery/strain).
+Plus **Wave 0** (BPC-157 provenance back-fill).
+
+**Gate before any Wave 1 research (§8 D3):** confirm `operator-profile.md` / `goals.md` /
+`current-state.md` are readable so gate 2.75 doesn't HALT `context-load-missing` — they load
+as context only for goal-agnostic library entries (PF-S2-04).
