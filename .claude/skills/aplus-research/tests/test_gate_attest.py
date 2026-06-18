@@ -392,6 +392,46 @@ def main():
     finally:
         shutil.rmtree(base)
 
+    # T_AR7a (AR-7, 2026-06-18): a verifier ships its schema-required structured
+    # fields as a fenced ```json block INSIDE the source .md (no separate draft
+    # gate-N.json). attest must use it as the scaffold, else gates with required
+    # structured fields (entity_classes/ic_checks) compose a JSON missing them
+    # and HALT schema-validation-failed.
+    base = make_base()
+    try:
+        (base / "sections").mkdir(parents=True, exist_ok=True)
+        run(["start-iteration", "--base", str(base), "--phase", "4.25"])
+        time.sleep(0.1)
+        cls = empty_4_25_classes()
+        cls["citations"]["scanned"] = 7
+        block = json.dumps({"phase": "4.25", "iterations": 1,
+                            "entity_classes": cls, "halt_reasons": []})
+        (base / "sections/id-reconcile-source.md").write_text(
+            "## Verdict\n\nverdict: PASS\n\n```json\n" + block + "\n```\n")
+        code, _, err = run(["attest", "--base", str(base), "--phase", "4.25"])
+        gate = json.loads((base / "gates/gate-4.25.json").read_text()) if code == 0 else {}
+        test("T_AR7a fenced ```json block in source .md used as gate scaffold",
+             code == 0 and gate.get("verdict") == "PASS"
+             and gate.get("entity_classes", {}).get("citations", {}).get("scanned") == 7,
+             err.strip().splitlines()[-1] if (err and code != 0) else "")
+    finally:
+        shutil.rmtree(base)
+
+    # T_AR7b (AR-7 negative): no structured fields anywhere → still
+    # schema-validation-failed, with the actionable AR-7 hint in the message.
+    base = make_base()
+    try:
+        (base / "sections").mkdir(parents=True, exist_ok=True)
+        run(["start-iteration", "--base", str(base), "--phase", "4.25"])
+        time.sleep(0.1)
+        (base / "sections/id-reconcile-source.md").write_text("## Verdict\n\nverdict: PASS\n")
+        code, _, err = run(["attest", "--base", str(base), "--phase", "4.25"], expect_exit=2)
+        test("T_AR7b missing structured fields still HALTs schema-validation-failed (AR-7 hint)",
+             code == 2 and "schema-validation-failed" in err and "AR-7" in err,
+             err.strip().splitlines()[-1] if err else "")
+    finally:
+        shutil.rmtree(base)
+
     # T14: phase-4.25 HALT round-trip with mismatch detail preserved.
     base = make_base()
     try:

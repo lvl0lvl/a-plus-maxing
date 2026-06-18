@@ -157,6 +157,21 @@ def parse_verdict_from_md(md_text):
     return m2.group(1).upper()
 
 
+def _extract_json_block(md_text):
+    """AR-7 (2026-06-18): extract the first fenced ```json … ``` block from an
+    agent's gate-N.md and parse it as the gate scaffold. Lets a verifier ship its
+    schema-required structured fields (4.25 entity_classes, 4.75 ic_checks, …) in a
+    single self-contained gate-N.md alongside the ## Verdict block, instead of a
+    separate draft gate-N.json. Returns a dict, or None if absent/unparseable."""
+    m = re.search(r"```json\s*\n(.*?)\n```", md_text, re.DOTALL)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except json.JSONDecodeError:
+        return None
+
+
 def schema_validate(gate_obj, phase):
     schema_path = SCHEMA_DIR / f"gate-{phase}.schema.json"
     if not schema_path.exists():
@@ -165,7 +180,12 @@ def schema_validate(gate_obj, phase):
     try:
         jsonschema.validate(gate_obj, schema)
     except jsonschema.ValidationError as e:
-        raise GateAttestationError("schema-validation-failed", str(e.message))
+        raise GateAttestationError(
+            "schema-validation-failed",
+            f"{e.message} — the verifier must ship the gate's structured fields "
+            f"(per schemas/gate-{phase}.schema.json) as a fenced ```json block in "
+            f"gate-{phase}.md, or a draft gates/gate-{phase}.json. AR-7.",
+        )
 
 
 def attest_simple(base, phase):
@@ -221,7 +241,12 @@ def attest_simple(base, phase):
         except json.JSONDecodeError:
             gate_obj = {}
     else:
-        gate_obj = {}
+        # AR-7: accept the structured scaffold as a fenced ```json block embedded
+        # in gate-N.md (single self-contained source) when no separate draft
+        # gate-N.json exists. Gates with schema-required structured fields
+        # (4.25 entity_classes, 4.75 ic_checks, …) otherwise compose a JSON
+        # missing them and fail validation.
+        gate_obj = _extract_json_block(md_text) or {}
 
     gate_obj.setdefault("phase", phase)
     gate_obj["verdict"] = verdict

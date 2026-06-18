@@ -466,10 +466,21 @@ For each of phases 3.5, 4.75, 6, 7.5, 8.5:
 python3 .claude/skills/aplus-research/lib/gate_attest.py start-iteration \
     --base /tmp/aplus-research/<slug> --phase <N>
 
-# 2. Dispatch the verifier agent. Agent brief must require:
-#    "write `gates/gate-<N>.md` with a `## Verdict` block containing
-#    `verdict: PASS` or `verdict: HALT` plus IC findings / scores / etc."
-#    (Phase 3.5 is special: judge agents write per-section `judges/judge-<X>.json`.)
+# 2. Dispatch the verifier agent. Agent brief must require BOTH:
+#    (a) a `## Verdict` block containing `verdict: PASS` or `verdict: HALT`, AND
+#    (b) the gate's schema-required STRUCTURED FIELDS as a fenced ```json block in
+#        the SAME source file — per `schemas/gate-<N>.schema.json`. Specifically:
+#          4.25  entity_classes (citations/institutions/compound_identifiers/
+#                regulatory_dates/trial_registrations, each scanned+mismatch_count)
+#          4.75  ic_checks IC-1..IC-13 (each a status) + population_mismatch +
+#                concentration_audit + corpus_scoping  (run the FULL 13 IC checks
+#                from references/citation-integrity.md — not a reduced subset)
+#          6/7.5/8.5  their schema-required fields
+#        attest uses that ```json block as the scaffold and OVERRIDES only the
+#        verdict from the `## Verdict` line (so the orchestrator never composes the
+#        gate decision). WITHOUT the block the composed gate fails schema-validation
+#        (AR-7, 2026-06-18). (Phase 3.5 is special: judge agents write per-section
+#        `judges/judge-<X>.json`.)
 
 # 3. Compose the canonical gate JSON from the agent's markdown
 python3 .claude/skills/aplus-research/lib/gate_attest.py attest \
