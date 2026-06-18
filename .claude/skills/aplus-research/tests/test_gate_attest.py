@@ -312,6 +312,49 @@ def main():
     finally:
         shutil.rmtree(base)
 
+    # T_AR6a (AR-6, 2026-06-18): gate-global start-iteration with PARTIAL
+    # remediation. The doc/orchestrator calls `start-iteration --phase 3.5`
+    # (no --section) each pass and re-judges only the HALTed sections, so passed
+    # sections keep an earlier-iteration judge. Each judge must be checked against
+    # the start of the iteration IT claims, not the latest gate clock — else the
+    # gate can never PASS. (Pre-fix this HALTed stale-agent-source on B/C.)
+    base = make_base()
+    try:
+        run(["start-iteration", "--base", str(base), "--phase", "3.5"])  # iter 1
+        time.sleep(0.1)
+        for sec in ("A", "B", "C"):
+            (base / f"judges/judge-{sec}.json").write_text(
+                json.dumps({"section": sec, "verdict": "PASS", "total": 100, "iteration": 1}))
+        time.sleep(0.2)
+        run(["start-iteration", "--base", str(base), "--phase", "3.5"])  # iter 2 (gate-global)
+        time.sleep(0.1)
+        (base / "judges/judge-A.json").write_text(  # only A re-judged at iter 2
+            json.dumps({"section": "A", "verdict": "PASS", "total": 100, "iteration": 2}))
+        code, _, err = run(["attest", "--base", str(base), "--phase", "3.5"])
+        gate = json.loads((base / "gates/gate-3.5.json").read_text()) if code == 0 else {}
+        test("T_AR6a gate-global partial remediation does not flag passed-earlier sections stale",
+             code == 0 and gate.get("verdict") == "PASS",
+             err.strip().splitlines()[-1] if (err and code != 0) else "")
+    finally:
+        shutil.rmtree(base)
+
+    # T_AR6b (AR-6 negative): anti-stale intent preserved. A judge CLAIMING
+    # iteration N but written BEFORE iteration N started is still stale → HALT.
+    base = make_base()
+    try:
+        run(["start-iteration", "--base", str(base), "--phase", "3.5"])  # iter 1
+        time.sleep(0.1)
+        (base / "judges/judge-A.json").write_text(  # claims iter 2, but written pre-iter-2
+            json.dumps({"section": "A", "verdict": "PASS", "total": 100, "iteration": 2}))
+        time.sleep(0.2)
+        run(["start-iteration", "--base", str(base), "--phase", "3.5"])  # iter 2 starts AFTER the write
+        code, _, err = run(["attest", "--base", str(base), "--phase", "3.5"], expect_exit=2)
+        test("T_AR6b judge claiming iter-N written before iter-N start is still stale → HALT",
+             code == 2 and "stale-agent-source" in err,
+             err.strip().splitlines()[-1] if err else "")
+    finally:
+        shutil.rmtree(base)
+
     # ─── v2 AC1 calibration (S6 2026-05-25): Phase 4.25 ID-Reconcile gate ────
     # Source path is sections/id-reconcile-source.md (not gates/gate-4.25.md
     # — the agent's deliverable lives with sections, the gate JSON lives in
@@ -346,6 +389,46 @@ def main():
              code == 0 and gate["verdict"] == "PASS" and
              gate["entity_classes"]["citations"]["scanned"] == 52 and code2 == 0,
              f"verdict={gate.get('verdict')}")
+    finally:
+        shutil.rmtree(base)
+
+    # T_AR7a (AR-7, 2026-06-18): a verifier ships its schema-required structured
+    # fields as a fenced ```json block INSIDE the source .md (no separate draft
+    # gate-N.json). attest must use it as the scaffold, else gates with required
+    # structured fields (entity_classes/ic_checks) compose a JSON missing them
+    # and HALT schema-validation-failed.
+    base = make_base()
+    try:
+        (base / "sections").mkdir(parents=True, exist_ok=True)
+        run(["start-iteration", "--base", str(base), "--phase", "4.25"])
+        time.sleep(0.1)
+        cls = empty_4_25_classes()
+        cls["citations"]["scanned"] = 7
+        block = json.dumps({"phase": "4.25", "iterations": 1,
+                            "entity_classes": cls, "halt_reasons": []})
+        (base / "sections/id-reconcile-source.md").write_text(
+            "## Verdict\n\nverdict: PASS\n\n```json\n" + block + "\n```\n")
+        code, _, err = run(["attest", "--base", str(base), "--phase", "4.25"])
+        gate = json.loads((base / "gates/gate-4.25.json").read_text()) if code == 0 else {}
+        test("T_AR7a fenced ```json block in source .md used as gate scaffold",
+             code == 0 and gate.get("verdict") == "PASS"
+             and gate.get("entity_classes", {}).get("citations", {}).get("scanned") == 7,
+             err.strip().splitlines()[-1] if (err and code != 0) else "")
+    finally:
+        shutil.rmtree(base)
+
+    # T_AR7b (AR-7 negative): no structured fields anywhere → still
+    # schema-validation-failed, with the actionable AR-7 hint in the message.
+    base = make_base()
+    try:
+        (base / "sections").mkdir(parents=True, exist_ok=True)
+        run(["start-iteration", "--base", str(base), "--phase", "4.25"])
+        time.sleep(0.1)
+        (base / "sections/id-reconcile-source.md").write_text("## Verdict\n\nverdict: PASS\n")
+        code, _, err = run(["attest", "--base", str(base), "--phase", "4.25"], expect_exit=2)
+        test("T_AR7b missing structured fields still HALTs schema-validation-failed (AR-7 hint)",
+             code == 2 and "schema-validation-failed" in err and "AR-7" in err,
+             err.strip().splitlines()[-1] if err else "")
     finally:
         shutil.rmtree(base)
 

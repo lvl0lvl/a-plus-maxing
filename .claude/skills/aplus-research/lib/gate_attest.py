@@ -157,6 +157,21 @@ def parse_verdict_from_md(md_text):
     return m2.group(1).upper()
 
 
+def _extract_json_block(md_text):
+    """AR-7 (2026-06-18): extract the first fenced ```json … ``` block from an
+    agent's gate-N.md and parse it as the gate scaffold. Lets a verifier ship its
+    schema-required structured fields (4.25 entity_classes, 4.75 ic_checks, …) in a
+    single self-contained gate-N.md alongside the ## Verdict block, instead of a
+    separate draft gate-N.json. Returns a dict, or None if absent/unparseable."""
+    m = re.search(r"```json\s*\n(.*?)\n```", md_text, re.DOTALL)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except json.JSONDecodeError:
+        return None
+
+
 def schema_validate(gate_obj, phase):
     schema_path = SCHEMA_DIR / f"gate-{phase}.schema.json"
     if not schema_path.exists():
@@ -165,7 +180,12 @@ def schema_validate(gate_obj, phase):
     try:
         jsonschema.validate(gate_obj, schema)
     except jsonschema.ValidationError as e:
-        raise GateAttestationError("schema-validation-failed", str(e.message))
+        raise GateAttestationError(
+            "schema-validation-failed",
+            f"{e.message} — the verifier must ship the gate's structured fields "
+            f"(per schemas/gate-{phase}.schema.json) as a fenced ```json block in "
+            f"gate-{phase}.md, or a draft gates/gate-{phase}.json. AR-7.",
+        )
 
 
 def attest_simple(base, phase):
@@ -221,7 +241,12 @@ def attest_simple(base, phase):
         except json.JSONDecodeError:
             gate_obj = {}
     else:
-        gate_obj = {}
+        # AR-7: accept the structured scaffold as a fenced ```json block embedded
+        # in gate-N.md (single self-contained source) when no separate draft
+        # gate-N.json exists. Gates with schema-required structured fields
+        # (4.25 entity_classes, 4.75 ic_checks, …) otherwise compose a JSON
+        # missing them and fail validation.
+        gate_obj = _extract_json_block(md_text) or {}
 
     gate_obj.setdefault("phase", phase)
     gate_obj["verdict"] = verdict
@@ -346,12 +371,23 @@ def attest_judge_gate(base):
         mtime = datetime.datetime.fromtimestamp(
             p.stat().st_mtime, tz=datetime.timezone.utc
         ).isoformat()
-        # BUG-001: choose per-section iter_start_ts when present, else phase-wide
+        # BUG-001: choose per-section iter_start_ts when present, else phase-wide.
+        # AR-6 (2026-06-18): when falling back to phase-wide, check this judge
+        # against the start of the iteration IT CLAIMS — not the latest gate
+        # clock. SKILL.md Phase 3.5 remediation is per-section ("re-dispatch that
+        # retrieval agent"), so sections converge at different iterations; a
+        # section that passed at iter-1 must be checked against iter-1's start,
+        # else the latest gate clock wrongly flags it stale and the gate becomes
+        # un-PASS-able for the normal partial-remediation case. Anti-stale intent
+        # is preserved: each judge is still required to be fresher than the
+        # iteration it asserts it ran in.
         sec_iters = _phase_state_section_iters(phase_state, section)
         if sec_iters:
             iter_start = sec_iters[-1]["iter_start_ts"]
-        elif phase_iter_start is not None:
-            iter_start = phase_iter_start
+        elif phase_iters:
+            _cand = [e for e in phase_iters if e["iteration"] <= iteration]
+            _chosen = max(_cand, key=lambda e: e["iteration"]) if _cand else phase_iters[0]
+            iter_start = _chosen["iter_start_ts"]
         else:
             raise GateAttestationError(
                 "no-iteration-started",
