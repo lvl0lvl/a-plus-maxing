@@ -1,0 +1,53 @@
+{
+  "specialist": "supplement-specialist",
+  "recommendations": [
+    {
+      "claim": "Creatine monohydrate supports muscular work capacity and strength recovery in resistance-trained adults across an established meta-analytic base of >100 RCTs.",
+      "source": "Lanhers et al. 2017 (Eur J Sport Sci meta-analysis, n=1,258); Rawson & Volek 2003; IOM creatine safety review 2002. maturity_rung: established. certainty: high; strength: strong.",
+      "confidence_tier": "high",
+      "reversibility": "fully reversible; cessation clears within 4-6 weeks with no documented rebound",
+      "category": "supplementation",
+      "payload": {
+        "name": "Creatine monohydrate",
+        "dose": "3-5 g/day",
+        "timing": "post-exercise or with any meal; loading phase optional"
+      }
+    },
+    {
+      "claim": "Omega-3 fatty acids (EPA+DHA) attenuate exercise-induced muscle soreness and support inflammatory resolution relevant to musculoskeletal recovery.",
+      "source": "Philpott et al. 2018 (J Int Soc Sports Nutr systematic review, ~25 RCTs, n>1,000); Smith et al. 2011 (JISSN). maturity_rung: trial-stage for recovery outcomes; monograph-backed for cardiovascular surrogate outcomes. certainty: moderate; strength: weak (recovery-specific endpoint). adulteration_flag: heavy-metal/PCB contamination documented in non-tested products - prefer IFOS or NSF certified. dshea_status: conventional ingredient, no enforcement action as of 2026-06-18.",
+      "confidence_tier": "moderate",
+      "reversibility": "fully reversible; no documented discontinuation effect",
+      "category": "supplementation",
+      "payload": {
+        "name": "Omega-3 (EPA+DHA)",
+        "dose": "2-3 g combined EPA+DHA per day",
+        "timing": "with meals containing fat to reduce GI side-effects"
+      }
+    },
+    {
+      "claim": "Magnesium glycinate supports sleep architecture quality and neuromuscular relaxation, both relevant to the recovery-priority goal, at doses within the IOM supplemental Tolerable Upper Intake Level.",
+      "source": "Abbasi et al. 2012 (J Res Med Sci, RCT n=46, sleep quality); Nielsen et al. 2010 (Magnes Res, muscle function). maturity_rung: trial-stage. certainty: low; strength: conditional. ul_status: IOM supplemental UL = 350 mg/day; dose below UL. worst_case_h_class: H7 (osmotic diarrhea, self-limiting, reversible). interaction_screen: no Rx regimen reported; no flag.",
+      "confidence_tier": "low",
+      "reversibility": "fully reversible; no documented discontinuation effect",
+      "category": "supplementation",
+      "payload": {
+        "name": "Magnesium glycinate",
+        "dose": "200-300 mg elemental magnesium",
+        "timing": "evening, 30-60 min before sleep"
+      }
+    },
+    {
+      "claim": "Hydrolyzed collagen peptides combined with vitamin C, timed around exercise, show connective-tissue and tendon-support signals relevant to the musculoskeletal recovery priority.",
+      "source": "Shaw et al. 2017 (Am J Clin Nutr, RCT n=8, tendon collagen synthesis); Praet et al. 2019 (Nutrients, RCT n=41, Achilles rehab). maturity_rung: trial-stage (small-RCT base, n<700 aggregate). certainty: low; strength: conditional. ul_status: no UL established. worst_case_h_class: H8. renal_flag: renal status NOT populated - protein load at this dose (15 g) is modest and not expected to be clinically relevant at normal GFR; flag for medical-liaison review given unknown status.",
+      "confidence_tier": "low",
+      "reversibility": "fully reversible; no documented discontinuation effect",
+      "category": "supplementation",
+      "payload": {
+        "name": "Hydrolyzed collagen peptides + vitamin C",
+        "dose": "15 g collagen + 50 mg vitamin C",
+        "timing": "30-60 min before exercise session"
+      }
+    }
+  ]
+}
