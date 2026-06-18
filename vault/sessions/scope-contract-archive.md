@@ -2111,3 +2111,13 @@ ACs (all PASS): AC1 theme system originated via ui-designer from the moodboard; 
 ### S69 Scope Contract Evaluation (2026-06-18)
 
 All 5 ACs PASS. `DIR Clinical Instrument` (`nJ4f1`) re-skinned via theme-conditional `clin-*` tokens + by-hand edits; clinical frame pixel-identical. Gauges fixed to true circles (top-left rotation-pivot bug, `rotation = 360−θ`). One PF (PF-S69-01: design-critic-after-present + verify-first-on-render, operator-caught), 3-layer (bead `bibc`). No `scripts/` touched; pytest 833/2; core-capability still NO. Design committed `4f71bd9` + close `ef3d509`; no PR at S69 (design locked, merged later in PR #145 at S70).
+
+## Scope Contract — Session 70 (2026-06-18)
+
+Goal: Build Slice 1 of the plan-generation pipeline (the PF-S63-02 core-capability proof): dispatch the `personal-trainer` author → `router.summarize` → `assemble(["workout"])` → `record_plan` → render a real, followable, clearance-deferred workout plan — verified by running the production path end-to-end.
+
+ACs (AC1-AC5 PASS, AC6 CHANGED): AC1 `scripts/plan/generate_plan.py` is `assemble`'s production caller (generic across the four plan-authors via `_PLAN_TRANSLATORS`); AC2 `personal-trainer` dispatched for real, 6 recs → 5 rendered after the HALT struck 1 (the CLAIM-PHRASING RULE), 0 load prescriptions; AC3 routed to the dashboard zone-3 plan card; AC4 `core-capability-audit.sh` + RED-proving negative test, `INV-CORE-CAPABILITY` registered + added to the close roster; AC5 the store-adversarial four + the two safety gates mutation-proven RED, suite 848/2, real production path rendered E2E; AC6 CHANGED — `/review-pr` (6-agent) → 3 legitimate fixed+blind-verified → `/merge` REST rebase PR #145 on `main` (`15ca1e9`); the `plan-integrity` role was NOT separately dispatched (scoped SE build, not a `/execute-plan` wave — its substance was covered by the integration-verification work + the mechanical gate; flagged CHANGED, not silent).
+
+### S70 Drift checks + PF attestation
+
+Task drift: ACs PASS (AC6 CHANGED-flagged); scope grew by two operator-approved/flagged additions (`INV-CORE-CAPABILITY` wiring; `.gitattributes` `*.pen binary`). Architecture drift: one INV added with approval, none degraded; INV-BRANCH-NOT-MAIN held (build `feature/plan-generation-design`; close `fix/s70-close` worktree); moved AWAY from PF-S63-02. Vision drift: none, toward-vision. PF attestation: One PF promoted — PF-S70-01 (wrong-branch commit after the operator switched the shared working tree; PF-S64-01 class, count=2; self-caught + relocated, no loss), 3-layer (bead `bsqz`); structural fix = isolated worktrees per stream. Full S70 detail in `memory/process-failures.md` Session 70.
