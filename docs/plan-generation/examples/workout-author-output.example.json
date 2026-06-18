@@ -1,0 +1,84 @@
+{
+  "_comment": "EXAMPLE author output captured from a real personal-trainer dispatch (S70, runtime A) over a SYNTHETIC de-identified operator state. PII-free. This is the universal recommendation contract a plan-domain author emits; assemble re-runs its four safety filters over it, generate_plan translates the surviving recs into the plan_schema workout plan. Not operator data.",
+  "specialist": "personal-trainer",
+  "recommendations": [
+    {
+      "claim": "Begin the session with hip-hinge patterning using a dowel or wall-touch cue to restore posterior-chain motor pattern without spinal loading.",
+      "source": "Motor-pattern re-education consensus (McGill, Low Back Disorders 3rd ed.; NSCA CSCS study guide movement-prep rationale); no specific threshold groundable to a whitelisted RCT at this prescription level - kept qualitative.",
+      "confidence_tier": "moderate",
+      "reversibility": "Fully reversible; movement-only, no load.",
+      "category": "training",
+      "payload": {
+        "name": "Hip Hinge Patterning (dowel or wall touch)",
+        "sets": 3,
+        "reps": "8",
+        "detail": "Stand hip-width, dowel along spine (head/thoracic/sacrum contact). Push hips back until you feel hamstring tension, maintain neutral lumbar, return tall. No spinal flexion or rotation. GRADE: certainty moderate x strength conditional - movement prep for a back-return context is broadly recommended but the specific set/rep scheme is a starting hypothesis to revise against your response. Established: motor-pattern re-education before loading. This session is movement-quality only; no external load is prescribed until clinician clearance is on file (refer-then-defer)."
+      }
+    },
+    {
+      "claim": "Perform bodyweight goblet squat-pattern holds to assess squat depth tolerance and reinforce bracing under no external load.",
+      "source": "Bodyweight squat as movement screen and re-entry tool: general return-to-training literature (NSCA Essentials of Personal Training; no RCT at this prescription level - qualitative).",
+      "confidence_tier": "moderate",
+      "reversibility": "Fully reversible; bodyweight only.",
+      "category": "training",
+      "payload": {
+        "name": "Bodyweight Goblet-Pattern Squat (hands clasped at chest)",
+        "sets": 3,
+        "reps": "6-8 quality reps",
+        "detail": "Feet slightly wider than hip-width, toes slightly out. Hands clasped at sternum (no external load - goblet is the positional reference only). Brace 360 degrees before descent. Descend to tolerance - stop at any back discomfort and note the depth. Pause 2 s at bottom if pain-free. GRADE: certainty moderate x strength conditional - re-entry squat pattern is a reasonable starting point; depth tolerance and symptom response determine progression. Provisional: no evidence comparing this specific rep range to alternatives in a back-return population. Every rep count is a starting hypothesis."
+      }
+    },
+    {
+      "claim": "Introduce prone plank holds to begin rebuilding anterior core endurance without spinal flexion.",
+      "source": "McGill's spine-sparing core endurance rationale (McGill, Low Back Disorders; core endurance > core strength for spinal stability in return-to-training - established principle, specific hold-time targets vary by source).",
+      "confidence_tier": "moderate",
+      "reversibility": "Fully reversible; isometric, no load.",
+      "category": "training",
+      "payload": {
+        "name": "Prone Plank (forearms)",
+        "sets": 3,
+        "reps": "20-30 s hold",
+        "detail": "Forearms on floor, elbows under shoulders, neutral spine, glutes lightly engaged. Stop the hold at the first sign of lumbar sag or back discomfort - shorter hold with quality beats longer with breakdown. Rest 60 s between sets. GRADE: certainty moderate x strength conditional - anterior core endurance is a broadly recommended re-entry target for back-region return; hold duration is a starting hypothesis. Established: isometric core work is appropriate in this phase. Provisional: isometric analgesia (pain-relief claims for isometrics) is a CONTESTED area; this prescription is for endurance, not analgesia."
+      }
+    },
+    {
+      "claim": "Perform TRX-assisted or bodyweight-only horizontal row to begin re-loading scapular retractors and upper back without any overhead pressing.",
+      "source": "Horizontal pull as a push-pull balance tool in return-to-training programming: NSCA CSCS study guide; no overhead pressing per hard-limit; TRX inverted row is a standard low-load entry point.",
+      "confidence_tier": "moderate",
+      "reversibility": "Fully reversible; bodyweight/strap-assisted, no external load.",
+      "category": "training",
+      "payload": {
+        "name": "TRX Inverted Row (or bodyweight row from low bar)",
+        "sets": 3,
+        "reps": "8-10",
+        "detail": "TRX straps at hip height, body at roughly 30-45 degrees incline (adjust angle to control difficulty - more vertical = easier). Pull shoulder blades together and down before initiating the row; elbows travel toward hips, NOT overhead. No overhead pressing or overhead reach at any point in the range. GRADE: certainty moderate x strength conditional - horizontal pulling is appropriate for scapular health and upper-back re-entry; rep range is a starting hypothesis to revise against measured response. Established: push-pull balance in programming. Do NOT substitute an overhead pull-up or any overhead pressing variant."
+      }
+    },
+    {
+      "claim": "Include a single-leg balance progression (bodyweight) to begin rebuilding proprioception and hip stability relevant to loaded return.",
+      "source": "Balance and proprioceptive training as return-to-training prep: general sports medicine consensus; no RCT at this prescription level - qualitative.",
+      "confidence_tier": "low",
+      "reversibility": "Fully reversible; balance only, no load.",
+      "category": "training",
+      "payload": {
+        "name": "Single-Leg Stance Hold (bodyweight, eyes open then eyes closed progression)",
+        "sets": 2,
+        "reps": "20-30 s per side",
+        "detail": "Stand on one foot, slight knee bend, neutral pelvis. Progress from eyes open (stable) to eyes closed only if the eyes-open hold is steady and symptom-free. Note any back or hip discomfort and stop that side. GRADE: certainty low x strength conditional - proprioceptive work is reasonable in a return-to-training phase, but effect size vs. alternatives is not well-established at this specificity. Provisional: single-leg balance as a driver of injury prevention is plausible but not strongly proven in this population. Starting hypothesis: revise based on stability and symptom response."
+      }
+    },
+    {
+      "claim": "Finish with a 5-minute low-intensity fan bike or treadmill walk for light aerobic flush and to assess exertional tolerance without spinal loading.",
+      "source": "Low-intensity aerobic cool-down as general recovery and exertional-tolerance check: established general principle (ACSM guidelines); specific duration is a starting hypothesis.",
+      "confidence_tier": "established",
+      "reversibility": "Fully reversible; low intensity, terminate on any discomfort.",
+      "category": "training",
+      "payload": {
+        "name": "Low-Intensity Fan Bike or Treadmill Walk (cool-down / tolerance check)",
+        "sets": 1,
+        "reps": "5 min continuous",
+        "detail": "Perceived exertion 3-4/10 (conversational pace). This doubles as an exertional-tolerance check: note any back discomfort, disproportionate breathlessness, or lower-extremity symptoms during or after. If any symptom arises that you'd classify as out of proportion to the effort - especially chest discomfort, dizziness, or dark urine post-session - stop and seek evaluation (TIME_CRITICAL escalation protocol applies). GRADE: certainty established x strength strong for low-intensity aerobic activity as a re-entry tool. No external load; wearable data is absent (Whoop pending) - coach from perceived exertion only; no HRV or readiness metric is fabricated."
+      }
+    }
+  ]
+}
