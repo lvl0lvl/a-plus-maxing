@@ -3,7 +3,7 @@ title: Session Handoff
 type: note
 owner: Walter McGivney
 created: 2026-05-16
-last_reviewed: 2026-06-15
+last_reviewed: 2026-06-17
 status: active
 depends_on: []
 superseded_by: null
@@ -12,45 +12,45 @@ review_cadence: weekly
 
 # Session Handoff
 
-## Scope Contract — Session 67 (2026-06-16)
+## Scope Contract — Session 68 (2026-06-16/17)
 
-Goal: Run the Discipline-11 pull-cadence check on the skills_library remote (operator-requested); bead the upstream unversioned-toolkit-drift finding; record the run in the (frozen) adoption log with an explicit per-instance identity note; land the doc update in the remote.
+Goal: Start the parked core-deliverable (`71s4`) design work — drive the plan-generation design (runtime + dependency-order decisions) via the design agent team, and explore + iterate the dashboard visual design from the operator's inspiration set.
 
 Acceptance criteria:
-- [x] AC1: fetch + diff the skills_library remote vs the adopted SHA + the pinned `rigor_version`; report the delta.
-- [x] AC2: bead the upstream unversioned-toolkit-drift finding as a drift-audit watch item (`lczu`).
-- [x] AC3: update `docs/rigor-adoption-log.md` — explicit per-instance identity note + a §10 pull-cadence log recording the first real run; a-plus pin HELD at 1.0.0 (no toolkit pull).
-- [x] AC4: refresh the global deploy (ff-merge the LOCAL skills_library to origin/main → the Wave D symlinks pick it up); verify 0 dead symlinks + no new unlinked items.
-- [x] AC5: full session close, `close-audit.sh --session 67` green; land the in-repo doc update via PR (`/review-pr` docs subset → `/merge`).
+- [x] AC1: open the session (Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline 833/2).
+- [x] AC2: settle the two pivotal plan-generation decisions (runtime = (A) interactive agent-dispatch; inputs = designed screens) and capture the derived topology in an in-repo design note.
+- [x] AC3: derive the plan-pipeline dependency order + author/advisor tiers via a multi-agent workflow (16-specialist elicitation → synthesis → adversarial review), NOT guessed.
+- [x] AC4: explore dashboard visual directions via the design-agent team (4 directions + design-review) from the operator inspiration; iterate the chosen Clinical Light direction BY HAND.
+- [x] AC5: log the process failures surfaced (PF-S68-01, PF-S68-02) 3-layer; full close.
 
-Files I WILL touch: `docs/rigor-adoption-log.md`; the LOCAL `~/Documents/Projects/skills_library` checkout (ff-merge — not the a-plus repo) + the global `~/.claude` symlinks it serves; HANDOFF/`.beads` at close.
-Files I will NOT touch: a-plus's vendored `toolkit/` (the pin HOLDS at 1.0.0 — VERSION unchanged, no versioned delta to pull); a-plus product/governance code; `enforce-heartbeat-clause` wiring (0qf6); `main` directly; 71s4.
-NOT doing: pulling the unversioned upstream toolkit drift into a-plus (would corrupt the 1.0.0 pin — HELD instead); fixing the upstream library VERSION-bump slip (a skills_library task, beaded `lczu`); building 71s4.
-Invariants at risk: INV-BRANCH-NOT-MAIN (on `fix/s67-pull-cadence-log`); INV-SKILL-TRACE (the doc PR gets `/review-pr` + `/merge`; per-PR table at close); INV-HO-ROTATION/PF-ATTESTATION at close.
+Files I WILL touch: `design/a+maxing_designs.pen` (+ `design/images/`); `vault/design/plan-generation-pipeline-v1.md`; `memory/process-failures.md` + `harvest.jsonl` + `.beads`; HANDOFF/vault at close.
+Files I will NOT touch: `scripts/` (no pipeline code — design phase); `main` directly.
+NOT doing: building the `71s4` pipeline code (design + screens phase only); the ADR-0005 / spec / memory guidance-correction (the "operator-held mock outside the repo" cleanup) — DEFERRED to S69; reversing the PII boundary.
+Invariants at risk: INV-BRANCH-NOT-MAIN (on `feature/plan-generation-design`); INV-HO-ROTATION / INV-PF-ATTESTATION / INV-SKILL-TRACE at close.
 
-### S67 Scope Contract Evaluation (2026-06-16, volatile)
+### S68 Scope Contract Evaluation (2026-06-17, volatile)
 
-- **AC1 (pull-cadence check) — PASS.** Fetched skills_library; origin/main +19 commits ahead of the adopted `86a1a26` (→ `9b8b721`); `VERSION` unchanged (1.0.0 == pinned); reported the delta (toolkit drift + skills/roles/website changes).
-- **AC2 (bead) — PASS.** `lczu` created (upstream unversioned-toolkit-drift watch).
-- **AC3 (adoption-log update) — PASS.** Per-instance identity note at the top + §10 pull-cadence log (first real run; pin held; the `lczu` finding + the extrapolation lesson).
-- **AC4 (global refresh) — PASS.** ff-merged the local checkout to origin/main; the Wave D symlinks resolve to the updated content (verified the new role frontmatter live); 0 new unlinked items, 0 dead symlinks; same 2 pre-existing library parity cracks, no new ones.
-- **AC5 (close) — PASS.** `close-audit --session 67` green; this doc PR (docs review → merge) carries it.
+- **AC1 (open) — PASS.** Start Protocol ran; branch-completeness 0 violations; baseline 833/2.
+- **AC2 (decisions + topology note) — PASS.** Runtime = (A) interactive agent-dispatch; inputs = designed screens. Captured in `vault/design/plan-generation-pipeline-v1.md` (the unbuilt-`71s4` topology spec).
+- **AC3 (derived order via agents) — PASS.** `plan-pipeline-order` workflow: 16-specialist elicitation → architect synthesis → 6-reviewer adversarial pass (rejected fabricated edge-provenance; re-derived from `WIKI.md` Reads/Owns) → reconcile. High confidence; 4 plan-authors + 12 advisors + the dependency phase order.
+- **AC4 (visual exploration + iteration) — PASS.** 4 dashboard directions built by the design-agent team + `design-reviewer` ranking (Sage & Paper recommended); operator chose Clinical Light and iterated it by hand (layout, tabbed insights card, full 16-specialist Care Team, calendar fit). Commits `0b42751`/`dab098c`/`8262d41`/`851f069`.
+- **AC5 (PFs + close) — PASS.** PF-S68-01 + PF-S68-02 logged 3-layer (PF + harvest + beads `56r9`/`9jdo`); this close.
 
-**CHANGED / flagged (none silent):** the a-plus vendored `toolkit/` was NOT pulled despite origin's toolkit drift — the version pin HELD (VERSION stayed 1.0.0; the changed audits are vendored-but-unused), the correct version-pin posture, not a skipped pull. The upstream VERSION-bump slip is beaded `lczu` (a skills_library fix, not a-plus's).
+**CHANGED / flagged (none silent):** the session SCOPE was written retroactively at close — no formal contract was written at open; the session pivoted organically from the S67-parked options into the operator-directed design work (a process gap noted here, not silent task drift). `71s4` design STARTED (decisions + topology + screens); the pipeline CODE is NOT built (correctly deferred). The early intake content built solo was REJECTED by the operator and does NOT stand (folded into PF-S68-01/02).
 
-### Drift checks (S67 close)
+### Drift checks (S68 close)
 
-- **Task drift:** all 5 ACs PASS. No silent drift; the one judgment (HOLD the pin vs pull unversioned drift) is documented + beaded.
-- **Architecture drift:** none in the a-plus repo (the only a-plus change is the adoption-log doc; product/governance/`toolkit/` code byte-identical — the pin held). The local skills_library checkout + global symlinks advanced to origin (non-destructive). INV-BRANCH-NOT-MAIN held (`fix/s67-pull-cadence-log`); INV-SKILL-TRACE binds the doc PR.
-- **Vision drift:** none. The adoption stays COMPLETE + frozen; the pull cadence (its one ongoing discipline) ran for the first time and the version pin behaved correctly. `71s4` remains parked. Matches `design/vision.md`.
+- **Task drift:** the session executed the operator-directed design work; ACs PASS. Real gap: no scope contract was written at OPEN (this close one is retroactive) — logged, not concealed. The early solo intake-content build was rejected (PF-S68-01), surfaced + logged.
+- **Architecture drift:** no INV degraded; no `scripts/` code touched (design phase). INV-BRANCH-NOT-MAIN held (`feature/plan-generation-design`); INV-HARVEST-CAPTURE exercised (2 PFs 3-layer). `vault/design/plan-generation-pipeline-v1.md` is a design spec for the UNBUILT `71s4` layer — PF-S63-02 core-capability is still NO (design-only).
+- **Vision drift:** none. The session designed the operator-facing surfaces (the dashboard + the plan-generation topology) — on-vision (physician-ready plan surface + closed loop). `design/vision.md` first sentence unchanged.
 
 ### PF attestation
 
-S67 close (2026-06-16): **No new PF-class entries this session.** Full attestation + the per-PR skill-trace table (this doc PR) + the disclosure ledger in `memory/process-failures.md` Session 67. The pull-cadence run + the upstream unversioned-drift finding (bead `lczu`) are logged in `docs/rigor-adoption-log.md` §10.
+S68 close (2026-06-17): **Two new PF entries promoted — PF-S68-01** (solo design without the agent team; thin/guessed content presented as finished) **+ PF-S68-02** (rebuild-for-edit: routing bounded edits through full-rebuild agents → regressions + the iteration fight). Both operator-caught; both logged 3-layer (PF log + `harvest.jsonl` + beads `56r9`/`9jdo`); the `design-via-agent-team` memory updated with the granularity rule (team for origination, hand for edits). Full attestation + the skill-trace escape + the disclosure ledger in `memory/process-failures.md` Session 68.
 
 ## Historical Scope Contracts (archived)
 
-Scope contracts for Sessions 5-66 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S64 archived S63; S65 archived S64; S66 archived S65; S67 archived S66) to keep this handoff lean. The current (S67) scope contract is above; the archive holds the prior-session archaeology.
+Scope contracts for Sessions 5-67 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S65 archived S64; S66 archived S65; S67 archived S66; S68 archived S67) to keep this handoff lean. The current (S68) scope contract is above; the archive holds the prior-session archaeology.
 
 ## Session 4 close — 2026-05-25
 
@@ -252,36 +252,37 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **The core deliverable is STILL UNBUILT — the forcing-function gate now guards it (PF-S63-02 / bead `71s4`).** No end-to-end plan generation: no model/API client in `scripts/`, `plan/assemble.py` has no production caller, `generate.run` renders only dashboard/report. `71s4` is PARKED pending design discussion + Pencil screen work (operator decision) — do NOT start it without that. The CLAUDE.md session-start core-capability gate forces "does plan generation work end-to-end yet?" (today: NO) before any secondary work.
-2. **The Rigor adoption is COMPLETE (all 4 waves) — only `0qf6` (heartbeat wiring) remains as post-adoption hardening.** Wave D (S66) synced the global `~/.claude/skills`+`commands` to the library (symlink model, no more staleness). `0qf6` (wire `enforce-heartbeat-clause`) is NOT done: the hook DENYs every Task dispatch lacking a liveness clause (no role-gating) → it would break `/review-pr`+`/aplus-research`. Wire it ONLY after the dispatch flows + a dispatch convention carry the clause, and extend `test_settings_hook_paths.sh` for the `toolkit/hooks/` prefix then. Until then PR lifecycles run with the hook OFF.
-3. **The rigor floor's newest mechanisms are LIVE — mostly exercised now, with one open caveat.** S65/S66 exercised the falsification advisory + `INV-CLOSE-AUDIT`/`INV-HARVEST-CAPTURE` + the global deploy (green); S67 ran the pull cadence for the first time (pin HELD correctly). Open caveats: (a) the pull cadence is VERSION-keyed, but the library has UNVERSIONED `toolkit/` drift (`lczu`) — so it won't auto-detect toolkit changes until the library bumps VERSION; at the next drift boundary `git fetch` the library + check whether `main` is ahead of the adopted SHA, NOT just whether VERSION moved; (b) `enforce-heartbeat-clause` stays UNWIRED (`0qf6`); (c) the global skills now SYMLINK `~/.claude/skills_library → the library checkout`, so moving/deleting that checkout breaks EVERY project's skills (keep the anchor valid). Standing mechanics: REST `gh api` full-40-char SHA for PR ops (GraphQL throttled); stage `git add` separately from `git commit`; run `gh api -f …` and `git push` as SEPARATE Bash commands (block-dangerous false-matches `push`+`-f` as `--force`); the bd `.beads/daemon-error` mismatch is benign for `--flush-only` but wants an env cleanup.
+1. **DESIGN DISCIPLINE — the freshest two PFs, a matched pair on GRANULARITY (PF-S68-01 + PF-S68-02).** S68-01: producing design SOLO instead of orchestrating the design agent team (thin/guessed content presented as finished). S68-02: the over-correction — routing BOUNDED edits through full-rebuild agents → regressions (removed sparklines reappeared), collateral damage, stalls, an iteration fight. **The rule: design ORIGINATION/exploration → the agent team; bounded EDITS to an existing artifact → BY HAND, smallest change, in place, never a rebuild agent.** Plus [[no-sparklines-in-pencil]] (sparklines never render right — numbers/line-charts only), and the recurring Pencil-agent bugs (stray nodes dumped at the origin overlapping other frames; `placeholder:true` flags left on → "still being built" highlight — clear them).
+2. **The core deliverable (`71s4`, P1) — DESIGN STARTED, CODE STILL UNBUILT.** S68 locked the runtime decision (interactive agent-dispatch), derived the dependency-order + 4-author/12-advisor tier topology (`vault/design/plan-generation-pipeline-v1.md`), and built+iterated the Clinical Light dashboard direction. But the PIPELINE CODE is not built: still no model/API client in `scripts/`, `plan/assemble.py` has no production caller, `generate.run` renders only dashboard/report. The core-capability-first gate still answers NO. Build only after the screens are signed off; minimal end-to-end path first (per the topology note's build sequence) with the mechanical core-capability gate.
+3. **Standing mechanics + the S67 carry-overs.** Pencil: ALWAYS pass `filePath` (active editor flips to the safety-platform file); build agents into clear regions, never the origin. Git/bd: stage `git add` separately from `git commit` (the PII hook denies combined); the bd `.beads/daemon-error` repo-id mismatch is benign for `--flush-only` but wants an env cleanup. Rigor floor (unchanged): the pull cadence is VERSION-keyed but the library has UNVERSIONED `toolkit/` drift (`lczu`) — at the next drift boundary fetch + compare the adopted SHA, not just VERSION; `enforce-heartbeat-clause` stays UNWIRED (`0qf6`); the global skills SYMLINK the library checkout (keep the anchor valid).
 
 ## Current State (volatile)
 
-- **S67 (2026-06-16) ran the Discipline-11 pull-cadence check on the skills_library remote (operator-requested) — the FIRST real pull-cadence run.** origin/main was +19 commits ahead of the adopted `86a1a26`; a-plus's vendored `toolkit/` pin HELD at 1.0.0 (VERSION unchanged → no versioned delta; the 2 drifted audits are vendored-but-unused). ff-merged the LOCAL skills_library checkout to origin/main (`9b8b721`) → the Wave D global symlinks picked up the update (new role frontmatter etc.); 0 dead symlinks, no new unlinked items, same 2 pre-existing library parity cracks.
-- **Finding (beaded `lczu`):** the library shipped `toolkit/` changes (2 audits + a test, +326L) WITHOUT a VERSION/CHANGELOG bump — so a version-pinned consumer won't auto-detect toolkit drift until the library cuts a versioned release. Upstream (skills_library) fix; a-plus correctly HELD the pin. Logged in `docs/rigor-adoption-log.md` §10 (the new pull-cadence log) + an explicit per-instance identity note added at the log's top (each adopter keeps its OWN log).
-- **Adoption status:** COMPLETE (all 4 waves A-D) + FROZEN; the pull cadence is the one ongoing discipline and now has its first logged run. The only a-plus repo change this session is the adoption-log doc; `toolkit/`/product/governance byte-identical (pytest 833/2, floor 13/13).
-- **Beads:** `71s4` (P1, core plan-generation — PARKED pending design + Pencil); `0qf6` (heartbeat — post-adoption); follow-ups `lczu` (upstream-drift watch), `9etx`/`p5wx`/`7may`/`po4x`. `ckl1`/`d1kc`/`eyn4`/`4hmo` CLOSED.
+- **S68 (2026-06-16/17) started the parked `71s4` DESIGN work — decisions, topology, and dashboard direction, all via the design agent team.** Two pivotal decisions locked: runtime = **(A) interactive agent-dispatch** (not a standalone API client); inputs = **designed screens** (guided intake). The plan-generation dependency order + tiers were DERIVED (not guessed) by the `plan-pipeline-order` multi-agent workflow (16-specialist elicitation → architect synthesis → 6-reviewer adversarial pass that rejected fabricated edge-provenance and re-derived from `WIKI.md` Reads/Owns → reconcile; high confidence): **4 plan-authors** (personal-trainer/nutritionist/supplement-specialist/peptide-specialist) + **12 advisors**, in a phase order (baseline labs/clearance → training → nutrition → compounds, with safety overlays). Captured in `vault/design/plan-generation-pipeline-v1.md`.
+- **Dashboard visual design: explored by the team, chosen + iterated by the operator.** 4 directions built by design agents (Clinical Light / Dark Premium / Anatomical HUD / Calm Editorial) + a `design-reviewer` ranking (Sage&Paper recommended). Operator chose **Clinical Light** and iterated it BY HAND into: a top Readiness/Care-Assistant row; a full-width tabbed insights card (Performance / Training Volume / Labs / Goals / Upcoming / Streak — 6 visibility-toggled panels, Performance active by default); calendar fitted to Today's-Plan height with scroll; a full-width **16-specialist Care Team** as individuated card-blocks with domain icons. All in `design/a+maxing_designs.pen` (+ `design/images/`).
+- **Two PFs promoted + a memory rule.** PF-S68-01 (solo design without the team) + PF-S68-02 (rebuild-for-edit) — both operator-caught, logged 3-layer (PF + harvest + beads `56r9`/`9jdo`); `feedback_design_via_agent_team` updated with the granularity rule. No `scripts/` code touched (design phase); pytest 833/2.
+- **Beads:** `71s4` (P1 — design STARTED, pipeline code UNBUILT); `56r9`/`9jdo` (the 2 new PF discipline beads); carry-overs `0qf6`/`lczu`/`9etx`/`p5wx`/`7may`/`po4x`.
 - **Active landmarks:** LM-01 (First MD visit) **2026-07-13** — 14-day scoped-drift-audit window opens **2026-06-29** (not open today). LM-02 Whoop baseline date-TBD.
 
-**Historical (kept for reference):** `vault/sessions/session-67.md`.
+**Historical (kept for reference):** `vault/sessions/session-68.md`.
 
 ## What Is Next (volatile)
 
-### Resume checklist — next session (S68) open
+### Resume checklist — next session (S69) open
 
-Open normally (Session Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline `main` 833/2 + the full negative floor 13/13). **The Rigor Framework adoption is COMPLETE (all 4 waves A-D); the global skills/commands deploy tracks the library; the pull cadence has its first logged run (S67).** Re-check `.beads/daemon-error` at open.
+Open normally (Session Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline `main` 833/2 + the full negative floor 13/13). The design work lives on the branch **`feature/plan-generation-design`** (NOT merged, NO PR yet — the dashboard is mid-iteration). The Clinical Light dashboard frame is `DIR Clinical Light` in `design/a+maxing_designs.pen`; the plan-generation topology spec is `vault/design/plan-generation-pipeline-v1.md`. **Design EDITS are made BY HAND, surgically (PF-S68-02); design ORIGINATION goes through the agent team (PF-S68-01); no sparklines in Pencil.**
 
-**S68 forward options (operator prioritizes at open, NOT pre-adopted):**
+**S69 forward options (operator prioritizes at open):**
 
-1. **The core deliverable (`71s4`, P1) — the point of everything, PARKED.** Resume only after the design discussion + Pencil screens. Then build the plan-generation path end-to-end (a model/API client — none in `scripts/`; a production caller for `assemble`; a `plan` render target; real operator meta-inputs), under the now-live core-capability-first gate, with `plan-integrity` guarding the build-plan and the mechanical core-capability gate built alongside.
-2. **Post-adoption hardening (optional):** `0qf6` (wire `enforce-heartbeat-clause` — now the global skills track the library, the remaining precondition is a dispatch convention carrying the liveness clause + the `test_settings_hook_paths.sh` `toolkit/hooks/` prefix); `lczu` (upstream-drift WATCH — at the next drift boundary, fetch the library + check whether `main` is ahead of the adopted SHA, not just VERSION; the upstream fix is the library bumping VERSION + a CHANGELOG row); `9etx` (the PF-S64-01 standing fix — non-mutating git for review agents + post-dispatch branch re-verify); `p5wx` (init_instance auto-provision `.venv`); `7may` (provenance-audit interpolation hardening); `po4x` (UPSTREAM toolkit fix — framework-side); plus a beads-env cleanup for `.beads/daemon-error`.
-3. **The WHOOP real-data tail (`mdzq`)** + the correctness/governance tail (`02pe`/`dqyv`/`ofn0` + P3s) — unchanged from S63.
-4. **Operator-gated:** July-visit prep (LM-01 / `c6k`) — first session on/after **2026-06-29** runs the LM-01 scoped drift audit.
+1. **Finish the dashboard design** (operator was mid-iteration at S68 close): build out the remaining tab screens (Labs / Goals / Upcoming / Streak) adapted to the full-width tab area — the panels exist (visibility-toggled) but were sized for the narrow column; then the intake / generate-review screens in the chosen Clinical Light language; operator sign-off; open a PR for the branch at a sign-off checkpoint.
+2. **The guidance-correction cleanup (DEFERRED from S68):** ADR-0005 one-line clarification that design mocks are PII-free → tracked in-repo, + fix the "operator-held mock outside the repo" forward-guidance in the 4 active design docs + the memory guard (root: PF-S49-01's guard institutionalized outside-the-repo). The `.pen` is already in-repo; this corrects the docs so it can't recur. A bounded `fix/` branch.
+3. **Build the `71s4` pipeline** — the design is now specced (`plan-generation-pipeline-v1.md`). ONLY after the screens are signed off. Minimal end-to-end path first (one author → `assemble` → `record_plan` → render), per the topology note's build sequence, with the mechanical core-capability gate landing alongside.
+4. **Post-adoption / carry-over hardening:** `0qf6` (heartbeat wiring), `lczu` (upstream-drift watch), `9etx`/`p5wx`/`7may`/`po4x`; the WHOOP/correctness tail (`mdzq`/`02pe`/`dqyv`/`ofn0`).
+5. **Operator-gated:** July-visit prep (LM-01 / `c6k`) — first session on/after **2026-06-29** runs the LM-01 scoped drift audit.
 
 ## Landmark window check (close step 8.7)
 
-S67 close (2026-06-16): RE-OPENED `vault/meta/landmarks.md` at close step 8.7. No landmark edited — S67 was a pull-cadence/doc session (no operator data, no artifact, no Whoop baseline start). LM-01 (First MD visit) **2026-07-13**: no trigger window open today (2026-06-16; the 14-day scoped-drift-audit window opens **2026-06-29**, the 7-day MD-handoff window 2026-07-06). LM-02 (Whoop baseline) date-TBD; LM-03 (23andMe) date-TBD; LM-04 (first HTML artifact) not triggered. No landmark actions due THIS session.
+S68 close (2026-06-17): RE-OPENED `vault/meta/landmarks.md` at close step 8.7. No landmark edited — S68 was design work (no operator data, no Whoop baseline start, no MD-handoff artifact). LM-01 (First MD visit) **2026-07-13**: no trigger window open today (2026-06-17; the 14-day scoped-drift-audit window opens **2026-06-29**, the 7-day MD-handoff window 2026-07-06). LM-02 (Whoop baseline) date-TBD; LM-03 (23andMe) date-TBD; LM-04 (first HTML artifact) NOT triggered — the dashboard was designed in Pencil only; no new HTML artifact was generated via `generate.run`. No landmark actions due THIS session.
 
 ## Open Issues
 
