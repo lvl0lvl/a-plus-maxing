@@ -1,0 +1,33 @@
+{
+  "specialist": "peptide-specialist",
+  "recommendations": [
+    {
+      "claim": "BPC-157 is the top-indexed soft-tissue healing peptide candidate for MSK recovery support, pending clinician clearance and renal/hepatic baseline.",
+      "source": "vault/compounds/bpc-157.md - evidence_tier C; 4 published human studies, cumulative n~60, no RCT; McGuire 2025 (Curr Rev Musculoskelet Med) explicit 'should not be recommended for clinical use'; Vasireddi 2025 HSS systematic review (544 articles, 1 qualifying human study, n<30)",
+      "confidence_tier": "very-low",
+      "reversibility": "SC administration; compound clears in hours (rat IV t-half ~ 15.2 min, no human PK data); practitioner cycle 4-8 weeks with >=4 weeks washout - cycle reversibility is convention, not RCT-validated",
+      "category": "peptide-therapy",
+      "grounding": "animal",
+      "payload": {
+        "compound": "BPC-157 (pentadecapeptide GEPPPGKPADDAGLV; acetate salt)",
+        "dose": "250-500 mcg SC QD [practitioner_protocol] convention, not trial-validated - anchored on rat allometric extrapolation (no human PK primary exists); originator Sikiric group never stated a human SC dose",
+        "route": "subcutaneous (SC); oral arginate/acetate bioavailability has zero in-vivo PK backing",
+        "cycle_week": 1,
+        "cycle_length_weeks": 6,
+        "tags": [
+          "maturity_rung:preclinical",
+          "worst_case_h_class:H2",
+          "H2-auto-block:active - angiogenic axis (VEGFR2/eNOS); theoretical neoangiogenesis + thrombotic ceiling; GRADE strength downgraded to conditional per strong-with-low-certainty HALT",
+          "clinician-clearance:NOT_GRANTED - this draft is decision-support only, routed to medical-liaison",
+          "renal-hepatic:UNKNOWN - hard-limit field unpopulated; CMP baseline REQUIRED before any trial opens",
+          "regulatory:FDA-Cat2-removed-April-2026-via-nominations-withdrawal-NOT-safety-clearance; WADA-S0-prohibited; TGA-Schedule4-Appendix-D",
+          "[practitioner_protocol]",
+          "[population-mismatch:rat/beagle - dose and PK extrapolated from animal data only]",
+          "concentration_of_evidence:80.8%-Zagreb-cluster - certainty downgraded",
+          "combination_evidence:none - single-compound only; no stack"
+        ],
+        "evidence": "maturity_rung=preclinical; 4 human studies cumulative n~60, 0 RCTs; 80.8% Zagreb-cluster concentration -> certainty very-low; worst_case_h_class=H2 (VEGFR2 angiogenic + thrombotic); GRADE certainty:very-low / strength:conditional (strong-with-low HALT applied)"
+      }
+    }
+  ]
+}

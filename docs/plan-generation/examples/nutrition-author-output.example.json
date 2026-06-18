@@ -1,0 +1,77 @@
+{
+  "specialist": "nutritionist",
+  "recommendations": [
+    {
+      "claim": "A resistance-trained adult at ~82 kg in moderate recovery should target approximately 2700 kcal/day at maintenance to support tissue repair without imposing an energy deficit.",
+      "source": "Thomas DT et al. 'Position of the Academy of Nutrition and Dietetics, Dietitians of Canada, and ACSM: Nutrition and Athletic Performance.' JADA 2016; 116(3):501-528.",
+      "confidence_tier": "certainty: low / strength: conditional / associational (energy multiplier estimated from population-level TEE data; individual variance is high)",
+      "reversibility": "fully reversible - calorie target is an intake parameter, adjustable each meal",
+      "category": "nutrition",
+      "payload": {
+        "calorie_goal": 2700,
+        "macros": {
+          "protein": 148,
+          "carbs": 343,
+          "fat": 82
+        },
+        "water_l": 3.5
+      }
+    },
+    {
+      "claim": "Meal 1 (breakfast): oats with milk, 3 whole eggs scrambled, and a banana provides a leucine-adequate protein dose with carbohydrate to initiate glycogen repletion after overnight fast.",
+      "source": "Morton RW et al. 'A systematic review, meta-analysis and meta-regression of the effect of protein supplementation on resistance training-induced gains in muscle mass and strength.' BJSM 2018; 52(6):376-384.",
+      "confidence_tier": "certainty: moderate / strength: conditional / causal (leucine threshold mechanism RCT-supported; meal composition is food-first practical application)",
+      "reversibility": "fully reversible - meal contents are interchangeable day to day",
+      "category": "nutrition",
+      "payload": {
+        "meal": {
+          "name": "Breakfast",
+          "contents": "80 g rolled oats cooked in 240 ml whole milk, 3 whole eggs scrambled, 1 medium banana",
+          "kcal": 675
+        }
+      }
+    },
+    {
+      "claim": "Meal 2 (midday): ground beef or chicken breast with rice and mixed vegetables delivers the midday protein dose and replenishes muscle glycogen between training sessions.",
+      "source": "Thomas DT et al. JADA 2016 (op. cit.); Jaeger R et al. 'International Society of Sports Nutrition Position Stand: Protein and Exercise.' JISSN 2017; 14:20.",
+      "confidence_tier": "certainty: moderate / strength: conditional / causal (protein dose per meal grounded in leucine-threshold RCTs; glycogen-repletion benefit is causal at sufficient CHO intake)",
+      "reversibility": "fully reversible",
+      "category": "nutrition",
+      "payload": {
+        "meal": {
+          "name": "Midday meal",
+          "contents": "170 g lean ground beef or chicken breast, 180 g cooked white rice, 150 g mixed vegetables with olive oil",
+          "kcal": 675
+        }
+      }
+    },
+    {
+      "claim": "Meal 3 (afternoon): Greek yogurt, mixed berries, and a small handful of nuts provides a protein-dense snack with antioxidant load to support recovery between meals.",
+      "source": "Stokes T et al. 'Recent Perspectives Regarding the Role of Dietary Protein for the Promotion of Muscle Hypertrophy.' Nutrients 2018; 10(2):180.",
+      "confidence_tier": "certainty: low / strength: conditional / associational (antioxidant-recovery link is observational; protein dose is mechanistically grounded)",
+      "reversibility": "fully reversible",
+      "category": "nutrition",
+      "payload": {
+        "meal": {
+          "name": "Afternoon snack",
+          "contents": "200 g full-fat Greek yogurt, 100 g mixed berries, 30 g mixed nuts",
+          "kcal": 675
+        }
+      }
+    },
+    {
+      "claim": "Meal 4 (evening): salmon or other fatty fish with roasted potatoes and a green salad closes the daily protein target and provides omega-3 fatty acids associated with reduced inflammatory markers during musculoskeletal recovery.",
+      "source": "Smith GI et al. 'Omega-3 polyunsaturated fatty acids augment the muscle protein anabolic response to hyperinsulinaemia-hyperaminoacidaemia in healthy young and middle-aged men and women.' Clin Sci 2011; 121(6):267-278.",
+      "confidence_tier": "certainty: low / strength: conditional / associational (omega-3 anti-inflammatory benefit during recovery is associational epidemiology; anabolic signaling signal is low-certainty mechanistic RCT in healthy adults, not injury-recovery population specifically)",
+      "reversibility": "fully reversible",
+      "category": "nutrition",
+      "payload": {
+        "meal": {
+          "name": "Evening meal",
+          "contents": "180 g salmon fillet, 200 g roasted potatoes, large green salad with olive oil and lemon",
+          "kcal": 675
+        }
+      }
+    }
+  ]
+}

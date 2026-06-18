@@ -47,19 +47,23 @@ or the thin-library sentinel `{"specialist": <slug>, "thin_library": true}`.
 
 ### Per-domain `payload` shapes (the `plan_schema` plan schemas)
 
-- **workout** — `{name (str), sets (int 1–100), reps? (str|int), detail? (str), load? (str)}`. WIRED.
-- **nutrition** — the plan is `{calorie_goal (int>0), macros {protein,carbs,fat ints>0}, meals[{name, contents?, kcal?}], water_l?}`. A nutrition author emits recs whose payloads compose to that plan; **a per-domain translator must aggregate** (the workout translator is 1 rec → 1 exercise; nutrition is N recs → one macro/meals plan). TODO.
-- **supplements** — `{items: [{name, dose (str), timing?}]}`. 1 rec → 1 item. TODO.
-- **peptides** — `{compound (str), dose (str), route (str), cycle_week?, cycle_length_weeks?, tags?, evidence?}`. TODO.
+- **workout** — `{name (str), sets (int 1–100), reps? (str|int), detail? (str), load? (str)}`. 1 rec → 1 exercise. WIRED (S70).
+- **nutrition** — the plan is `{calorie_goal (int>0), macros {protein,carbs,fat ints>0}, meals[{name, contents?, kcal?}], water_l?}`. The author emits ONE day-target rec (payload carries `calorie_goal`/`macros`/`water_l?`) plus one rec per `meal` (payload `{meal: {...}}`); `_to_nutrition_plan` **AGGREGATES** the surviving payloads into one plan (day-target fields last-wins, meals accumulate). Absent targets OR no surviving meal → records nothing (the honest no-plan state). WIRED (S71).
+- **supplements** — `{items: [{name, dose (str), timing?}]}`. 1 rec → 1 item (`_to_supplements_plan`). WIRED (S71).
+- **peptides** — `{compound (str), dose (str), route (str), cycle_week?, cycle_length_weeks?, tags?, evidence?}`. SINGLE compound per plan: `_to_peptides_plan` takes the first surviving rec's payload (a multi-compound stack is the deferred compound-band). WIRED (S71).
 
 ## Adding the next author (the small per-domain delta)
 
 1. Add a translator `_to_<domain>_plan(recommendations, gates) -> dict | None` to
    `scripts/plan/generate_plan.py` and register it in `_PLAN_TRANSLATORS`. It lifts the surviving
    recs' payloads into the domain's `plan_schema` shape (workout is 1:1; nutrition aggregates).
-2. Wire the domain's safety gate(s) through `gates` if it has one (workout = `clearance_granted`;
-   **nutrition = the 0.5 critical-floor RED-S/LEA screen** per the pipeline spec — that author
-   short-circuits energy-deficit content; supplements/peptides = the compound-band two-pass screen).
+2. Wire the domain's safety gate(s). A single-author OWNED screen is a pre-translation veto in
+   `_DOMAIN_GATES` (runs BEFORE translation, returns a distinct honest reason): **nutrition owns the
+   0.5 critical-floor RED-S/LEA screen** (`gates["red_s_lea_screen"]` `True`/`"tripped"` →
+   `red-s-lea-clinical-routing`, records no energy plan). A per-exercise/per-item gate runs inside the
+   translator (workout = `clearance_granted` drops `load`). The cross-compound supplement↔peptide
+   two-pass additive-AE screen and the nutrition→workout energy bounce are NOT per-author gates — they
+   are the deferred cross-domain layer (the step-4 reconciler).
 3. Add `tests/plan/test_generate_plan.py`-style coverage: happy path, the gate mutation-proven RED,
    struck-rec exclusion, the honest no-plan states, and the store-adversarial four (cross-stream /
    dedupe-idempotent / dedupe-key boundary / changed-value no-op).
@@ -96,12 +100,23 @@ silently shipped.
 - **Real-author E2E (the production-path verification — integration mandate):** dispatch the author,
   capture its JSON, then `generate_plan(domain, author_output, store_read, root, plan_date=..., gates=...)`
   against a temp store, then `generate.run("dashboard", _root=..., _today=...)` and inspect the rendered
-  card. The S70 workout run is captured at `docs/plan-generation/examples/workout-author-output.example.json`.
+  card. Captured real-dispatch runs (PII-free synthetic operator) at `docs/plan-generation/examples/`:
+  `workout-author-output.example.json` (S70), and `nutrition-` / `supplements-` / `peptides-author-output.example.json` (S71).
 - **Verification means running the production path, not just unit tests** (the integration mandate).
+- **Clinician-gated compounds (learned S71).** Dispatched faithfully, the supplement-specialist and
+  peptide-specialist are INFORM-class — their single-author output is a DRAFT pre-medical-liaison, not
+  an operator-approved directive. The peptide-specialist anchored BPC-157 at H2 (angiogenic auto-block)
+  and surfaced it as a decision-support draft with the H2 block + `clinician-clearance:NOT_GRANTED`
+  caveat RENDERED on the card (verified in the E2E). "Four authors wired" is NOT "operator-usable":
+  the cross-compound additive-AE screen + the medical-liaison terminal gate are the gate between
+  build-complete and operator-usable. The build runs on synthetic fixtures (no real operator data).
 
 ## What is deliberately NOT here yet (deferred per the build sequence)
 
-- The other three domain translators + their author dispatches (nutrition / supplements / peptides).
+- All four plan-domain authors are now WIRED (workout S70; nutrition / supplements / peptides S71).
+- The **cross-domain layer**: the supplement↔peptide two-pass mutual interaction/additive-AE screen
+  (Phase-3, bidirectional — members each pass single-domain filters but the combination is not yet
+  cross-checked for additive risk) and the nutrition→workout energy BOUNCE (a joint constraint).
 - The step-4 orchestrator reconciler (cross-domain overlap/contradiction + plan-bounce) and the
   medical-liaison terminal safety gate — the `/generate-plan` main agent that wraps `assemble`.
 - A standalone full-plan render screen (the dashboard plan card is Slice 1's surface; the operator is
