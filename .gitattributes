@@ -1,3 +1,8 @@
 
 # Use bd merge for beads JSONL files
 .beads/issues.jsonl merge=beads
+
+# Pencil design files are encrypted/serialized — line-diffing them is meaningless
+# and swamps PR review (a single re-skin is tens of thousands of diff lines). Treat
+# as binary: no textual diff, no line-merge (take-one-side on conflict).
+*.pen binary
