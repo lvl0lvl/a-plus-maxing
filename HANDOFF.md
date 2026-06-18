@@ -12,45 +12,45 @@ review_cadence: weekly
 
 # Session Handoff
 
-## Scope Contract — Session 69 (2026-06-18)
+## Scope Contract — Session 70 (2026-06-18)
 
-Goal: Produce a technical-instrument ("engineering-HUD on warm paper") STYLE iteration of the approved Clinical Light dashboard — re-skin only, zero layout change — origination via the design agent team, application by hand.
+Goal: Build Slice 1 of the plan-generation pipeline (the PF-S63-02 core-capability proof): dispatch the `personal-trainer` author → `router.summarize` → `assemble(["workout"])` → `record_plan` → render a real, followable, clearance-deferred workout plan — verified by running the production path end-to-end.
 
 Acceptance criteria:
-- [x] AC1: theme style-system originated via the design agent team (ui-designer) from the operator's moodboard; not soloed.
-- [x] AC2: themed frame is a DUPLICATE of the approved Clinical Light; node tree/positions/sizes/hierarchy unchanged — only visual properties restyled (theme-conditional `clin-*` tokens; clinical frame pinned + preserved).
-- [x] AC3: renders clean — no sparklines, no placeholder highlights, no stray nodes; screenshot-verified; gauges are true circles.
-- [x] AC4: operator sign-off on the theme; iterated by hand.
-- [x] AC5: committed to `feature/plan-generation-design`; full close.
+- [x] AC1: `plan.assemble` gains a real production caller (a new `scripts/plan/` entry-point) composing a specialist rec through the four filters → `record_plan`.
+- [x] AC2: the `personal-trainer` author dispatched for real (runtime A), clearance-deferred (no load prescription), not a stub.
+- [x] AC3: the recorded plan renders followable (routed to the dashboard zone-3 plan card per operator decision; standalone full-plan screen deferred, operator-drafted later).
+- [x] AC4: a mechanical core-capability gate lands (assemble has a production caller + the plan render + the E2E runs) with a RED-proving negative test.
+- [x] AC5: the `record_plan` write satisfies `docs/checklists/store-adversarial-tests.md`; full suite green; production path run E2E + the rendered plan inspected.
+- [~] AC6: QA + plan-integrity lens + `/review-pr` before merge; full close. (CHANGED — see eval.)
 
-Files I WILL touch: `design/a+maxing_designs.pen` (+ `design/images/`, `.design/`); `memory/process-failures.md` + `harvest.jsonl` + `.beads`; HANDOFF/vault at close.
-Files I will NOT touch: `scripts/` (no pipeline code — design phase); the approved `DIR Clinical Light` frame STRUCTURE (duplicate, never mutate); `main` directly.
-NOT doing: layout changes; the `71s4` pipeline code; the ADR-0005 / guidance-correction cleanup (still deferred); intake/generate-review screens.
-Invariants at risk: INV-BRANCH-NOT-MAIN (on `feature/plan-generation-design`); INV-HO-ROTATION / INV-PF-ATTESTATION / INV-SKILL-TRACE / INV-CLOSE-AUDIT / INV-HARVEST-CAPTURE at close.
+Files I WILL touch: new `scripts/plan/generate_plan.py`; new `scripts/core-capability-audit.sh` + `scripts/tests/test_core_capability_audit.sh`; new `tests/plan/test_generate_plan.py`; PII-free synthetic fixture (`docs/plan-generation/`); the gate wiring (`scripts/close-audit.sh`, `INVARIANTS.md`, `CLAUDE.md`); `.gitattributes`; HANDOFF/vault/PF-log/harvest/beads at close.
+Files I will NOT touch: `scripts/plan/assemble.py` + `router.py` core logic (built+tested — caller only); the PII boundary; the locked `design/a+maxing_designs.pen`; `main` directly.
+NOT doing: Slices 2–5 (nutrition/compound/ingestion/reconciler); no model/API client (runtime A); no real operator PII in tracked files.
+Invariants at risk: INV-BRANCH-NOT-MAIN; store-surface battery (`record_plan`); INV-CLOSE-AUDIT / INV-PF-ATTESTATION / INV-SKILL-TRACE / INV-HARVEST-CAPTURE at close; INV-CORE-CAPABILITY (added this session, operator-approved). Core-capability-first gate (PF-S63-02): satisfied — this IS the core work.
 
-### S69 Scope Contract Evaluation (2026-06-18, volatile)
+### S70 Scope Contract Evaluation (2026-06-18, volatile)
 
-- **AC1 (team origination) — PASS.** ui-designer (full profile inlined) read the moodboard + built the `Instrument Style Kit` + the segmented-gauge geometry; design-critic (full profile inlined) reviewed the applied result and diagnosed the shallow first pass.
-- **AC2 (duplicate, no layout change) — PASS.** `DIR Clinical Instrument` (`nJ4f1`) is a copy of `LXKlO`; re-skin via theme-conditional `clin-*` tokens (clinical pinned `skin:clinical`, instrument `skin:instrument`) + by-hand property edits (type/radius/motifs/de-chroma) — structure unchanged; clinical frame verified pixel-identical.
-- **AC3 (clean render) — PASS.** Final screenshot clean; gauges true circles (top-left rotation-pivot bug fixed, `rotation = 360−θ`); no sparklines/placeholder/stray nodes; scratch deleted.
-- **AC4 (operator sign-off) — PASS.** "good enough … lock it in."
-- **AC5 (commit + close) — PASS.** Design committed `4f71bd9` (+ pushed); this close.
+- **AC1 (production caller) — PASS.** `scripts/plan/generate_plan.py` is `assemble`'s production caller (calls `assemble` + `record_plan`), generic across the four plan-authors via `_PLAN_TRANSLATORS`.
+- **AC2 (real clearance-deferred author) — PASS.** `personal-trainer` dispatched for real (full profile inlined); returned a 5-exercise clearance-deferred session, 0 load prescriptions; the real output flowed through the production path.
+- **AC3 (followable render) — PASS.** Routed to the dashboard zone-3 plan card (operator decision); the recorded plan rendered (5 exercises, attributed `via personal-trainer`). The standalone full-plan screen is deferred (operator drafts it later).
+- **AC4 (mechanical gate) — PASS.** `core-capability-audit.sh` (structural greps + the `--self-test` E2E) + RED-proving negative test (incl. the F4 assemble-without-record_plan case); registered `INV-CORE-CAPABILITY`, added to the close roster.
+- **AC5 (store-adversarial + E2E) — PASS.** The four adversarial categories at the `record_plan` boundary + the two safety gates (clearance, struck-rec) mutation-proven RED; suite 848/2 (main); the real production path rendered a plan (E2E, not just units).
+- **AC6 (review + close) — CHANGED.** `/review-pr` (6-agent fresh) ran → gate PASS → 3 legitimate findings fixed + blind-verified; `/merge` (REST rebase) landed PR #145 on `main` (`15ca1e9`). The **`plan-integrity` role was NOT separately dispatched** — this was a scoped SE build, not a `/execute-plan` build-plan wave (where plan-integrity gates wave checkpoints); its substance (grounding every seam against the live tree + verifying the wired path E2E) was covered by the integration-verification work + the mechanical gate. Flagged CHANGED, not silent.
 
-**CHANGED / flagged (none silent):** the scope WAS written + operator-confirmed at the start of the work ("give it a shot") — INV-SCOPE-CONTRACT satisfied at open (unlike S68's retroactive contract). The design-critic pass + the 3-round gauge rebuild were operator-directed iterations within AC4 ("iterate by hand"), flagged not silent. PF-S69-01 captures the process gap (critic-after-present + verify-first-on-render).
+### Drift checks (S70 close)
 
-### Drift checks (S69 close)
-
-- **Task drift:** ACs PASS; the session executed the operator-directed style iteration. The critic run + gauge rebuild were in-scope operator-directed iterations, not silent drift. No `scripts/` touched.
-- **Architecture drift:** no INV degraded. INV-BRANCH-NOT-MAIN held; INV-HARVEST-CAPTURE exercised (PF-S69-01 3-layer). The theme-conditional `clin-*` tokens are additive (clinical skin unchanged). The core-capability-first gate (the S63 drift lesson) still answers NO — design-phase work, legitimately secondary, confirmed by grep.
-- **Vision drift:** none. The session refined the operator-facing dashboard surface — on-vision (physician-ready plan surface). `design/vision.md` first sentence unchanged.
+- **Task drift:** ACs PASS (AC6 CHANGED-flagged). Scope grew by two operator-approved/flagged additions — the `INV-CORE-CAPABILITY` wiring (operator-approved change-discipline ritual) and the `.gitattributes` `*.pen binary` hygiene fix (flagged; it enabled a clean PR review). No silent drift.
+- **Architecture drift:** one INV ADDED with approval (`INV-CORE-CAPABILITY`); none degraded. INV-BRANCH-NOT-MAIN held (build on `feature/plan-generation-design`; close on `fix/s70-close` in an isolated worktree). The session moved the project AWAY from the PF-S63-02 risk — the core capability is now built + mechanically guarded (the gate answers YES for workout).
+- **Vision drift:** none, toward-vision. The system now produces a followable, sourced plan end-to-end (the plan-generation leg of the closed loop). `design/vision.md` first sentence unchanged.
 
 ### PF attestation
 
-S69 close (2026-06-18): **One new PF promoted — PF-S69-01** (presented design to the operator without the design-critic gate; rationalized the elliptical gauges as a tool artifact instead of a controlled probe — all operator-caught). Logged 3-layer (PF log + `harvest.jsonl` + bead `bibc`). Full attestation + skill-trace escape ("No PR lifecycles ran this session.") + the disclosure ledger (3 operator-caught) in `memory/process-failures.md` Session 69.
+S70 close (2026-06-18): **One new PF promoted — PF-S70-01** (committed the governance-wiring commit to the wrong branch after the operator switched the shared working tree mid-session; did not re-verify `git branch --show-current` before committing — the PF-S64-01 branch-state class, recurrence_count=2; self-caught from the commit output + relocated cleanly, no work lost). Structural fix: the isolated-worktree pattern (this close ran in one; recommended to the operator for the parallel reskin). Logged 3-layer (PF log + `harvest.jsonl` + bead). Full attestation + the per-PR skill-trace table + the disclosure ledger in `memory/process-failures.md` Session 70.
 
 ## Historical Scope Contracts (archived)
 
-Scope contracts for Sessions 5-68 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S66 archived S65; S67 archived S66; S68 archived S67; S69 archived S68) to keep this handoff lean. The current (S69) scope contract is above; the archive holds the prior-session archaeology.
+Scope contracts for Sessions 5-69 + their evaluations were moved to `vault/sessions/scope-contract-archive.md` (S32 archived the S5-31 set; S33 archived S32; …; S67 archived S66; S68 archived S67; S69 archived S68; S70 archived S69) to keep this handoff lean. The current (S70) scope contract is above; the archive holds the prior-session archaeology.
 
 ## Session 4 close — 2026-05-25
 
@@ -252,41 +252,37 @@ S16 close (2026-05-29): No new PF-class entries this session. PF-S13-01 (AP-PROT
 
 ## Top-3 active failure modes (VOLATILE — rotates each session)
 
-1. **The core deliverable (`71s4`, P1) — DESIGN COMPLETE, CODE STILL UNBUILT — and it is the NEXT SESSION'S WHOLE FOCUS.** The runtime (interactive agent-dispatch), the dependency-order + 4-author/12-advisor topology (`vault/design/plan-generation-pipeline-v1.md`), and now the dashboard visual direction are all settled. The PIPELINE CODE is still not built — confirmed by grep this session: **no model/API client in `scripts/`, `plan.assemble` has no production caller, `generate.run` renders only dashboard/report.** Core-capability-first gate = NO. S70 wires the minimal end-to-end slice (one author → `assemble` → `record_plan` → a new `plan` render) with the mechanical core-capability gate. See "What Is Next" for the build-session kickoff.
-2. **DESIGN DISCIPLINE — PF-S69-01 (fresh) + the S68 granularity pair.** PF-S69-01: presented design to the operator WITHOUT first running the design-critic gate (operator did the critic's job), and rationalized the elliptical gauges as a `get_screenshot` artifact instead of a controlled probe. **Rules: design-critic runs BEFORE operator review (the team's QA gate is not optional); prove a suspected tool-artifact with a controlled probe before presenting; team for ORIGINATION, by-hand for bounded EDITS; [[no-sparklines-in-pencil]].** Pencil gotchas (now in `.design/system.md`): rects rotate about the **top-left corner** (radial ticks need `rotation = 360−θ`); `dashPattern` is **dropped** on ellipse strokes; multi-segment **path** strokes render **blank**; clear `placeholder:true`; no stray origin nodes.
-3. **Standing mechanics + carry-overs.** Pencil: ALWAYS pass `filePath` (active editor flips to the safety-platform file). Git/bd: stage `git add` separately from `git commit` (PII hook denies combined); `.beads/daemon-error` repo-id mismatch is benign for `--flush-only`; the `vault/approaches/` re-mangle is a benign basic-memory artifact (leave uncommitted). Rigor floor (unchanged): VERSION-keyed pull cadence misses the library's UNVERSIONED `toolkit/` drift (`lczu`); `enforce-heartbeat-clause` stays UNWIRED (`0qf6`).
+1. **Shared-working-tree branch collisions (PF-S70-01, fresh — PF-S64-01 class, count=2).** When two work streams share one checkout, a branch switch by one lands the other's commit on the wrong branch (this session: the governance commit landed on the operator's reskin branch after they switched the tree). Self-caught + relocated, no loss. **Rules: re-verify `git branch --show-current` before EVERY commit; run parallel streams in separate `git worktree`s (the structural fix — the reskin now gets its own worktree; the close ran in one).**
+2. **The core capability is WIRED but only ONE author (workout) is built.** `generate_plan` is generic across the four plan-authors; Slices 2–5 remain (nutrition energy-edge, compound two-pass band, Phase-0 ingestion/advisory, the step-4 orchestrator reconciler + medical-liaison terminal gate). The repeatable process is `docs/plan-generation/author-dispatch-process.md` — each new author is a per-domain translator + a real dispatch. **The CLAIM-PHRASING RULE is load-bearing for every future author: a claim must not contain a hard-limit subject even when negating it (the fail-closed HALT strikes "without any overhead pressing").**
+3. **Standing mechanics + carry-overs.** GraphQL throttles → REST fallback for PR-create/merge (full-40-char SHA on the `sha` guard). Git/bd: `git add` separate from `git commit` (PII hook); `.beads/daemon-error` + the `vault/approaches/` re-mangle are benign. Carry-overs: `0qf6`/`lczu`/`9etx`/`p5wx`/`7may`/`po4x` + the 3 PR#145 follow-up beads (`bwbw` pii_scan guard, `32gy` assemble-negation, `bc9z` stale INV count). Pencil: ALWAYS pass `filePath`.
 
 ## Current State (volatile)
 
-- **S69 (2026-06-18) produced the technical-instrument dashboard skin and locked the design direction.** On the approved Clinical Light layout (frozen, structure untouched), a duplicate frame `DIR Clinical Instrument` (`nJ4f1`) re-skinned to: warm-paper canvas + a single orange accent confined to marks (theme-conditional `clin-*` tokens — clinical pinned `skin:clinical` and verified pixel-identical, instrument `skin:instrument`); **JetBrains Mono** labels + **Space Grotesk** readouts; flat sharp (3px) cards; a grayscale anatomical figure; monochrome trend lines; accent index numerals; and **circular segmented radial-tick** Readiness gauges in three spec colors (teal/orange/sky). Done via the agent team (ui-designer origination + the `Instrument Style Kit` + gauge geometry; design-critic review) and by-hand application. Operator signed off ("good enough; lock it in"). Committed `4f71bd9` + pushed.
-- **One PF promoted.** PF-S69-01 (presented design without the design-critic gate; rationalized the elliptical gauges as a tool artifact rather than a controlled probe — all operator-caught), logged 3-layer (PF + harvest + bead `bibc`). The Pencil rendering findings (top-left rotation pivot; `dashPattern` dropped on ellipse strokes; blank multi-segment path strokes) are recorded in `.design/system.md`.
-- **No `scripts/` code touched; pytest 833/2. Core-capability still NO** — confirmed by grep (no model/API client; `plan.assemble` no production caller; `generate.run` renders only dashboard/report). The build is S70's dedicated focus.
-- **Beads:** `71s4` (P1 — design DONE, pipeline code UNBUILT → S70); `bibc` (PF-S69-01); carry-overs `0qf6`/`lczu`/`9etx`/`p5wx`/`7may`/`po4x`.
-- **Active landmarks:** LM-01 (First MD visit) **2026-07-13** — 14-day scoped-drift-audit window opens **2026-06-29** (not open today, 2026-06-18). LM-02 Whoop baseline date-TBD.
+- **S70 (2026-06-18) wired the CORE CAPABILITY end-to-end — PF-S63-02 closed for the workout domain.** `scripts/plan/generate_plan.py` is `assemble`'s production caller (generic across the four plan-authors): `router.summarize` → `assemble` (the four safety filters) → a per-domain translator → `plan_schema.record_plan` → the dashboard zone-3 plan card renders it. A REAL `personal-trainer` dispatch (full profile inlined) produced a clearance-deferred 5-exercise plan that rendered, **0 load prescriptions** (the clearance gate — default-deny without clinician clearance — and the HALT struck-rec exclusion are both mutation-proven RED). The mechanical gate `scripts/core-capability-audit.sh` (registered `INV-CORE-CAPABILITY`, added to the close roster) asserts the path stays wired via a `--self-test` E2E. The repeatable process is documented at `docs/plan-generation/author-dispatch-process.md`.
+- **PR #145** (6-agent `/review-pr` → gate PASS → 3 legitimate findings fixed + blind-verified → REST rebase `/merge`) landed on `main` at **`15ca1e9`** (as of 2026-06-18 S70 close), reconciling main with the S68/S69 design baseline + the S70 build. `*.pen` is now diffed as binary (`.gitattributes`).
+- **One PF promoted.** PF-S70-01 (wrong-branch commit in the shared working tree after the operator switched it; PF-S64-01 class, count=2; self-caught + relocated, no loss), 3-layer. Structural fix = isolated `git worktree`s per stream.
+- **pytest 848/2 (main).** Core-capability gate green; negative-test floor 14/14.
+- **Beads:** `71s4` (workout slice DONE — Slices 2-5 open); PR#145 follow-ups `bwbw`/`32gy`/`bc9z`; the PF-S70-01 bead; carry-overs `0qf6`/`lczu`/`9etx`/`p5wx`/`7may`/`po4x`.
+- **Active landmarks:** LM-01 (First MD visit) **2026-07-13** — 14-day scoped-drift-audit window opens **2026-06-29**. LM-02 Whoop baseline date-TBD.
 
-**Historical (kept for reference):** `vault/sessions/session-69.md`.
+**Historical (kept for reference):** `vault/sessions/session-70.md`.
 
 ## What Is Next (volatile)
 
-### S70 build-session kickoff — wire the CORE CAPABILITY (minimal end-to-end plan-generation)
+### S71 — continue the plan-generation build-out (Slice 2: nutrition author)
 
-Open normally (Session Start Protocol; `branch-completeness-audit.sh` at OPEN; baseline 833/2 + the negative floor). **This session's whole focus is the build** — operator direction at S69 close: "get this build done." Write the scope contract at OPEN and answer the core-capability-first gate (the S63 drift lesson) explicitly: it is still NO, and wiring it end-to-end IS the goal — so the secondary-work guard does not apply, this IS the core work.
+The core capability is wired for workout. Continue per the `vault/design/plan-generation-pipeline-v1.md` build sequence + the repeatable process in `docs/plan-generation/author-dispatch-process.md` (the universal rec contract + a per-domain translator + a real dispatch + E2E verification):
 
-**The minimal end-to-end slice** (per `vault/design/plan-generation-pipeline-v1.md` + runtime decision A = interactive agent-dispatch). State confirmed by grep at S69 close: no model/API client in `scripts/`; `plan/assemble.py` defines `assemble` with **no production caller**; `generate.run` renders only `dashboard`/`report`. Build the first vertical slice that makes the system do its one job:
+1. **Slice 2 — nutrition author + the one real build edge.** Wire workout energy-expenditure → nutrition energy/protein targets (nutrition may BOUNCE the workout plan — a joint constraint). Add `_to_nutrition_plan` to `_PLAN_TRANSLATORS` (it AGGREGATES N recs → one `{calorie_goal, macros, meals}` plan, unlike workout's 1:1); wire the **0.5 critical-floor RED-S/LEA screen** (nutritionist-owned, short-circuits energy-deficit content); dispatch the nutritionist for real (full profile inlined); E2E-verify on the dashboard.
+2. Then **Slice 3** (peptide + supplement two-pass mutual interaction/additive-AE screen), **Slice 4** (Phase-0 ingestion / advisory protocol-authors), **Slice 5** (the step-4 orchestrator reconciler with plan-bounce + the medical-liaison terminal safety gate — the `/generate-plan` main agent).
 
-1. **Invoke ONE plan-author** (personal-trainer specialist, via agent dispatch — runtime A) over the operator meta-inputs (`vault/meta/operator-profile.md` / `goals.md` / `current-state.md`) + the gated wiki → sourced recommendation(s). (Meta-inputs are still placeholders — populate the minimum needed or stub explicitly and flag.)
-2. **Give `plan.assemble` a production caller** — compose the author's recs through its 4 filters (attribution / sourcing / population-mismatch / fail-closed HALT).
-3. **`record_plan`** stores the assembled plan (store-surface task → satisfy `docs/checklists/store-adversarial-tests.md`).
-4. **Add a `plan` render target** to `generate.run` (currently only `dashboard`/`report`) + a plan template → render a followable plan. The locked dashboard visual language is `DIR Clinical Instrument` in `design/a+maxing_designs.pen`.
-5. **Land the mechanical core-capability gate** (a script asserting the path is wired) WITH this build — per CLAUDE.md it ships alongside `71s4`.
+**Discipline:** scope contract at open; **run parallel streams (e.g. the dashboard reskin) in separate `git worktree`s** (PF-S70-01 structural fix); re-verify `git branch --show-current` before each commit; honor the CLAIM-PHRASING RULE; **verify by running the production path E2E (a real rendered plan), not just unit tests** (integration mandate); store-surface writes satisfy `docs/checklists/store-adversarial-tests.md`; `/review-pr` → `/merge` before landing on main.
 
-**Discipline:** scope contract at open; if the slice maps to a `docs/build-plan/` wave run it via `/execute-plan` (read in full, PF-S17-01/PF-S36-01) with the `plan-integrity` role + three-tier review; otherwise a scoped SE build with QA + `/review-pr` before merge. **Verification = running the production path end-to-end (a real rendered plan), not just unit tests** (integration-verification mandate). Decide at open whether to branch from `main` or continue on `feature/plan-generation-design` (which holds the locked dashboard).
-
-**Deferred (NOT blocking the build):** remaining dashboard polish (tab/intake screens in the instrument language); the ADR-0005 / guidance-correction cleanup (still deferred from S68); carry-overs `0qf6`/`lczu`/`9etx`/`p5wx`/`7may`/`po4x`; operator-gated July-visit prep (LM-01 / `c6k`) — first session on/after **2026-06-29** runs the LM-01 scoped drift audit.
+**Deferred (NOT blocking):** the standalone full-plan render screen (operator drafting it); the dashboard reskin in flight (operator's worktree); the PR#145 follow-ups (`bwbw` pii_scan guard, `32gy` assemble-negation, `bc9z` stale INV count); the ADR-0005 / guidance-correction cleanup; carry-overs `0qf6`/`lczu`/`9etx`/`p5wx`/`7may`/`po4x`; operator-gated July-visit prep (LM-01) — first session on/after **2026-06-29** runs the LM-01 scoped drift audit.
 
 ## Landmark window check (close step 8.7)
 
-S69 close (2026-06-18): RE-OPENED `vault/meta/landmarks.md` at close step 8.7 (unchanged since open). No landmark edited — S69 was dashboard design work (no operator data, no Whoop baseline start, no MD-handoff artifact). LM-01 (First MD visit) **2026-07-13**: no trigger window open today (2026-06-18; the 14-day scoped-drift-audit window opens **2026-06-29**, the 7-day MD-handoff window 2026-07-06). LM-02 (Whoop baseline) date-TBD; LM-03 (23andMe) date-TBD; LM-04 (first HTML artifact) NOT triggered — the dashboard was designed in Pencil only; no new HTML artifact was generated via `generate.run`. No landmark actions due THIS session.
+S70 close (2026-06-18): RE-OPENED `vault/meta/landmarks.md` at close step 8.7 (unchanged). No landmark edited — S70 was plan-generation code (no operator data ingested, no Whoop baseline start, no MD-handoff artifact). LM-01 (First MD visit) **2026-07-13**: no trigger window open today (the 14-day scoped-drift-audit window opens **2026-06-29**, the 7-day MD-handoff window 2026-07-06). LM-02 (Whoop) / LM-03 (23andMe) date-TBD. LM-04 (first HTML artifact) NOT triggered — `generate.run` rendered the dashboard only to a tempdir (synthetic-fixture / operator-local data); no committed HTML artifact generated this session. No landmark actions due.
 
 ## Open Issues
 
