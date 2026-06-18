@@ -19,3 +19,8 @@ Categorized by where the fix would land. Started 2026-06-18 (S15, from skill_con
 - `aplus-research` itself executed **by hand** (it's a-plus project-local, not registered in this skill_consolidator-rooted session).
 
 (Appended as the run surfaces more.)
+
+## AR-6 (MAJOR/BLOCKING) — gate_attest Phase-3.5 gate-global mtime breaks per-section remediation
+SKILL.md Phase 3.5 = per-section re-dispatch; gate_attest uses ONE gate-global `iter_start_ts` and rejects any judge JSON older than it. Sections converging at different iterations (A iter3, B/D iter1, C/E iter2) → attest HALTs `stale-agent-source` on the earlier ones → the gate can never reach PASS for the common partial-remediation case. Fix: per-section iteration tracking, or accept a PASS judge by its own iter, or mandate+cost a whole-phase final re-judge. (skill_consolidator bead filed.)
+
+**AR-6 STATUS: FIXED** (commit 9ae92e8) — gate_attest now resolves each Phase-3.5 judge against the iteration it claims; smoke tests 16→18 (T_AR6a positive + T_AR6b negative); the BPC-157 gate-3.5 composes PASS. PR to lvl0lvl/a-plus-maxing.
