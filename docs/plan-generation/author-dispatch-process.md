@@ -111,14 +111,69 @@ silently shipped.
   the cross-compound additive-AE screen + the medical-liaison terminal gate are the gate between
   build-complete and operator-usable. The build runs on synthetic fixtures (no real operator data).
 
+## The cross-domain layer (orchestrator + reconciler) — WIRED S72
+
+The four single-author plans are computed and recorded INDEPENDENTLY by `generate_plan`. The
+cross-domain reconciler (`scripts/plan/orchestrate.py`, the step-4 "two terminal functions" of the
+design) runs them as ONE reconciled pass so a cross-domain check can stop an unsafe / un-fuelable plan
+BEFORE it is written. The refactor that enables this: `generate_plan.compute_plan(domain, author_output,
+store_read, *, gates)` does everything `generate_plan` does EXCEPT the `record_plan` write (it returns a
+candidate `{plan, reason, meta, ...}`); `generate_plan` = `compute_plan` + record (its contract is
+unchanged); the orchestrator computes every candidate, reconciles, then records the survivors.
+
+```
+generate_plans(authors, store_read, root, *, plan_date, gates, reauthor)
+  authors = {domain: envelope}  →  compute_plan each  →  reconcile  →  record survivors
+```
+
+**The author `reconciliation` envelope key** (top-level, sibling of `recommendations`; `compute_plan`
+lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
+
+- **workout** — `{"reconciliation": {"energy_cost_kcal": <int>}}` (the session's estimated training cost).
+- **nutrition** — `{"reconciliation": {"energy_budget": {"sustains": <bool>, "sustainable_training_kcal":
+  <int>, "maintenance_kcal": <int>}}}` (the nutritionist's verdict, given the workout cost).
+- any author — `{"reconciliation": {"conflicts": [{"with_domain": ..., "with": ..., "reason": ...}]}}`
+  declares a known cross-domain conflict for the report.
+
+**`reconcile(candidates)` — three behaviors (no recording):**
+
+1. **RED-S/LEA cross-domain short-circuit** (pipeline Phase 0.5). When nutrition tripped its
+   critical-floor screen (`gates["red_s_lea_screen"]` → nutrition reason `red-s-lea-clinical-routing`),
+   the reconciler ALSO holds the energy-prescribing WORKOUT plan to clinical-care routing — the screen
+   short-circuits workout AND nutrition. Precedence over the bounce.
+2. **The nutrition→workout energy BOUNCE** (Phase 2 joint constraint). When nutrition's `energy_budget`
+   verdict is `sustains: false`, the reconciler emits a bounce DIRECTIVE; `generate_plans` re-authors the
+   workout ONCE via the `reauthor(domain, {"sustainable_training_kcal": ceiling})` hook (runtime A: a
+   second personal-trainer dispatch under the energy ceiling). The re-authored plan is recorded only if
+   its `energy_cost_kcal` ≤ the ceiling; otherwise the workout is HELD (`energy-bounce-unresolved`), and
+   with no `reauthor` hook it is HELD (`energy-bounce-held`) — never an un-fuelable load on the dashboard.
+3. **Overlap + conflict detection** (the step-4 integration). An intervention identity surfacing in 2+
+   domains (a compound recommended as both a supplement and a peptide) and any author-declared conflict
+   are surfaced in the returned report. V1 DETECTS + REPORTS; the additive-AE screen and the
+   medical-liaison contradiction adjudication are the S73 compound-safety slice.
+
+The reconciliation report is RETURNED (`generate_plans(...)["reconciliation"]`), never persisted — no new
+store stream; plans record via the existing `record_plan` (the store-adversarial battery surface is
+unchanged). Tests: `tests/plan/test_orchestrate.py` (bounce + RED-S/LEA mutation-proven RED, overlap /
+conflict detection, the four-domain cross-stream + dedupe battery, the deterministic E2E render).
+Real-dispatch E2E (S72, both paths, PII-free synthetic operator):
+`cross-domain-{workout,nutrition}-author-output.example.json` (the no-bounce sustainable path) +
+`cross-domain-bounce-{workout-initial,workout-reauthored,nutrition-author-output}.example.json` (the
+real bounce: a 700-kcal cleared session → the nutritionist's real `sustains:false` (ceiling 300) →
+re-author to a 260-kcal reduced session, recorded; the bounced 700-kcal load never reaches the store).
+
 ## What is deliberately NOT here yet (deferred per the build sequence)
 
-- All four plan-domain authors are now WIRED (workout S70; nutrition / supplements / peptides S71).
-- The **cross-domain layer**: the supplement↔peptide two-pass mutual interaction/additive-AE screen
-  (Phase-3, bidirectional — members each pass single-domain filters but the combination is not yet
-  cross-checked for additive risk) and the nutrition→workout energy BOUNCE (a joint constraint).
-- The step-4 orchestrator reconciler (cross-domain overlap/contradiction + plan-bounce) and the
-  medical-liaison terminal safety gate — the `/generate-plan` main agent that wraps `assemble`.
+- All four plan-domain authors are WIRED (workout S70; nutrition / supplements / peptides S71); the
+  step-4 orchestrator reconciler — the nutrition→workout energy bounce + the RED-S/LEA cross-domain
+  short-circuit + cross-domain overlap/conflict detection — is WIRED (S72, above).
+- The **compound-safety + clinical-adjudication slice (S73)**: the supplement↔peptide two-pass mutual
+  interaction/additive-AE screen (Phase-3, bidirectional — members each pass single-domain filters but
+  the combination is not yet cross-checked for additive risk) and the **medical-liaison terminal safety
+  gate** (Phase-4 — the gate that turns the clinician-gated compound DRAFTS into operator-approvable
+  plans). The reconciler's overlap/conflict output is DETECT+REPORT until S73 adjudicates it.
+- The `/generate-plan` slash-command/skill wrapper (the orchestrator is wired as the `generate_plans`
+  callable the interactive main agent invokes; the command surface is a later convenience).
 - A standalone full-plan render screen (the dashboard plan card is Slice 1's surface; the operator is
   drafting the dedicated specialist-output screen separately).
 - Real operator data: populated locally (gitignored) per ADR-0005; never committed (public repo).

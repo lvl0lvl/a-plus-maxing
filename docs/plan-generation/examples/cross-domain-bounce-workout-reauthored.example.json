@@ -1,0 +1,30 @@
+{
+  "specialist": "personal-trainer",
+  "recommendations": [
+    {
+      "claim": "Goblet squat keeps a loaded lower-body pattern at a reduced metabolic cost.",
+      "source": "NSCA Essentials (4th ed.); Schoenfeld (2010)",
+      "confidence_tier": "established",
+      "reversibility": "Regress to bodyweight squat if bracing degrades; this is the trimmed substitute for the barbell variant",
+      "category": "training",
+      "payload": {"name": "Goblet Squat", "sets": 2, "reps": "8", "detail": "Elbows inside knees, neutral spine, controlled tempo.", "load": "single moderate dumbbell, RPE 6"}
+    },
+    {
+      "claim": "Romanian deadlift retains the loaded posterior-chain hinge at lower volume.",
+      "source": "McGill (2015); NSCA Essentials (4th ed.)",
+      "confidence_tier": "established",
+      "reversibility": "Reduce range or load on any posterior referral",
+      "category": "training",
+      "payload": {"name": "Dumbbell Romanian Deadlift", "sets": 2, "reps": "8", "detail": "Soft knee, hinge at hip, neutral spine, stop short of lumbar flexion.", "load": "moderate dumbbells, RPE 6"}
+    },
+    {
+      "claim": "Chest-supported row preserves one horizontal pulling stimulus without axial spinal loading.",
+      "source": "Schoenfeld (2010); Fenwick et al. (2009)",
+      "confidence_tier": "established",
+      "reversibility": "Switch to seated cable row if bench contact is lost",
+      "category": "training",
+      "payload": {"name": "Chest-Supported Dumbbell Row", "sets": 2, "reps": "10", "detail": "Chest on pad, retract scapula before pulling.", "load": "RPE 6-7"}
+    }
+  ],
+  "reconciliation": {"energy_cost_kcal": 260}
+}

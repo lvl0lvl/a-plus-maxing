@@ -1,0 +1,54 @@
+{
+  "specialist": "personal-trainer",
+  "recommendations": [
+    {
+      "claim": "Barbell back squat is the primary loaded lower-body compound for rebuilding strength capacity in the cleared returning trainee.",
+      "source": "NSCA Essentials of Strength Training (4th ed.); Schoenfeld (2010) hypertrophy review",
+      "confidence_tier": "established",
+      "reversibility": "Regress to goblet squat if lumbar bracing degrades; revisit load if any posterior referral returns",
+      "category": "training",
+      "payload": {"name": "Barbell Back Squat", "sets": 4, "reps": "6-8", "detail": "Neutral spine, controlled descent to parallel, drive through midfoot. Brace before unrack.", "load": "65-70% 1RM"}
+    },
+    {
+      "claim": "Conventional deadlift restores posterior-chain loaded hinge capacity at a load now permitted under clearance.",
+      "source": "McGill (2015) Low Back Disorders; NSCA Essentials (4th ed.)",
+      "confidence_tier": "established",
+      "reversibility": "Regress to trap-bar or RDL if setup position is compromised; reduce load on any technique breakdown",
+      "category": "training",
+      "payload": {"name": "Conventional Deadlift", "sets": 4, "reps": "5", "detail": "Hips set, lats engaged, bar over midfoot. Reset each rep. Stop the set on any spinal flexion under load.", "load": "60-65% 1RM"}
+    },
+    {
+      "claim": "Low-incline dumbbell press preserves upper-body pressing volume within a horizontal vector.",
+      "source": "Schoenfeld (2010); NSCA Essentials (4th ed.)",
+      "confidence_tier": "established",
+      "reversibility": "Reduce angle or load on any shoulder impingement signal",
+      "category": "training",
+      "payload": {"name": "Low-Incline Dumbbell Press (30 deg)", "sets": 4, "reps": "8-10", "detail": "Controlled descent, neutral wrist, elbows ~45 deg flare.", "load": "RPE 7-8"}
+    },
+    {
+      "claim": "Chest-supported row builds horizontal pulling volume without axial spinal loading.",
+      "source": "Schoenfeld (2010); Fenwick et al. (2009)",
+      "confidence_tier": "established",
+      "reversibility": "Switch to seated cable row if bench contact is lost",
+      "category": "training",
+      "payload": {"name": "Chest-Supported Dumbbell Row", "sets": 4, "reps": "10", "detail": "Chest stays on pad, retract scapula before pulling.", "load": "RPE 7-8"}
+    },
+    {
+      "claim": "Walking lunge adds single-leg loaded volume and unilateral hip-extensor work.",
+      "source": "Andersen et al. (2015) glute activation review; NSCA Essentials (4th ed.)",
+      "confidence_tier": "established",
+      "reversibility": "Regress to split squat (static) if balance or pelvic control degrades",
+      "category": "training",
+      "payload": {"name": "Dumbbell Walking Lunge", "sets": 3, "reps": "10 per leg", "detail": "Torso upright, knee tracks toe, push through front heel.", "load": "moderate dumbbells, RPE 7"}
+    },
+    {
+      "claim": "Captain's-chair knee raise trains anterior trunk under controlled flexion demand.",
+      "source": "McGill et al. (2009) torso exercises",
+      "confidence_tier": "established",
+      "reversibility": "Regress to dead-bug if lumbar control is lost at end range",
+      "category": "training",
+      "payload": {"name": "Captain's-Chair Knee Raise", "sets": 3, "reps": "12", "detail": "Posterior pelvic tilt, no swinging, controlled lower.", "load": "bodyweight"}
+    }
+  ],
+  "reconciliation": {"energy_cost_kcal": 700}
+}

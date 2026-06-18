@@ -12,6 +12,24 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 72 (2026-06-18)
+
+Goal: Build the cross-domain reconciler — the orchestrator terminal function (design `vault/design/plan-generation-pipeline-v1.md` decision 4, part 1): a `/generate-plan` orchestrator that computes all four candidate plans in one pass, runs the nutrition→workout energy bounce + cross-domain overlap detection, and records the reconciled set.
+
+Acceptance criteria:
+- [ ] AC1: `generate_plan` refactored to split compute-candidate (`compute_plan`) from record with NO behavior change to the single-domain public entry (all S70/S71 tests + the `--self-test` stay green).
+- [ ] AC2: a new orchestrator (`scripts/plan/orchestrate.py`, `generate_plans`) computes candidate plans for all four domains in one pass and records the reconciled set.
+- [ ] AC3: the reconciler implements the nutrition→workout energy bounce — `sustains:false` bounces the workout, the orchestrator re-authors it once under the sustainable-energy ceiling (capped 1 pass), the post-bounce plan is recorded (held if unresolved / no hook). Mutation-proven RED.
+- [ ] AC4: the reconciler detects cross-domain overlaps (same intervention/compound in 2+ domains) + author-declared conflicts and surfaces them in a reconciliation report (V1 = detect+report; contradiction adjudication is S73). The RED-S/LEA cross-domain short-circuit (a tripped nutrition screen also holds the workout) is wired here too (design Phase 0.5), mutation-proven RED.
+- [ ] AC5: verified by a real personal-trainer + nutritionist dispatch (full profiles inlined per INV-ROLE-INLINING) run through the orchestrator E2E to a rendered dashboard — the bounce exercised with real author reasoning (the integration mandate), not just a unit stub.
+- [ ] AC6: no new store-write stream (records via the existing `record_plan`; the store-adversarial surface unchanged); full suite green; the core-capability gate stays green.
+- [ ] AC7: plan-integrity lens + QA (Tier-2) + `/review-pr` (Tier-3, 6-agent) → fix legitimate findings → `/merge`; full session close.
+
+Files I WILL touch: new `scripts/plan/orchestrate.py`; `scripts/plan/generate_plan.py` (compute/record split — single-domain entry preserved); new `tests/plan/test_orchestrate.py`; `docs/plan-generation/author-dispatch-process.md`; new `docs/plan-generation/examples/cross-domain-*` envelopes (PII-free synthetic operator); HANDOFF/vault/PF-log/harvest/beads at close.
+Files I will NOT touch: `scripts/plan/assemble.py` + `router.py` core logic + the PII boundary (call only); `scripts/store/plan_schema.py` (`record_plan` — call only, no schema change); the deployed `.claude/agents/*` profiles (inline for dispatch, don't edit); the medical-liaison gate / additive-AE surfaces (S73); the locked `.pen`; `main` directly.
+NOT doing: the supplement↔peptide additive-AE screen (S73); the medical-liaison terminal gate (S73); the `/generate-plan` slash-command/skill wrapper (later convenience); auto-resolution of overlaps/contradictions (V1 detects+reports; adjudication is S73); a new store stream; a bounce loop beyond 1 re-author pass.
+Invariants at risk: INV-BRANCH-NOT-MAIN (build in the dedicated `../aplus-s72-reconciler` worktree off `main`; idle main trunk parked off `main` per PF-S71-01); INV-CORE-CAPABILITY (the refactor keeps the wired path green); store-surface battery (`record_plan` — unchanged surface, QA confirms no new write surface); INV-ROLE-INLINING (real trainer+nutritionist dispatches); INV-CLOSE-AUDIT / INV-PF-ATTESTATION / INV-SKILL-TRACE / INV-HARVEST-CAPTURE at close. Core-capability-first gate (PF-S63-02): SATISFIED — this IS the core work (the held line's integration terminal function).
+
 ## Scope Contract — Session 71 (2026-06-18)
 
 Goal: Wire the three remaining plan-domain authors (nutrition, supplements, peptides) end-to-end through the established per-author dispatch process — each a per-domain translator in `generate_plan.py` + its domain safety gate + a full test battery + a real specialist dispatch (full profile inlined) + a verified dashboard E2E render — so the core capability covers all four plan domains.
