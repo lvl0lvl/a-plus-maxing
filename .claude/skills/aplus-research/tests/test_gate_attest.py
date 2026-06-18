@@ -312,6 +312,49 @@ def main():
     finally:
         shutil.rmtree(base)
 
+    # T_AR6a (AR-6, 2026-06-18): gate-global start-iteration with PARTIAL
+    # remediation. The doc/orchestrator calls `start-iteration --phase 3.5`
+    # (no --section) each pass and re-judges only the HALTed sections, so passed
+    # sections keep an earlier-iteration judge. Each judge must be checked against
+    # the start of the iteration IT claims, not the latest gate clock — else the
+    # gate can never PASS. (Pre-fix this HALTed stale-agent-source on B/C.)
+    base = make_base()
+    try:
+        run(["start-iteration", "--base", str(base), "--phase", "3.5"])  # iter 1
+        time.sleep(0.1)
+        for sec in ("A", "B", "C"):
+            (base / f"judges/judge-{sec}.json").write_text(
+                json.dumps({"section": sec, "verdict": "PASS", "total": 100, "iteration": 1}))
+        time.sleep(0.2)
+        run(["start-iteration", "--base", str(base), "--phase", "3.5"])  # iter 2 (gate-global)
+        time.sleep(0.1)
+        (base / "judges/judge-A.json").write_text(  # only A re-judged at iter 2
+            json.dumps({"section": "A", "verdict": "PASS", "total": 100, "iteration": 2}))
+        code, _, err = run(["attest", "--base", str(base), "--phase", "3.5"])
+        gate = json.loads((base / "gates/gate-3.5.json").read_text()) if code == 0 else {}
+        test("T_AR6a gate-global partial remediation does not flag passed-earlier sections stale",
+             code == 0 and gate.get("verdict") == "PASS",
+             err.strip().splitlines()[-1] if (err and code != 0) else "")
+    finally:
+        shutil.rmtree(base)
+
+    # T_AR6b (AR-6 negative): anti-stale intent preserved. A judge CLAIMING
+    # iteration N but written BEFORE iteration N started is still stale → HALT.
+    base = make_base()
+    try:
+        run(["start-iteration", "--base", str(base), "--phase", "3.5"])  # iter 1
+        time.sleep(0.1)
+        (base / "judges/judge-A.json").write_text(  # claims iter 2, but written pre-iter-2
+            json.dumps({"section": "A", "verdict": "PASS", "total": 100, "iteration": 2}))
+        time.sleep(0.2)
+        run(["start-iteration", "--base", str(base), "--phase", "3.5"])  # iter 2 starts AFTER the write
+        code, _, err = run(["attest", "--base", str(base), "--phase", "3.5"], expect_exit=2)
+        test("T_AR6b judge claiming iter-N written before iter-N start is still stale → HALT",
+             code == 2 and "stale-agent-source" in err,
+             err.strip().splitlines()[-1] if err else "")
+    finally:
+        shutil.rmtree(base)
+
     # ─── v2 AC1 calibration (S6 2026-05-25): Phase 4.25 ID-Reconcile gate ────
     # Source path is sections/id-reconcile-source.md (not gates/gate-4.25.md
     # — the agent's deliverable lives with sections, the gate JSON lives in

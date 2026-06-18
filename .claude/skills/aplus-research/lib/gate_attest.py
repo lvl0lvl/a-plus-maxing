@@ -346,12 +346,23 @@ def attest_judge_gate(base):
         mtime = datetime.datetime.fromtimestamp(
             p.stat().st_mtime, tz=datetime.timezone.utc
         ).isoformat()
-        # BUG-001: choose per-section iter_start_ts when present, else phase-wide
+        # BUG-001: choose per-section iter_start_ts when present, else phase-wide.
+        # AR-6 (2026-06-18): when falling back to phase-wide, check this judge
+        # against the start of the iteration IT CLAIMS — not the latest gate
+        # clock. SKILL.md Phase 3.5 remediation is per-section ("re-dispatch that
+        # retrieval agent"), so sections converge at different iterations; a
+        # section that passed at iter-1 must be checked against iter-1's start,
+        # else the latest gate clock wrongly flags it stale and the gate becomes
+        # un-PASS-able for the normal partial-remediation case. Anti-stale intent
+        # is preserved: each judge is still required to be fresher than the
+        # iteration it asserts it ran in.
         sec_iters = _phase_state_section_iters(phase_state, section)
         if sec_iters:
             iter_start = sec_iters[-1]["iter_start_ts"]
-        elif phase_iter_start is not None:
-            iter_start = phase_iter_start
+        elif phase_iters:
+            _cand = [e for e in phase_iters if e["iteration"] <= iteration]
+            _chosen = max(_cand, key=lambda e: e["iteration"]) if _cand else phase_iters[0]
+            iter_start = _chosen["iter_start_ts"]
         else:
             raise GateAttestationError(
                 "no-iteration-started",
