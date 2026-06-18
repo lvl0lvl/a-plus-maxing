@@ -1,0 +1,37 @@
+{
+  "phase": "8.5",
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "/Users/Flybottle/Documents/Projects/a+research/vault/library/peptides/bpc-157/practitioner-layer.md",
+    "present": true,
+    "sha256": "65a158328b9bb2f2033af7b7236e8a865b0dce0af5981b285cafad4b751a74e1",
+    "compounding_sheets_count": 0,
+    "compounding_sheets_or_null_finding": true,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "/Users/Flybottle/Documents/Projects/a+research/vault/library/peptides/bpc-157/non-english-layer.md",
+    "present": true,
+    "sha256": "fe5b3ab6de83034fcd8102aff290c1765a1ddb50aed5d4a0190fc9e9385bd437",
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "Croatian"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "verdict": "PASS",
+  "timestamp": "2026-06-18T23:05:12.195261+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-18T22:47:26.083217+00:00",
+    "attest_ts": "2026-06-18T23:05:12.195264+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "44f282a8f36ceb2e144072cbcb2d93de4daeb2a0ad62918f6a10ce8bde750821",
+    "agent_source_mtime": "2026-06-18T23:04:30.779249+00:00"
+  }
+}

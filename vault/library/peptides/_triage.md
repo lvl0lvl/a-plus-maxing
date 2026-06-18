@@ -116,7 +116,7 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 
 | Peptide | Compound page | Status |
 |---|---|---|
-| BPC-157 | [[compounds/bpc-157]] | researching (library entry complete 2026-05-23; evidence_tier C / risk_tier experimental; matrix decision = avoid pending MD involvement) |
+| BPC-157 | [[compounds/bpc-157]] | **re-researched 2026-06-18 (deep mode, all gates attested PASS; prior 2026-05-23 entry archived — suspected fabricated citations). evidence_tier C / risk_tier experimental; no completed human RCT; ~85% single-lab (Sikiric/Zagreb) + 1 corroborating lab; FDA removed from Cat-2 ~Apr 2026 (FR 2026-07361) but unapproved + WADA-S0.** |
 
 ---
 
