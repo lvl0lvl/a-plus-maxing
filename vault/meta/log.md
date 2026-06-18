@@ -312,3 +312,5 @@ Ops: `create`, `update`, `link`, `lint`, `export`, `delete`, `schema`
 - **Discipline:** read-before-invoke HELD; **no new PF** (clean lifecycle, no user-caught failure). PF-S40-01 falsification window HELD again. PF-S25-01 tripped-clean (close on `fix/s42-close`). No `Workflow`/`AskUserQuestion`.
 - **New beads:** `5q5` P2 (render.py matrix-path reconciliation), `byj` P2 (resulted-panel render handling — couples to `s38`). **Closed:** `1ih` — **all 18 v1-build leaves now closed.**
 - **Next:** V1 build COMPLETE; no more `/execute-plan` waves. Forward = `pka` (prioritized) + the residual-bead group + LM-04 (Walter-pending data) + library-population `/aplus-research`. [[sessions/session-42]]
+
+- 2026-06-18 **update** compounds/bpc-157 + library/peptides/bpc-157/{research-report,practitioner-layer,non-english-layer} — deep re-research, all gates attested PASS (2.75→8.5). Prior entry archived at library/peptides/bpc-157/_archive/2026-06-18-suspect-fabrications/ + compounds/_archive/bpc-157-2026-06-18-suspect-fabrications.md.

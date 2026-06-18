@@ -1,0 +1,69 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-bpc157-p6-i1",
+  "draft_path": "/tmp/aplus-research/bpc-157/research-report.md",
+  "draft_sha256": "8b30b8d1e515bbfd1e7e8449ec425bda85d0d0e3ce05ec3211a38cda40a40ee2",
+  "findings": [
+    {
+      "category": "objectivity-issue",
+      "severity": "major",
+      "description": "Regulatory currency: the report asserts BPC-157 'remains FDA 503A Category 2' and frames the 2026 removal as resting 'only' on a low-trust longevity blog (agemd.com), 'NOT confirmed against an FDA/HHS primary.' As of 2026-06-18 the HHS-directed removal of ~11-12 peptides (incl. BPC-157) from Category 2 (announced 2026-04-15, effective ~2026-04-22) is corroborated by a Federal Register notice (2026-07361, pub. 2026-04-16, Docket FDA-2025-N-6895) and a regulatory-law firm plus multiple industry trackers. The report's own [14] already confirms the PCAC review is real, which is in tension with labeling the reclassification 'unverified low-trust.' The dismissal is now overstated and one-sided.",
+      "required_fix": "Soften \u00a73.1/\u00a73.6/\u00a79.5 from 'remains Category 2 / unverified low-trust' to: BPC-157 was removed from 503A Category 2 by HHS direction effective ~April 2026 (Federal Register 2026-07361; Docket FDA-2025-N-6895), pending the July 23-24 2026 PCAC vote on a possible Category-1 move; removal does NOT confer drug approval or current lawful compounding. Preserve the (correct) point that this changes the legal channel, not the human safety/efficacy evidence. If corpus is frozen, add a dated currency caveat rather than asserting present-tense Category-2 status."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "major",
+      "description": "The 'independent corroboration' base (refs [3], [5], [8]) all share author J.S. Pang at Chang Gung University/Memorial Hospital per the bibliography. The phrase 'distinct labs/groups = 2' can read as broader independence than exists: the entire non-Zagreb evidence base is a SINGLE second lab, and even the 'two themes' (tendon-cell repair, angiogenesis) come from that one group. The skeptical thesis is slightly under-stated here.",
+      "required_fix": "In \u00a74.3/\u00a74.4 state explicitly that the independent support derives from one additional lab (Pang/Chang Gung), so the corpus is 'originating lab + exactly one corroborating lab,' not multi-lab replication; reiterate that no third group has reproduced any in-vivo finding."
+    },
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "The \u00a76 human-exposure aggregate 'combined n ~= 30, three human pilot/case studies' is grounded to review [2] + practitioner ref [33]; only the IV pilot (n=2) is individually citable ([33b]). The intra-articular-knee and intravesical/cystitis pilots are not separately sourced, so the n~=30 is a soft secondary-review figure.",
+      "required_fix": "Tag the n~=30 explicitly as a secondary-review aggregate (per [2]) with only the n=2 IV pilot independently citable, or down-state to 'a handful of tiny pilot/case reports' without the specific count carrying citation weight."
+    },
+    {
+      "category": "unexamined-counter-evidence",
+      "severity": "minor",
+      "description": "\u00a76.2 cites the human-melanoma in-vitro abstract [31] (BPC-157 INHIBITS growth) as countervailing evidence against the oncologic worry, but [31] is itself a Sikiric/Zagreb-group abstract (Radeljak, Seiwerth, Sikiric). The 'reassuring' direct-tumor data thus inherit the same single-lab provenance the report otherwise flags - this self-consistency caveat is applied to efficacy claims but not to the reassuring safety counter-evidence.",
+      "required_fix": "Note in \u00a76.2 that the melanoma-inhibition abstract [31] is also from the originating group, so the 'opposite-direction' tumor signal carries the same single-lab caveat; keep the net 'unproven/untested in humans' conclusion."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "\u00a76.1 calls the animal toxicology 'genuinely reassuring,' but per [28] the per-group n values were not stated in the accessible text (report acknowledges this). A negative tox finding (no LD50, negative genotox/embryo-fetal) from studies of unknown/possibly small n and unknown independence should be hedged a notch more on the reassurance.",
+      "required_fix": "Add that the toxicology reassurance is limited by unreported per-group n and unconfirmed lab-independence of [28], so 'no toxic dose reached' is bounded by study power, not a positive demonstration of long-term safety."
+    }
+  ],
+  "additional_retrievals": [
+    {
+      "retrieve_agent_id": "critique-bpc157-p6-i1",
+      "judge_agent_id": "critique-bpc157-p6-i1",
+      "question": "As of mid-2026, is BPC-157 still in FDA 503A Category 2, or was it removed/reclassified, and is there a primary FDA/HHS source?",
+      "brief_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "retrieve_agent_id": "critique-bpc157-p6-i1",
+      "judge_agent_id": "critique-bpc157-p6-i1",
+      "question": "Does a primary FDA/HHS/Federal Register record (Docket FDA-2025-N-6895) confirm the April 2026 removal of BPC-157 from 503A Category 2 and the July 23-24 2026 PCAC meeting?",
+      "brief_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "retrieve_agent_id": "critique-bpc157-p6-i1",
+      "judge_agent_id": "critique-bpc157-p6-i1",
+      "question": "Is Federal Register document 2026-07361 the Category-2 removal instrument itself or only the PCAC meeting/public-docket notice? (Inconclusive: primary URL bot-blocked via redirect to unblock.federalregister.gov; not chased.)",
+      "brief_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "halt_reasons": [],
+  "verdict": "PASS",
+  "timestamp": "2026-06-18T22:39:02.200650+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-18T22:33:26.066829+00:00",
+    "attest_ts": "2026-06-18T22:39:02.200653+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "168bdce1c18078c8b7f152c48f250e1ee60483251229b0427951386647c07bcf",
+    "agent_source_mtime": "2026-06-18T22:39:02.121547+00:00"
+  }
+}
