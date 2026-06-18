@@ -126,6 +126,10 @@ def test_energy_bounce_reauthors_workout_under_ceiling(tmp_path):
     # the RECORDED workout is the re-authored reduced plan — never the bounced un-fuelable one.
     recorded = plan_schema.read_plan("workout", PLAN_DATE, tmp_path)["plan"]
     assert recorded["exercises"][0]["name"] == "Light goblet squat"
+    # EXACTLY ONE workout write reached the store — the bounced 900-kcal plan was never written
+    # (resolve_plan returns the last-appended, so the name assertion alone would stay green if a
+    # bug wrote both; this count assertion is what makes the store-safety property non-vacuous).
+    assert len(store.read("plan::workout", root=tmp_path)) == 1
     # nutrition still stands (it bounced the workout, not itself).
     assert out["results"]["nutrition"]["recorded"] is True
 
@@ -170,6 +174,39 @@ def test_energy_bounce_held_without_reauthor_hook(tmp_path):
     assert out["results"]["workout"]["recorded"] is False
     assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_HELD
     assert store.read("plan::workout", root=tmp_path) == []
+
+
+def test_energy_bounce_unresolved_when_reauthor_returns_none(tmp_path):
+    # a re-dispatch that fails / returns nothing must HOLD the workout, never leave the
+    # un-fuelable session recorded — the reauthor hook returning None is that failure mode.
+    store_read = _seed_store(tmp_path)
+    authors = {
+        "workout": _recon(_author(_workout_rec("Heavy back squat", 5)), energy_cost_kcal=900),
+        "nutrition": _nutrition(
+            _nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600),
+            energy_budget={"sustains": False, "sustainable_training_kcal": 450},
+        ),
+    }
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         reauthor=lambda domain, constraint: None)
+
+    assert out["reauthored"] is True
+    assert out["results"]["workout"]["recorded"] is False
+    assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_UNRESOLVED
+    assert store.read("plan::workout", root=tmp_path) == []
+
+
+def test_generate_plans_empty_authors_is_clean(tmp_path):
+    # a degenerate empty pass records nothing and returns a clean reconciliation report.
+    store_read = _seed_store(tmp_path)
+
+    out = generate_plans({}, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert out["results"] == {}
+    assert out["reauthored"] is False
+    assert out["reconciliation"]["bounce"] is None
+    assert out["reconciliation"]["overlaps"] == []
 
 
 # --- RED-S/LEA cross-domain short-circuit (pipeline Phase 0.5) ------------------
@@ -350,6 +387,18 @@ def test_orchestrator_dedupe_idempotent_rerun(tmp_path):
     assert len(store.read("plan::supplements", root=tmp_path)) == 1
 
 
+def test_orchestrator_dedupe_key_boundary_date(tmp_path):
+    # dedupe-key boundary (store-adversarial item 3): a different plan_date is a DISTINCT
+    # identity at the generate_plans boundary — both records persist, no collision.
+    store_read = _seed_store(tmp_path)
+    authors = {"workout": _author(_workout_rec("Goblet squat", 3))}
+
+    generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+    generate_plans(authors, store_read, tmp_path, plan_date="2026-06-19")
+
+    assert len(store.read("plan::workout", root=tmp_path)) == 2
+
+
 # --- production path end-to-end (integration-verification mandate) -------------
 
 
@@ -378,5 +427,7 @@ def test_orchestrator_end_to_end_renders_on_dashboard(tmp_path):
     )
     html = out.read_text(encoding="utf-8")
     assert "Goblet squat" in html
+    assert "Breakfast" in html  # nutrition round-trips through the orchestrated pass too
+    assert "2600" in html
     assert "Creatine" in html
     assert "BPC-157" in html
