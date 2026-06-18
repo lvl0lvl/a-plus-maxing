@@ -1,7 +1,7 @@
 ---
 title: BPC-157
 type: compound
-permalink: a-plus-maxing/compounds/bpc-157-1
+permalink: a-plus-maxing/compounds/_archive/bpc-157-2026-06-18-suspect-fabrications
 class: peptide
 evidence_tier: C
 risk_tier: experimental

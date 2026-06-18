@@ -1,7 +1,7 @@
 ---
 title: BPC-157 — Non-English Literature Layer
 type: layer
-permalink: a-plus-maxing/library/peptides/bpc-157/non-english-layer-1
+permalink: a-plus-maxing/library/peptides/bpc-157/_archive/2026-06-18-suspect-fabrications/non-english-layer
 parent: vault/compounds/bpc-157.md
 generated: 2026-05-24
 mode: deep

@@ -32,7 +32,7 @@ re_rotation_triggers:
 - Any Phase 2/3 RCT primary publication (NCT07437547 readout)
 - FDA reclassification update post-PCAC review (scheduled July 23 2026)
 - Any new Edwin Lee-clinic publication
-permalink: a-plus-maxing/library/peptides/bpc-157/research-report-1
+permalink: a-plus-maxing/library/peptides/bpc-157/_archive/2026-06-18-suspect-fabrications/research-report
 ---
 
 # BPC-157 — Canonical Academic Layer Report
