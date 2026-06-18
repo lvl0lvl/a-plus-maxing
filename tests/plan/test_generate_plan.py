@@ -22,9 +22,8 @@ import functools
 import pytest
 
 from scripts.generate import generate
-from scripts.plan import generate_plan as gp_mod
 from scripts.plan.generate_plan import generate_plan
-from scripts.store import keying, plan_schema, store
+from scripts.store import keying, store
 
 PLAN_DATE = "2026-06-18"
 
