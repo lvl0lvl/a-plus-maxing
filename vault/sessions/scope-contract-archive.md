@@ -2093,3 +2093,12 @@ ACs (all PASS): AC1 fetch+diff the remote vs adopted SHA + pinned `rigor_version
 ### S67 Scope Contract Evaluation (2026-06-16)
 
 All 5 ACs PASS. origin/main +19 commits ahead of adopted `86a1a26`; VERSION unchanged (1.0.0 == pinned) → a-plus toolkit pin HELD (the 2 drifted audits vendored-but-unused). ff-merged local skills_library → global symlinks picked it up (0 dead, no new unlinked, 2 pre-existing parity cracks). Upstream unversioned-toolkit-drift beaded `lczu`. Only a-plus change: the adoption-log doc. Drift + PF attestation (No new PF; disclosure ledger 1 gate-caught/0 operator-only) in process-failures Session 67. PR #144 (docs review → merge `d18ca93`).
+
+## Scope Contract — Session 68 (2026-06-16/17)
+
+Goal: Start the parked core-deliverable (`71s4`) design work — drive the plan-generation design (runtime + dependency-order decisions) via the design agent team, and explore + iterate the dashboard visual design from the operator's inspiration set.
+ACs (all PASS): AC1 open (Start Protocol; branch-completeness 0; baseline 833/2); AC2 settle the two pivotal decisions (runtime = (A) interactive agent-dispatch; inputs = designed screens) + topology note; AC3 derive the dependency order + author/advisor tiers via the multi-agent workflow (NOT guessed); AC4 explore 4 dashboard directions via the design team + iterate Clinical Light by hand; AC5 log PF-S68-01/02 3-layer + close.
+
+### S68 Scope Contract Evaluation (2026-06-17)
+
+All 5 ACs PASS. Runtime + topology captured in `vault/design/plan-generation-pipeline-v1.md` (4 plan-authors + 12 advisors + the dependency phase order). 4 directions + design-reviewer ranking; operator chose Clinical Light and iterated by hand (tabbed insights card, 16-specialist Care Team, calendar fit). Two PFs promoted (PF-S68-01 solo design; PF-S68-02 rebuild-for-edit), both operator-caught, 3-layer (beads `56r9`/`9jdo`). CHANGED: the scope was written retroactively at close (no contract at open) — flagged, not concealed. No `scripts/` touched; pytest 833/2; core-capability still NO. Commits `0b42751`/`dab098c`/`8262d41`/`851f069`/`428e331`; no PR (design mid-iteration).
