@@ -155,6 +155,9 @@ def test_energy_bounce_unresolved_when_reauthor_exceeds_ceiling(tmp_path):
     assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_UNRESOLVED
     # nothing un-fuelable reaches the store.
     assert store.read("plan::workout", root=tmp_path) == []
+    # cross-stream: holding the workout does NOT drop nutrition.
+    assert out["results"]["nutrition"]["recorded"] is True
+    assert len(store.read("plan::nutrition", root=tmp_path)) == 1
 
 
 def test_energy_bounce_held_without_reauthor_hook(tmp_path):
@@ -174,6 +177,9 @@ def test_energy_bounce_held_without_reauthor_hook(tmp_path):
     assert out["results"]["workout"]["recorded"] is False
     assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_HELD
     assert store.read("plan::workout", root=tmp_path) == []
+    # cross-stream: holding the workout does NOT drop nutrition.
+    assert out["results"]["nutrition"]["recorded"] is True
+    assert len(store.read("plan::nutrition", root=tmp_path)) == 1
 
 
 def test_energy_bounce_unresolved_when_reauthor_returns_none(tmp_path):
@@ -195,6 +201,57 @@ def test_energy_bounce_unresolved_when_reauthor_returns_none(tmp_path):
     assert out["results"]["workout"]["recorded"] is False
     assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_UNRESOLVED
     assert store.read("plan::workout", root=tmp_path) == []
+    # cross-stream: holding the workout does NOT drop nutrition.
+    assert out["results"]["nutrition"]["recorded"] is True
+    assert len(store.read("plan::nutrition", root=tmp_path)) == 1
+
+
+def test_energy_bounce_unresolved_when_ceiling_absent(tmp_path):
+    # F02: a sustains:false verdict that OMITS sustainable_training_kcal (ceiling=None) must HOLD
+    # the workout, never crash — mutation-proves the `ceiling is None` guard (deleting it would
+    # reach `new_cost > None` → TypeError on the safety-critical bounce path).
+    store_read = _seed_store(tmp_path)
+    authors = {
+        "workout": _recon(_author(_workout_rec("Heavy back squat", 5)), energy_cost_kcal=900),
+        "nutrition": _nutrition(
+            _nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600),
+            energy_budget={"sustains": False},  # no sustainable_training_kcal -> ceiling is None
+        ),
+    }
+
+    out = generate_plans(
+        authors, store_read, tmp_path, plan_date=PLAN_DATE,
+        reauthor=lambda domain, constraint: _recon(
+            _author(_workout_rec("Light goblet squat", 2)), energy_cost_kcal=200
+        ),
+    )
+
+    assert out["reauthored"] is True
+    assert out["results"]["workout"]["recorded"] is False
+    assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_UNRESOLVED
+    assert store.read("plan::workout", root=tmp_path) == []
+
+
+def test_clearance_gate_strips_load_through_orchestrator(tmp_path):
+    # F05: the clearance gate (no load without clinician clearance) must hold on the ORCHESTRATOR
+    # path, not just single-domain. A loaded workout rec, default gates -> load stripped; granting
+    # clearance keeps it. Deleting the gate in _to_workout_plan would record the load here too.
+    store_read = _seed_store(tmp_path)
+    authors = {"workout": _author(_workout_rec("Back squat", 4, load="70% 1RM"))}
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+    recorded = plan_schema.read_plan("workout", PLAN_DATE, tmp_path)["plan"]
+    assert out["results"]["workout"]["recorded"] is True
+    assert all("load" not in ex for ex in recorded["exercises"])  # default-deny strips load
+
+    cleared = _seed_store(tmp_path / "cleared")
+    out2 = generate_plans(
+        authors, cleared, tmp_path / "cleared", plan_date=PLAN_DATE,
+        gates={"clearance_granted": True},
+    )
+    recorded2 = plan_schema.read_plan("workout", PLAN_DATE, tmp_path / "cleared")["plan"]
+    assert out2["results"]["workout"]["recorded"] is True
+    assert recorded2["exercises"][0]["load"] == "70% 1RM"  # clearance keeps the load
 
 
 def test_generate_plans_empty_authors_is_clean(tmp_path):
@@ -295,6 +352,32 @@ def test_no_overlap_when_interventions_distinct(tmp_path):
     assert out["reconciliation"]["overlaps"] == []
 
 
+def test_overlap_dedupes_domains_and_reports_distinct(tmp_path):
+    # F06 (reject-but-adopt): a 3-domain overlap is unreachable (only supplements + peptides
+    # contribute compound identities), and a within-domain duplicate is rejected upstream by
+    # record_plan's unique-name check — so the dedup is exercised at the reconcile layer, which
+    # runs BEFORE recording. reconcile-level: a within-domain duplicate identity yields NO
+    # self-overlap (the set dedup; the old list form would report ["supplements","supplements"]).
+    supp = {
+        "domain": "supplements", "specialist": "supplement-specialist", "section": {}, "reason": None,
+        "plan": {"items": [{"name": "Creatine", "dose": "5 g"}, {"name": "Creatine", "dose": "3 g"}]},
+        "meta": {},
+    }
+    assert reconcile({"supplements": supp})["report"]["overlaps"] == []
+
+    # end-to-end: the genuine cross-domain (supplements↔peptides) overlap reports ONE entry with
+    # distinct sorted domains.
+    store_read = _seed_store(tmp_path)
+    cross = {
+        "supplements": _author(_supplement_rec("Creatine", "5 g"), specialist="supplement-specialist"),
+        "peptides": _author(_peptide_rec("Creatine", "5 g", "oral"), specialist="peptide-specialist"),
+    }
+    out = generate_plans(cross, store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["reconciliation"]["overlaps"] == [
+        {"intervention": "creatine", "domains": ["peptides", "supplements"]}
+    ]
+
+
 def test_author_declared_conflict_surfaced(tmp_path):
     store_read = _seed_store(tmp_path)
     authors = {
@@ -314,6 +397,30 @@ def test_author_declared_conflict_surfaced(tmp_path):
 
     conflicts = out["reconciliation"]["conflicts"]
     assert any(c["from"] == "supplements" and c["with"] == "bpc-157" for c in conflicts)
+
+
+def test_author_declared_conflicts_accumulate_across_authors(tmp_path):
+    # F07: conflicts declared by MULTIPLE authors all accumulate (the loop runs to completion).
+    # Also pins F01: each entry's `from` is the DECLARING domain, never an author-supplied override.
+    store_read = _seed_store(tmp_path)
+    authors = {
+        "supplements": _recon(
+            _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist"),
+            conflicts=[{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding risk"}],
+        ),
+        "peptides": _recon(
+            _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist"),
+            # this author tries to SUPPLY its own 'from' — the orchestrator must override it.
+            conflicts=[{"from": "spoofed", "with_domain": "supplements", "with": "fish oil",
+                        "reason": "additive bleeding risk"}],
+        ),
+    }
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    conflicts = out["reconciliation"]["conflicts"]
+    assert len(conflicts) == 2
+    assert {c["from"] for c in conflicts} == {"supplements", "peptides"}  # not "spoofed"
 
 
 # --- reconcile is pure (no I/O) ------------------------------------------------

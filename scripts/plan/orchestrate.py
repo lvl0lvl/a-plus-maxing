@@ -41,8 +41,8 @@ ENERGY_BOUNCE_UNRESOLVED = "energy-bounce-unresolved"  # the re-author did not h
 RED_S_LEA_CROSS_DOMAIN = RED_S_LEA_CLINICAL_ROUTING  # the nutrition screen short-circuits workout
 
 
-def _intervention_identities(candidate):
-    """The intervention identities a candidate plan contributes to overlap detection.
+def _compound_identities(candidate):
+    """The compound identities a candidate plan contributes to overlap detection.
 
     Supplements contribute each item `name`; peptides contribute the single `compound`. Other
     domains contribute none — workout exercises and nutrition meals are not the cross-compound
@@ -112,19 +112,23 @@ def reconcile(candidates):
                 "workout_cost_kcal": (workout.get("meta") or {}).get("energy_cost_kcal"),
             }
 
-    # 3. Overlap detection across the intervention-bearing domains.
+    # 3. Overlap detection: a compound identity surfacing in 2+ DISTINCT domains. Domains are
+    #    deduped (a set) so a within-domain duplicate is not a false self-overlap, and so the entry
+    #    aggregates to one record per identity (future-proof if a 3rd compound-bearing domain lands).
     seen = {}
     for domain, cand in candidates.items():
-        for ident in _intervention_identities(cand):
-            seen.setdefault(ident, []).append(domain)
+        for ident in _compound_identities(cand):
+            seen.setdefault(ident, set()).add(domain)
     for ident, domains in seen.items():
         if len(domains) >= 2:
             report["overlaps"].append({"intervention": ident, "domains": sorted(domains)})
 
     # author-declared cross-domain conflicts: surfaced, not adjudicated (the S73 liaison gate).
+    # The orchestrator's `from` (the declaring domain) is authoritative — it is spread LAST so an
+    # author-supplied `from` in the conflict dict cannot shadow the real source domain.
     for domain, cand in candidates.items():
         for conflict in (cand.get("meta") or {}).get("conflicts") or []:
-            report["conflicts"].append({"from": domain, **conflict})
+            report["conflicts"].append({**conflict, "from": domain})
 
     return {"report": report, "holds": holds}
 
@@ -167,11 +171,15 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
         plan_date (str): The plans' YYYY-MM-DD date.
         gates (dict, optional): Per-domain safety inputs (`clearance_granted`, `red_s_lea_screen`)
             passed to every domain's `compute_plan`. Defaults to all-conservative.
-        reauthor (Callable, optional): `reauthor(domain, constraint) -> author envelope` — the
-            orchestrator's re-dispatch hook for an energy-bounced workout (runtime A: a second
-            personal-trainer dispatch under the `{"sustainable_training_kcal": ceiling}`
-            constraint). When absent, a bounced workout is HELD (not recorded), never shipped as
-            an un-fuelable load.
+        reauthor (Callable, optional): `reauthor(domain, constraint) -> author envelope | None` —
+            the orchestrator's re-dispatch hook for an energy-bounced workout (runtime A: a second
+            personal-trainer dispatch). `domain` is always `"workout"` in V1; `constraint` is
+            `{"sustainable_training_kcal": <ceiling int>}`. The returned envelope MUST carry
+            `reconciliation.energy_cost_kcal` for the ceiling check to pass — an envelope that omits
+            it (or returns `None`, or whose cost still exceeds the ceiling) is held
+            `energy-bounce-unresolved` (the safe no-plan state, not an error). When `reauthor` is
+            absent, a bounced workout is held `energy-bounce-held` — never shipped as an un-fuelable
+            load.
 
     Returns:
         (dict) `results` (domain -> result record, the `generate_plan` shape), `reconciliation`
@@ -197,8 +205,10 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
             candidates["workout"] = new_candidate
             reauthored = True
             new_cost = (new_candidate.get("meta") or {}).get("energy_cost_kcal")
-            # The re-author must bring the session load under the sustainable ceiling; if it
-            # produced no plan, gave no cost, or stayed over the ceiling, hold (don't record).
+            # Hold (don't record) unless the re-author is provably fuelable. Two distinct hold
+            # cases: (a) MALFORMED — no plan, or the bounce directive / re-author gave no ceiling
+            # or no cost, so fuelability cannot be proven; (b) OVER-CEILING — `new_cost > ceiling`.
+            # A held workout is the honest no-plan state, never an un-fuelable load on the dashboard.
             if (
                 new_candidate.get("plan") is None
                 or ceiling is None
