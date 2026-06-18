@@ -1,0 +1,73 @@
+{
+  "specialist": "personal-trainer",
+  "recommendations": [
+    {
+      "claim": "Bodyweight hip hinge pattern (Romanian deadlift variation) builds posterior chain activation under load tolerance assessment conditions.",
+      "source": "McGill (2015) Low Back Disorders; Hides et al. (2001) lumbar multifidus reactivation post-episode",
+      "confidence_tier": "established",
+      "reversibility": "Regress to standing hip hinge drill if any posterior referral or >3/10 discomfort; advance load only after clinician clearance",
+      "category": "training",
+      "payload": {
+        "name": "Bodyweight Romanian Deadlift",
+        "sets": 3,
+        "reps": "8-10",
+        "detail": "Hinge at hip, soft knee, neutral spine throughout. Pause at end range with deliberate glute engagement on return. Stop if any posterior leg referral or sharp lumbar sensation."
+      }
+    },
+    {
+      "claim": "Quadruped bird-dog restores lumbopelvic stability via anti-extension demand without spinal loading.",
+      "source": "McGill et al. (2009) 'Exercises for the torso'; Richardson et al. (1999) segmental stabilization",
+      "confidence_tier": "established",
+      "reversibility": "Regress to dead-bug if pelvis cannot remain neutral; progression to loaded variation deferred until clearance",
+      "category": "training",
+      "payload": {
+        "name": "Bird-Dog",
+        "sets": 3,
+        "reps": "8 per side",
+        "detail": "From quadruped, brace lightly, extend opposite arm and leg simultaneously. Hold 2-3 sec at full extension. Pelvis stays square - no rotation or hip hike. Return under control."
+      }
+    },
+    {
+      "claim": "Glute bridge targets hip extensors and lumbar offloading in a supine, spine-friendly position.",
+      "source": "Andersen et al. (2015) glute activation review; Reiman et al. (2012) hip abductor/extensor EMG",
+      "confidence_tier": "established",
+      "reversibility": "Bilateral only at this stage; single-leg variant and added load deferred until clinician clearance",
+      "category": "training",
+      "payload": {
+        "name": "Glute Bridge",
+        "sets": 3,
+        "reps": "10-12",
+        "detail": "Supine, feet flat, hip-width. Drive through heels, squeeze glutes at top, avoid lumbar hyperextension. 2 sec hold at top. Controlled descent."
+      }
+    },
+    {
+      "claim": "Low-incline dumbbell press (bench angle 30-45 degrees) preserves upper-body pressing capacity within a horizontal vector.",
+      "source": "NSCA Essentials of Strength Training (4th ed.); Schoenfeld (2010) hypertrophy review",
+      "confidence_tier": "established",
+      "reversibility": "Light load only at this return phase; load increment deferred to clinician-clearance session; stop if any shoulder impingement signal",
+      "category": "training",
+      "payload": {
+        "name": "Low-Incline Dumbbell Press (30-45 deg)",
+        "sets": 3,
+        "reps": "10-12",
+        "detail": "Control the descent, neutral wrist, elbows ~45 deg flare. Move with intent, not momentum. Deferred loading - select a weight that produces mild effort at rep 10 with no joint pain."
+      }
+    },
+    {
+      "claim": "Chest-supported dumbbell row builds horizontal pulling volume without axial spinal loading.",
+      "source": "Schoenfeld (2010) back hypertrophy review; Fenwick et al. (2009) lumbar loading comparison",
+      "confidence_tier": "established",
+      "reversibility": "Chest-supported variant preferred if unsupported hip hinge loads the back uncomfortably; load progression deferred until clearance",
+      "category": "training",
+      "payload": {
+        "name": "Chest-Supported Dumbbell Row",
+        "sets": 3,
+        "reps": "10 per side",
+        "detail": "Bench at low incline, chest contact maintained throughout. Retract scapula before initiating pull. Elbow tracks body angle, no rotation. Hold 1 sec at peak contraction."
+      }
+    }
+  ],
+  "reconciliation": {
+    "energy_cost_kcal": 130
+  }
+}

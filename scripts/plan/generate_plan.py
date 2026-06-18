@@ -269,15 +269,87 @@ _DOMAIN_GATES = {
 }
 
 
+def compute_plan(domain, author_output, store_read, *, gates=None):
+    """Compute a domain's candidate plan WITHOUT recording it.
+
+    Everything `generate_plan` does except the `record_plan` write: derive the summary,
+    run `assemble`'s four filters for `domain`, apply the domain safety veto + the
+    coverage-gap check, and translate the surviving recommendations into the candidate
+    plan. The cross-domain orchestrator (`scripts/plan/orchestrate.py`) computes every
+    domain's candidate this way and reconciles them BEFORE recording (so a cross-domain
+    check — the energy bounce, the RED-S/LEA short-circuit — can hold a plan from being
+    written); the single-domain `generate_plan` records its candidate directly.
+
+    Args:
+        domain (str): A `plan_schema.PLAN_DOMAINS` member with a registered translator.
+        author_output (dict): The captured author envelope — `{"specialist": slug,
+            "recommendations": [...]}` (optionally a top-level `reconciliation` dict
+            carrying the cross-domain inputs) or the thin-library sentinel.
+        store_read (Callable): The store read surface, instance-root pre-bound (the
+            `router.summarize` caller contract — an unbound reader silently reads the
+            wrong instance).
+        gates (dict, optional): Per-domain safety inputs — `clearance_granted` (the workout
+            load gate) and `red_s_lea_screen` (the nutrition RED-S/LEA critical-floor veto).
+            Defaults to all-conservative.
+
+    Returns:
+        (dict) `domain`, `specialist`, `plan` (dict | None — NOT yet recorded), `section`
+        (the assembled section), `reason` (str | None — the coverage-gap kind, a domain
+        safety-veto reason (the nutrition Phase-0.5 screen returns `RED_S_LEA_CLINICAL_ROUTING`
+        == `'red-s-lea-clinical-routing'`), or `no-actionable-recommendation`), and `meta`
+        (the author's `reconciliation` inputs the reconciler reads — the workout energy cost,
+        the nutrition energy-budget verdict, author-declared conflicts — `{}` if none declared).
+
+    Raises:
+        KeyError: `domain` has no registered translator.
+    """
+    if domain not in _PLAN_TRANSLATORS:
+        raise KeyError(
+            f"no plan translator for domain {domain!r}; known: {tuple(_PLAN_TRANSLATORS)}"
+        )
+    gates = gates or {}
+    summary = router.summarize(store_read)
+    roster = {domain: _author_callable(author_output)}
+    section = assemble([domain], summary, roster)["sections"][0]
+    specialist = section.get("specialist")
+    meta = {}
+    if isinstance(author_output, dict) and isinstance(author_output.get("reconciliation"), dict):
+        meta = dict(author_output["reconciliation"])
+
+    def candidate(plan, reason):
+        return {
+            "domain": domain, "specialist": specialist, "plan": plan,
+            "section": section, "reason": reason, "meta": meta,
+        }
+
+    # Phase-0.5 owned safety veto runs BEFORE any content evaluation (including coverage
+    # gaps): a tripped critical-floor screen short-circuits to clinical-care routing
+    # regardless of what the author produced, so the veto reason is preserved rather than
+    # masked by a coincident coverage-gap kind.
+    domain_gate = _DOMAIN_GATES.get(domain)
+    if domain_gate is not None:
+        veto = domain_gate(section.get("recommendations", []), gates)
+        if veto is not None:
+            return candidate(None, veto)
+
+    if section.get("coverage_gap"):
+        return candidate(None, section["coverage_gap"])
+
+    plan = _PLAN_TRANSLATORS[domain](section.get("recommendations", []), gates)
+    if plan is None:
+        return candidate(None, "no-actionable-recommendation")
+    return candidate(plan, None)
+
+
 def generate_plan(domain, author_output, store_read, root, *, plan_date, gates=None):
     """Run one plan-author's output through the safety filters and record the plan.
 
-    The production caller of `assemble` (PF-S63-02). Derives the summary from the store,
-    runs the author's recommendations through `assemble`'s four filters for `domain`, then
-    translates the surviving recommendations into the domain plan and records it via
-    `record_plan`. A coverage-gap section, or a section whose recommendations are all
-    struck / payload-less, records NOTHING — the dashboard renders the honest no-plan state
-    rather than a fabricated regimen.
+    The single-domain production caller of `assemble` (PF-S63-02): computes the candidate
+    via `compute_plan` (summary -> `assemble`'s four filters -> domain veto / coverage-gap ->
+    translate), then records it via `record_plan`. A coverage-gap section, or a section whose
+    recommendations are all struck / payload-less, records NOTHING — the dashboard renders the
+    honest no-plan state rather than a fabricated regimen. The cross-domain orchestrator uses
+    `compute_plan` + `record_plan` directly so reconciliation runs between the two.
 
     Args:
         domain (str): A `plan_schema.PLAN_DOMAINS` member with a registered translator.
@@ -296,9 +368,8 @@ def generate_plan(domain, author_output, store_read, root, *, plan_date, gates=N
     Returns:
         (dict) A result record: `domain`, `specialist`, `recorded` (bool), `plan`
         (dict | None), `section` (the assembled section), `reason` (str | None — the
-        coverage-gap kind, a domain safety-veto reason (the nutrition Phase-0.5 screen returns
-        `RED_S_LEA_CLINICAL_ROUTING` == `'red-s-lea-clinical-routing'`), or
-        `no-actionable-recommendation` when nothing was recorded).
+        coverage-gap kind, the domain safety-veto reason, or `no-actionable-recommendation`
+        when nothing was recorded).
 
     Raises:
         KeyError: `domain` has no registered translator.
@@ -306,46 +377,13 @@ def generate_plan(domain, author_output, store_read, root, *, plan_date, gates=N
             schema-nonconformant plan, or the author omitted attribution) — surfaced
             loud, never silently dropped.
     """
-    if domain not in _PLAN_TRANSLATORS:
-        raise KeyError(
-            f"no plan translator for domain {domain!r}; known: {tuple(_PLAN_TRANSLATORS)}"
-        )
-    gates = gates or {}
-    summary = router.summarize(store_read)
-    roster = {domain: _author_callable(author_output)}
-    section = assemble([domain], summary, roster)["sections"][0]
-    specialist = section.get("specialist")
-
-    # Phase-0.5 owned safety veto runs BEFORE any content evaluation (including coverage
-    # gaps): a tripped critical-floor screen short-circuits to clinical-care routing
-    # regardless of what the author produced, so the veto reason is preserved rather than
-    # masked by a coincident coverage-gap kind.
-    domain_gate = _DOMAIN_GATES.get(domain)
-    if domain_gate is not None:
-        veto = domain_gate(section.get("recommendations", []), gates)
-        if veto is not None:
-            return {
-                "domain": domain, "specialist": specialist, "recorded": False,
-                "plan": None, "section": section, "reason": veto,
-            }
-
-    if section.get("coverage_gap"):
-        return {
-            "domain": domain, "specialist": specialist, "recorded": False,
-            "plan": None, "section": section, "reason": section["coverage_gap"],
-        }
-
-    plan = _PLAN_TRANSLATORS[domain](section.get("recommendations", []), gates)
-    if plan is None:
-        return {
-            "domain": domain, "specialist": specialist, "recorded": False,
-            "plan": None, "section": section, "reason": "no-actionable-recommendation",
-        }
-
-    plan_schema.record_plan(domain, plan, plan_date, specialist, root)
+    result = compute_plan(domain, author_output, store_read, gates=gates)
+    recorded = result["plan"] is not None
+    if recorded:
+        plan_schema.record_plan(domain, result["plan"], plan_date, result["specialist"], root)
     return {
-        "domain": domain, "specialist": specialist, "recorded": True,
-        "plan": plan, "section": section, "reason": None,
+        "domain": domain, "specialist": result["specialist"], "recorded": recorded,
+        "plan": result["plan"], "section": result["section"], "reason": result["reason"],
     }
 
 

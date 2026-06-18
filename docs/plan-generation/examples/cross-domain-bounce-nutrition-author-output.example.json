@@ -1,0 +1,55 @@
+{
+  "specialist": "nutritionist",
+  "recommendations": [
+    {
+      "claim": "Daily energy target of 2150 kcal supports recovery without imposing a deficit on a modestly-eating returning trainee at ~75 kg body mass; protein set at 128 g (~1.7 g/kg) to meet the evidence-supported training-recovery floor, carbohydrates at 240 g to restore muscle glycogen, fat at 60 g meeting essential fatty acid needs.",
+      "source": "Morton et al. 2018 (Br J Sports Med) meta-analysis on protein dose; Thomas et al. 2016 ACSM/AND/DC joint position stand",
+      "confidence_tier": "certainty: moderate / strength: strong / causal (daily protein total for recovery)",
+      "reversibility": "Calorie target is upward-adjustable as appetite returns; protein floor is the binding constraint.",
+      "category": "nutrition",
+      "payload": {
+        "calorie_goal": 2150,
+        "macros": {"protein": 128, "carbs": 240, "fat": 60},
+        "water_l": 2.5
+      }
+    },
+    {
+      "claim": "Breakfast of eggs, oats, and fruit supplies leucine-sufficient protein (~35 g) plus carbohydrate to break the overnight fast and prime tissue repair.",
+      "source": "Norton & Layman 2006 (J Nutr) on leucine threshold; ACSM/AND/DC 2016 position stand",
+      "confidence_tier": "certainty: low / strength: conditional / causal (distribution is lower-certainty than the daily total)",
+      "reversibility": "Food-first; portion adjustable to appetite.",
+      "category": "nutrition",
+      "payload": {
+        "meal": {"name": "Breakfast", "contents": "3 whole eggs scrambled, 80 g rolled oats cooked, 150 g mixed berries, 200 ml low-fat milk", "kcal": 530}
+      }
+    },
+    {
+      "claim": "Lunch of chicken, rice, and vegetables delivers a second leucine-triggering protein bolus (~40 g) with glycogen-replenishing carbohydrate.",
+      "source": "Areta et al. 2013 (J Physiol) on protein distribution; Thomas et al. 2016 position stand",
+      "confidence_tier": "certainty: low / strength: conditional / causal (distribution is lower-certainty than the daily total)",
+      "reversibility": "Protein source interchangeable; carbohydrate portion adjustable.",
+      "category": "nutrition",
+      "payload": {
+        "meal": {"name": "Lunch", "contents": "170 g grilled chicken breast, 180 g cooked rice, 200 g mixed vegetables with olive oil", "kcal": 620}
+      }
+    },
+    {
+      "claim": "Dinner of salmon, potato, and leafy greens closes the daily protein target (~33 g) while supplying omega-3 fatty acids with provisional anti-inflammatory signaling evidence.",
+      "source": "Smith et al. 2011 (Clin Sci) on omega-3 and MPS; Calder 2017 (Eur J Clin Nutr) on EPA/DHA and inflammation",
+      "confidence_tier": "certainty: low / strength: conditional / associational (omega-3 anti-inflammatory benefit is associational)",
+      "reversibility": "Fish source substitutable; fat-soluble vitamin delivery from this meal is food-first per protocol.",
+      "category": "nutrition",
+      "payload": {
+        "meal": {"name": "Dinner", "contents": "150 g baked salmon fillet, 200 g boiled baby potatoes, 150 g sauteed spinach and courgette", "kcal": 530}
+      }
+    }
+  ],
+  "reconciliation": {
+    "energy_budget": {
+      "sustains": false,
+      "sustainable_training_kcal": 300,
+      "maintenance_kcal": 2050,
+      "bounce_reason": "A ~700 kcal session against a constrained ~2,050 kcal intake at maintenance drives the day to roughly a 650 kcal deficit, which programs an unintended deficit into a recovery-priority trainee whose appetite has not expanded to cover the load."
+    }
+  }
+}
