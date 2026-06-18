@@ -246,7 +246,8 @@ def _self_test():
             print("core-capability self-test FAIL: load prescription shipped without clearance")
             return 1
         out = generate.run(
-            "dashboard", _root=tmp, _today=datetime.date.fromisoformat(plan_date)
+            "dashboard", _root=tmp, _out_dir=tmp,
+            _today=datetime.date.fromisoformat(plan_date),
         )
         if "Goblet squat" not in out.read_text(encoding="utf-8"):
             print("core-capability self-test FAIL: dashboard did not render the recorded plan")

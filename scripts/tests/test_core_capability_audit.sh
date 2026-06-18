@@ -37,6 +37,14 @@ check "caller-without-assemble FAILs" 1 "$rc"
 rc=0; CORE_CAP_CALLER="$TMP/does-not-exist.py" CORE_CAP_SKIP_BEHAVIORAL=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
 check "missing-caller FAILs" 1 "$rc"
 
+# (B2) RED — a caller that calls assemble( but NOT record_plan( (proves the
+# record_plan structural check fires INDEPENDENTLY of the assemble check; F-007).
+cat > "$TMP/assemble-only.py" <<'PY'
+# section = assemble([domain], summary, roster)  -- but the plan is never recorded
+PY
+rc=0; CORE_CAP_CALLER="$TMP/assemble-only.py" CORE_CAP_SKIP_BEHAVIORAL=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
+check "assemble-without-record_plan FAILs" 1 "$rc"
+
 # (C) GREEN — a structurally-wired caller (calls both assemble and record_plan).
 cat > "$TMP/wired.py" <<'PY'
 # stub: section = assemble([domain], summary, roster)
