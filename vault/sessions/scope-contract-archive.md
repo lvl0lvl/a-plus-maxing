@@ -2084,3 +2084,12 @@ Acceptance criteria:
 ### S66 Scope Contract Evaluation (2026-06-15)
 
 All 5 ACs PASS. Wave D = a 50-shadow machine-wide mirror (the `ckl1` bead under-described it; surfaced + operator-confirmed before the destructive step, under a pre-made 908K backup). `deploy-and-verify` (anchor + non-clobbering symlink-deploy + parity) + a full mirror → 43 skills + 33 commands now library symlinks, 9 local-only preserved, 0 dead symlinks. Parity residual: 2 pre-existing library `upgrade-skill` cracks (library-side). A verify-logic near-miss (`[ -d ]` false-alarm on the `.agents` symlinks) caught immediately, no harm. Drift + PF attestation (No new PF; disclosure ledger 3 caught/0 operator-only) in `memory/process-failures.md` Session 66; the adopter-facing Wave D experience in `docs/rigor-adoption-log.md` §5 Issue #11. PR #143 (docs 3-agent review → merge `75d21f7`).
+
+## Scope Contract — Session 67 (2026-06-16)
+
+Goal: Run the Discipline-11 pull-cadence check on the skills_library remote (operator-requested); bead the upstream unversioned-toolkit-drift finding; record it in the frozen adoption log with a per-instance identity note; land the doc update via PR.
+ACs (all PASS): AC1 fetch+diff the remote vs adopted SHA + pinned `rigor_version`; AC2 bead the upstream drift (`lczu`); AC3 adoption-log §10 pull-cadence log + per-instance note; AC4 refresh global deploy via ff-merge (0 dead symlinks); AC5 close + PR.
+
+### S67 Scope Contract Evaluation (2026-06-16)
+
+All 5 ACs PASS. origin/main +19 commits ahead of adopted `86a1a26`; VERSION unchanged (1.0.0 == pinned) → a-plus toolkit pin HELD (the 2 drifted audits vendored-but-unused). ff-merged local skills_library → global symlinks picked it up (0 dead, no new unlinked, 2 pre-existing parity cracks). Upstream unversioned-toolkit-drift beaded `lczu`. Only a-plus change: the adoption-log doc. Drift + PF attestation (No new PF; disclosure ledger 1 gate-caught/0 operator-only) in process-failures Session 67. PR #144 (docs review → merge `d18ca93`).
