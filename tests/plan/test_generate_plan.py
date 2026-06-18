@@ -22,6 +22,7 @@ import functools
 import pytest
 
 from scripts.generate import generate
+from scripts.plan.assemble import THIN_LIBRARY_GAP
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, generate_plan
 from scripts.store import keying, store
 
@@ -186,7 +187,7 @@ def test_thin_library_records_nothing(tmp_path):
     result = generate_plan("workout", author, store_read, tmp_path, plan_date=PLAN_DATE)
 
     assert result["recorded"] is False
-    assert result["reason"] == plan_schema_thin_library_kind()
+    assert result["reason"] == THIN_LIBRARY_GAP
     assert store.read("plan::workout", root=tmp_path) == []
 
 
@@ -445,6 +446,23 @@ def test_nutrition_red_s_lea_clear_records_plan(tmp_path):
     assert len(store.read("plan::nutrition", root=tmp_path)) == 1
 
 
+def test_nutrition_red_s_lea_gate_true_value_also_trips(tmp_path):
+    # The gate accepts both the boolean True and "tripped" — cover the True branch.
+    store_read = _seed_store(tmp_path)
+    author = _author(
+        _nutrition_target_rec(), _nutrition_meal_rec("Breakfast"), specialist="nutritionist",
+    )
+
+    result = generate_plan(
+        "nutrition", author, store_read, tmp_path,
+        plan_date=PLAN_DATE, gates={"red_s_lea_screen": True},
+    )
+
+    assert result["recorded"] is False
+    assert result["reason"] == RED_S_LEA_CLINICAL_ROUTING
+    assert store.read("plan::nutrition", root=tmp_path) == []
+
+
 def test_nutrition_struck_meal_excluded(tmp_path):
     # A meal rec struck by the class-aware HALT (category in the prohibited set) is
     # excluded from the aggregated meals, never lifted back in.
@@ -489,6 +507,7 @@ def test_nutrition_no_meals_records_nothing(tmp_path):
     result = generate_plan("nutrition", author, store_read, tmp_path, plan_date=PLAN_DATE)
 
     assert result["recorded"] is False
+    assert result["reason"] == "no-actionable-recommendation"
     assert store.read("plan::nutrition", root=tmp_path) == []
 
 
@@ -555,6 +574,20 @@ def test_supplements_all_struck_records_nothing(tmp_path):
     result = generate_plan("supplements", author, store_read, tmp_path, plan_date=PLAN_DATE)
 
     assert result["recorded"] is False
+    assert result["reason"] == "no-actionable-recommendation"
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_supplements_malformed_payload_raises_loud(tmp_path):
+    # A present-but-malformed item (missing required `dose`) passes through to record_plan,
+    # which fails LOUD -> never silently dropped.
+    store_read = _seed_store(tmp_path)
+    bad = _supplement_rec("Creatine monohydrate", "5 g")
+    del bad["payload"]["dose"]
+    author = _author(bad, specialist="supplement-specialist")
+
+    with pytest.raises(ValueError):
+        generate_plan("supplements", author, store_read, tmp_path, plan_date=PLAN_DATE)
     assert store.read("plan::supplements", root=tmp_path) == []
 
 
@@ -597,6 +630,24 @@ def test_peptides_takes_first_surviving_compound(tmp_path):
     assert result["plan"]["compound"] == "BPC-157"
 
 
+def test_peptides_takes_first_of_multiple_surviving(tmp_path):
+    # V1 records ONE compound — when MORE than one rec survives, the first is the regimen
+    # (multi-compound stacks are the deferred compound-band). MUTATION: a translator that
+    # merged/accumulated survivors instead of taking the first would fail this.
+    store_read = _seed_store(tmp_path)
+    author = _author(
+        _peptide_rec("BPC-157", "250 mcg", "subcutaneous"),
+        _peptide_rec("TB-500", "2 mg", "subcutaneous"),
+        specialist="peptide-specialist",
+    )
+
+    result = generate_plan("peptides", author, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert result["recorded"] is True
+    assert result["plan"]["compound"] == "BPC-157"
+    assert len(store.read("plan::peptides", root=tmp_path)) == 1
+
+
 def test_peptides_empty_records_nothing(tmp_path):
     store_read = _seed_store(tmp_path)
     author = _author(specialist="peptide-specialist")
@@ -605,6 +656,19 @@ def test_peptides_empty_records_nothing(tmp_path):
 
     assert result["recorded"] is False
     assert result["reason"] == "no-recommendations"
+    assert store.read("plan::peptides", root=tmp_path) == []
+
+
+def test_peptides_malformed_payload_raises_loud(tmp_path):
+    # A present-but-malformed regimen (missing required `compound`) passes through to
+    # record_plan, which fails LOUD -> never silently dropped.
+    store_read = _seed_store(tmp_path)
+    bad = _peptide_rec("BPC-157", "250 mcg", "subcutaneous")
+    del bad["payload"]["compound"]
+    author = _author(bad, specialist="peptide-specialist")
+
+    with pytest.raises(ValueError):
+        generate_plan("peptides", author, store_read, tmp_path, plan_date=PLAN_DATE)
     assert store.read("plan::peptides", root=tmp_path) == []
 
 
@@ -679,6 +743,84 @@ def test_nutrition_dedupe_key_boundary_specialist_and_date(tmp_path):
     assert len(store.read("plan::nutrition", root=tmp_path)) == 3
 
 
+def test_supplements_dedupe_idempotent_rerun(tmp_path):
+    store_read = _seed_store(tmp_path)
+    author = _author(_supplement_rec("Creatine monohydrate", "5 g"),
+                     specialist="supplement-specialist")
+    generate_plan("supplements", author, store_read, tmp_path, plan_date=PLAN_DATE)
+    generate_plan("supplements", author, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_supplements_changed_value_same_identity_is_noop(tmp_path):
+    store_read = _seed_store(tmp_path)
+    generate_plan("supplements",
+                  _author(_supplement_rec("Creatine monohydrate", "5 g"),
+                          specialist="supplement-specialist"),
+                  store_read, tmp_path, plan_date=PLAN_DATE)
+    generate_plan("supplements",
+                  _author(_supplement_rec("Magnesium glycinate", "300 mg"),
+                          specialist="supplement-specialist"),
+                  store_read, tmp_path, plan_date=PLAN_DATE)
+
+    readings = store.read("plan::supplements", root=tmp_path)
+    assert len(readings) == 1
+    assert readings[-1]["value"]["items"][0]["name"] == "Creatine monohydrate"
+
+
+def test_supplements_dedupe_key_boundary_specialist_and_date(tmp_path):
+    store_read = _seed_store(tmp_path)
+    rec = _supplement_rec("Creatine monohydrate", "5 g")
+    generate_plan("supplements", _author(rec, specialist="supplement-specialist"),
+                  store_read, tmp_path, plan_date=PLAN_DATE)
+    generate_plan("supplements", _author(rec, specialist="health-implementer"),
+                  store_read, tmp_path, plan_date=PLAN_DATE)
+    generate_plan("supplements", _author(rec, specialist="supplement-specialist"),
+                  store_read, tmp_path, plan_date="2026-06-19")
+
+    assert len(store.read("plan::supplements", root=tmp_path)) == 3
+
+
+def test_peptides_dedupe_idempotent_rerun(tmp_path):
+    store_read = _seed_store(tmp_path)
+    author = _author(_peptide_rec("BPC-157", "250 mcg", "subcutaneous"),
+                     specialist="peptide-specialist")
+    generate_plan("peptides", author, store_read, tmp_path, plan_date=PLAN_DATE)
+    generate_plan("peptides", author, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert len(store.read("plan::peptides", root=tmp_path)) == 1
+
+
+def test_peptides_changed_value_same_identity_is_noop(tmp_path):
+    store_read = _seed_store(tmp_path)
+    generate_plan("peptides",
+                  _author(_peptide_rec("BPC-157", "250 mcg", "subcutaneous"),
+                          specialist="peptide-specialist"),
+                  store_read, tmp_path, plan_date=PLAN_DATE)
+    generate_plan("peptides",
+                  _author(_peptide_rec("TB-500", "2 mg", "subcutaneous"),
+                          specialist="peptide-specialist"),
+                  store_read, tmp_path, plan_date=PLAN_DATE)
+
+    readings = store.read("plan::peptides", root=tmp_path)
+    assert len(readings) == 1
+    assert readings[-1]["value"]["compound"] == "BPC-157"
+
+
+def test_peptides_dedupe_key_boundary_specialist_and_date(tmp_path):
+    store_read = _seed_store(tmp_path)
+    rec = _peptide_rec("BPC-157", "250 mcg", "subcutaneous")
+    generate_plan("peptides", _author(rec, specialist="peptide-specialist"),
+                  store_read, tmp_path, plan_date=PLAN_DATE)
+    generate_plan("peptides", _author(rec, specialist="health-implementer"),
+                  store_read, tmp_path, plan_date=PLAN_DATE)
+    generate_plan("peptides", _author(rec, specialist="peptide-specialist"),
+                  store_read, tmp_path, plan_date="2026-06-19")
+
+    assert len(store.read("plan::peptides", root=tmp_path)) == 3
+
+
 # --- production path end-to-end for the new domains (integration mandate) -------
 
 
@@ -715,6 +857,7 @@ def test_supplements_end_to_end_renders_on_dashboard(tmp_path):
                        _today=datetime.date.fromisoformat(PLAN_DATE))
     html = out.read_text(encoding="utf-8")
     assert "Creatine monohydrate" in html
+    assert "5 g" in html  # the dose renders on the card
     assert "supplement-specialist" in html
 
 
@@ -732,14 +875,6 @@ def test_peptides_end_to_end_renders_on_dashboard(tmp_path):
                        _today=datetime.date.fromisoformat(PLAN_DATE))
     html = out.read_text(encoding="utf-8")
     assert "BPC-157" in html
+    assert "250 mcg" in html  # the dose renders in the protocol line
+    assert "subcutaneous" in html  # the route renders in the protocol line
     assert "peptide-specialist" in html
-
-
-# --- helpers -------------------------------------------------------------------
-
-
-def plan_schema_thin_library_kind():
-    """The coverage-gap kind `assemble` reports for a thin-library author output."""
-    from scripts.plan.assemble import THIN_LIBRARY_GAP
-
-    return THIN_LIBRARY_GAP
