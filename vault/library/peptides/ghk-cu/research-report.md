@@ -399,11 +399,11 @@ This is a goal-agnostic library entry; the following are design considerations, 
 
 [8] Dymek M, Olechowska K, Hąc-Wydro K, Sikora E. "Liposomes as Carriers of GHK-Cu Tripeptide for Cosmetic Application." *Pharmaceutics* 2023;15(10):2485. PMID: 37896245. DOI: 10.3390/pharmaceutics15102485. tag=in_vitro. tier=1 (independent formulation study). (Hydrophilicity barrier; ~100 nm liposomes; prolonged release 64.7–84.9%/24 h; viability data.)
 
-[9] Hostynek JJ, Dreher F, Maibach HI. "Human skin penetration of a copper tripeptide in vitro as a function of skin layer." *Inflammation Research* 2011;60(1):79-86. PMID: 20721598. DOI: 10.1007/s00011-010-0238-9. tag=in_vitro. tier=1 (independent ex-vivo human skin). (Permeability coeff 2.43±0.51×10⁻⁴ cm/h; 136.2±17.5 µg/cm²/48 h; 97±6.6 µg/cm² depot; "potentially therapeutically effective amounts.")
+[9] Hostynek JJ, Dreher F, Maibach HI. "Human skin retention and penetration of a copper tripeptide in vitro as a function of skin layer towards anti-inflammatory therapy." *Inflammation Research* 2011;60(1):79-86. PMID: 20721598. DOI: 10.1007/s00011-010-0238-9. tag=in_vitro. tier=1 (independent ex-vivo human skin). (Permeability coeff 2.43±0.51×10⁻⁴ cm/h; 136.2±17.5 µg/cm²/48 h; 97±6.6 µg/cm² depot; "potentially therapeutically effective amounts.")
 
 [10] Badenhorst T, Svirskis D, Wu Z. "Physicochemical characterization of native glycyl-L-histidyl-L-lysine tripeptide for wound healing and anti-aging: a preformulation study for dermal delivery." *Pharmaceutical Development and Technology* 2016;21(2):152-160. DOI: 10.3109/10837450.2014.979944. tag=in_vitro. tier=2 (independent preformulation; small scope). (Native-GHK physicochemical/preformulation data.)
 
-[11] Lau SJ, Sarkar B. "The interaction of copper(II) and glycyl-L-histidyl-L-lysine, a growth-modulating tripeptide from plasma." *Biochemical Journal* 1981;199(3):649-656. PMID: 7340824. DOI: 10.1042/bj1990649. tag=in_vitro. tier=1 (independent primary physicochemical). (Potentiometric + spectrophotometric Cu(II)-GHK binding/coordination; 0.15 M NaCl, 25 °C. Independent of Pickart.)
+[11] Lau SJ, Sarkar B. "The interaction of copper(II) and glycyl-L-histidyl-L-lysine, a growth-modulating tripeptide from plasma." *Biochemical Journal* 1981;199(3):649-656. PMID: 7340824. (DOI omitted — legacy Portland Press identifier did not reliably resolve; PMID is authoritative.) tag=in_vitro. tier=1 (independent primary physicochemical). (Potentiometric + spectrophotometric Cu(II)-GHK binding/coordination; 0.15 M NaCl, 25 °C. Independent of Pickart.)
 
 **Mechanism**
 
