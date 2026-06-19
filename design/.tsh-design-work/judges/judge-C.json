@@ -1,0 +1,21 @@
+{
+  "section": "C",
+  "brief_hash": "4ba51cf717fdead71b10a6b6466a0179b508fd100773f6b011461a839d1045f6",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 97,
+    "type_tag_discipline": 95,
+    "population_annotation": 94,
+    "route_fidelity": null,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 96
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Both prior fixes verified against PubMed: Favresse [4] PMID 29982406 confirmed as 'Interferences With Thyroid Function Immunoassays' Endocr Rev 2018;39(5):830-850, and Thienpont [9] PMID 20395624 confirmed as the IFCC C-STFT TSH standardization report Clin Chem 2010;56(6):902-911. All seven non-null dimensions score 94-97: citation fidelity is clean across all nine entries, type-tag discipline is fully enforced with no bare [N], the new standardization/harmonization section is substantively complete and correctly tagged, and interference directionality (biotin falsely-low, heterophile/macro-TSH falsely-high) is mechanistically sound and consistent throughout."
+}

@@ -1,0 +1,75 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 0
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 28,
+    "largest_cluster_count": 8,
+    "share": 0.29,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 16,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "TRUST CIs + Brabant pulse amplitude: paywalled corpus-missing"
+  ],
+  "iterations": 2,
+  "timestamp": "2026-06-19T20:10:25.802581+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T20:08:41.569145+00:00",
+    "attest_ts": "2026-06-19T20:10:25.802584+00:00",
+    "iteration": 2,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "a677fc70fcd895aea3c1ad740e4771f45f936d7f39b29f961e037d207d79817b",
+    "agent_source_mtime": "2026-06-19T20:10:05.511196+00:00"
+  }
+}

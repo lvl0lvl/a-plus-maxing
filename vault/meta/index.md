@@ -36,6 +36,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/hba1c]] (HbA1c — hemoglobin A1c; category: blood; confidence: established)
 - [[biomarkers/fasting-insulin]] (Fasting insulin; category: blood; confidence: supported)
 - [[biomarkers/homa-ir]] (HOMA-IR — insulin-resistance index; category: functional; source: calculation; confidence: supported)
+- [[biomarkers/tsh]] (TSH — thyroid-stimulating hormone; category: blood; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -78,6 +79,7 @@ _(none yet)_
 - [[library/biomarkers/hba1c/research-report]] (HbA1c standard /aplus-research; 35 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/fasting-insulin/research-report]] (Fasting insulin standard /aplus-research; 39 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/homa-ir/research-report]] (HOMA-IR standard /aplus-research; 29 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/tsh/research-report]] (TSH standard /aplus-research; 31 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/

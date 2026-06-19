@@ -1,0 +1,19 @@
+# Rubric — tsh (biomarker, standard mode)
+
+**Judge threshold:** 92/100. route_fidelity + risk_floor_readiness = null (biomarker).
+
+## Section plan (4 sections, paired retrieval+judge)
+- **A — Physiology & The HPT Axis:** TSH (thyrotropin) secreted by the anterior pituitary thyrotrophs under hypothalamic TRH drive; the negative-feedback loop (free T4/T3 suppress TSH); the **log-linear inverse TSH↔free-T4 relationship** (small fT4 change → large TSH change — why TSH is the most sensitive single test of thyroid status); pulsatile + circadian secretion (nocturnal surge); what TSH indexes (pituitary's integrated read of thyroid hormone sufficiency at the tissue level).
+- **B — Reference Ranges, Units & Thresholds:** the standard reference interval (~**0.4–4.0 (or 4.5) mIU/L**, assay/population-dependent); the debate over the upper limit (~2.5–3.0 proposed by some, NACB) and why; **age-specific drift** (upper limit rises with age) + **trimester-specific pregnancy ranges**; subclinical hypothyroidism (TSH above ref, normal fT4) vs overt; subclinical/overt hyperthyroidism (suppressed TSH); units mIU/L = µIU/mL (1:1); population distributions (NHANES); the log-normal distribution of TSH.
+- **C — Measurement & Interferences:** third-generation immunometric (sandwich) assays (functional sensitivity ~0.01 mIU/L, generations defined by sensitivity); standardization/harmonization status; **interferences** — biotin (falsely low in some assays), heterophile/anti-ruthenium antibodies + macro-TSH (falsely HIGH), assay-specific; non-thyroidal illness / "sick euthyroid" (TSH transiently low then rebound); diurnal variation + timing; drugs that shift TSH; the TSH-fT4 discordance patterns and what they mean.
+- **D — Determinants & Clinical Significance:** TSH as the first-line screening test for thyroid dysfunction; what elevated/suppressed predicts (overt + subclinical thyroid disease, CV/mortality associations of subclinical states, the controversy over treating SCH); determinants that raise (Hashimoto's/autoimmune hypothyroidism, iodine deficiency/excess, recovery from illness, certain drugs — lithium, amiodarone, checkpoint inhibitors) / lower (Graves'/hyperthyroidism, central hypothyroidism [low TSH + low fT4], thyroid hormone therapy, glucocorticoids, dopamine); pairing with fT4 (and fT3) for interpretation; limitations — TSH alone misses central hypothyroidism + lags acute changes (3-6 wk equilibration).
+
+## Judge dimensions (0-100; total = rounded mean of non-null)
+evidence_quality, citation_fidelity, type_tag_discipline, population_annotation, route_fidelity(null), concentration_audit_handling, risk_floor_readiness(null), reasoning_integrity, completeness_vs_brief.
+
+## Tag-discipline rules the judge MUST enforce
+- Diagnostic thresholds / reference intervals → attribute to the ISSUING body (ATA — American Thyroid Association; the Endocrine Society; NACB; WHO) tagged `regulatory`, OR to the named population study tagged `cohort`. StatPearls/Endotext/narrative reviews → `mechanism_review` (NEVER regulatory/meta_analysis/rct).
+- Effect sizes / risk ratios → rct/meta_analysis/cohort (NAMED cohort/meta — e.g. the Thyroid Studies Collaboration for subclinical-thyroid CV risk).
+- animal/in_vitro numbers → species-flagged. No number on vendor/anecdote/off-whitelist. Every inline `[N, tag]` (no bare [N]).
+- Units consistent (mIU/L = µIU/mL). VERIFY enrollment N + effect sizes + first-author names + PMIDs against the source (the metabolic-cluster lesson — several fabricated/mis-attributed cites were caught; verify upfront).
+- Whitelisted hosts include ngsp.org, ifcc.org, diabetesjournals.org, journals.plos.org, jci.org, portlandpress.com + the standard Tier-1/2 set; thyroid-relevant: thyroid.org/ATA, academic.oup.com (JCEM), liebertpub.com (Thyroid journal — verify it's admissible as Tier-1 peer-reviewed; if a cite needs it and it's not listed, flag for whitelist addition).

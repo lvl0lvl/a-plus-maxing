@@ -70,6 +70,7 @@ Always admissible. Cite as `rct`, `meta_analysis`, `cohort`, `open_label`, `anim
 - `karger.com`
 - `frontiersin.org` (lower trust — open-access; flag any single-source claim)
 - `mdpi.com` (lower trust — open-access; flag any single-source claim)
+- `liebertpub.com` (Mary Ann Liebert — *Thyroid* (official ATA journal) + other peer-reviewed titles; added 2026-06-19 wiki-research, thyroid cluster)
 - `biorxiv.org` (preprint — admissible but flag as `not-peer-reviewed`)
 - `medrxiv.org` (preprint — same)
 
@@ -81,6 +82,8 @@ Always admissible. Cite as `regulatory`.
 - `ema.europa.eu`
 - `tga.gov.au`
 - `canada.ca/en/health-canada` (Health Canada)
+- `thyroid.org` (American Thyroid Association — clinical guidelines; added 2026-06-19 wiki-research)
+- `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`
 - `cdc.gov`
