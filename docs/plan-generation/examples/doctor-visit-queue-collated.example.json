@@ -1,0 +1,35 @@
+{
+  "_comment": "REAL captured medical-liaison doctor-visit-queue collation (S77). The deployed medical-liaison, full profile inlined, collated three ADJUDICATED safety findings the plan-generation pipeline produced (the orchestrator's collate_doctor_visit_queue recorded them as raw dvq::queue entries) into the severity-ranked MD-handout 'flagged interactions/contraindications' list (design §9.4 Background-3). PII-free SYNTHETIC operator. The liaison ranked the non-overridable CRITICAL warfarin+antithrombotic auto-block (its Core Rule 4 vitamin-K/warfarin watchlist) FIRST — agreeing with the code's resolve_doctor_visit_queue safety-tier ordering (non-overridable leads). It then applied CLINICAL judgment within the MEDIUM band (the concrete bpc-157 cross-domain conflict above the generic class-level additive-AE entry), each line source-named + GRADE-tagged, rendering NO clinical verdict. The code's mechanical rank reproduces the safety-TIER ordering (non-overridable > HIGH > MEDIUM); the INTRA-band refinement is the liaison's dispatch-time judgment (the entries are open-on-extras, so the liaison's rank + GRADE annotations store alongside the data-layer entry). This is the integration check: the data-layer rank and the liaison agree on the safety-critical lead.",
+  "ranked_finding_ids": [
+    "rx-bpmh:supplements:bleeding-risk",
+    "conflict:supplements:peptides/bpc-157",
+    "additive-ae:class:bleeding-risk"
+  ],
+  "entries": [
+    {
+      "finding_id": "rx-bpmh:supplements:bleeding-risk",
+      "rank": 1,
+      "watchlist": true,
+      "grade": {"certainty": "moderate", "strength": "conditional"},
+      "flag": "supplement-specialist: supplement contributes an additive bleeding-risk class that stacks against the operator's present medication's bleeding-risk interaction class (warfarin/antithrombotic + bleeding-risk supplement watchlist pairing); auto-block, non-overridable.",
+      "disposition": "auto-block (non-overridable)"
+    },
+    {
+      "finding_id": "conflict:supplements:peptides/bpc-157",
+      "rank": 2,
+      "watchlist": false,
+      "grade": {"certainty": "low", "strength": "conditional"},
+      "flag": "supplement-specialist: author-declared cross-domain conflict — bpc-157 (peptides) plus supplements adds bleeding risk; flagged for review.",
+      "disposition": "cleared via informed-refusal override"
+    },
+    {
+      "finding_id": "additive-ae:class:bleeding-risk",
+      "rank": 3,
+      "watchlist": false,
+      "grade": {"certainty": "low", "strength": "conditional"},
+      "flag": "supplement-specialist: supplement<->peptide additive adverse-event risk on the shared bleeding-risk class.",
+      "disposition": "cleared via informed-refusal override"
+    }
+  ],
+  "clinical_verdict_rendered": false
+}

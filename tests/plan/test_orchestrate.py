@@ -38,9 +38,11 @@ from scripts.plan.orchestrate import (
     ENERGY_BOUNCE_UNRESOLVED,
     RED_S_LEA_CROSS_DOMAIN,
     RX_BPMH_HELD,
+    collate_doctor_visit_queue,
     generate_plans,
     reconcile,
 )
+from scripts.store import queue_schema
 from scripts.store import plan_schema, store
 from tests.plan.test_generate_plan import (
     PLAN_DATE,
@@ -1752,3 +1754,127 @@ def test_rx_bpmh_and_conflict_both_open_without_adjudicator_held(tmp_path):
     assert out["results"]["supplements"]["reason"] == CONFLICT_HELD  # precedence: conflict before rx-bpmh
     assert "supplements" in {f["held_domain"] for f in out["reconciliation"]["rx_bpmh"]}  # rx-bpmh detected too
     assert any(c["from"] == "supplements" for c in out["reconciliation"]["conflicts"])
+
+
+# --- doctor-visit-queue collation (S77, the medical-liaison's owned collation surface) ----------
+# collate_doctor_visit_queue reads a generate_plans result + records each ADJUDICATED safety finding
+# (additive-AE / conflict / rx-bpmh; cleared-with-override OR block-stands) into the dvq::queue stream,
+# severity-ranked on read. generate_plans itself is unchanged (the collation is a separate call).
+
+
+def test_generate_plans_writes_no_queue_stream(tmp_path):
+    # BACKWARD-COMPAT: generate_plans alone never writes the dvq:: stream (the collation is separate).
+    store_read = _seed_store(tmp_path)
+    generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    assert queue_schema.read_doctor_visit_queue(tmp_path) == []
+
+
+def test_collate_records_cleared_additive_ae(tmp_path):
+    # An additive-AE supplement cleared via a MEDIUM override -> one queue entry, the finding_id +
+    # caution matching the adjudicated safety_finding verbatim (so the SBAR render reproduces it).
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    recorded = collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    assert len(recorded) == 1
+    queue = queue_schema.read_doctor_visit_queue(tmp_path)
+    assert len(queue) == 1
+    e = queue[0]
+    assert e["axis"] == "additive-ae"
+    assert e["finding_id"].startswith("additive-ae:")
+    assert e["caution"].startswith("Supplement<->peptide additive")  # verbatim from the safety_finding
+    assert e["outcome"] == "cleared-with-override"
+    assert e["composite_band"] == "MEDIUM"
+    assert e["non_overridable"] is False
+    assert e["held_domain"] == "supplements"
+    assert e["source_specialist"] == "supplement-specialist"
+
+
+def test_collate_non_overridable_block_stands_entry(tmp_path):
+    # A CRITICAL auto-block -> a block-stands entry flagged non_overridable (ranks highest for the MD).
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("CRITICAL"))
+    collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    e = queue_schema.read_doctor_visit_queue(tmp_path)[0]
+    assert e["outcome"] == "block-stands"
+    assert e["non_overridable"] is True
+    assert e["composite_band"] == "CRITICAL"
+
+
+def test_collate_records_conflict_and_rx_bpmh(tmp_path):
+    # A supplement that declares a conflict AND trips rx-bpmh (operator on the matching Rx class),
+    # both adjudicated MEDIUM -> two queue entries (one per axis), both cleared.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk"]},
+        },
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    queue = queue_schema.read_doctor_visit_queue(tmp_path)
+    axes = {e["axis"] for e in queue}
+    assert "cross-domain-conflict" in axes and "rx-bpmh" in axes
+    assert all(e["source_specialist"] == "supplement-specialist" for e in queue)
+
+
+def test_collate_empty_without_adjudicator(tmp_path):
+    # No adjudicator -> nothing reached the gate -> nothing adjudicated -> empty queue.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE)
+    assert collate_doctor_visit_queue(out, PLAN_DATE, tmp_path) == []
+    assert queue_schema.read_doctor_visit_queue(tmp_path) == []
+
+
+def test_collate_severity_ranked_e2e(tmp_path):
+    # E2E: a supplement held by additive-AE (CRITICAL auto-block) AND a conflict (MEDIUM cleared) ->
+    # the queue surfaces the non-overridable auto-block FIRST (the MD-priority ordering).
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk"]},
+        },
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison({"additive-ae": "CRITICAL", "cross-domain-conflict": "MEDIUM"}))
+    collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    queue = queue_schema.read_doctor_visit_queue(tmp_path)
+    assert queue[0]["non_overridable"] is True  # the CRITICAL additive-AE auto-block leads
+    assert queue[0]["axis"] == "additive-ae"
+    assert any(e["axis"] == "cross-domain-conflict" and e["outcome"] == "cleared-with-override" for e in queue)
+
+
+def test_real_liaison_collation_agrees_on_safety_tier_lead(tmp_path):
+    # AC4: the REAL captured medical-liaison collation (doctor-visit-queue-collated.example.json) ranked
+    # the non-overridable CRITICAL warfarin auto-block FIRST. The code's resolve_doctor_visit_queue
+    # reproduces that SAFETY-TIER lead (the integration check). Intra-band the liaison refines clinically
+    # (conflict above the generic additive-AE) while the code's tiebreak is deterministic finding_id —
+    # the liaison's refinement is its dispatch-time judgment, not the data layer's, so only the
+    # safety-critical lead is asserted equal here.
+    collation = _example_envelope("doctor-visit-queue-collated.example.json")
+    raw_entries = [
+        {"finding_id": "additive-ae:class:bleeding-risk", "axis": "additive-ae",
+         "caution": "Supplement<->peptide additive adverse-event risk (shared additive-AE classes: bleeding-risk)",
+         "held_domain": "supplements", "source_specialist": "supplement-specialist",
+         "outcome": "cleared-with-override", "non_overridable": False, "composite_band": "MEDIUM"},
+        {"finding_id": "rx-bpmh:supplements:bleeding-risk", "axis": "rx-bpmh",
+         "caution": "Supplement<->Rx BPMH interaction: supplements contributes additive-AE class(es) bleeding-risk that stack against the operator's present medication interaction class(es) bleeding-risk",
+         "held_domain": "supplements", "source_specialist": "supplement-specialist",
+         "outcome": "block-stands", "non_overridable": True, "composite_band": "CRITICAL"},
+        {"finding_id": "conflict:supplements:peptides/bpc-157", "axis": "cross-domain-conflict",
+         "caution": "Author-declared cross-domain conflict from supplements: bpc-157 (peptides) — additive bleeding risk, needs review",
+         "held_domain": "supplements", "source_specialist": "supplement-specialist",
+         "outcome": "cleared-with-override", "non_overridable": False, "composite_band": "MEDIUM"},
+    ]
+    for e in raw_entries:
+        queue_schema.record_doctor_visit_queue_entry(e, PLAN_DATE, tmp_path)
+    ranked = queue_schema.read_doctor_visit_queue(tmp_path)
+    # the code leads with the non-overridable auto-block — matching the liaison's rank-1
+    assert ranked[0]["finding_id"] == collation["ranked_finding_ids"][0] == "rx-bpmh:supplements:bleeding-risk"
+    assert ranked[0]["non_overridable"] is True
+    # the liaison rendered no clinical verdict (the queue is questions/observations for the doctor)
+    assert collation["clinical_verdict_rendered"] is False
+    # all three findings are present in the data-layer queue (none dropped)
+    assert {e["finding_id"] for e in ranked} == set(collation["ranked_finding_ids"])

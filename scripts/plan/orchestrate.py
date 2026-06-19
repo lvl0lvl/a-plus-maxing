@@ -53,7 +53,7 @@ recorded via the existing `record_plan` (the store-adversarial battery surface i
 from scripts.plan import router
 from scripts.plan.adjudicate import adjudicate
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, compute_plan
-from scripts.store import plan_schema
+from scripts.store import plan_schema, queue_schema
 
 # Reconciler hold reasons: a candidate computed a plan, but a cross-domain check holds it from
 # recording — the honest no-plan state, never an unsafe / un-fuelable plan on the dashboard.
@@ -603,3 +603,99 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
     return {"results": results, "reconciliation": report, "reauthored": reauthored,
             "adjudication": adjudication, "conflict_adjudications": conflict_adjudications,
             "rx_bpmh_adjudications": rx_bpmh_adjudications}
+
+
+def _queue_specialist(results, domain):
+    """The specialist that authored a held domain's plan (the queue entry's source attribution)."""
+    return (results.get(domain) or {}).get("specialist")
+
+
+def _doctor_visit_queue_entry(safety_finding, adjudication, axis, source_specialist):
+    """Build one doctor-visit-queue entry from a safety finding + its liaison adjudication.
+
+    Carries the data-layer fields the SBAR handout's flagged-interactions section renders from
+    (medical-liaison design §9.4 Background-3): the finding identity + verbatim caution, the held
+    compound domain + its source specialist, the adjudication outcome, and the severity signal
+    (`non_overridable` + the override record's `composite_band`, or `CRITICAL` for a non-overridable
+    auto-block). No clinical verdict; the GRADE annotation is the liaison's to add at its dispatch
+    (entries are open on extras).
+
+    Args:
+        safety_finding (dict): The reconciler's `safety_finding` (`finding_id` + `caution` + held domain).
+        adjudication (dict): The `adjudicate` outcome for that finding.
+        axis (str): The finding's axis (`additive-ae` | `cross-domain-conflict` | `rx-bpmh`).
+        source_specialist (str | None): The held domain's authoring specialist.
+
+    Returns:
+        (dict) The queue entry.
+    """
+    override = adjudication.get("override_record") or {}
+    non_overridable = bool(adjudication.get("non_overridable"))
+    band = override.get("composite_band") or ("CRITICAL" if non_overridable else None)
+    outcome = "cleared-with-override" if adjudication.get("outcome") == "cleared" else "block-stands"
+    return {
+        "finding_id": safety_finding["finding_id"],
+        "axis": axis,
+        "caution": safety_finding["caution"],
+        "held_domain": safety_finding["held_domain"],
+        "source_specialist": source_specialist,
+        "outcome": outcome,
+        "non_overridable": non_overridable,
+        "composite_band": band,
+    }
+
+
+def collate_doctor_visit_queue(result, on_date, root):
+    """Collate a `generate_plans` result's adjudicated safety findings into the doctor-visit queue.
+
+    The medical-liaison's owned collation surface (design §2.2, §9.4): each safety finding the
+    pipeline ADJUDICATED through the liaison gate — the additive-AE finding plus every conflict-held
+    and Rx-BPMH-held domain's finding, whether the override CLEARED it or the block STANDS — is
+    recorded as a severity-ranked queue entry via `queue_schema.record_doctor_visit_queue_entry`.
+    Each finding is rebuilt with the SAME `safety_finding` builders the orchestrator routed to the
+    gate (so the queued `finding_id` + `caution` match the adjudicated finding verbatim) and joined
+    to its `adjudicate` outcome. A finding that never reached the gate (no adjudicator wired) is not
+    queued here — only adjudicated dispositions land in the MD-facing queue. Pure collation: it reads
+    the returned `result` and writes ONLY the `dvq::queue` stream (no plan stream touched).
+
+    Args:
+        result (dict): A `generate_plans` return value.
+        on_date (str): The collation date, YYYY-MM-DD.
+        root (str | Path): The store root.
+
+    Returns:
+        (list) The queue entries recorded this collation (in collation order, pre-rank).
+    """
+    report = result["reconciliation"]
+    results = result["results"]
+    recorded = []
+
+    adjudication = result.get("adjudication")
+    if adjudication is not None and report.get("additive_ae"):
+        safety_finding = _additive_ae_safety_finding(report["additive_ae"])
+        entry = _doctor_visit_queue_entry(
+            safety_finding, adjudication, "additive-ae",
+            _queue_specialist(results, safety_finding["held_domain"]),
+        )
+        queue_schema.record_doctor_visit_queue_entry(entry, on_date, root)
+        recorded.append(entry)
+
+    for domain, adjudication in result.get("conflict_adjudications", {}).items():
+        domain_conflicts = [c for c in report["conflicts"] if c.get("from") == domain]
+        safety_finding = _conflict_safety_finding(domain, domain_conflicts)
+        entry = _doctor_visit_queue_entry(
+            safety_finding, adjudication, "cross-domain-conflict", _queue_specialist(results, domain),
+        )
+        queue_schema.record_doctor_visit_queue_entry(entry, on_date, root)
+        recorded.append(entry)
+
+    for domain, adjudication in result.get("rx_bpmh_adjudications", {}).items():
+        matched = next((f["classes"] for f in report["rx_bpmh"] if f["held_domain"] == domain), [])
+        safety_finding = _rx_bpmh_safety_finding(domain, matched)
+        entry = _doctor_visit_queue_entry(
+            safety_finding, adjudication, "rx-bpmh", _queue_specialist(results, domain),
+        )
+        queue_schema.record_doctor_visit_queue_entry(entry, on_date, root)
+        recorded.append(entry)
+
+    return recorded

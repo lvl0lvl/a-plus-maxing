@@ -111,9 +111,11 @@ silently shipped.
   the cross-compound additive-AE screen is WIRED (S73, the compound band) and the **medical-liaison
   terminal gate** (WIRED S74, `scripts/plan/adjudicate.py`) adjudicates the held additive-AE finding —
   a content-valid override releases the supplement, a non-overridable / invalid adjudication holds it.
-  The author-conflict adjudication (`cfaj`) is WIRED S75 and the supplement↔Rx BPMH axis (`rxbp`) is
-  WIRED S76 (see the liaison-gate / behavior-3 / behavior-5 sections below). The remaining gate to full
-  operator-usable is the doctor-visit-queue artifact. The build runs on synthetic
+  The author-conflict adjudication (`cfaj`) is WIRED S75, the supplement↔Rx BPMH axis (`rxbp`) is
+  WIRED S76, and the doctor-visit-queue DATA LAYER (the `dvq::` store stream + the collation of the
+  adjudicated safety findings) is WIRED S77 (see the liaison-gate / behavior-3 / behavior-5 sections
+  below). The remaining surface is the design-led rendered SBAR handout (a visual artifact — Pencil +
+  operator sign-off + the design agents, never originated solo). The build runs on synthetic
   fixtures (no real operator data).
 
 ## The cross-domain layer (orchestrator + reconciler) — WIRED S72
@@ -283,11 +285,20 @@ RED) + the `test_orchestrate.py` liaison-gate section (the wiring + the real-env
   de-identified Rx-interaction-class tokens never raw drug names, holds a class-stacking compound +
   routes it through the SAME gate; verified E2E over real medical-liaison BPMH dispatches,
   `liaison-rxbp-{cleared,blocked}.example.json`).
-- The remaining Phase-4 surface, beaded as a follow-on that REUSES the gate (the override-record
-  validator + the critical-non-overridable gate + the `safety_finding` envelope): the
-  **doctor-visit-queue collation + SBAR handout artifact** (a substrate write surface). Until it lands,
-  the reconciler holds the additive-AE supplement + a conflict-declaring domain + a BPMH-matched
-  compound (cleared only via the liaison gate), and overlap output stays DETECT+REPORT.
+- The **doctor-visit-queue DATA LAYER** is WIRED (S77, `scripts/store/queue_schema.py` +
+  `scripts/plan/orchestrate.py`): a `dvq::queue` store stream (disjoint namespace; the store-adversarial
+  battery — cross-stream, dedupe, mutation — is in `tests/store/test_queue_schema.py`) and
+  `collate_doctor_visit_queue(result, on_date, root)`, which records each ADJUDICATED safety finding
+  (additive-AE + every conflict-held + every Rx-BPMH-held domain's finding, cleared-via-override OR
+  block-stands) as a severity-ranked queue entry (non-overridable auto-block first, then HIGH, then
+  MEDIUM); the queued `finding_id` + `caution` match the adjudicated finding verbatim. Verified over a
+  real medical-liaison collation dispatch (`doctor-visit-queue-collated.example.json`): the liaison's
+  ranking agrees with the code on the safety-tier lead, refining intra-band clinically at dispatch.
+  The remaining surface, beaded as a design-led follow-on, is the **rendered SBAR handout** (a one-page
+  visual artifact — Pencil + operator sign-off + the design agents, never originated solo). Until it
+  lands, the reconciler holds the additive-AE supplement + a conflict-declaring domain + a BPMH-matched
+  compound (cleared only via the liaison gate), overlap output stays DETECT+REPORT, and the queue
+  persists the adjudicated findings for the MD handout.
 - The `/generate-plan` slash-command/skill wrapper (the orchestrator is wired as the `generate_plans`
   callable the interactive main agent invokes; the command surface is a later convenience).
 - A standalone full-plan render screen (the dashboard plan card is Slice 1's surface; the operator is
