@@ -4,7 +4,7 @@ type: reference
 status: active
 owner: walter
 created: 2026-05-16
-last_reviewed: 2026-06-17
+last_reviewed: 2026-06-18
 depends_on: []
 superseded_by: null
 review_cadence: session

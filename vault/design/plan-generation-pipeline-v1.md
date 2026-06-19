@@ -4,7 +4,7 @@ type: design
 status: approved
 owner: walter
 created: 2026-06-16
-last_reviewed: 2026-06-16
+last_reviewed: 2026-06-18
 review_cadence: phase
 permalink: a-plus-maxing/design/plan-generation-pipeline-v1
 ---
