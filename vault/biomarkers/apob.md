@@ -34,7 +34,7 @@ provenance_slug: labs-specialist
 ## Current Value
 - value: pending (not yet measured)
 - trend: n/a
-- history pointer: [[labs/]] (awaiting first panel)
+- history pointer: pending — first lab panel July 2026
 
 ## Affected By
 - genetics [[dna/apob]] — APOB / LDLR / PCSK9 variants; familial hypercholesterolemia (LDLR ~90%, APOB ~5–10%, PCSK9 ~1% of monogenic dominant FH)

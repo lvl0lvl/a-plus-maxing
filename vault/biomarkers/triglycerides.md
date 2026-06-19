@@ -30,12 +30,12 @@ provenance_slug: labs-specialist
 - FASTING — very high: ≥ 500 mg/dL (pancreatitis risk rises markedly above ~1000–2000 mg/dL)
 - NON-fasting — abnormal: ≥ 175 mg/dL (≥ 2 mmol/L, EAS/EFLM)
 - unit note: divide mg/dL by 88.5 for mmol/L (e.g., 150 ≈ 1.7, 500 ≈ 5.6)
-- source of target: [[library/biomarkers/triglycerides/research-report]] + NCEP ATP III (fasting bands) / AHA 2011 scientific statement (optimal < 100; non-fasting ≥ 200 → fasting panel)
+- source of target: [[library/biomarkers/triglycerides/research-report]] + NCEP ATP III (fasting bands) / AHA 2011 scientific statement (optimal < 100; non-fasting ≥ 200 → fasting panel) / EAS/EFLM (non-fasting ≥ 175 mg/dL)
 
 ## Current Value
 - value: pending (not yet measured)
 - trend: n/a
-- history pointer: [[labs/]] (awaiting first panel)
+- history pointer: pending — first lab panel July 2026
 
 ## Affected By
 - diet (major): refined carbohydrate, sugar/fructose, and alcohol — raise hepatic VLDL secretion and apoC-III

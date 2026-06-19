@@ -97,7 +97,7 @@ The Martin-Hopkins method replaces the fixed factor of 5 with an **adjustable fa
 
 ### Sampson (NIH equation 2)
 
-The Sampson/NIH equation is a fixed (non-adjustable) formula derived by beta-quantification, **LDL-C = TC/0.948 − HDL-C/0.971 − [TG/8.56 + (TG × non-HDL-C)/2140 − TG²/16100] − 9.44**, extending validity to triglycerides up to **800 mg/dL** [6, cohort][11, mechanism_review]. It outperformed both Friedewald and Martin-Hopkins at low LDL-C and high triglycerides, reporting a validation concordance correlation coefficient of **0.992** [6, cohort]. A head-to-head comparison in 111,939 patients reported accuracy versus the reference method of **62.1% (Martin/Hopkins) vs 40.4% (Sampson) vs 19.3% (Friedewald)** — illustrating that the equations are not interchangeable and that performance depends on the population's triglyceride distribution [14, cohort].
+The Sampson/NIH equation is a fixed (non-adjustable) formula derived by beta-quantification, **LDL-C = TC/0.948 − HDL-C/0.971 − [TG/8.56 + (TG × non-HDL-C)/2140 − TG²/16100] − 9.44**, extending validity to triglycerides up to **800 mg/dL** [6, cohort][11, mechanism_review]. It outperformed both Friedewald and Martin-Hopkins at low LDL-C and high triglycerides, reporting a validation concordance correlation coefficient of **0.992** [6, cohort]. A head-to-head comparison across the full triglyceride range (111,939 patients) reported accuracy versus the reference method of **62.1% (Martin/Hopkins) vs 40.4% (Sampson) vs 19.3% (Friedewald)** — illustrating that the equations are not interchangeable and that performance depends on the population's triglyceride distribution [14, cohort].
 
 ### Direct measurement and fasting status
 

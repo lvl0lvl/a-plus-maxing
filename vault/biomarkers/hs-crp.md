@@ -34,7 +34,7 @@ provenance_slug: labs-specialist
 ## Current Value
 - value: pending (not yet measured)
 - trend: n/a
-- history pointer: [[labs/]] (awaiting first panel)
+- history pointer: pending — first lab panel July 2026
 
 ## Affected By
 - raised by: adiposity / BMI (major modifiable determinant — visceral fat secretes IL-6 driving hepatic CRP; BMI alone ~15% of CRP variance), acute infection / inflammation / trauma / surgery / MI (the >10 mg/L spikes), smoking, metabolic syndrome / type 2 diabetes, aging, sleep disturbance, depression, physical inactivity

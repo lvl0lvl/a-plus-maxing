@@ -34,7 +34,7 @@ provenance_slug: labs-specialist
 ## Current Value
 - value: pending (not yet measured)
 - trend: n/a
-- history pointer: [[labs/]] (awaiting first panel)
+- history pointer: pending — first lab panel July 2026
 
 ## Affected By
 - genetics [[dna/ldlr]] — LDLR / APOB / PCSK9 variants; familial hypercholesterolemia (LDLR ≥85%, APOB, PCSK9 gain-of-function); HeFH untreated LDL-C >190 mg/dL (~1 in 250), HoFH >450 mg/dL (~1 in 300,000)

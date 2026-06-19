@@ -33,7 +33,7 @@ provenance_slug: labs-specialist
 ## Current Value
 - value: pending (not yet measured)
 - trend: n/a
-- history pointer: [[labs/]] (awaiting first panel)
+- history pointer: pending — first lab panel July 2026
 
 ## Affected By
 - genetics [[dna/cetp]] — CETP / LIPC / SCARB1 / LIPG drive high HDL-C; ABCA1 (Tangier disease) / APOA1 / LCAT drive low HDL-C; ~18.7% of low-HDL and ~10.9% of high-HDL extremes carry a rare large-effect variant

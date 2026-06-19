@@ -34,12 +34,12 @@ provenance_slug: labs-specialist
 ## Current Value
 - value: pending (not yet measured)
 - trend: n/a
-- history pointer: [[labs/]] (awaiting first panel)
+- history pointer: pending — first lab panel July 2026
 
 ## Affected By
 - genetics [[dna/lpa]] — *LPA* locus, KIV-2 copy-number variant; ~80–90% genetically determined (largely fixed at birth)
 - raised by: statins (~10–20% paradoxical increase), menopause, hypothyroidism, renal / nephrotic disease
-- lowered by: [[compounds/pcsk9-inhibitors]] (~20–30%), niacin (not recommended — no outcome benefit), lipoprotein apheresis (~60–70% acute)
+- lowered by: [[compounds/pcsk9-inhibitors]] (~20–27%), niacin (not recommended — no outcome benefit), lipoprotein apheresis (~60–70% acute)
 - investigational RNA agents (not approved): pelacarsen, olpasiran, lepodisiran
 - minimal effect: diet, exercise, weight loss — Lp(a) is largely refractory to lifestyle
 

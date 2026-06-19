@@ -33,7 +33,7 @@ provenance_slug: labs-specialist
 ## Current Value
 - value: pending (not yet measured)
 - trend: n/a
-- history pointer: [[labs/]]
+- history pointer: pending — first lab panel July 2026
 
 ## Affected By
 - systemic inflammation / infection (raises)
@@ -42,7 +42,7 @@ provenance_slug: labs-specialist
 - age (raises — inflammaging)
 - sex (women slightly higher, gap ≤ ~10%)
 - weight loss (lowers — ~15–23% after bariatric surgery)
-- exercise (lowers — endurance training, ~−9 μmol/L pooled)
+- exercise (lowers — endurance training, ~−9 μmol/L pooled [LabCorp scale])
 - statins: minimal effect on GlycA (statin-resistant residual-inflammatory component) — contrast with hs-CRP
 - heritability ~30% (majority of variance is acquired/modifiable)
 
