@@ -111,19 +111,18 @@ Populated after triage passes. Format: `<peptide> | <class> | <triage-score> | <
 all deep-passed → Done. Healing class fully triaged (4 Excluded); Ipamorelin held (16/25).
 Triage scores: `tesamorelin/.provenance/triage-scores.md`.
 
-Ranked queue (deep-pass-eligible, not yet deep-passed):
-- `Retatrutide | metabolic | 18/25 | deep pass NEXT (with hard sourcing caveat)` — triple agonist; strong Phase-2/3 but
-  INVESTIGATIONAL (not approved → sourcing 2/5; entry must gate toward "wait for approval", not acquisition).
+Ranked queue (deep-pass-eligible, not yet deep-passed): _(empty — metabolic class fully done; next round triages a new class)_
 - `Retatrutide | metabolic | 18/25 | deep pass (with hard sourcing caveat)` — triple agonist, strong Phase-2/3
   but INVESTIGATIONAL (not approved → sourcing 2/5; entry must gate toward "wait for approval", not acquisition).
 
 **Metabolic class triaged 2026-06-18:** Semaglutide 24, Tirzepatide 24, Retatrutide 18 (eligible); AOD-9604 12 → Excluded.
 
-**CLAIMED — next round (reserved 2026-06-18, peptide-library track):**
-Deep pass on **Retatrutide** (ranked-queue top; investigational-sourcing caveat). Then continue the loop
-through the remaining classes (GH-secretagogues: CJC-1295/Sermorelin/Hexarelin/MK-677; Cognitive; Sexual;
-Immune/longevity remainder: Epitalon/FOXO4-DRI/Humanin; Mitochondrial: SS-31/MOTS-c) until the taxonomy is
-fully Done/Excluded. Do NOT re-run anything already Done/Excluded.
+**CLAIMED — next round (reserved 2026-06-19, peptide-library track):**
+**GH-secretagogue class triage** — CJC-1295 (±DAC), Sermorelin, Hexarelin, MK-677 (Ibutamoren) — then deep-pass any
+eligible. Then continue the loop through Cognitive (Selank, Semax, Cerebrolysin, Dihexa, NA-Selank-Amidate), Sexual
+(PT-141, Melanotan II, Kisspeptin-10), Immune/longevity remainder (Epitalon, FOXO4-DRI, Humanin), Mitochondrial
+(SS-31, MOTS-c) until the taxonomy is fully Done/Excluded. Do NOT re-run anything already Done/Excluded.
+(Metabolic class COMPLETE: Semaglutide + Tirzepatide + Retatrutide Done; AOD-9604 Excluded.)
 
 ## Excluded (do not re-research without trigger)
 
@@ -143,6 +142,7 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 | Peptide | Compound page | Status |
 |---|---|---|
 | BPC-157 | [[compounds/bpc-157]] | **re-researched 2026-06-18 (deep mode, all gates attested PASS; prior 2026-05-23 entry archived — suspected fabricated citations). evidence_tier C / risk_tier experimental; no completed human RCT; ~85% single-lab (Sikiric/Zagreb) + 1 corroborating lab; FDA removed from Cat-2 ~Apr 2026 (FR 2026-07361) but unapproved + WADA-S0.** |
+| Retatrutide | [[compounds/retatrutide]] | **deep pass 2026-06-19 (triage 18/25). evidence_tier B / risk_tier moderate. Triple GIP/GLP-1/glucagon agonist (LY3437943); highest-efficacy in class (Phase 2 −24.2%/48wk not plateaued; TRIUMPH-1 topline ~−28% but NOT peer-reviewed). FIRST-CLASS CAVEAT = SOURCING: INVESTIGATIONAL, not approved anywhere, NO legitimate prescription/compounding pathway → gray-market only; posture = WAIT FOR APPROVAL. Also incretin goal mismatch (lean −6.5 kg, no muscle RCT); thin long-term safety; dose-dependent HR rise (~+6.7 bpm). NOT separately WADA-listed. Review: PASS-with-fixes (applied).** |
 | Tirzepatide | [[compounds/tirzepatide]] | **deep pass 2026-06-18 (triage 24/25). evidence_tier S / risk_tier moderate. Dual GIP/GLP-1 (GIP-biased); FDA-approved Mounjaro (T2D)/Zepbound (obesity + first-ever OSA drug, Dec 2024); most potent in class (SURMOUNT-1 −20.9%, beats semaglutide head-to-head SURMOUNT-5 −20.2% vs −13.7%). SAME FIRST-CLASS CAVEAT as semaglutide — GOAL MISMATCH: ~25% of mass lost is lean, reverses on stopping, NO muscle-building RCT (lean-sparing only via add-on anti-myostatin). Boxed thyroid-C-cell; GI AEs; NOT WADA-prohibited (Monitoring). Compounding wound down (shortage resolved Dec 2024). Review: PASS-with-fixes (applied).** |
 | Semaglutide | [[compounds/semaglutide]] | **deep pass 2026-06-18 (triage 24/25). evidence_tier S / risk_tier moderate. GLP-1 RA, FDA-approved (Ozempic/Wegovy/Rybelsus); huge RCT base (STEP −14.9%, SELECT MACE HR 0.80, SUSTAIN-6, FLOW, STEP-HFpEF, ESSENCE). FIRST-CLASS CAVEAT: GOAL MISMATCH — a weight-loss drug that reduces lean mass + reverses on stopping; NO RCT for recovery/lean-building. Boxed thyroid-C-cell warning; GI AEs; NAION/pancreatitis signals. NOT WADA-prohibited (Monitoring Program). Compounded salt-forms not approved API; gray market winding down (shortage resolved Feb 2025). Review: clean PASS.** |
 | Thymosin Alpha-1 | [[compounds/thymosin-alpha-1]] | **deep pass 2026-06-18 (triage 19/25). evidence_tier B / risk_tier low. Immune rebalancer (TLR→DC→Th1 + IDO/Treg); approved abroad ~30+ countries (NOT FDA-approved). FIRST-CLASS CAVEAT: the efficacy story shifted — best sepsis trial (TESTS, BMJ 2025, n=1089) is NEGATIVE; positive meta is a small-trial artifact. Goal-fit gap: NO RCT for general recovery in healthy adults. Removed from US 503A Cat-2 (Sept 2024). NOT WADA-prohibited (contrast TB-500). Very clean safety.** |
