@@ -1,0 +1,25 @@
+{
+  "specialist": "supplement-specialist",
+  "recommendations": [
+    {
+      "claim": "High-dose fish oil (EPA/DHA ~3-4 g/day) may modestly support muscle-recovery markers, but the human-outcome evidence for recovery specifically is trial-stage and mixed; its established human-outcome evidence is in the triglyceride/cardiovascular domain.",
+      "source": "EFSA NDA opinion on supplemental long-chain n-3 (combined EPA+DHA up to ~5 g/day no safety concern, general population); muscle-recovery/DOMS RCT literature is small and heterogeneous (trial-stage); triglyceride-lowering meta-analyses are the established-rung human-outcome anchor.",
+      "confidence_tier": "maturity_rung: established for triglyceride/CV outcomes, trial-stage for recovery; GRADE certainty low-to-moderate (recovery), strength conditional",
+      "reversibility": "Fully reversible; effects and antiplatelet contribution resolve within days-to-weeks of discontinuation.",
+      "category": "supplement",
+      "payload": {"name": "fish oil (EPA/DHA)", "dose": "~3-4 g/day combined EPA+DHA", "timing": "with a fat-containing meal"}
+    }
+  ],
+  "reconciliation": {
+    "ae_profile": {
+      "additive_classes": ["bleeding-risk"],
+      "interactions": [
+        {
+          "with": "BPC-157",
+          "mechanism": "concurrent perturbation of the hemostatic/vascular axis — high-dose fish oil contributes a documented antiplatelet/bleeding-risk effect while BPC-157 is angiogenic/vascular-acting with a thrombotic worst-case and near-zero human-outcome data; the net hemostatic interaction is uncharacterized in humans",
+          "severity": "moderate"
+        }
+      ]
+    }
+  }
+}

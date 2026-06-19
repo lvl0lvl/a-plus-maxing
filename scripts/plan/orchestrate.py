@@ -3,13 +3,13 @@
 The `/generate-plan` orchestrator's reconciliation job (design
 `vault/design/plan-generation-pipeline-v1.md` decision 4: "two terminal functions, not
 one") — find overlaps, bounce plans back, integrate — kept DISTINCT from the medical-liaison
-clinical safety adjudication (the deferred S73 slice).
+clinical safety adjudication (the deferred S74 slice).
 
 Under runtime A the orchestrator dispatches each plan-domain author, captures their output,
 computes each domain's candidate plan via `generate_plan.compute_plan` (no record yet),
 reconciles across domains, then records the reconciled set via `record_plan`. Recording is
 held until after reconciliation so a cross-domain check can stop an unsafe / un-fuelable plan
-from ever being written. The three cross-domain behaviors in this slice:
+from ever being written. The four cross-domain behaviors in this slice:
 
   1. RED-S/LEA cross-domain short-circuit (pipeline Phase 0.5): the nutritionist's
      critical-floor screen short-circuits ALL energy-deficit content — nutrition AND workout —
@@ -24,8 +24,17 @@ from ever being written. The three cross-domain behaviors in this slice:
   3. Cross-domain OVERLAP detection (the step-4 integration): an intervention identity
      surfacing in 2+ domains (a compound recommended as both a supplement and a peptide) is
      surfaced in the reconciliation report, alongside any author-declared cross-domain
-     conflict. V1 DETECTS + REPORTS; the additive-AE screen and the medical-liaison
-     contradiction adjudication are the S73 compound-safety slice, not this one.
+     conflict. V1 DETECTS + REPORTS; the medical-liaison contradiction adjudication is the
+     deferred S74 clinical slice.
+  4. Supplement<->peptide additive-AE screen (pipeline Phase 3, the compound band): each
+     compound passes its single-domain filters, but their COMBINATION is not presumed safe
+     ("component tolerability does not compose to combination safety" — peptide-specialist
+     Rule 7). Bidirectional: a SHARED author-declared additive-AE class, or an author-declared
+     pairwise interaction naming the other compound, is an additive-AE finding — surfaced in the
+     report AND holding the SUPPLEMENT (the side that finalizes last against the settled compound
+     surface) from recording: the honest no-stack state, never an un-screened additive-AE
+     combination written. The medical-liaison terminal gate (S74) adjudicates the held finding
+     (and the supplement<->Rx axis); V1 holds + reports.
 
 The reconciliation report is RETURNED (not persisted — no new store stream); plans are
 recorded via the existing `record_plan` (the store-adversarial battery surface is unchanged).
@@ -39,6 +48,7 @@ from scripts.store import plan_schema
 ENERGY_BOUNCE_HELD = "energy-bounce-held"  # bounced, and no re-author hook was available
 ENERGY_BOUNCE_UNRESOLVED = "energy-bounce-unresolved"  # the re-author did not honor the ceiling
 RED_S_LEA_CROSS_DOMAIN = RED_S_LEA_CLINICAL_ROUTING  # the nutrition screen short-circuits workout
+ADDITIVE_AE_HELD = "additive-ae-held"  # supplement<->peptide additive-AE risk holds the supplement
 
 
 def _compound_identities(candidate):
@@ -70,6 +80,95 @@ def _compound_identities(candidate):
     return [n.strip().lower() for n in names if n.strip()]
 
 
+def _ae_profile(candidate):
+    """The author-declared additive-AE profile a compound candidate contributes to the screen.
+
+    The compound author declares it in the `reconciliation` envelope (lifted into the candidate
+    `meta` by `compute_plan`): `ae_profile.additive_classes` is the list of AE-class tokens the
+    compound contributes (the supplement/peptide specialists' own vocabulary — `bleeding-risk`,
+    `serotonergic`, `hepatotoxicity`, `malignancy-risk`, `cyp3a4-pgp`, …), and
+    `ae_profile.interactions` is the list of author-declared pairwise interactions. A candidate
+    that declared none contributes an empty profile.
+
+    Args:
+        candidate (dict): A `compute_plan` result.
+
+    Returns:
+        (dict) The `ae_profile` dict, or `{}` when none was declared.
+    """
+    profile = (candidate.get("meta") or {}).get("ae_profile")
+    return profile if isinstance(profile, dict) else {}
+
+
+def _normalized_ae_classes(profile):
+    """The normalized `additive_classes` token set from an `ae_profile` (lowercased, stripped)."""
+    classes = profile.get("additive_classes")
+    if not isinstance(classes, list):
+        return set()
+    return {c.strip().lower() for c in classes if isinstance(c, str) and c.strip()}
+
+
+def _declared_interaction_findings(profile, declaring_domain, other_identities):
+    """The declaring domain's interactions that NAME the other compound (the identity-match path).
+
+    A pairwise interaction fires only when its `with` resolves to one of the other compound's
+    identities (the specific compound, not a class — the shared-class path covers class-level
+    additivity). Normalized for case/spacing-insensitive matching, mirroring the overlap check.
+
+    Args:
+        profile (dict): The declaring domain's `ae_profile`.
+        declaring_domain (str): The domain that declared the interactions (the authoritative
+            `from`, pinned by the orchestrator so an author-supplied `from` cannot shadow it).
+        other_identities (set): The other compound's normalized identities.
+
+    Returns:
+        (list) One finding per matched interaction.
+    """
+    findings = []
+    interactions = profile.get("interactions")
+    if not isinstance(interactions, list):
+        return findings
+    for interaction in interactions:
+        if not isinstance(interaction, dict):
+            continue
+        target = interaction.get("with")
+        if isinstance(target, str) and target.strip().lower() in other_identities:
+            findings.append({
+                "kind": "declared-interaction", "from": declaring_domain,
+                "with": target.strip().lower(), "mechanism": interaction.get("mechanism"),
+                "severity": interaction.get("severity"),
+            })
+    return findings
+
+
+def _additive_ae_findings(supplement, peptide):
+    """The supplement<->peptide additive-AE findings (the Phase-3 compound-band screen).
+
+    Bidirectional, two detection paths: (a) a SHARED additive-AE class both compounds declare —
+    additive in combination even though each cleared its single-domain filters; (b) an
+    author-declared pairwise interaction (from either side) that names the other compound. Pure
+    over the two candidates; the orchestrator holds the supplement when this is non-empty.
+
+    Args:
+        supplement (dict): The supplements `compute_plan` candidate (a recorded plan).
+        peptide (dict): The peptides `compute_plan` candidate (a recorded plan).
+
+    Returns:
+        (list) The additive-AE findings (empty when the combination is clean).
+    """
+    supp_profile = _ae_profile(supplement)
+    pep_profile = _ae_profile(peptide)
+    findings = []
+    for ae_class in sorted(_normalized_ae_classes(supp_profile) & _normalized_ae_classes(pep_profile)):
+        findings.append({"kind": "shared-class", "ae_class": ae_class,
+                         "between": ["peptides", "supplements"]})
+    supp_identities = set(_compound_identities(supplement))
+    pep_identities = set(_compound_identities(peptide))
+    findings.extend(_declared_interaction_findings(supp_profile, "supplements", pep_identities))
+    findings.extend(_declared_interaction_findings(pep_profile, "peptides", supp_identities))
+    return findings
+
+
 def reconcile(candidates):
     """Cross-domain reconciliation over the computed candidates (no recording).
 
@@ -83,10 +182,12 @@ def reconcile(candidates):
 
     Returns:
         (dict) `report` (`red_s_lea_cross_domain` bool, `bounce` dict | None, `overlaps` list,
-        `conflicts` list) and `holds` (domain -> hold reason — workout under a RED-S/LEA
-        short-circuit; the bounce-driven holds are applied by `generate_plans`).
+        `conflicts` list, `additive_ae` list) and `holds` (domain -> hold reason — workout under
+        a RED-S/LEA short-circuit, supplements under an additive-AE finding; the bounce-driven
+        holds are applied by `generate_plans`).
     """
-    report = {"red_s_lea_cross_domain": False, "bounce": None, "overlaps": [], "conflicts": []}
+    report = {"red_s_lea_cross_domain": False, "bounce": None, "overlaps": [],
+              "conflicts": [], "additive_ae": []}
     holds = {}
 
     nutrition = candidates.get("nutrition")
@@ -123,12 +224,28 @@ def reconcile(candidates):
         if len(domains) >= 2:
             report["overlaps"].append({"intervention": ident, "domains": sorted(domains)})
 
-    # author-declared cross-domain conflicts: surfaced, not adjudicated (the S73 liaison gate).
+    # author-declared cross-domain conflicts: surfaced, not adjudicated (the S74 liaison gate).
     # The orchestrator's `from` (the declaring domain) is authoritative — it is spread LAST so an
     # author-supplied `from` in the conflict dict cannot shadow the real source domain.
     for domain, cand in candidates.items():
         for conflict in (cand.get("meta") or {}).get("conflicts") or []:
             report["conflicts"].append({**conflict, "from": domain})
+
+    # 4. Supplement<->peptide additive-AE screen (pipeline Phase 3): runs only when BOTH a
+    #    supplement and a peptide candidate carry a plan (no recommended compound, no additive
+    #    risk in THIS pass). A shared additive-AE class or an author-declared pairwise interaction
+    #    holds the SUPPLEMENT (it finalizes last against the settled compound surface) — the honest
+    #    no-stack state. The liaison gate (S74) adjudicates the held finding + the supplement<->Rx axis.
+    supplement = candidates.get("supplements")
+    peptide = candidates.get("peptides")
+    if (
+        supplement is not None and supplement.get("plan") is not None
+        and peptide is not None and peptide.get("plan") is not None
+    ):
+        findings = _additive_ae_findings(supplement, peptide)
+        if findings:
+            report["additive_ae"] = findings
+            holds["supplements"] = ADDITIVE_AE_HELD
 
     return {"report": report, "holds": holds}
 
@@ -161,8 +278,9 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
 
     The `/generate-plan` orchestrator (runtime A): computes each domain's candidate via
     `compute_plan`, reconciles across domains (the RED-S/LEA cross-domain short-circuit + the
-    nutrition->workout energy bounce + overlap detection), applies a single bounce re-author
-    when the energy budget is unsustainable, and records the surviving plans via `record_plan`.
+    nutrition->workout energy bounce + overlap detection + the supplement<->peptide additive-AE
+    screen), applies a single bounce re-author when the energy budget is unsustainable, and
+    records the surviving plans via `record_plan`.
 
     Args:
         authors (dict): domain -> the captured author envelope, for the domains to run (1-4).

@@ -1,0 +1,19 @@
+{
+  "specialist": "supplement-specialist",
+  "recommendations": [
+    {
+      "claim": "Creatine monohydrate 5 g/day has established human-outcome evidence for supporting strength, lean-mass retention, and training recovery, and is well-tolerated at this maintenance dose.",
+      "source": "Large human-outcome literature including ISSN position stand on creatine (2017) and multiple RCT meta-analyses; established-rung human-outcome data for strength/lean-mass/recovery; renal-safety concern in healthy individuals not supported (serum creatinine rise is a measurement artifact, not injury).",
+      "confidence_tier": "maturity_rung: established/monograph-backed; GRADE certainty high, strength conditional (held to conditional because clinician clearance is not granted and this is a pre-liaison draft)",
+      "reversibility": "Fully reversible; muscle creatine stores and any water-retention effect wash out over ~4-6 weeks after discontinuation.",
+      "category": "supplement",
+      "payload": {"name": "creatine monohydrate", "dose": "5 g/day", "timing": "any time of day, daily and consistent"}
+    }
+  ],
+  "reconciliation": {
+    "ae_profile": {
+      "additive_classes": [],
+      "interactions": []
+    }
+  }
+}
