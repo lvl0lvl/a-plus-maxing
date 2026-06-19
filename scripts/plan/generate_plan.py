@@ -48,12 +48,13 @@ here in addition to the author honoring it (defense in depth), and it fails clos
 Per-domain translators (the small delta each author adds): workout is 1 rec -> 1 exercise;
 nutrition AGGREGATES N recs -> one `{calorie_goal, macros, meals}` day plan; supplements is
 1 rec -> 1 item; peptides records one compound regimen (the schema is single-compound — a
-multi-compound stack is the deferred compound-band two-pass screen). A domain may also own a
+multi-compound peptide stack within one plan is not supported here). A domain may also own a
 pre-translation safety veto in `_DOMAIN_GATES` — nutrition owns the 0.5 critical-floor
 RED-S / LEA screen (pipeline Phase 0.5), which short-circuits energy content to clinical-care
 routing BEFORE translation when the operator's state trips it. The cross-compound
-supplement<->peptide additive-AE screen and the nutrition->workout energy bounce are deferred
-to the cross-domain layer (the step-4 reconciler) per the pipeline design.
+supplement<->peptide additive-AE screen and the nutrition->workout energy bounce are NOT
+per-author concerns — they run in the cross-domain layer (the step-4 reconciler,
+`scripts/plan/orchestrate.py`) per the pipeline design.
 """
 
 from scripts.plan import router
@@ -178,9 +179,10 @@ def _to_supplements_plan(recommendations, gates):
 
     1 recommendation -> 1 item: each surviving recommendation's `payload` is a supplement item
     ({name, dose, timing?} — the `plan_schema` supplements schema). Records nothing when no
-    surviving recommendation carries a usable item payload (the honest no-plan state). The
-    cross-compound additive-AE / supplement<->peptide interaction screen is the deferred
-    compound-band step; each item here is single-domain filtered by `assemble`.
+    surviving recommendation carries a usable item payload (the honest no-plan state). Each item
+    here is single-domain filtered by `assemble`; the cross-compound additive-AE /
+    supplement<->peptide interaction screen runs in the cross-domain reconciler
+    (`scripts/plan/orchestrate.py`), not this single-domain translator.
 
     Args:
         recommendations (list): The assembled supplements section's composed claims.
@@ -206,10 +208,10 @@ def _to_peptides_plan(recommendations, gates):
 
     The `plan_schema` peptides plan is a SINGLE compound regimen ({compound, dose, route,
     cycle_week?, cycle_length_weeks?, tags?, evidence?}); V1 records one compound per plan
-    document (a multi-compound stack is the deferred compound-band two-pass screen, not a
-    single-author plan). The first surviving recommendation's `payload` is the regimen; records
-    nothing when none survives (the honest no-plan state). The author dispatch is briefed to
-    return one compound for the plan.
+    document (a multi-compound peptide stack within one plan is not supported). The first
+    surviving recommendation's `payload` is the regimen; records nothing when none survives (the
+    honest no-plan state). The author dispatch is briefed to return one compound for the plan.
+    The cross-domain supplement<->peptide additive-AE screen runs in the reconciler.
 
     Args:
         recommendations (list): The assembled peptides section's composed claims.
@@ -298,7 +300,8 @@ def compute_plan(domain, author_output, store_read, *, gates=None):
         safety-veto reason (the nutrition Phase-0.5 screen returns `RED_S_LEA_CLINICAL_ROUTING`
         == `'red-s-lea-clinical-routing'`), or `no-actionable-recommendation`), and `meta`
         (the author's `reconciliation` inputs the reconciler reads — the workout energy cost,
-        the nutrition energy-budget verdict, author-declared conflicts — `{}` if none declared).
+        the nutrition energy-budget verdict, the compound additive-AE profile, author-declared
+        conflicts — `{}` if none declared).
 
     Raises:
         KeyError: `domain` has no registered translator.

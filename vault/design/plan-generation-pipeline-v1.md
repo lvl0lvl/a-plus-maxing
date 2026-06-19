@@ -57,12 +57,12 @@ The step-4 *integration/reconciliation* (overlaps, contradictions, plan-bounce) 
 4. **+ Phase-0 ingestion / advisory layer** — the protocol/parameter authors + monitoring markers.
 5. **+ step-4 reconciler** (orchestrator, with plan-bounce) **+ medical-liaison terminal safety gate.**
 
-**Build status:** Slice 1 WIRED (S70, workout); slices 2–3 single-author translators WIRED (S71, nutrition/supplements/peptides). The step-4 **orchestrator reconciler** is WIRED (S72, `scripts/plan/orchestrate.py`): the nutrition→workout energy bounce (Phase 2), the RED-S/LEA cross-domain short-circuit (Phase 0.5), and cross-domain overlap/conflict DETECTION. Deferred to the S73 compound-safety + clinical-adjudication slice: the supplement↔peptide two-pass additive-AE screen (slice-3 compound-band screen) and the **medical-liaison terminal safety gate** (Phase 4) — the gate that turns the clinician-gated compound DRAFTS into operator-approvable plans; the reconciler's overlap/conflict output stays detect+report until the liaison gate adjudicates it.
+**Build status:** Slice 1 WIRED (S70, workout); slices 2–3 single-author translators WIRED (S71, nutrition/supplements/peptides). The step-4 **orchestrator reconciler** is WIRED (S72, `scripts/plan/orchestrate.py`): the nutrition→workout energy bounce (Phase 2), the RED-S/LEA cross-domain short-circuit (Phase 0.5), and cross-domain overlap/conflict DETECTION. The **supplement↔peptide two-pass additive-AE screen** (slice-3 compound-band, Phase 3) is WIRED (S73): a shared author-declared additive-AE class or a pairwise interaction holds the supplement before recording, bidirectional, verified E2E over real supplement-specialist + peptide-specialist dispatches. Deferred to the **S74 clinical-adjudication slice** (the held line's closer): the **medical-liaison terminal safety gate** (Phase 4) — collates the doctor-visit queue + every risk HALT, runs BPMH reconciliation, adjudicates the held additive-AE findings + author conflicts + the supplement↔Rx axis before operator approval. Until it lands, the additive-AE screen HOLDS (the safe no-stack state) and the overlap/conflict output stays detect+report.
 
 ## Deferred to build-out
 
 - 5th plan domain (sleep / recovery) — ADR-0010 one-way door; revisit once the protocol-author tier is built.
-- The orchestrator reconciler's energy-bounce capability is BUILT (S72). What remains deferred is the compound-band additive-AE screen + the medical-liaison terminal adjudication (the S73 slice; see Build status above).
+- The orchestrator reconciler's energy-bounce capability is BUILT (S72); the compound-band additive-AE screen is BUILT (S73). What remains deferred is the medical-liaison terminal adjudication — the S74 clinical slice that closes the held line to operator-usable (see Build status above).
 
 ## Cross-references
 

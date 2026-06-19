@@ -12,6 +12,22 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 73 (2026-06-18)
+
+Goal: Build the supplement↔peptide additive-AE screen — the Phase-3 compound-band cross-domain safety check (design `vault/design/plan-generation-pipeline-v1.md` Phase 3): the reconciler detects when a drafted supplement and peptide carry *additive* adverse-event risk and holds/flags the combination before recording, so no un-screened compound stack reaches the store. The two-slice split of the S73 compound-safety + clinical-adjudication slice (S73 = the screen; S74 = the medical-liaison terminal gate) was operator-confirmed at this session's open.
+
+Acceptance criteria:
+- [ ] AC1: an author-declared additive-AE / interaction contract added to the `reconciliation` envelope (supplement + peptide each declare AE classes / pairwise interactions, reasoning over the wiki at dispatch); `compute_plan` lifts it into the candidate's `meta` (mirrors the S72 energy-budget pattern); the single-domain public contract stays UNCHANGED (all S70–S72 tests + the `--self-test` green).
+- [ ] AC2: a bidirectional supplement↔peptide additive-AE screen in `reconcile` — a shared additive-AE class OR an author-declared pairwise interaction surfaces in the reconciliation report AND HOLDS the configured side before recording (two-pass: each compound passes single-domain filters → joint screen → finalize). Mutation-proven RED.
+- [ ] AC3: verified by a real supplement-specialist + peptide-specialist dual dispatch (full profiles inlined per INV-ROLE-INLINING) run through `generate_plans` E2E — a genuine additive-AE pair held/flagged, a clean (non-additive) pair recorded (the integration mandate), not a unit stub.
+- [ ] AC4: no new store-write stream (the screen holds/flags BEFORE `record_plan`; the store-adversarial surface unchanged); full suite green; the core-capability gate stays green.
+- [ ] AC5: plan-integrity lens + QA (Tier-2) → `/review-pr` (Tier-3, 6-agent) → fix legitimate findings → `/merge`; full session close.
+
+Files I WILL touch: `scripts/plan/orchestrate.py` (the screen); `scripts/plan/generate_plan.py` (lift the AE profile into `meta` — minimal, mirrors the energy-budget lift); `tests/plan/test_orchestrate.py`; `docs/plan-generation/author-dispatch-process.md`; new `docs/plan-generation/examples/compound-screen-*` envelopes (PII-free synthetic operator); HANDOFF/vault/PF-log/harvest/beads at close.
+Files I will NOT touch: `scripts/plan/assemble.py` + `router.py` core logic + the PII boundary (call only); `scripts/store/plan_schema.py` (`record_plan` — call only, no schema change); the deployed `.claude/agents/*` profiles (inline for dispatch, don't edit); the medical-liaison terminal gate + the `mdv` INV promotions (S74); the wiki research-list / `vault/library/` coordination surface (the two parallel wiki sessions own it); the measure/adjust legs; `main` directly.
+NOT doing: the medical-liaison terminal adjudication gate (S74 — the held-line closer); the `mdv` INV candidate promotions (S74, with the liaison gate); the measure leg (`record_plan_tracking` production caller); the adjust leg; auto-resolution beyond hold/flag (the liaison adjudicates contradictions); a new store stream; the screen reading wiki AE sections directly (author-declared is the runtime-A-consistent choice).
+Invariants at risk: INV-BRANCH-NOT-MAIN (build in the dedicated `../aplus-s73-screen` worktree off `main`; idle main trunk parked on `parking/s73-screen` per PF-S71-01); INV-CORE-CAPABILITY (the screen extends the wired path — stays green + `--self-test` passes); store-surface battery (`record_plan` — unchanged surface; QA confirms no new write surface); INV-ROLE-INLINING (real supplement + peptide dispatches); INV-CLOSE-AUDIT / INV-PF-ATTESTATION / INV-SKILL-TRACE / INV-HARVEST-CAPTURE at close. Core-capability-first gate (PF-S63-02): SATISFIED — this IS core work (the held line's compound-safety half; the liaison gate that closes it to operator-usable is S74).
+
 ## Scope Contract — Session 72 (2026-06-18)
 
 Goal: Build the cross-domain reconciler — the orchestrator terminal function (design `vault/design/plan-generation-pipeline-v1.md` decision 4, part 1): a `/generate-plan` orchestrator that computes all four candidate plans in one pass, runs the nutrition→workout energy bounce + cross-domain overlap detection, and records the reconciled set.

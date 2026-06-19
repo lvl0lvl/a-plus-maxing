@@ -136,8 +136,20 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
   the reconciler reads only `sustains` + `sustainable_training_kcal`, so it is annotation, not a contract key.
 - any author — `{"reconciliation": {"conflicts": [{"with_domain": ..., "with": ..., "reason": ...}]}}`
   declares a known cross-domain conflict for the report.
+- **supplements / peptides** — `{"reconciliation": {"ae_profile": {"additive_classes": [<token>, ...],
+  "interactions": [{"with": <other compound>, "mechanism": <str>, "severity": "low|moderate|high"}]}}}`
+  declares the compound's adverse-event profile for the additive-AE screen. `additive_classes` are the
+  AE-class tokens the compound CONTRIBUTES (a SHARED token across the supplement + peptide is an additive
+  finding); `interactions` are author-declared pairwise interactions whose `with` NAMES the other
+  compound by its plan name (the supplement item `name` / the peptide `compound`). **Canonical AE-class
+  vocabulary** (so cross-author matching works): `bleeding-risk`, `serotonergic`, `hepatotoxicity`,
+  `nephrotoxicity`, `malignancy-risk`, `thrombotic`, `igf-elevation`, `cyp3a4-pgp`, `qt-prolongation`,
+  `hypoglycemia`, `immunomodulation`, `sedation`, `stimulant-load` (grounded in the supplement Core-Rule-5
+  interaction screen + the peptide Rule-6 H-class axes). `with` matching is exact (normalized
+  lowercase/strip): name the compound as the other domain records it; a parenthetical qualifier
+  (`fish oil (EPA/DHA)`) is a known V1 precision gap (the shared-class path still catches it).
 
-**`reconcile(candidates)` — three behaviors (no recording):**
+**`reconcile(candidates)` — four behaviors (no recording):**
 
 1. **RED-S/LEA cross-domain short-circuit** (pipeline Phase 0.5). When nutrition tripped its
    critical-floor screen (`gates["red_s_lea_screen"]` → nutrition reason `red-s-lea-clinical-routing`),
@@ -151,8 +163,19 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
    with no `reauthor` hook it is HELD (`energy-bounce-held`) — never an un-fuelable load on the dashboard.
 3. **Overlap + conflict detection** (the step-4 integration). An intervention identity surfacing in 2+
    domains (a compound recommended as both a supplement and a peptide) and any author-declared conflict
-   are surfaced in the returned report. V1 DETECTS + REPORTS; the additive-AE screen and the
-   medical-liaison contradiction adjudication are the S73 compound-safety slice.
+   are surfaced in the returned report. V1 DETECTS + REPORTS; the medical-liaison contradiction
+   adjudication is the deferred S74 clinical slice.
+4. **Supplement↔peptide additive-AE screen** (pipeline Phase 3, the compound band, WIRED S73). Runs only
+   when BOTH a supplement and a peptide candidate carry a plan. A SHARED author-declared additive-AE class
+   (`ae_profile.additive_classes`) or an author-declared pairwise interaction naming the other compound
+   (`ae_profile.interactions`) is an additive-AE finding — surfaced in `report["additive_ae"]` AND HOLDING
+   the SUPPLEMENT (`additive-ae-held`; it finalizes last against the settled compound surface). The honest
+   no-stack state, never an un-screened additive-AE combination written. Bidirectional (either author's
+   declaration fires it; "component tolerability does not compose to combination safety"). The
+   medical-liaison terminal gate (S74) adjudicates the held finding + the supplement↔Rx axis. Real-dispatch
+   E2E (S73, PII-free synthetic operator): `compound-screen-supplement-{fishoil,creatine}-author-output`
+   + `compound-screen-peptide-bpc157-author-output.example.json` (the additive fish-oil↔BPC-157 hold via a
+   shared `bleeding-risk` axis, and the clean creatine↔BPC-157 pair that records both).
 
 The reconciliation report is RETURNED (`generate_plans(...)["reconciliation"]`), never persisted — no new
 store stream; plans record via the existing `record_plan` (the store-adversarial battery surface is
@@ -168,12 +191,14 @@ re-author to a 260-kcal reduced session, recorded; the bounced 700-kcal load nev
 
 - All four plan-domain authors are WIRED (workout S70; nutrition / supplements / peptides S71); the
   step-4 orchestrator reconciler — the nutrition→workout energy bounce + the RED-S/LEA cross-domain
-  short-circuit + cross-domain overlap/conflict detection — is WIRED (S72, above).
-- The **compound-safety + clinical-adjudication slice (S73)**: the supplement↔peptide two-pass mutual
-  interaction/additive-AE screen (Phase-3, bidirectional — members each pass single-domain filters but
-  the combination is not yet cross-checked for additive risk) and the **medical-liaison terminal safety
-  gate** (Phase-4 — the gate that turns the clinician-gated compound DRAFTS into operator-approvable
-  plans). The reconciler's overlap/conflict output is DETECT+REPORT until S73 adjudicates it.
+  short-circuit + cross-domain overlap/conflict detection — is WIRED (S72); the supplement↔peptide
+  additive-AE screen (Phase-3 compound band) is WIRED (S73, behavior 4 above).
+- The **clinical-adjudication slice (S74)** — the held line's closer: the **medical-liaison terminal
+  safety gate** (Phase-4 — collates the doctor-visit queue + every risk HALT, runs BPMH reconciliation,
+  adjudicates the held additive-AE findings + author-declared conflicts + the supplement↔Rx axis before
+  operator approval). This is the gate that turns the clinician-gated compound DRAFTS (and the held
+  supplement) into operator-approvable plans. Until it lands, the reconciler's additive-AE screen HOLDS
+  (the safe no-stack state) and the overlap/conflict output is DETECT+REPORT.
 - The `/generate-plan` slash-command/skill wrapper (the orchestrator is wired as the `generate_plans`
   callable the interactive main agent invokes; the command surface is a later convenience).
 - A standalone full-plan render screen (the dashboard plan card is Slice 1's surface; the operator is

@@ -12,6 +12,9 @@ reconciles across domains, then records the reconciled set. These tests pin:
   - the RED-S/LEA cross-domain short-circuit: a tripped nutrition critical-floor screen also
     holds the energy-prescribing workout plan (precedence over a coincident bounce);
   - cross-domain OVERLAP + author-declared conflict detection (detect + report, non-blocking);
+  - the supplement<->peptide additive-AE screen (pipeline Phase 3): a shared additive-AE class or
+    an author-declared pairwise interaction HOLDS the supplement before recording, never an
+    un-screened additive-AE compound stack (mutation-proven RED);
   - the store-adversarial battery at the orchestrator write boundary (four-domain cross-stream
     isolation + dedupe idempotency); and
   - the production path end-to-end (orchestrated multi-domain pass -> rendered dashboard).
@@ -25,6 +28,7 @@ import datetime
 from scripts.generate import generate
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, compute_plan
 from scripts.plan.orchestrate import (
+    ADDITIVE_AE_HELD,
     ENERGY_BOUNCE_HELD,
     ENERGY_BOUNCE_UNRESOLVED,
     RED_S_LEA_CROSS_DOMAIN,
@@ -331,7 +335,7 @@ def test_overlap_detected_across_supplement_and_peptide(tmp_path):
     assert {"intervention": "creatine", "domains": ["peptides", "supplements"]} in (
         out["reconciliation"]["overlaps"]
     )
-    # V1 detection is non-blocking: both plans still record (adjudication is the S73 gate).
+    # V1 detection is non-blocking: both plans still record (adjudication is the S74 liaison gate).
     assert out["results"]["supplements"]["recorded"] is True
     assert out["results"]["peptides"]["recorded"] is True
 
@@ -421,6 +425,198 @@ def test_author_declared_conflicts_accumulate_across_authors(tmp_path):
     conflicts = out["reconciliation"]["conflicts"]
     assert len(conflicts) == 2
     assert {c["from"] for c in conflicts} == {"supplements", "peptides"}  # not "spoofed"
+
+
+# --- supplement<->peptide additive-AE screen (pipeline Phase 3) ----------------
+
+
+def _compound_authors(supp_recon=None, pep_recon=None):
+    """A supplements + peptides author pair, each with an optional `reconciliation` dict."""
+    supp = _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist")
+    pep = _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist")
+    return {
+        "supplements": _recon(supp, **supp_recon) if supp_recon else supp,
+        "peptides": _recon(pep, **pep_recon) if pep_recon else pep,
+    }
+
+
+def test_additive_ae_shared_class_holds_supplement(tmp_path):
+    # CORE mutation-proof: a supplement and a peptide that each clear their single-domain filters
+    # but BOTH carry the same additive-AE class (bleeding-risk) is an additive combination. The
+    # screen HOLDS the supplement (it finalizes last) and surfaces the finding. Deleting the
+    # screen would record the supplement here -> this test goes RED, which is the proof.
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk", "malignancy-risk"]}},
+    )
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert out["reconciliation"]["additive_ae"] == [
+        {"kind": "shared-class", "ae_class": "bleeding-risk", "between": ["peptides", "supplements"]}
+    ]
+    # the supplement is HELD (the honest no-stack state), never the un-screened additive stack.
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+    # cross-stream: holding the supplement does NOT drop the peptide draft.
+    assert out["results"]["peptides"]["recorded"] is True
+    assert len(store.read("plan::peptides", root=tmp_path)) == 1
+
+
+def test_additive_ae_class_match_is_case_insensitive(tmp_path):
+    # the class tokens are normalized (lowercased/stripped) before intersection — two authors
+    # writing the same class with different casing/spacing still match.
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["  Bleeding-Risk "]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert out["reconciliation"]["additive_ae"][0]["ae_class"] == "bleeding-risk"
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+
+
+def test_additive_ae_declared_interaction_from_peptide_side(tmp_path):
+    # bidirectional path A: the PEPTIDE author names the supplement item in a pairwise interaction.
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        pep_recon={"ae_profile": {"interactions": [
+            {"with": "Fish oil", "mechanism": "additive antiplatelet effect", "severity": "moderate"}
+        ]}},
+    )
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    finding = out["reconciliation"]["additive_ae"][0]
+    assert finding["kind"] == "declared-interaction"
+    assert finding["from"] == "peptides"
+    assert finding["with"] == "fish oil"
+    # mechanism + severity ride through for the S74 liaison to adjudicate.
+    assert finding["mechanism"] == "additive antiplatelet effect"
+    assert finding["severity"] == "moderate"
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+    assert out["results"]["peptides"]["recorded"] is True
+
+
+def test_additive_ae_declared_interaction_from_supplement_side(tmp_path):
+    # bidirectional path B: the SUPPLEMENT author names the peptide compound in a pairwise
+    # interaction — the same finding fires (the screen checks BOTH authors' declarations).
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"interactions": [
+            {"with": "BPC-157", "mechanism": "additive angiogenic load", "severity": "high"}
+        ]}},
+    )
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    finding = out["reconciliation"]["additive_ae"][0]
+    assert finding["from"] == "supplements"
+    assert finding["with"] == "bpc-157"
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+
+
+def test_no_additive_ae_when_profiles_disjoint(tmp_path):
+    # NON-TAUTOLOGY control: distinct additive classes + no declared interaction -> NO finding and
+    # BOTH compounds record. Proves the screen discriminates rather than always-holding.
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["gi-irritation"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["malignancy-risk"]}},
+    )
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert out["reconciliation"]["additive_ae"] == []
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["results"]["peptides"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_additive_ae_inert_without_a_peptide(tmp_path):
+    # the screen needs BOTH compound domains to carry a plan — a supplement alone (even with an
+    # ae_profile) has no peptide to be additive WITH, so it records normally.
+    store_read = _seed_store(tmp_path)
+    supp = _recon(
+        _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist"),
+        ae_profile={"additive_classes": ["bleeding-risk"]},
+    )
+
+    out = generate_plans({"supplements": supp}, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert out["reconciliation"]["additive_ae"] == []
+    assert out["results"]["supplements"]["recorded"] is True
+
+
+def test_additive_ae_screen_inert_without_ae_profiles(tmp_path):
+    # a supplement + peptide pair that declare NO ae_profile records both — the screen only fires
+    # on a declared additive class or interaction, never by mere co-presence (overlap ≠ additive AE).
+    store_read = _seed_store(tmp_path)
+
+    out = generate_plans(_compound_authors(), store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert out["reconciliation"]["additive_ae"] == []
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["results"]["peptides"]["recorded"] is True
+
+
+def test_additive_ae_held_supplement_idempotent_on_rerun(tmp_path):
+    # store-safety: re-running an additive-AE pass never leaks the held supplement into the store.
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+
+    generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+    generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert store.read("plan::supplements", root=tmp_path) == []
+    assert len(store.read("plan::peptides", root=tmp_path)) == 1
+
+
+def test_reconcile_additive_ae_is_pure():
+    # reconcile surfaces the finding + the supplement hold with NO I/O (mirrors the bounce-purity
+    # pin); the orchestrator applies the hold.
+    supp = {
+        "domain": "supplements", "specialist": "supplement-specialist", "section": {}, "reason": None,
+        "plan": {"items": [{"name": "Fish oil", "dose": "2 g"}]},
+        "meta": {"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    }
+    pep = {
+        "domain": "peptides", "specialist": "peptide-specialist", "section": {}, "reason": None,
+        "plan": {"compound": "BPC-157", "dose": "250 mcg", "route": "subq"},
+        "meta": {"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    }
+
+    out = reconcile({"supplements": supp, "peptides": pep})
+
+    assert out["report"]["additive_ae"][0]["ae_class"] == "bleeding-risk"
+    assert out["holds"]["supplements"] == ADDITIVE_AE_HELD
+
+
+def test_additive_ae_end_to_end_renders_peptide_holds_supplement(tmp_path):
+    # integration mandate: an additive-AE pass renders the peptide draft on the dashboard while the
+    # held supplement does NOT surface its (un-screened) stack — the production-path proof.
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+
+    generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    out = generate.run(
+        "dashboard", _root=tmp_path, _out_dir=tmp_path,
+        _today=datetime.date.fromisoformat(PLAN_DATE),
+    )
+    html = out.read_text(encoding="utf-8")
+    assert "BPC-157" in html  # the peptide draft renders
+    assert "Fish oil" not in html  # the held supplement's stack never reaches the card
 
 
 # --- reconcile is pure (no I/O) ------------------------------------------------

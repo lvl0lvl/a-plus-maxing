@@ -1,0 +1,50 @@
+{
+  "specialist": "peptide-specialist",
+  "recommendations": [
+    {
+      "claim": "BPC-157 has mechanistically-mapped (animal/in-vitro) angiogenic and tendon-fibroblast activity proposed to support soft-tissue and connective-tissue recovery, but human efficacy is unproven (no completed published human RCT).",
+      "source": "vault/compounds/bpc-157.md + vault/library/peptides/bpc-157/research-report.md (Sikiric/Zagreb ~85% single-lab; Chang Gung tendon-fibroblast/VEGFR2; Huang 2015 FMMU). NCT02637284 status UNKNOWN, NCT07437547 recruiting.",
+      "confidence_tier": "maturity_rung: preclinical; GRADE certainty: very-low; strength: conditional",
+      "reversibility": "Pharmacologically reversible on discontinuation (no validated human-evidence-based stopping rule exists; cycling is convention only). The H2 worst-case harms (malignancy promotion, thrombotic) are NOT presumptively reversible — this is the auto-block driver.",
+      "category": "peptide",
+      "grounding": "animal",
+      "payload": {
+        "compound": "BPC-157",
+        "dose": "~250-500 mcg [practitioner_protocol] — convention, NOT trial-validated; no USP/NF monograph, no admissible compounding clinical data sheet. Stated as the literature's reported convention, not an administration directive.",
+        "route": "subcutaneous [practitioner_protocol]",
+        "cycle_week": 1,
+        "cycle_length_weeks": 8,
+        "tags": [
+          "maturity_rung:preclinical",
+          "concentration:~85%-single-lab-Sikiric-Zagreb [dominance-caveat]",
+          "[population-mismatch:rat]",
+          "[non-English-literature]",
+          "worst_case_h_class:H2",
+          "H2-AUTO-BLOCK",
+          "clearance_gated:true",
+          "draft:pre-medical-liaison",
+          "WADA-S0",
+          "TGA-Schedule-4",
+          "regulatory-removal-is-not-approval"
+        ],
+        "evidence": "Human-outcome evidence is preclinical/anecdote; mechanism (VEGFR2/eNOS, FAK-paxillin) is mapped in vitro/animal only — no mechanism-cited confidence upgrade. The only PK figure (~15-min t1/2) is rat-IV (He 2022): [population-mismatch: rat], HED corrects for size only, no human PK exists. ~85% single-lab dominance (Sikiric/Zagreb) downgrades certainty. Reconstitution arithmetic, if performed, is neutral math, not a self-administration endorsement. clearance_granted=false: ships as a clearance-gated DRAFT (INFORM-class) with the H2 auto-block surfaced; NOT an operator directive — routes to medical-liaison."
+      }
+    }
+  ],
+  "reconciliation": {
+    "ae_profile": {
+      "additive_classes": [
+        "thrombotic",
+        "malignancy-risk",
+        "bleeding-risk"
+      ],
+      "interactions": [
+        {
+          "with": "Fish oil",
+          "mechanism": "BPC-157 angiogenic vascular remodeling (VEGFR2/eNOS, NO-system modulation) concurrent with high-dose EPA/DHA antiplatelet/bleeding-axis load — combined effect on hemostasis and vascular tone; combination_evidence: none (no study), component tolerability does not compose to combination safety",
+          "severity": "moderate"
+        }
+      ]
+    }
+  }
+}
