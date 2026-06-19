@@ -181,7 +181,7 @@ def reconcile(candidates):
     Pure over `candidates` (domain -> `compute_plan` result). Produces the reconciliation
     report plus the HOLD directives the orchestrator applies before recording (the energy
     bounce is RETURNED as a directive for the orchestrator to re-author, not applied as a hold
-    here). See the module docstring for the three behaviors.
+    here). See the module docstring for the four behaviors.
 
     Args:
         candidates (dict): domain -> `compute_plan` result, for the domains in this pass.
