@@ -1,0 +1,30 @@
+{
+  "_comment": "REAL captured medical-liaison adjudication envelope (S76, rxbp). The deployed medical-liaison, full profile inlined, adjudicated a held supplement<->Rx BPMH finding (the orchestrator's rxbp screen held the supplement plan because its author-declared bleeding-risk class stacked against the operator's PRESENT medication interaction class, read de-identified through the router.summarize PII boundary — never the raw drug name). The synthetic operator is on low-dose aspirin 81 mg/day (an antiplatelet, bleeding-risk class) and the supplement plan is fish oil 2 g/day (bleeding-risk). The liaison assessed HIGH / H3 — a real additive antithrombotic-class watchlist pairing but BOUNDED and monitorable (no anticoagulant, no narrow-therapeutic-index agent, no INR), so overridable — and built a content-valid override at the HIGH (understanding+appreciation+reasoning) rung honoring the operator's informed refusal. The orchestrator's adjudicate() validates this and RELEASES the supplement hold: the supplement records. Contrast liaison-rxbp-blocked.example.json (warfarin -> CRITICAL/H2, non-overridable) — the SAME finding_id adjudicated to opposite outcomes on the specific medication, the BPMH gate's marquee discrimination.",
+  "finding_id": "rx-bpmh:supplements:bleeding-risk",
+  "status": "override-recorded",
+  "composite_band": "HIGH",
+  "harm_class": "H3",
+  "verdict": "BLOCK_WITH_OVERRIDE_PATH",
+  "severity_final": {"set_by": "medical-liaison", "verdict": "BLOCK_WITH_OVERRIDE_PATH"},
+  "override_record": {
+    "caution_verbatim": "Supplement<->Rx BPMH interaction: supplements contributes additive-AE class(es) bleeding-risk that stack against the operator's present medication interaction class(es) bleeding-risk",
+    "composite_band": "HIGH",
+    "risks_communicated": {
+      "general": "Aspirin 81 mg/day is an antiplatelet agent; fish oil 2 g/day EPA/DHA carries a mild antiplatelet/antithrombotic effect. Taken together the bleeding-risk classes are ADDITIVE (antithrombotic-class stacking), an interaction-database watchlist pairing — not a bare 'no interaction'. Source-disagreement is expected and must be checked at the database + doctor (e.g., some monographs flag additive bleeding for antiplatelet+omega-3, others note the effect is dose-dependent and clinically modest at 2 g/day); the verdict is routed there, not asserted here. This is a real, additive, MONITORABLE pairing — not an anticoagulant prescription (no warfarin/DOAC, no narrow-therapeutic-index agent, no INR), so the worst-case-reachable harm is bounded (clinically significant bleeding) rather than acute life-threatening.",
+      "risks_of_proceeding": "Proceeding with fish oil while on daily aspirin can increase bruising and bleeding tendency (additive antiplatelet effect): easy/prolonged bruising, longer bleeding from minor cuts, gum/nose bleeds, and — at the worst-case-reachable ceiling — bleeding heavy enough to need medical attention (GI or, rarely, intracranial), especially if a future second antithrombotic, NSAID, trauma, or procedure is added. The risk is materially elevated around any surgery, dental work, or invasive procedure unless both agents are held in advance. False reassurance ('they're fine together') is itself the harm this block guards against; the bleeding signal can be silent until significant."
+    },
+    "operator_reason": "Operator takes aspirin 81 mg/day for cardiovascular primary prevention and wishes to add fish oil 2 g/day for its independent cardiovascular and lipid benefit. They state explicit understanding that fish oil stacks additively on the aspirin's bleeding-risk class, and have a concrete plan to manage that risk: self-monitor for unusual bruising and bleeding, hold BOTH agents in advance of any surgical, dental, or invasive procedure, and disclose both agents to their primary-care physician for clinician review at the July 2026 visit. The rationale is condition-grounded (CV primary prevention) and paired with a stated monitoring and disclosure plan.",
+    "evidence_tier_required": "understanding+appreciation+reasoning",
+    "evidence_provided": {
+      "rung": "understanding+appreciation+reasoning",
+      "understanding": "Operator states the two agents share the bleeding-risk (antithrombotic) class and that the effect is additive when stacked — accurate comprehension of the interaction.",
+      "appreciation_as_applied": "Operator applies the risk to their own case: self-monitor for unusual bruising/bleeding, and hold BOTH agents before any procedure or dental work — appreciation that the elevated bleeding tendency is procedure-relevant for them specifically.",
+      "reasoning": "Operator weighs the additive bleeding risk against the independent cardiovascular rationale for both agents and elects to proceed under a monitoring-plus-clinician-disclosure plan (July 2026 PCP visit), rather than proceeding blind — a coherent risk/benefit reasoning chain.",
+      "grade_tag": {"certainty": "moderate", "strength": "conditional"}
+    },
+    "override_literal": "operator is overriding a safety block",
+    "voluntariness_note": "The decision is the operator's own, made without coercion; authorization is recorded out-of-band and logged here, never inferred from in-conversation insistence. This override does NOT lower the band: the finding remains HIGH and the pairing remains a watchlist interaction routed to a database lookup and the operator's physician; the override records an informed choice to proceed under monitoring, and the block cannot be cleared FOR the operator. If the rung were unmet, the block would STAND.",
+    "timestamp": "2026-06-19T12:00:00-04:00",
+    "contradictions_log_ref": "vault/meta/contradictions.md#C-2"
+  }
+}

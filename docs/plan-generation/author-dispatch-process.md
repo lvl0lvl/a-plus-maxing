@@ -111,9 +111,9 @@ silently shipped.
   the cross-compound additive-AE screen is WIRED (S73, the compound band) and the **medical-liaison
   terminal gate** (WIRED S74, `scripts/plan/adjudicate.py`) adjudicates the held additive-AE finding —
   a content-valid override releases the supplement, a non-overridable / invalid adjudication holds it.
-  The remaining gates to full operator-usable are the Phase-4 follow-on axes (`rxbp` supplement↔Rx BPMH
-  + the doctor-visit-queue artifact; `cfaj` author-conflict adjudication is WIRED S75 — see the
-  liaison-gate / behavior-3 sections below). The build runs on synthetic
+  The author-conflict adjudication (`cfaj`) is WIRED S75 and the supplement↔Rx BPMH axis (`rxbp`) is
+  WIRED S76 (see the liaison-gate / behavior-3 / behavior-5 sections below). The remaining gate to full
+  operator-usable is the doctor-visit-queue artifact. The build runs on synthetic
   fixtures (no real operator data).
 
 ## The cross-domain layer (orchestrator + reconciler) — WIRED S72
@@ -154,9 +154,13 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
   `hypoglycemia`, `immunomodulation`, `sedation`, `stimulant-load` (grounded in the supplement Core-Rule-5
   interaction screen + the peptide Rule-6 H-class axes). `with` matching is exact (normalized
   lowercase/strip): name the compound as the other domain records it; a parenthetical qualifier
-  (`fish oil (EPA/DHA)`) is a known V1 precision gap (the shared-class path still catches it).
+  (`fish oil (EPA/DHA)`) is a known V1 precision gap (the shared-class path still catches it). The SAME
+  `additive_classes` tokens also feed the supplement↔Rx BPMH screen (behavior 5, `rxbp`): a token that
+  intersects the operator's PRESENT Rx-interaction classes (read de-identified from the store, behavior 5)
+  holds the compound through the liaison gate — so the canonical vocabulary is shared across the
+  compound↔compound and compound↔Rx axes.
 
-**`reconcile(candidates)` — four behaviors (no recording):**
+**`reconcile(candidates, *, operator_rx_classes=...)` — five behaviors (no recording):**
 
 1. **RED-S/LEA cross-domain short-circuit** (pipeline Phase 0.5). When nutrition tripped its
    critical-floor screen (`gates["red_s_lea_screen"]` → nutrition reason `red-s-lea-clinical-routing`),
@@ -184,11 +188,27 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
    the SUPPLEMENT (`additive-ae-held`; it finalizes last against the settled compound surface). The honest
    no-stack state, never an un-screened additive-AE combination written. Bidirectional (either author's
    declaration fires it; "component tolerability does not compose to combination safety"). The
-   medical-liaison terminal gate (`adjudicate`, WIRED S74 — see next section) adjudicates the held finding;
-   the supplement↔Rx axis is the beaded follow-on `rxbp`. Real-dispatch
+   medical-liaison terminal gate (`adjudicate`, WIRED S74 — see next section) adjudicates the held finding.
+   Real-dispatch
    E2E (S73, PII-free synthetic operator): `compound-screen-supplement-{fishoil,creatine}-author-output`
    + `compound-screen-peptide-bpc157-author-output.example.json` (the additive fish-oil↔BPC-157 hold via a
    shared `bleeding-risk` axis, and the clean creatine↔BPC-157 pair that records both).
+5. **Supplement↔Rx BPMH screen** (pipeline Phase 4, the medical-liaison's marquee watchlist check, WIRED
+   S76). The operator's PRESENT medication interaction classes are read de-identified through the
+   `router.summarize` PII boundary — a new `rx-interaction-classes` summary field carrying operator/
+   liaison-curated class tokens (the SAME canonical AE-class vocabulary the compound authors declare),
+   NEVER the raw drug names (the raw `medication-list` is a named-excluded raw-PII class dropped at the
+   boundary; the drug-name→class de-identification is an operator/liaison CURATION step at the store layer,
+   so no pharmacology DB enters `scripts/`). A compound-bearing domain (supplements AND peptides) whose
+   declared `ae_profile.additive_classes` intersect the operator's present Rx-classes is an rx-bpmh finding
+   — surfaced in `report["rx_bpmh"]` AND HELD in an INDEPENDENT `rx_bpmh_held` set (`rx-bpmh-held`), routed
+   through the SAME gate (`adjudicate`); a content-valid override releases it, a non-overridable / invalid
+   adjudication holds it. Tracked independently of the additive-AE and conflict holds (a compound can carry
+   several concurrent concerns, each cleared on its own — a domain records only when in NONE of the three
+   sets). Real-dispatch E2E (S76, PII-free SYNTHETIC operator on a synthetic Rx; no real medication data):
+   `liaison-rxbp-{cleared,blocked}.example.json` — the SAME finding_id adjudicated to OPPOSITE outcomes on
+   the specific medication (aspirin+fish-oil → HIGH/H3 overridable → clears; warfarin+fish-oil → CRITICAL/H2
+   vitamin-K/warfarin watchlist → non-overridable auto-block).
 
 The reconciliation report is RETURNED (`generate_plans(...)["reconciliation"]`), never persisted — no new
 store stream; plans record via the existing `record_plan` (the store-adversarial battery surface is

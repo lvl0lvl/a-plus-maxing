@@ -36,12 +36,21 @@ from ever being written. The four cross-domain behaviors in this slice:
      surface) from recording: the honest no-stack state, never an un-screened additive-AE
      combination written. The medical-liaison terminal gate (`adjudicate`) then adjudicates the
      held finding: a content-valid override releases the supplement, a non-overridable / invalid
-     adjudication leaves it held. The supplement<->Rx axis is the beaded follow-on `rxbp`.
+     adjudication leaves it held.
+  5. Supplement<->Rx BPMH screen (pipeline Phase 4, the medical-liaison's marquee watchlist check —
+     `rxbp`): each compound-bearing domain (supplements AND peptides) whose author-declared additive-AE
+     classes intersect the operator's PRESENT Rx-interaction classes — read de-identified through the
+     `router.summarize` PII boundary (the curated `rx-interaction-classes` field, never raw drug names)
+     — is HELD pending the liaison gate (`adjudicate`, the SAME gate), the safe default. The hold is
+     tracked in its OWN set (`rx_bpmh_held`), independent of the other holds; each concern clears on its
+     own. No pharmacology DB enters the orchestrator: the drug-name -> interaction-class de-identification
+     is an operator/liaison CURATION step at the store layer.
 
 The reconciliation report is RETURNED (not persisted — no new store stream); plans are
 recorded via the existing `record_plan` (the store-adversarial battery surface is unchanged).
 """
 
+from scripts.plan import router
 from scripts.plan.adjudicate import adjudicate
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, compute_plan
 from scripts.store import plan_schema
@@ -53,6 +62,7 @@ ENERGY_BOUNCE_UNRESOLVED = "energy-bounce-unresolved"  # the re-author did not h
 RED_S_LEA_CROSS_DOMAIN = RED_S_LEA_CLINICAL_ROUTING  # the nutrition screen short-circuits workout
 ADDITIVE_AE_HELD = "additive-ae-held"  # supplement<->peptide additive-AE risk holds the supplement
 CONFLICT_HELD = "cross-domain-conflict-held"  # an author-declared cross-domain conflict holds the declarer
+RX_BPMH_HELD = "rx-bpmh-held"  # a compound's additive-AE class stacks against an operator Rx-interaction class
 
 
 def _compound_identities(candidate):
@@ -245,29 +255,86 @@ def _conflict_safety_finding(from_domain, conflicts):
     }
 
 
-def reconcile(candidates):
+def _rx_bpmh_matched_classes(candidate, operator_rx_classes):
+    """A compound's declared additive-AE classes that stack against the operator's present Rx classes.
+
+    The supplement<->Rx BPMH screen (rxbp): a compound declares its additive-AE classes
+    (`ae_profile.additive_classes`, the same canonical vocabulary the additive-AE screen uses); the
+    operator's present medication interaction CLASSES come from the de-identified `rx-interaction-classes`
+    summary field (operator/liaison-curated — never raw drug names). Their intersection is the BPMH
+    finding: a supplement contributing `bleeding-risk` while the operator is on a `bleeding-risk`-class
+    medication is the antithrombotic-stacking watchlist case. Pure over the candidate + the operator
+    class set.
+
+    Args:
+        candidate (dict): A compound `compute_plan` candidate (supplements or peptides).
+        operator_rx_classes (set): The operator's present Rx-interaction-class tokens (normalized).
+
+    Returns:
+        (set) The matched (shared) class tokens — empty when the compound is clean against the BPMH surface.
+    """
+    return _normalized_ae_classes(_ae_profile(candidate)) & set(operator_rx_classes)
+
+
+def _rx_bpmh_safety_finding(held_domain, matched_classes):
+    """The `safety_finding` the orchestrator routes to the liaison for a held supplement<->Rx BPMH finding.
+
+    Distills the matched BPMH classes into the held-finding the liaison adjudicates
+    (`scripts/plan/adjudicate.py`): a deterministic `finding_id` (so the liaison envelope can echo it) and
+    a `caution` the override record must reproduce verbatim. The held domain is the compound domain whose
+    declared class stacked against the operator's medication surface.
+
+    Args:
+        held_domain (str): The compound domain whose plan is held (supplements or peptides).
+        matched_classes (set): The shared additive-AE / Rx-interaction class tokens (non-empty).
+
+    Returns:
+        (dict) `finding_id`, `source`, `held_domain`, `caution`, and the matched `classes`.
+    """
+    classes = sorted(matched_classes)
+    detail = ", ".join(classes)
+    return {
+        "finding_id": "rx-bpmh:" + held_domain + ":" + ";".join(classes),
+        "source": "rx-bpmh", "held_domain": held_domain,
+        "caution": (
+            f"Supplement<->Rx BPMH interaction: {held_domain} contributes additive-AE class(es) "
+            f"{detail} that stack against the operator's present medication interaction class(es) {detail}"
+        ),
+        "classes": classes,
+    }
+
+
+def reconcile(candidates, *, operator_rx_classes=frozenset()):
     """Cross-domain reconciliation over the computed candidates (no recording).
 
     Pure over `candidates` (domain -> `compute_plan` result). Produces the reconciliation
     report plus the HOLD directives the orchestrator applies before recording (the energy
     bounce is RETURNED as a directive for the orchestrator to re-author, not applied as a hold
-    here). See the module docstring for the four behaviors.
+    here). See the module docstring for the five behaviors.
 
     Args:
         candidates (dict): domain -> `compute_plan` result, for the domains in this pass.
+        operator_rx_classes (set, optional): The operator's present Rx-interaction-class tokens
+            (from the de-identified `rx-interaction-classes` summary field — never raw drug names).
+            Drives the supplement<->Rx BPMH screen (behavior 5, rxbp). Defaults to empty (no
+            medication surface, no BPMH hold — the backward-compatible no-Rx default).
 
     Returns:
         (dict) `report` (`red_s_lea_cross_domain` bool, `bounce` dict | None, `overlaps` list,
-        `conflicts` list, `additive_ae` list); `holds` (domain -> hold reason — workout under a
-        RED-S/LEA short-circuit, supplements under an additive-AE finding; the bounce-driven holds
-        are applied by `generate_plans`); and `conflict_held` (list of declaring domains held by an
-        author-declared cross-domain conflict — tracked INDEPENDENTLY of `holds` so a domain can
-        carry both a `holds` reason and an open conflict, each cleared on its own).
+        `conflicts` list, `additive_ae` list, `rx_bpmh` list); `holds` (domain -> hold reason —
+        workout under a RED-S/LEA short-circuit, supplements under an additive-AE finding; the
+        bounce-driven holds are applied by `generate_plans`); `conflict_held` (list of declaring
+        domains held by an author-declared cross-domain conflict); and `rx_bpmh_held` (list of
+        compound domains held by a supplement<->Rx BPMH finding). `conflict_held` and `rx_bpmh_held`
+        are tracked INDEPENDENTLY of `holds` and of each other, so a domain can carry several
+        concurrent concerns (an additive-AE hold AND a conflict AND a BPMH match), each cleared on
+        its own — clearing one never releases a domain whose other concern is still open.
     """
     report = {"red_s_lea_cross_domain": False, "bounce": None, "overlaps": [],
-              "conflicts": [], "additive_ae": []}
+              "conflicts": [], "additive_ae": [], "rx_bpmh": []}
     holds = {}
     conflict_held = []  # declaring domains held by an author-conflict — INDEPENDENT of `holds`
+    rx_bpmh_held = []  # compound domains held by a supplement<->Rx BPMH match — INDEPENDENT of both
 
     nutrition = candidates.get("nutrition")
     workout = candidates.get("workout")
@@ -325,7 +392,7 @@ def reconcile(candidates):
     #    risk in THIS pass). A shared additive-AE class or an author-declared pairwise interaction
     #    holds the SUPPLEMENT (it finalizes last against the settled compound surface) — the honest
     #    no-stack state. `generate_plans` then routes the held finding to the liaison gate
-    #    (`adjudicate`); the supplement<->Rx axis is the beaded follow-on `rxbp`.
+    #    (`adjudicate`). The supplement<->Rx axis is the separate behavior 5 below (`rxbp`).
     supplement = candidates.get("supplements")
     peptide = candidates.get("peptides")
     if (
@@ -337,7 +404,26 @@ def reconcile(candidates):
             report["additive_ae"] = findings
             holds["supplements"] = ADDITIVE_AE_HELD
 
-    return {"report": report, "holds": holds, "conflict_held": conflict_held}
+    # 5. Supplement<->Rx BPMH screen (rxbp, pipeline Phase 4 — the medical-liaison's marquee
+    #    watchlist check). Each compound-bearing domain (supplements AND peptides — the screen is
+    #    symmetric; a peptide stacking with an operator anticoagulant is the same watchlist case as a
+    #    supplement) whose declared additive-AE classes intersect the operator's PRESENT Rx-interaction
+    #    classes is HELD pending the liaison gate — the safe default (a flagged medication-stacking
+    #    interaction is not shipped un-adjudicated), mirroring the additive-AE supplement hold. The hold
+    #    is tracked in its OWN set (`rx_bpmh_held`), INDEPENDENT of `holds` AND `conflict_held`: a compound
+    #    can carry a BPMH match alongside an additive-AE hold and/or a conflict, and each concern clears on
+    #    its own. `generate_plans` adjudicates each via the SAME gate; a content-valid override clears it.
+    for domain in ("supplements", "peptides"):
+        cand = candidates.get(domain)
+        if cand is None or cand.get("plan") is None:
+            continue
+        matched = _rx_bpmh_matched_classes(cand, operator_rx_classes)
+        if matched:
+            report["rx_bpmh"].append({"held_domain": domain, "classes": sorted(matched)})
+            rx_bpmh_held.append(domain)
+
+    return {"report": report, "holds": holds, "conflict_held": conflict_held,
+            "rx_bpmh_held": rx_bpmh_held}
 
 
 def _held_result(candidate, reason):
@@ -395,18 +481,19 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
             load.
         adjudicator (Callable, optional): `adjudicator(safety_finding) -> liaison envelope | None`
             — the medical-liaison dispatch hook for a held finding (runtime A: a real `medical-liaison`
-            dispatch, full profile inlined), called for the additive-AE finding AND for each
-            conflict-held domain's finding. The envelope is validated by `adjudicate`; a content-valid
-            HIGH/MEDIUM override releases that domain's hold, a CRITICAL/H1-H2 auto-block or any
-            invalid/absent envelope leaves it held. When absent, a held domain stays held — the safe
-            default.
+            dispatch, full profile inlined), called for the additive-AE finding, for each conflict-held
+            domain's finding, AND for each supplement<->Rx BPMH-held compound's finding. The envelope is
+            validated by `adjudicate`; a content-valid HIGH/MEDIUM override releases that domain's hold,
+            a CRITICAL/H1-H2 auto-block or any invalid/absent envelope leaves it held. When absent, a
+            held domain stays held — the safe default. All three axes reuse the SAME gate.
 
     Returns:
         (dict) `results` (domain -> result record, the `generate_plan` shape), `reconciliation`
         (the `reconcile` report), `reauthored` (bool — a bounce re-author ran), `adjudication`
-        (the `adjudicate` outcome for a held additive-AE finding, or `None`), and
+        (the `adjudicate` outcome for a held additive-AE finding, or `None`),
         `conflict_adjudications` (declaring-domain -> `adjudicate` outcome for each conflict-held
-        domain; `{}` when none ran).
+        domain; `{}` when none ran), and `rx_bpmh_adjudications` (compound-domain -> `adjudicate`
+        outcome for each supplement<->Rx BPMH-held domain; `{}` when none ran).
     """
     gates = gates or {}
     candidates = {
@@ -414,10 +501,16 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
         for domain, author_output in authors.items()
     }
 
-    outcome = reconcile(candidates)
+    # The operator's present Rx-interaction classes (de-identified, curated in the store; never raw
+    # drug names) drive the supplement<->Rx BPMH screen. Derived once from the summary — the same
+    # operator state every domain's `compute_plan` reads, so this is the canonical single read.
+    operator_rx_classes = router.rx_interaction_class_set(router.summarize(store_read))
+
+    outcome = reconcile(candidates, operator_rx_classes=operator_rx_classes)
     report = outcome["report"]
     holds = dict(outcome["holds"])
     conflict_held = set(outcome["conflict_held"])  # tracked independently of `holds`
+    rx_bpmh_held = set(outcome["rx_bpmh_held"])  # tracked independently of `holds` and `conflict_held`
     reauthored = False
 
     bounce = report["bounce"]
@@ -474,17 +567,39 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
             if adjudication_outcome["outcome"] == "cleared":
                 conflict_held.discard(domain)
 
-    # A domain records only when it is in NEITHER `holds` NOR `conflict_held`. A `holds` reason takes
-    # the result's `reason`; otherwise an open conflict holds it as CONFLICT_HELD.
+    # Supplement<->Rx BPMH adjudication (rxbp, pipeline Phase 4): each compound domain in the INDEPENDENT
+    # `rx_bpmh_held` set is routed to the SAME liaison gate — INCLUDING a compound that ALSO carries a
+    # `holds` reason (an additive-AE-held supplement) AND/OR an open conflict. A content-valid override
+    # clears the BPMH concern (drops it from `rx_bpmh_held`); a non-overridable / invalid / absent
+    # adjudication leaves it open. Because `rx_bpmh_held` is independent of the other two sets, clearing
+    # one concern never releases a domain whose OTHER concern is still open — a domain records only when it
+    # is in NONE of the three. When no adjudicator is wired, a BPMH-held domain stays held (the safe
+    # default). One adjudication per held compound domain (its matched classes aggregated into one finding).
+    rx_bpmh_adjudications = {}
+    if adjudicator is not None:
+        for domain in sorted(rx_bpmh_held):
+            matched = next(f["classes"] for f in report["rx_bpmh"] if f["held_domain"] == domain)
+            safety_finding = _rx_bpmh_safety_finding(domain, matched)
+            adjudication_outcome = adjudicate(safety_finding, adjudicator(safety_finding))
+            rx_bpmh_adjudications[domain] = adjudication_outcome
+            if adjudication_outcome["outcome"] == "cleared":
+                rx_bpmh_held.discard(domain)
+
+    # A domain records only when it is in NONE of `holds` / `conflict_held` / `rx_bpmh_held`. A `holds`
+    # reason takes the result's `reason`; otherwise an open conflict (CONFLICT_HELD) or BPMH match
+    # (RX_BPMH_HELD) holds it — each an independent concern, any one of which suppresses recording.
     results = {}
     for domain, candidate in candidates.items():
         hold_reason = holds.get(domain)
         if hold_reason is None and domain in conflict_held:
             hold_reason = CONFLICT_HELD
+        if hold_reason is None and domain in rx_bpmh_held:
+            hold_reason = RX_BPMH_HELD
         if hold_reason is not None:
             results[domain] = _held_result(candidate, hold_reason)
         else:
             results[domain] = _recorded_result(candidate, plan_date, root)
 
     return {"results": results, "reconciliation": report, "reauthored": reauthored,
-            "adjudication": adjudication, "conflict_adjudications": conflict_adjudications}
+            "adjudication": adjudication, "conflict_adjudications": conflict_adjudications,
+            "rx_bpmh_adjudications": rx_bpmh_adjudications}

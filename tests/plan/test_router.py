@@ -980,3 +980,108 @@ def test_smei_in_range_without_range_trips_load_assert():
     finally:
         biomarker_meta.METADATA = original
         importlib.reload(router)
+
+
+# --- rxbp: the supplement<->Rx BPMH PII boundary (de-identified Rx classes) -----
+
+
+def _rx_records(rx_classes_value=None, **extra):
+    """Clean field-set records, optionally seeding the curated `rx-interaction-classes` item.
+
+    `extra` injects additional raw store items (e.g. a raw `medication-list`) for the adversarial
+    leak tests.
+    """
+    records = _clean_records()
+    if rx_classes_value is not None:
+        records.append({"item": "rx-interaction-classes", "timepoint": "2026-01-01T00:00:00+00:00",
+                        "source": "intake", "value": rx_classes_value})
+    for item, val in extra.items():
+        records.append({"item": item, "timepoint": "2026-01-01T00:00:00+00:00",
+                        "source": "intake", "value": val})
+    return records
+
+
+def test_rx_interaction_classes_always_set_empty_default():
+    """No-meds operator: the field is ALWAYS present and defaults to the empty token.
+
+    Mirrors `recent-trend-direction`'s always-set contract — a no-medication operator must NOT
+    trip dispatch's partial-summary raise. Reds if the field is set only `if readings`.
+    """
+    summary = router.summarize(_clean_store_read())  # no rx-interaction-classes item seeded
+    assert summary["rx-interaction-classes"] == ""
+    assert set(summary.keys()) == set(router.SUMMARY_FIELD_SET)  # field present, summary complete
+
+
+def test_rx_interaction_classes_passes_curated_tokens():
+    """The curated de-identified class tokens cross the boundary, normalized (sorted/lower/dedup)."""
+    summary = router.summarize(_store_read_factory(
+        _rx_records("CYP3A4-pgp; bleeding-risk; bleeding-risk")
+    ))
+    assert summary["rx-interaction-classes"] == "bleeding-risk;cyp3a4-pgp"  # deduped + sorted + lowered
+
+
+def test_summarize_drops_raw_medication_list_never_leaks():
+    """ADVERSARIAL PII (AC1): a raw `medication-list` free-text never survives `summarize`.
+
+    The raw medication free-text (drug names + a prescriber note) is a named-excluded raw-PII class
+    with NO derivation — `summarize` never reads it. Only the operator/liaison-curated
+    `rx-interaction-classes` tokens cross. Reds if a future wiring routes the raw item into the
+    summary (e.g. backing the field off `medication-list`): the planted raw substrings would appear.
+    """
+    raw_meds = "warfarin 5mg nightly; atorvastatin 40mg — Dr-SENTINEL-Smith"
+    summary = router.summarize(_store_read_factory(
+        _rx_records("anticoagulant;bleeding-risk", **{"medication-list": raw_meds})
+    ))
+    token_blob = " ".join(str(v) for v in summary.values())
+    for leaked in ("warfarin", "atorvastatin", "Dr-SENTINEL-Smith", "5mg"):
+        assert leaked not in token_blob, f"raw medication substring {leaked!r} leaked: {summary}"
+    # the curated class tokens DID cross (the de-identified surface is what the BPMH screen reads).
+    assert summary["rx-interaction-classes"] == "anticoagulant;bleeding-risk"
+    assert "medication-list" not in summary  # the raw item is never a summary field
+
+
+def test_rx_interaction_classes_8j6_pii_backstop_raises():
+    """The 8j6 pass-through PII gate is the runtime backstop on the curated value (mutation-proof).
+
+    The class tokens are de-identified BY the curation contract, but that contract is unenforced
+    upstream — so a mis-curated value carrying raw operator PII (a prescriber phone) RAISES at the
+    boundary rather than crossing. Reds if the 8j6 scan is removed from the deriver: the PII would
+    pass through and this expected raise would not fire.
+    """
+    with pytest.raises(ValueError) as exc:
+        router.summarize(_store_read_factory(
+            _rx_records("anticoagulant; call +14155550123")
+        ))
+    assert "rx-interaction-classes" in str(exc.value)
+    assert "fail-closed" in str(exc.value)
+    assert "+14155550123" not in str(exc.value)  # names the field, never echoes the PII value
+
+
+def test_medication_list_rejected_by_dispatch_whitelist():
+    """AC1 belt: the raw `medication-list` is named-excluded, so the dispatch whitelist rejects it.
+
+    Proves the boundary is allow-only-field-set, not block-known-bad: even if a raw medication field
+    were injected into a payload, `dispatch` raises before any send.
+    """
+    summary = router.summarize(_clean_store_read())
+    summary["medication-list"] = "warfarin 5mg"  # inject the raw raw-PII field
+    with pytest.raises(ValueError) as exc:
+        router.dispatch(summary)
+    assert "medication-list" in str(exc.value)
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("bleeding-risk;cyp3a4-pgp", {"bleeding-risk", "cyp3a4-pgp"}),
+    ("  Bleeding-Risk ; ANTICOAGULANT ", {"bleeding-risk", "anticoagulant"}),
+    ("", set()),
+    (";;", set()),
+])
+def test_rx_interaction_class_set_parses(value, expected):
+    """The orchestrator's parser normalizes the `;`-joined scalar into a token set."""
+    assert router.rx_interaction_class_set({"rx-interaction-classes": value}) == expected
+
+
+def test_rx_interaction_class_set_absent_field_is_empty():
+    """A summary predating the field (or a non-str value) yields the empty set — no Rx surface."""
+    assert router.rx_interaction_class_set({}) == set()
+    assert router.rx_interaction_class_set({"rx-interaction-classes": None}) == set()
