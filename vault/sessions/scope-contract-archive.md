@@ -2141,3 +2141,7 @@ ACs (all 7 PASS): AC1 `compute_plan` split from `generate_plan` (compute the can
 ## Scope Contract — Session 73 (2026-06-18) [archived S74]
 
 Goal: Build the supplement↔peptide additive-AE screen (Phase-3 compound-band cross-domain safety check) — the reconciler holds/flags an additive-AE supplement↔peptide combination before recording. ACs: AC1 author-declared `ae_profile` contract lifted into `meta` (PASS); AC2 bidirectional screen in `reconcile`, mutation-proven RED (PASS); AC3 real supplement+peptide dual-dispatch E2E (PASS); AC4 no new store stream + suite + gate green (PASS); AC5 plan-integrity+QA → /review-pr → /merge, full close (PASS). All 5 PASS. PR #154 → main @ d0d5a1c; close PR #159. PF-S73-01 promoted post-close (close-step-8 freshness skip). Full eval in `vault/sessions/session-73.md`.
+
+## Scope Contract — Session 74 (2026-06-19) [archived S75]
+
+Goal: Wire the medical-liaison terminal adjudication gate (Phase 4) over the reconciler's held additive-AE finding — the held-line closer. ACs: AC1 adjudication input contract (PASS); AC2 override-record validator INV-OVERRIDE-RECORD-SCHEMA, mutation-proven RED (PASS); AC3 critical-non-overridable gate INV-CRITICAL-NON-OVERRIDABLE, mutation-proven RED (PASS); AC4 terminal outcome wired, no new store stream (PASS); AC5 real medical-liaison E2E (PASS); AC6 both INVs promoted + audit + review + close (PASS). All PASS. PR #168 → main @ 972b880. PF-S74-01 promoted post-close (the full close was not re-run on the final merged main; PR #170). Full eval in vault/sessions/session-74.md.
