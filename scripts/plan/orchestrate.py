@@ -10,7 +10,7 @@ Under runtime A the orchestrator dispatches each plan-domain author, captures th
 computes each domain's candidate plan via `generate_plan.compute_plan` (no record yet),
 reconciles across domains, then records the reconciled set via `record_plan`. Recording is
 held until after reconciliation so a cross-domain check can stop an unsafe / un-fuelable plan
-from ever being written. The four cross-domain behaviors in this slice:
+from ever being written. The five cross-domain behaviors in this slice:
 
   1. RED-S/LEA cross-domain short-circuit (pipeline Phase 0.5): the nutritionist's
      critical-floor screen short-circuits ALL energy-deficit content — nutrition AND workout —
