@@ -63,7 +63,7 @@ or the thin-library sentinel `{"specialist": <slug>, "thin_library": true}`.
    `red-s-lea-clinical-routing`, records no energy plan). A per-exercise/per-item gate runs inside the
    translator (workout = `clearance_granted` drops `load`). The cross-compound supplement↔peptide
    two-pass additive-AE screen and the nutrition→workout energy bounce are NOT per-author gates — they
-   are the deferred cross-domain layer (the step-4 reconciler).
+   run in the cross-domain layer (the step-4 reconciler, both WIRED: bounce S72, additive-AE screen S73).
 3. Add `tests/plan/test_generate_plan.py`-style coverage: happy path, the gate mutation-proven RED,
    struck-rec exclusion, the honest no-plan states, and the store-adversarial four (cross-stream /
    dedupe-idempotent / dedupe-key boundary / changed-value no-op).
@@ -108,8 +108,9 @@ silently shipped.
   an operator-approved directive. The peptide-specialist anchored BPC-157 at H2 (angiogenic auto-block)
   and surfaced it as a decision-support draft with the H2 block + `clinician-clearance:NOT_GRANTED`
   caveat RENDERED on the card (verified in the E2E). "Four authors wired" is NOT "operator-usable":
-  the cross-compound additive-AE screen + the medical-liaison terminal gate are the gate between
-  build-complete and operator-usable. The build runs on synthetic fixtures (no real operator data).
+  the cross-compound additive-AE screen is WIRED (S73, the compound band); the **medical-liaison
+  terminal gate** (S74) is the remaining gate between build-complete and operator-usable. The build
+  runs on synthetic fixtures (no real operator data).
 
 ## The cross-domain layer (orchestrator + reconciler) — WIRED S72
 

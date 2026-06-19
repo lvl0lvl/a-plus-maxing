@@ -619,6 +619,102 @@ def test_additive_ae_end_to_end_renders_peptide_holds_supplement(tmp_path):
     assert "Fish oil" not in html  # the held supplement's stack never reaches the card
 
 
+def test_additive_ae_malformed_profile_is_inert_by_design(tmp_path):
+    # DELIBERATE trusted-author contract (not an accident): a present-but-MALFORMED ae_profile —
+    # additive_classes a string not a list, a non-dict ae_profile, a non-list interactions, an
+    # interaction missing `with` — is treated as NO declaration (no finding, supplement records).
+    # The screen reads the structured form; a malformed one is not guessed at. This pins the
+    # fail-direction so a future refactor cannot silently WIDEN it. (Fail-loud is an S74 candidate.)
+    malformed = [
+        {"ae_profile": {"additive_classes": "bleeding-risk"}},          # string, not a list
+        {"ae_profile": ["bleeding-risk"]},                              # not a dict
+        {"ae_profile": {"interactions": {"with": "BPC-157"}}},          # interactions not a list
+        {"ae_profile": {"interactions": [{"mechanism": "x"}]}},         # interaction missing `with`
+    ]
+    for i, supp_recon in enumerate(malformed):
+        root = tmp_path / f"m{i}"
+        sr = _seed_store(root)
+        out = generate_plans(
+            _compound_authors(supp_recon=supp_recon,
+                              pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}}),
+            sr, root, plan_date=PLAN_DATE,
+        )
+        assert out["reconciliation"]["additive_ae"] == [], f"malformed[{i}] must produce no finding"
+        assert out["results"]["supplements"]["recorded"] is True, f"malformed[{i}] records (inert)"
+        assert len(store.read("plan::supplements", root=root)) == 1
+
+
+def test_additive_ae_interaction_with_is_normalized(tmp_path):
+    # the interaction `with` token is normalized (lowercase/strip) independently of the class path:
+    # a mixed-case/whitespace `with` still matches the other compound's identity.
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"interactions": [
+            {"with": "  Bpc-157 ", "mechanism": "x", "severity": "moderate"}
+        ]}},
+    )
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    finding = out["reconciliation"]["additive_ae"][0]
+    assert finding["kind"] == "declared-interaction" and finding["with"] == "bpc-157"
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+
+
+def test_additive_ae_holds_whole_multi_item_supplement(tmp_path):
+    # one additive item holds the ENTIRE supplement plan (the conservative no-stack state) — the
+    # whole multi-item plan is suppressed, not just the offending item.
+    store_read = _seed_store(tmp_path)
+    supp = _recon(
+        _author(_supplement_rec("Fish oil", "2 g"), _supplement_rec("Creatine", "5 g"),
+                specialist="supplement-specialist"),
+        ae_profile={"additive_classes": ["bleeding-risk"]},
+    )
+    pep = _recon(
+        _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist"),
+        ae_profile={"additive_classes": ["bleeding-risk"]},
+    )
+
+    out = generate_plans({"supplements": supp, "peptides": pep}, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []  # the whole stack is held
+
+
+def test_additive_ae_both_sides_declare_yields_finding_per_direction(tmp_path):
+    # when BOTH authors name the other compound, each declaration is a distinct finding (the
+    # liaison sees both authors' reasoning); the hold is set ONCE regardless. Dedup, if wanted, is
+    # the S74 liaison gate's call — V1 surfaces both directions faithfully.
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"interactions": [{"with": "BPC-157", "mechanism": "a", "severity": "moderate"}]}},
+        pep_recon={"ae_profile": {"interactions": [{"with": "Fish oil", "mechanism": "b", "severity": "moderate"}]}},
+    )
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    findings = out["reconciliation"]["additive_ae"]
+    froms = sorted(f["from"] for f in findings if f["kind"] == "declared-interaction")
+    assert froms == ["peptides", "supplements"]  # one finding per declaring direction
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD  # held once
+
+
+def test_additive_ae_interaction_severity_mechanism_optional(tmp_path):
+    # an interaction with no severity/mechanism still fires the hold (they ride through as None for
+    # the S74 liaison; their absence does not suppress the safety finding).
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        pep_recon={"ae_profile": {"interactions": [{"with": "Fish oil"}]}},
+    )
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    finding = out["reconciliation"]["additive_ae"][0]
+    assert finding["with"] == "fish oil"
+    assert finding["mechanism"] is None and finding["severity"] is None
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+
+
 # --- reconcile is pure (no I/O) ------------------------------------------------
 
 
