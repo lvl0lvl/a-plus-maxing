@@ -31,7 +31,7 @@ KPV suppresses inflammation largely independent of melanocortin receptors: it en
 
 Counter-evidence / caveats:
 - Antimicrobial: Cutuli 2000 (PMID 10670585, positive, single-lineage) vs Songok 2018 (PMID 29953505, **null** for native KPV) → low-confidence/contested.
-- Acne/gout efficacy is for **KdPT** (PMID 21010060-class analogue work) / **(CKPV)₂** dimer, not KPV monomer.
+- Acne/gout efficacy is for **KdPT** (Mastrofrancesco 2010, PMID 20610647) / **(CKPV)₂** dimer analogue work, not the KPV monomer (see report §7).
 - **Zero human studies**; ~75% of gut-IBD efficacy primaries single-lab (Merlin/GSU); magnitudes single-lab.
 
 ## Non-English Literature Coverage

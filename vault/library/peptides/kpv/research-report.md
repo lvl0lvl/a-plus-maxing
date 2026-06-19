@@ -508,7 +508,7 @@ The honest summary: KPV is a reasonable *mechanistic* candidate to think about, 
 | §7.3 | `[9, animal]` | Ji 2013 ((CKPV)₂ vaginitis) | **[20]** |
 | §7.4 | `[6, in_vitro]` | Mastrofrancesco 2010 (KdPT sebocytes/acne) | **[19]** |
 | §7.4 | `[17, in_vitro]` | Capsoni 2009 (α-MSH+(CKPV)₂ gout/MSU) | **[24]** |
-| §8 | `[1, animal]` | Getting 2003 (vasopermeability, no AE reported) | **[1]** |
+| §8 | `[1, animal]` | Hiltz & Lipton 1989 (histamine vasopermeability, no AE reported) — PMID 2550304 | **[23]** |
 | §8 | `[2, animal]` | Dalmasso 2008 (oral KPV colitis, no AE) | **[2]** |
 | §8 | `[3, mechanism_review]` | Brzoska 2008 (theoretical-risk framing) | **[5]** |
 | §8 | `[4, animal]` | Xiao 2017 (HA-NP, no cytotoxicity) | **[12]** |
