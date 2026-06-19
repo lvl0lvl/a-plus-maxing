@@ -111,8 +111,9 @@ silently shipped.
   the cross-compound additive-AE screen is WIRED (S73, the compound band) and the **medical-liaison
   terminal gate** (WIRED S74, `scripts/plan/adjudicate.py`) adjudicates the held additive-AE finding —
   a content-valid override releases the supplement, a non-overridable / invalid adjudication holds it.
-  The remaining gates to full operator-usable are the Phase-4 follow-on axes (`rxbp`/`cfaj` + the
-  doctor-visit-queue artifact; see the liaison-gate section below). The build runs on synthetic
+  The remaining gates to full operator-usable are the Phase-4 follow-on axes (`rxbp` supplement↔Rx BPMH
+  + the doctor-visit-queue artifact; `cfaj` author-conflict adjudication is WIRED S75 — see the
+  liaison-gate / behavior-3 sections below). The build runs on synthetic
   fixtures (no real operator data).
 
 ## The cross-domain layer (orchestrator + reconciler) — WIRED S72
