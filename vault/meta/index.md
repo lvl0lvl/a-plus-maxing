@@ -41,6 +41,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/free-t3]] (Free T3 — free triiodothyronine; category: blood; confidence: established)
 - [[biomarkers/total-testosterone]] (Total testosterone; category: blood; confidence: established)
 - [[biomarkers/free-testosterone]] (Free testosterone; category: blood; confidence: established)
+- [[biomarkers/shbg]] (SHBG — sex hormone-binding globulin; category: blood; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -88,6 +89,7 @@ _(none yet)_
 - [[library/biomarkers/free-t3/research-report]] (Free T3 standard /aplus-research; 33 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/total-testosterone/research-report]] (Total testosterone standard /aplus-research; 30 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/free-testosterone/research-report]] (Free testosterone standard /aplus-research; 25 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/shbg/research-report]] (SHBG standard /aplus-research; 35 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/
