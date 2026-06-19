@@ -37,6 +37,7 @@ from scripts.plan.orchestrate import (
     ENERGY_BOUNCE_HELD,
     ENERGY_BOUNCE_UNRESOLVED,
     RED_S_LEA_CROSS_DOMAIN,
+    RX_BPMH_HELD,
     generate_plans,
     reconcile,
 )
@@ -1394,3 +1395,278 @@ def test_orchestrator_end_to_end_renders_on_dashboard(tmp_path):
     assert "2600" in html
     assert "Creatine" in html
     assert "BPC-157" in html
+
+
+# --- supplement<->Rx BPMH screen + adjudication (rxbp, pipeline Phase 4) ---------
+#
+# The operator's present Rx-interaction classes are seeded as the curated, de-identified
+# `rx-interaction-classes` store item (never raw drug names — that boundary is proven in
+# tests/plan/test_router.py). generate_plans reads them through `router.summarize` and holds a
+# compound whose declared additive-AE class stacks against them, routing it through the SAME gate.
+
+
+def _bpmh_store(tmp_path, rx_classes):
+    """A seeded store whose operator carries the given curated Rx-interaction-class token list."""
+    return _seed_store(tmp_path, **{"rx-interaction-classes": rx_classes})
+
+
+def _bpmh_supp_authors(supp_classes, pep_classes=None):
+    """A supplement (declaring `supp_classes`) + a peptide pair for the BPMH screen."""
+    return _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": supp_classes}},
+        pep_recon={"ae_profile": {"additive_classes": pep_classes}} if pep_classes else None,
+    )
+
+
+def _selective_liaison(by_source):
+    """An adjudicator returning a band per finding `source` (or None -> no envelope, block stands).
+
+    Lets a test clear ONE concern while leaving another open — the interaction probe (PF-S75-01).
+    """
+    calls = []
+
+    def hook(safety_finding):
+        calls.append(safety_finding)
+        band = by_source.get(safety_finding["source"])
+        if band is None:
+            return None
+        env = _envelope(band=band, finding_id=safety_finding["finding_id"])
+        if env["override_record"] is not None:
+            env["override_record"]["caution_verbatim"] = safety_finding["caution"]
+        return env
+
+    hook.calls = calls
+    return hook
+
+
+def _supp_candidate(additive_classes):
+    """A raw supplements candidate dict (no I/O) declaring `additive_classes` for the BPMH screen."""
+    return {"domain": "supplements", "specialist": "supplement-specialist", "section": {},
+            "reason": None, "plan": {"items": [{"name": "Fish oil", "dose": "2 g"}]},
+            "meta": {"ae_profile": {"additive_classes": additive_classes}}}
+
+
+def test_reconcile_sets_rx_bpmh_hold_purely():
+    # CORE mutation-proof: reconcile (pure, no I/O) holds a compound whose declared additive-AE class
+    # intersects the operator's present Rx classes, in the INDEPENDENT rx_bpmh_held set. Remove the
+    # screen -> empty.
+    outcome = reconcile({"supplements": _supp_candidate(["bleeding-risk"])},
+                        operator_rx_classes={"bleeding-risk"})
+    assert "supplements" in outcome["rx_bpmh_held"]
+    assert outcome["report"]["rx_bpmh"] == [{"held_domain": "supplements", "classes": ["bleeding-risk"]}]
+    assert "supplements" not in outcome["holds"]  # tracked independently of `holds`
+
+
+def test_reconcile_no_rx_bpmh_hold_when_disjoint():
+    outcome = reconcile({"supplements": _supp_candidate(["bleeding-risk"])},
+                        operator_rx_classes={"cyp3a4-pgp"})  # operator on a different class
+    assert outcome["rx_bpmh_held"] == []
+    assert outcome["report"]["rx_bpmh"] == []
+
+
+def test_reconcile_no_rx_bpmh_hold_without_operator_classes():
+    # The default (no operator_rx_classes arg) is the backward-compatible no-Rx surface -> no hold.
+    outcome = reconcile({"supplements": _supp_candidate(["bleeding-risk"])})
+    assert outcome["rx_bpmh_held"] == []
+
+
+def test_rx_bpmh_holds_supplement_without_adjudicator(tmp_path):
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+    # cross-stream: the peptide (no operator-Rx match, declared no class) still records.
+    assert out["results"]["peptides"]["recorded"] is True
+
+
+def test_rx_bpmh_no_hold_without_operator_rx(tmp_path):
+    # BACKWARD-COMPAT: a no-medication operator (no curated rx-interaction-classes item) -> no BPMH hold.
+    store_read = _seed_store(tmp_path)  # no rx-interaction-classes seeded -> "" -> empty set
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["reconciliation"]["rx_bpmh"] == []
+
+
+def test_rx_bpmh_match_is_case_insensitive(tmp_path):
+    store_read = _bpmh_store(tmp_path, "Bleeding-Risk")  # curated value normalizes to bleeding-risk
+    out = generate_plans(_bpmh_supp_authors(["  BLEEDING-risk "]), store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+
+
+def test_rx_bpmh_screens_peptides_too(tmp_path):
+    # GENERALIZATION: the screen is symmetric — a PEPTIDE stacking against the operator's Rx is held
+    # too (a peptide + anticoagulant is the same watchlist case as a supplement + anticoagulant).
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["peptides"]["recorded"] is False
+    assert out["results"]["peptides"]["reason"] == RX_BPMH_HELD
+    assert {f["held_domain"] for f in out["reconciliation"]["rx_bpmh"]} == {"peptides"}
+
+
+def test_rx_bpmh_liaison_override_releases_and_records(tmp_path):
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_rx_bpmh_liaison_autoblock_keeps_held(tmp_path):
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=_liaison("CRITICAL"))
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+
+
+def test_rx_bpmh_liaison_vacuous_override_keeps_held(tmp_path):
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    liaison = _liaison("HIGH", override=_override_record("HIGH", operator_reason="trust me"))
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=liaison)
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+
+
+def test_rx_bpmh_adjudicator_returning_none_keeps_held(tmp_path):
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=lambda finding: None)
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+
+
+def test_rx_bpmh_adjudicator_not_called_without_match(tmp_path):
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")  # operator on a class the supplement does not declare
+    liaison = _liaison("MEDIUM")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=liaison)
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["rx_bpmh_adjudications"] == {}
+    assert liaison.calls == []
+
+
+def test_rx_bpmh_safety_finding_id_and_caution(tmp_path):
+    # The deterministic finding_id + caution the liaison echoes (sorted classes; verbatim caution).
+    store_read = _bpmh_store(tmp_path, "bleeding-risk;cyp3a4-pgp")
+    liaison = _liaison("MEDIUM")
+    generate_plans(_bpmh_supp_authors(["cyp3a4-pgp", "bleeding-risk"]), store_read, tmp_path,
+                   plan_date=PLAN_DATE, adjudicator=liaison)
+    finding = next(c for c in liaison.calls if c["source"] == "rx-bpmh")
+    assert finding["finding_id"] == "rx-bpmh:supplements:bleeding-risk;cyp3a4-pgp"
+    assert finding["held_domain"] == "supplements"
+    assert "bleeding-risk, cyp3a4-pgp" in finding["caution"]
+
+
+# --- PF-S75-01 interaction probe: rx-bpmh COMPOSES with the other holds ----------
+# A compound can carry several concurrent concerns (additive-AE + rx-bpmh + conflict). Each clears
+# on its OWN adjudication; clearing one MUST NOT release a domain whose other concern is still open.
+# (This is exactly the S74/S75 safety-design-hole class — probed at Tier-1, not left to Tier-3.)
+
+
+def test_rx_bpmh_and_additive_ae_are_independent_holds(tmp_path):
+    # The supplement is held by BOTH additive-AE (bleeding-risk shared with the peptide) AND rx-bpmh
+    # (cyp3a4-pgp matches the operator's Rx). Clearing the additive-AE override must NOT release it
+    # while the rx-bpmh concern is open — the SEC-1 analog.
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    # additive-AE clears (MEDIUM), rx-bpmh blocks (CRITICAL): the supplement STAYS held.
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison({"additive-ae": "MEDIUM", "rx-bpmh": "CRITICAL"}))
+    assert out["adjudication"]["outcome"] == "cleared"  # additive-AE DID clear
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False  # but the supplement is NOT released
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_rx_bpmh_cleared_but_additive_ae_keeps_held(tmp_path):
+    # The reverse direction: rx-bpmh clears, additive-AE blocks -> still held (additive-AE open).
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison({"additive-ae": "CRITICAL", "rx-bpmh": "MEDIUM"}))
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+
+
+def test_rx_bpmh_and_additive_ae_both_cleared_records(tmp_path):
+    # Both concerns cleared -> the supplement records. (Proves the dual hold is RELEASABLE, not a deadlock.)
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison({"additive-ae": "MEDIUM", "rx-bpmh": "MEDIUM"}))
+    assert out["adjudication"]["outcome"] == "cleared"
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_rx_bpmh_and_conflict_are_independent_holds(tmp_path):
+    # A supplement held by BOTH a cross-domain conflict AND rx-bpmh: clearing the conflict must NOT
+    # release it while the rx-bpmh is open (the conflict_held x rx_bpmh_held interaction).
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk"]},
+        },
+    )
+    # conflict clears (MEDIUM), rx-bpmh blocks (CRITICAL) -> still held.
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison({"cross-domain-conflict": "MEDIUM", "rx-bpmh": "CRITICAL"}))
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+
+
+# --- AC4: real medical-liaison rxbp dispatch, captured + run through the production path ---------
+# Two REAL captured envelopes adjudicating the SAME finding_id (rx-bpmh:supplements:bleeding-risk) to
+# OPPOSITE outcomes on the specific medication — the BPMH gate's marquee clinical discrimination:
+# aspirin (antiplatelet) -> HIGH/H3 overridable -> clears; warfarin (anticoagulant, narrow TI) ->
+# CRITICAL/H2 -> non-overridable auto-block. Not stubs — captured out-of-band per the integration mandate.
+
+
+def test_real_rx_bpmh_liaison_cleared_envelope_records(tmp_path):
+    # The REAL aspirin+fish-oil envelope (HIGH/H3, content-valid HIGH-rung informed-refusal override),
+    # run through the production path, RELEASES the BPMH-held supplement: it records.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    env = _example_envelope("liaison-rxbp-cleared.example.json")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=lambda finding: env)
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_real_rx_bpmh_liaison_blocked_envelope_keeps_held(tmp_path):
+    # The REAL warfarin+fish-oil envelope (CRITICAL/H2 mechanical-auto-block, null override path), run
+    # through the production path, KEEPS the supplement held — the marquee BPMH safety property: an
+    # anticoagulant interaction is non-overridable, and the operator's informed-refusal does not lower it.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    env = _example_envelope("liaison-rxbp-blocked.example.json")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=lambda finding: env)
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["rx_bpmh_adjudications"]["supplements"]["non_overridable"] is True
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
