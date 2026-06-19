@@ -1,0 +1,21 @@
+{
+  "section": "A",
+  "brief_hash": "3000280ca15b8a2e6d4f2c3b60bd973d908e061e8f68e3d7a4d9e75b1e2da919",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 97,
+    "type_tag_discipline": 96,
+    "population_annotation": 93,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 97
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section A is mechanistically accurate and bibliographically clean: both spot-checked PMIDs (28673039, 12780747) resolved to the claimed papers with matching authors, journals, and DOIs; all seven non-null dimensions exceed the 92 threshold; every inline citation carries a correct mechanism_review tag with no bare [N]; unit math (ng/dL↔nmol/L ×0.0347) checks out across all stated values; and all eight items in the Section A rubric brief are fully covered."
+}
