@@ -26,6 +26,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
 - [[biomarkers/lp-a]] (Lp(a) — lipoprotein(a); category: blood; confidence: established)
+- [[biomarkers/apob]] (ApoB — apolipoprotein B; category: blood; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -58,6 +59,7 @@ _(none yet)_
 - [[library/peptides/bpc-157/practitioner-layer]] (rebuilt 2026-05-24; prescribing-practice; pharmacies + named physicians + consensus dose; PRIOR ARCHIVED)
 - [[library/peptides/bpc-157/non-english-layer]] (rebuilt 2026-05-24; Croatian/Chinese/Russian/Korean coverage; PRIOR ARCHIVED)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/
