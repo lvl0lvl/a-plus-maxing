@@ -1878,3 +1878,18 @@ def test_real_liaison_collation_agrees_on_safety_tier_lead(tmp_path):
     assert collation["clinical_verdict_rendered"] is False
     # all three findings are present in the data-layer queue (none dropped)
     assert {e["finding_id"] for e in ranked} == set(collation["ranked_finding_ids"])
+
+
+def test_collate_cumulative_latest_disposition_wins(tmp_path):
+    # SHOULD-FIX-2 (Tier-2): re-collating the SAME finding on a LATER date supersedes its earlier
+    # disposition through the collation path (block-stands at date 1 -> cleared at date 2 -> the queue
+    # shows cleared). Pins latest-wins at the collation-integration level, not only the schema layer.
+    store_read = _seed_store(tmp_path)
+    blocked = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("CRITICAL"))
+    collate_doctor_visit_queue(blocked, "2026-06-19", tmp_path)
+    assert queue_schema.read_doctor_visit_queue(tmp_path)[0]["outcome"] == "block-stands"
+    cleared = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    collate_doctor_visit_queue(cleared, "2026-06-20", tmp_path)  # later date, same finding_id
+    queue = queue_schema.read_doctor_visit_queue(tmp_path)
+    assert len(queue) == 1  # one finding, the latest record wins
+    assert queue[0]["outcome"] == "cleared-with-override"  # the 06-20 cleared disposition supersedes

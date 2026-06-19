@@ -46,8 +46,12 @@ from ever being written. The five cross-domain behaviors in this slice:
      own. No pharmacology DB enters the orchestrator: the drug-name -> interaction-class de-identification
      is an operator/liaison CURATION step at the store layer.
 
-The reconciliation report is RETURNED (not persisted — no new store stream); plans are
-recorded via the existing `record_plan` (the store-adversarial battery surface is unchanged).
+The reconciliation report is RETURNED (`generate_plans` persists no new store stream — plans are
+recorded via the existing `record_plan`). After the run, `collate_doctor_visit_queue` records the
+ADJUDICATED safety findings (additive-AE / conflict / rx-bpmh) into the doctor-visit-queue store
+stream (`scripts/store/queue_schema.py`, the `dvq::queue` namespace) — a NEW store-adversarial-battery
+surface (covered by `tests/store/test_queue_schema.py`); this collation is a SEPARATE call, so
+`generate_plans` itself stays a pure compute-reconcile-record pass.
 """
 
 from scripts.plan import router

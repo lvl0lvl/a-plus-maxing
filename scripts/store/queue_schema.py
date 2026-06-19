@@ -96,16 +96,26 @@ def record_doctor_visit_queue_entry(entry, on_date, root):
 
 
 def _severity_rank(entry):
-    """The sort key for a queue entry: (severity tier, finding_id) — lower tier first.
+    """The sort key for a queue entry: (outcome tier, band rank, finding_id) — lower first.
 
-    Non-overridable auto-blocks lead; then HIGH, MEDIUM, then an unknown band. The finding_id
-    secondary key makes the ordering deterministic within a tier.
+    Outcome tier leads, because a finding's DISPOSITION outranks its band on the MD handout:
+        0 — a non-overridable auto-block (CRITICAL / H1-H2): the operator CANNOT proceed; most urgent.
+        1 — a block-stands overridable finding (an open concern the override did NOT clear, e.g. a
+            vacuous/invalid override): an UNRESOLVED safety concern the doctor must still address.
+        2 — a cleared-with-override finding: the operator proceeded with informed consent; the doctor
+            should know, but it is lower priority than an unresolved concern.
+    An UNRESOLVED block-stands must never rank below a RESOLVED cleared finding (the safety-ordering
+    inversion this fixes). Band (CRITICAL>HIGH>MEDIUM>unknown) is the secondary key within a tier; the
+    finding_id is the tertiary key so the order is deterministic.
     """
     if bool(entry.get("non_overridable")):
-        tier = 0
+        outcome_tier = 0
+    elif entry.get("outcome") == "block-stands":
+        outcome_tier = 1
     else:
-        tier = _BAND_RANK.get(entry.get("composite_band"), _UNKNOWN_BAND_TIER)
-    return (tier, str(entry.get("finding_id")))
+        outcome_tier = 2
+    band_rank = _BAND_RANK.get(entry.get("composite_band"), _UNKNOWN_BAND_TIER)
+    return (outcome_tier, band_rank, str(entry.get("finding_id")))
 
 
 def resolve_doctor_visit_queue(readings):

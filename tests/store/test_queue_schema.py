@@ -143,3 +143,25 @@ def test_adversarial_mutation_constant_source_collapses_distinct_findings(tmp_pa
     queue_schema.record_doctor_visit_queue_entry(_entry("finding:b", band="HIGH"), "2026-06-19", tmp_path)
     raw = store.read("dvq::queue", root=tmp_path)
     assert len(raw) == 1  # MUTATION RED: the two distinct findings collapsed to one under the constant source
+
+
+def test_severity_rank_block_stands_outranks_cleared(tmp_path):
+    # SHOULD-FIX-1 (Tier-2): an UNRESOLVED block-stands finding ranks ABOVE a RESOLVED cleared one,
+    # even when the block-stands carries no band (an invalid/vacuous override at HIGH/MEDIUM -> band
+    # None). A still-blocked concern below a cleared one on the MD handout is the safety-ordering
+    # inversion this pins. Reds if outcome stops leading the rank key.
+    queue_schema.record_doctor_visit_queue_entry(
+        _entry("z-cleared:medium", band="MEDIUM", outcome="cleared-with-override"), "2026-06-19", tmp_path)
+    queue_schema.record_doctor_visit_queue_entry(
+        _entry("a-blocked:unknown-band", band=None, outcome="block-stands"), "2026-06-19", tmp_path)
+    ranked = queue_schema.read_doctor_visit_queue(tmp_path)
+    assert [e["finding_id"] for e in ranked] == ["a-blocked:unknown-band", "z-cleared:medium"]
+
+
+def test_severity_rank_auto_block_above_block_stands_above_cleared(tmp_path):
+    # The full outcome-tier order: non-overridable auto-block > overridable block-stands > cleared.
+    queue_schema.record_doctor_visit_queue_entry(_entry("c:cleared", band="HIGH", outcome="cleared-with-override"), "2026-06-19", tmp_path)
+    queue_schema.record_doctor_visit_queue_entry(_entry("b:blocked", band="MEDIUM", outcome="block-stands"), "2026-06-19", tmp_path)
+    queue_schema.record_doctor_visit_queue_entry(_entry("a:autoblock", band="CRITICAL", non_overridable=True, outcome="block-stands"), "2026-06-19", tmp_path)
+    ranked = [e["finding_id"] for e in queue_schema.read_doctor_visit_queue(tmp_path)]
+    assert ranked == ["a:autoblock", "b:blocked", "c:cleared"]  # auto-block, then block-stands, then cleared
