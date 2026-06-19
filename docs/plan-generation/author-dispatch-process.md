@@ -164,8 +164,8 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
    with no `reauthor` hook it is HELD (`energy-bounce-held`) — never an un-fuelable load on the dashboard.
 3. **Overlap + conflict detection** (the step-4 integration). An intervention identity surfacing in 2+
    domains (a compound recommended as both a supplement and a peptide) and any author-declared conflict
-   are surfaced in the returned report. V1 DETECTS + REPORTS; the medical-liaison contradiction
-   adjudication is the deferred S74 clinical slice.
+   are surfaced in the returned report. This pass DETECTS + REPORTS; routing the conflict axis
+   through the liaison gate is the beaded follow-on `cfaj`.
 4. **Supplement↔peptide additive-AE screen** (pipeline Phase 3, the compound band, WIRED S73). Runs only
    when BOTH a supplement and a peptide candidate carry a plan. A SHARED author-declared additive-AE class
    (`ae_profile.additive_classes`) or an author-declared pairwise interaction naming the other compound
@@ -173,7 +173,8 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
    the SUPPLEMENT (`additive-ae-held`; it finalizes last against the settled compound surface). The honest
    no-stack state, never an un-screened additive-AE combination written. Bidirectional (either author's
    declaration fires it; "component tolerability does not compose to combination safety"). The
-   medical-liaison terminal gate (S74) adjudicates the held finding + the supplement↔Rx axis. Real-dispatch
+   medical-liaison terminal gate (`adjudicate`, WIRED S74 — see next section) adjudicates the held finding;
+   the supplement↔Rx axis is the beaded follow-on `rxbp`. Real-dispatch
    E2E (S73, PII-free synthetic operator): `compound-screen-supplement-{fishoil,creatine}-author-output`
    + `compound-screen-peptide-bpc157-author-output.example.json` (the additive fish-oil↔BPC-157 hold via a
    shared `bleeding-risk` axis, and the clean creatine↔BPC-157 pair that records both).
@@ -188,18 +189,70 @@ Real-dispatch E2E (S72, both paths, PII-free synthetic operator):
 real bounce: a 700-kcal cleared session → the nutritionist's real `sustains:false` (ceiling 300) →
 re-author to a 260-kcal reduced session, recorded; the bounced 700-kcal load never reaches the store).
 
+## The medical-liaison terminal adjudication gate (Phase 4) — WIRED S74
+
+The reconciler HOLDS the additive-AE supplement; the medical-liaison terminal gate
+(`scripts/plan/adjudicate.py`) ADJUDICATES the held finding — the held-line closer. Under runtime A
+`generate_plans` is given an `adjudicator(safety_finding) -> liaison envelope | None` hook (a real
+`medical-liaison` dispatch, full profile inlined per INV-ROLE-INLINING); the gate validates the
+envelope and either RELEASES the hold (a content-valid override → the supplement records) or leaves
+the block STANDING (a non-overridable auto-block, or any invalid/absent override). No `adjudicator`
+wired → the supplement stays held (the safe no-stack default). The override record rides the returned
+`generate_plans(...)["adjudication"]`, NOT a new store stream.
+
+```
+generate_plans(authors, store_read, root, *, plan_date, gates, reauthor, adjudicator)
+  ... reconcile → held additive-AE supplement → adjudicator(safety_finding) → adjudicate() → release | hold
+```
+
+**The liaison adjudication envelope** (the deployed medical-liaison's runtime-A output; `adjudicate`
+consumes it). The orchestrator routes a `safety_finding` (`finding_id` + `caution` + `held_domain`)
+to the liaison; the liaison returns:
+
+- `finding_id` — must echo the safety_finding's id (a mismatch → block stands).
+- `composite_band` — `HIGH` | `MEDIUM` | `CRITICAL` (the liaison assigns it).
+- `harm_class` — `H1`…`Hn` | `null` (the liaison assigns it).
+- `verdict` — `BLOCK` | `BLOCK_WITH_OVERRIDE_PATH`.
+- `severity_final` — `{"set_by": "medical-liaison"}` for an overridable HIGH/MEDIUM; `{"set_by":
+  "mechanical-auto-block-per-R3"}` for a CRITICAL / H1-H2 auto-block.
+- `override_record` — the 10-field record below, or `null` (always `null` for an auto-block).
+
+**The override-record schema** (validated on CONTENT, not presence — INV-OVERRIDE-RECORD-SCHEMA):
+`caution_verbatim` (reproduces the finding's `caution` exactly); `composite_band` (HIGH or MEDIUM
+only); `risks_communicated` (`{general, risks_of_proceeding}` — a content-bearing `risks_of_proceeding`
+clause is required); `operator_reason` (content-bearing — a length floor + a vacuous stop-list reject
+"because I want to try it"; required at HIGH); `evidence_tier_required` (MEDIUM→`clear-choice`;
+HIGH→`understanding+appreciation+reasoning`); `evidence_provided` (`{rung}` — must be ≥
+`evidence_tier_required`); `override_literal` (the canonical "operator is overriding a safety block",
+referenced never redefined); `voluntariness_note`; `timestamp`; `contradictions_log_ref`.
+
+**The two gate invariants** (bead `mdv`, promoted S74): **INV-OVERRIDE-RECORD-SCHEMA** (a held finding
+clears only via a content-valid record — the rubber-stamp is rejected) and **INV-CRITICAL-NON-OVERRIDABLE**
+(a `composite_band == CRITICAL` OR `harm_class ∈ {H1, H2}` finding never gets an override path; an
+envelope that builds one is a violation, block stands). Mechanical gate:
+`scripts/audit-medical-liaison-override.sh <envelope.json>` (delegates to `adjudicate.py
+--audit-envelope` — the same validation the in-code gate runs). Real-dispatch E2E (S74, PII-free
+synthetic operator): `liaison-adjudication-cleared.example.json` (the real deployed liaison built a
+content-valid MEDIUM override for an informed-refusal request → the held supplement records) +
+`liaison-adjudication-blocked.example.json` (a vacuous "just want to try both" at HIGH → refused →
+block stands). Tests: `tests/plan/test_adjudicate.py` (the validator + critical gate, mutation-proven
+RED) + the `test_orchestrate.py` liaison-gate section (the wiring + the real-envelope E2E).
+
 ## What is deliberately NOT here yet (deferred per the build sequence)
 
 - All four plan-domain authors are WIRED (workout S70; nutrition / supplements / peptides S71); the
   step-4 orchestrator reconciler — the nutrition→workout energy bounce + the RED-S/LEA cross-domain
   short-circuit + cross-domain overlap/conflict detection — is WIRED (S72); the supplement↔peptide
-  additive-AE screen (Phase-3 compound band) is WIRED (S73, behavior 4 above).
-- The **clinical-adjudication slice (S74)** — the held line's closer: the **medical-liaison terminal
-  safety gate** (Phase-4 — collates the doctor-visit queue + every risk HALT, runs BPMH reconciliation,
-  adjudicates the held additive-AE findings + author-declared conflicts + the supplement↔Rx axis before
-  operator approval). This is the gate that turns the clinician-gated compound DRAFTS (and the held
-  supplement) into operator-approvable plans. Until it lands, the reconciler's additive-AE screen HOLDS
-  (the safe no-stack state) and the overlap/conflict output is DETECT+REPORT.
+  additive-AE screen (Phase-3 compound band) is WIRED (S73, behavior 4 above); the **medical-liaison
+  terminal adjudication gate** for the held additive-AE finding is WIRED (S74, the section above).
+- The remaining Phase-4 surfaces, beaded as follow-ons that REUSE the S74 gate (the override-record
+  validator + the critical-non-overridable gate + the `safety_finding` envelope): the **supplement↔Rx
+  BPMH axis** (`rxbp` — adds the operator medication-list read THROUGH the `router.summarize` PII
+  de-identification boundary, which earns its own adversarial verification); the **author-conflict
+  adjudication** (`cfaj` — routes `report["conflicts"]` through the same gate, detect-only → adjudicated);
+  the **doctor-visit-queue collation + SBAR handout artifact** (a substrate write surface). Until those
+  land, the reconciler holds the additive-AE supplement (cleared only via the liaison gate above), and
+  overlap/conflict output stays DETECT+REPORT.
 - The `/generate-plan` slash-command/skill wrapper (the orchestrator is wired as the `generate_plans`
   callable the interactive main agent invokes; the command surface is a later convenience).
 - A standalone full-plan render screen (the dashboard plan card is Slice 1's surface; the operator is
