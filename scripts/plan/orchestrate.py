@@ -453,9 +453,9 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
         for domain in [d for d, reason in holds.items() if reason == CONFLICT_HELD]:
             domain_conflicts = [c for c in report["conflicts"] if c.get("from") == domain]
             safety_finding = _conflict_safety_finding(domain, domain_conflicts)
-            outcome = adjudicate(safety_finding, adjudicator(safety_finding))
-            conflict_adjudications[domain] = outcome
-            if outcome["outcome"] == "cleared":
+            adjudication_outcome = adjudicate(safety_finding, adjudicator(safety_finding))
+            conflict_adjudications[domain] = adjudication_outcome
+            if adjudication_outcome["outcome"] == "cleared":
                 del holds[domain]
 
     results = {}
