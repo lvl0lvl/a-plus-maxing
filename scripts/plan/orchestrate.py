@@ -22,11 +22,11 @@ from ever being written. The four cross-domain behaviors in this slice:
      the workout and the orchestrator re-authors it ONCE under the sustainable-energy ceiling.
      The re-authored plan is recorded only if its load honors the ceiling; otherwise the
      workout is HELD (never an un-fuelable load — the honest no-plan state).
-  3. Cross-domain OVERLAP detection (the step-4 integration): an intervention identity
-     surfacing in 2+ domains (a compound recommended as both a supplement and a peptide) is
-     surfaced in the reconciliation report, alongside any author-declared cross-domain
-     conflict. This pass DETECTS + REPORTS; adjudicating the conflict axis through the liaison
-     gate is the beaded follow-on `cfaj` (this slice closes the additive-AE axis, behavior 4).
+  3. Cross-domain OVERLAP detection + author-CONFLICT adjudication (the step-4 integration):
+     an intervention identity surfacing in 2+ domains is surfaced in the report (detect-only). An
+     author-declared cross-domain conflict is surfaced AND HOLDS the declaring (`from`) domain
+     pending the liaison gate (`cfaj`) — the safe default, like behavior 4; `generate_plans` routes
+     each conflict-held domain to `adjudicate`, and a content-valid override releases it.
   4. Supplement<->peptide additive-AE screen (pipeline Phase 3, the compound band): each
      compound passes its single-domain filters, but their COMBINATION is not presumed safe
      ("component tolerability does not compose to combination safety" — peptide-specialist
@@ -52,6 +52,7 @@ ENERGY_BOUNCE_HELD = "energy-bounce-held"  # bounced, and no re-author hook was 
 ENERGY_BOUNCE_UNRESOLVED = "energy-bounce-unresolved"  # the re-author did not honor the ceiling
 RED_S_LEA_CROSS_DOMAIN = RED_S_LEA_CLINICAL_ROUTING  # the nutrition screen short-circuits workout
 ADDITIVE_AE_HELD = "additive-ae-held"  # supplement<->peptide additive-AE risk holds the supplement
+CONFLICT_HELD = "cross-domain-conflict-held"  # an author-declared cross-domain conflict holds the declarer
 
 
 def _compound_identities(candidate):
@@ -210,6 +211,33 @@ def _additive_ae_safety_finding(findings):
     }
 
 
+def _conflict_safety_finding(from_domain, conflicts):
+    """The `safety_finding` the orchestrator routes to the liaison for a held cross-domain conflict.
+
+    Distills the declaring domain's author-declared conflicts (the `report["conflicts"]` entries with
+    this `from`) into the held-finding the liaison adjudicates (`scripts/plan/adjudicate.py`): a
+    deterministic `finding_id` (so the liaison envelope can echo it) and a `caution` the override
+    record must reproduce verbatim. The held domain is the declaring (`from`) domain.
+
+    Args:
+        from_domain (str): The declaring domain whose plan is held.
+        conflicts (list): That domain's conflict entries (`{with_domain, with, reason, from}`).
+
+    Returns:
+        (dict) `finding_id`, `source`, `held_domain`, `caution`, and the raw `conflicts`.
+    """
+    tokens = sorted(f"{c.get('with_domain')}/{c.get('with')}" for c in conflicts)
+    detail = "; ".join(
+        f"{c.get('with')} ({c.get('with_domain')}) — {c.get('reason')}" for c in conflicts
+    )
+    return {
+        "finding_id": "conflict:" + from_domain + ":" + ";".join(tokens),
+        "source": "cross-domain-conflict", "held_domain": from_domain,
+        "caution": f"Author-declared cross-domain conflict from {from_domain}: {detail}",
+        "conflicts": conflicts,
+    }
+
+
 def reconcile(candidates):
     """Cross-domain reconciliation over the computed candidates (no recording).
 
@@ -265,13 +293,20 @@ def reconcile(candidates):
         if len(domains) >= 2:
             report["overlaps"].append({"intervention": ident, "domains": sorted(domains)})
 
-    # author-declared cross-domain conflicts: surfaced, not adjudicated (the conflict-axis follow-on
-    # `cfaj` routes these through the liaison gate). The orchestrator's `from` (the declaring domain)
-    # is authoritative — it is spread LAST so an
-    # author-supplied `from` in the conflict dict cannot shadow the real source domain.
+    # Author-declared cross-domain conflicts (cfaj): surfaced in the report AND the declaring domain
+    # is HELD pending the liaison gate — the safe default (a flagged cross-domain conflict is not
+    # shipped un-adjudicated), mirroring the additive-AE supplement hold. The orchestrator's `from`
+    # (the declaring domain) is authoritative — spread LAST so an author-supplied `from` cannot shadow
+    # the real source domain. The hold is set only when the declarer carries a plan and is not already
+    # held by a higher-precedence behavior (RED-S/LEA here; the additive-AE screen below and the energy
+    # bounce in `generate_plans` overwrite it where they fire — both are more specific). `generate_plans`
+    # then routes each CONFLICT_HELD domain to `adjudicate`; a content-valid override releases it.
     for domain, cand in candidates.items():
-        for conflict in (cand.get("meta") or {}).get("conflicts") or []:
+        domain_conflicts = (cand.get("meta") or {}).get("conflicts") or []
+        for conflict in domain_conflicts:
             report["conflicts"].append({**conflict, "from": domain})
+        if domain_conflicts and cand.get("plan") is not None and domain not in holds:
+            holds[domain] = CONFLICT_HELD
 
     # 4. Supplement<->peptide additive-AE screen (pipeline Phase 3): runs only when BOTH a
     #    supplement and a peptide candidate carry a plan (no recommended compound, no additive
@@ -324,10 +359,11 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
     `compute_plan`, reconciles across domains (the RED-S/LEA cross-domain short-circuit + the
     nutrition->workout energy bounce + overlap detection + the supplement<->peptide additive-AE
     screen), applies a single bounce re-author when the energy budget is unsustainable, and
-    records the surviving plans via `record_plan`. When a supplement is held under an additive-AE
-    finding and an `adjudicator` is provided, the medical-liaison terminal gate (`adjudicate`)
-    adjudicates the held finding: a content-valid override RELEASES the hold (the supplement
-    records); a non-overridable / invalid / absent adjudication leaves it HELD.
+    records the surviving plans via `record_plan`. When a domain is held — under an additive-AE
+    finding (supplements) OR an author-declared cross-domain conflict (`cfaj`, the declaring domain) —
+    and an `adjudicator` is provided, the medical-liaison terminal gate (`adjudicate`) adjudicates the
+    held finding: a content-valid override RELEASES the hold (the domain records); a non-overridable /
+    invalid / absent adjudication leaves it HELD. Both axes reuse the SAME gate.
 
     Args:
         authors (dict): domain -> the captured author envelope, for the domains to run (1-4).
@@ -346,16 +382,19 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
             absent, a bounced workout is held `energy-bounce-held` — never shipped as an un-fuelable
             load.
         adjudicator (Callable, optional): `adjudicator(safety_finding) -> liaison envelope | None`
-            — the medical-liaison dispatch hook for a held additive-AE finding (runtime A: a real
-            `medical-liaison` dispatch, full profile inlined). The envelope is validated by
-            `adjudicate`; a content-valid HIGH/MEDIUM override releases the supplement hold, a
-            CRITICAL/H1-H2 auto-block or any invalid/absent envelope leaves the block standing. When
-            absent, a held additive-AE supplement stays held — the safe no-stack default.
+            — the medical-liaison dispatch hook for a held finding (runtime A: a real `medical-liaison`
+            dispatch, full profile inlined), called for the additive-AE finding AND for each
+            conflict-held domain's finding. The envelope is validated by `adjudicate`; a content-valid
+            HIGH/MEDIUM override releases that domain's hold, a CRITICAL/H1-H2 auto-block or any
+            invalid/absent envelope leaves it held. When absent, a held domain stays held — the safe
+            default.
 
     Returns:
         (dict) `results` (domain -> result record, the `generate_plan` shape), `reconciliation`
-        (the `reconcile` report), `reauthored` (bool — a bounce re-author ran), and `adjudication`
-        (the `adjudicate` outcome for a held additive-AE finding, or `None` when none ran).
+        (the `reconcile` report), `reauthored` (bool — a bounce re-author ran), `adjudication`
+        (the `adjudicate` outcome for a held additive-AE finding, or `None`), and
+        `conflict_adjudications` (declaring-domain -> `adjudicate` outcome for each conflict-held
+        domain; `{}` when none ran).
     """
     gates = gates or {}
     candidates = {
@@ -404,6 +443,21 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
         if adjudication["outcome"] == "cleared":
             del holds["supplements"]
 
+    # Conflict adjudication (cfaj, pipeline Phase 4): each domain HELD by an author-declared
+    # cross-domain conflict is routed to the SAME liaison gate. A content-valid override RELEASES the
+    # hold (the domain records); a non-overridable / invalid / absent adjudication leaves it held. When
+    # no adjudicator is wired, a conflict-held domain stays held (the safe default). One adjudication
+    # per declaring domain (its conflicts aggregated into one safety_finding).
+    conflict_adjudications = {}
+    if adjudicator is not None:
+        for domain in [d for d, reason in holds.items() if reason == CONFLICT_HELD]:
+            domain_conflicts = [c for c in report["conflicts"] if c.get("from") == domain]
+            safety_finding = _conflict_safety_finding(domain, domain_conflicts)
+            outcome = adjudicate(safety_finding, adjudicator(safety_finding))
+            conflict_adjudications[domain] = outcome
+            if outcome["outcome"] == "cleared":
+                del holds[domain]
+
     results = {}
     for domain, candidate in candidates.items():
         hold_reason = holds.get(domain)
@@ -413,4 +467,4 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
             results[domain] = _recorded_result(candidate, plan_date, root)
 
     return {"results": results, "reconciliation": report, "reauthored": reauthored,
-            "adjudication": adjudication}
+            "adjudication": adjudication, "conflict_adjudications": conflict_adjudications}

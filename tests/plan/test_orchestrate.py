@@ -33,6 +33,7 @@ from scripts.generate import generate
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, compute_plan
 from scripts.plan.orchestrate import (
     ADDITIVE_AE_HELD,
+    CONFLICT_HELD,
     ENERGY_BOUNCE_HELD,
     ENERGY_BOUNCE_UNRESOLVED,
     RED_S_LEA_CROSS_DOMAIN,
@@ -407,6 +408,12 @@ def test_author_declared_conflict_surfaced(tmp_path):
 
     conflicts = out["reconciliation"]["conflicts"]
     assert any(c["from"] == "supplements" and c["with"] == "bpc-157" for c in conflicts)
+    # cfaj (S75): the declaring domain is now HELD pending the liaison gate — the safe default with
+    # no adjudicator wired (was detect-only/record pre-S75). The non-declaring peptide is unaffected.
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == CONFLICT_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+    assert out["results"]["peptides"]["recorded"] is True
 
 
 def test_author_declared_conflicts_accumulate_across_authors(tmp_path):
@@ -431,6 +438,145 @@ def test_author_declared_conflicts_accumulate_across_authors(tmp_path):
     conflicts = out["reconciliation"]["conflicts"]
     assert len(conflicts) == 2
     assert {c["from"] for c in conflicts} == {"supplements", "peptides"}  # not "spoofed"
+    # cfaj (S75): BOTH declaring domains are held (no adjudicator). The held set == the declaring set.
+    assert out["results"]["supplements"]["reason"] == CONFLICT_HELD
+    assert out["results"]["peptides"]["reason"] == CONFLICT_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+    assert store.read("plan::peptides", root=tmp_path) == []
+
+
+# --- cross-domain conflict adjudication via the liaison gate (cfaj, Phase 4) ----
+
+
+def _conflict_authors(supp_conflicts=None, pep_conflicts=None):
+    """A supplements + peptides author pair, each with optional `reconciliation.conflicts`."""
+    supp = _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist")
+    pep = _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist")
+    return {
+        "supplements": _recon(supp, conflicts=supp_conflicts) if supp_conflicts else supp,
+        "peptides": _recon(pep, conflicts=pep_conflicts) if pep_conflicts else pep,
+    }
+
+
+_SUPP_CONFLICT = [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding risk"}]
+
+
+def test_conflict_holds_declaring_domain_without_adjudicator(tmp_path):
+    # CORE mutation-proof: a declared cross-domain conflict HOLDS the declaring domain before
+    # recording (the safe default). Removing the `holds[domain] = CONFLICT_HELD` line records it
+    # here -> RED. The non-declaring peptide records.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read, tmp_path,
+                         plan_date=PLAN_DATE)
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == CONFLICT_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+    assert out["results"]["peptides"]["recorded"] is True
+    assert len(store.read("plan::peptides", root=tmp_path)) == 1
+
+
+def test_reconcile_sets_conflict_hold_purely():
+    # reconcile (pure, no I/O) sets the conflict hold on the declaring domain that carries a plan.
+    supp = {"domain": "supplements", "specialist": "supplement-specialist", "section": {},
+            "reason": None, "plan": {"items": [{"name": "Fish oil", "dose": "2 g"}]},
+            "meta": {"conflicts": _SUPP_CONFLICT}}
+    outcome = reconcile({"supplements": supp})
+    assert outcome["holds"]["supplements"] == CONFLICT_HELD
+    assert any(c["from"] == "supplements" for c in outcome["report"]["conflicts"])
+
+
+def test_conflict_no_plan_is_not_held():
+    # A domain that declares a conflict but computed NO plan has nothing to hold.
+    supp = {"domain": "supplements", "specialist": "supplement-specialist", "section": {},
+            "reason": "some-reason", "plan": None, "meta": {"conflicts": _SUPP_CONFLICT}}
+    outcome = reconcile({"supplements": supp})
+    assert "supplements" not in outcome["holds"]
+
+
+def test_conflict_liaison_override_releases_and_records(tmp_path):
+    # The liaison gate clears a conflict-held domain via a content-valid override -> it records.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_conflict_liaison_autoblock_keeps_held(tmp_path):
+    # A non-overridable (CRITICAL) liaison adjudication holds the conflict-held domain.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=_liaison("CRITICAL"))
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["conflict_adjudications"]["supplements"]["non_overridable"] is True
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_conflict_liaison_vacuous_override_keeps_held(tmp_path):
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("HIGH", override=_override_record("HIGH", operator_reason="trust me"))
+    out = generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=liaison)
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_conflict_safety_finding_id_and_caution(tmp_path):
+    # The orchestrator routes a deterministic finding_id + a caution reproducing the conflict.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("MEDIUM")
+    generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read, tmp_path,
+                   plan_date=PLAN_DATE, adjudicator=liaison)
+    assert len(liaison.calls) == 1
+    finding = liaison.calls[0]
+    assert finding["finding_id"] == "conflict:supplements:peptides/bpc-157"
+    assert finding["held_domain"] == "supplements"
+    assert "bpc-157" in finding["caution"]
+
+
+def test_conflict_additive_ae_takes_precedence_over_conflict_hold(tmp_path):
+    # A supplement that BOTH declares a conflict AND trips the additive-AE screen is ADDITIVE_AE_HELD
+    # (the compound-band screen is more specific); the conflict hold does not shadow it.
+    store_read = _seed_store(tmp_path)
+    authors = _conflict_authors(supp_conflicts=_SUPP_CONFLICT)
+    authors["supplements"] = _recon(
+        _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist"),
+        conflicts=_SUPP_CONFLICT, ae_profile={"additive_classes": ["bleeding-risk"]},
+    )
+    authors["peptides"] = _recon(
+        _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist"),
+        ae_profile={"additive_classes": ["bleeding-risk"]},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+
+
+def test_conflict_adjudicator_not_called_without_conflict(tmp_path):
+    # Non-tautology control: no declared conflict -> no conflict hold, no conflict adjudication.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("MEDIUM")
+    out = generate_plans(_conflict_authors(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=liaison)
+    assert out["conflict_adjudications"] == {}
+    assert out["results"]["supplements"]["recorded"] is True
+
+
+def test_real_conflict_liaison_cleared_envelope_records(tmp_path):
+    # AC3 codified: the REAL captured medical-liaison conflict-adjudication envelope (a content-valid
+    # MEDIUM override of an author-declared cross-domain conflict), run through the production path,
+    # RELEASES the conflict-held supplement — the conflict axis closed via the SAME S74 gate, verified
+    # E2E with genuine liaison output (not a stub).
+    store_read = _seed_store(tmp_path)
+    env = _example_envelope("liaison-conflict-cleared.example.json")
+    conflict = [{"with_domain": "peptides", "with": "bpc-157",
+                 "reason": "additive bleeding risk, needs review"}]
+    out = generate_plans(_conflict_authors(supp_conflicts=conflict), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=lambda finding: env)
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
 
 
 # --- supplement<->peptide additive-AE screen (pipeline Phase 3) ----------------
