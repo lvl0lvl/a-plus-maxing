@@ -107,18 +107,18 @@ Populated after triage passes. Format: `<peptide> | <class> | <triage-score> | <
 > "supplement↔peptide additive-AE screen" *consumes* compound entries but does not
 > author them — so it does not claim anything in this queue. No collision.
 
-**Done this cycle (2026-06-18):** Healing/soft-tissue triage pass (all 4 ≤12 → Excluded) +
-a GH-secretagogue/metabolic/immune triage round, then a **deep pass on the winner, Tesamorelin
-(21/25) → Done.** Full scores: `tesamorelin/.provenance/triage-scores.md`.
+**Done so far (2026-06-18):** BPC-157 (re-research) · Tesamorelin (21/25) · **Thymosin Alpha-1 (19/25)** —
+all deep-passed → Done. Healing class fully triaged (4 Excluded); Ipamorelin held (16/25).
+Triage scores: `tesamorelin/.provenance/triage-scores.md`.
 
-Ranked queue (deep-pass-eligible, not yet deep-passed):
-- `Thymosin Alpha-1 | immune/longevity | 19/25 | NEXT deep pass` — approved-abroad immunomodulator
-  with real RCT/meta evidence for post-illness immune restoration; deep pass must flag (a) the
-  negative pivotal sepsis trial (TESTS, BMJ 2025) and (b) uncertain US sourcing post-2024 FDA 503A removal.
+Ranked queue (deep-pass-eligible, not yet deep-passed): _(empty — next round triages a new class)_
 
-**CLAIMED — next session (reserved 2026-06-18, peptide-library track):**
-Deep pass on **Thymosin Alpha-1** (the ranked-queue top). Do NOT re-run BPC-157 or Tesamorelin.
-See `_research-log.md` for the prep checklist + run invocation.
+**CLAIMED — next round (reserved 2026-06-18, peptide-library track):**
+**Metabolic class triage** — Semaglutide, Tirzepatide, Retatrutide, AOD-9604 — then deep-pass the
+winner(s). (GLP-1/GIP agonists are FDA-approved with large RCT bases + directly goal-relevant to body
+composition; expect ≥1 deep-pass-eligible.) Then continue the loop through the remaining classes
+(GH-secretagogues: CJC-1295/Sermorelin/Hexarelin/MK-677; Cognitive; Sexual; Immune/longevity remainder;
+Mitochondrial) until the taxonomy is fully Done/Excluded. Do NOT re-run anything already Done/Excluded.
 
 ## Excluded (do not re-research without trigger)
 
@@ -137,6 +137,7 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 | Peptide | Compound page | Status |
 |---|---|---|
 | BPC-157 | [[compounds/bpc-157]] | **re-researched 2026-06-18 (deep mode, all gates attested PASS; prior 2026-05-23 entry archived — suspected fabricated citations). evidence_tier C / risk_tier experimental; no completed human RCT; ~85% single-lab (Sikiric/Zagreb) + 1 corroborating lab; FDA removed from Cat-2 ~Apr 2026 (FR 2026-07361) but unapproved + WADA-S0.** |
+| Thymosin Alpha-1 | [[compounds/thymosin-alpha-1]] | **deep pass 2026-06-18 (triage 19/25). evidence_tier B / risk_tier low. Immune rebalancer (TLR→DC→Th1 + IDO/Treg); approved abroad ~30+ countries (NOT FDA-approved). FIRST-CLASS CAVEAT: the efficacy story shifted — best sepsis trial (TESTS, BMJ 2025, n=1089) is NEGATIVE; positive meta is a small-trial artifact. Goal-fit gap: NO RCT for general recovery in healthy adults. Removed from US 503A Cat-2 (Sept 2024). NOT WADA-prohibited (contrast TB-500). Very clean safety.** |
 | Tesamorelin | [[compounds/tesamorelin]] | **deep pass 2026-06-18 (triage 21/25). evidence_tier A for HIV-lipodystrophy (Falutz NEJM 2007, Stanley JAMA 2014 / Lancet HIV 2019, Badran meta 2026) but effectively D for the operator's goal — population transfer: NO RCT in non-HIV/general/post-illness adults for body comp. FDA-approved (NDA 022505) HIV-only; EMA withdrawn 2012; WADA S2.2.4; 503A Cat-2. risk_tier moderate (IGF-1 + glucose monitoring; malignancy contraindication). Belongs on the doctor-handout queue, not a self-sourced protocol.** |
 
 ---

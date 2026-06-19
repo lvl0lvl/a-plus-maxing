@@ -27,6 +27,28 @@ the next. Keep going until the triage taxonomy is fully Done/Excluded.
 
 ---
 
+## 2026-06-18 — Thymosin Alpha-1 deep pass (round 3)
+
+### DONE (verified)
+- **Thymosin Alpha-1 deep pass** (triage 19/25) → compound entry + report + 2 layers + `.provenance/`.
+  evidence_tier B (indications) / effectively D (operator's goal). **Merge-gate review ran BEFORE merge:**
+  reviewer independently re-verified 13/13 citations real, confirmed TESTS is genuinely negative and the
+  WADA Tα1≠TB-500 distinction is correct → **PASS-WITH-FIXES**; 3 precision fixes applied (Romani-2004 TLR
+  attribution, elderly-flu n, COVID severe-subgroup). No fabrication, no blocking issues.
+
+### CLAIMED (re-checkable via `thymosin-alpha-1/.provenance/sources-ledger.md`)
+- Two first-class caveats: (a) **the efficacy story shifted** — the best-quality sepsis trial (TESTS, BMJ
+  2025, n=1089) is NEGATIVE (HR 0.99); the positive 2025 meta (OR 0.73) is a small-single-center-trial
+  artifact (HQ subgroup NS). (b) **Goal-fit gap** — NO RCT for general post-illness recovery in healthy adults.
+- Low-risk (drug-related AEs <1% across >2000 pts; TESTS safety = placebo); NOT WADA-prohibited (contrast
+  TB-500); not FDA-approved + removed from US 503A Cat-2 (Sept 2024). Chinese-authored RCT base, surveyed.
+
+### CLAIMED / RESERVED — next round
+**Metabolic class triage** (Semaglutide, Tirzepatide, Retatrutide, AOD-9604) → deep-pass winner(s); then
+continue the loop through the remaining classes until [[_triage]] is fully Done/Excluded.
+
+---
+
 ## 2026-06-18 — Healing-class triage + Tesamorelin deep pass (round 2)
 
 ### DONE (verified)
