@@ -107,14 +107,18 @@ Populated after triage passes. Format: `<peptide> | <class> | <triage-score> | <
 > "supplement↔peptide additive-AE screen" *consumes* compound entries but does not
 > author them — so it does not claim anything in this queue. No collision.
 
-**CLAIMED — next session (reserved 2026-06-18, peptide-library track):**
-`Healing / soft-tissue triage pass` — shallow-scan + score the remaining four of the
-flagged top class against `meta/goals.md`: **TB-500, GHK-Cu, KPV, LL-37** (BPC-157 is
-already deep-passed → Done). Then deep-pass the top scorer (cap: 2 deep passes/session;
-triage batches). **Do NOT** re-run BPC-157 or start a different class until this triage
-pass lands. See `_research-log.md` for the prep checklist + the run invocation.
+**Done this cycle (2026-06-18):** Healing/soft-tissue triage pass (all 4 ≤12 → Excluded) +
+a GH-secretagogue/metabolic/immune triage round, then a **deep pass on the winner, Tesamorelin
+(21/25) → Done.** Full scores: `tesamorelin/.provenance/triage-scores.md`.
 
-_(no scored rows yet — the reserved triage pass above produces the first ones.)_
+Ranked queue (deep-pass-eligible, not yet deep-passed):
+- `Thymosin Alpha-1 | immune/longevity | 19/25 | NEXT deep pass` — approved-abroad immunomodulator
+  with real RCT/meta evidence for post-illness immune restoration; deep pass must flag (a) the
+  negative pivotal sepsis trial (TESTS, BMJ 2025) and (b) uncertain US sourcing post-2024 FDA 503A removal.
+
+**CLAIMED — next session (reserved 2026-06-18, peptide-library track):**
+Deep pass on **Thymosin Alpha-1** (the ranked-queue top). Do NOT re-run BPC-157 or Tesamorelin.
+See `_research-log.md` for the prep checklist + run invocation.
 
 ## Excluded (do not re-research without trigger)
 
@@ -122,13 +126,18 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 
 | Peptide | Reason | Re-open trigger |
 |---|---|---|
-| _(none yet)_ | | |
+| TB-500 | Triage 12/25 (2026-06-18). All human data are on a DIFFERENT molecule (topical/ophthalmic full-length Tβ4, RGN-259); the TB-500 fragment has zero human trials; gray-market-only sourcing. | A human RCT of the TB-500 fragment (or injectable Tβ4) on a tendon/joint/recovery endpoint. |
+| GHK-Cu | Triage 11/25 (2026-06-18). Human evidence is topical-cosmetic only; the sole systemic-recovery data is one transient-effect rat ACL study; injectable use is gray-market + unmonitored copper load. | A human RCT of systemic/injectable GHK-Cu for a musculoskeletal-recovery endpoint. |
+| KPV | Triage 12/25 (2026-06-18). Gut/inflammation (α-MSH) indicated; animal+in-vitro only; no tendon/joint data; zero human trials. | A verified human safety/efficacy study, or an explicit soft-tissue/recovery study. |
+| LL-37 | Triage 12/25 (2026-06-18). Real topical-wound RCTs but off-goal; a larger Phase-IIb VLU trial reportedly failed; unresolved oncology dual-role; gray-market systemic sourcing. | A human RCT for a recovery/systemic indication with the oncology risk addressed. |
+| Ipamorelin | Triage 16/25 → HOLD (2026-06-18). Only human RCT (post-op ileus) was negative on an off-goal endpoint; ZERO human body-composition/recovery/sleep data; no clean Rx pathway. | A human RCT on a body-composition / recovery / sleep endpoint. |
 
 ## Done (compound page exists)
 
 | Peptide | Compound page | Status |
 |---|---|---|
 | BPC-157 | [[compounds/bpc-157]] | **re-researched 2026-06-18 (deep mode, all gates attested PASS; prior 2026-05-23 entry archived — suspected fabricated citations). evidence_tier C / risk_tier experimental; no completed human RCT; ~85% single-lab (Sikiric/Zagreb) + 1 corroborating lab; FDA removed from Cat-2 ~Apr 2026 (FR 2026-07361) but unapproved + WADA-S0.** |
+| Tesamorelin | [[compounds/tesamorelin]] | **deep pass 2026-06-18 (triage 21/25). evidence_tier A for HIV-lipodystrophy (Falutz NEJM 2007, Stanley JAMA 2014 / Lancet HIV 2019, Badran meta 2026) but effectively D for the operator's goal — population transfer: NO RCT in non-HIV/general/post-illness adults for body comp. FDA-approved (NDA 022505) HIV-only; EMA withdrawn 2012; WADA S2.2.4; 503A Cat-2. risk_tier moderate (IGF-1 + glucose monitoring; malignancy contraindication). Belongs on the doctor-handout queue, not a self-sourced protocol.** |
 
 ---
 
