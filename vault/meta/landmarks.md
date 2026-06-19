@@ -3,7 +3,7 @@ title: Landmark Register
 type: reference
 status: active
 created: 2026-05-25
-last_reviewed: 2026-06-18
+last_reviewed: 2026-06-19
 review_cadence: session
 permalink: a-plus-maxing/meta/landmarks
 ---

@@ -3,7 +3,7 @@ title: Project Invariants Register
 type: reference
 status: active
 created: 2026-05-25
-last_reviewed: 2026-05-25
+last_reviewed: 2026-06-19
 review_cadence: every-5-sessions
 permalink: a-plus-maxing/invariants
 ---
