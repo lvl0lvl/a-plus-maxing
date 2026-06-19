@@ -27,6 +27,27 @@ the next. Keep going until the triage taxonomy is fully Done/Excluded.
 
 ---
 
+## 2026-06-18 — Semaglutide deep pass (round 5)
+
+### DONE (verified)
+- **Semaglutide deep pass** (triage 24/25) → compound entry + report + 2 layers + `.provenance/`. evidence_tier S
+  (indications) / off-target for the operator's goal. **Merge-gate review = clean PASS** (6/6 load-bearing citations
+  independently re-verified to exact title/journal/finding; WADA-monitoring claim confirmed; lean-mass figure honestly
+  tier-flagged; goal-mismatch caveat prominent). No blocking issues, no required fixes.
+
+### CLAIMED (re-checkable via `semaglutide/.provenance/sources-ledger.md`)
+- **First-class caveat = GOAL MISMATCH:** tier-S, FDA-approved, but answers a different question than the operator's —
+  a weight-loss/appetite-suppressing drug that reduces absolute lean mass (−9.7% STEP 1 DEXA) and reverses on stopping
+  (STEP 4); NO RCT for lean-building/recovery. Off-target for post-illness rebuilding.
+- Safety well-mapped (boxed thyroid-C-cell; GI; pancreatitis/gallbladder/NAION/aspiration); NOT WADA-prohibited
+  (Monitoring Program). Compounded salt-forms not the approved API; gray market winding down (shortage resolved Feb 2025).
+
+### CLAIMED / RESERVED — next round
+Deep pass **Tirzepatide** (24/25), then **Retatrutide** (18/25, with the investigational-sourcing caveat). Then the
+remaining classes (GH-secretagogues, Cognitive, Sexual, Immune/longevity remainder, Mitochondrial) until [[_triage]] is fully Done/Excluded.
+
+---
+
 ## 2026-06-18 — Metabolic class triage (round 4)
 
 ### DONE (verified)
