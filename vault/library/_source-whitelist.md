@@ -71,6 +71,7 @@ Always admissible. Cite as `rct`, `meta_analysis`, `cohort`, `open_label`, `anim
 - `frontiersin.org` (lower trust — open-access; flag any single-source claim)
 - `mdpi.com` (lower trust — open-access; flag any single-source claim)
 - `liebertpub.com` (Mary Ann Liebert — *Thyroid* (official ATA journal) + other peer-reviewed titles; added 2026-06-19 wiki-research, thyroid cluster)
+- `tandfonline.com` (Taylor & Francis — peer-reviewed journals incl. Annals of Clinical Biochemistry, Critical Reviews in Clin Lab Sciences; added 2026-06-19 wiki-research)
 - `biorxiv.org` (preprint — admissible but flag as `not-peer-reviewed`)
 - `medrxiv.org` (preprint — same)
 

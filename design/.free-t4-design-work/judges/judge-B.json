@@ -1,0 +1,27 @@
+{
+  "section": "B",
+  "brief_hash": "65c447ed8ad733eb4c1e375d904352507ef5cb508cfbc15c6b14a700254b5641",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 90,
+    "type_tag_discipline": 100,
+    "population_annotation": 98,
+    "route_fidelity": null,
+    "concentration_audit_handling": 100,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 99
+  },
+  "total": 97,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "note",
+      "dimension": "citation_fidelity",
+      "detail": "Reference [1] (Park et al. PMID 29390008) states n=5,987 for the reference population, but the PubMed abstract reports 7,061 total individuals analyzed. The 5,987 figure likely reflects the post-exclusion euthyroid/TPOAb-negative reference cohort — standard reference-interval methodology — not a fabrication. Verified: first author 'Park', journal PLoS ONE 2018, PMID 29390008 all correct. Non-blocking."
+    }
+  ],
+  "summary": "Section B is well-constructed: every inline citation carries a correct type-tag, the ×12.87 conversion table is mathematically exact (all four values verified), the method-dependence caveat is explicitly flagged as load-bearing, pregnancy trimester ranges and the TSH/fT4 diagnostic grid are both present with named cohorts, and the FTI/T7 historical section is accurate. The sole note is a minor n-discrepancy in [1] (5,987 reference-population vs 7,061 total enrolled) that is consistent with standard exclusion methodology and does not affect the cited interval."
+}
