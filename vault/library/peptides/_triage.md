@@ -117,12 +117,12 @@ Ranked queue (deep-pass-eligible, not yet deep-passed): _(empty — metabolic cl
 
 **Metabolic class triaged 2026-06-18:** Semaglutide 24, Tirzepatide 24, Retatrutide 18 (eligible); AOD-9604 12 → Excluded.
 
-**CLAIMED — next round (reserved 2026-06-19, peptide-library track):**
-**Sexual / dopaminergic class triage** — PT-141 (Bremelanotide; FDA-approved as Vyleesi — likely deep-pass-eligible),
-Melanotan II, Kisspeptin-10 — then deep-pass any eligible. Then Immune/longevity remainder (Epitalon, FOXO4-DRI,
-Humanin), Mitochondrial (SS-31, MOTS-c) until the taxonomy is fully Done/Excluded. Do NOT re-run anything already Done/Excluded.
-(COMPLETE: Healing; Metabolic [Sema+Tirze+Reta Done, AOD Excluded]; GH-secretagogue [Tesamorelin Done; Sermorelin+MK-677
-Held; CJC-1295+Hexarelin Excluded; Ipamorelin Held]; **Cognitive** [Semax+Selank+Cerebrolysin Held; Dihexa+NA-Selank-Amidate Excluded].)
+**CLAIMED — next round (reserved 2026-06-19, peptide-library track) — THE FINAL TRIAGE:**
+**Immune/longevity remainder + Mitochondrial class triage** — Epitalon, FOXO4-DRI, Humanin, SS-31 (Elamipretide),
+MOTS-c — then deep-pass any eligible (SS-31/Elamipretide has real Stealth-BioTherapeutics human RCTs — watch for
+eligibility). **This is the last untriaged set; after it the taxonomy is fully Done/Excluded** and the standing goal is met.
+(COMPLETE: Healing; Metabolic; GH-secretagogue; Cognitive; **Sexual/dopaminergic** [PT-141 + Kisspeptin-10 Held; Melanotan II Excluded].
+Immune/longevity: Thymosin Alpha-1 already Done — only Epitalon/FOXO4-DRI/Humanin remain.)
 
 ## Excluded (do not re-research without trigger)
 
@@ -145,6 +145,9 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 | Cerebrolysin | Triage 14/25 → HOLD (2026-06-19). Porcine brain-derived peptide mix; LARGE RCT base (CARS stroke PMID 26564102 positive) BUT Cochrane reviews null/weak with bias + a non-fatal-SAE signal (stroke PMID 37818733 "no further trials"; vascular dementia PMID 31710397). **IV/IM course administration conflicts with the no-clinic-visit limit**; approved in 50+ countries, NOT FDA. | A low-risk-of-bias positive RCT + a non-parenteral route, or operator request. |
 | Dihexa | Triage 10/25 (2026-06-19). Ang-IV-derived c-Met/HGF activator — PRECLINICAL ONLY, no human data. Cornerstone evidence compromised: McCoy 2013 (PMID 23055539) carries a 2021 Notice of Concern; the mechanism paper Benoist 2014 was RETRACTED 2025 (PMID 40312093). Real oncogenic concern (c-Met activation); same-class clinical drug fosgonimeton failed Phase 2/3 (2024). Gray-market. evidence_tier D. | A clean human safety + efficacy trial resolving the oncogenic concern (unlikely). |
 | N-Acetyl-Selank-Amidate | Triage (2026-06-19) — folded into Selank: **NO ADMISSIBLE DISTINCT PRIMARY EVIDENCE** (vendor/encyclopedia pages only); a gray-market Selank derivative. Excluded pending any distinct human data. | A distinct human study on the amidate variant specifically. |
+| Kisspeptin-10 | Triage 17/25 → HOLD (2026-06-19). Real A-tier academic human evidence (Dhillo group: sexual brain processing + penile tumescence PMID 36735255 [KP-54]; LH/testosterone PMID 21632808 [KP-10]) — but KP-10's **~4-min half-life means it only works as a monitored IV infusion**; gray-market self-dosed "Kisspeptin-10" is a sourcing mismatch. Investigational, not approved. | A realistic monitored administration route + a libido-treatment RCT. |
+| PT-141 (Bremelanotide) | Triage 16/25 → HOLD (2026-06-19). FDA-approved as **Vyleesi (2019) — but for FEMALE premenopausal HSDD** (RECONNECT Phase-3 PMID 31599840); **male use is off-label** with thin evidence. Lower-priority class for this user; cardiovascular-gated (transient BP rise — contraindicated in uncontrolled HTN/CVD; nausea 40%; focal hyperpigmentation). | A lab/clinical flag elevating the sexual-health goal + a BP-clean baseline; or male-specific evidence. |
+| Melanotan II | Triage 8/25 (2026-06-19). Non-selective melanocortin agonist (tanning + erectile); NOT approved anywhere. Verified MELANOMA / mole-change case reports (PMID 21564053, 22724573) + ischemic priapism (PMID 33460908); MHRA warning (inaccurate dosing in every sample tested). evidence_tier D / risk HIGH (oncologic + urologic-emergency). The approved analog bremelanotide is the rigorous alternative. | (Effectively permanent exclude — superseded by bremelanotide; would need a wholly new safety profile.) |
 
 ## Done (compound page exists)
 

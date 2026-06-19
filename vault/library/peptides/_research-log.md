@@ -27,6 +27,22 @@ the next. Keep going until the triage taxonomy is fully Done/Excluded.
 
 ---
 
+## 2026-06-19 — Sexual/dopaminergic class triage (round 10) — no deep-pass-eligible candidate
+
+### DONE (verified)
+- **Sexual/dopaminergic class triaged**: **Kisspeptin-10 17/HOLD** (real A-tier Dhillo-group human evidence, but
+  ~4-min half-life needs monitored IV infusion — gray-market self-dosing mismatch), **PT-141/Bremelanotide 16/HOLD**
+  (FDA-approved Vyleesi but for FEMALE HSDD; male off-label, lower-priority class, cardiovascular-gated), **Melanotan II
+  8/EXCLUDE** (not approved; melanoma/priapism case reports; MHRA warning). **No deep-pass-eligible candidate** — even the
+  one FDA-approved compound (PT-141) holds because its approval is for women and the class is low-priority for this user.
+- Anti-fabrication held: verified RECONNECT, the melanoma/priapism case reports, and the kisspeptin RCTs.
+
+### CLAIMED / RESERVED — next round (THE FINAL TRIAGE)
+**Immune/longevity remainder + Mitochondrial** (Epitalon, FOXO4-DRI, Humanin, SS-31/Elamipretide, MOTS-c) → deep-pass
+any eligible (SS-31 has real human RCTs). **After this the taxonomy is fully Done/Excluded and the standing goal is met.**
+
+---
+
 ## 2026-06-19 — Cognitive class triage (round 9) — no deep-pass-eligible candidate
 
 ### DONE (verified)
