@@ -1,0 +1,29 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "compound_risk_tier": "experimental",
+  "compound_entry_path": "vault/compounds/ghk-cu.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "populated"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "serum copper",
+    "ceruloplasmin",
+    "liver function"
+  ],
+  "halt_reasons": [],
+  "iterations": 1,
+  "timestamp": "2026-06-19T15:17:57Z",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T15:10:02.437515+00:00",
+    "attest_ts": "2026-06-19T15:20:59.645001+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "9188fcc4391c90a0987d3b4645b022ac5e56ba0e7c965a0fcd5685a9a77a4082",
+    "agent_source_mtime": "2026-06-19T15:20:44.885174+00:00"
+  }
+}
