@@ -226,10 +226,17 @@ def _conflict_safety_finding(from_domain, conflicts):
     Returns:
         (dict) `finding_id`, `source`, `held_domain`, `caution`, and the raw `conflicts`.
     """
-    tokens = sorted(f"{c.get('with_domain')}/{c.get('with')}" for c in conflicts)
-    detail = "; ".join(
-        f"{c.get('with')} ({c.get('with_domain')}) — {c.get('reason')}" for c in conflicts
+    # Order the entries by (with_domain, with) so BOTH the finding_id tokens AND the caution detail
+    # share one deterministic ordering — the caution must reproduce verbatim through the liaison, so an
+    # order-stable caution keeps it regenerable. A malformed entry (no string `with`) is dropped from
+    # the routing surface (trusted-author-malformed-is-inert, mirroring `_ae_profile`), never emitted
+    # as a `None/None` token; it still rides the raw `conflicts` for the record.
+    routable = sorted(
+        (c for c in conflicts if isinstance(c.get("with"), str)),
+        key=lambda c: (str(c.get("with_domain")), c.get("with")),
     )
+    tokens = [f"{c.get('with_domain')}/{c['with']}" for c in routable]
+    detail = "; ".join(f"{c['with']} ({c.get('with_domain')}) — {c.get('reason')}" for c in routable)
     return {
         "finding_id": "conflict:" + from_domain + ":" + ";".join(tokens),
         "source": "cross-domain-conflict", "held_domain": from_domain,
@@ -251,13 +258,16 @@ def reconcile(candidates):
 
     Returns:
         (dict) `report` (`red_s_lea_cross_domain` bool, `bounce` dict | None, `overlaps` list,
-        `conflicts` list, `additive_ae` list) and `holds` (domain -> hold reason — workout under
-        a RED-S/LEA short-circuit, supplements under an additive-AE finding; the bounce-driven
-        holds are applied by `generate_plans`).
+        `conflicts` list, `additive_ae` list); `holds` (domain -> hold reason — workout under a
+        RED-S/LEA short-circuit, supplements under an additive-AE finding; the bounce-driven holds
+        are applied by `generate_plans`); and `conflict_held` (list of declaring domains held by an
+        author-declared cross-domain conflict — tracked INDEPENDENTLY of `holds` so a domain can
+        carry both a `holds` reason and an open conflict, each cleared on its own).
     """
     report = {"red_s_lea_cross_domain": False, "bounce": None, "overlaps": [],
               "conflicts": [], "additive_ae": []}
     holds = {}
+    conflict_held = []  # declaring domains held by an author-conflict — INDEPENDENT of `holds`
 
     nutrition = candidates.get("nutrition")
     workout = candidates.get("workout")
@@ -297,16 +307,18 @@ def reconcile(candidates):
     # is HELD pending the liaison gate — the safe default (a flagged cross-domain conflict is not
     # shipped un-adjudicated), mirroring the additive-AE supplement hold. The orchestrator's `from`
     # (the declaring domain) is authoritative — spread LAST so an author-supplied `from` cannot shadow
-    # the real source domain. The hold is set only when the declarer carries a plan and is not already
-    # held by a higher-precedence behavior (RED-S/LEA here; the additive-AE screen below and the energy
-    # bounce in `generate_plans` overwrite it where they fire — both are more specific). `generate_plans`
-    # then routes each CONFLICT_HELD domain to `adjudicate`; a content-valid override releases it.
+    # the real source domain. The conflict hold is tracked in its OWN set (`conflict_held`), INDEPENDENT
+    # of `holds`: a domain can carry both an additive-AE/RED-S-LEA/bounce hold AND a conflict, and each
+    # concern must clear on its own — clearing one (e.g. an additive-AE override) must NOT release a
+    # domain whose distinct conflict is still open. `generate_plans` adjudicates each conflict-held
+    # domain; a content-valid override removes it from `conflict_held`; a domain records only when it is
+    # in NEITHER `holds` NOR `conflict_held`.
     for domain, cand in candidates.items():
         domain_conflicts = (cand.get("meta") or {}).get("conflicts") or []
         for conflict in domain_conflicts:
             report["conflicts"].append({**conflict, "from": domain})
-        if domain_conflicts and cand.get("plan") is not None and domain not in holds:
-            holds[domain] = CONFLICT_HELD
+        if domain_conflicts and cand.get("plan") is not None:
+            conflict_held.append(domain)
 
     # 4. Supplement<->peptide additive-AE screen (pipeline Phase 3): runs only when BOTH a
     #    supplement and a peptide candidate carry a plan (no recommended compound, no additive
@@ -325,7 +337,7 @@ def reconcile(candidates):
             report["additive_ae"] = findings
             holds["supplements"] = ADDITIVE_AE_HELD
 
-    return {"report": report, "holds": holds}
+    return {"report": report, "holds": holds, "conflict_held": conflict_held}
 
 
 def _held_result(candidate, reason):
@@ -405,6 +417,7 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
     outcome = reconcile(candidates)
     report = outcome["report"]
     holds = dict(outcome["holds"])
+    conflict_held = set(outcome["conflict_held"])  # tracked independently of `holds`
     reauthored = False
 
     bounce = report["bounce"]
@@ -443,24 +456,31 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
         if adjudication["outcome"] == "cleared":
             del holds["supplements"]
 
-    # Conflict adjudication (cfaj, pipeline Phase 4): each domain HELD by an author-declared
-    # cross-domain conflict is routed to the SAME liaison gate. A content-valid override RELEASES the
-    # hold (the domain records); a non-overridable / invalid / absent adjudication leaves it held. When
-    # no adjudicator is wired, a conflict-held domain stays held (the safe default). One adjudication
-    # per declaring domain (its conflicts aggregated into one safety_finding).
+    # Conflict adjudication (cfaj, pipeline Phase 4): each domain in the INDEPENDENT `conflict_held`
+    # set is routed to the SAME liaison gate — INCLUDING a domain that ALSO carries a `holds` reason
+    # (e.g. an additive-AE-held supplement that ALSO declared a distinct conflict). A content-valid
+    # override clears the conflict (drops it from `conflict_held`); a non-overridable / invalid / absent
+    # adjudication leaves the conflict open. Because `conflict_held` is independent of `holds`, clearing
+    # one concern never releases a domain whose OTHER concern is still open — a domain records only when
+    # it is in NEITHER set. When no adjudicator is wired, a conflict-held domain stays held (the safe
+    # default). One adjudication per declaring domain (its conflicts aggregated into one safety_finding).
     conflict_adjudications = {}
     if adjudicator is not None:
-        for domain in [d for d, reason in holds.items() if reason == CONFLICT_HELD]:
+        for domain in sorted(conflict_held):
             domain_conflicts = [c for c in report["conflicts"] if c.get("from") == domain]
             safety_finding = _conflict_safety_finding(domain, domain_conflicts)
             adjudication_outcome = adjudicate(safety_finding, adjudicator(safety_finding))
             conflict_adjudications[domain] = adjudication_outcome
             if adjudication_outcome["outcome"] == "cleared":
-                del holds[domain]
+                conflict_held.discard(domain)
 
+    # A domain records only when it is in NEITHER `holds` NOR `conflict_held`. A `holds` reason takes
+    # the result's `reason`; otherwise an open conflict holds it as CONFLICT_HELD.
     results = {}
     for domain, candidate in candidates.items():
         hold_reason = holds.get(domain)
+        if hold_reason is None and domain in conflict_held:
+            hold_reason = CONFLICT_HELD
         if hold_reason is not None:
             results[domain] = _held_result(candidate, hold_reason)
         else:
