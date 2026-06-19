@@ -34,6 +34,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/glyca]] (GlycA — glycoprotein acetylation; category: blood; confidence: provisional)
 - [[biomarkers/fasting-glucose]] (Fasting plasma glucose; category: blood; confidence: established)
 - [[biomarkers/hba1c]] (HbA1c — hemoglobin A1c; category: blood; confidence: established)
+- [[biomarkers/fasting-insulin]] (Fasting insulin; category: blood; confidence: supported)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -74,6 +75,7 @@ _(none yet)_
 - [[library/biomarkers/glyca/research-report]] (GlycA standard /aplus-research; 19 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/fasting-glucose/research-report]] (Fasting plasma glucose standard /aplus-research; 45 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/hba1c/research-report]] (HbA1c standard /aplus-research; 35 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/fasting-insulin/research-report]] (Fasting insulin standard /aplus-research; 39 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/

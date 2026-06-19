@@ -1,0 +1,21 @@
+{
+  "section": "C",
+  "brief_hash": "5495ab748e29aae41a2371cd707a63c904fc52f7524b01e62167ac2d97f86e0d",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 92,
+    "type_tag_discipline": 97,
+    "population_annotation": 91,
+    "route_fidelity": null,
+    "concentration_audit_handling": 93,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 96
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section C is factually tight against its citations: the Marcovina 2007 ADA Workgroup figures (12 methods / 9 manufacturers / 39 specimens; CV 12–66% median 24%; cross-reactivity <2% / <3% / >40% for the three proinsulin species; common reference preparation ineffective) were verified against the published paper, and all type tags are correctly applied (cohort for comparative analytical studies, regulatory for the IFCC/Thienpont standards-body status report, mechanism_review for the IDE-hemolysis and LC-MS/MS RMP papers). Every source is whitelisted Tier 1 or Tier 2 (ifcc.org now Tier 2 per whitelist); no bare [N] citations; the ~71% RCV is mathematically consistent with EuBIVAS CVI 25.3% at CVA ~5%; mechanistic reasoning (IDE release, sandwich-epitope destruction, B-chain epitope retention by des-64,65) is correct throughout."
+}

@@ -63,6 +63,10 @@ Always admissible. Cite as `rct`, `meta_analysis`, `cohort`, `open_label`, `anim
 - `springer.com`
 - `wiley.com` (Wiley Online Library)
 - `oup.com` (Oxford Academic)
+- `diabetesjournals.org` (American Diabetes Association journals — Diabetes, Diabetes Care; added 2026-06-19 wiki-research)
+- `journals.plos.org` / `plos.org` (Public Library of Science — PLoS ONE, PLoS Medicine; added 2026-06-19 wiki-research)
+- `jci.org` (Journal of Clinical Investigation + JCI Insight; added 2026-06-19 wiki-research)
+- `portlandpress.com` (Portland Press — Bioscience Reports, Biochemical Journal; added 2026-06-19 wiki-research)
 - `karger.com`
 - `frontiersin.org` (lower trust — open-access; flag any single-source claim)
 - `mdpi.com` (lower trust — open-access; flag any single-source claim)
