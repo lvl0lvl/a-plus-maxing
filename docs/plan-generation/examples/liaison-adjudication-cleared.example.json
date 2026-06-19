@@ -1,0 +1,24 @@
+{
+  "_comment": "REAL captured medical-liaison adjudication envelope (S74). The deployed medical-liaison, full profile inlined, adjudicated the held supplement<->peptide bleeding-risk additive-AE finding (fish oil 2 g/day + BPC-157 250 mcg subq) given an operator informed-refusal request. It assigned MEDIUM / H3 (a real antithrombotic-stacking watchlist interaction, but bounded — no anticoagulant Rx, no acute event, so not CRITICAL/H1-H2), then built a content-valid override record at the MEDIUM clear-choice rung. The orchestrator's adjudicate() validates this and RELEASES the supplement hold: the supplement records. This is the held-line closer.",
+  "finding_id": "additive-ae:class:bleeding-risk",
+  "status": "override-recorded",
+  "composite_band": "MEDIUM",
+  "harm_class": "H3",
+  "verdict": "BLOCK_WITH_OVERRIDE_PATH",
+  "severity_final": {"set_by": "medical-liaison", "verdict": "BLOCK_WITH_OVERRIDE_PATH"},
+  "override_record": {
+    "caution_verbatim": "Supplement<->peptide additive adverse-event risk (shared additive-AE classes: bleeding-risk)",
+    "composite_band": "MEDIUM",
+    "risks_communicated": {
+      "general": "High-dose fish oil (2 g/day EPA/DHA) has an antiplatelet effect; BPC-157 adds a vascular/bleeding-modulating effect. This is the antithrombotic-stacking watchlist class - a database lookup + clinician review is the correct path, not a bare reassurance.",
+      "risks_of_proceeding": "Taking both together raises bleeding and bruising risk above either alone: easy/unusual bruising, nosebleeds, prolonged bleeding from minor cuts, and elevated bleeding risk around any procedure, dental work, or unanticipated injury. The home-monitoring plan reduces but does not eliminate this risk; an acute bleed can still occur without warning."
+    },
+    "operator_reason": "Operator accepts the additive bleeding/bruising risk for connective-tissue recovery, having understood the antiplatelet + vascular-modulating mechanism and that the combined risk exceeds either compound alone; commits to a 7-day pre-procedure/dental hold of both, active symptom monitoring (unusual bruising, nosebleeds, prolonged bleeding) with stop-and-seek-care on appearance, and disclosure of both to the primary-care MD at the July 2026 visit.",
+    "evidence_tier_required": "clear-choice",
+    "evidence_provided": {"rung": "understanding+appreciation+reasoning"},
+    "override_literal": "operator is overriding a safety block",
+    "voluntariness_note": "Operator states the choice is made freely, for connective-tissue recovery, without pressure, and acknowledges the home-monitoring plan does not eliminate the risk. No in-conversation concession by the liaison authorized this; authorization is the out-of-band recorded informed-acceptance statement.",
+    "timestamp": "2026-06-19T10:00:00-04:00",
+    "contradictions_log_ref": "vault/meta/contradictions.md#C-1"
+  }
+}

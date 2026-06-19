@@ -3,7 +3,8 @@
 The `/generate-plan` orchestrator's reconciliation job (design
 `vault/design/plan-generation-pipeline-v1.md` decision 4: "two terminal functions, not
 one") — find overlaps, bounce plans back, integrate — kept DISTINCT from the medical-liaison
-clinical safety adjudication (the deferred S74 slice).
+clinical safety adjudication (`scripts/plan/adjudicate.py`), which the orchestrator invokes as
+the terminal gate over a held additive-AE finding.
 
 Under runtime A the orchestrator dispatches each plan-domain author, captures their output,
 computes each domain's candidate plan via `generate_plan.compute_plan` (no record yet),
@@ -24,8 +25,8 @@ from ever being written. The four cross-domain behaviors in this slice:
   3. Cross-domain OVERLAP detection (the step-4 integration): an intervention identity
      surfacing in 2+ domains (a compound recommended as both a supplement and a peptide) is
      surfaced in the reconciliation report, alongside any author-declared cross-domain
-     conflict. V1 DETECTS + REPORTS; the medical-liaison contradiction adjudication is the
-     deferred S74 clinical slice.
+     conflict. This pass DETECTS + REPORTS; adjudicating the conflict axis through the liaison
+     gate is the beaded follow-on `cfaj` (this slice closes the additive-AE axis, behavior 4).
   4. Supplement<->peptide additive-AE screen (pipeline Phase 3, the compound band): each
      compound passes its single-domain filters, but their COMBINATION is not presumed safe
      ("component tolerability does not compose to combination safety" — peptide-specialist
@@ -33,13 +34,15 @@ from ever being written. The four cross-domain behaviors in this slice:
      pairwise interaction naming the other compound, is an additive-AE finding — surfaced in the
      report AND holding the SUPPLEMENT (the side that finalizes last against the settled compound
      surface) from recording: the honest no-stack state, never an un-screened additive-AE
-     combination written. The medical-liaison terminal gate (S74) adjudicates the held finding
-     (and the supplement<->Rx axis); V1 holds + reports.
+     combination written. The medical-liaison terminal gate (`adjudicate`) then adjudicates the
+     held finding: a content-valid override releases the supplement, a non-overridable / invalid
+     adjudication leaves it held. The supplement<->Rx axis is the beaded follow-on `rxbp`.
 
 The reconciliation report is RETURNED (not persisted — no new store stream); plans are
 recorded via the existing `record_plan` (the store-adversarial battery surface is unchanged).
 """
 
+from scripts.plan.adjudicate import adjudicate
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, compute_plan
 from scripts.store import plan_schema
 
@@ -93,8 +96,8 @@ def _ae_profile(candidate):
     (no finding). This is the deliberate trusted-author contract: the screen reads the structured
     declaration the careful specialist authored, and a malformed one is treated as no declaration
     rather than guessed at. The contract shape is documented in
-    `docs/plan-generation/author-dispatch-process.md`; tightening this to fail-loud is a candidate
-    for the S74 liaison gate's fuller adjudication.
+    `docs/plan-generation/author-dispatch-process.md`; tightening this to fail-loud is a deferred
+    hardening candidate (the liaison gate adjudicates the held finding, not the declaration's shape).
 
     Args:
         candidate (dict): A `compute_plan` result.
@@ -175,6 +178,38 @@ def _additive_ae_findings(supplement, peptide):
     return findings
 
 
+def _additive_ae_safety_finding(findings):
+    """The `safety_finding` the orchestrator routes to the medical-liaison for a held additive-AE.
+
+    Distills the reconciler's additive-AE findings into the held-finding the liaison adjudicates
+    (`scripts/plan/adjudicate.py`): a deterministic `finding_id` (so the liaison envelope can echo
+    it) and a `caution` the override record must reproduce verbatim. The held domain is always the
+    supplement (the side the screen holds).
+
+    Args:
+        findings (list): The reconciler's `report["additive_ae"]` findings (non-empty).
+
+    Returns:
+        (dict) `finding_id`, `source`, `held_domain`, `caution`, and the raw `findings`.
+    """
+    shared = sorted(f["ae_class"] for f in findings if f.get("kind") == "shared-class")
+    interactions = sorted(
+        f"{f['from']}->{f['with']}" for f in findings if f.get("kind") == "declared-interaction"
+    )
+    tokens = [f"class:{c}" for c in shared] + [f"interaction:{i}" for i in interactions]
+    parts = []
+    if shared:
+        parts.append("shared additive-AE classes: " + ", ".join(shared))
+    if interactions:
+        parts.append("author-declared interactions: " + ", ".join(interactions))
+    caution = "Supplement<->peptide additive adverse-event risk (" + "; ".join(parts) + ")"
+    return {
+        "finding_id": "additive-ae:" + ";".join(tokens),
+        "source": "additive-ae", "held_domain": "supplements",
+        "caution": caution, "findings": findings,
+    }
+
+
 def reconcile(candidates):
     """Cross-domain reconciliation over the computed candidates (no recording).
 
@@ -230,8 +265,9 @@ def reconcile(candidates):
         if len(domains) >= 2:
             report["overlaps"].append({"intervention": ident, "domains": sorted(domains)})
 
-    # author-declared cross-domain conflicts: surfaced, not adjudicated (the S74 liaison gate).
-    # The orchestrator's `from` (the declaring domain) is authoritative — it is spread LAST so an
+    # author-declared cross-domain conflicts: surfaced, not adjudicated (the conflict-axis follow-on
+    # `cfaj` routes these through the liaison gate). The orchestrator's `from` (the declaring domain)
+    # is authoritative — it is spread LAST so an
     # author-supplied `from` in the conflict dict cannot shadow the real source domain.
     for domain, cand in candidates.items():
         for conflict in (cand.get("meta") or {}).get("conflicts") or []:
@@ -241,7 +277,8 @@ def reconcile(candidates):
     #    supplement and a peptide candidate carry a plan (no recommended compound, no additive
     #    risk in THIS pass). A shared additive-AE class or an author-declared pairwise interaction
     #    holds the SUPPLEMENT (it finalizes last against the settled compound surface) — the honest
-    #    no-stack state. The liaison gate (S74) adjudicates the held finding + the supplement<->Rx axis.
+    #    no-stack state. `generate_plans` then routes the held finding to the liaison gate
+    #    (`adjudicate`); the supplement<->Rx axis is the beaded follow-on `rxbp`.
     supplement = candidates.get("supplements")
     peptide = candidates.get("peptides")
     if (
@@ -279,14 +316,18 @@ def _recorded_result(candidate, plan_date, root):
     }
 
 
-def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor=None):
+def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor=None,
+                   adjudicator=None):
     """Run all provided plan-domain authors as one reconciled pass and record the result.
 
     The `/generate-plan` orchestrator (runtime A): computes each domain's candidate via
     `compute_plan`, reconciles across domains (the RED-S/LEA cross-domain short-circuit + the
     nutrition->workout energy bounce + overlap detection + the supplement<->peptide additive-AE
     screen), applies a single bounce re-author when the energy budget is unsustainable, and
-    records the surviving plans via `record_plan`.
+    records the surviving plans via `record_plan`. When a supplement is held under an additive-AE
+    finding and an `adjudicator` is provided, the medical-liaison terminal gate (`adjudicate`)
+    adjudicates the held finding: a content-valid override RELEASES the hold (the supplement
+    records); a non-overridable / invalid / absent adjudication leaves it HELD.
 
     Args:
         authors (dict): domain -> the captured author envelope, for the domains to run (1-4).
@@ -304,10 +345,17 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
             `energy-bounce-unresolved` (the safe no-plan state, not an error). When `reauthor` is
             absent, a bounced workout is held `energy-bounce-held` — never shipped as an un-fuelable
             load.
+        adjudicator (Callable, optional): `adjudicator(safety_finding) -> liaison envelope | None`
+            — the medical-liaison dispatch hook for a held additive-AE finding (runtime A: a real
+            `medical-liaison` dispatch, full profile inlined). The envelope is validated by
+            `adjudicate`; a content-valid HIGH/MEDIUM override releases the supplement hold, a
+            CRITICAL/H1-H2 auto-block or any invalid/absent envelope leaves the block standing. When
+            absent, a held additive-AE supplement stays held — the safe no-stack default.
 
     Returns:
         (dict) `results` (domain -> result record, the `generate_plan` shape), `reconciliation`
-        (the `reconcile` report), and `reauthored` (bool — a bounce re-author ran).
+        (the `reconcile` report), `reauthored` (bool — a bounce re-author ran), and `adjudication`
+        (the `adjudicate` outcome for a held additive-AE finding, or `None` when none ran).
     """
     gates = gates or {}
     candidates = {
@@ -343,6 +391,19 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
         else:
             holds["workout"] = ENERGY_BOUNCE_HELD
 
+    # Medical-liaison terminal adjudication (pipeline Phase 4): the additive-AE screen HOLDS the
+    # supplement; the liaison adjudicates the held finding. A content-valid HIGH/MEDIUM override
+    # RELEASES the hold (the supplement records); a CRITICAL/H1-H2 auto-block or an invalid/absent
+    # adjudication leaves the block standing. The override record rides the returned `adjudication`,
+    # not a new store stream. When no adjudicator is wired the supplement stays held (the safe
+    # no-stack default — the S73 behavior).
+    adjudication = None
+    if holds.get("supplements") == ADDITIVE_AE_HELD and adjudicator is not None:
+        safety_finding = _additive_ae_safety_finding(report["additive_ae"])
+        adjudication = adjudicate(safety_finding, adjudicator(safety_finding))
+        if adjudication["outcome"] == "cleared":
+            del holds["supplements"]
+
     results = {}
     for domain, candidate in candidates.items():
         hold_reason = holds.get(domain)
@@ -351,4 +412,5 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
         else:
             results[domain] = _recorded_result(candidate, plan_date, root)
 
-    return {"results": results, "reconciliation": report, "reauthored": reauthored}
+    return {"results": results, "reconciliation": report, "reauthored": reauthored,
+            "adjudication": adjudication}

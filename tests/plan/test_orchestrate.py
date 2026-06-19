@@ -24,6 +24,8 @@ out-of-band per the integration mandate and captured under docs/plan-generation/
 """
 
 import datetime
+import json
+from pathlib import Path
 
 from scripts.generate import generate
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, compute_plan
@@ -46,6 +48,8 @@ from tests.plan.test_generate_plan import (
     _supplement_rec,
     _workout_rec,
 )
+from scripts.plan import adjudicate
+from tests.plan.test_adjudicate import _envelope, _override_record
 
 
 def _recon(author, **fields):
@@ -752,6 +756,180 @@ def test_additive_ae_shared_class_and_interaction_combine(tmp_path):
     kinds = sorted(f["kind"] for f in out["reconciliation"]["additive_ae"])
     assert kinds == ["declared-interaction", "shared-class"]  # both paths fired in one pass
     assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD  # held once
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+# --- medical-liaison terminal adjudication gate (pipeline Phase 4) -------------
+
+
+def _liaison(band="HIGH", harm_class=None, override="auto", set_by="auto"):
+    """An adjudicator hook that echoes the received finding's id + caution into an envelope.
+
+    Records every call on `.calls` so a test can assert the gate ran (or did not) and on what.
+    """
+    calls = []
+
+    def hook(safety_finding):
+        calls.append(safety_finding)
+        env = _envelope(band=band, harm_class=harm_class, finding_id=safety_finding["finding_id"],
+                        override=override, set_by=set_by)
+        if env["override_record"] is not None:
+            env["override_record"]["caution_verbatim"] = safety_finding["caution"]
+        return env
+
+    hook.calls = calls
+    return hook
+
+
+def _held_pair():
+    """A fish-oil + BPC-157 pair that both declare bleeding-risk -> the supplement is held."""
+    return _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+
+
+def test_liaison_valid_override_releases_and_records_supplement(tmp_path):
+    # CORE mutation-proof: a held additive-AE supplement clears via a content-valid HIGH override
+    # -> the hold is RELEASED and the supplement RECORDS. Removing `del holds["supplements"]` (the
+    # release) leaves it held -> this test goes RED, the proof the gate actually clears.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("HIGH")
+
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+
+    assert out["adjudication"]["outcome"] == "cleared"
+    assert out["adjudication"]["override_record"] is not None
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+    # cross-stream: clearing the supplement does not disturb the peptide draft.
+    assert out["results"]["peptides"]["recorded"] is True
+    assert len(store.read("plan::peptides", root=tmp_path)) == 1
+
+
+def test_liaison_critical_autoblock_keeps_supplement_held(tmp_path):
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_liaison("CRITICAL"))
+
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["adjudication"]["non_overridable"] is True
+    assert out["adjudication"]["reasons"] == [adjudicate.AUTO_BLOCK_SENTINEL]
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_liaison_critical_override_path_rejected_keeps_held(tmp_path):
+    # INV-CRITICAL-NON-OVERRIDABLE at the wiring: a CRITICAL finding that arrives WITH an override
+    # path never releases — the block stands. Mutation: dropping the non-overridable gate would let
+    # the override path clear the supplement -> RED.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("CRITICAL", override=_override_record("HIGH"), set_by=adjudicate.LIAISON_SET_BY)
+
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["adjudication"]["non_overridable"] is True
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_liaison_vacuous_override_keeps_held(tmp_path):
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("HIGH", override=_override_record("HIGH", operator_reason="trust me"))
+
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_no_adjudicator_keeps_held_supplement_held(tmp_path):
+    # The safe default (S73 behavior, unchanged): no adjudicator wired -> the supplement stays held
+    # and no adjudication ran.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert out["adjudication"] is None
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_adjudicator_not_called_without_a_held_finding(tmp_path):
+    # Non-tautology control: a clean (no declared additive-AE) compound pair is NOT held, so the
+    # liaison gate never runs and both compounds record.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("HIGH")
+
+    out = generate_plans(_compound_authors(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=liaison)
+
+    assert out["adjudication"] is None
+    assert liaison.calls == []
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["results"]["peptides"]["recorded"] is True
+
+
+def test_liaison_receives_deterministic_finding_id_and_caution(tmp_path):
+    # The orchestrator routes a `safety_finding` with a deterministic id + the caution the override
+    # record must reproduce verbatim — the contract the real liaison echoes.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("HIGH")
+
+    generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+
+    assert len(liaison.calls) == 1
+    finding = liaison.calls[0]
+    assert finding["finding_id"] == "additive-ae:class:bleeding-risk"
+    assert finding["held_domain"] == "supplements"
+    assert "bleeding-risk" in finding["caution"]
+
+
+def test_liaison_cleared_supplement_renders_on_dashboard(tmp_path):
+    # Integration: a cleared supplement reaches the store and renders on the dashboard.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_liaison("HIGH"))
+
+    assert out["adjudication"]["outcome"] == "cleared"
+    rendered = generate.run(
+        "dashboard", _root=tmp_path, _out_dir=tmp_path,
+        _today=datetime.date.fromisoformat(PLAN_DATE),
+    )
+    html = rendered.read_text(encoding="utf-8")
+    assert "Fish oil" in html  # the cleared supplement renders
+    assert "BPC-157" in html  # the peptide draft renders alongside
+
+
+def _example_envelope(name):
+    """Load a captured medical-liaison adjudication envelope from docs/plan-generation/examples."""
+    path = Path(__file__).resolve().parents[2] / "docs/plan-generation/examples" / name
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_real_liaison_cleared_envelope_releases_supplement(tmp_path):
+    # AC5 codified: the REAL captured medical-liaison cleared envelope (a content-valid MEDIUM
+    # informed-refusal override), run through the production path, RELEASES the held supplement —
+    # the held-line closer verified end-to-end with genuine liaison output, not a stub.
+    store_read = _seed_store(tmp_path)
+    env = _example_envelope("liaison-adjudication-cleared.example.json")
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=lambda finding: env)
+    assert out["adjudication"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_real_liaison_blocked_envelope_keeps_held(tmp_path):
+    # The companion: the REAL refusal scenario (a vacuous override at HIGH) leaves the block
+    # standing — the supplement is never recorded on insistence.
+    store_read = _seed_store(tmp_path)
+    env = _example_envelope("liaison-adjudication-blocked.example.json")
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=lambda finding: env)
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
     assert store.read("plan::supplements", root=tmp_path) == []
 
 
