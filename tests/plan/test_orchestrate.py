@@ -1733,3 +1733,22 @@ def test_rx_bpmh_peptide_hold_composes_with_additive_ae_supplement_hold(tmp_path
     assert out["results"]["peptides"]["recorded"] is False
     assert out["results"]["peptides"]["reason"] == RX_BPMH_HELD
     assert {f["held_domain"] for f in out["reconciliation"]["rx_bpmh"]} == {"supplements", "peptides"}
+
+
+def test_rx_bpmh_and_conflict_both_open_without_adjudicator_held(tmp_path):
+    # TEST-rxbp-2 (Tier-3): a supplement held by BOTH an open conflict AND an open rx-bpmh match, with
+    # NO adjudicator, stays held — pinning the recording loop's fixed precedence (holds -> conflict_held
+    # -> rx_bpmh_held) so a reorder is a decision, not a silent change of the surfaced reason. Both
+    # concerns are detected in their INDEPENDENT sets; conflict is surfaced as the reason (checked first).
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk"]},
+        },
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)  # no adjudicator
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == CONFLICT_HELD  # precedence: conflict before rx-bpmh
+    assert "supplements" in {f["held_domain"] for f in out["reconciliation"]["rx_bpmh"]}  # rx-bpmh detected too
+    assert any(c["from"] == "supplements" for c in out["reconciliation"]["conflicts"])
