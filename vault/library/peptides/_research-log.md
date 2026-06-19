@@ -27,6 +27,26 @@ the next. Keep going until the triage taxonomy is fully Done/Excluded.
 
 ---
 
+## 2026-06-19 — Retatrutide deep pass (round 7) — METABOLIC CLASS COMPLETE
+
+### DONE (verified)
+- **Retatrutide deep pass** (triage 18/25) → entry + report + 2 layers + `.provenance/`. evidence_tier B (one Phase-2
+  base; Phase-3 TRIUMPH topline NOT peer-reviewed) / risk_tier moderate. **Merge-gate review = PASS-WITH-FIXES** (5 PMIDs
+  + DOI independently re-verified; investigational status + topline-not-peer-reviewed flagged everywhere; WADA accurate;
+  2 nuance fixes applied: lean-to-total ratio comparable to tirzepatide, DXA completer attrition). No fabrication.
+- **Metabolic class COMPLETE:** Semaglutide + Tirzepatide + Retatrutide Done; AOD-9604 Excluded.
+
+### CLAIMED (re-checkable via `retatrutide/.provenance/sources-ledger.md`)
+- **First-class caveat = SOURCING:** INVESTIGATIONAL, not approved anywhere, NO legitimate prescription/compounding
+  pathway → gray-market only (unverified purity/dose). Posture = WAIT FOR APPROVAL, do not source — this overrides the
+  class-leading efficacy. Plus incretin goal mismatch (lean −6.5 kg, no muscle RCT), thin long-term safety, HR rise (~+6.7 bpm).
+
+### CLAIMED / RESERVED — next round
+**GH-secretagogue class triage** (CJC-1295 ±DAC, Sermorelin, Hexarelin, MK-677) → deep-pass eligibles. Then Cognitive,
+Sexual, Immune/longevity remainder, Mitochondrial until [[_triage]] is fully Done/Excluded.
+
+---
+
 ## 2026-06-18 — Tirzepatide deep pass (round 6)
 
 ### DONE (verified)
