@@ -173,8 +173,10 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
    cross-domain conflict is surfaced AND (cfaj, WIRED S75) HOLDS the declaring (`from`) domain
    (`cross-domain-conflict-held`) pending the liaison gate — the safe default; `generate_plans` routes
    each conflict-held domain to `adjudicate` (the SAME gate as additive-AE), and a content-valid
-   override releases it. RED-S/LEA + the energy bounce + the additive-AE screen keep precedence over a
-   conflict hold where they fire.
+   override releases it. The conflict hold is tracked INDEPENDENTLY (a `conflict_held` set, not the
+   single-reason `holds` dict): a domain can carry both an additive-AE / bounce / RED-S-LEA hold AND a
+   conflict, and each concern clears on its own — clearing one never releases a domain whose other
+   concern is still open (Tier-3 SEC-1/BUG-1). A domain records only when in NEITHER set.
 4. **Supplement↔peptide additive-AE screen** (pipeline Phase 3, the compound band, WIRED S73). Runs only
    when BOTH a supplement and a peptide candidate carry a plan. A SHARED author-declared additive-AE class
    (`ae_profile.additive_classes`) or an author-declared pairwise interaction naming the other compound

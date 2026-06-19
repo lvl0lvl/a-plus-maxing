@@ -481,7 +481,8 @@ def test_reconcile_sets_conflict_hold_purely():
             "reason": None, "plan": {"items": [{"name": "Fish oil", "dose": "2 g"}]},
             "meta": {"conflicts": _SUPP_CONFLICT}}
     outcome = reconcile({"supplements": supp})
-    assert outcome["holds"]["supplements"] == CONFLICT_HELD
+    assert "supplements" in outcome["conflict_held"]  # tracked independently of `holds`
+    assert "supplements" not in outcome["holds"]
     assert any(c["from"] == "supplements" for c in outcome["report"]["conflicts"])
 
 
@@ -490,6 +491,7 @@ def test_conflict_no_plan_is_not_held():
     supp = {"domain": "supplements", "specialist": "supplement-specialist", "section": {},
             "reason": "some-reason", "plan": None, "meta": {"conflicts": _SUPP_CONFLICT}}
     outcome = reconcile({"supplements": supp})
+    assert "supplements" not in outcome["conflict_held"]
     assert "supplements" not in outcome["holds"]
 
 
@@ -579,6 +581,25 @@ def test_real_conflict_liaison_cleared_envelope_records(tmp_path):
     assert len(store.read("plan::supplements", root=tmp_path)) == 1
 
 
+def test_real_conflict_liaison_blocked_envelope_keeps_held(tmp_path):
+    # Tier-3 TEST-3 (parity with the additive-AE block companion): the REAL-shape blocked conflict
+    # envelope (a vacuous override at HIGH) keeps the conflict-declaring supplement held, with the
+    # rejection reasons pinned so the conflict E2E goes RED if the INV-OVERRIDE-RECORD-SCHEMA sub-gate
+    # regresses on this axis.
+    store_read = _seed_store(tmp_path)
+    env = _example_envelope("liaison-conflict-blocked.example.json")
+    conflict = [{"with_domain": "peptides", "with": "bpc-157",
+                 "reason": "additive bleeding risk, needs review"}]
+    out = generate_plans(_conflict_authors(supp_conflicts=conflict), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=lambda finding: env)
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+    reasons = out["conflict_adjudications"]["supplements"]["reasons"]
+    assert any("operator_reason" in r for r in reasons)
+    assert any("rung" in r for r in reasons)
+
+
 def test_conflict_from_non_compound_domain_held_and_adjudicated(tmp_path):
     # A conflict declared by a NON-compound domain (workout) is held + adjudicated the same way —
     # the gate is domain-agnostic (compute_plan lifts `reconciliation.conflicts` for every domain).
@@ -629,10 +650,11 @@ def test_red_s_lea_precedence_over_a_coincident_conflict(tmp_path):
     assert out["results"]["workout"]["reason"] == RED_S_LEA_CROSS_DOMAIN
 
 
-def test_energy_bounce_overwrites_conflict_hold_on_same_domain(tmp_path):
-    # MUST-FIX (QA): a workout that declares a conflict AND is energy-bounced (no reauthor) is held
-    # for the BOUNCE (precedence); the conflict is still SURFACED in the report but NOT separately
-    # adjudicated (the plan is held either way — safe). Pinned so the precedence can't silently change.
+def test_energy_bounce_and_conflict_are_independent_holds(tmp_path):
+    # Tier-3 BUG-1 fix: a workout that declares a conflict AND is energy-bounced (no reauthor) carries
+    # BOTH holds INDEPENDENTLY. The bounce hold makes it not record; the conflict is INDEPENDENTLY
+    # adjudicated (not "overwritten" by the bounce). With a clearing liaison, the conflict clears but
+    # the workout STILL does not record — the bounce hold stands. (Pre-fix the conflict was shadowed.)
     authors = {
         "workout": _recon(_author(_workout_rec("Heavy back squat", 5)), energy_cost_kcal=900,
                           conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "x"}]),
@@ -643,10 +665,83 @@ def test_energy_bounce_overwrites_conflict_hold_on_same_domain(tmp_path):
     }
     out = generate_plans(authors, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE,
                          adjudicator=_liaison("MEDIUM"))
-    assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_HELD
-    assert "workout" not in out["conflict_adjudications"]  # superseded by the bounce hold
-    assert any(c["from"] == "workout" for c in out["reconciliation"]["conflicts"])  # still surfaced
+    assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_HELD  # held (bounce), not recorded
+    assert out["conflict_adjudications"]["workout"]["outcome"] == "cleared"  # conflict adjudicated independently
+    assert store.read("plan::workout", root=tmp_path) == []  # the bounce hold still suppresses it
+
+
+def test_bounce_success_with_conflict_keeps_workout_conflict_held(tmp_path):
+    # Tier-3 BUG-1 fix: a workout that declares a conflict AND is energy-bounced but reauthored fuelable
+    # is NOT released by the successful bounce — its INDEPENDENT conflict hold stands (no adjudicator).
+    # Pre-fix the success path left a stale single-reason hold and could record the reauthored plan.
+    def reauthor(domain, constraint):
+        return _recon(_author(_workout_rec("Light goblet squat", 2)),
+                      energy_cost_kcal=constraint["sustainable_training_kcal"] - 50,
+                      conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "x"}])
+    authors = {
+        "workout": _recon(_author(_workout_rec("Heavy back squat", 5)), energy_cost_kcal=900,
+                          conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "x"}]),
+        "nutrition": _nutrition(
+            _nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600),
+            energy_budget={"sustains": False, "sustainable_training_kcal": 450},
+        ),
+    }
+    out = generate_plans(authors, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE, reauthor=reauthor)
+    assert out["reauthored"] is True
+    assert out["results"]["workout"]["recorded"] is False  # the independent conflict hold stands
+    assert out["results"]["workout"]["reason"] == CONFLICT_HELD
     assert store.read("plan::workout", root=tmp_path) == []
+
+
+def test_additive_ae_cleared_but_distinct_conflict_keeps_supplement_held(tmp_path):
+    # Tier-3 SEC-1 MUST-FIX: a supplement that BOTH trips the additive-AE screen AND declares a DISTINCT
+    # cross-domain conflict is held by both. Clearing the additive-AE override must NOT release it — the
+    # distinct conflict still holds it. Pre-fix the additive-AE clear (del holds["supplements"]) recorded
+    # the supplement with the conflict never adjudicated. With a per-finding adjudicator that clears the
+    # additive-AE but BLOCKS the conflict (CRITICAL), the supplement stays held.
+    store_read = _seed_store(tmp_path)
+    authors = {
+        "supplements": _recon(
+            _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist"),
+            ae_profile={"additive_classes": ["bleeding-risk"]},
+            conflicts=[{"with_domain": "workout", "with": "high-volume", "reason": "recovery load"}],
+        ),
+        "peptides": _recon(
+            _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist"),
+            ae_profile={"additive_classes": ["bleeding-risk"]},
+        ),
+    }
+
+    def adjudicator(safety_finding):
+        # Clear the additive-AE finding (MEDIUM override); BLOCK the distinct conflict (CRITICAL auto-block).
+        band = "CRITICAL" if safety_finding["source"] == "cross-domain-conflict" else "MEDIUM"
+        env = _envelope(band=band, finding_id=safety_finding["finding_id"])
+        if env["override_record"] is not None:
+            env["override_record"]["caution_verbatim"] = safety_finding["caution"]
+        return env
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=adjudicator)
+    assert out["adjudication"]["outcome"] == "cleared"  # the additive-AE WAS cleared
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "block-stands"  # the conflict was NOT
+    assert out["results"]["supplements"]["recorded"] is False  # still held by the open conflict
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_conflict_safety_finding_multi_conflict_per_domain_sorted(tmp_path):
+    # Tier-3 TEST-2: a domain declaring 2+ conflicts aggregates into ONE finding with sorted, order-stable
+    # finding_id tokens AND caution detail (so the caution the liaison must reproduce verbatim is
+    # regenerable). Input is deliberately out-of-sorted-order.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("MEDIUM")
+    authors = _conflict_authors(supp_conflicts=[
+        {"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"},
+        {"with_domain": "nutrition", "with": "fish-protein", "reason": "allergen overlap"},
+    ])
+    generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+    finding = liaison.calls[0]
+    # sorted by (with_domain, with): nutrition/fish-protein before peptides/bpc-157
+    assert finding["finding_id"] == "conflict:supplements:nutrition/fish-protein;peptides/bpc-157"
+    assert finding["caution"].index("fish-protein") < finding["caution"].index("bpc-157")
 
 
 # --- supplement<->peptide additive-AE screen (pipeline Phase 3) ----------------
