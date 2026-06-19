@@ -102,7 +102,19 @@ Score ≤ 12/25 → exclude from this cycle. Score ≥ 18/25 → eligible for de
 
 Populated after triage passes. Format: `<peptide> | <class> | <triage-score> | <next action>`.
 
-_(empty — first triage pass not yet run)_
+> **Track ownership (2026-06-18).** This is the **peptide-library research track**. The
+> plan-generation pipeline is a *separate* track (a-plus sessions S72–S73); its S73
+> "supplement↔peptide additive-AE screen" *consumes* compound entries but does not
+> author them — so it does not claim anything in this queue. No collision.
+
+**CLAIMED — next session (reserved 2026-06-18, peptide-library track):**
+`Healing / soft-tissue triage pass` — shallow-scan + score the remaining four of the
+flagged top class against `meta/goals.md`: **TB-500, GHK-Cu, KPV, LL-37** (BPC-157 is
+already deep-passed → Done). Then deep-pass the top scorer (cap: 2 deep passes/session;
+triage batches). **Do NOT** re-run BPC-157 or start a different class until this triage
+pass lands. See `_research-log.md` for the prep checklist + the run invocation.
+
+_(no scored rows yet — the reserved triage pass above produces the first ones.)_
 
 ## Excluded (do not re-research without trigger)
 
