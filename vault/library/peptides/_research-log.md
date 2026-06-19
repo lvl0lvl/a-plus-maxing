@@ -61,10 +61,38 @@ A skeptical next session can re-check each via the cited artifact rather than re
   not registered in the orchestrating session). The gate logic is tool-agnostic, but the
   retrieval breadth depends on the substitute search — a re-run with Tavily may surface more.
 
-### CLAIMED / RESERVED — next session
-**Healing / soft-tissue triage pass** (see [[_triage]] "Current ranked queue"): score
-**TB-500, GHK-Cu, KPV, LL-37** vs goals; then deep-pass the top scorer. Reserved so the
-work isn't duplicated.
+### SWEEP DIRECTIVE (operator, 2026-06-19): deep-pass EVERY peptide
+The two-pass triage model is overridden: every peptide in [[_triage]] gets a full
+`/aplus-research --mode=deep` run + PR cycle, no ranking gate. Deep-mode baselines hold;
+a ceiling may be lowered only with a documented evidence reason here (no guessing).
+
+---
+
+## 2026-06-19 — TB-500 / Thymosin Beta-4 deep-pass (sweep entry 1)
+
+### DONE (verified — mechanical evidence on disk)
+- **TB-500 entry shipped:** `compounds/tb-500.md` + `library/peptides/tb-500/research-report.md`
+  (~11K words, 79 dedup primaries) + practitioner-layer + non-english-layer + full
+  `.provenance/` (7 attested gate JSONs, 7 judge JSONs, 7 sections + id-reconcile).
+- **All 7 gates attested PASS** (2.75 scope, 3.5 paired-judge @99, 4.25 reconcile, 4.75
+  integrity, 6 critique, 7.5 risk-floor, 8.5 layers); `verify-chain` intact (system python3).
+- **Independent paired-judge gate worked:** caught a CRITICAL FDA-503A inversion + 6 other
+  real errors (DOI misattribution, population mislabel, trial-status, tally miscounts) across
+  iter-1→4; cross-section reconcile caught 3 more (incl. the stale Cat-2 status); zero fabrications.
+
+### CLAIMED (asserted this session — backed by `.provenance/`, re-checkable, not independently re-audited)
+- Marketed "TB-500" = Ac-LKKTETQ fragment ≠ studied full-length Tβ4 (Esposito 2012). 
+- No human RCT met a primary endpoint for ANY Tβ4 indication (SEER-1 p=0.0656 terminated; ARISE-3 missed); ZERO athletic human evidence.
+- Bidirectional cancer signal (pro-metastatic melanoma over-expression; myeloma suppressor) — net prudent contraindication for active/recent malignancy.
+- FDA removed from 503A Cat-2 ~Apr 2026 (FR 2026-07361, NOT approval); WADA S2.3 prohibited; evidence_tier C / risk_tier experimental.
+- Methodology caveat: WebSearch/WebFetch substituted for Tavily MCP (AR-2); gate logic tool-agnostic, retrieval breadth may differ from a Tavily run.
+
+### Process / skill meta-findings surfaced (for skill_consolidator beads)
+- Retrieval-agent "source tally" counts are an error-prone class that slips first-pass judging → add a mechanical tally-vs-enumeration self-check to retrieval briefs.
+- `gate_attest` requires `start-iteration` BEFORE the verifier writes (mtime guard) — dispatching judges first forces a wasteful re-run; document the ordering / support hashing pre-existing verifier output.
+- bda merge audit (`audit-research-provenance.sh`) is keyed by SPECIALIST slug + needs a Python-3.14 `.venv`; doesn't cleanly apply to a direct library-entry slug on a py3.9 machine. Verify-chain (system python3) is the working integrity proof.
+
+### NEXT (reserved): **GHK-Cu** (sweep entry 2), then KPV → LL-37 → … per [[_triage]] order.
 
 ---
 

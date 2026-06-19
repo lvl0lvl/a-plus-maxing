@@ -107,12 +107,19 @@ Populated after triage passes. Format: `<peptide> | <class> | <triage-score> | <
 > "supplement↔peptide additive-AE screen" *consumes* compound entries but does not
 > author them — so it does not claim anything in this queue. No collision.
 
-**CLAIMED — next session (reserved 2026-06-18, peptide-library track):**
-`Healing / soft-tissue triage pass` — shallow-scan + score the remaining four of the
-flagged top class against `meta/goals.md`: **TB-500, GHK-Cu, KPV, LL-37** (BPC-157 is
-already deep-passed → Done). Then deep-pass the top scorer (cap: 2 deep passes/session;
-triage batches). **Do NOT** re-run BPC-157 or start a different class until this triage
-pass lands. See `_research-log.md` for the prep checklist + the run invocation.
+**ACTIVE SWEEP (operator directive 2026-06-19, peptide-library track) — DEEP-PASS EVERY PEPTIDE:**
+Operator override of the two-pass triage model: **every peptide in the taxonomy gets a full
+`/aplus-research --mode=deep` run** (no triage/ranking gate). Each finished entry ships via the
+PR cycle. Deep-mode baselines (25+ sources / 10k words / 99 judge) hold; lower a ceiling ONLY
+with a documented evidence reason in `_research-log.md` (e.g. "total admissible Tier-1/2
+literature = N after exhaustive search"), never a guess.
+Order (BPC-157 done): **TB-500 ✅** → GHK-Cu → KPV → LL-37 → Ipamorelin → CJC-1295 → Tesamorelin
+→ Sermorelin → Hexarelin → MK-677 → Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank
+→ Semax → Cerebrolysin → Dihexa → N-Acetyl-Selank-Amidate → PT-141 → Melanotan-II → Kisspeptin-10
+→ Thymosin-α1 → Epitalon → FOXO4-DRI → Humanin → SS-31 → MOTS-c.
+**Next: GHK-Cu.** This sweep is the peptide-library track only — disjoint from the biomarker
+wiki-research session (`feature/wiki-research`) and the plan-generation track
+(`feature/compound-ae-screen`). See `_research-log.md` for per-entry DONE/CLAIMED status.
 
 _(no scored rows yet — the reserved triage pass above produces the first ones.)_
 
@@ -129,6 +136,7 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 | Peptide | Compound page | Status |
 |---|---|---|
 | BPC-157 | [[compounds/bpc-157]] | **re-researched 2026-06-18 (deep mode, all gates attested PASS; prior 2026-05-23 entry archived — suspected fabricated citations). evidence_tier C / risk_tier experimental; no completed human RCT; ~85% single-lab (Sikiric/Zagreb) + 1 corroborating lab; FDA removed from Cat-2 ~Apr 2026 (FR 2026-07361) but unapproved + WADA-S0.** |
+| TB-500 (Tβ4) | [[compounds/tb-500]] | **deep-passed 2026-06-19 (deep mode, all 7 gates attested PASS 2.75→8.5, chain intact). evidence_tier C / risk_tier experimental; marketed product is the Ac-LKKTETQ fragment ≠ studied full-length Tβ4; no human RCT met a primary endpoint; zero athletic human evidence; bidirectional (net solid-tumor pro-metastatic) cancer signal; single-lab share ~20% but 100% of clinical-translation in Goldstein/RegeneRx nexus; FDA removed from 503A Cat-2 ~Apr 2026 (FR 2026-07361, NOT approval); WADA-S2.3.** |
 
 ---
 
