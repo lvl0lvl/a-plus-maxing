@@ -88,13 +88,19 @@ def _ae_profile(candidate):
     compound contributes (the supplement/peptide specialists' own vocabulary — `bleeding-risk`,
     `serotonergic`, `hepatotoxicity`, `malignancy-risk`, `cyp3a4-pgp`, …), and
     `ae_profile.interactions` is the list of author-declared pairwise interactions. A candidate
-    that declared none contributes an empty profile.
+    that declared none — or a present-but-malformed declaration (an `ae_profile` that is not a
+    dict; `additive_classes`/`interactions` of the wrong type) — contributes an EMPTY profile
+    (no finding). This is the deliberate trusted-author contract: the screen reads the structured
+    declaration the careful specialist authored, and a malformed one is treated as no declaration
+    rather than guessed at. The contract shape is documented in
+    `docs/plan-generation/author-dispatch-process.md`; tightening this to fail-loud is a candidate
+    for the S74 liaison gate's fuller adjudication.
 
     Args:
         candidate (dict): A `compute_plan` result.
 
     Returns:
-        (dict) The `ae_profile` dict, or `{}` when none was declared.
+        (dict) The `ae_profile` dict, or `{}` when none was declared (or it was malformed).
     """
     profile = (candidate.get("meta") or {}).get("ae_profile")
     return profile if isinstance(profile, dict) else {}
