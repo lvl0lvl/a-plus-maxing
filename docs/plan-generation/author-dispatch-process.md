@@ -278,14 +278,16 @@ RED) + the `test_orchestrate.py` liaison-gate section (the wiring + the real-env
   terminal adjudication gate** for the held additive-AE finding is WIRED (S74, the section above); the
   **author-conflict adjudication** (`cfaj`) is WIRED (S75 — `report["conflicts"]` HOLDS the declaring
   domain + routes it through the SAME gate; verified E2E over a real medical-liaison conflict dispatch,
-  `liaison-conflict-cleared.example.json`).
-- The remaining Phase-4 surfaces, beaded as follow-ons that REUSE the gate (the override-record
-  validator + the critical-non-overridable gate + the `safety_finding` envelope): the **supplement↔Rx
-  BPMH axis** (`rxbp` — adds the operator medication-list read THROUGH the `router.summarize` PII
-  de-identification boundary, which earns its own adversarial verification); the **doctor-visit-queue
-  collation + SBAR handout artifact** (a substrate write surface). Until those land, the reconciler
-  holds the additive-AE supplement + a conflict-declaring domain (cleared only via the liaison gate),
-  and overlap output stays DETECT+REPORT.
+  `liaison-conflict-cleared.example.json`); the **supplement↔Rx BPMH axis** (`rxbp`) is WIRED (S76 —
+  the operator medication-list read THROUGH the `router.summarize` PII de-identification boundary, as
+  de-identified Rx-interaction-class tokens never raw drug names, holds a class-stacking compound +
+  routes it through the SAME gate; verified E2E over real medical-liaison BPMH dispatches,
+  `liaison-rxbp-{cleared,blocked}.example.json`).
+- The remaining Phase-4 surface, beaded as a follow-on that REUSES the gate (the override-record
+  validator + the critical-non-overridable gate + the `safety_finding` envelope): the
+  **doctor-visit-queue collation + SBAR handout artifact** (a substrate write surface). Until it lands,
+  the reconciler holds the additive-AE supplement + a conflict-declaring domain + a BPMH-matched
+  compound (cleared only via the liaison gate), and overlap output stays DETECT+REPORT.
 - The `/generate-plan` slash-command/skill wrapper (the orchestrator is wired as the `generate_plans`
   callable the interactive main agent invokes; the command surface is a later convenience).
 - A standalone full-plan render screen (the dashboard plan card is Slice 1's surface; the operator is

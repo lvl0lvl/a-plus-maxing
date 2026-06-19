@@ -1670,3 +1670,66 @@ def test_real_rx_bpmh_liaison_blocked_envelope_keeps_held(tmp_path):
     assert out["results"]["supplements"]["recorded"] is False
     assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
     assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_rx_bpmh_additive_ae_and_conflict_all_three_independent(tmp_path):
+    # PF-S75-01 triple-concern probe (QA Tier-2 SHOULD-FIX): ONE supplement held by ALL THREE concerns
+    # at once — additive-AE (`holds`, shared bleeding-risk with the peptide), a cross-domain conflict
+    # (`conflict_held`), AND rx-bpmh (`rx_bpmh_held`, cyp3a4-pgp matches the operator Rx). Clearing TWO
+    # while the third is open must keep it held — the sequential recording-loop check past two cleared
+    # concerns must not short-circuit. The supplement declares cyp3a4-pgp (operator-matched) PLUS
+    # bleeding-risk (peptide-shared) so the three holds land on the one domain, isolated from the peptide.
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]},
+        },
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    # additive-AE + conflict CLEAR (MEDIUM), rx-bpmh BLOCKS (CRITICAL): the supplement STAYS held.
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison(
+                             {"additive-ae": "MEDIUM", "cross-domain-conflict": "MEDIUM", "rx-bpmh": "CRITICAL"}))
+    assert out["adjudication"]["outcome"] == "cleared"  # additive-AE cleared
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "cleared"  # conflict cleared
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"  # rx-bpmh open
+    assert out["results"]["supplements"]["recorded"] is False  # but the supplement is NOT released
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD  # the still-open concern
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_rx_bpmh_additive_ae_and_conflict_all_three_cleared_records(tmp_path):
+    # The releasable proof: with ALL THREE concerns cleared, the triple-held supplement records (not a deadlock).
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]},
+        },
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison(
+                             {"additive-ae": "MEDIUM", "cross-domain-conflict": "MEDIUM", "rx-bpmh": "MEDIUM"}))
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_rx_bpmh_peptide_hold_composes_with_additive_ae_supplement_hold(tmp_path):
+    # QA Tier-2 SHOULD-FIX (multi-DOMAIN composition in one pass): the supplement is additive-AE-held
+    # (`holds`) while the PEPTIDE is rx-bpmh-held (`rx_bpmh_held`) — distinct domains, distinct concerns,
+    # each cleared on its own gate call. With no adjudicator BOTH stay held; the two independent sets do
+    # not interfere across domains.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+    # supplement: additive-AE held (shared bleeding-risk); also rx-bpmh-matches but additive-AE is the shown reason.
+    assert out["results"]["supplements"]["recorded"] is False
+    # peptide: rx-bpmh held (its bleeding-risk class matches the operator Rx) — held on its OWN concern.
+    assert out["results"]["peptides"]["recorded"] is False
+    assert out["results"]["peptides"]["reason"] == RX_BPMH_HELD
+    assert {f["held_domain"] for f in out["reconciliation"]["rx_bpmh"]} == {"supplements", "peptides"}
