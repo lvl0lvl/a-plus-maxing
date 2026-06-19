@@ -74,6 +74,7 @@ Always admissible. Cite as `rct`, `meta_analysis`, `cohort`, `open_label`, `anim
 - `tandfonline.com` (Taylor & Francis — peer-reviewed journals incl. Annals of Clinical Biochemistry, Critical Reviews in Clin Lab Sciences; added 2026-06-19 wiki-research)
 - `degruyter.com` (De Gruyter — peer-reviewed journals incl. Clinical Chemistry and Laboratory Medicine (CCLM); added 2026-06-19 wiki-research)
 - `sagepub.com` / `journals.sagepub.com` (SAGE — peer-reviewed journals incl. Annals of Clinical Biochemistry; added 2026-06-19 wiki-research)
+- `scielo.br` (SciELO Brazil — open-access peer-reviewed journals incl. Archives of Endocrinology and Metabolism (SBEM); PMC-indexed; added 2026-06-19 wiki-research)
 - `biorxiv.org` (preprint — admissible but flag as `not-peer-reviewed`)
 - `medrxiv.org` (preprint — same)
 

@@ -1,0 +1,21 @@
+{
+  "section": "D",
+  "brief_hash": "fbab67b185b3f6d8170e482fed50c2986a9a9c64ed2c6fe8560f858d50e4f32f",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 95,
+    "type_tag_discipline": 97,
+    "population_annotation": 97,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 97
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Both iteration-1 defects confirmed fixed: (1) Stuenkel 2015 [1] now carries [regulatory] throughout body text and bibliography — all six inline appearances corrected from mechanism_review; (2) the Finkelstein sexual-dysfunction overclaim is remediated at the sentence level — 'Sexual function declined with deficiency of both testosterone and estradiol … the trial attributed libido and erectile decline partly to falling estradiol, not to E2 alone' accurately reflects the RCT design, while fat-mass→E2 specificity is correctly retained. All four high-stakes effect sizes remain exact (Finkelstein N=400; Key/EHBCCG RR 2.00 [1.47–2.71] and free-E2 RR 2.58 [1.76–3.78]; Ettinger 4.9–9.6% BMD N=274; Hodis/ELITE CIMT 0.0044 vs 0.0078 mm/yr p=0.008 N=643). No bare [N] citations; all 12-enum tags correctly applied; concentration-audit handling and brief completeness remain strong. Score advances from 93→96."
+}
