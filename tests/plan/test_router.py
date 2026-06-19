@@ -1085,3 +1085,19 @@ def test_rx_interaction_class_set_absent_field_is_empty():
     """A summary predating the field (or a non-str value) yields the empty set — no Rx surface."""
     assert router.rx_interaction_class_set({}) == set()
     assert router.rx_interaction_class_set({"rx-interaction-classes": None}) == set()
+
+
+def test_rx_interaction_classes_8j6_backstop_scans_past_scan_text_cap():
+    """SEC-1 regression: the 8j6 backstop scans PER TOKEN, not the truncated whole value.
+
+    pii_scan.scan_text truncates its input at _MAX_SCAN_TEXT_LEN; a `;`-joined class list can
+    legitimately exceed it. A whole-value scan elides PII past the cap — a real de-identification-
+    boundary leak. The per-token scan keeps every scanned unit short, so trailing PII in a long
+    curated value still RAISES. Reds if the deriver reverts to scanning the whole `;`-joined value.
+    """
+    long_value = ";".join(["bleeding-risk"] * 400) + "; contact dr.smith@example.com"
+    assert len(long_value) > 4096  # past the scan_text cap — a whole-value scan would elide the tail
+    with pytest.raises(ValueError) as exc:
+        router.summarize(_store_read_factory(_rx_records(long_value)))
+    assert "rx-interaction-classes" in str(exc.value)
+    assert "dr.smith@example.com" not in str(exc.value)  # names the field, never echoes the PII
