@@ -139,7 +139,9 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
   workout cost). `bounce_reason` is an OPTIONAL human-readable note a `sustains:false` verdict may carry;
   the reconciler reads only `sustains` + `sustainable_training_kcal`, so it is annotation, not a contract key.
 - any author — `{"reconciliation": {"conflicts": [{"with_domain": ..., "with": ..., "reason": ...}]}}`
-  declares a known cross-domain conflict for the report.
+  declares a known cross-domain conflict. Surfaced in the report AND (cfaj, WIRED S75) HOLDS the
+  declaring domain pending the liaison gate — the safe default; the orchestrator pins `from` (the
+  declaring domain), so an author-supplied `from` cannot shadow it.
 - **supplements / peptides** — `{"reconciliation": {"ae_profile": {"additive_classes": [<token>, ...],
   "interactions": [{"with": <other compound>, "mechanism": <str>, "severity": "low|moderate|high"}]}}}`
   declares the compound's adverse-event profile for the additive-AE screen. `additive_classes` are the
@@ -165,10 +167,13 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
    second personal-trainer dispatch under the energy ceiling). The re-authored plan is recorded only if
    its `energy_cost_kcal` ≤ the ceiling; otherwise the workout is HELD (`energy-bounce-unresolved`), and
    with no `reauthor` hook it is HELD (`energy-bounce-held`) — never an un-fuelable load on the dashboard.
-3. **Overlap + conflict detection** (the step-4 integration). An intervention identity surfacing in 2+
-   domains (a compound recommended as both a supplement and a peptide) and any author-declared conflict
-   are surfaced in the returned report. This pass DETECTS + REPORTS; routing the conflict axis
-   through the liaison gate is the beaded follow-on `cfaj`.
+3. **Overlap detection + author-conflict adjudication** (the step-4 integration). An intervention
+   identity surfacing in 2+ domains is surfaced in the report (detect-only). An author-declared
+   cross-domain conflict is surfaced AND (cfaj, WIRED S75) HOLDS the declaring (`from`) domain
+   (`cross-domain-conflict-held`) pending the liaison gate — the safe default; `generate_plans` routes
+   each conflict-held domain to `adjudicate` (the SAME gate as additive-AE), and a content-valid
+   override releases it. RED-S/LEA + the energy bounce + the additive-AE screen keep precedence over a
+   conflict hold where they fire.
 4. **Supplement↔peptide additive-AE screen** (pipeline Phase 3, the compound band, WIRED S73). Runs only
    when BOTH a supplement and a peptide candidate carry a plan. A SHARED author-declared additive-AE class
    (`ae_profile.additive_classes`) or an author-declared pairwise interaction naming the other compound
@@ -247,15 +252,17 @@ RED) + the `test_orchestrate.py` liaison-gate section (the wiring + the real-env
   step-4 orchestrator reconciler — the nutrition→workout energy bounce + the RED-S/LEA cross-domain
   short-circuit + cross-domain overlap/conflict detection — is WIRED (S72); the supplement↔peptide
   additive-AE screen (Phase-3 compound band) is WIRED (S73, behavior 4 above); the **medical-liaison
-  terminal adjudication gate** for the held additive-AE finding is WIRED (S74, the section above).
-- The remaining Phase-4 surfaces, beaded as follow-ons that REUSE the S74 gate (the override-record
+  terminal adjudication gate** for the held additive-AE finding is WIRED (S74, the section above); the
+  **author-conflict adjudication** (`cfaj`) is WIRED (S75 — `report["conflicts"]` HOLDS the declaring
+  domain + routes it through the SAME gate; verified E2E over a real medical-liaison conflict dispatch,
+  `liaison-conflict-cleared.example.json`).
+- The remaining Phase-4 surfaces, beaded as follow-ons that REUSE the gate (the override-record
   validator + the critical-non-overridable gate + the `safety_finding` envelope): the **supplement↔Rx
   BPMH axis** (`rxbp` — adds the operator medication-list read THROUGH the `router.summarize` PII
-  de-identification boundary, which earns its own adversarial verification); the **author-conflict
-  adjudication** (`cfaj` — routes `report["conflicts"]` through the same gate, detect-only → adjudicated);
-  the **doctor-visit-queue collation + SBAR handout artifact** (a substrate write surface). Until those
-  land, the reconciler holds the additive-AE supplement (cleared only via the liaison gate above), and
-  overlap/conflict output stays DETECT+REPORT.
+  de-identification boundary, which earns its own adversarial verification); the **doctor-visit-queue
+  collation + SBAR handout artifact** (a substrate write surface). Until those land, the reconciler
+  holds the additive-AE supplement + a conflict-declaring domain (cleared only via the liaison gate),
+  and overlap output stays DETECT+REPORT.
 - The `/generate-plan` slash-command/skill wrapper (the orchestrator is wired as the `generate_plans`
   callable the interactive main agent invokes; the command surface is a later convenience).
 - A standalone full-plan render screen (the dashboard plan card is Slice 1's surface; the operator is
