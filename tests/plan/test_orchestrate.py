@@ -579,6 +579,76 @@ def test_real_conflict_liaison_cleared_envelope_records(tmp_path):
     assert len(store.read("plan::supplements", root=tmp_path)) == 1
 
 
+def test_conflict_from_non_compound_domain_held_and_adjudicated(tmp_path):
+    # A conflict declared by a NON-compound domain (workout) is held + adjudicated the same way —
+    # the gate is domain-agnostic (compute_plan lifts `reconciliation.conflicts` for every domain).
+    workout = _recon(_author(_workout_rec("Goblet squat", 3)),
+                     conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "load vs intake"}])
+    out = generate_plans({"workout": workout}, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["workout"]["reason"] == CONFLICT_HELD
+    cleared = generate_plans({"workout": workout}, _seed_store(tmp_path / "b"), tmp_path / "b",
+                             plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    assert cleared["conflict_adjudications"]["workout"]["outcome"] == "cleared"
+    assert cleared["results"]["workout"]["recorded"] is True
+
+
+def test_conflict_adjudicator_returning_none_keeps_held(tmp_path):
+    # Parity with the additive-AE path: a conflict adjudicator that returns None leaves the block held.
+    out = generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), _seed_store(tmp_path),
+                         tmp_path, plan_date=PLAN_DATE, adjudicator=lambda finding: None)
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_conflict_multiple_declaring_domains_each_adjudicated(tmp_path):
+    # The loop adjudicates EACH conflict-held domain independently (one entry per declarer).
+    authors = _conflict_authors(
+        supp_conflicts=[{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+        pep_conflicts=[{"with_domain": "supplements", "with": "fish oil", "reason": "additive bleeding"}],
+    )
+    out = generate_plans(authors, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_liaison("MEDIUM"))
+    assert set(out["conflict_adjudications"]) == {"supplements", "peptides"}
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["conflict_adjudications"]["peptides"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["results"]["peptides"]["recorded"] is True
+
+
+def test_red_s_lea_precedence_over_a_coincident_conflict(tmp_path):
+    # A workout short-circuited by the nutrition RED-S/LEA screen stays RED-S/LEA-held even if it
+    # declares a conflict — RED-S/LEA precedence; the conflict hold does not shadow it.
+    authors = {
+        "workout": _recon(_author(_workout_rec("Goblet squat", 3)), energy_cost_kcal=500,
+                          conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "x"}]),
+        "nutrition": _nutrition(_nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600)),
+    }
+    out = generate_plans(authors, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE,
+                         gates={"red_s_lea_screen": True})
+    assert out["results"]["workout"]["reason"] == RED_S_LEA_CROSS_DOMAIN
+
+
+def test_energy_bounce_overwrites_conflict_hold_on_same_domain(tmp_path):
+    # MUST-FIX (QA): a workout that declares a conflict AND is energy-bounced (no reauthor) is held
+    # for the BOUNCE (precedence); the conflict is still SURFACED in the report but NOT separately
+    # adjudicated (the plan is held either way — safe). Pinned so the precedence can't silently change.
+    authors = {
+        "workout": _recon(_author(_workout_rec("Heavy back squat", 5)), energy_cost_kcal=900,
+                          conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "x"}]),
+        "nutrition": _nutrition(
+            _nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600),
+            energy_budget={"sustains": False, "sustainable_training_kcal": 450},
+        ),
+    }
+    out = generate_plans(authors, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_liaison("MEDIUM"))
+    assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_HELD
+    assert "workout" not in out["conflict_adjudications"]  # superseded by the bounce hold
+    assert any(c["from"] == "workout" for c in out["reconciliation"]["conflicts"])  # still surfaced
+    assert store.read("plan::workout", root=tmp_path) == []
+
+
 # --- supplement<->peptide additive-AE screen (pipeline Phase 3) ----------------
 
 
