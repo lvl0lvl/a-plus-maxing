@@ -1,0 +1,82 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "WARN",
+      "findings": [
+        "Non-enum tag `search-derived` at section-B L26 and L32; both attach to qualitative mechanism statements carrying NO standalone number (numbers in those sentences carry separate admissible cites [2]/[5]/[3]); co-tagged mechanism_review + corroborated by saved refs 1/3. WARN not HALT because no number rests on a non-admissible tag. The [7, rct]/[N, rct] hits at A-L66/L71 are post-fix audit prose, not live cites."
+      ]
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "WARN",
+      "findings": [
+        "No corpus-scoping failure: 74/74 numerical claims grep-verified, 0 failed. WARN carried from IC-1 only (non-enum `search-derived` tag on two number-free mechanism statements)."
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 47
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 12,
+    "largest_cluster_count": 3,
+    "share": 0.25,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 74,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-1: non-enum tag `search-derived` (B-L26, B-L32) on number-free mechanism statements, co-tagged mechanism_review + corroborated; WARN not HALT",
+    "IC-13: no failure; WARN carried from IC-1"
+  ],
+  "iterations": 1,
+  "timestamp": "2026-06-19T01:10:36.693182+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T01:05:03.918011+00:00",
+    "attest_ts": "2026-06-19T01:10:36.693185+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "750c8789ea59dcaba85b6ac07c74517c076e51deec624b02e32bbf17bb7811c3",
+    "agent_source_mtime": "2026-06-19T01:09:50.712976+00:00"
+  }
+}
