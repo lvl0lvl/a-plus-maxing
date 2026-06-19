@@ -362,3 +362,11 @@ def test_cli_audit_critical_override_exits_nonzero(tmp_path):
     envelope = _envelope("CRITICAL", override=_override_record("HIGH"), set_by=adjudicate.LIAISON_SET_BY)
     path.write_text(json.dumps(envelope))
     assert adjudicate._cli(["--audit-envelope", str(path)]) == 1
+
+
+def test_cli_audit_malformed_json_exits_two(tmp_path):
+    # A non-JSON envelope is a could-not-run (exit 2), not a found violation (exit 1) — the F-008
+    # exit-code contract the bash wrapper maps to its skipped/FATAL path.
+    path = tmp_path / "malformed.json"
+    path.write_text("not json {")
+    assert adjudicate._cli(["--audit-envelope", str(path)]) == 2

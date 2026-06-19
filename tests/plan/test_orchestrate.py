@@ -856,6 +856,17 @@ def test_no_adjudicator_keeps_held_supplement_held(tmp_path):
     assert store.read("plan::supplements", root=tmp_path) == []
 
 
+def test_adjudicator_returning_none_keeps_held(tmp_path):
+    # A wired adjudicator that returns None (a real liaison dispatch can fail / decline to emit) is
+    # treated as no adjudication -> the block stands (parity with the reauthor-returns-None path).
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=lambda finding: None)
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
 def test_adjudicator_not_called_without_a_held_finding(tmp_path):
     # Non-tautology control: a clean (no declared additive-AE) compound pair is NOT held, so the
     # liaison gate never runs and both compounds record.

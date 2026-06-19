@@ -313,13 +313,23 @@ def adjudicate(safety_finding, envelope):
 
 
 def _cli(argv=None):
-    """`--audit-envelope <path.json>`: exit 0 when the envelope violates neither invariant, else 1."""
+    """`--audit-envelope <path.json>`: exit 0 (sound) / 1 (invariant violation) / 2 (could-not-run).
+
+    Exit 2 — not 1 — on an unreadable / non-JSON envelope: a malformed input is a could-not-run, not
+    a found violation. The audit-helpers F-008 contract distinguishes the two (a check that could not
+    run must never read as a clean pass, and must be told apart from a real violation), and the bash
+    wrapper maps a non-0/1 exit to its `skipped`/FATAL path — so the CLI returns 2, never a traceback-1.
+    """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--audit-envelope", metavar="PATH", required=True,
                         help="a liaison adjudication envelope JSON to audit against both invariants")
     args = parser.parse_args(argv)
-    with open(args.audit_envelope) as handle:
-        envelope = json.load(handle)
+    try:
+        with open(args.audit_envelope) as handle:
+            envelope = json.load(handle)
+    except (OSError, ValueError) as exc:
+        print(f"COULD-NOT-RUN: cannot read envelope {args.audit_envelope!r}: {exc}", file=sys.stderr)
+        return 2
     ok, violations = audit_adjudication_envelope(envelope)
     if ok:
         print("OK: adjudication envelope violates neither gate invariant")

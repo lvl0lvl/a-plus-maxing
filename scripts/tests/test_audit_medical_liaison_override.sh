@@ -108,6 +108,8 @@ bash "$AUDIT" >/dev/null 2>&1; rc=$?
 if [ "$rc" -eq 2 ]; then ok "no-arg -> exit 2"; else bad "no-arg -> exit 2 (got $rc)"; fi
 bash "$AUDIT" "$FIX/nonexist.json" >/dev/null 2>&1; rc=$?
 if [ "$rc" -eq 2 ]; then ok "missing file -> exit 2"; else bad "missing file -> exit 2 (got $rc)"; fi
+printf 'not json {' > "$FIX/bad_malformed.json"
+expect bad_malformed 2 "malformed JSON -> could-not-run (exit 2, not a violation)"
 
 echo "test_audit_medical_liaison_override: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
