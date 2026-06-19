@@ -82,6 +82,8 @@ Always admissible. Cite as `regulatory`.
 - `cdc.gov`
 - `dailymed.nlm.nih.gov` (FDA labels)
 - `accessdata.fda.gov` (FDA approval letters, label PDFs)
+- `ngsp.org` (National Glycohemoglobin Standardization Program — the DCCT-anchored US HbA1c standardization body: certified-method registry + the NGSP↔IFCC master equation; added 2026-06-19 wiki-research, HbA1c entry)
+- `ifcc.org` (International Federation of Clinical Chemistry and Laboratory Medicine — SI-traceable reference measurement systems / calibration; added 2026-06-19 wiki-research)
 
 ## Tier 2.5 — Curated practitioner with cited primaries
 

@@ -1,0 +1,21 @@
+{
+  "section": "A",
+  "brief_hash": "ad1bd8e60417da69b33d0ffb1d69e0d666a566d00fc5912c8c73e93eb47d2cfb",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 97,
+    "type_tag_discipline": 98,
+    "population_annotation": 97,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 97
+  },
+  "total": 97,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "The Tahara and Shima dual-citation defect is resolved: reference [5] now carries only the 1995 paper (PMID 7497851, DOI verified), and the prose attribution reads '(1995)' only. All seven sources are Tier 1/2, tags are correctly applied (mechanism_review for biochemistry/kinetics, cohort for ADAG, regulatory for NGSP/IFCC master equation), population annotation for the ADAG cohort is complete (n=507 with subgroup breakdown), and the mechanistic reasoning chain is internally consistent with no unsupported claims."
+}

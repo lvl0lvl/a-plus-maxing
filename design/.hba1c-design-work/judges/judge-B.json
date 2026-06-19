@@ -1,0 +1,21 @@
+{
+  "section": "B",
+  "brief_hash": "d2a54956d5e322e6e50512efc463571e355b148b7bd4e8d39391589596e3da32",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 95,
+    "type_tag_discipline": 99,
+    "population_annotation": 97,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 97
+  },
+  "total": 97,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "All seven non-null dimensions clear the threshold independently; the two iteration-1 remediations are confirmed correct — Hoelzel 2004 as `mechanism_review` (a peer-reviewed method-comparison study, not a regulatory body) and the prediabetes IFCC upper bound at 47 mmol/mol (the clinical convention: one unit below the 48 mmol/mol diabetes cut-point, not the raw rounded output of converting 6.4%). Conversion table values, ADAG equation outputs, and eAG figures all verified arithmetically within accepted rounding tolerances."
+}
