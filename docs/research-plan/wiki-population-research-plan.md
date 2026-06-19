@@ -371,13 +371,16 @@ table; after picking, append your claim** so the two tracks don't duplicate. A c
 
 | Session | Subject / cluster | Wave | Mode | Status | Date |
 |---|---|---|---|---|---|
-| `feature/wiki-research` worktree | **Lipids / CV-risk biomarkers** — ApoB, Lp(a), LDL-C, HDL-C, triglycerides, GlycA, hs-CRP (7 entries) | 1 | standard | claimed — research begins next session | 2026-06-18 |
+| `feature/wiki-research` worktree | **Lipids / CV-risk biomarkers** — ApoB, Lp(a), LDL-C, HDL-C, triglycerides, GlycA, hs-CRP (7 entries) | 1 | standard | **IN PROGRESS** — research underway, building entries through wiki ingestion (claimed 2026-06-18, started 2026-06-18) | 2026-06-18 |
+| `feature/research-bpc157-rerun` (other session) | **BPC-157** deep re-research + finished entry | 0 | deep | **DONE** — merged to `main` (PR #150, all gates attested) | 2026-06-18 |
+
+**Claim update mandate:** update this table when a subject is *claimed/started* (status `IN PROGRESS`), not only when it is done and ingested — so the parallel track never duplicates work that is underway. Flip a row to `DONE` as its entries land in the wiki.
 
 **Still open (Wave 1 remaining clusters, for the other session):** Metabolic panel
 (glucose, HbA1c, insulin, HOMA-IR, CMP) · Thyroid (TSH, fT3, fT4) · Hormones (total/free
 testosterone, estradiol, cortisol, DHEA-S, IGF-1, SHBG) · Vitamins/minerals (vit D, ferritin,
 B12, RBC-Mg) · Wearable (HRV, RHR, sleep-efficiency, respiratory rate, recovery/strain).
-Plus **Wave 0** (BPC-157 provenance back-fill).
+**Wave 0** (BPC-157) is **DONE** (above).
 
 **Gate before any Wave 1 research (§8 D3):** confirm `operator-profile.md` / `goals.md` /
 `current-state.md` are readable so gate 2.75 doesn't HALT `context-load-missing` — they load
