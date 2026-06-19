@@ -110,8 +110,31 @@ def _nonempty_str(value):
     return isinstance(value, str) and bool(value.strip())
 
 
+def _set_by(envelope):
+    """The envelope's `severity_final.set_by`, or None when severity_final is absent / not a dict.
+
+    A real liaison can emit a truthy non-dict `severity_final` (a bare string); reading set_by must
+    not crash on `.get` — a non-dict reads as no set_by, which fails the set_by checks → block stands
+    (the safe default), never a `.get`-on-str AttributeError that aborts the pass.
+    """
+    severity_final = envelope.get("severity_final")
+    return severity_final.get("set_by") if isinstance(severity_final, dict) else None
+
+
+def _is_malformed_harm_class(harm_class):
+    """Whether `harm_class` is malformed — present but not a string (a single token, or absent)."""
+    return harm_class is not None and not isinstance(harm_class, str)
+
+
 def is_non_overridable(composite_band, harm_class):
     """Whether a finding is non-overridable (INV-CRITICAL-NON-OVERRIDABLE).
+
+    `harm_class` is normalized (strip + upper) before the H1/H2 set test so a true non-overridable
+    harm declared in non-canonical casing/whitespace (`"h1"`, `" H1 "`, `"H2\\n"`) is still caught —
+    fail-SAFE toward the block standing, never released on a casing variance. A non-string harm_class
+    is treated as "not a recognized harm class" here (it never reaches the unhashable-membership
+    crash); a malformed harm_class is separately rejected by the callers as a malformed envelope
+    (block stands) rather than silently routed overridable.
 
     Args:
         composite_band (str): The finding's band.
@@ -121,7 +144,8 @@ def is_non_overridable(composite_band, harm_class):
         (bool) True when the band is CRITICAL or the harm class is H1/H2 — no override path is
         honored for such a finding.
     """
-    return composite_band == "CRITICAL" or harm_class in NON_OVERRIDABLE_HARM_CLASSES
+    hc = harm_class.strip().upper() if isinstance(harm_class, str) else harm_class
+    return composite_band == "CRITICAL" or (isinstance(hc, str) and hc in NON_OVERRIDABLE_HARM_CLASSES)
 
 
 def validate_override_record(record, *, composite_band, caution=None):
@@ -214,10 +238,12 @@ def audit_adjudication_envelope(envelope):
     band = envelope.get("composite_band")
     harm_class = envelope.get("harm_class")
     override_record = envelope.get("override_record")
-    set_by = (envelope.get("severity_final") or {}).get("set_by")
+    set_by = _set_by(envelope)
 
     if band not in BANDS:
         violations.append({"invariant": "schema", "reason": f"composite_band {band!r} not in {BANDS}"})
+    if _is_malformed_harm_class(harm_class):
+        violations.append({"invariant": "schema", "reason": "harm_class must be a string or null"})
 
     if is_non_overridable(band, harm_class):
         if override_record is not None:
@@ -277,6 +303,13 @@ def adjudicate(safety_finding, envelope):
         held["reasons"] = ["envelope finding_id does not match the held finding — the block stands"]
         return held
 
+    # A malformed routing key is a malformed envelope -> the block stands (the module contract:
+    # never crash, never silently release). A non-string harm_class cannot be reasoned about, so it
+    # is held rather than routed overridable (where a valid override could otherwise clear it).
+    if _is_malformed_harm_class(harm_class):
+        held["reasons"] = ["malformed harm_class (not a string) — the block stands"]
+        return held
+
     if is_non_overridable(band, harm_class):
         held["non_overridable"] = True
         # The envelope must NOT carry an override path; if it does, that is the invariant violation.
@@ -295,7 +328,7 @@ def adjudicate(safety_finding, envelope):
         held["reasons"] = ["no override record provided — the block stands"]
         return held
 
-    if (envelope.get("severity_final") or {}).get("set_by") != LIAISON_SET_BY:
+    if _set_by(envelope) != LIAISON_SET_BY:
         held["reasons"] = [f"severity_final.set_by must be {LIAISON_SET_BY!r} — the block stands"]
         return held
 

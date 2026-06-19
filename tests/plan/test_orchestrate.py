@@ -27,6 +27,8 @@ import datetime
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.generate import generate
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, compute_plan
 from scripts.plan.orchestrate import (
@@ -867,6 +869,22 @@ def test_adjudicator_returning_none_keeps_held(tmp_path):
     assert store.read("plan::supplements", root=tmp_path) == []
 
 
+def test_adjudicator_that_raises_is_fail_loud_and_records_nothing(tmp_path):
+    # Review TEST-3: a liaison dispatch that ERRORS is fail-loud — the exception propagates out of
+    # generate_plans (matching the unguarded reauthor hook), and because it raises BEFORE the
+    # recording loop, NOTHING is recorded. The safe no-release direction: an errored adjudication
+    # never silently records the held supplement.
+    store_read = _seed_store(tmp_path)
+
+    def boom(safety_finding):
+        raise RuntimeError("liaison dispatch failed")
+
+    with pytest.raises(RuntimeError):
+        generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=boom)
+    assert store.read("plan::supplements", root=tmp_path) == []
+    assert store.read("plan::peptides", root=tmp_path) == []
+
+
 def test_adjudicator_not_called_without_a_held_finding(tmp_path):
     # Non-tautology control: a clean (no declared additive-AE) compound pair is NOT held, so the
     # liaison gate never runs and both compounds record.
@@ -942,6 +960,12 @@ def test_real_liaison_blocked_envelope_keeps_held(tmp_path):
     assert out["adjudication"]["outcome"] == "block-stands"
     assert out["results"]["supplements"]["recorded"] is False
     assert store.read("plan::supplements", root=tmp_path) == []
+    # Single-gate isolation (review TEST-1): the blocked fixture is rejected on BOTH the vacuous
+    # operator_reason AND the sub-HIGH rung. Pinning each rejection reason makes this E2E go RED if
+    # EITHER INV-OVERRIDE-RECORD-SCHEMA sub-gate regresses (not only if both fail at once).
+    reasons = out["adjudication"]["reasons"]
+    assert any("operator_reason" in r for r in reasons)
+    assert any("rung" in r for r in reasons)
 
 
 # --- reconcile is pure (no I/O) ------------------------------------------------

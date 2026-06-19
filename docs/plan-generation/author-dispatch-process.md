@@ -108,9 +108,12 @@ silently shipped.
   an operator-approved directive. The peptide-specialist anchored BPC-157 at H2 (angiogenic auto-block)
   and surfaced it as a decision-support draft with the H2 block + `clinician-clearance:NOT_GRANTED`
   caveat RENDERED on the card (verified in the E2E). "Four authors wired" is NOT "operator-usable":
-  the cross-compound additive-AE screen is WIRED (S73, the compound band); the **medical-liaison
-  terminal gate** (S74) is the remaining gate between build-complete and operator-usable. The build
-  runs on synthetic fixtures (no real operator data).
+  the cross-compound additive-AE screen is WIRED (S73, the compound band) and the **medical-liaison
+  terminal gate** (WIRED S74, `scripts/plan/adjudicate.py`) adjudicates the held additive-AE finding —
+  a content-valid override releases the supplement, a non-overridable / invalid adjudication holds it.
+  The remaining gates to full operator-usable are the Phase-4 follow-on axes (`rxbp`/`cfaj` + the
+  doctor-visit-queue artifact; see the liaison-gate section below). The build runs on synthetic
+  fixtures (no real operator data).
 
 ## The cross-domain layer (orchestrator + reconciler) — WIRED S72
 
