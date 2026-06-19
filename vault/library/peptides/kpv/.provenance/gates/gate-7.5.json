@@ -1,0 +1,29 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T16:40:01Z",
+  "iterations": 2,
+  "compound_risk_tier": "experimental",
+  "compound_entry_path": "vault/library/peptides/kpv/research-report.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "placeholder-with-pointer"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "hs-CRP",
+    "fecal calprotectin",
+    "CBC/CMP"
+  ],
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T16:39:08.122013+00:00",
+    "attest_ts": "2026-06-19T16:41:45.760757+00:00",
+    "iteration": 2,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "dbf6537e0acadc077caba03f32193054ddc7ebc6119a3c77006face52f4b6944",
+    "agent_source_mtime": "2026-06-19T16:40:54.284952+00:00"
+  }
+}

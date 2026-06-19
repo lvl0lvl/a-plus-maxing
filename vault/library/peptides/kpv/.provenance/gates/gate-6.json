@@ -1,0 +1,70 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-kpv-i1",
+  "draft_path": "vault/library/peptides/kpv/research-report.md",
+  "findings": [
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "Zero-human-evidence reality is carried pervasively (frontmatter, read-first, TL;DR, S2 BLUF, S3, S6, S7, S8, S9, S10, S11) \u2014 confirmation, not a gap."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "Merlin single-lab concentration carried fairly: S5 first-class with both denominators (50% all-cause / ~75% gut-IBD), >=70% flag, honest reduce-not-eliminate caveat; correctly scoped to the gut/IBD track."
+    },
+    {
+      "category": "unexamined-counter-evidence",
+      "severity": "minor",
+      "description": "Contested antimicrobial balanced: Cutuli positive + Songok 2018 independent null + originating-group concession of weak native activity; lands at LOW confidence; robust signal assigned to engineered/dimerized derivatives."
+    },
+    {
+      "category": "bias",
+      "severity": "minor",
+      "description": "Monomer-vs-analogue discipline consistent: KdPT (acne) and alpha-MSH+(CKPV)2 (gout) and (CKPV)2 (vaginitis) kept off the KPV-monomer ledger across S1.8/S3.3/S7.2/S7.4/S11; no analogue finding laundered onto KPV."
+    },
+    {
+      "category": "citation-incomplete",
+      "severity": "major",
+      "description": "Dual numbering: section-body local citation numbers (e.g. [3,in_vitro]=Land 2012 in S2.3) do not map to unified Bibliography numbering (where [3]=Land but [4]=KdPT etc.); disclosed in the bibliography header and attested by upstream Phase-4.25 reconcile, but not reconstructable by the end reader. Recommend a per-section crosswalk or renumber inline cites. Traceability friction, not mis-grounding."
+    },
+    {
+      "category": "logical-inconsistency",
+      "severity": "minor",
+      "description": "S5.2 counts Cutuli (in-vitro-lead per S7.3/bibliography) and Bonfiglio (corneal) as 'in-vivo efficacy primaries'; self-disclosed in S5.6 as denominator-sensitivity that does not move the headline gut/IBD 75%."
+    },
+    {
+      "category": "objectivity-issue",
+      "severity": "minor",
+      "description": "Tone non-promotional throughout ('mechanistically attractive but clinically unproven'); the single enthusiasm point (PepT1-KO causal result) is correctly bounded as preclinical."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "Overstatement traps all avoided: 12,000x framed as single-lab intra-study formulation comparison not general potency; gut-IBD not oversold as near-clinical; vendor LD50/>=100 mg/kg marked UNVERIFIED; FDA Cat-2 removal repeatedly stated as not approval / not lawfully compoundable."
+    },
+    {
+      "category": "objectivity-issue",
+      "severity": "minor",
+      "description": "Regulatory/WADA accurate: FDA Cat-2(2023)->removed ~15 Apr 2026 (nomination withdrawn, 1 of 12)->unlisted pending PCAC 23-24 Jul 2026, removal!=approval, PCAC non-binding; WADA not named but S0 catch-all at all times, contrasted with BPC-157/S2; FDA line-item honestly conceded as multi-source-corroborated not primary-quoted."
+    },
+    {
+      "category": "missing-perspective",
+      "severity": "minor",
+      "description": "Optional: report states the Apr 2026 removal was nominator-withdrawal but does not draw the inference that an administrative/commercial withdrawal is a negative-to-neutral signal, not vindication; the existing 'removal != approval' framing already prevents the dangerous misread."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T16:18:11.393921+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T16:16:01.947087+00:00",
+    "attest_ts": "2026-06-19T16:18:11.393924+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "31cf0dc5e7693a2a3db15d7b0779a15c931e4fa3c51d843cbbee7452fbf3fe4e",
+    "agent_source_mtime": "2026-06-19T16:17:36.551777+00:00"
+  }
+}

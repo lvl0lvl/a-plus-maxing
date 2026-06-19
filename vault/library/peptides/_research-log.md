@@ -111,7 +111,27 @@ a ceiling may be lowered only with a documented evidence reason here (no guessin
 ### Additional meta-findings (skill_consolidator beads)
 - Verifier agents sometimes emit schema-invalid gate JSON blocks (stray `note` key; string where integer; markdown-bold `verdict: **PASS**` breaks the parser) → add "emit schema-valid JSON + plain `verdict: PASS`, self-validate before returning" to every gate-verifier brief. (Extends bead 2h6/71c family.)
 
-### NEXT (reserved): **KPV** (sweep entry 3), then LL-37 → Ipamorelin → … per [[_triage]] order.
+---
+
+## 2026-06-19 — KPV (Lys-Pro-Val · α-MSH(11-13)) deep-pass (sweep entry 3)
+
+### DONE (verified — mechanical evidence on disk)
+- **KPV entry shipped:** `compounds/kpv.md` + `library/peptides/kpv/research-report.md` (~11.1K words, 47 dedup entries) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 7 judges + 7 sections + id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@99/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Independent gates caught real errors:** 3.5 judges caught a wrong-PMID note (17973296→18092346), a 503A regulatory inversion (KPV removed from Cat-2 ~Apr 2026, not "in Cat-2"), and a practitioner-citation defect (mis-dated Moore source + an unsupported "KPV+BPC-157" pairing that the source actually makes for TB-500). E-judge independently confirmed ZERO human studies AND caught+rejected a hallucinated "pilot trial." **7.5 risk-floor HALTed** on the experimental-tier third-party-marker rule → resolved honestly by naming objective assays (hs-CRP/calprotectin/CBC-CMP), NOT by fabricating a KPV-specific biomarker. Zero fabrications.
+
+### CLAIMED (asserted this session — backed by `.provenance/`, re-checkable)
+- ENTIRELY preclinical; **zero human studies of any design** (registry + literature null); Pawar 2017 is ex-vivo skin permeation, not a trial. KPV≠KdPT (Lys-D-Pro-Thr); neither has human trials.
+- Mechanism: melanocortin-receptor-INDEPENDENT intracellular NF-κB inhibition; gut uptake via PepT1 (PepT1-KO abolishes benefit); importin-α3/p65 step is single-lab.
+- Strongest data = rodent colitis (direction replicated ≥4 labs; magnitudes ~75% single-lab Merlin/GSU). Native-KPV antimicrobial contested (Cutuli positive single-lineage vs Songok null). Acne/gout efficacy = KdPT/(CKPV)₂ analogues, not monomer.
+- FDA: 503A Cat-2 (2023) → removed ~Apr 2026 (nomination withdrawn), unlisted pending PCAC 23-24 Jul 2026; removal ≠ approval. WADA not individually named but prohibited under S0.
+- Monitoring: no KPV-specific validated biomarker; objective monitoring = hs-CRP/fecal calprotectin/CBC-CMP (general assays).
+
+### Meta-findings (skill_consolidator beads)
+- FDA 503A Cat-2 removal (~Apr 2026) is a RECURRING retrieval miss (hit TB-500 + KPV) → bake "check the Apr-2026 503A Cat-2 removal status" into the safety/regulatory retrieval brief.
+- 7.5 verifier over-read the third-party-marker rule (demanded a compound-SPECIFIC validated biomarker; the rule only needs a named OBJECTIVE assay) → clarify the verifier brief: a named objective lab assay (e.g. hs-CRP) satisfies it.
+
+### NEXT (reserved): **LL-37** (sweep entry 4), then Ipamorelin → CJC-1295 → … per [[_triage]] order.
 
 ---
 
