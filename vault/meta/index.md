@@ -25,6 +25,13 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
+- [[biomarkers/lp-a]] (Lp(a) — lipoprotein(a); category: blood; confidence: established)
+- [[biomarkers/apob]] (ApoB — apolipoprotein B; category: blood; confidence: established)
+- [[biomarkers/ldl-c]] (LDL-C — LDL cholesterol; category: blood; confidence: established)
+- [[biomarkers/hdl-c]] (HDL-C — HDL cholesterol; category: blood; confidence: established)
+- [[biomarkers/triglycerides]] (Triglycerides; category: blood; confidence: established)
+- [[biomarkers/hs-crp]] (hs-CRP — high-sensitivity C-reactive protein; category: blood; confidence: established)
+- [[biomarkers/glyca]] (GlycA — glycoprotein acetylation; category: blood; confidence: provisional)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -56,6 +63,13 @@ _(none yet)_
 - [[library/peptides/bpc-157/research-report]] (rebuilt 2026-05-24 via /aplus-research --update=suspect-fabrications; 1,039 lines / ~20K words refined; 52 dedup primaries; 80.8% Sikirić-Zagreb metro; 6 paired retrievals; IC-13 30/30 PASS; PRIOR ARCHIVED)
 - [[library/peptides/bpc-157/practitioner-layer]] (rebuilt 2026-05-24; prescribing-practice; pharmacies + named physicians + consensus dose; PRIOR ARCHIVED)
 - [[library/peptides/bpc-157/non-english-layer]] (rebuilt 2026-05-24; Croatian/Chinese/Russian/Korean coverage; PRIOR ARCHIVED)
+- [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/hdl-c/research-report]] (HDL-C standard /aplus-research; 19 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/triglycerides/research-report]] (Triglycerides standard /aplus-research; 19 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/hs-crp/research-report]] (hs-CRP standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/glyca/research-report]] (GlycA standard /aplus-research; 19 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/

@@ -360,3 +360,28 @@ set (operator-trimmed per D1) has a green `bda` provenance chain, passed the com
 carries real cited values to template, is registered in the index, and survives the periodic
 `wiki-lint.sh` — at which point the 16 specialists have a knowledge base to reason over and
 the July-visit handout has real entries to draw from.
+
+---
+
+## 10. Active research claims — cross-session coordination
+
+Two sessions are populating the wiki in parallel. **Before picking a subject, read this
+table; after picking, append your claim** so the two tracks don't duplicate. A claim is
+(session, subject/cluster, wave, mode, status, date).
+
+| Session | Subject / cluster | Wave | Mode | Status | Date |
+|---|---|---|---|---|---|
+| `feature/wiki-research` worktree | **Lipids / CV-risk biomarkers** — ApoB, Lp(a), LDL-C, HDL-C, triglycerides, GlycA, hs-CRP (7 entries) | 1 | standard | **DONE — ingested, PR #160 open** (all gates 2.75/3.5/4.25/4.75 attested PASS, bda-clean; `/review-pr`→`/merge` pending GitHub rate-limit) | 2026-06-19 |
+| `feature/research-bpc157-rerun` (other session) | **BPC-157** deep re-research + finished entry | 0 | deep | **DONE** — merged to `main` (PR #150, all gates attested) | 2026-06-18 |
+
+**Claim update mandate:** update this table when a subject is *claimed/started* (status `IN PROGRESS`), not only when it is done and ingested — so the parallel track never duplicates work that is underway. Flip a row to `DONE` as its entries land in the wiki.
+
+**Still open (Wave 1 remaining clusters, for the other session):** Metabolic panel
+(glucose, HbA1c, insulin, HOMA-IR, CMP) · Thyroid (TSH, fT3, fT4) · Hormones (total/free
+testosterone, estradiol, cortisol, DHEA-S, IGF-1, SHBG) · Vitamins/minerals (vit D, ferritin,
+B12, RBC-Mg) · Wearable (HRV, RHR, sleep-efficiency, respiratory rate, recovery/strain).
+**Wave 0** (BPC-157) is **DONE** (above).
+
+**Gate before any Wave 1 research (§8 D3):** confirm `operator-profile.md` / `goals.md` /
+`current-state.md` are readable so gate 2.75 doesn't HALT `context-load-missing` — they load
+as context only for goal-agnostic library entries (PF-S2-04).

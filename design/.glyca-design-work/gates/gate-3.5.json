@@ -1,0 +1,49 @@
+{
+  "phase": "3.5",
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T01:59:52.783618+00:00",
+  "mode_threshold": 99,
+  "iterations": 1,
+  "judge_verdicts": [
+    {
+      "section": "A",
+      "retrieve_agent_id": "retrieve-A-iter1",
+      "judge_agent_id": "judge-A-iter1",
+      "brief_hash": "52209c18974151c6626d614a5798b0158bbdb69cd7439610c9d37cde9c865fc2",
+      "score": 97,
+      "verdict": "PASS",
+      "iteration": 1
+    },
+    {
+      "section": "B",
+      "retrieve_agent_id": "retrieve-B-iter1",
+      "judge_agent_id": "judge-B-iter1",
+      "brief_hash": "860528bb1cc8aad9ddb7be3be5a82d0dd235b6fadb12d5c815575f5ef6d376e6",
+      "score": 95,
+      "verdict": "PASS",
+      "iteration": 1
+    }
+  ],
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T01:58:16.850105+00:00",
+    "attest_ts": "2026-06-19T01:59:52.783621+00:00",
+    "iteration": 1,
+    "judge_sources": [
+      {
+        "section": "A",
+        "iteration": 1,
+        "sha256": "12f75d556c8211da4fe563dd452ef96d89bf60a324cbe3cf42302f9ea4e8bffe",
+        "path": "judges/judge-A.json",
+        "mtime": "2026-06-19T01:59:11.148810+00:00"
+      },
+      {
+        "section": "B",
+        "iteration": 1,
+        "sha256": "4d365396bea0db0f0c98dd628a2684ed172f336a3ae3a9218438c6207301de1f",
+        "path": "judges/judge-B.json",
+        "mtime": "2026-06-19T01:59:31.823391+00:00"
+      }
+    ]
+  }
+}
