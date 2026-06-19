@@ -499,6 +499,9 @@ def test_additive_ae_declared_interaction_from_peptide_side(tmp_path):
     assert finding["mechanism"] == "additive antiplatelet effect"
     assert finding["severity"] == "moderate"
     assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+    # store-safety pinned DIRECTLY on the interaction path (not only via the reason proxy): the
+    # interaction-driven hold must keep the supplement out of the store, like the shared-class path.
+    assert store.read("plan::supplements", root=tmp_path) == []
     assert out["results"]["peptides"]["recorded"] is True
 
 
@@ -713,6 +716,43 @@ def test_additive_ae_interaction_severity_mechanism_optional(tmp_path):
     assert finding["with"] == "fish oil"
     assert finding["mechanism"] is None and finding["severity"] is None
     assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+
+
+def test_additive_ae_two_shared_classes_each_a_finding(tmp_path):
+    # the screen emits ONE finding per shared additive-AE class, in sorted order — pins the
+    # `sorted(supp & pep)` enumeration (cardinality + ordering) the single-class tests never reach.
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["serotonergic", "bleeding-risk"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk", "serotonergic"]}},
+    )
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    shared = [f for f in out["reconciliation"]["additive_ae"] if f["kind"] == "shared-class"]
+    assert [f["ae_class"] for f in shared] == ["bleeding-risk", "serotonergic"]  # one each, sorted
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD  # held ONCE
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_additive_ae_shared_class_and_interaction_combine(tmp_path):
+    # a single pass can trigger BOTH detection paths: the screen runs the shared-class intersection
+    # AND the interaction passes unconditionally, so both finding kinds surface, hold set once.
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+        pep_recon={"ae_profile": {
+            "additive_classes": ["bleeding-risk"],
+            "interactions": [{"with": "Fish oil", "mechanism": "x", "severity": "high"}],
+        }},
+    )
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+    kinds = sorted(f["kind"] for f in out["reconciliation"]["additive_ae"])
+    assert kinds == ["declared-interaction", "shared-class"]  # both paths fired in one pass
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD  # held once
+    assert store.read("plan::supplements", root=tmp_path) == []
 
 
 # --- reconcile is pure (no I/O) ------------------------------------------------
