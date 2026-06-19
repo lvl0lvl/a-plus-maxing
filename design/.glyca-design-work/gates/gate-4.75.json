@@ -1,0 +1,80 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "WARN",
+      "findings": [
+        "heritability ~30% (h2=0.2971, Rg=0.4397) rests solely on ref6 MDPI open-access \u2014 load-bearing single-source quality note, number grep-verified, already flagged inline",
+        "Nightingale unit means (1230/1216/1233/1236 umol/L) rest on ref10 medRxiv preprint \u2014 single-source-preprint quality note, cross-checked vs ref7 platform doc, already flagged inline"
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 13
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 13,
+    "largest_cluster_count": 3,
+    "share": 0.23,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 79,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: heritability single-source open-access (MDPI ref6)",
+    "IC-13: Nightingale unit means single-source preprint (medRxiv ref10)"
+  ],
+  "iterations": 1,
+  "timestamp": "2026-06-19T02:11:39.555186+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T02:06:37.475616+00:00",
+    "attest_ts": "2026-06-19T02:11:39.555189+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "d88196d726514e7f2a661a26992b862f4bb61efc8b28df3b00d56a3761387f5b",
+    "agent_source_mtime": "2026-06-19T02:11:05.491239+00:00"
+  }
+}

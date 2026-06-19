@@ -1,0 +1,73 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 17
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 9,
+    "largest_cluster_count": 2,
+    "share": 0.22,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 52,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [],
+  "iterations": 1,
+  "timestamp": "2026-06-19T01:34:01.366300+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T01:29:38.591580+00:00",
+    "attest_ts": "2026-06-19T01:34:01.366303+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "0b136e0eae2d9a5be6efc72046535e85a1b5d2f842c5be2df17782507d43d553",
+    "agent_source_mtime": "2026-06-19T01:33:22.962137+00:00"
+  }
+}
