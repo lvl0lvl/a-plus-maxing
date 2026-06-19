@@ -27,6 +27,22 @@ the next. Keep going until the triage taxonomy is fully Done/Excluded.
 
 ---
 
+## 2026-06-18 — Metabolic class triage (round 4)
+
+### DONE (verified)
+- **Metabolic class triaged** (citations verified): **Semaglutide 24/25** (tier S, FDA-approved, STEP/SELECT/SUSTAIN),
+  **Tirzepatide 24/25** (tier S, FDA-approved, SURMOUNT/SURPASS), **Retatrutide 18/25** (eligible but investigational —
+  sourcing 2/5, hold for approval), **AOD-9604 12/25 → Excluded** (human fat-loss claim is an unverifiable 2005
+  conference abstract; the one large Phase-2b trial failed; WADA S2). Triage agents held the anti-fabrication line
+  (flagged the unverifiable AOD-9604 "2.6 kg" figure).
+
+### CLAIMED / RESERVED — next rounds
+Deep pass **Semaglutide → Tirzepatide → Retatrutide** (in that order), each with the merge-gate review before merge.
+Then continue the loop (GH-secretagogues, Cognitive, Sexual, Immune/longevity remainder, Mitochondrial) until
+[[_triage]] is fully Done/Excluded.
+
+---
+
 ## 2026-06-18 — Thymosin Alpha-1 deep pass (round 3)
 
 ### DONE (verified)

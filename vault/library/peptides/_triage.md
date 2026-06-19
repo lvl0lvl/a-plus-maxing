@@ -111,14 +111,19 @@ Populated after triage passes. Format: `<peptide> | <class> | <triage-score> | <
 all deep-passed → Done. Healing class fully triaged (4 Excluded); Ipamorelin held (16/25).
 Triage scores: `tesamorelin/.provenance/triage-scores.md`.
 
-Ranked queue (deep-pass-eligible, not yet deep-passed): _(empty — next round triages a new class)_
+Ranked queue (deep-pass-eligible, not yet deep-passed):
+- `Semaglutide | metabolic | 24/25 | deep pass NEXT` — FDA-approved GLP-1 (STEP/SELECT/SUSTAIN); tier S.
+- `Tirzepatide | metabolic | 24/25 | deep pass` — FDA-approved dual GIP/GLP-1 (SURMOUNT/SURPASS); tier S.
+- `Retatrutide | metabolic | 18/25 | deep pass (with hard sourcing caveat)` — triple agonist, strong Phase-2/3
+  but INVESTIGATIONAL (not approved → sourcing 2/5; entry must gate toward "wait for approval", not acquisition).
+
+**Metabolic class triaged 2026-06-18:** Semaglutide 24, Tirzepatide 24, Retatrutide 18 (eligible); AOD-9604 12 → Excluded.
 
 **CLAIMED — next round (reserved 2026-06-18, peptide-library track):**
-**Metabolic class triage** — Semaglutide, Tirzepatide, Retatrutide, AOD-9604 — then deep-pass the
-winner(s). (GLP-1/GIP agonists are FDA-approved with large RCT bases + directly goal-relevant to body
-composition; expect ≥1 deep-pass-eligible.) Then continue the loop through the remaining classes
-(GH-secretagogues: CJC-1295/Sermorelin/Hexarelin/MK-677; Cognitive; Sexual; Immune/longevity remainder;
-Mitochondrial) until the taxonomy is fully Done/Excluded. Do NOT re-run anything already Done/Excluded.
+Deep pass on **Semaglutide** (ranked-queue top), then Tirzepatide, then Retatrutide. Then continue the loop
+through the remaining classes (GH-secretagogues: CJC-1295/Sermorelin/Hexarelin/MK-677; Cognitive; Sexual;
+Immune/longevity remainder: Epitalon/FOXO4-DRI/Humanin; Mitochondrial: SS-31/MOTS-c) until the taxonomy is
+fully Done/Excluded. Do NOT re-run anything already Done/Excluded.
 
 ## Excluded (do not re-research without trigger)
 
@@ -131,6 +136,7 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 | KPV | Triage 12/25 (2026-06-18). Gut/inflammation (α-MSH) indicated; animal+in-vitro only; no tendon/joint data; zero human trials. | A verified human safety/efficacy study, or an explicit soft-tissue/recovery study. |
 | LL-37 | Triage 12/25 (2026-06-18). Real topical-wound RCTs but off-goal; a larger Phase-IIb VLU trial reportedly failed; unresolved oncology dual-role; gray-market systemic sourcing. | A human RCT for a recovery/systemic indication with the oncology risk addressed. |
 | Ipamorelin | Triage 16/25 → HOLD (2026-06-18). Only human RCT (post-op ileus) was negative on an off-goal endpoint; ZERO human body-composition/recovery/sleep data; no clean Rx pathway. | A human RCT on a body-composition / recovery / sleep endpoint. |
+| AOD-9604 | Triage 12/25 (2026-06-18). The goal-defining human fat-loss claim is a non-indexed 2005 conference abstract (NO PMID/DOI — the circulating "2.6 kg" figure is unverifiable); the one large Phase-2b obesity trial FAILED; development abandoned 2007; FDA 503A Category-2 (nomination withdrawn 2024); WADA S2. Good short-term safety but evidentially hollow for weight loss. | A published, indexed human RCT showing a real weight-loss effect. |
 
 ## Done (compound page exists)
 
