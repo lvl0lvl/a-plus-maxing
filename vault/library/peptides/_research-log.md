@@ -18,6 +18,43 @@ canonical queue lives in [[_triage]]; this file owns the narrative + the claim l
 
 ---
 
+## STANDING GOAL (operator, 2026-06-18)
+**Finish populating the wiki: complete ALL peptide research, round after round (triage → deep-pass
+eligible → exclude rest → ship via PR cycle WITH review), until nothing is left on [[_triage]] —
+without duplicating the other session's track 1 (plan pipeline). Follow the protocols.** Each round:
+claim the next target in `_triage`, run it, review-gate before merge, log DONE vs CLAIMED here, claim
+the next. Keep going until the triage taxonomy is fully Done/Excluded.
+
+---
+
+## 2026-06-18 — Healing-class triage + Tesamorelin deep pass (round 2)
+
+### DONE (verified)
+- **Healing/soft-tissue triage pass** — TB-500 (12), GHK-Cu (11), KPV (12), LL-37 (12): all ≤12 →
+  **Excluded** with re-open triggers (see [[_triage]]). Every triage citation verified real; the honest
+  finding is that the remaining healing class has no deep-pass-eligible candidate vs the recovery goal.
+- **Tesamorelin deep pass** (triage 21/25, winner over Thymosin Alpha-1 19/25 and Ipamorelin 16/25) →
+  **compound entry + research report + 2 layers + `.provenance/` (method, sources-ledger, triage-scores,
+  review-verdict)**. evidence_tier A (HIV-lipodystrophy) / effectively D (operator's non-HIV goal).
+- **Merge-gate review ran BEFORE merge** (the PR-cycle review I must not skip): independent reviewer
+  re-verified all 10 load-bearing PMIDs real → **PASS-WITH-FIXES**; 3 precision fixes applied (503A→deemed-biologic
+  reframe, EMA date 2012-06-21, WADA named-listing upgrade). No fabrication, no blocking issues.
+
+### CLAIMED (asserted — re-checkable via `tesamorelin/.provenance/sources-ledger.md`)
+- The central finding: **ALL tesamorelin body-composition efficacy is in HIV-associated lipodystrophy;
+  NO RCT exists in non-HIV/general/post-illness adults** (verified absence). Population transfer = the
+  first-class caveat (analog of BPC-157's single-lab concentration).
+- Safety watch-items: IGF-1 +3 SDS in 36% at 26 wk; new HbA1c ≥6.5% in 5% vs 1% (HR ~3.3); active-malignancy
+  contraindication; benefit reverses on stopping; WADA S2.2.4; effectively D for the operator's goal.
+- Method caveat: produced via orchestrated dispatched agents + independent review, NOT the literal
+  `gate_attest` CLI chain (no machine-signed gate-N.json). See `.provenance/method.md`.
+
+### CLAIMED / RESERVED — next round
+**Thymosin Alpha-1 deep pass** (ranked-queue top, triage 19/25). Then continue the loop through the
+taxonomy until [[_triage]] is fully Done/Excluded.
+
+---
+
 ## 2026-06-18 — BPC-157 deep re-research + aplus-research skill operationalization
 
 ### DONE (verified — mechanical evidence on disk / on main)
