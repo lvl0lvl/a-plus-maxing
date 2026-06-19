@@ -9,6 +9,7 @@
     "phase": {"const": "7.5"},
     "verdict": {"enum": ["PASS", "HALT", "SKIP-not-compound"]},
     "timestamp": {"type": "string", "format": "date-time"},
+    "iterations": {"type": "integer", "minimum": 1},
     "compound_risk_tier": {"enum": ["low", "medium", "high", "experimental"]},
     "compound_entry_path": {"type": "string"},
     "required_fields": {

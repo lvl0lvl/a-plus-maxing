@@ -9,6 +9,7 @@
     "phase": {"const": "6"},
     "verdict": {"enum": ["PASS", "HALT"]},
     "timestamp": {"type": "string", "format": "date-time"},
+    "iterations": {"type": "integer", "minimum": 1},
     "critique_agent_id": {"type": "string", "pattern": "^[a-zA-Z0-9_-]+$"},
     "draft_path": {"type": "string"},
     "draft_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
