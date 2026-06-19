@@ -1,0 +1,127 @@
+{
+  "phase": "4.75",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 7,
+      "count_flagged": 0,
+      "findings": [
+        "8 bare [N] cites in C-15 recap + D-4/D-8 cross-refs; each source tagged elsewhere in-section and every number grounded with [N,tag] at its primary claim \u2014 convention WARN, not fabrication"
+      ]
+    },
+    "IC-2": {
+      "status": "PASS",
+      "findings": [
+        "all real bib entries carry tag=; F-[8] is an explicit cross-ref, G-[2]/[3] reserved placeholders, G-[9] duplicate pointer"
+      ]
+    },
+    "IC-3": {
+      "status": "PASS",
+      "findings": [
+        "G-[13] vendor grounds only self-reported purity/identity constants, never efficacy/dose/AE-rate"
+      ]
+    },
+    "IC-4": {
+      "status": "PASS",
+      "findings": [
+        "G-[14] qualitative, G-[15] reconstitution-admin math only, E-[8]/[10] press-release qualitative; no enumerated number grounded on anecdote"
+      ]
+    },
+    "IC-5": {
+      "status": "PASS",
+      "findings": [
+        "G-[16]/[17]/[18] ground dose/cycle/route conventions only; no efficacy/AE/mechanism"
+      ]
+    },
+    "IC-6": {
+      "status": "PASS",
+      "findings": [
+        "zero live compounding_data_sheet tags; former [15] re-tagged to anecdote_aggregate"
+      ]
+    },
+    "IC-7": {
+      "status": "PASS",
+      "findings": [
+        "literal [population-mismatch] tag not used (WARN), but all 24 animal claims carry species labels + explicit 'not human data' framing; no animal result laundered as human"
+      ]
+    },
+    "IC-8": {
+      "status": "PASS",
+      "findings": [
+        "route-extrapolation tagged in A (2x) and C (3x); D narrates route/modality mismatch in claim bodies"
+      ]
+    },
+    "IC-9": {
+      "status": "PASS",
+      "findings": [
+        "concentration audit is the first ## section of G, ahead of indications, with boxed COI flag"
+      ]
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0,
+      "findings": [
+        "Esposito 2012 (22962027), Spurney 2010 (20126456), Zhou 2012 (21907210), Sosne 2023 (36613994), Wang 2021 (34346165) all real PMID/DOI and support their claims"
+      ]
+    },
+    "IC-11": {
+      "status": "PASS",
+      "findings": [
+        "no TODO/TBD/XXX/lorem/[citation needed]; G reserved bib slots are documented numbering placeholders"
+      ]
+    },
+    "IC-12": {
+      "status": "PASS",
+      "findings": [
+        "MW re-anchored to UniProt P62328 (Wikipedia tertiary cross-check only); G-[10] Wikipedia grounds a COI fact, not a number"
+      ]
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 5,
+      "count_flagged": 0,
+      "findings": [
+        "5/5 key numbers abstract-confirmed in cited source; several full-texts paywalled (Wiley/Nature/CAPTCHA) \u2192 abstract-level verification only = corpus-missing WARN, not scoping fail"
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 24,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 20,
+    "largest_cluster_name": "Goldstein/RegeneRx",
+    "largest_cluster_count": 4,
+    "share": 0.2,
+    "threshold_triggered": false,
+    "surfaced_section_heading": "## Concentration audit (dominant labs; estimated single-lab share of efficacy primaries; method)",
+    "surfaced_before_first_indication": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 5,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-1: 8 bare [N] inline cites in C-15 dose recap + D-4/D-8 cross-references (each source tagged elsewhere in-section; numbers grounded with [N,tag] at primary claim) \u2014 type-tag-convention deviation, not fabrication",
+    "IC-7: literal [population-mismatch] tag string is not used; substance satisfied via per-claim species labels + explicit 'not human data' framing",
+    "IC-13: paywalled full-texts (Wiley 403 on A-[2]/A-[4], PubMed CAPTCHA on A-[6], Nature auth-wall on D-[1]) verified at abstract/record level only \u2014 corpus-missing WARN",
+    "IC-10: Sosne NK trial pub-system year shows 2022 vs corpus-cited 2023 (vol 24(1), Jan-2023 issue) \u2014 issue-date reconciliation already documented in-corpus; PMID 36613994 / DOI correct"
+  ],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T13:24:54.229910+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T13:16:14.571718+00:00",
+    "attest_ts": "2026-06-19T13:24:54.229913+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "08b09bfe191cbc786e851911f87753bfb9a9e8808345e71e286855fc9815e883",
+    "agent_source_mtime": "2026-06-19T13:23:52.320292+00:00"
+  }
+}
