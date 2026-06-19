@@ -38,6 +38,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/homa-ir]] (HOMA-IR — insulin-resistance index; category: functional; source: calculation; confidence: supported)
 - [[biomarkers/tsh]] (TSH — thyroid-stimulating hormone; category: blood; confidence: established)
 - [[biomarkers/free-t4]] (Free T4 — free thyroxine; category: blood; confidence: established)
+- [[biomarkers/free-t3]] (Free T3 — free triiodothyronine; category: blood; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -82,6 +83,7 @@ _(none yet)_
 - [[library/biomarkers/homa-ir/research-report]] (HOMA-IR standard /aplus-research; 29 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/tsh/research-report]] (TSH standard /aplus-research; 31 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/free-t4/research-report]] (Free T4 standard /aplus-research; 38 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/free-t3/research-report]] (Free T3 standard /aplus-research; 33 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/
