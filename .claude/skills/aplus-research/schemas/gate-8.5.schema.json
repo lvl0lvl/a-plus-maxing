@@ -9,6 +9,7 @@
     "phase": {"const": "8.5"},
     "verdict": {"enum": ["PASS", "HALT", "SKIP-quick-mode", "SKIP-not-compound"]},
     "timestamp": {"type": "string", "format": "date-time"},
+    "iterations": {"type": "integer", "minimum": 1},
     "mode": {"enum": ["quick", "standard", "deep", "ultradeep"]},
     "practitioner_layer": {
       "type": "object",
