@@ -373,7 +373,7 @@ table; after picking, append your claim** so the two tracks don't duplicate. A c
 |---|---|---|---|---|---|
 | `feature/wiki-research` (merged) | **Lipids / CV-risk biomarkers** — ApoB, Lp(a), LDL-C, HDL-C, triglycerides, GlycA, hs-CRP (7 entries) | 1 | standard | **DONE — merged to main** (PR #160 squashed; gates 2.75/3.5/4.25/4.75 attested + bda-clean; `/review-pr` → 8 fixes incl. hs-CRP JUPITER cite + 7 `[[labs/]]` dead-links → `/merge`) | 2026-06-19 |
 | `feature/research-bpc157-rerun` (other session) | **BPC-157** deep re-research + finished entry | 0 | deep | **DONE** — merged to `main` (PR #150, all gates attested) | 2026-06-18 |
-| `feature/wiki-metabolic` worktree | **Metabolic — glycemic core** — fasting glucose, HbA1c, fasting insulin, HOMA-IR (4 entries) | 1 | standard | **IN PROGRESS** — claimed 2026-06-19 | 2026-06-19 |
+| `feature/wiki-metabolic` worktree | **Metabolic — glycemic core** — fasting glucose ✓, HbA1c, fasting insulin, HOMA-IR (4 entries) | 1 | standard | **IN PROGRESS** — fasting-glucose DONE (45 src; gates 2.75/3.5/4.25/4.75 attested + bda-clean; ingested); HbA1c / fasting-insulin / HOMA-IR remain | 2026-06-19 |
 
 **Claim update mandate:** update this table when a subject is *claimed/started* (status `IN PROGRESS`), not only when it is done and ingested — so the parallel track never duplicates work that is underway. Flip a row to `DONE` as its entries land in the wiki.
 

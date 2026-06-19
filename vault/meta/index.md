@@ -32,6 +32,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/triglycerides]] (Triglycerides; category: blood; confidence: established)
 - [[biomarkers/hs-crp]] (hs-CRP — high-sensitivity C-reactive protein; category: blood; confidence: established)
 - [[biomarkers/glyca]] (GlycA — glycoprotein acetylation; category: blood; confidence: provisional)
+- [[biomarkers/fasting-glucose]] (Fasting plasma glucose; category: blood; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -70,6 +71,7 @@ _(none yet)_
 - [[library/biomarkers/triglycerides/research-report]] (Triglycerides standard /aplus-research; 19 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/hs-crp/research-report]] (hs-CRP standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/glyca/research-report]] (GlycA standard /aplus-research; 19 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/fasting-glucose/research-report]] (Fasting plasma glucose standard /aplus-research; 45 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/
