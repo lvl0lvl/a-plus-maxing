@@ -1,0 +1,21 @@
+{
+  "section": "C",
+  "brief_hash": "45465758f0bd61a3683944e3ec0eafed2b180ba96daec3b6ecc47c46c3b866ce",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 93,
+    "type_tag_discipline": 97,
+    "population_annotation": 94,
+    "route_fidelity": null,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 94
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section C is tightly sourced and mechanically accurate: Fiers 2018 (PMID 29618085) numbers verified exact (cFT-V/ED ratio 1.19, cFT-Z/ED ratio 2.05, cFT-Z vs SHBG ρ 0.75), Vermeulen 1999 (PMID 10523012) and Zakharov DOI 10.1016/j.mce.2014.09.001 confirmed, all inline tags correctly applied with no bare citations. One non-blocking flag: Narinx 2025 (PMID 40068942) is published in Clin Chem Lab Med by De Gruyter (degruyter.com not yet on the source whitelist) — real peer-reviewed journal, flag for whitelist addition, not HALT per rubric."
+}
