@@ -1,0 +1,18 @@
+# Rubric — homa-ir (biomarker, standard mode)
+
+**Judge threshold:** 92/100. route_fidelity + risk_floor_readiness = null (biomarker / calculation). category is functional/calculation; source is calculation.
+
+## Section plan (4 sections, paired retrieval+judge)
+- **A — What HOMA-IR Is & The Model:** the Matthews et al. 1985 Homeostatic Model Assessment; HOMA-IR as a fasting-state surrogate of insulin resistance derived from fasting glucose × fasting insulin; the structural model (feedback between β-cell glucose sensing and hepatic/peripheral insulin action); **HOMA1 (the original linear approximation) vs HOMA2 (the updated nonlinear computer model, Levy/Wallace 1998, accounts for proinsulin/renal-loss/hepatic+peripheral resistance separately)**; HOMA-%S (sensitivity), HOMA-%B (β-cell function); what it estimates (predominantly HEPATIC insulin resistance) vs what it does not (peripheral/muscle SI — needs clamp).
+- **B — Calculation, Units & Thresholds:** the formulas — **HOMA-IR = (fasting insulin µIU/mL × fasting glucose mg/dL) / 405** and the SI form **÷ 22.5 with glucose in mmol/L**; the HOMA2 calculator (use insulin OR C-peptide OR specific-insulin inputs). The load-bearing caveat: **NO universal cutpoint** — thresholds are population-, ethnicity-, and assay-dependent (because insulin is non-standardized). Commonly cited: ~1.0 in healthy lean adults; IR thresholds quoted in the ~1.9–2.9 range (study/population-specific). Give example population-derived cutpoints with their cohorts. QUICKI relationship.
+- **C — Validation & Measurement Limitations:** validation against the hyperinsulinaemic-euglycaemic CLAMP (report the correlation range, ~0.6–0.9 depending on study/population, and that HOMA tracks hepatic better than peripheral IR); HOMA-IR INHERITS fasting insulin's assay non-standardization (so absolute values don't transfer across labs/assays) → HOMA2 + locally-derived cutpoints recommended; biological + analytical variability; the fasting-only limitation; comparison to other indices (QUICKI, Matsuda [dynamic], TyG).
+- **D — Clinical Significance & Determinants:** HOMA-IR predicts incident type 2 diabetes, metabolic syndrome, MASLD/NAFLD, cardiovascular disease (cite named cohorts/meta-analyses with effect sizes — verify each); use in research vs the limits of clinical use; determinants that raise (obesity, IR, diet, inactivity) / lower (weight loss, exercise, metformin); limitations — assay-dependence, no universal cutpoint, fasting-state, invalid where fasting insulin is invalid (exogenous insulin/secretagogues, β-cell failure).
+
+## Judge dimensions (0-100; total = rounded mean of non-null)
+evidence_quality, citation_fidelity, type_tag_discipline, population_annotation, route_fidelity(null), concentration_audit_handling, risk_floor_readiness(null), reasoning_integrity, completeness_vs_brief.
+
+## Tag-discipline rules the judge MUST enforce
+- The Matthews 1985 + Levy/Wallace 1998 HOMA model papers → `cohort` or `mechanism_review` per their design (Matthews 1985 is the model-development paper). Effect sizes/risk ratios → rct/meta_analysis/cohort (NAMED cohort). StatPearls/Endotext/reviews → `mechanism_review` (NEVER regulatory/rct/meta_analysis). 
+- The formula constants (405 / 22.5) correct + internally consistent; insulin µIU/mL↔pmol/L ×6.0; glucose mg/dL↔mmol/L ÷18.0.
+- The "no universal cutpoint" + "inherits insulin assay non-standardization" caveats MUST be present.
+- Whitelisted hosts include ngsp.org, ifcc.org, diabetesjournals.org, journals.plos.org, jci.org, portlandpress.com (Tier 1/2). No number on off-whitelist/vendor/anecdote. Every inline `[N, tag]` (no bare [N]). VERIFY enrollment N + effect sizes + first-author names against the source (the fasting-insulin lesson).
