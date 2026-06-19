@@ -118,11 +118,12 @@ Ranked queue (deep-pass-eligible, not yet deep-passed): _(empty — metabolic cl
 **Metabolic class triaged 2026-06-18:** Semaglutide 24, Tirzepatide 24, Retatrutide 18 (eligible); AOD-9604 12 → Excluded.
 
 **CLAIMED — next round (reserved 2026-06-19, peptide-library track):**
-**GH-secretagogue class triage** — CJC-1295 (±DAC), Sermorelin, Hexarelin, MK-677 (Ibutamoren) — then deep-pass any
-eligible. Then continue the loop through Cognitive (Selank, Semax, Cerebrolysin, Dihexa, NA-Selank-Amidate), Sexual
-(PT-141, Melanotan II, Kisspeptin-10), Immune/longevity remainder (Epitalon, FOXO4-DRI, Humanin), Mitochondrial
+**Cognitive class triage** — Selank, Semax, Cerebrolysin, Dihexa, N-Acetyl-Selank-Amidate — then deep-pass any eligible
+(note: Selank/Semax/Cerebrolysin have substantial RUSSIAN literature — the non-English layer will matter here). Then
+Sexual (PT-141, Melanotan II, Kisspeptin-10), Immune/longevity remainder (Epitalon, FOXO4-DRI, Humanin), Mitochondrial
 (SS-31, MOTS-c) until the taxonomy is fully Done/Excluded. Do NOT re-run anything already Done/Excluded.
-(Metabolic class COMPLETE: Semaglutide + Tirzepatide + Retatrutide Done; AOD-9604 Excluded.)
+(COMPLETE: Healing class; Metabolic class [Sema+Tirze+Reta Done, AOD Excluded]; **GH-secretagogue class** [Tesamorelin Done;
+Sermorelin + MK-677 Held; CJC-1295 + Hexarelin Excluded; Ipamorelin Held].)
 
 ## Excluded (do not re-research without trigger)
 
@@ -136,6 +137,10 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 | LL-37 | Triage 12/25 (2026-06-18). Real topical-wound RCTs but off-goal; a larger Phase-IIb VLU trial reportedly failed; unresolved oncology dual-role; gray-market systemic sourcing. | A human RCT for a recovery/systemic indication with the oncology risk addressed. |
 | Ipamorelin | Triage 16/25 → HOLD (2026-06-18). Only human RCT (post-op ileus) was negative on an off-goal endpoint; ZERO human body-composition/recovery/sleep data; no clean Rx pathway. | A human RCT on a body-composition / recovery / sleep endpoint. |
 | AOD-9604 | Triage 12/25 (2026-06-18). The goal-defining human fat-loss claim is a non-indexed 2005 conference abstract (NO PMID/DOI — the circulating "2.6 kg" figure is unverifiable); the one large Phase-2b obesity trial FAILED; development abandoned 2007; FDA 503A Category-2 (nomination withdrawn 2024); WADA S2. Good short-term safety but evidentially hollow for weight loss. | A published, indexed human RCT showing a real weight-loss effect. |
+| Sermorelin | Triage 16/25 → HOLD (2026-06-19). GHRH(1-29), was FDA-approved (Geref, discontinued ~2008 commercial). Adult body-comp RCT thin/mixed: Khorram 1997 (PMID 9141536) +1.26 kg LBM in men only (single-blind, n≈18) vs Vittone 1997 (PMID 9005976) NULL. Well-tolerated, IGF-1-monitorable, but compounded-only + WADA S2. The evidence-backed GHRH analog in this class = Tesamorelin (Done). | A modern adult body-composition/sleep RCT, or operator request for a full entry. |
+| MK-677 (Ibutamoren) | Triage 15/25 → HOLD (2026-06-19). Real multi-year RCTs (evidence_tier A) reliably raise GH/IGF-1 + FFM +1.6 kg (Nass 2008, PMID 18981485) — BUT repeatedly FAILED to convert the surrogate to clinical benefit (Alzheimer's PMID 19015485; hip-fracture PMID 21067829 terminated early for a CHF safety signal), and causes insulin resistance + raised fasting glucose + edema. Never approved; gray-market; WADA S2. High-interest compound — revisit if operator wants a full entry. | New positive clinical-outcome RCT, or operator request for a full entry. |
+| CJC-1295 (±DAC) | Triage 11/25 (2026-06-19). Surrogate PK/PD only — DAC form raised GH/IGF-1 (Teichman 2006, PMID 16352683); NO body-comp/sleep outcome RCT; no-DAC form essentially undocumented. Phase-2 HIV-lipodystrophy trial halted 2006 after a participant death (causality unadjudicated); DAC half-life 6–8 d (slow to clear AEs). Gray-market; WADA S2. | A clinical-outcome RCT + a resolved safety record. |
+| Hexarelin | Triage 9/25 (2026-06-19). GHRP with real GH pharmacodynamics but the GH response DESENSITIZES with continued use (PMID 10990150) — undermining chronic use; no body-comp/outcome RCT; distinct CD36 cardiac activity (unquantified in humans); never approved; gray-market; WADA S2. | A clinical-outcome RCT overcoming the desensitization problem. |
 
 ## Done (compound page exists)
 
