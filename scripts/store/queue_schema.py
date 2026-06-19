@@ -18,8 +18,15 @@ Stream (a disjoint item namespace, like `plan::`/`plan-track::`):
 Every write goes THROUGH `scripts.store.store.append` keyed by the one `scripts.store.keying`
 Line Field Set; this module defines no second key and reimplements no store I/O. All persistence
 is local file I/O; 0 model-bound send. Writers raise only ValueError; readers never raise on
-absence. Entries are closed on the `finding_id` requirement and open on extras (the liaison adds
-GRADE annotations at its dispatch).
+absence. Entries are closed on the `finding_id` requirement and open on extras.
+
+Render precondition (the SBAR-handout render contract): the GRADE (certainty/strength) + per-finding
+watchlist tags §9.4 Background-3 names are the LIAISON's dispatch-time annotations, added onto the
+open-on-extras entry when a `medical-liaison` collation runs — they are NOT data-layer fields. A
+liaison-absent collation (the `collate_doctor_visit_queue` path with no dispatch) yields entries
+WITHOUT `grade`/`watchlist`, so the render MUST tolerate their absence and degrade to the deterministic
+safety-tier ordering this module computes (non-overridable auto-block > block-stands > cleared, then
+band). The data layer guarantees the tier baseline; the liaison refines intra-tier + GRADE at dispatch.
 """
 
 import datetime

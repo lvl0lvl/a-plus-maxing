@@ -1893,3 +1893,68 @@ def test_collate_cumulative_latest_disposition_wins(tmp_path):
     queue = queue_schema.read_doctor_visit_queue(tmp_path)
     assert len(queue) == 1  # one finding, the latest record wins
     assert queue[0]["outcome"] == "cleared-with-override"  # the 06-20 cleared disposition supersedes
+
+
+def test_collate_entry_matches_adjudicated_finding_verbatim(tmp_path):
+    # Tier-3 TEST-1: the queued finding_id + caution EXACTLY equal the safety_finding the liaison
+    # adjudicated (so the SBAR render reproduces it verbatim), not merely startswith.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    liaison = _liaison("MEDIUM")
+    authors = _compound_authors(supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}})
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+    collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    queue = queue_schema.read_doctor_visit_queue(tmp_path)
+    rx_call = next(c for c in liaison.calls if c["source"] == "rx-bpmh")  # the finding the liaison saw
+    rx_entry = next(e for e in queue if e["axis"] == "rx-bpmh")
+    assert rx_entry["finding_id"] == rx_call["finding_id"]  # EXACT, not startswith
+    assert rx_entry["caution"] == rx_call["caution"]  # verbatim caution match
+
+
+def test_collate_overridable_block_stands_keeps_real_band(tmp_path):
+    # Tier-3 BUG-1: an OVERRIDABLE block-stands (vacuous HIGH override -> block-stands, non_overridable
+    # False) keeps its REAL band (HIGH) threaded from the envelope, NOT None — so it ranks by band within
+    # the block-stands tier, not collapsed to the unknown sub-tier. Reds if the band threading is removed.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}})
+    vacuous_high = _liaison("HIGH", override=_override_record("HIGH", operator_reason="trust me"))
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=vacuous_high)
+    e = next(e for e in collate_doctor_visit_queue(out, PLAN_DATE, tmp_path) if e["axis"] == "rx-bpmh")
+    assert e["outcome"] == "block-stands"
+    assert e["non_overridable"] is False
+    assert e["composite_band"] == "HIGH"  # the real band preserved, NOT None (BUG-1 fix)
+
+
+def test_collate_non_overridable_via_harm_class_keeps_real_band(tmp_path):
+    # Tier-3 BUG-2: a non-overridable-via-harm_class finding (band HIGH, harm_class H1) keeps its REAL
+    # band (HIGH) + harm_class (H1), NOT a fabricated "CRITICAL"; non_overridable still ranks it tier 0.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}})
+    h1 = _liaison("HIGH", harm_class="H1")
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=h1)
+    e = next(e for e in collate_doctor_visit_queue(out, PLAN_DATE, tmp_path) if e["axis"] == "rx-bpmh")
+    assert e["non_overridable"] is True
+    assert e["composite_band"] == "HIGH"  # real band, NOT fabricated CRITICAL (BUG-2 fix)
+    assert e["harm_class"] == "H1"
+
+
+def test_collate_derives_non_overridable_lead_via_collation(tmp_path):
+    # Tier-3 TEST-4: the safety-tier lead is DERIVED by collate_doctor_visit_queue from a real
+    # generate_plans result (not a hand-built fixture) — a non-overridable rx-bpmh (CRITICAL auto-block)
+    # while the additive-AE + conflict clear (MEDIUM) -> the rx-bpmh non-overridable entry leads the
+    # ranked queue. Exercises the _doctor_visit_queue_entry band/non_overridable derivation end-to-end.
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]},
+        },
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison(
+                             {"additive-ae": "MEDIUM", "cross-domain-conflict": "MEDIUM", "rx-bpmh": "CRITICAL"}))
+    collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    ranked = queue_schema.read_doctor_visit_queue(tmp_path)
+    assert ranked[0]["axis"] == "rx-bpmh"  # the derived non-overridable auto-block leads
+    assert ranked[0]["non_overridable"] is True
+    assert {e["axis"] for e in ranked} == {"additive-ae", "cross-domain-conflict", "rx-bpmh"}

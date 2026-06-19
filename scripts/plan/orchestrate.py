@@ -308,6 +308,32 @@ def _rx_bpmh_safety_finding(held_domain, matched_classes):
     }
 
 
+def _adjudicate_with_band(safety_finding, adjudicator):
+    """Adjudicate a held finding, then annotate the outcome with the envelope's band + harm_class.
+
+    `adjudicate` releases on CONTENT and does NOT echo `composite_band`/`harm_class` into its outcome
+    (they live in the liaison envelope), so a block-stands outcome would otherwise lose the finding's
+    real band — the doctor-visit-queue collation then could not rank or display a still-open concern
+    faithfully (it would read `None` for an overridable block-stands, or fabricate `CRITICAL` for a
+    non-overridable). The orchestrator holds the envelope here, so it threads the real band + harm_class
+    onto the outcome. This does NOT change the gate's release decision: `outcome` / `non_overridable` /
+    `override_record` are `adjudicate`'s, untouched — only the descriptive band/harm_class are added.
+
+    Args:
+        safety_finding (dict): The held finding routed to the liaison.
+        adjudicator (Callable): `adjudicator(safety_finding) -> envelope | None`.
+
+    Returns:
+        (dict) The `adjudicate` outcome, plus `composite_band` + `harm_class` from the envelope.
+    """
+    envelope = adjudicator(safety_finding)
+    outcome = adjudicate(safety_finding, envelope)
+    if isinstance(envelope, dict):
+        outcome["composite_band"] = envelope.get("composite_band")
+        outcome["harm_class"] = envelope.get("harm_class")
+    return outcome
+
+
 def reconcile(candidates, *, operator_rx_classes=frozenset()):
     """Cross-domain reconciliation over the computed candidates (no recording).
 
@@ -549,7 +575,7 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
     adjudication = None
     if holds.get("supplements") == ADDITIVE_AE_HELD and adjudicator is not None:
         safety_finding = _additive_ae_safety_finding(report["additive_ae"])
-        adjudication = adjudicate(safety_finding, adjudicator(safety_finding))
+        adjudication = _adjudicate_with_band(safety_finding, adjudicator)
         if adjudication["outcome"] == "cleared":
             del holds["supplements"]
 
@@ -566,7 +592,7 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
         for domain in sorted(conflict_held):
             domain_conflicts = [c for c in report["conflicts"] if c.get("from") == domain]
             safety_finding = _conflict_safety_finding(domain, domain_conflicts)
-            adjudication_outcome = adjudicate(safety_finding, adjudicator(safety_finding))
+            adjudication_outcome = _adjudicate_with_band(safety_finding, adjudicator)
             conflict_adjudications[domain] = adjudication_outcome
             if adjudication_outcome["outcome"] == "cleared":
                 conflict_held.discard(domain)
@@ -584,7 +610,7 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
         for domain in sorted(rx_bpmh_held):
             matched = next(f["classes"] for f in report["rx_bpmh"] if f["held_domain"] == domain)
             safety_finding = _rx_bpmh_safety_finding(domain, matched)
-            adjudication_outcome = adjudicate(safety_finding, adjudicator(safety_finding))
+            adjudication_outcome = _adjudicate_with_band(safety_finding, adjudicator)
             rx_bpmh_adjudications[domain] = adjudication_outcome
             if adjudication_outcome["outcome"] == "cleared":
                 rx_bpmh_held.discard(domain)
@@ -619,14 +645,17 @@ def _doctor_visit_queue_entry(safety_finding, adjudication, axis, source_special
 
     Carries the data-layer fields the SBAR handout's flagged-interactions section renders from
     (medical-liaison design §9.4 Background-3): the finding identity + verbatim caution, the held
-    compound domain + its source specialist, the adjudication outcome, and the severity signal
-    (`non_overridable` + the override record's `composite_band`, or `CRITICAL` for a non-overridable
-    auto-block). No clinical verdict; the GRADE annotation is the liaison's to add at its dispatch
-    (entries are open on extras).
+    compound domain + its source specialist, the adjudication outcome, and the severity signals
+    (`non_overridable`, the REAL `composite_band`, and `harm_class`). The band + harm_class are the
+    envelope values the orchestrator threaded onto the outcome (`_adjudicate_with_band`), so a
+    block-stands finding keeps its real band (not `None`) and a non-overridable finding keeps its real
+    band + harm_class (not a fabricated `CRITICAL`); the band is `None` only when no adjudicator ran.
+    No clinical verdict; the GRADE annotation is the liaison's to add at its dispatch (entries are
+    open on extras).
 
     Args:
         safety_finding (dict): The reconciler's `safety_finding` (`finding_id` + `caution` + held domain).
-        adjudication (dict): The `adjudicate` outcome for that finding.
+        adjudication (dict): The `adjudicate` outcome for that finding, band-annotated.
         axis (str): The finding's axis (`additive-ae` | `cross-domain-conflict` | `rx-bpmh`).
         source_specialist (str | None): The held domain's authoring specialist.
 
@@ -635,7 +664,9 @@ def _doctor_visit_queue_entry(safety_finding, adjudication, axis, source_special
     """
     override = adjudication.get("override_record") or {}
     non_overridable = bool(adjudication.get("non_overridable"))
-    band = override.get("composite_band") or ("CRITICAL" if non_overridable else None)
+    # The real band threaded from the envelope (available for cleared AND block-stands); the cleared
+    # override record's band is the same value and serves as the fallback. None only when unadjudicated.
+    band = adjudication.get("composite_band") or override.get("composite_band")
     outcome = "cleared-with-override" if adjudication.get("outcome") == "cleared" else "block-stands"
     return {
         "finding_id": safety_finding["finding_id"],
@@ -646,6 +677,7 @@ def _doctor_visit_queue_entry(safety_finding, adjudication, axis, source_special
         "outcome": outcome,
         "non_overridable": non_overridable,
         "composite_band": band,
+        "harm_class": adjudication.get("harm_class"),
     }
 
 
@@ -694,7 +726,11 @@ def collate_doctor_visit_queue(result, on_date, root):
         recorded.append(entry)
 
     for domain, adjudication in result.get("rx_bpmh_adjudications", {}).items():
-        matched = next((f["classes"] for f in report["rx_bpmh"] if f["held_domain"] == domain), [])
+        # No `[]` default — a BPMH-adjudicated domain is always present in `report["rx_bpmh"]` (both
+        # populated in lockstep in `reconcile`), so a missing match is an impossible inconsistent
+        # result that fails loud rather than queuing a degenerate empty-class finding (mirrors the
+        # production adjudication loop in `generate_plans`, which uses no default).
+        matched = next(f["classes"] for f in report["rx_bpmh"] if f["held_domain"] == domain)
         safety_finding = _rx_bpmh_safety_finding(domain, matched)
         entry = _doctor_visit_queue_entry(
             safety_finding, adjudication, "rx-bpmh", _queue_specialist(results, domain),
