@@ -371,7 +371,7 @@ table; after picking, append your claim** so the two tracks don't duplicate. A c
 
 | Session | Subject / cluster | Wave | Mode | Status | Date |
 |---|---|---|---|---|---|
-| `feature/wiki-research` worktree | **Lipids / CV-risk biomarkers** — ApoB, Lp(a), LDL-C, HDL-C, triglycerides, GlycA, hs-CRP (7 entries) | 1 | standard | **IN PROGRESS** — research underway, building entries through wiki ingestion (claimed 2026-06-18, started 2026-06-18) | 2026-06-18 |
+| `feature/wiki-research` worktree | **Lipids / CV-risk biomarkers** — ApoB, Lp(a), LDL-C, HDL-C, triglycerides, GlycA, hs-CRP (7 entries) | 1 | standard | **DONE — ingested, PR #160 open** (all gates 2.75/3.5/4.25/4.75 attested PASS, bda-clean; `/review-pr`→`/merge` pending GitHub rate-limit) | 2026-06-19 |
 | `feature/research-bpc157-rerun` (other session) | **BPC-157** deep re-research + finished entry | 0 | deep | **DONE** — merged to `main` (PR #150, all gates attested) | 2026-06-18 |
 
 **Claim update mandate:** update this table when a subject is *claimed/started* (status `IN PROGRESS`), not only when it is done and ingested — so the parallel track never duplicates work that is underway. Flip a row to `DONE` as its entries land in the wiki.
