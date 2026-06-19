@@ -27,6 +27,25 @@ the next. Keep going until the triage taxonomy is fully Done/Excluded.
 
 ---
 
+## 2026-06-18 — Tirzepatide deep pass (round 6)
+
+### DONE (verified)
+- **Tirzepatide deep pass** (triage 24/25) → entry + report + 2 layers + `.provenance/`. evidence_tier S / off-target
+  for the operator's goal. **Merge-gate review = PASS-WITH-FIXES** (14/14 load-bearing citations independently
+  re-verified to exact title/journal/finding; WADA-monitoring + all regulatory dates confirmed; 3 precision fixes
+  applied: DXA substudy denominator −21.3%, "by mass" qualifier on the lean ratio, SURMOUNT-4 regain phrasing). No fabrication.
+
+### CLAIMED (re-checkable via `tirzepatide/.provenance/sources-ledger.md`)
+- Most potent agent in class (SURMOUNT-1 −20.9%; beats semaglutide head-to-head −20.2% vs −13.7%, SURMOUNT-5); first/only
+  FDA OSA drug (SURMOUNT-OSA). **Same GOAL MISMATCH as semaglutide:** ~25% of mass lost is lean tissue, reverses on
+  stopping, NO muscle-building RCT (lean-sparing only via add-on anti-myostatin). NOT WADA-prohibited (Monitoring).
+
+### CLAIMED / RESERVED — next round
+Deep pass **Retatrutide** (18/25, investigational — entry must gate toward "wait for approval", not acquisition). Then
+the remaining classes (GH-secretagogues, Cognitive, Sexual, Immune/longevity remainder, Mitochondrial) until [[_triage]] is fully Done/Excluded.
+
+---
+
 ## 2026-06-18 — Semaglutide deep pass (round 5)
 
 ### DONE (verified)
