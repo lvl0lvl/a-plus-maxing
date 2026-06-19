@@ -348,6 +348,84 @@ def test_adjudicate_caution_mismatch_block_stands():
     assert outcome["outcome"] == "block-stands"
 
 
+# --- malformed routing-key fail-safe (PR review SEC-1 / BUG-1 / BUG-2) ----------
+
+
+def test_is_non_overridable_normalizes_harm_class_casing():
+    # SEC-1: a true H1/H2 declared in non-canonical casing/whitespace stays non-overridable
+    # (never released on a casing variance).
+    for hc in ("h1", " H1", "H1 ", "H2\n", "h2", " H2 "):
+        assert adjudicate.is_non_overridable("HIGH", hc) is True, hc
+    assert adjudicate.is_non_overridable("HIGH", "H3") is False  # a genuine overridable class
+    assert adjudicate.is_non_overridable("HIGH", None) is False
+
+
+def test_adjudicate_noncanonical_h1_with_override_path_block_stands():
+    # SEC-1 end-to-end: a lowercase-h1 finding carrying a valid override path must NOT clear.
+    envelope = _envelope("HIGH", harm_class="h1", override=_override_record("HIGH"),
+                         set_by=adjudicate.LIAISON_SET_BY)
+    outcome = adjudicate.adjudicate(_safety_finding(), envelope)
+    assert outcome["outcome"] == "block-stands"
+    assert outcome["non_overridable"] is True
+    assert outcome["override_record"] is None
+
+
+def test_audit_noncanonical_h1_with_override_path_violates():
+    envelope = _envelope("HIGH", harm_class=" H1 ", override=_override_record("HIGH"),
+                         set_by=adjudicate.LIAISON_SET_BY)
+    ok, violations = adjudicate.audit_adjudication_envelope(envelope)
+    assert ok is False
+    assert any(v["invariant"] == "INV-CRITICAL-NON-OVERRIDABLE" for v in violations)
+
+
+def test_set_by_helper_handles_non_dict_severity_final():
+    # BUG-1: a truthy non-dict severity_final reads as no set_by (never a .get crash).
+    assert adjudicate._set_by({"severity_final": "medical-liaison"}) is None
+    assert adjudicate._set_by({"severity_final": ["x"]}) is None
+    assert adjudicate._set_by({"severity_final": {"set_by": "medical-liaison"}}) == "medical-liaison"
+    assert adjudicate._set_by({}) is None
+
+
+def test_adjudicate_non_dict_severity_final_block_stands_no_crash():
+    # BUG-1: a HIGH override envelope whose severity_final is a bare string must block-stand,
+    # not raise AttributeError.
+    envelope = _envelope("HIGH")
+    envelope["severity_final"] = "medical-liaison set this"  # truthy non-dict
+    outcome = adjudicate.adjudicate(_safety_finding(), envelope)
+    assert outcome["outcome"] == "block-stands"
+
+
+def test_audit_non_dict_severity_final_no_crash():
+    envelope = _envelope("HIGH")
+    envelope["severity_final"] = "medical-liaison set this"
+    ok, violations = adjudicate.audit_adjudication_envelope(envelope)
+    assert ok is False  # no set_by -> override record can't be liaison-attributed
+
+
+def test_is_non_overridable_unhashable_harm_class_no_crash():
+    # BUG-2: an unhashable harm_class must not raise TypeError at the frozenset membership test.
+    assert adjudicate.is_non_overridable("HIGH", ["H1"]) is False
+    assert adjudicate.is_non_overridable("HIGH", {"h": 1}) is False
+
+
+def test_adjudicate_unhashable_harm_class_block_stands_no_crash():
+    # BUG-2: a malformed (non-string) harm_class is a malformed envelope -> block stands, never a
+    # crash and never silently routed overridable-and-cleared.
+    envelope = _envelope("HIGH", harm_class=["H1"], override=_override_record("HIGH"),
+                         set_by=adjudicate.LIAISON_SET_BY)
+    outcome = adjudicate.adjudicate(_safety_finding(), envelope)
+    assert outcome["outcome"] == "block-stands"
+    assert outcome["override_record"] is None
+
+
+def test_audit_unhashable_harm_class_violates_no_crash():
+    envelope = _envelope("HIGH", harm_class=["H1"], override=_override_record("HIGH"),
+                         set_by=adjudicate.LIAISON_SET_BY)
+    ok, violations = adjudicate.audit_adjudication_envelope(envelope)
+    assert ok is False
+    assert any("harm_class" in v["reason"] for v in violations)
+
+
 # --- the --audit-envelope CLI (what the bash audit wraps) -----------------------
 
 
