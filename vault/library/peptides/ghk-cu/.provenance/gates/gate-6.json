@@ -1,0 +1,40 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-ghkcu-i1",
+  "draft_path": "vault/library/peptides/ghk-cu/research-report.md",
+  "findings": [
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "Refs [50] (Avena Lab TDS) and [62] (Fu 2015 ACL/orthopaedic animal study, PMID 25731775) are in the bibliography but never cited by an inline [N] token in the body \u2014 orphaned references; wire in or drop."
+    },
+    {
+      "category": "unexamined-counter-evidence",
+      "severity": "minor",
+      "description": "Ref [62] Fu 2015 is an independent animal GHK-Cu study reporting only TRANSIENTLY improved healing; this null-leaning nuance belongs in the \u00a77.3 model-dependence/wound-signal balance alongside Parker 2013 but is left orphaned. Omission is conservative (would strengthen the model-dependent caveat), hence non-blocking."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "The tier-C 'pull up' and \u00a76/\u00a711 summaries lean on Mulder 1994 as 'one positive RCT / highest-quality human design.' All caveats (n unstated, ProCyte COI, 30 years old, wound-not-cosmetic) are disclosed in \u00a73.3, but the summary-level 'one positive RCT' framing still reads more robust than an n-unstated single industry trial warrants; a one-clause thinness reminder at \u00a76/\u00a711 would tighten balance."
+    },
+    {
+      "category": "objectivity-issue",
+      "severity": "minor",
+      "description": "The cMap '31.2%' figure, always correctly framed as a bioinformatic prediction, is repeated as a precise numeric headline in \u00a72.3, \u00a77.5, and \u00a77.6, giving a 3-profile-based number more salience than its basis warrants. Salience nit, not a misstatement; tone is non-promotional overall."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T15:06:44.406386+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T15:03:52.686138+00:00",
+    "attest_ts": "2026-06-19T15:06:44.406389+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "0fcafdfae1eacd5b33493b2dbbee59ea49aea5fb85964d71dfa63fdb5cfc7440",
+    "agent_source_mtime": "2026-06-19T15:06:14.515543+00:00"
+  }
+}

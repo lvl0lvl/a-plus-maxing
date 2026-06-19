@@ -1,0 +1,89 @@
+{
+  "phase": "4.75",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 150,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "WARN",
+      "findings": [
+        "ufnalska-2021 log cK(7.4)=12.62 corpus-missing: value not in abstract, full-text PDF paywalled (HTTP 403); citation genuine and on-topic; paywall->WARN not HALT",
+        "Hong-2010 '~1 uM' GHK concentration is full-text-level (not in abstract); correctly framed as predicted active concentration, not asserted as measured"
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 50,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 28,
+    "largest_cluster_name": "Pickart/Skin Biology nexus",
+    "largest_cluster_count": 3,
+    "share": 0.11,
+    "threshold_triggered": false,
+    "surfaced_section_heading": "Concentration/COI audit (Pickart/Margolina share estimate + method; commercial COI surfaced)",
+    "surfaced_before_first_indication": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 6,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: ufnalska-2021 log cK(7.4)=12.62 corpus-missing (paywalled full text)",
+    "IC-13: hong-2010 ~1 uM is full-text-level, framed as prediction not measurement",
+    "IC-9 residual: review-layer share is a calibrated estimate not a full bibliometric census (Section G self-discloses)"
+  ],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T15:03:52.567882+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T14:45:09.922572+00:00",
+    "attest_ts": "2026-06-19T15:03:52.567885+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "a9971473edd1e14ac3d116c95b53d270b1200daf7aec3d53c5d2302780b97b69",
+    "agent_source_mtime": "2026-06-19T15:03:35.897755+00:00"
+  }
+}
