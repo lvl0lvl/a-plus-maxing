@@ -118,12 +118,11 @@ Ranked queue (deep-pass-eligible, not yet deep-passed): _(empty — metabolic cl
 **Metabolic class triaged 2026-06-18:** Semaglutide 24, Tirzepatide 24, Retatrutide 18 (eligible); AOD-9604 12 → Excluded.
 
 **CLAIMED — next round (reserved 2026-06-19, peptide-library track):**
-**Cognitive class triage** — Selank, Semax, Cerebrolysin, Dihexa, N-Acetyl-Selank-Amidate — then deep-pass any eligible
-(note: Selank/Semax/Cerebrolysin have substantial RUSSIAN literature — the non-English layer will matter here). Then
-Sexual (PT-141, Melanotan II, Kisspeptin-10), Immune/longevity remainder (Epitalon, FOXO4-DRI, Humanin), Mitochondrial
-(SS-31, MOTS-c) until the taxonomy is fully Done/Excluded. Do NOT re-run anything already Done/Excluded.
-(COMPLETE: Healing class; Metabolic class [Sema+Tirze+Reta Done, AOD Excluded]; **GH-secretagogue class** [Tesamorelin Done;
-Sermorelin + MK-677 Held; CJC-1295 + Hexarelin Excluded; Ipamorelin Held].)
+**Sexual / dopaminergic class triage** — PT-141 (Bremelanotide; FDA-approved as Vyleesi — likely deep-pass-eligible),
+Melanotan II, Kisspeptin-10 — then deep-pass any eligible. Then Immune/longevity remainder (Epitalon, FOXO4-DRI,
+Humanin), Mitochondrial (SS-31, MOTS-c) until the taxonomy is fully Done/Excluded. Do NOT re-run anything already Done/Excluded.
+(COMPLETE: Healing; Metabolic [Sema+Tirze+Reta Done, AOD Excluded]; GH-secretagogue [Tesamorelin Done; Sermorelin+MK-677
+Held; CJC-1295+Hexarelin Excluded; Ipamorelin Held]; **Cognitive** [Semax+Selank+Cerebrolysin Held; Dihexa+NA-Selank-Amidate Excluded].)
 
 ## Excluded (do not re-research without trigger)
 
@@ -141,6 +140,11 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 | MK-677 (Ibutamoren) | Triage 15/25 → HOLD (2026-06-19). Real multi-year RCTs (evidence_tier A) reliably raise GH/IGF-1 + FFM +1.6 kg (Nass 2008, PMID 18981485) — BUT repeatedly FAILED to convert the surrogate to clinical benefit (Alzheimer's PMID 19015485; hip-fracture PMID 21067829 terminated early for a CHF safety signal), and causes insulin resistance + raised fasting glucose + edema. Never approved; gray-market; WADA S2. High-interest compound — revisit if operator wants a full entry. | New positive clinical-outcome RCT, or operator request for a full entry. |
 | CJC-1295 (±DAC) | Triage 11/25 (2026-06-19). Surrogate PK/PD only — DAC form raised GH/IGF-1 (Teichman 2006, PMID 16352683); NO body-comp/sleep outcome RCT; no-DAC form essentially undocumented. Phase-2 HIV-lipodystrophy trial halted 2006 after a participant death (causality unadjudicated); DAC half-life 6–8 d (slow to clear AEs). Gray-market; WADA S2. | A clinical-outcome RCT + a resolved safety record. |
 | Hexarelin | Triage 9/25 (2026-06-19). GHRP with real GH pharmacodynamics but the GH response DESENSITIZES with continued use (PMID 10990150) — undermining chronic use; no body-comp/outcome RCT; distinct CD36 cardiac activity (unquantified in humans); never approved; gray-market; WADA S2. | A clinical-outcome RCT overcoming the desensitization problem. |
+| Semax | Triage 15/25 → HOLD (2026-06-19). Russian ACTH(4-10) analog, approved in Russia (stroke/cognitive). Efficacy evidence is Russian open-label (PMID 29798983, 110 stroke pts, Barthel/BDNF) + animal mechanism; the rigorous English data (PMID 30225715) is fMRI biomarker only — no blinded English cognitive RCT. Intranasal (fits no-clinic limit); gray-market in US (PCAC review ~2026). | A blinded English-language human cognitive RCT, or regulated US supply. |
+| Selank | Triage 15/25 → HOLD (2026-06-19). Russian tuftsin-analog anxiolytic (approved Russia 2009, GAD). Small Russian active-comparator trials (PMID 18454096 vs medazepam; PMID 25176261 vs phenazepam, n=60) + animal GABAergic mechanism; no English RCT/meta. Good reported tolerability, intranasal; gray-market in US. **N-Acetyl-Selank-Amidate: NO admissible distinct evidence — not scored separately.** | A blinded English human RCT, or regulated supply. |
+| Cerebrolysin | Triage 14/25 → HOLD (2026-06-19). Porcine brain-derived peptide mix; LARGE RCT base (CARS stroke PMID 26564102 positive) BUT Cochrane reviews null/weak with bias + a non-fatal-SAE signal (stroke PMID 37818733 "no further trials"; vascular dementia PMID 31710397). **IV/IM course administration conflicts with the no-clinic-visit limit**; approved in 50+ countries, NOT FDA. | A low-risk-of-bias positive RCT + a non-parenteral route, or operator request. |
+| Dihexa | Triage 10/25 (2026-06-19). Ang-IV-derived c-Met/HGF activator — PRECLINICAL ONLY, no human data. Cornerstone evidence compromised: McCoy 2013 (PMID 23055539) carries a 2021 Notice of Concern; the mechanism paper Benoist 2014 was RETRACTED 2025 (PMID 40312093). Real oncogenic concern (c-Met activation); same-class clinical drug fosgonimeton failed Phase 2/3 (2024). Gray-market. evidence_tier D. | A clean human safety + efficacy trial resolving the oncogenic concern (unlikely). |
+| N-Acetyl-Selank-Amidate | Triage (2026-06-19) — folded into Selank: **NO ADMISSIBLE DISTINCT PRIMARY EVIDENCE** (vendor/encyclopedia pages only); a gray-market Selank derivative. Excluded pending any distinct human data. | A distinct human study on the amidate variant specifically. |
 
 ## Done (compound page exists)
 

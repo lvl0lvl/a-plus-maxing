@@ -27,6 +27,23 @@ the next. Keep going until the triage taxonomy is fully Done/Excluded.
 
 ---
 
+## 2026-06-19 — Cognitive class triage (round 9) — no deep-pass-eligible candidate
+
+### DONE (verified)
+- **Cognitive class triaged** (citations verified, Russian literature surveyed): **Semax 15/HOLD** (Russian open-label +
+  animal; no blinded English RCT), **Selank 15/HOLD** (small Russian trials; no English RCT; NA-Selank-Amidate no distinct
+  evidence — folded), **Cerebrolysin 14/HOLD** (large RCT base BUT Cochrane null/bias + non-fatal-SAE signal; IV/IM courses
+  clash with no-clinic-visit limit), **Dihexa 10/EXCLUDE** (preclinical only; cornerstone papers retracted/Notice-of-Concern;
+  oncogenic c-Met concern). **No deep-pass-eligible candidate.**
+- Strong anti-fabrication: agents rejected two wrong-paper PMIDs (Selank), caught the Dihexa retraction (Benoist 2014 →
+  PMID 40312093) + Notice of Concern (McCoy 2013), and flagged the same-class fosgonimeton Phase-2/3 failure.
+
+### CLAIMED / RESERVED — next round
+**Sexual/dopaminergic class triage** (PT-141/Bremelanotide [FDA-approved Vyleesi — likely deep-pass-eligible], Melanotan
+II, Kisspeptin-10) → deep-pass eligibles. Then Immune/longevity remainder, Mitochondrial until [[_triage]] fully Done/Excluded.
+
+---
+
 ## 2026-06-19 — GH-secretagogue class triage (round 8) — no deep-pass-eligible candidate
 
 ### DONE (verified)
