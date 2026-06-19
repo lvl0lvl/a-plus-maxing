@@ -371,13 +371,14 @@ table; after picking, append your claim** so the two tracks don't duplicate. A c
 
 | Session | Subject / cluster | Wave | Mode | Status | Date |
 |---|---|---|---|---|---|
-| `feature/wiki-research` worktree | **Lipids / CV-risk biomarkers** — ApoB, Lp(a), LDL-C, HDL-C, triglycerides, GlycA, hs-CRP (7 entries) | 1 | standard | **DONE — ingested, PR #160 open** (all gates 2.75/3.5/4.25/4.75 attested PASS, bda-clean; `/review-pr`→`/merge` pending GitHub rate-limit) | 2026-06-19 |
+| `feature/wiki-research` (merged) | **Lipids / CV-risk biomarkers** — ApoB, Lp(a), LDL-C, HDL-C, triglycerides, GlycA, hs-CRP (7 entries) | 1 | standard | **DONE — merged to main** (PR #160 squashed; gates 2.75/3.5/4.25/4.75 attested + bda-clean; `/review-pr` → 8 fixes incl. hs-CRP JUPITER cite + 7 `[[labs/]]` dead-links → `/merge`) | 2026-06-19 |
 | `feature/research-bpc157-rerun` (other session) | **BPC-157** deep re-research + finished entry | 0 | deep | **DONE** — merged to `main` (PR #150, all gates attested) | 2026-06-18 |
+| `feature/wiki-metabolic` worktree | **Metabolic — glycemic core** — fasting glucose, HbA1c, fasting insulin, HOMA-IR (4 entries) | 1 | standard | **IN PROGRESS** — claimed 2026-06-19 | 2026-06-19 |
 
 **Claim update mandate:** update this table when a subject is *claimed/started* (status `IN PROGRESS`), not only when it is done and ingested — so the parallel track never duplicates work that is underway. Flip a row to `DONE` as its entries land in the wiki.
 
-**Still open (Wave 1 remaining clusters, for the other session):** Metabolic panel
-(glucose, HbA1c, insulin, HOMA-IR, CMP) · Thyroid (TSH, fT3, fT4) · Hormones (total/free
+**Still open (Wave 1 remaining clusters):** Metabolic — CMP organ markers
+(ALT, AST, eGFR, electrolytes; the glycemic core glucose/HbA1c/insulin/HOMA-IR is CLAIMED above) · Thyroid (TSH, fT3, fT4) · Hormones (total/free
 testosterone, estradiol, cortisol, DHEA-S, IGF-1, SHBG) · Vitamins/minerals (vit D, ferritin,
 B12, RBC-Mg) · Wearable (HRV, RHR, sleep-efficiency, respiratory rate, recovery/strain).
 **Wave 0** (BPC-157) is **DONE** (above).
