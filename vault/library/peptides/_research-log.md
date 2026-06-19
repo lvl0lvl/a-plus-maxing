@@ -27,6 +27,23 @@ the next. Keep going until the triage taxonomy is fully Done/Excluded.
 
 ---
 
+## 2026-06-19 — GH-secretagogue class triage (round 8) — no deep-pass-eligible candidate
+
+### DONE (verified)
+- **GH-secretagogue class triaged** (citations verified): **Sermorelin 16/25 HOLD** (FDA-approved/discontinued; adult RCT
+  thin — Khorram +1.26 kg LBM men-only vs Vittone NULL), **MK-677 15/25 HOLD** (real RCTs raise GH/IGF-1+FFM but FAILED
+  clinical endpoints + insulin resistance + CHF signal), **CJC-1295 11/25 EXCLUDE** (surrogate-only; trial halted after a
+  death), **Hexarelin 9/25 EXCLUDE** (GH desensitizes; no outcome RCT). **No deep-pass-eligible candidate** — the
+  evidence-backed GHRH analog of this class (Tesamorelin) was already deep-passed. All four are gray-market + WADA S2.
+- Agents held anti-fabrication: corrected a vendor misattribution (+1.26 kg LBM is Khorram, not Vittone); flagged the
+  unadjudicated CJC-1295 trial death.
+
+### CLAIMED / RESERVED — next round
+**Cognitive class triage** (Selank, Semax, Cerebrolysin, Dihexa, NA-Selank-Amidate) — Russian literature will matter
+(non-English layer). Then Sexual, Immune/longevity remainder, Mitochondrial until [[_triage]] is fully Done/Excluded.
+
+---
+
 ## 2026-06-19 — Retatrutide deep pass (round 7) — METABOLIC CLASS COMPLETE
 
 ### DONE (verified)
