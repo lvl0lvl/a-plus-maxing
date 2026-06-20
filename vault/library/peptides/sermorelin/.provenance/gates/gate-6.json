@@ -1,0 +1,30 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-serm-i1",
+  "draft_path": "vault/library/peptides/sermorelin/research-report.md",
+  "findings": [
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "\u00a75.4 lists 'Concomitant drugs that affect GH release' under the Contraindications heading, then immediately reclassifies it as a diagnostic-use/interaction caution; these are interaction cautions, not true contraindications. Self-corrected in body but heading placement slightly overstates."
+    },
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "Section C source dated the approval withdrawal '~2009' while the report uses '~2008'; the report's 2008 framing is the more precise reading (2008 discontinuation letters + withdrawal request) and is internally consistent, so this is an improvement over the source rather than an error \u2014 flagged only for traceability."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-20T21:36:55.938967+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T21:34:00.599319+00:00",
+    "attest_ts": "2026-06-20T21:36:55.938970+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "deb39bfbbe040e9434e3bceebd2b3ccb73cfb93dea3ea5403727ea64527f3620",
+    "agent_source_mtime": "2026-06-20T21:36:31.827087+00:00"
+  }
+}
