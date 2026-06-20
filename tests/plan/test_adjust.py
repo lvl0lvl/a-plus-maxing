@@ -281,3 +281,39 @@ def test_tracking_without_plan_for_date_is_no_plan_to_adjust_from(tmp_path):
     result = adjust.adjust_plan("workout", _adjusted(), _store_read(root), root,
                                 prior_date=_PRIOR, adjust_date=_ADJUST)
     assert result["state"] == adjust.NO_PLAN_TO_ADJUST_FROM and result["adjusted"] is False
+
+
+# --- the nutrition AGGREGATE translator lands on the adjust path (not just the veto) ---
+
+def test_nutrition_closed_loop_adjust_lands(tmp_path):
+    """The nutrition AGGREGATE translator records an adjusted day plan (the happy path, not the veto)."""
+    root = tmp_path / "store"
+    _seed_store(root)
+    plan_schema.record_plan(
+        "nutrition", {"calorie_goal": 2600, "macros": {"protein": 190, "carbs": 250, "fat": 80},
+                      "meals": [{"name": "Breakfast", "kcal": 650}]}, _PRIOR, "nutritionist", root)
+    track.record_tracking("nutrition", {"food_kcal": 2550}, _PRIOR, root)
+    nut_adjusted = _author(
+        _nutrition_target_rec(calorie_goal=2400, protein=180, carbs=230, fat=70),
+        _nutrition_meal_rec("Breakfast", contents="eggs, oats", kcal=600), specialist="nutritionist")
+    result = adjust.adjust_plan("nutrition", nut_adjusted, _store_read(root), root,
+                                prior_date=_PRIOR, adjust_date=_ADJUST)
+    assert result["state"] == adjust.ADJUSTED and result["adjusted"] is True
+    plan = result["plan"]
+    assert plan["calorie_goal"] == 2400                  # the adjusted target landed (aggregate ran)
+    assert plan["macros"]["protein"] == 180
+    assert any(m["name"] == "Breakfast" for m in plan["meals"])
+    assert track.resolve_plan_progress("nutrition", _ADJUST, root)["plan"]["calorie_goal"] == 2400
+
+
+# --- the gates=None default-deny holds on the adjust path -------------------
+
+def test_gates_none_default_drops_uncleared_load_on_replan(tmp_path):
+    """With gates OMITTED (the all-conservative default), an un-cleared load is still dropped on adjust."""
+    root = tmp_path / "store"
+    _seed_plan_and_tracking(root)
+    result = adjust.adjust_plan(
+        "workout", _adjusted("Front squat", load="70% 1RM"), _store_read(root), root,
+        prior_date=_PRIOR, adjust_date=_ADJUST)   # gates omitted -> None -> all-conservative default
+    assert result["adjusted"] is True
+    assert all("load" not in ex for ex in result["plan"]["exercises"])   # default-deny holds on adjust
