@@ -20,11 +20,11 @@ from pathlib import Path
 
 from scripts.generate import render
 from scripts.store import store
-from vault.design.templates import dashboard, report
+from vault.design.templates import dashboard, handout, report
 
 # The artifact_name -> template-module selection. A template is a module exposing
 # render(store_read); render.emit names the output file from the module.
-_TEMPLATES = {"dashboard": dashboard, "report": report}
+_TEMPLATES = {"dashboard": dashboard, "handout": handout, "report": report}
 
 
 def run(artifact_name, *, _root=None, _out_dir=None, _today=None):
@@ -37,7 +37,8 @@ def run(artifact_name, *, _root=None, _out_dir=None, _today=None):
     and binds no listening socket.
 
     Args:
-        artifact_name (str): The artifact to render: 'dashboard' or 'report'.
+        artifact_name (str): The artifact to render: 'dashboard', 'handout', or
+            'report'.
         _root (str | Path, optional): Test-only store-root seam. Defaults to the
             store's `vault/store/`.
         _out_dir (Path, optional): Test-only output-dir seam, forwarded to

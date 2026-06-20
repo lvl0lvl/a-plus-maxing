@@ -32,7 +32,6 @@ and extended with the face sheet's own page rules. A template is a callable
 """
 
 import datetime
-import re
 from pathlib import Path
 
 from scripts.store import biomarker_meta, plan_schema
@@ -55,25 +54,13 @@ _PROFILE_PATHS = (
     Path("vault/meta/operator-profile.md"),
 )
 
-# The self-reported tier's base amber — the v3 spec's ONE unregistered hex:
-# non-text tier chrome only (glyph fills, stat-box top edges), never text
-# (tier TEXT renders the registered `*-text` shades).
-_SELF_REPORTED_BASE = "#B7791F"
-
-# Source tier -> (glyph, non-text base chrome, AA text shade). Glyph SHAPES
-# are distinct so monochrome print preserves the tiers (facesheet spec).
-_TIER_CHROME = {
-    "lab-grade": ("◆", cs.ACCENTS["training"], cs.CHROME["training-text"]),
-    "consumer wearable": ("●", cs.ACCENTS["supplements"], cs.CHROME["supplements-text"]),
-    "self-reported": ("○", _SELF_REPORTED_BASE, cs.CHROME["watch-text"]),
-}
-
-# Reading source tag -> tier. Only the sources that exist are mapped
-# (loop_schema's biomarker writer tags "manual" = operator-entered =
-# self-reported); an unmapped source renders NO tier claim — a gap is
-# stated, never inferred. Lab-grade/wearable land here when those ingest
-# sources exist.
-_SOURCE_TIERS = {"manual": "self-reported"}
+# The source-tier chrome + the source->tier map now live in `component_set`
+# (one enforcement point, shared with the doctor-visit handout); kept as module
+# aliases so this template's call sites — and the tests that read these symbols
+# off `report` — are unchanged.
+_SELF_REPORTED_BASE = cs._SELF_REPORTED_BASE
+_TIER_CHROME = cs.TIER_CHROME
+_SOURCE_TIERS = cs.SOURCE_TIERS
 
 # The signals section's four 30-day aggregate slots (LM-02 gated: structure
 # renders, values stay em-dash — the dashboard's designed-empty precedent).
@@ -146,69 +133,27 @@ def _readings_by_item(store_read):
 
 
 def _read_profile():
-    """Parse the operator profile's header-relevant fields.
+    """Parse the operator profile's header fields (initials-only; ADR-0009 D2).
 
-    Reads the FIRST existing `_PROFILE_PATHS` entry: the gitignored filled
-    copy under `vault/scaffold/filled/` (ADR-0005's pinned filled-scaffold
-    path) wins over the tracked scaffold. Returns initials (from the profile
-    title — never the full name), the age BAND (decade, e.g. `40s`, derived
-    from a filled Age field — the exact age never renders), and the
-    January-issue status (a filled Current status field). An unfilled
-    scaffold prompt (`<...>`) reads None, and no profile file at all reads
-    all-None — the header renders its em-dash awaiting slots either way
-    (ADR-0009 D2 honest absence; a fresh clone still generates).
+    Delegates to the shared `component_set.read_profile`, passing this module's
+    `_PROFILE_PATHS` (the test seam): the ADR-0005 filled copy wins over the
+    tracked scaffold, the operator renders as INITIALS only (never the full
+    name), and unfilled fields render their em-dash awaiting slots.
 
     Returns:
         (dict) Keys `initials`, `age_band`, `issue_status`; None = unfilled.
     """
-    fields = {"initials": None, "age_band": None, "issue_status": None}
-    path = next((p for p in _PROFILE_PATHS if p.exists()), None)
-    if path is None:
-        return fields
-    text = path.read_text(encoding="utf-8")
-    title = re.search(r"^# Operator Profile — (.+)$", text, re.M)
-    if title:
-        initials = "".join(
-            word[0].upper() for word in title.group(1).split() if word[0].isalpha()
-        )
-        fields["initials"] = initials or None
-    age = re.search(r"^- \*\*Age:\*\* (.+)$", text, re.M)
-    if age:
-        years = re.match(r"(\d+)", age.group(1).strip())
-        # Plausible-age bound: a DOB-shaped value ("1982-03-15" -> 1982) or a
-        # zero is not an age in years — render the em-dash, never a fabricated
-        # band like "1980s" (ADR-0009 D2).
-        if years and 0 < int(years.group(1)) < 120:
-            fields["age_band"] = f"{int(years.group(1)) // 10 * 10}s"
-    status = re.search(r"^- \*\*Current status:\*\* (.+)$", text, re.M)
-    if status:
-        value = status.group(1).strip()
-        if value and not value.startswith("<"):
-            fields["issue_status"] = value
-    return fields
+    return cs.read_profile(_PROFILE_PATHS)
 
 
 def _long_date(day):
     """Format a date in the face sheet's long form, e.g. `June 12, 2026`."""
-    return f"{cs.MONTH_NAMES[day.month - 1]} {day.day}, {day.year}"
+    return cs.long_date(day)
 
 
 def _tier_markup(tier, with_word=False):
-    """Render a tier's glyph span in its base chrome, plus a trailing space.
-
-    Args:
-        tier (str): A `_TIER_CHROME` key.
-        with_word (bool, optional): Append the tier word in its AA `*-text`
-            shade (the page-2 captions and the footer legend form).
-
-    Returns:
-        (str) The assembled tier markup.
-    """
-    glyph, base, text = _TIER_CHROME[tier]
-    markup = f"<span style='color:{base}'>{glyph}</span> "
-    if with_word:
-        markup += f"<span style='color:{text}'>{tier}</span>"
-    return markup
+    """Render a source tier's glyph span (delegates to `component_set.tier_markup`)."""
+    return cs.tier_markup(tier, with_word)
 
 
 def _section(title, bar_hex, body_html, card_class=None):
@@ -385,14 +330,8 @@ def _regimen_section(plan_readings, today):
 
 
 def _tier_glyph(source):
-    """Render a reading source's tier glyph (non-text chrome), or ''.
-
-    Only mapped sources render a glyph — an unmapped source states no tier.
-    """
-    tier = _SOURCE_TIERS.get(source)
-    if tier is None:
-        return ""
-    return _tier_markup(tier)
+    """Render a reading source's tier glyph (delegates to `component_set.tier_glyph`)."""
+    return cs.tier_glyph(source)
 
 
 def _numeric_readings(readings):
