@@ -28,6 +28,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/ll-37]] (status: researching; evidence_tier: C; risk_tier: experimental)
 - [[compounds/ipamorelin]] (status: researching; evidence_tier: C; risk_tier: experimental)
 - [[compounds/cjc-1295]] (status: researching; evidence_tier: C; risk_tier: experimental)
+- [[compounds/tesamorelin]] (status: researching; evidence_tier: B; risk_tier: medium)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -116,6 +117,9 @@ _(none yet)_
 - [[library/peptides/cjc-1295/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~9.7K words; 31 unified citations + crosswalk; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 16/16 identifier entries verified, 0 fabrications, 0 Wikipedia, 0 fixes)
 - [[library/peptides/cjc-1295/practitioner-layer]] (2026-06-20; DAC ~1–2 mg/wk vs no-DAC "Mod GRF 1-29" ~100 mcg + ipamorelin — kept separate; only a historical Tailor Made data sheet)
 - [[library/peptides/cjc-1295/non-english-layer]] (2026-06-20; Russian/Chinese/originator all none-located — ConjuChem lineage is English-published)
+- [[library/peptides/tesamorelin/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~11.1K words; 41 unified citations + crosswalk; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 24/24 verified, 0 fabrications, 0 Wikipedia, 0 fixes; the ONLY FDA-approved GHRH analogue — evidence_tier B / risk_tier medium)
+- [[library/peptides/tesamorelin/practitioner-layer]] (2026-06-20; LABEL doses 2 mg / 1.4 mg / 1.28 mg SC daily by formulation [regulatory]; off-label conventions unattributed)
+- [[library/peptides/tesamorelin/non-english-layer]] (2026-06-20; Russian/Chinese/originator all none-located — literature is English-published)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)

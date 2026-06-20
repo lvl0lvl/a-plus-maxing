@@ -1,0 +1,93 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 115,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 5
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 4,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 2
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 12,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 1,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 4,
+    "largest_cluster_name": "Theratechnologies (sponsor/manufacturer lens \u2014 all 4 efficacy primaries; academic-lineage lens MGH/Grinspoon-Stanley = 2/4 = 0.50)",
+    "largest_cluster_count": 4,
+    "share": 1.0,
+    "threshold_triggered": true,
+    "surfaced_section_heading": "Section C \u203a Concentration audit (sponsor 100% flagged first-class; academic lineage 50%)"
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 4,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-10: PMID 28617838 (\u00a7D [6]) first author is Clemmons DR, not Stanley TL as labeled \u2014 identifier/topic correct, fix lead-author label",
+    "IC-13/corpus_scoping: JCEM pooled, JAIDS confirmatory, Stanley 2019 Lancet HIV, and T2DM/mechanistic secondary granular figures are paywalled \u2014 primaries resolve and topics confirmed, exact secondary numbers corpus-limited (abstract-only), not HALT"
+  ],
+  "timestamp": "2026-06-20T18:59:13.802011+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T18:52:58.101953+00:00",
+    "attest_ts": "2026-06-20T18:59:13.802014+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "9f6d7850253f51f9f7bb424077330a1a57522652d7a4ac59786feefa627c543d",
+    "agent_source_mtime": "2026-06-20T18:59:05.064984+00:00"
+  }
+}

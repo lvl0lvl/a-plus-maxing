@@ -1,0 +1,30 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-tesa-i1",
+  "draft_path": "vault/library/peptides/tesamorelin/research-report.md",
+  "findings": [
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "\u00a71.3 cites a secondary '~26-38 min' half-life range as orienting context without its own inline citation; faithful to section A (presented as bracketing context only), not load-bearing."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "\u00a76.5 widens the section-E '~$3,000/mo' cost to '$2,400-$5,500/mo' via aggregator [34] not present in section E; properly tagged anecdote/price-aggregator and flagged non-clinical, but originates in the synthesis/\u00a7F layer rather than \u00a7E."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-20T19:12:42.312748+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T19:09:17.729369+00:00",
+    "attest_ts": "2026-06-20T19:12:42.312751+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "0ebf656917853bf967d4b304040ea4992de1cc37fd90a9b70579c3519745ef71",
+    "agent_source_mtime": "2026-06-20T19:12:14.821315+00:00"
+  }
+}
