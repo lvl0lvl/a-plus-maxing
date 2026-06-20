@@ -163,7 +163,23 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 - FDA never approved; removed from 503A interim Cat-2 ~Sept 2024; PCAC voted AGAINST 503A bulks listing Oct 29 2024 (fluid-retention/hyperglycemia/CHF); NOT in the Apr-2026 FR 2026-07361 action. WADA S2.2 prohibited (named). Monitoring: IGF-1 (keep in age/sex range) + fasting glucose/HbA1c.
 - Canonical FR-2026-07361 removed-12 (verified, for cross-entry consistency): BPC-157, TB-500, Epitalon, GHK-Cu, MOTS-c, DSIP/Emideltide, Dihexa, **PEG-MGF**, Melanotan-II, KPV, Semax, LL-37 — **MK-677 is NOT in it** (a prior-entry error to watch).
 
-### NEXT (reserved, my/primary lane): **CJC-1295** (sweep entry 6), then Tesamorelin → Sermorelin → Hexarelin → MK-677 → Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
+## 2026-06-20 — CJC-1295 (GRF(1-29) GHRH analogue) deep-pass (sweep entry 6, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **CJC-1295 entry shipped:** `compounds/cjc-1295.md` + `library/peptides/cjc-1295/research-report.md` (~9.7K words, 31 unified citations + crosswalk) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections incl. id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Efficient calibration held** — 5/6 sections first-pass at bar 92; gates caught real defects in ONE round each: (a) §E HALT (88) on sourcing-tier — load-bearing regulatory facts rested on off-whitelist legal blogs → re-anchored to govinfo/fda primaries; (b) **4.25 ID-reconcile CAUGHT a genuine cross-section contradiction** — §D/§F wrongly said CJC-1295 "removed from Cat-2 ~Sept 2024" vs §E (NOT removed) → fixed D/F to defer to E.
+- **Final independent full-bib audit: 16/16 identifier entries verified, 0 fabrications, 0 Wikipedia, 0 fixes — cleanest run of the sweep** (no PMID defect, unlike Ipamorelin). Compound-entry consistency PASS.
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- **CJC-1295 = TWO molecules** constantly conflated: WITH DAC (maleimido-Lys→albumin-Cys34, t½ ~5.8–8.1 d; the Teichman 2006 PMID 16352683 Phase-1 PK/PD molecule) vs WITHOUT DAC = "Modified GRF 1-29" (~30 min; the ~100 mcg ipamorelin-stack partner). PK/trials/dosing NEVER cross-attributed.
+- GHRH-receptor agonist (NOT ghrelin/GHSR — contrast ipamorelin); GH→hepatic IGF-1; DAC raises basal GH/IGF-1 over days.
+- **No human efficacy, ever.** The only efficacy program (ConjuChem with-DAC Phase II HIV-lipodystrophy, NCT00267527) was TERMINATED July 2006 after a participant death; causation NOT established (on-scene MD: likely occult coronary disease). GH/IGF-1 elevation is a biomarker, not benefit. No approval, no Phase 3. no-DAC has zero human efficacy data.
+- ConjuChem single-lineage ~100% of the 2 efficacy/PK preclinical primaries (Jette 2005 PMID 15817669 rat; Alba 2006 PMID 16822960 GHRHKO mouse) — concentration alert surfaced first-class.
+- Regulatory: never approved; interim 503A Cat-2 (2023); PCAC voted AGAINST positive-list addition Dec 4 2024 (FR Doc 2024-24828); **NOT** among the 12 removed by FR Doc 2026-07361. WADA S2.2.4 prohibited (CJC-1295 named).
+- **META-FINDING (cross-entry):** the independent judge verified the govinfo primary — **FR Doc 2026-07361 is the JULY-2026 PCAC MEETING NOTICE (7 peptides), not itself the "removal of 12" enumeration**; the removed-12 trace to FDA's parallel Category-2 action + secondaries. Prior entries (LL-37, KPV, etc.) framed 2026-07361 as "the removal action" — worth a consistency pass on those.
+
+### NEXT (reserved, my/primary lane): **Tesamorelin** (sweep entry 7), then Sermorelin → Hexarelin → MK-677 → Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
 
 ---
 

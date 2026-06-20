@@ -1,0 +1,37 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/cjc-1295/practitioner-layer.md",
+    "present": true,
+    "sha256": "943bc2800ac7ee1773a4aa1d21dbe4824bf0af068a2ed8df164eed72601c2cfe",
+    "compounding_sheets_count": 1,
+    "compounding_sheets_or_null_finding": true,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/cjc-1295/non-english-layer.md",
+    "present": true,
+    "sha256": "8c89d8fdaaff6f795f7c9ce56de51c74f93d7cc60887e09b04119405c39a60cd",
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "Other"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-20T18:34:06.785551+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T18:31:46.754516+00:00",
+    "attest_ts": "2026-06-20T18:34:06.785554+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "fab6644e78adcaf67757f26b95e5561077e3e2e3079ae20006a871ec40cb2148",
+    "agent_source_mtime": "2026-06-20T18:33:56.249268+00:00"
+  }
+}
