@@ -1,0 +1,42 @@
+{
+  "section": "D",
+  "brief_hash": "a91c54c068b33bf4dbec701cc093f0973cc5e9ebdc602241c664782b0a5c8d42",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 91,
+    "citation_fidelity": 88,
+    "type_tag_discipline": 95,
+    "population_annotation": 93,
+    "route_fidelity": null,
+    "concentration_audit_handling": 90,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 93,
+    "completeness_vs_brief": 95
+  },
+  "total": 92,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "dim": "citation_fidelity",
+      "severity": "minor",
+      "finding": "Reference [3] (Kovesdy CKD-PC EHJ 2018) omits a PMID; all other bibliography entries carry PMIDs. Correct PMID is 29554312. Statistics, author list, and journal citation for ref [3] are otherwise confirmed accurate via PubMed.",
+      "action": "Add 'PMID 29554312' to bib entry [3] before ingestion."
+    },
+    {
+      "dim": "citation_fidelity",
+      "severity": "advisory",
+      "finding": "Goyal JAMA 2012 OR 6.44 (95% CI 4.27-9.70) at >=5.5 mEq/L: the OR 6.44 is confirmed via secondary reporting of full-text table data (Forbes/JAMA commentary); the specific CI 4.27-9.70 is from the full-text table and is not contradicted by any accessible source but cannot be independently verified from the abstract alone. Not flagged as fabricated; flagged as full-text-dependent.",
+      "action": "Confirm CI 4.27-9.70 against full-text Table 2 of JAMA 2012;307(2):157-164 before final ingestion."
+    }
+  ],
+  "verification_log": {
+    "goyal_jama_2012_pmid_22235086": "CONFIRMED — n=38689, 67 US hospitals, 2000-2008, authors Goyal/Spertus/Gosch/Venkitachalam/Jones/Van den Berghe/Kosiborod match section exactly; OR 6.44 at >5.5 confirmed via full-text secondary source; OR 1.99 at 4.5-<5.0 confirmed in abstract.",
+    "nunez_circulation_2018_pmid_29025765": "CONFIRMED — n=2164, 16116 observations, 1090 deaths, median 2.8yr, HR 2.35 hypoK (CI 1.40-3.93) and HR 1.55 hyperK (CI 1.11-2.16); all figures and author list match section exactly.",
+    "kovesdy_ckd_pc_ehj_2018_pmid_29554312": "CONFIRMED — n=1217986, 27 cohorts, mean FU 6.9yr, HR 1.49 at 3.0 mmol/L (CI 1.26-1.76), HR 1.22 at 5.5 mmol/L (CI 1.15-1.29); author list confirmed; PMID is 29554312, not cited in bib entry.",
+    "opal_hk_nejm_pmid_25415805": "CONFIRMED — authors Weir/Bakris/Bushinsky/Mayo/Garza/Stasiv/Wittes/Christ-Schmidt/Berman/Pitt match section; K reduction 1.01 mmol/L; 76% normokalemia at 4wk; withdrawal-phase p<0.001.",
+    "packham_zs9_nejm_pmid_25415807": "CONFIRMED — authors Packham/Rasmussen/Lavin/El-Shahawy/Roger/Block/Qunibi/Pergola/Singh match section; n=753; normokalemia 80-94% at 48h.",
+    "host_whitelist": "All journals whitelisted: jamanetwork.com (JAMA), ahajournals.org (Circulation), oup.com (EHJ), nejm.org (NEJM), asnjournals.org (JASN), karger.com (Am J Nephrol). No rejected hosts detected."
+  },
+  "summary": "Section D is mechanistically complete and accurately covers all brief-required determinants (hyperK renal/RAAS/shift, hypoK diuretic/GI/shift, hypoMg-ROMK-refractory hypoK, arrhythmia danger, U-shaped mortality with three named cohorts, RAAS-inhibitor dilemma, both K-binders) with correct type-tags, whitelisted sources, and confirmed effect sizes; the sole actionable deficiency is a missing PMID on reference [3] (Kovesdy EHJ 2018; correct PMID 29554312), which depresses citation_fidelity to 88 but leaves the rounded mean at 92, meeting threshold."
+}

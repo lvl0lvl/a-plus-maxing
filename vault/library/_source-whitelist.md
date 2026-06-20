@@ -102,6 +102,8 @@ Always admissible. Cite as `regulatory`.
 - `bloodtransfusion.it` (Blood Transfusion / Blood Transfus — SIMTI, Italian transfusion-medicine societies; peer-reviewed, PMC-indexed; added 2026-06-20 wiki-research)
 - `bioscientifica.com` (Bioscientifica — European Journal of Endocrinology / Endocrine Connections and the European hyponatraemia guideline; peer-reviewed; added 2026-06-20 wiki-research)
 - `f1000research.com` (F1000Research — open-research platform with transparent post-publication peer review, PMC-indexed; acceptable for mechanism/physiology context, not sole-source for a numeric efficacy claim; added 2026-06-20 wiki-research)
+- `rcpa.edu.au` (Royal College of Pathologists of Australasia — the RCPA Manual reference-interval / pathology-test authority; professional pathology college; added 2026-06-20 wiki-research)
+- `clinmedres.org` (Clinical Medicine & Research — Marshfield Clinic Health System, peer-reviewed, PMC-indexed; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`
