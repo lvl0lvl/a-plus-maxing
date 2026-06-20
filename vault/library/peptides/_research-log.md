@@ -133,6 +133,52 @@ a ceiling may be lowered only with a documented evidence reason here (no guessin
 
 ---
 
+## 2026-06-20 — LL-37 (human cathelicidin) deep-pass (sweep entry 4)
+
+### DONE (verified — mechanical evidence on disk)
+- **LL-37 entry shipped:** `compounds/ll-37.md` + `library/peptides/ll-37/research-report.md` (~15K words, 80-entry bibliography) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 7 judges + 8 sections + id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@99/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Independent full-bibliography re-audit (operator-requested trust gate):** 4 independent agents re-checked all 80 entries against PubMed/Crossref → 61 VERIFIED, 15 legitimate NO-ID (regulatory/vendor/book/void), **0 fabrications**, 4 citation-precision defects found + fixed: [9] author Pahar→Radic/Muller, [32] first-author Wang→Lu, [47] PMID 31170213→31170191, [15] dead DOI. Independent integrity sweep: sound (no laundered numbers; Mahlapuu Phase IIb-negative + psoriasis-autoantigen + Kang log-kill spot-confirmed against source).
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent re-audit)
+- Genuinely DUAL-NATURED: antimicrobial/LPS-neutralizing/wound-healing/angiogenic AND a disease driver — psoriasis autoantigen + self-DNA/RNA→pDC→type-I-IFN (psoriasis/lupus/rosacea/atherosclerosis); context-dependent cancer (pro-tumor ovarian/lung/breast; anti-tumor colon/gastric).
+- Human administration evidence = 4 small trials: Grönberg 2014 (positive Phase I/II VLU) → Mahlapuu 2021 HEAL (Phase IIb, PRIMARY ENDPOINT NEGATIVE) → Miranda 2023 DFU (granulation only) → melanoma n=4 dose-finding (skin toxicity). No Phase III, no approval. Endogenous-biomarker data is separate.
+- FDA: 503A Cat-2 (2023) → removed ~Apr 2026 (FR 2026-07361), not approval; deferred off Jul-2026 PCAC to ~Feb 2027. WADA not individually named but prohibited under S0. Native short half-life; no established human PK figure.
+- Monitoring: no LL-37-specific validated biomarker; objective via hs-CRP/inflammation markers. Dominant safety consideration = autoimmunity/psoriasis-flare risk (LL-37 is the autoantigen).
+
+### Process note
+This entry was finished under the operator's "Step 0" trust protocol after a long inefficiency failure: independent re-verification of the existing draft FIRST (passed: 0 fabrications), then the 3 remaining gates run via the actual skill machinery, then PR opened for OPERATOR review/merge (not auto-merged).
+
+## 2026-06-20 — Ipamorelin (NNC 26-0161) deep-pass (sweep entry 5, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **Ipamorelin entry shipped:** `compounds/ipamorelin.md` + `library/peptides/ipamorelin/research-report.md` (~10.2K words, 31-entry bibliography) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections w/ id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Ran under the EFFICIENT calibration** (after the LL-37 inefficiency): lean single-pass, 6 sections, judge bar 92, genuine-defects-only, recurring-error self-checks in retrieval briefs. Result: 5/6 sections passed first-pass; gates caught real defects in ONE round each — E's wrong 12-peptide Apr-2026 list (MK-677→PEG-MGF), a Section-D **Wikipedia citation IC-12 HALT** (removed, re-grounded to registry+RCT). Final independent full-bib audit: 18/18 identifier entries verified, **0 fabrications, 0 Wikipedia**, 1 misattributed PMID fixed (37139855→37066827); compound-entry consistency PASS (no invented PMID this time).
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- "First SELECTIVE GH secretagogue" — GH without ACTH/cortisol/prolactin — but ANIMAL-grounded (Raun 1998), not human-proven.
+- Human evidence: acute PK/PD only (Gobburu 1999, IV); the sole efficacy program (postoperative ileus Phase 2, Beck 2014, n≈114, p=0.15) FAILED → Novo Nordisk/Helsinn discontinued development. No approval, no Phase 3, zero human efficacy for muscle/fat/anti-aging. Human PK IV-only (no human SC PK).
+- ~80% Novo-Nordisk single-lineage concentration (≥70% flag, surfaced first-class). Bone = content/area not volumetric BMD; intermittent dosing did NOT raise IGF-1 in rats.
+- FDA never approved; removed from 503A interim Cat-2 ~Sept 2024; PCAC voted AGAINST 503A bulks listing Oct 29 2024 (fluid-retention/hyperglycemia/CHF); NOT in the Apr-2026 FR 2026-07361 action. WADA S2.2 prohibited (named). Monitoring: IGF-1 (keep in age/sex range) + fasting glucose/HbA1c.
+- Canonical FR-2026-07361 removed-12 (verified, for cross-entry consistency): BPC-157, TB-500, Epitalon, GHK-Cu, MOTS-c, DSIP/Emideltide, Dihexa, **PEG-MGF**, Melanotan-II, KPV, Semax, LL-37 — **MK-677 is NOT in it** (a prior-entry error to watch).
+
+## 2026-06-20 — CJC-1295 (GRF(1-29) GHRH analogue) deep-pass (sweep entry 6, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **CJC-1295 entry shipped:** `compounds/cjc-1295.md` + `library/peptides/cjc-1295/research-report.md` (~9.7K words, 31 unified citations + crosswalk) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections incl. id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Efficient calibration held** — 5/6 sections first-pass at bar 92; gates caught real defects in ONE round each: (a) §E HALT (88) on sourcing-tier — load-bearing regulatory facts rested on off-whitelist legal blogs → re-anchored to govinfo/fda primaries; (b) **4.25 ID-reconcile CAUGHT a genuine cross-section contradiction** — §D/§F wrongly said CJC-1295 "removed from Cat-2 ~Sept 2024" vs §E (NOT removed) → fixed D/F to defer to E.
+- **Final independent full-bib audit: 16/16 identifier entries verified, 0 fabrications, 0 Wikipedia, 0 fixes — cleanest run of the sweep** (no PMID defect, unlike Ipamorelin). Compound-entry consistency PASS.
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- **CJC-1295 = TWO molecules** constantly conflated: WITH DAC (maleimido-Lys→albumin-Cys34, t½ ~5.8–8.1 d; the Teichman 2006 PMID 16352683 Phase-1 PK/PD molecule) vs WITHOUT DAC = "Modified GRF 1-29" (~30 min; the ~100 mcg ipamorelin-stack partner). PK/trials/dosing NEVER cross-attributed.
+- GHRH-receptor agonist (NOT ghrelin/GHSR — contrast ipamorelin); GH→hepatic IGF-1; DAC raises basal GH/IGF-1 over days.
+- **No human efficacy, ever.** The only efficacy program (ConjuChem with-DAC Phase II HIV-lipodystrophy, NCT00267527) was TERMINATED July 2006 after a participant death; causation NOT established (on-scene MD: likely occult coronary disease). GH/IGF-1 elevation is a biomarker, not benefit. No approval, no Phase 3. no-DAC has zero human efficacy data.
+- ConjuChem single-lineage ~100% of the 2 efficacy/PK preclinical primaries (Jette 2005 PMID 15817669 rat; Alba 2006 PMID 16822960 GHRHKO mouse) — concentration alert surfaced first-class.
+- Regulatory: never approved; interim 503A Cat-2 (2023); PCAC voted AGAINST positive-list addition Dec 4 2024 (FR Doc 2024-24828); **NOT** among the 12 removed by FR Doc 2026-07361. WADA S2.2.4 prohibited (CJC-1295 named).
+- **META-FINDING (cross-entry):** the independent judge verified the govinfo primary — **FR Doc 2026-07361 is the JULY-2026 PCAC MEETING NOTICE (7 peptides), not itself the "removal of 12" enumeration**; the removed-12 trace to FDA's parallel Category-2 action + secondaries. Prior entries (LL-37, KPV, etc.) framed 2026-07361 as "the removal action" — worth a consistency pass on those.
+
 ## 2026-06-20 — Tesamorelin (GHRH(1-44) analogue, Egrifta) deep-pass (sweep entry 7, primary-session lane)
 
 ### DONE (verified — mechanical evidence on disk)

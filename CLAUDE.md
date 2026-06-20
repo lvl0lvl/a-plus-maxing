@@ -52,6 +52,8 @@ Before adopting any secondary-work scope, answer in writing: **does the core cap
 
 ## Session Close Protocol
 
+**The close is AUTOMATIC, never operator-triggered.** When a session's substantive work completes (the build merged, the task done), run this FULL protocol immediately as the back half of "done" — do NOT report results and wait for an instruction to close. The operator must never have to say "close the session," "follow the protocols," or "finish the remaining work"; a task is not "complete" until the close has run and is attested with evidence. Surface ONLY genuinely operator-owned decisions (a design sign-off, a not-yet-authorized merge, a real ambiguity), and tee those up rather than stall the close around them. (Recurring operator frustration; the failure mode is treating the build as the finish line and the close as a separate operator-triggered phase. See `~/.claude/projects/.../memory/feedback_auto_run_session_close.md`. A recurrence is a process failure to harden, not a one-off.)
+
 Before saying "done" or "complete":
 
 1. **Run full test suite** -- `.venv/bin/python -m pytest -q` (the V1 Python suite, since S31/Wave 2). For governance/tooling-only sessions, run the relevant `scripts/tests/*.sh` shell suites.

@@ -1,0 +1,124 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T17:38:26Z",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "WARN",
+      "findings": [
+        "bare 'mechanism' tag at section-B claim 9 / [8] (canonical is 'mechanism_review'; source Lande 2007 PMID 17873860 verified)",
+        "non-enum 'case-report' token in section-F [5] inline (paired with/standing in for valid anecdote_aggregate)"
+      ],
+      "count_checked": 117,
+      "count_flagged": 3
+    },
+    "IC-2": {
+      "status": "WARN",
+      "findings": [
+        "section-B [8] tag=mechanism (non-enum)",
+        "section-G [15] tag=in_vitro/clinical-correlate ('clinical-correlate' non-enum, paired with valid in_vitro)"
+      ],
+      "count_checked": 75,
+      "count_flagged": 2
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 4,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 2,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 2,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 14,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 7,
+      "count_flagged": 0
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "WARN",
+      "findings": [
+        "section-B [13]/section-D [11] Armiento 2020 IAPP: cited PMID 32220015 is WRONG (belongs to unrelated Varlamov alcohol/macaque paper); correct PMID for DOI 10.1002/anie.202000148 is 31999880 \u2014 source real, DOI/title/authors correct, claim verified",
+        "section-D [9] Nakamura 2024: cited PMID 38194275 is WRONG (belongs to unrelated Li Y JCI colorectal-NET paper); correct PMID for DOI 10.1172/JCI172578 is 38194294 \u2014 source real, DOI/title/authors correct",
+        "both defects are wrong secondary identifiers on DOI-resolvable real sources (not fabricated citations); both were Phase-4.25-logged as MATCH in error"
+      ],
+      "count_checked": 11,
+      "count_flagged": 2
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "findings": [
+        "corpus-missing WARN: Barlow 2011 (PMID 22031815) exact '~70-80% lung titer / ~60% survival' figures not in abstract (full text paywalled); qualitative in-vivo-influenza claim verified, comparable-to-zanamivir confirmed",
+        "5 load-bearing claims spot-verified against primary text; 0 quote-not-found / number-not-found fabrications"
+      ],
+      "count_checked": 5,
+      "count_flagged": 0
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 14,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 24,
+    "largest_cluster_name": "Lande/Gilliet psoriasis-SLE mechanism program",
+    "largest_cluster_count": 5,
+    "share": 0.15,
+    "threshold_triggered": false,
+    "surfaced_section_heading": "Concentration audit (dominant labs; estimated single-lab share + method)",
+    "surfaced_before_first_indication": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 5,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-1: bare 'mechanism' inline tag (section-B) + 'case-report' non-enum token (section-F)",
+    "IC-2: non-enum bibliography tags 'mechanism' (B[8]) and 'clinical-correlate' (G[15])",
+    "IC-7: population context surfaced via prose species= naming rather than literal [population-mismatch] token (semantically compliant)",
+    "IC-10: Armiento 2020 cited PMID 32220015 is wrong (correct 31999880); Nakamura 2024 cited PMID 38194275 is wrong (correct 38194294) \u2014 sources real & DOI-resolvable, claims verified, but secondary PMIDs misattributed and Phase-4.25 reconcile wrongly passed both",
+    "IC-13: corpus-missing WARN on Barlow 2011 exact titer/survival figures (paywalled abstract)"
+  ],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T17:25:06.809217+00:00",
+    "attest_ts": "2026-06-19T17:41:52.155006+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "231617b174e4e2227aebb54eda44b46c96a35977f54d381a401ac5e8559b7dac",
+    "agent_source_mtime": "2026-06-19T17:39:55.034754+00:00"
+  }
+}

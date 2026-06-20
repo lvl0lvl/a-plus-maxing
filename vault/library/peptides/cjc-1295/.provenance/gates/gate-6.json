@@ -1,0 +1,30 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-cjc-i1",
+  "draft_path": "vault/library/peptides/cjc-1295/research-report.md",
+  "findings": [
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "bibliography-display-order: Rendered Bibliography is grouped by category, so [14] (FDA 503A) physically appears after [15][16][17]; display order is non-contiguous. Every inline token [1]-[31] still resolves correctly via the crosswalk and all entries are cited; cosmetic only, not misleading."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "regulatory-removed12-cross-source-inference: The 'CJC-1295 not in the April-2026 removed-12' and the 12-peptide tally rely on FDA Category-2 page [14] + secondary advisories [20][22] jointly with primary FR Doc 2026-07361 [26], because [26] enumerates only the 7 agenda peptides. The draft transparently discloses this in its Primary-source note; protected facts are not drifted. Disclosed limitation, not a misstatement."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-20T18:26:16.205682+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T18:22:32.839985+00:00",
+    "attest_ts": "2026-06-20T18:26:16.205685+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "930691006b7692080a38a09b9f0497a69d8b540ee9a937f8c5e51d5d402c1520",
+    "agent_source_mtime": "2026-06-20T18:26:07.046193+00:00"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "section": "E",
+  "brief_hash": "na",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 96,
+    "type_tag_discipline": 95,
+    "population_annotation": null,
+    "route_fidelity": null,
+    "concentration_audit_handling": null,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 96
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": []
+}

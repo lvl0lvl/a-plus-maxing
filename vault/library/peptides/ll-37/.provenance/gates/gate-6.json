@@ -1,0 +1,40 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-ll37-i1",
+  "draft_path": "vault/library/peptides/ll-37/research-report.md",
+  "findings": [
+    {
+      "category": "logical-inconsistency",
+      "severity": "minor",
+      "description": "Enrollment stated as '211 enrolled across all arms' (sec 3 intro and 3.7), but summing enrolled/randomized per-trial gives 212 (34+149+25+4); 211 equals the TREATED sum (34+148+25+4) since Mahlapuu reports 149 randomized/148 treated. The '211 enrolled' label conflates randomized vs treated by one subject. Immaterial to conclusions but internally inconsistent with the report's own tables."
+    },
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "Three unified bibliography entries are non-resolvable placeholders/aggregates rather than specific citations: [3] is an explicit retained-slot pointer to [1]/[4]; [35] is a generic ClinicalTrials.gov/FDA not-approved pointer; [42] is the UCLA Koon/Cheng/Pothoulakis colitis cluster with PMIDs 'not individually re-verified.' Each is transparently disclosed and [35]/[42] are not used to ground efficacy, so honesty is preserved, but none yields an independently resolvable primary identifier."
+    },
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "Paywall-gated Barlow 2011 magnitudes (sec 7.2: '~70-80% titer reduction day 3', '~60% vs 0% survival') are presented inline with apparent precision; the abstract-verified/not-independently-re-derived caveat follows only in a trailing parenthetical, so the numbers read as established before the hedge. Hedge is present and correct but sequencing makes the figures look firmer than the evidence supports."
+    },
+    {
+      "category": "missing-perspective",
+      "severity": "minor",
+      "description": "EU/EMA and non-US regulatory status is recorded as 'no approval found' and flagged as a coverage gap (sec 4.2/4.4) rather than affirmatively searched, despite the pivotal Phase IIb being EU-conducted (EudraCT 2018-000536-10). An affirmative EMA/EU-investigational-status check would close a small gap. Honestly disclosed, hence minor."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T17:59:02.710418+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T17:44:24.920013+00:00",
+    "attest_ts": "2026-06-19T17:59:02.710422+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "2a9f48e5d35634439d7352297a7fdea3fe24db438dfc0d3ad7822d8997861163",
+    "agent_source_mtime": "2026-06-19T17:58:28.191153+00:00"
+  }
+}
