@@ -30,6 +30,8 @@ REUSE only: this module reads `track.resolve_plan_progress` and records via
 the plan/tracking streams + the safety filters unchanged. Writers raise only ValueError.
 """
 
+import datetime
+
 from scripts.plan import generate_plan as gp
 from scripts.plan import track
 from scripts.store import plan_schema
@@ -67,7 +69,8 @@ def adjust_plan(domain, author_output, store_read, root, *, prior_date, adjust_d
         prior_date (str): The YYYY-MM-DD date of the plan whose progress is being adjusted FROM
             (the date `resolve_plan_progress` reads the plan + tracking at).
         adjust_date (str): The YYYY-MM-DD date the adjusted plan is recorded UNDER (the new
-            prescription's date; typically forward of `prior_date`).
+            prescription's date; MUST be strictly after `prior_date` — the adjustment is a
+            forward plan, so a same-date/earlier date is a caller error that raises).
         gates (dict, optional): Per-domain safety inputs forwarded to `generate_plan`
             (`clearance_granted`, `red_s_lea_screen`). Defaults to all-conservative.
 
@@ -80,13 +83,28 @@ def adjust_plan(domain, author_output, store_read, root, *, prior_date, adjust_d
         progression adjusted from -- the provenance, never None on the record path).
 
     Raises:
-        ValueError: An untracked domain (always). And -- ONLY on the record path (progress exists)
-            -- a `record_plan` rejection of the adjusted plan (a schema-nonconformant translated
-            plan, or omitted attribution), surfaced loud by `generate_plan`, never silently dropped.
+        ValueError: A caller error (always) — an untracked domain, a non-forward `adjust_date`
+            (same-date or earlier than `prior_date`), or a malformed date. And -- ONLY on the
+            record path (progress exists) -- a `record_plan` rejection of the adjusted plan (a
+            schema-nonconformant translated plan, or omitted attribution), surfaced loud by
+            `generate_plan`, never silently dropped.
     """
     if domain not in plan_schema.TRACKED_DOMAINS:
         raise ValueError(
             f"untracked plan domain {domain!r}; known: {plan_schema.TRACKED_DOMAINS}"
+        )
+    # The adjustment is a FORWARD plan: `adjust_date` is a NEW, later prescription date. A same-date
+    # or earlier `adjust_date` shares the prior plan's store identity (`(item, timepoint, source)`)
+    # and dedupe-drops the adjusted value — leaving the OLD plan in the store while this returned
+    # `adjusted`, a silent data-loss misreport of the operator's new prescription. Fail loud (a
+    # caller date-ordering error, like the untracked-domain check) rather than record a non-forward
+    # adjust. `fromisoformat` also rejects a malformed date here, consistent with the pipeline's
+    # fail-loud date boundary.
+    if datetime.date.fromisoformat(adjust_date) <= datetime.date.fromisoformat(prior_date):
+        raise ValueError(
+            f"adjust_date {adjust_date!r} must be AFTER prior_date {prior_date!r}: the adjustment "
+            f"is a forward plan; a same-date or earlier adjust_date collides with the prior plan's "
+            f"store identity (dedupe-drop) and would misreport the record"
         )
     progress = track.resolve_plan_progress(domain, prior_date, root)
 
