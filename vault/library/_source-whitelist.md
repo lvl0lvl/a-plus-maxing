@@ -125,6 +125,7 @@ Always admissible. Cite as `regulatory`.
 - `iopscience.iop.org` (IOP Publishing — Physiological Measurement; peer-reviewed; the primary venue for physiological-signal/PPG measurement methods; added 2026-06-20 wiki-research)
 - `mja.com.au` (Medical Journal of Australia — MJA; peer-reviewed general medical journal; added 2026-06-20 wiki-research)
 - `rcp.ac.uk` / `rcplondon.ac.uk` (Royal College of Physicians — NEWS2 / National Early Warning Score standard + clinical guidelines; authoritative issuing body; added 2026-06-20 wiki-research)
+- `journals.sagepub.com` / `sagepub.com` (SAGE Publishing — Int J Sports Science & Coaching + other peer-reviewed titles; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`

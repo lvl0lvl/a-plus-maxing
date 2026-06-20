@@ -378,17 +378,17 @@ table; after picking, append your claim** so the two tracks don't duplicate. A c
 | `feature/wiki-metabolic` worktree | **Hormones (endocrine)** — total testosterone ✓, free testosterone ✓, SHBG ✓, estradiol ✓, cortisol (AM) ✓, DHEA-S ✓, IGF-1 ✓ (7 entries) | 1 | standard | **DONE — all 7 ingested** (gates 2.75/3.5/4.25/4.75 attested + bda-clean) | 2026-06-20 |
 | `feature/wiki-metabolic` worktree | **Metabolic — CMP organ markers** — ALT ✓, AST ✓, eGFR/creatinine ✓, albumin ✓, sodium ✓, potassium ✓ (6 entries; the executor-judged CMP liver/kidney/electrolyte subset worth standalone entries) | 1 | standard | **DONE** — 6/6 ingested (ALT/AST/eGFR/albumin/sodium/potassium), all gates attested + bda-clean | 2026-06-20 |
 | `feature/wiki-metabolic` worktree | **Vitamins / minerals** — vitamin D (25-OH) ✓, ferritin ✓, vitamin B12 ✓, RBC magnesium ✓ (4 entries) | 1 | standard | **DONE** — 4/4 ingested (vit-D/ferritin/B12/RBC-Mg), all gates attested + bda-clean | 2026-06-20 |
-| `feature/wiki-metabolic` worktree | **Wearable (device-derived metrics)** — HRV ✓, resting heart rate ✓, sleep efficiency ✓, respiratory rate ✓, recovery/strain (5 entries; `category: wearable`, `source: wearable` — adapted rubric: device-validity in place of assay-standardization, individual-baseline-trend framing in place of population reference intervals) | 1 | standard | **IN PROGRESS** — 4/5 done (HRV/RHR/sleep-efficiency/respiratory-rate ingested, gates attested + bda-clean); recovery/strain remains (the FINAL Wave-1 entry) | 2026-06-20 |
+| `feature/wiki-metabolic` worktree | **Wearable (device-derived metrics)** — HRV ✓, resting heart rate ✓, sleep efficiency ✓, respiratory rate ✓, recovery/strain ✓ (5 entries; `category: wearable`, `source: wearable` — adapted rubric: device-validity in place of assay-standardization, individual-baseline-trend framing in place of population reference intervals) | 1 | standard | **DONE** — 5/5 ingested (HRV/RHR/sleep-efficiency/respiratory-rate/recovery-strain), all gates attested + bda-clean. **WAVE-1 BACKLOG COMPLETE.** | 2026-06-20 |
 
 **Claim update mandate:** update this table when a subject is *claimed/started* (status `IN PROGRESS`), not only when it is done and ingested — so the parallel track never duplicates work that is underway. Flip a row to `DONE` as its entries land in the wiki.
 
-**Still open (Wave 1 remaining clusters):** Wearable (HRV, RHR, sleep-efficiency, respiratory
-rate, recovery/strain) — **OPEN, the LAST Wave-1 cluster** (NOTE: `category: wearable`,
-`source: wearable` — a different entry shape from the lab biomarkers; no serum units /
-measurement-assay section; the 4-section rubric needs adapting for device-derived metrics).
-ALL lab-biomarker clusters are now DONE: glycemic core, thyroid, hormones, CMP organ markers,
-**and Vitamins/minerals (vit D, ferritin, B12, RBC-Mg) — 4/4 ingested** · **Wave 0** (BPC-157)
-**DONE** (above).
+**Still open (Wave 1):** NOTHING — **WAVE-1 BACKLOG COMPLETE (2026-06-20).** All Wave-1 clusters
+are ingested via gated /aplus-research (gates attested + bda-clean + wiki-lint-clean): lipids/CV (7),
+glycemic core (4), thyroid (3), hormones (7), CMP organ markers (6), Vitamins/minerals (4),
+and the Wearable cluster (HRV, RHR, sleep-efficiency, respiratory-rate, recovery/strain — 5/5,
+the device-derived `category: wearable` shape) · **Wave 0** (BPC-157) **DONE**. The only remaining
+wiki-population work is **Peptides** — owned by the parallel session, NOT to be touched here.
+The accumulated `feature/wiki-metabolic` set is ready for the operator's classifier-gated merge → main.
 
 **Gate before any Wave 1 research (§8 D3):** confirm `operator-profile.md` / `goals.md` /
 `current-state.md` are readable so gate 2.75 doesn't HALT `context-load-missing` — they load
