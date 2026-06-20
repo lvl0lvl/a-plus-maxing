@@ -375,7 +375,7 @@ table; after picking, append your claim** so the two tracks don't duplicate. A c
 | `feature/research-bpc157-rerun` (other session) | **BPC-157** deep re-research + finished entry | 0 | deep | **DONE** — merged to `main` (PR #150, all gates attested) | 2026-06-18 |
 | `feature/wiki-metabolic` worktree | **Metabolic — glycemic core** — fasting glucose ✓, HbA1c ✓, fasting insulin ✓, HOMA-IR ✓ (4 entries) | 1 | standard | **DONE — all 4 ingested** (gates 2.75/3.5/4.25/4.75 attested + bda-clean); cluster ready to PR → main | 2026-06-19 |
 | `feature/wiki-metabolic` worktree | **Thyroid** — TSH ✓, free T4 ✓, free T3 ✓ (3 entries) | 1 | standard | **DONE — all 3 ingested** (gates 2.75/3.5/4.25/4.75 attested + bda-clean) | 2026-06-19 |
-| `feature/wiki-metabolic` worktree | **Hormones (endocrine)** — total testosterone ✓, free testosterone ✓, SHBG ✓, estradiol ✓, cortisol (AM), DHEA-S, IGF-1 (7 entries) | 1 | standard | **IN PROGRESS** — 4/7 done (total-T/free-T/SHBG/estradiol ingested, gates attested + bda-clean); cortisol/DHEA-S/IGF-1 remain | 2026-06-19 |
+| `feature/wiki-metabolic` worktree | **Hormones (endocrine)** — total testosterone ✓, free testosterone ✓, SHBG ✓, estradiol ✓, cortisol (AM) ✓, DHEA-S, IGF-1 (7 entries) | 1 | standard | **IN PROGRESS** — 5/7 done (total-T/free-T/SHBG/estradiol/cortisol ingested, gates attested + bda-clean); DHEA-S/IGF-1 remain | 2026-06-20 |
 
 **Claim update mandate:** update this table when a subject is *claimed/started* (status `IN PROGRESS`), not only when it is done and ingested — so the parallel track never duplicates work that is underway. Flip a row to `DONE` as its entries land in the wiki.
 

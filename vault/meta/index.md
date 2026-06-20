@@ -43,6 +43,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/free-testosterone]] (Free testosterone; category: blood; confidence: established)
 - [[biomarkers/shbg]] (SHBG — sex hormone-binding globulin; category: blood; confidence: established)
 - [[biomarkers/estradiol]] (Estradiol — E2; category: blood; confidence: established)
+- [[biomarkers/cortisol]] (Cortisol; category: blood; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -92,6 +93,7 @@ _(none yet)_
 - [[library/biomarkers/free-testosterone/research-report]] (Free testosterone standard /aplus-research; 25 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/shbg/research-report]] (SHBG standard /aplus-research; 35 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/estradiol/research-report]] (Estradiol standard /aplus-research; 28 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/cortisol/research-report]] (Cortisol standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/
