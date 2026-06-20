@@ -522,9 +522,7 @@ def _asks_section(panels, plan_readings, answered_watchouts, today):
 
 def _footer(today):
     """Render the footer: the colored source-tier legend + the honesty line."""
-    legend = " · ".join(
-        _tier_markup(tier, with_word=True) for tier in _TIER_CHROME
-    )
+    legend = cs.tier_legend()
     generated = _long_date(today)
     return (
         "<div class='fs-foot'>"
