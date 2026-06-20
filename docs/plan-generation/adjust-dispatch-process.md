@@ -36,8 +36,9 @@ then records the specialist's adjusted author output through the SAME `generate_
 3. **Dispatch the specialist with the progress** (below) → capture the ADJUSTED author output.
 4. **Record.** `adjust_plan(domain, author_output, store_read, root, prior_date=…, adjust_date=…,
    gates=…)` runs the adjusted output through `generate_plan` (so `assemble`'s four safety filters
-   + the workout clearance gate apply to the re-plan exactly as to the initial plan — the floor is
-   NOT bypassed on adjust) and records it as a NEW dated plan for `adjust_date`. The prior plan +
+   + the workout clearance gate + the domain veto apply to the re-plan exactly as to the initial
+   plan's per-domain step — the per-domain floor is NOT bypassed) and records it as a NEW dated
+   plan for `adjust_date`. The prior plan +
    tracking are immutable history; `resolve_plan_progress` at the new date reads the adjusted
    prescription.
 
@@ -65,15 +66,24 @@ carry over unchanged.
 `adjust_plan` does NOT re-run the reasoning — it records the captured output. The de-load/advance
 judgment is the specialist's; the code is the wiring + the boundary + the safety floor.
 
-## The safety floor is NOT bypassed on the re-plan
+## The per-domain safety floor is NOT bypassed on the re-plan
 
-Because `adjust_plan` records via `generate_plan`, every safety filter the initial plan passed
-applies to the adjusted plan too: `assemble`'s attribution / sourcing-completeness /
-population-mismatch / class-aware HALT filters, the workout **clearance gate** (an un-cleared
-load prescription is dropped from the adjusted plan exactly as from the initial — the LM-01
-July-13 clinician clearance is still the V1 unlock), and the nutrition RED-S/LEA critical-floor
-veto. An adjusted plan whose recommendations are all struck / payload-less records NOTHING and
-surfaces `generate_plan`'s reason — never a fabricated adjustment that skipped the floor.
+Because `adjust_plan` records via `generate_plan`, every PER-DOMAIN safety filter the initial
+plan's `generate_plan` step passed applies to the adjusted plan too: `assemble`'s attribution /
+sourcing-completeness / population-mismatch / class-aware HALT filters, the workout **clearance
+gate** (an un-cleared load prescription is dropped from the adjusted plan exactly as from the
+initial — the LM-01 July-13 clinician clearance is still the V1 unlock), and the nutrition
+RED-S/LEA critical-floor veto. An adjusted plan whose recommendations are all struck /
+payload-less records NOTHING and surfaces `generate_plan`'s reason — never a fabricated
+adjustment that skipped the per-domain floor.
+
+**Cross-domain reconciliation is a separate step (a V1 adjust boundary).** The cross-domain
+holds — `orchestrate`'s nutrition→workout energy-bounce, supplement↔peptide additive-AE,
+author-conflict, and supplement↔Rx BPMH — live in the reconciler (`orchestrate.py`), NOT in the
+single-domain `generate_plan`. A per-domain adjust via `adjust_plan` does not re-run them, exactly
+as the initial plan's per-domain `generate_plan` step does not (only the orchestrator's
+cross-domain pass does). A multi-domain re-plan that needs cross-domain reconciliation routes
+through `orchestrate` like the initial plan; the per-domain adjust leg is the V1 surface.
 
 ## Running + verifying
 

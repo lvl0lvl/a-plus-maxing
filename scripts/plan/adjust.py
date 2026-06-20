@@ -12,14 +12,18 @@ plan-generation-pipeline-v1.md`): the de-load/advance REASONING is the domain SP
 authored at dispatch over the plan-vs-actual progress -- it is NOT computed here (the
 progression is a clinical/coaching judgment, never invented in `scripts/`). This module is the
 production caller that (a) reads the progress for the honest "nothing to progress from"
-boundary, and (b) records the specialist's adjusted author output via the SAME `generate_plan`
-path -- so `assemble`'s four safety filters + the workout clearance gate apply to the re-plan
-EXACTLY as to the initial plan (the safety floor is never bypassed on adjust). The orchestrator
+boundary, and (b) records the specialist's adjusted author output via the SAME single-domain
+`generate_plan` path -- so the per-domain safety floor (`assemble`'s four filters + the workout
+clearance gate + the domain veto) applies to the re-plan EXACTLY as to the initial plan's
+per-domain step. Cross-domain reconciliation (`orchestrate`'s energy-bounce / additive-AE /
+conflict / Rx-BPMH holds) is a SEPARATE orchestrator step the per-domain adjust does not re-run
+-- a documented V1 adjust boundary, not a bypassed floor (the initial per-domain plan does not
+run those holds either; only the orchestrator's cross-domain pass does). The orchestrator
 dispatches the specialist with the progress (`docs/plan-generation/adjust-dispatch-process.md`)
 and feeds the captured output here.
 
 Adjusting requires BOTH a prior plan AND a tracking snapshot (the tracked actual): no prior
-plan is generate, not adjust; a plan with no tracking is no actual to progress from. Either
+plan means generate, not adjust; a plan with no tracking is no actual to progress from. Either
 absent -> records nothing and returns the honest no-progress-to-adjust boundary, never a
 fabricated adjustment. The adjusted plan records as a NEW dated plan (`adjust_date`) -- the
 prior plan + tracking are immutable history, and `resolve_plan_progress` at the new date reads
@@ -53,9 +57,11 @@ def adjust_plan(domain, author_output, store_read, root, *, prior_date, adjust_d
     tracking snapshot, else there is no progress to adjust from. When progress exists, records the
     specialist's ADJUSTED `author_output` (the de-load/advance reasoning the specialist authored
     at dispatch over the progress) via the REUSED `generate_plan` as a NEW dated plan for
-    `adjust_date` -- the same path the initial plan took, so the four `assemble` safety filters +
-    the workout clearance gate apply to the re-plan too (a struck / coverage-gap / no-actionable
-    adjusted plan records nothing and surfaces generate_plan's `reason`, never a bypassed floor).
+    `adjust_date` -- the same single-domain path the initial plan took, so the four `assemble`
+    safety filters + the workout clearance gate + the domain veto apply to the re-plan too (a
+    struck / coverage-gap / no-actionable adjusted plan records nothing and surfaces
+    generate_plan's `reason`, never a bypassed per-domain floor). Cross-domain reconciliation
+    (`orchestrate`) is a separate orchestrator step, not re-run on a per-domain adjust.
 
     Args:
         domain (str): A `plan_schema.TRACKED_DOMAINS` member (workout / nutrition / supplements --
@@ -93,18 +99,25 @@ def adjust_plan(domain, author_output, store_read, root, *, prior_date, adjust_d
         raise ValueError(
             f"untracked plan domain {domain!r}; known: {plan_schema.TRACKED_DOMAINS}"
         )
+    # Validate both dates with the STORE's own date contract (`plan_schema._check_date`, the exact
+    # check `record_plan` enforces) so a non-canonical date — e.g. basic-ISO `YYYYMMDD`, which
+    # `datetime.date.fromisoformat` accepts but the store's strict dashed `_DATE_RE` rejects — fails
+    # loud at the caller boundary on EVERY path, including the no-progress boundary returns where
+    # `record_plan` is never reached (an unvalidated `adjust_date` would otherwise be echoed into the
+    # result). Reuse, not a duplicated regex.
+    plan_schema._check_date(prior_date, "prior_date")
+    plan_schema._check_date(adjust_date, "adjust_date")
     # The adjustment is a FORWARD plan: `adjust_date` is a NEW, later prescription date. A same-date
-    # or earlier `adjust_date` shares the prior plan's store identity (`(item, timepoint, source)`)
-    # and dedupe-drops the adjusted value — leaving the OLD plan in the store while this returned
-    # `adjusted`, a silent data-loss misreport of the operator's new prescription. Fail loud (a
-    # caller date-ordering error, like the untracked-domain check) rather than record a non-forward
-    # adjust. `fromisoformat` also rejects a malformed date here, consistent with the pipeline's
-    # fail-loud date boundary.
+    # or earlier `adjust_date` collides with the prior plan's store identity
+    # (`(item, timepoint, source=plan::<specialist>)`): it dedupe-drops the adjusted value when the
+    # adjust specialist matches the prior plan's, or appends a second same-date plan that SHADOWS the
+    # prior (last-write-wins on read) when the specialist differs — either way misreporting the
+    # forward prescription. Fail loud (a caller date-ordering error, like the untracked-domain check).
     if datetime.date.fromisoformat(adjust_date) <= datetime.date.fromisoformat(prior_date):
         raise ValueError(
             f"adjust_date {adjust_date!r} must be AFTER prior_date {prior_date!r}: the adjustment "
             f"is a forward plan; a same-date or earlier adjust_date collides with the prior plan's "
-            f"store identity (dedupe-drop) and would misreport the record"
+            f"store identity and would misreport the record"
         )
     progress = track.resolve_plan_progress(domain, prior_date, root)
 
