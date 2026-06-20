@@ -61,10 +61,13 @@ def record_tracking(domain, tracking, on_date, root):
             f"untracked plan domain {domain!r}; known: {plan_schema.TRACKED_DOMAINS}"
         )
     plan = plan_schema.read_plan(domain, on_date, root)
-    # state == NO_PLAN means the domain has zero recorded plans (resolve_plan over no readings); any
-    # other state (a plan today, or NO_PLAN_TODAY = plans on file but none dated on_date) means a plan
-    # exists to track against. No plan -> record nothing, the honest no-plan-to-track boundary.
-    if plan["state"] == plan_schema.NO_PLAN:
+    # `resolve_plan` returns state None ONLY when a plan is dated `on_date` (its content + same-date
+    # plan_date); NO_PLAN (zero plans) and NO_PLAN_TODAY (plans on file, none dated `on_date`) both mean
+    # there is no plan FOR this date to track against. Tracking is same-date against the existing
+    # date-specific plan resolution (no carry-forward active-plan window) — recording a snapshot against
+    # an off-date or absent plan would attribute today's adherence to a plan that did not govern today.
+    # No plan for the date -> record nothing, the honest no-plan-to-track boundary.
+    if plan["state"] is not None:
         return {"domain": domain, "on_date": on_date, "state": NO_PLAN_TO_TRACK,
                 "recorded": False, "plan_date": None}
     plan_schema.record_plan_tracking(domain, tracking, on_date, root)
@@ -76,10 +79,14 @@ def resolve_plan_progress(domain, on_date, root):
     """Join a domain's recorded plan with its tracking snapshot into a plan-vs-actual view (ADJUST read).
 
     The read-back the re-plan + the dashboard consume: it pairs `read_plan` (the prescription) with
-    `read_plan_tracking` (what was actually done) for `domain` on `on_date`. Honest absence states —
-    a domain with no plan has no progress (`has_plan` False); a plan with no tracking snapshot is
-    plan-only (`has_tracking` False, the operator has not logged yet), never an invented snapshot.
-    Pure read; computes no progression verdict (that is the deferred specialist-reasoning adjust).
+    `read_plan_tracking` (what was actually done) for `domain` on `on_date`. Same-date, matching the
+    measure leg + the existing date-specific plan resolution: `has_plan` is True ONLY when a plan is
+    dated `on_date` (`resolve_plan` state None), so `has_plan` is True iff `plan` is not None — no
+    plan for the date (zero plans, or plans on file but none dated `on_date`) is `has_plan` False with
+    `plan` None (never an invented plan); a plan with no tracking snapshot is plan-only (`has_tracking`
+    False, the operator has not logged yet). `plan_date` carries the latest on-file plan date even when
+    `has_plan` is False (informational — "a plan exists on file, dated `plan_date`, just not for this
+    date"). Pure read; computes no progression verdict (that is the deferred specialist-reasoning adjust).
 
     Args:
         domain (str): A `plan_schema.TRACKED_DOMAINS` member.
@@ -87,8 +94,9 @@ def resolve_plan_progress(domain, on_date, root):
         root (str | Path): The store root.
 
     Returns:
-        (dict) `domain`, `plan` (the plan dict | None), `specialist` (str | None), `plan_date`
-        (str | None), `tracking` (the snapshot dict | None), `has_plan` (bool), `has_tracking` (bool).
+        (dict) `domain`, `plan` (the plan dict for `on_date` | None), `specialist` (str | None),
+        `plan_date` (str | None — the latest on-file plan date), `tracking` (the snapshot dict | None),
+        `has_plan` (bool — a plan dated `on_date`), `has_tracking` (bool).
 
     Raises:
         ValueError: An untracked domain.
@@ -99,7 +107,7 @@ def resolve_plan_progress(domain, on_date, root):
         )
     plan = plan_schema.read_plan(domain, on_date, root)
     tracking = plan_schema.read_plan_tracking(domain, on_date, root)
-    has_plan = plan["state"] != plan_schema.NO_PLAN
+    has_plan = plan["state"] is None  # a plan dated on_date -> plan content present (vs NO_PLAN/NO_PLAN_TODAY)
     return {
         "domain": domain,
         "plan": plan["plan"],

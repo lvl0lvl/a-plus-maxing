@@ -169,3 +169,55 @@ def test_closed_loop_e2e_plan_measure_progress(tmp_path):
     assert prog["has_plan"] and prog["has_tracking"]  # the loop closed: plan + actual paired
     assert prog["tracking"]["elapsed_min"] == 50
     assert prog["plan"] is not None
+
+
+# --- Tier-2: the NO_PLAN_TODAY seam + gate-precedence + append-order coverage -----
+
+
+def test_record_tracking_no_plan_today_is_no_plan_to_track(tmp_path):
+    # Tier-2 (plan-integrity SF-1 / QA): a plan on file but NOT dated on_date (NO_PLAN_TODAY) is NOT a
+    # plan to track against on_date — tracking is same-date (no carry-forward). Recording today's
+    # adherence against an off-date plan would attribute it to a plan that did not govern today.
+    _seed_plan(tmp_path, date="2026-06-15")  # plan dated earlier than the tracking date
+    r = record_tracking("workout", _wk_tracking(), "2026-06-19", tmp_path)
+    assert r["state"] == NO_PLAN_TO_TRACK and r["recorded"] is False
+    assert r["plan_date"] is None
+    assert plan_schema.read_plan_tracking("workout", "2026-06-19", tmp_path) is None  # nothing recorded
+
+
+def test_progress_no_plan_today_has_plan_false_no_contradiction(tmp_path):
+    # Tier-2: NO_PLAN_TODAY (a plan dated 06-15, progress for 06-19) -> has_plan False with plan None
+    # (no has_plan-True-but-plan-None contradiction); plan_date carries the latest on-file date.
+    _seed_plan(tmp_path, date="2026-06-15")
+    prog = resolve_plan_progress("workout", "2026-06-19", tmp_path)
+    assert prog["has_plan"] is False  # no plan FOR 06-19
+    assert prog["plan"] is None  # consistent: has_plan False <-> plan None
+    assert prog["plan_date"] == "2026-06-15"  # informational: a plan exists on file, just not for the date
+
+
+def test_record_tracking_no_plan_gate_precedes_snapshot_validation(tmp_path):
+    # Tier-2 (QA): gate precedence — a malformed snapshot for a domain with NO plan for the date returns
+    # the no-plan-to-track boundary (records nothing), it does NOT raise. There is no plan to track
+    # against, so the snapshot is never validated. (Contrast: malformed WITH a plan raises — covered above.)
+    r = record_tracking("workout", {"volume_lb": -5}, "2026-06-19", tmp_path)  # no plan seeded + malformed
+    assert r["state"] == NO_PLAN_TO_TRACK and r["recorded"] is False
+
+
+def test_record_tracking_latest_of_three_same_date_snapshots_wins(tmp_path):
+    # Tier-2 (QA): append-order latest-wins beyond N=2 — three distinct same-date snapshots, the latest
+    # appended resolves through the progress join (exercises resolve_tracking's reversed-scan past N=2).
+    _seed_plan(tmp_path)
+    for vol in (5000, 5200, 5400):
+        record_tracking("workout", _wk_tracking(volume_lb=vol), "2026-06-19", tmp_path)
+    assert len(store.read("plan-track::workout", root=tmp_path)) == 3  # all three distinct persisted
+    assert resolve_plan_progress("workout", "2026-06-19", tmp_path)["tracking"]["volume_lb"] == 5400
+
+
+def test_record_tracking_supplements_domain(tmp_path):
+    # Tier-2 (QA domain parity): the supplements tracked domain records + reads back like workout.
+    _seed_plan(tmp_path, domain="supplements",
+               plan={"items": [{"name": "Creatine", "dose": "5 g"}]}, specialist="supplement-specialist")
+    r = record_tracking("supplements", {"taken": ["Creatine"]}, "2026-06-19", tmp_path)
+    assert r["state"] == RECORDED
+    prog = resolve_plan_progress("supplements", "2026-06-19", tmp_path)
+    assert prog["has_plan"] and prog["tracking"]["taken"] == ["Creatine"]
