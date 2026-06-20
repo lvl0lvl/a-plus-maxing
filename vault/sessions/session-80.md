@@ -54,8 +54,8 @@ specialist's, not invented in `scripts/` (plan-integrity confirmed zero progress
   `adjusted=True`); fixed with the fail-loud forward-date gate. Load-bearing tests mutation-proven
   non-vacuous.
 - **Tier-3 `/review-pr`** (6-agent): security CLEAN. Blind-triaged 6 LEGITIMATE (the basic-ISO
-  `YYYYMMDD` date-format strictness; the gate-rationale precision; the nutrition aggregate +
-  `gates=None` default-deny coverage; the per-domain-vs-cross-domain safety-floor doc narrowing;
+  `YYYYMMDD` date-format strictness; the gate-rationale precision; the nutrition aggregate landing;
+  the `gates=None` default-deny coverage; the per-domain-vs-cross-domain safety-floor doc narrowing;
   the docstring typo) + 2 NOT_A_BUG (the documented `state`-union; the unreachable inherited
   KeyError). All legitimate fixed + executed blind-verify RESOLVED.
 
