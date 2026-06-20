@@ -195,6 +195,40 @@ def test_finding_source_attribution(tmp_path):
     assert "via supplement-specialist · supplement–Rx (BPMH) · HIGH" in section
 
 
+def test_caution_absent_renders_em_dash_not_none(tmp_path):
+    """A finding with no caution renders an em-dash, never the literal 'None'."""
+    root = tmp_path / "store"
+    queue_schema.record_doctor_visit_queue_entry(
+        {"finding_id": "nc", "axis": "rx-bpmh", "held_domain": "supplements",
+         "source_specialist": "supplement-specialist", "outcome": "block-stands",
+         "non_overridable": False, "composite_band": "HIGH"},   # no 'caution' key
+        _ISO, root)
+    row = _between(_interactions(_emit(root, tmp_path)), "class='hd-find'", "</div>")
+    assert ">None<" not in row
+    assert "<span>—</span>" in row
+
+
+def test_unknown_composite_band_is_omitted(tmp_path):
+    """A band outside the data layer's known set is not displayed as a real band."""
+    root = tmp_path / "store"
+    queue_schema.record_doctor_visit_queue_entry(
+        _finding("ub", caution="finding with a garbage band", band="WOBBLE"), _ISO, root)
+    section = _interactions(_emit(root, tmp_path))
+    assert "finding with a garbage band" in section   # the finding still renders
+    assert "WOBBLE" not in section                     # ...but the unknown band is omitted
+
+
+def test_unknown_outcome_surfaces_not_downgrades(tmp_path):
+    """An unrecognized outcome surfaces for discussion (concern), never as consent."""
+    root = tmp_path / "store"
+    queue_schema.record_doctor_visit_queue_entry(
+        _finding("uo", caution="finding with an unknown outcome",
+                 outcome="deferred-pending-labs", band="HIGH"), _ISO, root)
+    section = _interactions(_emit(root, tmp_path))
+    assert "pill tint-concern'>disposition unverified — discuss" in section
+    assert "on record — proceeding with consent" not in section
+
+
 def test_empty_queue_states_absence_not_safety(tmp_path):
     """An empty queue states 'none on file' — never the unstated claim 'you are safe'."""
     section = _interactions(_emit(tmp_path / "store", tmp_path))
@@ -250,14 +284,23 @@ def test_situation_and_assessment_are_honest_awaiting(tmp_path):
     assert "awaiting" in assessment
 
 
-def test_no_clinical_verdict_anywhere(tmp_path):
-    """The whole sheet states no diagnosis/prescription and renders no STOP/START verdict."""
+def test_sheet_adds_no_prescriptive_verdict_of_its_own(tmp_path):
+    """The sheet's OWN copy is non-prescribing.
+
+    The disclaimers render, AND — given neutral source cautions (the seeded
+    findings carry none) — no STOP/START/prescribe/discontinue verb appears
+    anywhere. Cautions are verbatim source text, so this proves the sheet itself
+    adds no clinical verdict (the negative assertion QA found missing).
+    """
     root = tmp_path / "store"
-    _seed_findings(root)
+    _seed_findings(root)   # neutral cautions — no prescription verbs
     _seed_plans(root)
     html = _emit(root, tmp_path)
     assert "states no diagnosis or prescription" in html
     assert "renders no clinical verdict" in html
+    low = html.lower()
+    for verb in ("stop ", "start ", "prescribe", "discontinue"):
+        assert verb not in low, verb
 
 
 # --- PII: initials only ----------------------------------------------------

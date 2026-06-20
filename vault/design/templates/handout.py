@@ -195,17 +195,24 @@ def _disposition(entry):
     """Return (chip label, PALETTE pill tint) for a finding's MD disposition.
 
     The disposition is the finding's CURRENT state for the doctor; the colour is a
-    PALETTE data state (via the pill tint), NEVER accent chrome. The three tiers
+    PALETTE data state (via the pill tint), NEVER accent chrome. The known tiers
     mirror `queue_schema._severity_rank` exactly (one contract, not a second
     judgment): a non-overridable auto-block and an unresolved block-stands are both
     open concerns (concern); a cleared-with-override is on record, the operator
-    proceeding with informed consent (watch).
+    proceeding with informed consent (watch). An UNRECOGNIZED outcome — outside the
+    writer's closed {block-stands, cleared-with-override} domain, reachable only by
+    a malformed entry — SURFACES for discussion as a concern; it never silently
+    downgrades to the consent disposition (which would be a safety downgrade on this
+    sheet — PF-S78-01 value-domain grounding).
     """
     if bool(entry.get("non_overridable")):
         return "auto-block — do not proceed", "concern"
-    if entry.get("outcome") == "block-stands":
+    outcome = entry.get("outcome")
+    if outcome == "block-stands":
         return "unresolved — discuss", "concern"
-    return "on record — proceeding with consent", "watch"
+    if outcome == "cleared-with-override":
+        return "on record — proceeding with consent", "watch"
+    return "disposition unverified — discuss", "concern"
 
 
 def _finding_source(entry):
@@ -221,7 +228,11 @@ def _finding_source(entry):
         bits.append(f"via {entry['source_specialist']}")
     if entry.get("axis"):
         bits.append(_AXIS_LABEL.get(entry["axis"], entry["axis"]))
-    if entry.get("composite_band"):
+    # Display the band ONLY when it is one the data layer ranks (the closed
+    # CRITICAL/HIGH/MEDIUM domain `queue_schema._BAND_RANK` keys); a None or an
+    # unrecognized band is omitted, never shown as a real band on the MD sheet
+    # (PF-S78-01 value-domain grounding — one source of truth for the bands).
+    if entry.get("composite_band") in queue_schema._BAND_RANK:
         bits.append(entry["composite_band"])
     src = (
         f"<span class='hd-findsrc'>{cs._escape(' · '.join(bits))}</span>" if bits else ""
@@ -240,10 +251,15 @@ def _finding_row(entry):
     ranked the findings, so the rows render in MD-priority order as received.
     """
     label, tint = _disposition(entry)
+    # An absent/empty caution renders an em-dash, never the literal "None"
+    # (str(None)) on the safety surface — honest absence (ADR-0009 D2). The data
+    # layer writes caution unconditionally; this owns the open-on-extras edge.
+    caution = entry.get("caution")
+    caution_html = cs._escape(str(caution)) if caution else "—"
     return (
         "<div class='hd-find'>"
         f"{cs.pill(label, tint)}"
-        f"<span>{cs._escape(str(entry.get('caution', '')))}</span>"
+        f"<span>{caution_html}</span>"
         f"{_finding_source(entry)}"
         "</div>"
     )
