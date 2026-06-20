@@ -115,6 +115,8 @@ Always admissible. Cite as `regulatory`.
 - `biomedcentral.com` (BioMed Central — Springer Nature open-access journals [e.g. J Physiological Anthropology]; peer-reviewed; added 2026-06-20 wiki-research)
 - `folmed.org` (Folia Medica, Plovdiv — Sciendo / De Gruyter [DOI 10.2478/folmed-*]; PubMed-indexed peer-reviewed; the canonical systematic review on wearable-HRV measurement validity [Georgiou 2018]; added 2026-06-20 wiki-research — tier 2, regional/lower-impact, flag single-source claims)
 - `journals.humankinetics.com` / `humankinetics.com` (Human Kinetics — Int J Sports Physiol Perform [IJSPP], J Strength Cond Res-adjacent sports-science titles; PubMed-indexed peer-reviewed; added 2026-06-20 wiki-research)
+- `cmaj.ca` (Canadian Medical Association Journal — CMAJ; Tier-1 peer-reviewed general medical journal; added 2026-06-20 wiki-research)
+- `ieeexplore.ieee.org` (IEEE Xplore — IEEE Transactions on Biomedical Engineering, IEEE J Biomed Health Inform + other peer-reviewed engineering/biomedical titles; the primary venue for PPG/wearable signal-processing validation; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`

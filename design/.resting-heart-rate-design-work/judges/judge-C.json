@@ -1,0 +1,26 @@
+{
+  "section": "C",
+  "brief_hash": "7e50b4c2da3b05abe77ebac8a871e5406c763271115ce36ee6ff4281989a0558",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 88,
+    "citation_fidelity": 90,
+    "type_tag_discipline": 100,
+    "population_annotation": 95,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 97
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "minor",
+      "dimension": "citation_fidelity",
+      "description": "[10] Wouters 2025 (JMIR Form Res) lacks a PMID; DOI and whitelisted journal are present \u2014 not a HALT defect, but the PMID should be added once indexed."
+    }
+  ]
+}

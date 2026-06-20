@@ -57,6 +57,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/vitamin-b12]] (Vitamin B12 — cobalamin; category: blood; confidence: established)
 - [[biomarkers/rbc-magnesium]] (RBC magnesium — intracellular Mg surrogate; category: blood; confidence: supported)
 - [[biomarkers/hrv]] (Heart rate variability — autonomic/recovery; category: wearable; confidence: supported)
+- [[biomarkers/resting-heart-rate]] (Resting heart rate — fitness/autonomic; category: wearable; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -120,6 +121,7 @@ _(none yet)_
 - [[library/biomarkers/vitamin-b12/research-report]] (Vitamin B12 standard /aplus-research; 32 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/rbc-magnesium/research-report]] (RBC magnesium standard /aplus-research; 28 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/hrv/research-report]] (Heart rate variability standard /aplus-research; 32 sources; gates 2.75/3.5/4.25/4.75 attested; first WEARABLE entry)
+- [[library/biomarkers/resting-heart-rate/research-report]] (Resting heart rate standard /aplus-research; 34 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/
