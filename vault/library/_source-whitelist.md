@@ -117,6 +117,7 @@ Always admissible. Cite as `regulatory`.
 - `journals.humankinetics.com` / `humankinetics.com` (Human Kinetics — Int J Sports Physiol Perform [IJSPP], J Strength Cond Res-adjacent sports-science titles; PubMed-indexed peer-reviewed; added 2026-06-20 wiki-research)
 - `cmaj.ca` (Canadian Medical Association Journal — CMAJ; Tier-1 peer-reviewed general medical journal; added 2026-06-20 wiki-research)
 - `ieeexplore.ieee.org` (IEEE Xplore — IEEE Transactions on Biomedical Engineering, IEEE J Biomed Health Inform + other peer-reviewed engineering/biomedical titles; the primary venue for PPG/wearable signal-processing validation; added 2026-06-20 wiki-research)
+- `jcsm.aasm.org` / `aasm.org` (American Academy of Sleep Medicine — Journal of Clinical Sleep Medicine + AASM clinical practice guidelines/scoring standards; the authoritative sleep-medicine body; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`
