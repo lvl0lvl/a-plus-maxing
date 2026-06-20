@@ -1,0 +1,75 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 1
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 35,
+    "largest_cluster_count": 3,
+    "share": 0.086,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 13,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "Fritz/Winters analog-ratio + Kacker r: paywalled corpus-missing WARN"
+  ],
+  "iterations": 2,
+  "timestamp": "2026-06-19T22:33:31.629156+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T22:30:39.776647+00:00",
+    "attest_ts": "2026-06-19T22:33:31.629159+00:00",
+    "iteration": 2,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "28c8e662fe61aaeaf2c0568dd4c45acfc6c34136ff2b29fa9881697f440e8dd1",
+    "agent_source_mtime": "2026-06-19T22:33:16.093609+00:00"
+  }
+}

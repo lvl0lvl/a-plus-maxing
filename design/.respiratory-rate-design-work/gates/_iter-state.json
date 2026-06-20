@@ -1,0 +1,65 @@
+{
+  "3.5": {
+    "phase_iterations": [
+      {
+        "iteration": 1,
+        "iter_start_ts": "2026-06-20T13:13:53.245253+00:00"
+      }
+    ],
+    "sections": {
+      "A": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-06-20T13:26:13.408524+00:00",
+          "section": "A"
+        }
+      ],
+      "B": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-06-20T13:26:13.464894+00:00",
+          "section": "B"
+        },
+        {
+          "iteration": 2,
+          "iter_start_ts": "2026-06-20T13:33:17.578193+00:00",
+          "section": "B"
+        }
+      ],
+      "C": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-06-20T13:26:13.520961+00:00",
+          "section": "C"
+        }
+      ],
+      "D": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-06-20T13:26:13.575842+00:00",
+          "section": "D"
+        }
+      ]
+    }
+  },
+  "4.25": [
+    {
+      "iteration": 1,
+      "iter_start_ts": "2026-06-20T13:35:38.595375+00:00"
+    },
+    {
+      "iteration": 2,
+      "iter_start_ts": "2026-06-20T13:38:16.436974+00:00"
+    }
+  ],
+  "4.75": [
+    {
+      "iteration": 1,
+      "iter_start_ts": "2026-06-20T13:35:38.650825+00:00"
+    },
+    {
+      "iteration": 2,
+      "iter_start_ts": "2026-06-20T13:48:18.010852+00:00"
+    }
+  ]
+}

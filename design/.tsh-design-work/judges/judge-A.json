@@ -1,0 +1,29 @@
+{
+  "section": "A",
+  "brief_hash": "77d5daf6092099d7d12fbbdeafd60a40da28ac3379c68000a61b7f54178ab1d4",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 91,
+    "type_tag_discipline": 96,
+    "population_annotation": 95,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 97
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "minor",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Bibliography [7] — Hershman JM, Beck-Peccoz P. Thyroid. 2023;33(7):785–790. PMID: 36716249",
+      "issue": "Reference [7] is listed in the bibliography with tag mechanism_review and tier: 1 (liebertpub.com, now whitelisted) but is never cited inline in the section text. An orphaned bibliography entry is minor slop and marginally deflates citation_fidelity.",
+      "recommended_fix": "Either add an inline [7, mechanism_review] citation where its content is relevant (e.g., the historical-context sentence on TSH as the sensitive thyroid test), or remove the entry from the Section A bibliography. If it is reserved for a later section, move it there."
+    }
+  ],
+  "summary": "Section A is a high-quality physiology overview: all six active inline citations resolve to whitelisted Tier-1 sources with verified PMIDs and correct first-author surnames (Rothacker 2016 PMID 26735261 and Andersen 2002 PMID 11889165 spot-checked via PubMed), type-tags are correctly assigned throughout, the log-linear TSH↔fT4 relationship and index-of-individuality (0.49) figures match the primary literature, and all five rubric elements are addressed. The sole finding is an orphaned bibliography entry ([7]) that is never referenced inline; it does not affect numerical accuracy or any tag-discipline rule."
+}

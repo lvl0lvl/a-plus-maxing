@@ -1,0 +1,83 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 0
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 25,
+    "largest_cluster_count": 4,
+    "share": 0.16,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 22,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13:corpus-missing:Wallace-2004-CV-figures-not-in-abstract",
+    "IC-13:corpus-missing:Katz-2000-r-0.78-not-fetched",
+    "IC-13:corpus-missing:Matsuda-1999-clamp-r-values-not-fetched",
+    "IC-13:corpus-missing:KoGES-9.9yr-followup-not-in-abstract",
+    "IC-13:corpus-missing:Mehta-2024-case-control-counts-not-in-abstract",
+    "IC-13:corpus-missing:Battista-2021-30-RCTs-1437-participants-not-in-abstract",
+    "IC-13:corpus-missing:Brzozowska-2023-n55-not-fetched",
+    "IC-13:paraphrase-imprecision:Tripathy-2004-IGT-should-be-IFG/IGT",
+    "IC-13:paraphrase-no-token-match:Parry-Strong-2022-HOMA-IR-supplementary-only"
+  ],
+  "iterations": 1,
+  "timestamp": "2026-06-19T19:08:38.909397+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T19:00:57.053425+00:00",
+    "attest_ts": "2026-06-19T19:08:38.909400+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "5d8b8498e3bcf9911248101eb2ec42ad0e45cda311bba0eec41bc22091e5a43d",
+    "agent_source_mtime": "2026-06-19T19:07:48.847727+00:00"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "section": "D",
+  "brief_hash": "cb921a0a0d1a4dbabd782ce8e18ac5e3597ff5c3a399a8210515ce54e1abdd13",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 90,
+    "type_tag_discipline": 98,
+    "population_annotation": 97,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 97
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "minor",
+      "dimension": "citation_fidelity",
+      "description": "Brand 2014 (PMID 25019163) reports OR 1.73 (95% CI 1.62–1.85) for prevalent metabolic syndrome in the 'What Lowers SHBG' sub-section. This statistic was not among the mandated verification targets and could not be confirmed via PubMed abstract alone (abstract reports the incident HR 1.44 figure). The mandated effect sizes (Ding 2009 Q4-vs-Q1 ORs 0.09/0.10, MR ORs 0.28/0.29; Perry 2010 OR 0.94, 27,657 cases/58,481 controls, 15 studies) were all verified against PubMed and match exactly. This does not reach HALT threshold but should be verified against the Brand 2014 full text before wiki ingest."
+    }
+  ],
+  "summary": "Section D is thorough and well-structured: the lowers/raises lists are correct with insulin resistance correctly named as the central lowering driver via the HNF4α mechanism, all mandated effect sizes carry named-study cohort/meta_analysis tags with correct [N, tag] discipline, and the SHBG→T2D causality framing is appropriately hedged. All high-stakes statistics verified against PubMed (Ding 2009 NEJM PMID 19657112 and Perry 2010 HMG PMID 19933169 match exactly); one unverified stat (Brand 2014 OR 1.73 for prevalent MetS) is logged as a minor finding for full-text confirmation before ingest."
+}

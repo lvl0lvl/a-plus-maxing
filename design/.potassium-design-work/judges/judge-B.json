@@ -1,0 +1,38 @@
+{
+  "section": "B",
+  "brief_hash": "004b33a09dbe39bbea7b434f94cb03c8afbba81803a333d9ef918179b6ecac6e",
+  "iteration": 3,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 97,
+    "type_tag_discipline": 98,
+    "population_annotation": 96,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 97
+  },
+  "total": 97,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "webfetch_verification": {
+    "PMID_18591376_Sevastos": {
+      "source": "clinmedres.org full text (whitelisted host)",
+      "verified": true,
+      "confirmed": [
+        "Dk range 0.40–2.61 mmol/L verbatim: CONFIRMED ('Dk was usually high, ranging between 0.40 and 2.61 mmol/L')",
+        "Dk100 index formula Dk × 100,000 / platelets (per mm³): CONFIRMED",
+        "Disproportionately lower Dk at very high platelet counts (reason for Dk100 normalization): CONFIRMED",
+        "0.4 mmol/L as diagnostic threshold for pseudohyperkalemia: CONFIRMED (carried forward from iteration 2)",
+        "No per-1,000×10⁹/L linear rate in paper: CONFIRMED absent (prior-iteration fabrication correctly removed)"
+      ]
+    }
+  },
+  "prior_halt_defects_status": {
+    "B-F1_fabricated_07_rate_removed": "CONFIRMED FIXED — '~0.7 mmol/L per 1,000 × 10⁹/L' absent; replaced with actual Sevastos findings (Dk 0.40–2.61 mmol/L, Dk100 index, non-linear characterization)",
+    "B-F2_normal_gap_vs_threshold_conflation": "CONFIRMED FIXED — section now distinctly states normal gap ~0.2–0.5 mmol/L and separately states 0.4 mmol/L diagnostic threshold for pseudohyperkalemia"
+  },
+  "summary": "Iteration 3 resolves both prior HALT defects: the fabricated ~0.7 mmol/L per-platelet-count linear rate is gone, replaced with Sevastos's actual findings (Dk 0.40–2.61 mmol/L, Dk100 non-linear normalization), confirmed verbatim via WebFetch on clinmedres.org (whitelisted); and the normal-gap vs diagnostic-threshold conflation is corrected. All seven citations resolve to whitelisted tier-1/tier-2 hosts with correct tag/tier suffixes, no bare [N] citations remain, all brief load-bearing elements are present and accurately sourced. Total 97 ≥ 92 threshold."
+}

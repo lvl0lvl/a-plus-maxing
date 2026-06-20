@@ -1,0 +1,21 @@
+{
+  "section": "B",
+  "brief_hash": "2fcd1fa8a2cb5f20ffcd0d04e759ac36825e6a64be199a1ceacae38573f859a2",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 93,
+    "citation_fidelity": 94,
+    "type_tag_discipline": 96,
+    "population_annotation": 92,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 97
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Iteration 2 remediation is complete and correct: the unverified off-whitelist male E2 medians (40.9/24.5 pg/mL via OptimalDX) are removed, the adult male reference interval is now anchored to Frederiksen 2020 LC-MS/MS cohort (PMID 31720688, n=1838, ~14–41 pg/mL / 50–150 pmol/L), Russell 2019 (PMID 31096185) is retained as [5, mechanism_review] for qualitative physiological narrative only with a transparent bibliography note, all x3.671 unit conversions verify correctly, all 12-enum type tags are applied with no bare [N] citations, and all brief requirements are covered — total 95/100, PASS."
+}

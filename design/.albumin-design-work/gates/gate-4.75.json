@@ -1,0 +1,75 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 7
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 30,
+    "largest_cluster_count": 2,
+    "share": 0.07,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 16,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "Goldwasser-Feldman 9250267 + a few full-paper figures abstract-unverifiable (paywall/CAPTCHA) \u2014 non-blocking"
+  ],
+  "iterations": 2,
+  "timestamp": "2026-06-20T05:14:55.478871+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T05:12:18.916020+00:00",
+    "attest_ts": "2026-06-20T05:14:55.478875+00:00",
+    "iteration": 2,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "9d734731e11a69b37e639a664141aaa7064e404002505f7f3f232b1b4394653b",
+    "agent_source_mtime": "2026-06-20T05:14:31.840149+00:00"
+  }
+}

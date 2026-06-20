@@ -1,0 +1,76 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "WARN"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 0
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 12,
+    "largest_cluster_count": 3,
+    "share": 0.25,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 12,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-1: Section B line 5 uses [1, regulatory] but bib entry [1] (Levey 2006 MDRD cohort study) is declared tag:cohort \u2014 inline tag is valid enum member but diverges from bib-declared type; IDMS standardization claim would be more precisely grounded by a regulatory source",
+    "IC-10: Section A bib [8] Murty 2013 (Indian J Nephrol, Medknow/LWW) borderline whitelisted under journals.lww.com umbrella \u2014 peer-reviewed, PMC-indexed, grounds mechanistic claim only (not numerical efficacy)"
+  ],
+  "iterations": 1,
+  "timestamp": "2026-06-20T04:11:18.272710+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T04:05:13.870548+00:00",
+    "attest_ts": "2026-06-20T04:11:18.272713+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "0d353cfcd3a1611a322751dc5ae7bbe07338bf274f76df2acc9d8be8594d9fb8",
+    "agent_source_mtime": "2026-06-20T04:10:40.567949+00:00"
+  }
+}

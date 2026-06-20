@@ -1,0 +1,29 @@
+{
+  "section": "A",
+  "brief_hash": "ad1dc6aaa9915e0ab7e23dda367016fe83b24e4869e548b18c34473b7c29d811",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 90,
+    "type_tag_discipline": 95,
+    "population_annotation": 93,
+    "route_fidelity": null,
+    "concentration_audit_handling": 98,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 95
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "WARN",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "Bibliography entries [1] and [2]",
+      "issue": "References [1] and [2] are bibliographically identical — both cite Herman JP et al., Compr Physiol 2016;6(2):603–621, PMID 27065163, DOI 10.1002/cphy.c150015. The same paper appears under two separate reference numbers, covering synthesis/StAR ([1]) and HPA cascade/AVP/negative-feedback/CNS effects ([2]). This is structural redundancy, not fabrication — both PMIDs are real and verified — but it inflates the apparent citation count and could mislead a reader into expecting two distinct sources.",
+      "recommended_fix": "Collapse [1] and [2] into a single reference number (e.g., [1]) and update all inline citations to use that single number. The paper legitimately supports all claims currently attributed to both entries."
+    }
+  ],
+  "summary": "Section A covers HPA-axis physiology thoroughly and accurately: all seven bibliography entries are real, peer-reviewed tier-1 mechanism reviews; two PMIDs spot-checked (27065163 and 39177247) fully confirmed; all unit conversions (µg/dL ↔ nmol/L ×27.6) verified correct; all inline citations carry type tags; mechanistic chain and CBG/11β-HSD physiology are accurate. One WARN: references [1] and [2] point to the same paper (Herman et al. 2016, PMID 27065163) — a redundant listing that depresses citation_fidelity to 90 but does not breach the 92 total threshold."
+}

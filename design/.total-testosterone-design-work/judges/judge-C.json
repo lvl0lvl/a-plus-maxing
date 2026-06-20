@@ -1,0 +1,43 @@
+{
+  "section": "C",
+  "brief_hash": "2193fa6d475a354170b6745a75fda72f076fe589e8f13cc417116fcdb8292dc8",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 87,
+    "type_tag_discipline": 78,
+    "population_annotation": 93,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 96
+  },
+  "total": 92,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "id": "F-C-01",
+      "dimension": "type_tag_discipline",
+      "severity": "minor",
+      "location": "Pre-analytical Considerations — diurnal variation claim, ref [8]",
+      "detail": "Ref [8] is an Endotext book chapter (Anawalt B, Matsumoto AM, NBK279145, nih.gov) explicitly identified in the bibliography as 'no PMID — book chapter'. The diurnal-variation sentence tags it '[8, cohort]'. The correct tag for a narrative book chapter is 'mechanism_review', not 'cohort'. No numerical effect size from this reference is at risk of being miscredited, but the tag is wrong."
+    },
+    {
+      "id": "F-C-02",
+      "dimension": "type_tag_discipline",
+      "severity": "minor",
+      "location": "Analytical Interferences — heterophile antibody paragraph",
+      "detail": "The inline cite '[PMC12143982, cohort]' tags a case report series as 'cohort'. A case report (or small case series) should carry the tag 'open_label', not 'cohort'. 'cohort' implies a prospective or retrospective observational study with a defined population."
+    },
+    {
+      "id": "F-C-03",
+      "dimension": "citation_fidelity",
+      "severity": "minor",
+      "location": "Analytical Interferences — heterophile antibody paragraph",
+      "detail": "PMC12143982 is cited inline as '[PMC12143982, cohort]' but has no numbered bibliography entry. All other references appear as numbered entries [1]–[9] with full citation details. The missing bibliography entry is a fidelity gap; the reader cannot verify author, journal, year, or title from the reference list."
+    }
+  ],
+  "summary": "Section C is a thorough, well-sourced account of testosterone measurement methodology. Rosner 17090633 and Vermeulen 10523012 both verified correct (author, title, year, key findings, pregnancy caveat). Three minor findings: Endotext chapter [8] mis-tagged 'cohort' instead of 'mechanism_review'; PMC12143982 mis-tagged 'cohort' instead of 'open_label'; and PMC12143982 has no bibliography entry. No off-whitelist numerical claims, no reversed interference directions, no fabricated PMIDs, no omissions from the brief. Total 92 = threshold; PASS with findings flagged for remediation."
+}

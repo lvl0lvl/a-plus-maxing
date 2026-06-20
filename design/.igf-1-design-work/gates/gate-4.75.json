@@ -1,0 +1,79 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "WARN"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 1
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 15,
+    "largest_cluster_count": 2,
+    "share": 0.13,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 11,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-10-unnumbered-animal-annotation: Section D \u00a7D.3 uses [animal \u2014 murine models] as unnumbered prose annotation with no bibliography entry; primary for Ames/Snell dwarf mouse longevity (40\u201365% longer) not cited by PMID",
+    "IC-10-off-whitelist-journal: Hawkes/Grimberg Pediatr Endocrinol Rev 2015 PMID 26841638 (C[10], mechanism_review) \u2014 MRE Press journal not on source whitelist; no numerical claim grounded; orchestrator to adjudicate (add to whitelist or re-source)",
+    "IC-13-abstract-only-chanson-age-bands: Age-banded ng/mL values attributed to Chanson 2016 (PMID 27167056) are full-text-dependent; PubMed abstract does not enumerate per-age-group ranges \u2014 corpus-missing for these specific values",
+    "IC-13-abstract-only-faje-r2: Faje 2010 (PMID 20190159) r\u00b2=0.77 for nadir GH vs IGF-1 is a full-text regression result; not in PubMed abstract",
+    "IC-13-N-discrepancy-guevara: Report states N\u224899 Laron individuals; PubMed abstract cites 90 living GHRD subjects at analysis \u2014 minor discrepancy likely full-text resolvable (total cohort vs living subset); not fabricated"
+  ],
+  "iterations": 1,
+  "timestamp": "2026-06-20T01:49:20.747653+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T01:44:25.268151+00:00",
+    "attest_ts": "2026-06-20T01:49:20.747657+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "d60b4621270d654d5aabd3385bd1b924fd63ae1af17a37ddac1b791c89ee01ec",
+    "agent_source_mtime": "2026-06-20T01:48:48.236675+00:00"
+  }
+}

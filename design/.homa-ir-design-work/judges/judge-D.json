@@ -1,0 +1,21 @@
+{
+  "section": "D",
+  "brief_hash": "e0d1dfc5f27b024b65469b9ec7e5be8d0ccdbf0d299b2ab2548d48ee58f1e692",
+  "iteration": 3,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 98,
+    "type_tag_discipline": 99,
+    "population_annotation": 96,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 98
+  },
+  "total": 97,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "All four iteration-2 findings resolved: F-D-04 (bib [4] journal corrected to Clin Diabetes Endocrinol 2023;9(1):7, PMID 37974292 confirmed); F-D-05 (Sweeney bare-cite replaced with Sondrup N et al. Sleep Med Rev 2022:62:101594, PMID 35189549, WebFetch-confirmed this round); F-D-06 (KoGES 9.9y follow-up accepted per task-brief verification attestation); F-D-07 (bariatric effect size now carries [11, cohort] citing Brzozowska MM Sci Rep 2023;13(1):6032, PMID 37055514, WebFetch-confirmed N=55 prospective and −3.7 HOMA-IR vs dietary CI −5.4 to −2.1). All 11 bibliography entries are clean; every inline [N, tag] resolves correctly; no bare citations; no off-whitelist sources; no unsupported numerical claims."
+}

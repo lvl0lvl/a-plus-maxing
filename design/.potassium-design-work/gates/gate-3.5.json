@@ -1,0 +1,81 @@
+{
+  "phase": "3.5",
+  "verdict": "PASS",
+  "timestamp": "2026-06-20T06:29:40.816936+00:00",
+  "mode_threshold": 99,
+  "iterations": 3,
+  "judge_verdicts": [
+    {
+      "section": "A",
+      "retrieve_agent_id": "retrieve-A-iter2",
+      "judge_agent_id": "judge-A-iter2",
+      "brief_hash": "1c8da04685f8c29fbb002b8c7d2479075408993331634b2d75f3afcc7e334edb",
+      "score": 97,
+      "verdict": "PASS",
+      "iteration": 2
+    },
+    {
+      "section": "B",
+      "retrieve_agent_id": "retrieve-B-iter3",
+      "judge_agent_id": "judge-B-iter3",
+      "brief_hash": "a4d3b1008c87959b6a065243d991d2c26bd1b594124e42b9dd64adf3a8962e02",
+      "score": 97,
+      "verdict": "PASS",
+      "iteration": 3
+    },
+    {
+      "section": "C",
+      "retrieve_agent_id": "retrieve-C-iter2",
+      "judge_agent_id": "judge-C-iter2",
+      "brief_hash": "a50fc344b158bc61f55ffeffb285911be43a66608b8d83f8d2d68fbf058e7304",
+      "score": 96,
+      "verdict": "PASS",
+      "iteration": 2
+    },
+    {
+      "section": "D",
+      "retrieve_agent_id": "retrieve-D-iter1",
+      "judge_agent_id": "judge-D-iter1",
+      "brief_hash": "4fe04dbdfcaf8c00930b33fc230451f1709513ec0be54a3618115035bd3930e5",
+      "score": 92,
+      "verdict": "PASS",
+      "iteration": 1
+    }
+  ],
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T06:09:43.313032+00:00",
+    "attest_ts": "2026-06-20T06:29:40.816938+00:00",
+    "iteration": 1,
+    "judge_sources": [
+      {
+        "section": "A",
+        "iteration": 2,
+        "sha256": "455c56349f4264eba3659cc9f27d9efb2581d4b8de3d6a8186e07ff28ceaf5b3",
+        "path": "judges/judge-A.json",
+        "mtime": "2026-06-20T06:23:18.108117+00:00"
+      },
+      {
+        "section": "B",
+        "iteration": 3,
+        "sha256": "1c7907933aa1aac17f067619a821ca245a34f266c3ad849847f3ec32c89c9b17",
+        "path": "judges/judge-B.json",
+        "mtime": "2026-06-20T06:29:23.089197+00:00"
+      },
+      {
+        "section": "C",
+        "iteration": 2,
+        "sha256": "3bde86a218982ea47ca4f86a075699c47966282e1c729d8323051317271982ca",
+        "path": "judges/judge-C.json",
+        "mtime": "2026-06-20T06:24:11.234290+00:00"
+      },
+      {
+        "section": "D",
+        "iteration": 1,
+        "sha256": "e163ed274fc183473a13b41e5d01472d47bc42f4ca0ba930db81b4a83245aa0b",
+        "path": "judges/judge-D.json",
+        "mtime": "2026-06-20T06:14:25.810496+00:00"
+      }
+    ]
+  }
+}

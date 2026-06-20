@@ -1,0 +1,21 @@
+{
+  "section": "A",
+  "brief_hash": "a3e15781b393f10cf13ba61120edb43d38c3680cba2bff96386dc72851f15650",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 95,
+    "type_tag_discipline": 98,
+    "population_annotation": 94,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 96
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "All four iteration-1 HALT defects confirmed fixed: Adv Pharm Bull removed and replaced with Nair 2014 Diabetes Care (PMID 24062331, whitelisted via diabetesjournals.org) with the cooked-meat claim now qualitative; eJIFCC ref corrected to 23(2):33-40 and ejifcc.org now whitelisted; Kannapiran corrected to 25(4):380-384; Murty re-tagged cohort. No off-whitelist hosts, no bare [N] citations, no bib gaps, and all inline tags match bib entries — section scores 96/100 across 7 non-null dimensions."
+}

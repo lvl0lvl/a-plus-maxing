@@ -1,0 +1,78 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "WARN"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 0
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 13,
+    "largest_cluster_count": 2,
+    "share": 0.154,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 8,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-2: Section C bibliography entries 1,2,5,6,9,10 missing trailing [tag] annotation; Section B bibliography entry [1] (unit conversion derivation note) missing [tag] annotation. Tags present in inline citations; structural omission in bibliography format only.",
+    "IC-1/IC-2 notation: Section A inline [9, mechanism_review] references bib entry A[9] tagged rct (Arlt 1999 NEJM PMID 10502590). Inline tag is within the 12-enum (no IC-1 HALT); mismatch between inline use-tag and bib design-tag is a notation inconsistency.",
+    "IC-10 untagged attribution: Section C line 27 cites ARUP Laboratories and Mayo Clinic Laboratories in parentheses for pre-analytic serum stability values. Neither host is on the source whitelist; neither is an inline [N, tag] citation. Claim is pre-analytic lab procedure spec (not efficacy/dose/AE rate); classified WARN.",
+    "IC-13 corpus-missing: Orentreich 1984 (PMID 6235241) lower-bound age-banded reference values not recoverable from abstract alone (paywall). Rosenfeld 1975 (PMID 123927) specific 7-10h half-life figure not stated in abstract (long half-life qualitatively confirmed)."
+  ],
+  "iterations": 1,
+  "timestamp": "2026-06-20T01:18:11.525941+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T01:09:27.745275+00:00",
+    "attest_ts": "2026-06-20T01:18:11.525944+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "5b3a6caddd19b07dbcd42678fd9e30ace62247510373a574952ad0ec4fa5d4f3",
+    "agent_source_mtime": "2026-06-20T01:17:39.282885+00:00"
+  }
+}

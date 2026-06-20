@@ -1,0 +1,35 @@
+{
+  "section": "D",
+  "brief_hash": "94e5091219b3002350e45426b29df7756aa868bc2c3862dc8bc3269d8d7c7715",
+  "iteration": 3,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 91,
+    "type_tag_discipline": 96,
+    "population_annotation": 98,
+    "route_fidelity": null,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 98
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "low",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "D.5 Limitations, item 1: 'Within-individual biological CV for FPG is approximately 5–7%'",
+      "issue": "Quantitative claim with no resolvable [N, tag] cite. Well-established laboratory value but the rubric requires every numeric claim to carry a citation.",
+      "recommended_fix": "Add a citation to a laboratory variability reference (e.g., Carobene et al. or a CLIA/ISO reference-range source tagged mechanism_review or cohort) or to a guideline that states this figure."
+    },
+    {
+      "severity": "low",
+      "dimension": "citation_fidelity",
+      "claim_or_location": "D.5 Limitations, item 3: 'glucose falls ~5–7% per hour in whole blood'",
+      "issue": "Quantitative pre-analytic decay rate with no resolvable [N, tag] cite. Correct and well-established but uncited.",
+      "recommended_fix": "Add a citation to a pre-analytic stability study or laboratory standard (e.g., Sacks DB et al. or an IFCC/CLSI document) tagged mechanism_review."
+    }
+  ]
+}

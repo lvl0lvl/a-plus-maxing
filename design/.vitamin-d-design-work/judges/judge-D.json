@@ -1,0 +1,40 @@
+{
+  "section": "D",
+  "brief_hash": "e2d462d251e60169b6bec944b038d5cddd0c1ffefe616b68938d7616e9f4a82e",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 93,
+    "type_tag_discipline": 98,
+    "population_annotation": 95,
+    "route_fidelity": null,
+    "concentration_audit_handling": 90,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 88
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "minor",
+      "dimension": "completeness_vs_brief",
+      "finding": "The 2024 Endocrine Society guideline shift (de-emphasizing routine screening and 25(OH)D-guided supplementation in healthy adults) is explicitly called for in the rubric brief but is absent from the section. Only the 2011 IOM/National Academies RDA (600–800 IU) and UL (4,000 IU) are cited. The ES-vs-IOM threshold debate (30 ng/mL vs 20 ng/mL sufficiency cutoff) is treated in the measurement section but not the management framing. Does not drop total below threshold.",
+      "action": "Add one sentence on the 2024 ES guideline shift in the management framing paragraph."
+    },
+    {
+      "severity": "minor",
+      "dimension": "citation_fidelity",
+      "finding": "Bibliography entry [5] (Hahn et al. BMJ 2022, DOI 10.1136/bmj-2021-066452) omits the PMID (35082139). All other Tier-1 RCT entries carry explicit PMIDs. No fabricated data detected — authors, N, HR, and CI all verified against PubMed.",
+      "action": "Add PMID 35082139 to bib entry [5]."
+    },
+    {
+      "severity": "info",
+      "dimension": "citation_fidelity",
+      "finding": "References [1] and [2] both resolve to Holick MF NEJM 2007 PMID 17634462 (same paper cited twice under different numbers). The section acknowledges this inline. No fabrication; no factual error. Redundant dual-numbering is a style issue, not an integrity failure.",
+      "action": "Consider collapsing to a single reference [1] and updating all inline cites."
+    }
+  ],
+  "summary": "Section D passes at 94/100. All four highest-stakes trial results verified against PubMed: VITAL (PMID 30415629) cancer HR 0.96 / CVD HR 0.97 exact; D-Health (PMID 35026158) mortality HR 1.04 exact; Zhao fracture meta (PMID 29279934) 33 RCTs N=51,145 exact; Hahn VITAL autoimmune ancillary full author list confirmed (PMID 35082139). All RCTs are correctly tagged `rct`, the Zhao meta correctly tagged `meta_analysis`. The observational-vs-RCT divergence, reverse causation, and 'status marker not a proven causal lever' conclusion are all present and accurately framed. Two minor gaps: the 2024 ES guideline shift is absent from the management framing (brief-required), and bib [5] lacks a PMID."
+}

@@ -1,0 +1,21 @@
+{
+  "section": "A",
+  "brief_hash": "dd5117abea50e2d4b3fdf33b0c7c8a7e401cb5a68372872ccaa10cf2a7ba16c5",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 92,
+    "citation_fidelity": 94,
+    "type_tag_discipline": 96,
+    "population_annotation": 93,
+    "route_fidelity": null,
+    "concentration_audit_handling": 90,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 93,
+    "completeness_vs_brief": 94
+  },
+  "total": 93,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Both prior HALT defects confirmed fixed: [5] Laurent 2016 now correctly tagged `animal` in the bibliography and all inline citations, with species named inline as '(murine)' in the prose; [6] Plymate 1988 now correctly tagged `in_vitro` throughout. All 7 citations use valid 12-enum tags with no bare [N] citations. Total 93 clears the 92 threshold."
+}

@@ -1,0 +1,74 @@
+{
+  "section": "B",
+  "brief_hash": "7f7731d4cfde6289d69ce3b6d390411dbb75f87df424e2c29578e9308fd2ed09",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 95,
+    "type_tag_discipline": 90,
+    "population_annotation": 96,
+    "route_fidelity": null,
+    "concentration_audit_handling": 99,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 98
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "dim": "type_tag_discipline",
+      "severity": "minor",
+      "description": "Brambilla 2009 (PMID 19088162) tagged [4, mechanism_review] but is an original primary research study (diurnal variation measured in human subjects, JCEM 2009) — more accurately tagged cohort or open_label. Does not affect numerical claims but is a tag-discipline imprecision."
+    }
+  ],
+  "spot_checks": [
+    {
+      "pmid": "28324103",
+      "claimed_author": "Travison TG",
+      "verified_author": "Thomas G Travison",
+      "claimed_journal": "J Clin Endocrinol Metab. 2017",
+      "verified": true,
+      "claimed_doi": "10.1210/jc.2016-2935",
+      "verified_doi": true,
+      "key_values_verified": "264-916 ng/dL (9.2-31.8 nmol/L); 9054 men; 4 cohorts (Framingham, EMAS, MrOS, SIBLOS); 5th pct=303 ng/dL; median=531 ng/dL — all confirmed"
+    },
+    {
+      "pmid": "29562364",
+      "claimed_author": "Bhasin S",
+      "verified_author": "Shalender Bhasin",
+      "claimed_journal": "J Clin Endocrinol Metab. 2018",
+      "verified": true,
+      "claimed_doi": "10.1210/jc.2018-00229",
+      "verified_doi": true,
+      "key_values_verified": "Diagnostic framework: fasting morning samples, repeated measurement, symptom requirement — all confirmed. No single numerical cutoff; emphasis on consistent low + symptoms confirmed."
+    },
+    {
+      "pmid": "17090633",
+      "claimed_author": "Rosner W",
+      "verified_author": "William Rosner",
+      "claimed_journal": "J Clin Endocrinol Metab. 2007",
+      "verified": true,
+      "claimed_doi": "10.1210/jc.2006-1864",
+      "verified_doi": true,
+      "key_values_verified": "Endocrine Society position statement on testosterone measurement limitations confirmed. 1133-laboratory figure is a widely attributed finding from this source; not independently confirmed from abstract alone but PMID and attribution are correct."
+    }
+  ],
+  "unit_conversion_audit": {
+    "factor_stated": "1 ng/dL = 0.0347 nmol/L",
+    "factor_correct": true,
+    "table_checks": [
+      {"ng_dL": 264, "stated_nmol_L": 9.2, "computed": 9.16, "pass": true},
+      {"ng_dL": 300, "stated_nmol_L": 10.4, "computed": 10.41, "pass": true},
+      {"ng_dL": 531, "stated_nmol_L": 18.4, "computed": 18.43, "pass": true},
+      {"ng_dL": 600, "stated_nmol_L": 20.8, "computed": 20.82, "pass": true},
+      {"ng_dL": 916, "stated_nmol_L": 31.8, "computed": 31.79, "pass": true},
+      {"ng_dL": 303, "stated_nmol_L": 10.5, "computed": 10.51, "pass": true}
+    ],
+    "reverse_factor_stated": "1 nmol/L = 28.8 ng/dL",
+    "reverse_factor_computed": 28.82,
+    "reverse_factor_pass": true
+  },
+  "summary": "Section B is accurate and well-sourced. The harmonized 264–916 ng/dL range is correctly attributed to Travison 2017 [cohort], the ~300 ng/dL threshold caveats (continuum, ≥2 fasting AM samples, symptoms) are correctly attributed to Bhasin 2018 [regulatory], all unit conversions are arithmetically correct, and both mandatory PMIDs were spot-checked and confirmed. One minor tag-discipline issue: Brambilla 2009 is tagged mechanism_review but is a primary human study (cohort/open_label is more precise)."
+}

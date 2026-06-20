@@ -1,0 +1,28 @@
+{
+  "section": "D",
+  "brief_hash": "984ab97dc22952b7dd369546c0fd335c17ccdbe285b7ae4c7e251afe03e0bb3a",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 93,
+    "citation_fidelity": 84,
+    "type_tag_discipline": 97,
+    "population_annotation": 97,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 97
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "dimension": "citation_fidelity",
+      "severity": "minor",
+      "ref": 10,
+      "finding": "Author field lists 'Karger Publishers' (the publisher) instead of the actual author name(s) for PMID 19816042 (Nephron Clin Pract 2010;114(1):c38-c44). All other elements (title, journal, volume/issue/pages, PMID, URL to karger.com — a whitelisted host) are present and correct. The error is bibliographic only and does not affect the claim grounded on this reference (B6 depletion mechanism in CKD/dialysis). Scored citation_fidelity at 84; does not pull total below threshold."
+    }
+  ],
+  "summary": "Section D passes at total 94 (mean of 7 non-null dimensions). All prior iteration-1 fixes confirmed: [15] Lim rhabdo URL is now pubmed.ncbi.nlm.nih.gov (not wjgnet); [5] Kim 2008 Hepatology PMID 18366115 replaces the prior off-whitelist Cureus cite; zero off-whitelist hosts ground any numerical claim; all 16 inline citations carry [N, tag] with no bare [N]; the Framingham OR 1.48, WOSCOPS HR 3.38, Nyblom De Ritis 69%, and normal-ALT-does-not-exclude-cirrhosis caveat are all intact. One residual minor defect: [10] lists the publisher 'Karger Publishers' rather than the article's author(s), docking citation_fidelity to 84; the remaining six non-null dimensions score 93-97, clearing the 92 threshold at 94."
+}

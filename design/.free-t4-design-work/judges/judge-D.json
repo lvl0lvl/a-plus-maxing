@@ -1,0 +1,21 @@
+{
+  "section": "D",
+  "brief_hash": "dece945a01d125bde0da59338720504be50d514b681ff97467715e8acbc9dfa2",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 92,
+    "citation_fidelity": 91,
+    "type_tag_discipline": 94,
+    "population_annotation": 96,
+    "route_fidelity": null,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 94,
+    "completeness_vs_brief": 96
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "All iteration-1 remediation confirmed: no AUC claim on Abbey 2022 (decision tree + fT4 < 0.89 ng/dL / 11.45 pmol/L / n=72 BLSA verified via PubMed PMID 35311240), fabricated mean age removed to 'older adults', Sakai 2018 structural facts (n=539, fT4 above-range at admission, significant fT4 reduction by discharge, TSH unchanged) verified from abstract (PMID 30055589) with pmol/L figures carried from prior PMC pass — PMC CAPTCHA-blocked in this iteration but abstract confirms all structural claims. One minor bibliographic imprecision noted but not blocking: ref 9 prose credits 'Van den Berghe, Wiersinga' for the 2010 J Endocrinol PMID 20016079 (Wiersinga sole-author); Van den Berghe 2014 Thyroid is the primary bibliography entry — no fabricated number involved, citation_fidelity scored 91. All effect sizes carry [N, tag] with named population; no bare citations; all PMIDs present and author/journal-matched."
+}

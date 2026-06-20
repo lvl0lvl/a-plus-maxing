@@ -1,0 +1,29 @@
+{
+  "section": "D",
+  "brief_hash": "da3b3d11fdd9939a47114e876f016c3f7a7513c0e157013d70c4d4138ab7f2f2",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 95,
+    "type_tag_discipline": 80,
+    "population_annotation": 97,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 94,
+    "completeness_vs_brief": 97
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "minor",
+      "dimension": "type_tag_discipline",
+      "location": "D.6, sentence: 'no single population-anchored reference range … [4, mechanism_review; 6, mechanism_review]'",
+      "defect": "Citation [4] (Bhasin 2018, Endocrine Society Clinical Practice Guideline, PMID 29562364) is tagged `mechanism_review` in D.6 but correctly tagged `regulatory` in D.2. Endocrine Society CPGs map to `regulatory` per the rubric tag-discipline rules and the source whitelist (endocrine.org = Tier 2 regulatory). The tag is internally inconsistent and misclassifies a CPG as a narrative review in the limitations paragraph.",
+      "fix": "Change `[4, mechanism_review]` to `[4, regulatory]` at the D.6 reference to the absence of harmonised reference range infrastructure (Bhasin 2018 CPG)."
+    }
+  ],
+  "summary": "Section D passes at 94/100 (threshold 92). All four prior-round defects confirmed resolved: Bhasin [4] correctly tagged `regulatory` in D.2, Pezzaioli fold-change quantified as 'approximately two-fold (20.2% vs 10.6%)', n=94 added inline, and Bizuneh removed from D.1 body with no duplicate tag conflict. One residual minor defect: [4] is re-tagged `mechanism_review` in the D.6 limitations paragraph — an internal inconsistency, not an accuracy error — which depresses type_tag_discipline to 80 but total 94 clears the 92 threshold."
+}
