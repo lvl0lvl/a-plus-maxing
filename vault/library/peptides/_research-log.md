@@ -131,7 +131,25 @@ a ceiling may be lowered only with a documented evidence reason here (no guessin
 - FDA 503A Cat-2 removal (~Apr 2026) is a RECURRING retrieval miss (hit TB-500 + KPV) → bake "check the Apr-2026 503A Cat-2 removal status" into the safety/regulatory retrieval brief.
 - 7.5 verifier over-read the third-party-marker rule (demanded a compound-SPECIFIC validated biomarker; the rule only needs a named OBJECTIVE assay) → clarify the verifier brief: a named objective lab assay (e.g. hs-CRP) satisfies it.
 
-### NEXT (reserved): **LL-37** (sweep entry 4), then Ipamorelin → CJC-1295 → … per [[_triage]] order.
+---
+
+## 2026-06-20 — Tesamorelin (GHRH(1-44) analogue, Egrifta) deep-pass (sweep entry 7, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **Tesamorelin entry shipped:** `compounds/tesamorelin.md` + `library/peptides/tesamorelin/research-report.md` (~11.1K words, 41 unified citations + crosswalk) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections incl. id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Cleanest evidence base of the sweep** — 6/6 sections PASS first-pass at bar 92, NO section HALT. Gates still earned keep: 4.75 flagged a §D author-label error (PMID 28617838 first author is **Clemmons DR**, not "Stanley TL") → fixed before synthesis; 4.25 reconcile confirmed cross-section consistency (Egrifta SV vs WR setids correctly distinguished).
+- **Final independent full-bib audit: 24/24 identifier entries verified, 0 fabrications, 0 Wikipedia, 0 fixes.** Compound-entry consistency PASS. (The suspicious 2026 Badran meta PMID 41545261 VERIFIED real.)
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- **The ONLY FDA-APPROVED GHRH analogue in the cluster** → deliberately tiered **evidence_tier B / risk_tier medium** (not C/experimental like the unapproved peptides). Demonstrates the pipeline tiers on evidence, not by rote.
+- Structure: stabilized GHRH(1-44)NH2 + trans-3-hexenoyl N-cap (NOT the GRF(1-29) core of CJC-1295/sermorelin). GHRH-R agonist → pulsatile GH → IGF-1; effects REVERSE on discontinuation. Half-life ~8 min healthy / ~18–38 min HIV.
+- **Approved efficacy is NARROW + real:** Falutz 2007 (NEJM PMID 18057338) + Falutz 2010 pooled (PMID 20554713) Phase 3 RCTs in HIV-lipodystrophy → ~15% VAT @26wk → ~18% @52wk; visceral-selective, weight-neutral; 2026 Badran meta (PMID 41545261) confirms. **INTEGRITY AXIS: that efficacy is HIV-lipodystrophy-VAT only.** NAFLD (Stanley 2019 Lancet HIV 31611038) + cognition (Baker 2012 Arch Neurol 22869065) = INVESTIGATIONAL (mostly HIV+). Bodybuilding/athletic/anti-aging/healthy-adult fat-loss = **ZERO human efficacy data** (off-label extrapolation).
+- ~100% Theratechnologies single-sponsor concentration (academic-lineage MGH ~50%) — surfaced first-class.
+- Regulatory: FDA approved 2010 (exact indication "reduction of excess abdominal fat in HIV-infected adult patients with lipodystrophy"); Egrifta SV 2019 / Egrifta WR 2025; EMA NOT approved (withdrawn, Ferrer); WADA S2.2.4 prohibited (tesamorelin named); ~$3000/mo brand. Contraindications (label): HPA-axis disruption, active malignancy, hypersensitivity incl. mannitol, pregnancy. Monitoring: IGF-1 + fasting glucose/HbA1c.
+- Optional post-ship (non-blocking, no claim depends): refresh NCT02572323 status to "Completed"; note NCT07481734 "Mock Study" flag.
+
+### NEXT (reserved, my/primary lane): **Sermorelin** (sweep entry 8), then Hexarelin → MK-677 → Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
 
 ---
 
