@@ -2,9 +2,14 @@
 
 `record_tracking` is the production caller for `plan_schema.record_plan_tracking` (the no-production-
 caller gap); `resolve_plan_progress` joins a domain's plan + tracking into the plan-vs-actual view.
-This suite covers the no-plan-to-track honest boundary (mutation-proven), the recorded path, the
-read-back absence states, the store-adversarial battery for the new write/read surface (cross-stream
-isolation, dedupe, mutation), and the closed-loop E2E through the existing `generate_plan` path.
+This suite covers the no-plan-to-track honest boundary, the recorded path, the read-back absence
+states, the store-adversarial battery for the new write/read surface, and the closed-loop E2E through
+the existing `generate_plan` path. Store-adversarial category mapping (`docs/checklists/store-adversarial-tests.md`):
+`track.py` defines NO new store key — it reuses `plan_schema`'s `plan-track::`/`plan::` keying — so
+the KEYING/DEDUPE category-4 mutation is `test_adversarial_cross_stream_isolation` (goes RED if the
+read/write domain is collapsed to a constant) + `test_adversarial_same_snapshot_idempotent_distinct_persist`
+(goes RED if the content-tag dedupe is widened/removed); `test_no_plan_gate_is_load_bearing_both_directions`
+mutates `track.py`'s OWN no-plan gate (a logic mutation, distinct from the reused keying).
 """
 
 import pytest
@@ -136,18 +141,23 @@ def test_adversarial_same_snapshot_idempotent_distinct_persist(tmp_path):
     assert resolve_plan_progress("workout", "2026-06-19", tmp_path)["tracking"]["volume_lb"] == 5200  # latest wins
 
 
-def test_adversarial_mutation_no_plan_gate_is_load_bearing(tmp_path, monkeypatch):
-    # CATEGORY 4 (mutation-style): break the plan-existence gate — force read_plan to always report a
-    # plan present — and a no-plan domain would then record tracking against a non-existent plan
-    # (fabricated adherence). The no-plan-to-track boundary goes RED under the mutation, proving the
-    # gate is load-bearing, not tautological.
-    monkeypatch.setattr(
+def test_no_plan_gate_is_load_bearing_both_directions(tmp_path, monkeypatch):
+    # CATEGORY 4 (mutation-style, SELF-CONTAINED): the gate is load-bearing iff the SAME input flips
+    # outcome with the gate's deciding signal. The contrast lives in ONE test: with the real read_plan
+    # over a no-plan domain the result is no-plan-to-track + nothing written (the boundary holds); with
+    # read_plan forced to report a plan present (the mutation of the gate's deciding signal) the same
+    # call records. So removing the `state is None` gate cannot leave the boundary green — the no-plan
+    # direction goes RED. (The keying/dedupe category-4 mutation is the cross-stream + dedupe tests
+    # below, which go RED under a domain-collapse / constant-source mutation — track.py adds no new key.)
+    real = record_tracking("workout", _wk_tracking(), "2026-06-19", tmp_path)  # real read_plan, no plan
+    assert real["state"] == NO_PLAN_TO_TRACK and real["recorded"] is False  # the boundary holds...
+    assert plan_schema.read_plan_tracking("workout", "2026-06-19", tmp_path) is None  # ...nothing written
+    monkeypatch.setattr(  # mutate the gate's deciding signal: read_plan reports a plan present
         plan_schema, "read_plan",
         lambda domain, on_date, root: {"state": None, "plan": {}, "specialist": "x", "plan_date": on_date},
     )
-    r = record_tracking("workout", _wk_tracking(), "2026-06-19", tmp_path)  # no real plan seeded
-    assert r["state"] == RECORDED  # MUTATION: the gate is bypassed -> it records against a phantom plan
-    assert plan_schema.read_plan_tracking("workout", "2026-06-19", tmp_path) is not None
+    mutated = record_tracking("workout", _wk_tracking(), "2026-06-19", tmp_path)
+    assert mutated["state"] == RECORDED  # ...and flips to RECORDED — the gate's signal is decisive
 
 
 # --- AC4: the closed-loop E2E through the production path ------------------------
@@ -192,7 +202,7 @@ def test_progress_no_plan_today_has_plan_false_no_contradiction(tmp_path):
     prog = resolve_plan_progress("workout", "2026-06-19", tmp_path)
     assert prog["has_plan"] is False  # no plan FOR 06-19
     assert prog["plan"] is None  # consistent: has_plan False <-> plan None
-    assert prog["plan_date"] == "2026-06-15"  # informational: a plan exists on file, just not for the date
+    assert prog["plan_date"] is None  # plan_date means "the plan FOR this date" — None here (CONTRACTS-TRACK-1)
 
 
 def test_record_tracking_no_plan_gate_precedes_snapshot_validation(tmp_path):
@@ -221,3 +231,42 @@ def test_record_tracking_supplements_domain(tmp_path):
     assert r["state"] == RECORDED
     prog = resolve_plan_progress("supplements", "2026-06-19", tmp_path)
     assert prog["has_plan"] and prog["tracking"]["taken"] == ["Creatine"]
+
+
+# --- Tier-3: cross-surface plan_date agreement + the residual read-side seams ----
+
+
+def test_plan_date_agrees_across_record_and_progress_surfaces(tmp_path):
+    # Tier-3 CONTRACTS-TRACK-1: `plan_date` means the same on both surfaces — the date of the plan FOR
+    # on_date, or None. A NO_PLAN_TODAY domain (plan dated 06-15, operate on 06-19) returns None from
+    # BOTH record_tracking (no-plan-to-track) and resolve_plan_progress (has_plan False); a same-date
+    # plan returns on_date from both. No interchange divergence.
+    _seed_plan(tmp_path, date="2026-06-15")  # plan on file, not for 06-19 (NO_PLAN_TODAY)
+    rec = record_tracking("workout", _wk_tracking(), "2026-06-19", tmp_path)
+    prog = resolve_plan_progress("workout", "2026-06-19", tmp_path)
+    assert rec["plan_date"] is None and prog["plan_date"] is None  # agree: no plan FOR 06-19
+    _seed_plan(tmp_path, date="2026-06-19")  # now a plan FOR 06-19
+    rec2 = record_tracking("workout", _wk_tracking(), "2026-06-19", tmp_path)
+    prog2 = resolve_plan_progress("workout", "2026-06-19", tmp_path)
+    assert rec2["plan_date"] == "2026-06-19" and prog2["plan_date"] == "2026-06-19"  # agree: the same-date plan
+
+
+def test_record_tracking_no_plan_today_gate_precedes_validation(tmp_path):
+    # Tier-3 TEST-2: gate precedence on the NO_PLAN_TODAY branch too — a malformed snapshot + a plan
+    # dated EARLIER than on_date returns no-plan-to-track (records nothing), it does NOT raise. The
+    # same-date gate fires before snapshot validation for plans-on-file-but-not-today, not only zero-plan.
+    _seed_plan(tmp_path, date="2026-06-15")  # plan on file, not for 06-19
+    r = record_tracking("workout", {"volume_lb": -5}, "2026-06-19", tmp_path)  # malformed + NO_PLAN_TODAY
+    assert r["state"] == NO_PLAN_TO_TRACK and r["recorded"] is False
+    assert plan_schema.read_plan_tracking("workout", "2026-06-19", tmp_path) is None
+
+
+def test_progress_tracking_without_plan_for_date_is_honest(tmp_path):
+    # Tier-3 TEST-3: resolve_plan_progress is a PURE reader — if a tracking snapshot exists for a date
+    # with NO plan for that date (reachable only by writing plan_schema.record_plan_tracking DIRECTLY,
+    # bypassing record_tracking's gate), the join reports the asymmetry honestly (has_plan False,
+    # has_tracking True, plan None) rather than inventing a plan. Pins the read-side stays non-contradictory.
+    plan_schema.record_plan_tracking("workout", _wk_tracking(), "2026-06-19", tmp_path)  # tracking, no plan
+    prog = resolve_plan_progress("workout", "2026-06-19", tmp_path)
+    assert prog["has_plan"] is False and prog["has_tracking"] is True
+    assert prog["plan"] is None and prog["tracking"]["volume_lb"] == 5000  # actual-without-plan, honest
