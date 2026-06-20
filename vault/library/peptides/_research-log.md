@@ -133,6 +133,22 @@ a ceiling may be lowered only with a documented evidence reason here (no guessin
 
 ---
 
+## 2026-06-20 — LL-37 (human cathelicidin) deep-pass (sweep entry 4)
+
+### DONE (verified — mechanical evidence on disk)
+- **LL-37 entry shipped:** `compounds/ll-37.md` + `library/peptides/ll-37/research-report.md` (~15K words, 80-entry bibliography) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 7 judges + 8 sections + id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@99/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Independent full-bibliography re-audit (operator-requested trust gate):** 4 independent agents re-checked all 80 entries against PubMed/Crossref → 61 VERIFIED, 15 legitimate NO-ID (regulatory/vendor/book/void), **0 fabrications**, 4 citation-precision defects found + fixed: [9] author Pahar→Radic/Muller, [32] first-author Wang→Lu, [47] PMID 31170213→31170191, [15] dead DOI. Independent integrity sweep: sound (no laundered numbers; Mahlapuu Phase IIb-negative + psoriasis-autoantigen + Kang log-kill spot-confirmed against source).
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent re-audit)
+- Genuinely DUAL-NATURED: antimicrobial/LPS-neutralizing/wound-healing/angiogenic AND a disease driver — psoriasis autoantigen + self-DNA/RNA→pDC→type-I-IFN (psoriasis/lupus/rosacea/atherosclerosis); context-dependent cancer (pro-tumor ovarian/lung/breast; anti-tumor colon/gastric).
+- Human administration evidence = 4 small trials: Grönberg 2014 (positive Phase I/II VLU) → Mahlapuu 2021 HEAL (Phase IIb, PRIMARY ENDPOINT NEGATIVE) → Miranda 2023 DFU (granulation only) → melanoma n=4 dose-finding (skin toxicity). No Phase III, no approval. Endogenous-biomarker data is separate.
+- FDA: 503A Cat-2 (2023) → removed ~Apr 2026 (FR 2026-07361), not approval; deferred off Jul-2026 PCAC to ~Feb 2027. WADA not individually named but prohibited under S0. Native short half-life; no established human PK figure.
+- Monitoring: no LL-37-specific validated biomarker; objective via hs-CRP/inflammation markers. Dominant safety consideration = autoimmunity/psoriasis-flare risk (LL-37 is the autoantigen).
+
+### Process note
+This entry was finished under the operator's "Step 0" trust protocol after a long inefficiency failure: independent re-verification of the existing draft FIRST (passed: 0 fabrications), then the 3 remaining gates run via the actual skill machinery, then PR opened for OPERATOR review/merge (not auto-merged).
+
 ## 2026-06-20 — Ipamorelin (NNC 26-0161) deep-pass (sweep entry 5, primary-session lane)
 
 ### DONE (verified — mechanical evidence on disk)
