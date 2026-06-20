@@ -94,6 +94,9 @@ Always admissible. Cite as `regulatory`.
 - `tga.gov.au`
 - `canada.ca/en/health-canada` (Health Canada)
 - `thyroid.org` (American Thyroid Association — clinical guidelines; added 2026-06-19 wiki-research)
+- `kdigo.org` (Kidney Disease: Improving Global Outcomes — international CKD/kidney clinical practice guidelines; added 2026-06-20 wiki-research)
+- `kidney.org` (National Kidney Foundation — KDOQI guidelines, NKDEP creatinine standardization; added 2026-06-20 wiki-research)
+- `ejifcc.org` (eJIFCC — the official journal of the International Federation of Clinical Chemistry and Laboratory Medicine; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`
