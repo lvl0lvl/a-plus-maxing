@@ -31,6 +31,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/tesamorelin]] (status: researching; evidence_tier: B; risk_tier: medium)
 - [[compounds/sermorelin]] (status: researching; evidence_tier: B; risk_tier: medium)
 - [[compounds/hexarelin]] (status: researching; evidence_tier: C; risk_tier: experimental)
+- [[compounds/mk-677]] (status: researching; evidence_tier: B; risk_tier: medium)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -128,6 +129,9 @@ _(none yet)_
 - [[library/peptides/hexarelin/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~11.5K words; 40 unified citations + crosswalk; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 22/23 verified + 1 author fixed, 0 fabrications, 0 Wikipedia; GHRP/ghrelin-receptor+CD36, tachyphylaxis-limited — evidence_tier C / risk_tier experimental)
 - [[library/peptides/hexarelin/practitioner-layer]] (2026-06-20; ~100 mcg SC 2–3×/day cycled for tachyphylaxis; NO compounding data sheet found [never §503A-nominated]; gray-market only)
 - [[library/peptides/hexarelin/non-english-layer]] (2026-06-20; one Russian-language review context-only; Chinese/Italian none-located; Mediolanum originator English-published)
+- [[library/peptides/mk-677/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~11.3K words; 38 unified citations + crosswalk; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 16/16 verified, 0 fabrications, 0 Wikipedia; ORAL small-molecule ghrelin-receptor agonist [not a peptide], biomarker-only efficacy + FAILED Alzheimer's/hip-fracture — evidence_tier B / risk_tier medium)
+- [[library/peptides/mk-677/practitioner-layer]] (2026-06-20; oral ~10–25 mg/day once daily; glucose-monitoring caveat; NO compounding data sheet [unapproved small molecule, not on §503A])
+- [[library/peptides/mk-677/non-english-layer]] (2026-06-20; no non-English clinical primary located; Japanese patent ≠ clinical primary; Merck/academic English-published)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)
