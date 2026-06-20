@@ -1,3 +1,15 @@
+---
+title: Plan-Author Dispatch Process (V1, runtime A)
+type: guide
+status: active
+owner: walter
+created: 2026-06-13
+last_reviewed: 2026-06-20
+depends_on: [vault/design/plan-generation-pipeline-v1.md]
+superseded_by: ""
+review_cadence: phase
+---
+
 # Plan-Author Dispatch Process (V1, runtime A)
 
 **What this is.** The repeatable process for generating one plan domain end-to-end: dispatch a
