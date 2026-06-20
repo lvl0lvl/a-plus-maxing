@@ -109,6 +109,12 @@ Always admissible. Cite as `regulatory`.
 - `ashpublications.org` (American Society of Hematology — Blood, Blood Advances; flagship peer-reviewed hematology journals; added 2026-06-20 wiki-research)
 - `haematologica.org` (Haematologica — European Hematology Association / Ferrata Storti Foundation, peer-reviewed; added 2026-06-20 wiki-research)
 - `nice.org.uk` (National Institute for Health and Care Excellence — UK clinical guidelines [e.g. NG239 vitamin B12 deficiency]; authoritative guideline body; added 2026-06-20 wiki-research)
+- `ahajournals.org` (American Heart Association — Circulation, Hypertension, Stroke, JAHA, Circ: Arrhythmia & Electrophysiology; flagship peer-reviewed cardiovascular journals; added 2026-06-20 wiki-research — formalizing prior use)
+- `jmir.org` (JMIR Publications — Journal of Medical Internet Research, JMIR mHealth and uHealth; peer-reviewed, the major venue for wearable-device-validation studies; added 2026-06-20 wiki-research)
+- `bjsm.bmj.com` (British Journal of Sports Medicine — BMJ; peer-reviewed sports-medicine flagship; added 2026-06-20 wiki-research)
+- `biomedcentral.com` (BioMed Central — Springer Nature open-access journals [e.g. J Physiological Anthropology]; peer-reviewed; added 2026-06-20 wiki-research)
+- `folmed.org` (Folia Medica, Plovdiv — Sciendo / De Gruyter [DOI 10.2478/folmed-*]; PubMed-indexed peer-reviewed; the canonical systematic review on wearable-HRV measurement validity [Georgiou 2018]; added 2026-06-20 wiki-research — tier 2, regional/lower-impact, flag single-source claims)
+- `journals.humankinetics.com` / `humankinetics.com` (Human Kinetics — Int J Sports Physiol Perform [IJSPP], J Strength Cond Res-adjacent sports-science titles; PubMed-indexed peer-reviewed; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`
