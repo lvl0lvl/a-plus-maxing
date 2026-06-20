@@ -377,17 +377,17 @@ table; after picking, append your claim** so the two tracks don't duplicate. A c
 | `feature/wiki-metabolic` worktree | **Thyroid** — TSH ✓, free T4 ✓, free T3 ✓ (3 entries) | 1 | standard | **DONE — all 3 ingested** (gates 2.75/3.5/4.25/4.75 attested + bda-clean) | 2026-06-19 |
 | `feature/wiki-metabolic` worktree | **Hormones (endocrine)** — total testosterone ✓, free testosterone ✓, SHBG ✓, estradiol ✓, cortisol (AM) ✓, DHEA-S ✓, IGF-1 ✓ (7 entries) | 1 | standard | **DONE — all 7 ingested** (gates 2.75/3.5/4.25/4.75 attested + bda-clean) | 2026-06-20 |
 | `feature/wiki-metabolic` worktree | **Metabolic — CMP organ markers** — ALT ✓, AST ✓, eGFR/creatinine ✓, albumin ✓, sodium ✓, potassium ✓ (6 entries; the executor-judged CMP liver/kidney/electrolyte subset worth standalone entries) | 1 | standard | **DONE** — 6/6 ingested (ALT/AST/eGFR/albumin/sodium/potassium), all gates attested + bda-clean | 2026-06-20 |
-| `feature/wiki-metabolic` worktree | **Vitamins / minerals** — vitamin D (25-OH) ✓, ferritin ✓, vitamin B12 ✓, RBC magnesium (4 entries) | 1 | standard | **IN PROGRESS** — 3/4 done (vit-D/ferritin/B12 ingested, gates attested + bda-clean); RBC-Mg remains | 2026-06-20 |
+| `feature/wiki-metabolic` worktree | **Vitamins / minerals** — vitamin D (25-OH) ✓, ferritin ✓, vitamin B12 ✓, RBC magnesium ✓ (4 entries) | 1 | standard | **DONE** — 4/4 ingested (vit-D/ferritin/B12/RBC-Mg), all gates attested + bda-clean | 2026-06-20 |
 
 **Claim update mandate:** update this table when a subject is *claimed/started* (status `IN PROGRESS`), not only when it is done and ingested — so the parallel track never duplicates work that is underway. Flip a row to `DONE` as its entries land in the wiki.
 
-**Still open (Wave 1 remaining clusters):** Vitamins/minerals (vit D, ferritin, B12,
-RBC-Mg) — **CLAIMED/IN PROGRESS above** · Wearable (HRV, RHR, sleep-efficiency, respiratory
-rate, recovery/strain) — **OPEN** (NOTE: `category: wearable`, `source: wearable` — a different
-entry shape from the lab biomarkers; no serum units / measurement-assay section; the 4-section
-rubric needs adapting for device-derived metrics).
-All other Wave-1 clusters (glycemic core, thyroid, hormones, CMP organ markers) + **Wave 0**
-(BPC-157) are **DONE** (above).
+**Still open (Wave 1 remaining clusters):** Wearable (HRV, RHR, sleep-efficiency, respiratory
+rate, recovery/strain) — **OPEN, the LAST Wave-1 cluster** (NOTE: `category: wearable`,
+`source: wearable` — a different entry shape from the lab biomarkers; no serum units /
+measurement-assay section; the 4-section rubric needs adapting for device-derived metrics).
+ALL lab-biomarker clusters are now DONE: glycemic core, thyroid, hormones, CMP organ markers,
+**and Vitamins/minerals (vit D, ferritin, B12, RBC-Mg) — 4/4 ingested** · **Wave 0** (BPC-157)
+**DONE** (above).
 
 **Gate before any Wave 1 research (§8 D3):** confirm `operator-profile.md` / `goals.md` /
 `current-state.md` are readable so gate 2.75 doesn't HALT `context-load-missing` — they load

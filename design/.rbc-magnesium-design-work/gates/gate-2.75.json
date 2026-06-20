@@ -1,0 +1,19 @@
+{
+  "phase": "2.75",
+  "verdict": "PASS",
+  "timestamp": "2026-06-20T09:22:47Z",
+  "context_files": [
+    {"path": "vault/meta/operator-profile.md", "sha256": "94abbfbefb6f9e3d53ed4fc8e3e0debbfee8a7828ccffb9e01c4da50aa3bd5fe", "loaded": true},
+    {"path": "vault/meta/current-state.md", "sha256": "b3d87971b079a551b09df8b68d3fb2c41eb4a66c5a199118b5f2407eb6e95afb", "loaded": true},
+    {"path": "vault/meta/goals.md", "sha256": "19df4d79b341923bbdff005f44841f12a7cc14b3630265ecf6f9cf0979bf4801", "loaded": true},
+    {"path": "vault/library/_source-whitelist.md", "sha256": "24b02db11c26ae6cd8b13189dd709bfd8ac51caff72b5d75c15472815c7a5ae2", "loaded": true}
+  ],
+  "target": {"class": "biomarker", "slug": "rbc-magnesium", "type": "biomarker"},
+  "output_paths": {
+    "research_report": "vault/library/biomarkers/rbc-magnesium/research-report.md",
+    "compound_entry": "vault/biomarkers/rbc-magnesium.md"
+  },
+  "update_mode": false,
+  "archive_paths": [],
+  "halt_reasons": []
+}

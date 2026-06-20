@@ -55,6 +55,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/vitamin-d]] (25-hydroxyvitamin D — vitamin D status; category: blood; confidence: established)
 - [[biomarkers/ferritin]] (Serum ferritin — iron stores / acute-phase; category: blood; confidence: established)
 - [[biomarkers/vitamin-b12]] (Vitamin B12 — cobalamin; category: blood; confidence: established)
+- [[biomarkers/rbc-magnesium]] (RBC magnesium — intracellular Mg surrogate; category: blood; confidence: supported)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -116,6 +117,7 @@ _(none yet)_
 - [[library/biomarkers/vitamin-d/research-report]] (25-hydroxyvitamin D standard /aplus-research; 33 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ferritin/research-report]] (Serum ferritin standard /aplus-research; 35 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/vitamin-b12/research-report]] (Vitamin B12 standard /aplus-research; 32 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/rbc-magnesium/research-report]] (RBC magnesium standard /aplus-research; 28 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/
