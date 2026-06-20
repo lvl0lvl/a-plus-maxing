@@ -746,7 +746,10 @@ def read_profile(profile_paths):
     either way (ADR-0009 D2 honest absence; a fresh clone still generates).
 
     Args:
-        profile_paths (tuple): The candidate profile `Path`s in preference order.
+        profile_paths (tuple): The candidate profile `Path`s in preference order —
+            a non-empty tuple of `Path` (the empty tuple `()` reads all-None).
+            Passing None, or entries that are not `Path`, is a caller error and is
+            not coerced.
 
     Returns:
         (dict) Keys `initials`, `age_band`, `issue_status`; None = unfilled.

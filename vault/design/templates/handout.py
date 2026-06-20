@@ -155,9 +155,11 @@ def _regimen_section(plan_readings, today):
     """Render section 2a — current regimen, from the day's supplement/peptide plans.
 
     `name — dose` per supplement; `compound · dose · route` for the peptide, with
-    an experimental tag adding the disclosure note. The Rx-medication rows are an
-    honest awaiting sub-line: no medication-reconciliation (BPMH) intake stream
-    exists, so a fabricated Rx row would be a claim.
+    an experimental tag adding the disclosure note. A domain whose `resolve_plan`
+    state is non-None (no plan dated today) is skipped; when BOTH are skipped the
+    body falls back to the awaiting line. The Rx-medication rows are an honest
+    awaiting sub-line: no medication-reconciliation (BPMH) intake stream exists,
+    so a fabricated Rx row would be a claim.
     """
     on_date = today.isoformat()
     rows = []

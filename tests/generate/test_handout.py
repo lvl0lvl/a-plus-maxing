@@ -261,6 +261,25 @@ def test_regimen_awaiting_when_no_plan_today(tmp_path):
     assert "No supplement or peptide plan recorded for today." in regimen
 
 
+def test_non_experimental_peptide_has_no_disclosure_note(tmp_path):
+    """A peptide without the experimental tag renders the row but no disclosure note."""
+    root = tmp_path / "store"
+    plan_schema.record_plan(
+        "peptides", {"compound": "tb-500", "dose": "2 mg", "route": "subq", "tags": []},
+        _ISO, "peptide-specialist", root)
+    regimen = _between(_emit(root, tmp_path), "current regimen", "flagged interactions")
+    assert "tb-500 · 2 mg · subq" in regimen
+    assert "experimental — disclosure attached" not in regimen
+
+
+def test_footer_renders_tier_legend_and_honesty(tmp_path):
+    """The footer carries the source-tier legend words + the honesty + no-record lines."""
+    foot = _between(_emit(tmp_path / "store", tmp_path), "hd-foot", "</body>")
+    assert "lab-grade" in foot and "consumer wearable" in foot and "self-reported" in foot
+    assert "every value tagged · gaps stated, never inferred" in foot
+    assert "not a medical record" in foot
+
+
 def test_recommendation_questions_and_requests_only(tmp_path):
     """Recommendation renders requests + questions only, behind the no-verdict disclaimer."""
     root = tmp_path / "store"
@@ -272,6 +291,26 @@ def test_recommendation_questions_and_requests_only(tmp_path):
     assert "Requests — order today:" in rec
     assert "Ferritin" in rec or "ferritin" in rec.lower()   # the pending panel chip
     assert "Questions:" in rec
+    # the derived watch-out questions render by display name (bpc-157's protocol)
+    assert "Injection Site Reaction" in rec and "Appetite Change" in rec
+
+
+def test_recommendation_answered_watchout_is_filtered(tmp_path):
+    """An answered watch-out drops from the Questions queue; unanswered ones remain."""
+    root = tmp_path / "store"
+    _seed_plans(root)
+    loop_schema.record_watchout_answer(
+        "appetite_change", "no change", "2026-06-10T00:00:00+00:00", root)
+    rec = _between(_emit(root, tmp_path), "Recommendation — questions", "hd-foot")
+    assert "Appetite Change" not in rec            # answered -> filtered out
+    assert "Injection Site Reaction" in rec        # unanswered -> still queued
+
+
+def test_recommendation_empty_states(tmp_path):
+    """No pending panels + no active protocol -> both honest none-states render."""
+    rec = _between(handout.render([], _today=_TODAY), "Recommendation — questions", "hd-foot")
+    assert "none pending" in rec
+    assert "none queued" in rec
 
 
 def test_situation_and_assessment_are_honest_awaiting(tmp_path):
@@ -353,16 +392,18 @@ def test_single_file_no_external_asset_references(tmp_path):
 
 
 def test_escaping_across_interpolated_sinks(tmp_path):
-    """A finding's caution + source carrying markup are escaped, never injected raw."""
+    """A finding's caution + source + grade carrying markup are escaped, never raw."""
     root = tmp_path / "store"
     queue_schema.record_doctor_visit_queue_entry(
         _finding("inj", caution="<script>alert('x')</script> & more",
-                 source_specialist="<b>spoof</b>", band="HIGH"),
+                 source_specialist="<b>spoof</b>", band="HIGH", grade="<i>g</i>"),
         _ISO, root)
     section = _interactions(_emit(root, tmp_path))
     assert "<script>" not in section
     assert "&lt;script&gt;" in section
     assert "<b>spoof</b>" not in section
+    assert "<i>g</i>" not in section              # the grade chip sink is escaped too
+    assert "&lt;i&gt;g&lt;/i&gt;" in section
 
 
 # --- AC5: store-surface adversarial battery --------------------------------
@@ -403,6 +444,17 @@ def test_adversarial_same_finding_dedupe_latest_wins(tmp_path):
     assert section.count("class='hd-find'") == 1                  # not two rows for one finding
     assert "on record — proceeding with consent" in section       # the LATEST disposition
     assert "unresolved — discuss" not in section                  # the superseded one is gone
+
+
+def test_adversarial_idempotent_same_date_norecord(tmp_path):
+    """The identical finding recorded twice on the SAME date is an idempotent no-op — ONE row."""
+    root = tmp_path / "store"
+    entry = _finding("dup", caution="warfarin interaction", outcome="block-stands", band="HIGH")
+    queue_schema.record_doctor_visit_queue_entry(entry, _ISO, root)
+    queue_schema.record_doctor_visit_queue_entry(entry, _ISO, root)   # identical, same date
+    section = _interactions(_emit(root, tmp_path))
+    assert section.count("class='hd-find'") == 1
+    assert section.count("warfarin interaction") == 1
 
 
 def test_adversarial_mutation_findings_required(tmp_path):
