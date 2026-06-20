@@ -59,6 +59,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/hrv]] (Heart rate variability — autonomic/recovery; category: wearable; confidence: supported)
 - [[biomarkers/resting-heart-rate]] (Resting heart rate — fitness/autonomic; category: wearable; confidence: established)
 - [[biomarkers/sleep-efficiency]] (Sleep efficiency — sleep continuity; category: wearable; confidence: supported)
+- [[biomarkers/respiratory-rate]] (Respiratory rate — vital sign / early-illness; category: wearable; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -124,6 +125,7 @@ _(none yet)_
 - [[library/biomarkers/hrv/research-report]] (Heart rate variability standard /aplus-research; 32 sources; gates 2.75/3.5/4.25/4.75 attested; first WEARABLE entry)
 - [[library/biomarkers/resting-heart-rate/research-report]] (Resting heart rate standard /aplus-research; 34 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/sleep-efficiency/research-report]] (Sleep efficiency standard /aplus-research; 30 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/respiratory-rate/research-report]] (Respiratory rate standard /aplus-research; 32 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/

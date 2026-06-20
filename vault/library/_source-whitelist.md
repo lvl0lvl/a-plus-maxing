@@ -118,6 +118,13 @@ Always admissible. Cite as `regulatory`.
 - `cmaj.ca` (Canadian Medical Association Journal — CMAJ; Tier-1 peer-reviewed general medical journal; added 2026-06-20 wiki-research)
 - `ieeexplore.ieee.org` (IEEE Xplore — IEEE Transactions on Biomedical Engineering, IEEE J Biomed Health Inform + other peer-reviewed engineering/biomedical titles; the primary venue for PPG/wearable signal-processing validation; added 2026-06-20 wiki-research)
 - `jcsm.aasm.org` / `aasm.org` (American Academy of Sleep Medicine — Journal of Clinical Sleep Medicine + AASM clinical practice guidelines/scoring standards; the authoritative sleep-medicine body; added 2026-06-20 wiki-research)
+- `journal.chestnet.org` (CHEST — American College of Chest Physicians; peer-reviewed pulmonary/critical-care flagship; added 2026-06-20 wiki-research)
+- `atsjournals.org` (American Thoracic Society — Am J Respir Crit Care Med, Annals ATS; peer-reviewed respiratory/critical-care flagship; added 2026-06-20 wiki-research)
+- `ersjournals.com` / `erj.ersjournals.com` (European Respiratory Society — European Respiratory Journal + ERR; peer-reviewed respiratory flagship; added 2026-06-20 wiki-research)
+- `annualreviews.org` (Annual Reviews — Annual Review of Neuroscience/Physiology etc.; authoritative peer-reviewed review series; added 2026-06-20 wiki-research)
+- `iopscience.iop.org` (IOP Publishing — Physiological Measurement; peer-reviewed; the primary venue for physiological-signal/PPG measurement methods; added 2026-06-20 wiki-research)
+- `mja.com.au` (Medical Journal of Australia — MJA; peer-reviewed general medical journal; added 2026-06-20 wiki-research)
+- `rcp.ac.uk` / `rcplondon.ac.uk` (Royal College of Physicians — NEWS2 / National Early Warning Score standard + clinical guidelines; authoritative issuing body; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`
