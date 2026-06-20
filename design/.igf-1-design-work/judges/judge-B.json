@@ -1,0 +1,21 @@
+{
+  "section": "B",
+  "brief_hash": "71029f428cd0cff815069406fcbc129c6ab7fadc0eb484e2af209a2df7a30351",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 96,
+    "type_tag_discipline": 99,
+    "population_annotation": 97,
+    "route_fidelity": null,
+    "concentration_audit_handling": 98,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 98
+  },
+  "total": 97,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section B fully delivers the brief: age-dependence framed as the defining interpretive feature, SDS/z-score established as the preferred metric via the Bidlingmaier IDS-iSYS multicenter cohort (PMID 24606072, verified), representative age-banded ranges attributed to named cohorts with assay specificity, Katznelson 2014 (PMID 25356808, verified) and Molitch 2011 correctly tagged regulatory, units stated 1:1, and the no-universal-cutpoint integrating conclusion delivered. All inline citations carry type tags; no bare [N] present; no off-whitelist sources."
+}

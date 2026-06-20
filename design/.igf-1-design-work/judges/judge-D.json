@@ -1,0 +1,35 @@
+{
+  "section": "D",
+  "brief_hash": "c0eefa837b1a0caf7ba9120c5526d758d32c4efc23d0417e9b4d3bf85adfc8c8",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 92,
+    "type_tag_discipline": 99,
+    "population_annotation": 96,
+    "route_fidelity": null,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 94,
+    "completeness_vs_brief": 98
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "dim": "citation_fidelity",
+      "severity": "minor",
+      "finding": "N discrepancy persists — Laron cohort body text (§D.3) still reads '99 Ecuadorian individuals' and population annotation [3] reads 'N≈99 cases.' PubMed PMID 21325617 specifies 90 living subjects analyzed. The ~99 figure reflects total registered patients over the 22-year follow-up; only 90 were living at time of analysis and are the basis for all reported statistics. Does not affect any stated statistic. Recommend '90 living subjects (of ~99 registered)' or equivalent for precision.",
+      "action": "recommended_correction_not_blocking"
+    }
+  ],
+  "iteration_2_changes_verified": {
+    "tag_fix_Katznelson_1": "CONFIRMED — inline [1, regulatory] in §D.1; bib [1] carries '— tag: regulatory — tier: 2'. Off-enum 'clinical_guideline' eliminated.",
+    "tag_fix_Molitch_2": "CONFIRMED — inline [2, regulatory] in §D.2; bib [2] carries '— tag: regulatory — tier: 2'. Off-enum 'clinical_guideline' eliminated.",
+    "IC2_bib_tag_coverage": "CONFIRMED — all 8 bibliography entries carry '— tag:' suffix ([1][2]=regulatory, [3][6][8]=cohort, [4][5][7]=meta_analysis). IC-2 fully satisfied.",
+    "inline_tags_all_enum": "CONFIRMED — every inline cite uses [N, tag] form with tag in 12-enum. Zero bare [N] citations.",
+    "animal_species_flag": "CONFIRMED — §D.3 model-organism longevity data carries '[animal — murine models]' flag as required by IC-7."
+  },
+  "summary": "Iteration 2 fixes are complete and verified: both Endocrine Society guidelines ([1] Katznelson, [2] Molitch) now carry 'regulatory' — the correct enum value — replacing the off-enum 'clinical_guideline' from iteration 1; all 8 bibliography entries now carry explicit '— tag:' suffixes satisfying IC-2. type_tag_discipline improves from 98 to 99. The sole remaining minor finding is the Laron N≈99 vs. 90 body-text imprecision carried from iteration 1, non-blocking and acknowledged by the brief. Total 96, verdict PASS."
+}

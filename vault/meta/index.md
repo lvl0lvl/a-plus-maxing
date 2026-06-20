@@ -45,6 +45,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/estradiol]] (Estradiol — E2; category: blood; confidence: established)
 - [[biomarkers/cortisol]] (Cortisol; category: blood; confidence: established)
 - [[biomarkers/dhea-s]] (DHEA-S — dehydroepiandrosterone sulfate; category: blood; confidence: established)
+- [[biomarkers/igf-1]] (IGF-1 — insulin-like growth factor 1; category: blood; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -96,6 +97,7 @@ _(none yet)_
 - [[library/biomarkers/estradiol/research-report]] (Estradiol standard /aplus-research; 28 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/cortisol/research-report]] (Cortisol standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/dhea-s/research-report]] (DHEA-S standard /aplus-research; 35 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/igf-1/research-report]] (IGF-1 standard /aplus-research; 26 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/
