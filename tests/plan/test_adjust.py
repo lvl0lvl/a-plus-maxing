@@ -16,7 +16,10 @@ import pytest
 
 from scripts.plan import adjust, generate_plan as gp, track
 from scripts.store import plan_schema, store
-from tests.plan.test_generate_plan import _author, _seed_store, _workout_rec
+from tests.plan.test_generate_plan import (
+    _author, _seed_store, _workout_rec,
+    _nutrition_target_rec, _nutrition_meal_rec, _supplement_rec,
+)
 
 _PRIOR = "2026-06-18"
 _ADJUST = "2026-06-25"
@@ -196,3 +199,85 @@ def test_adversarial_mutation_records_via_generate_plan(tmp_path):
     names = [ex["name"] for r in readings if r["timepoint"] == _ADJUST
              for ex in r["value"]["exercises"]]
     assert "Distinctive-mutation-lift" in names
+
+
+# --- the forward-date gate (the same-date dedupe-drop misreport) ------------
+
+def test_non_forward_adjust_date_raises(tmp_path):
+    """adjust_date must be AFTER prior_date: a same-date/earlier date would dedupe-drop the
+    adjusted plan against the prior plan's store identity while reporting `adjusted` — fail loud."""
+    root = tmp_path / "store"
+    _seed_plan_and_tracking(root)
+    with pytest.raises(ValueError, match="must be AFTER"):   # same date -> store-identity collision
+        adjust.adjust_plan("workout", _adjusted(), _store_read(root), root,
+                           prior_date=_PRIOR, adjust_date=_PRIOR)
+    with pytest.raises(ValueError, match="must be AFTER"):   # earlier than the prior block
+        adjust.adjust_plan("workout", _adjusted(), _store_read(root), root,
+                           prior_date=_PRIOR, adjust_date="2026-06-10")
+    with pytest.raises(ValueError):                          # a malformed date fails loud too
+        adjust.adjust_plan("workout", _adjusted(), _store_read(root), root,
+                           prior_date=_PRIOR, adjust_date="not-a-date")
+    # the prior plan is untouched by the rejected adjusts (no silent overwrite)
+    assert track.resolve_plan_progress("workout", _PRIOR, root)["plan"]["exercises"][0]["name"] == "Goblet squat"
+
+
+# --- the safety floor on the re-plan: the nutrition half --------------------
+
+def test_red_s_lea_veto_applies_to_the_nutrition_replan(tmp_path):
+    """The nutrition RED-S/LEA critical-floor veto fires on the ADJUST re-plan (floor not bypassed)."""
+    root = tmp_path / "store"
+    _seed_store(root)
+    plan_schema.record_plan(
+        "nutrition", {"calorie_goal": 2600, "macros": {"protein": 190, "carbs": 250, "fat": 80},
+                      "meals": [{"name": "Breakfast", "kcal": 650}]}, _PRIOR, "nutritionist", root)
+    track.record_tracking("nutrition", {"food_kcal": 2550}, _PRIOR, root)
+    nut_adjusted = _author(
+        _nutrition_target_rec(calorie_goal=2400, protein=180, carbs=230, fat=70),
+        _nutrition_meal_rec("Breakfast", kcal=600), specialist="nutritionist")
+    result = adjust.adjust_plan("nutrition", nut_adjusted, _store_read(root), root,
+                                prior_date=_PRIOR, adjust_date=_ADJUST,
+                                gates={"red_s_lea_screen": "tripped"})
+    assert result["adjusted"] is False
+    assert result["state"] == gp.RED_S_LEA_CLINICAL_ROUTING   # the floor fired on the re-plan, no plan recorded
+    assert track.resolve_plan_progress("nutrition", _ADJUST, root)["has_plan"] is False
+
+
+# --- the adjust leg on a non-workout TRACKED domain -------------------------
+
+def test_supplements_closed_loop_adjust(tmp_path):
+    """The adjust leg works for supplements (a non-workout TRACKED domain)."""
+    root = tmp_path / "store"
+    _seed_store(root)
+    plan_schema.record_plan("supplements", {"items": [{"name": "Creatine", "dose": "5 g"}]},
+                            _PRIOR, "supplement-specialist", root)
+    track.record_tracking("supplements", {"taken": ["Creatine"]}, _PRIOR, root)
+    supp_adjusted = _author(_supplement_rec("Creatine", "5 g"), _supplement_rec("Citrulline", "6 g"),
+                            specialist="supplement-specialist")
+    result = adjust.adjust_plan("supplements", supp_adjusted, _store_read(root), root,
+                                prior_date=_PRIOR, adjust_date=_ADJUST)
+    assert result["state"] == adjust.ADJUSTED and result["adjusted"] is True
+    assert "Citrulline" in [i["name"] for i in result["plan"]["items"]]   # the specialist's addition recorded
+
+
+# --- the record path fails loud on a schema-nonconformant adjusted plan -----
+
+def test_record_path_raises_on_schema_nonconformant_adjusted_plan(tmp_path):
+    """A schema-nonconformant adjusted plan raises ValueError on the record path (never silently dropped)."""
+    root = tmp_path / "store"
+    _seed_plan_and_tracking(root)
+    bad = _author(_workout_rec("Box squat", 999))   # sets=999 violates the plan_schema 1..100 ceiling
+    with pytest.raises(ValueError):
+        adjust.adjust_plan("workout", bad, _store_read(root), root,
+                           prior_date=_PRIOR, adjust_date=_ADJUST, gates={"clearance_granted": False})
+
+
+# --- the has_plan x has_tracking value domain: the (no-plan, has-tracking) corner ---
+
+def test_tracking_without_plan_for_date_is_no_plan_to_adjust_from(tmp_path):
+    """Tracking present but no plan dated prior_date -> no-plan-to-adjust-from (has_plan checked first)."""
+    root = tmp_path / "store"
+    # the raw schema writer bypasses record_tracking's no-plan gate -> tracking with no plan-for-date
+    plan_schema.record_plan_tracking("workout", _wk_tracking(), _PRIOR, root)
+    result = adjust.adjust_plan("workout", _adjusted(), _store_read(root), root,
+                                prior_date=_PRIOR, adjust_date=_ADJUST)
+    assert result["state"] == adjust.NO_PLAN_TO_ADJUST_FROM and result["adjusted"] is False
