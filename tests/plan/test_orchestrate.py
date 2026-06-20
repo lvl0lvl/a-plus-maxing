@@ -24,17 +24,25 @@ out-of-band per the integration mandate and captured under docs/plan-generation/
 """
 
 import datetime
+import json
+from pathlib import Path
+
+import pytest
 
 from scripts.generate import generate
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, compute_plan
 from scripts.plan.orchestrate import (
     ADDITIVE_AE_HELD,
+    CONFLICT_HELD,
     ENERGY_BOUNCE_HELD,
     ENERGY_BOUNCE_UNRESOLVED,
     RED_S_LEA_CROSS_DOMAIN,
+    RX_BPMH_HELD,
+    collate_doctor_visit_queue,
     generate_plans,
     reconcile,
 )
+from scripts.store import queue_schema
 from scripts.store import plan_schema, store
 from tests.plan.test_generate_plan import (
     PLAN_DATE,
@@ -46,6 +54,8 @@ from tests.plan.test_generate_plan import (
     _supplement_rec,
     _workout_rec,
 )
+from scripts.plan import adjudicate
+from tests.plan.test_adjudicate import _envelope, _override_record
 
 
 def _recon(author, **fields):
@@ -401,6 +411,12 @@ def test_author_declared_conflict_surfaced(tmp_path):
 
     conflicts = out["reconciliation"]["conflicts"]
     assert any(c["from"] == "supplements" and c["with"] == "bpc-157" for c in conflicts)
+    # cfaj (S75): the declaring domain is now HELD pending the liaison gate — the safe default with
+    # no adjudicator wired (was detect-only/record pre-S75). The non-declaring peptide is unaffected.
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == CONFLICT_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+    assert out["results"]["peptides"]["recorded"] is True
 
 
 def test_author_declared_conflicts_accumulate_across_authors(tmp_path):
@@ -425,6 +441,310 @@ def test_author_declared_conflicts_accumulate_across_authors(tmp_path):
     conflicts = out["reconciliation"]["conflicts"]
     assert len(conflicts) == 2
     assert {c["from"] for c in conflicts} == {"supplements", "peptides"}  # not "spoofed"
+    # cfaj (S75): BOTH declaring domains are held (no adjudicator). The held set == the declaring set.
+    assert out["results"]["supplements"]["reason"] == CONFLICT_HELD
+    assert out["results"]["peptides"]["reason"] == CONFLICT_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+    assert store.read("plan::peptides", root=tmp_path) == []
+
+
+# --- cross-domain conflict adjudication via the liaison gate (cfaj, Phase 4) ----
+
+
+def _conflict_authors(supp_conflicts=None, pep_conflicts=None):
+    """A supplements + peptides author pair, each with optional `reconciliation.conflicts`."""
+    supp = _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist")
+    pep = _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist")
+    return {
+        "supplements": _recon(supp, conflicts=supp_conflicts) if supp_conflicts else supp,
+        "peptides": _recon(pep, conflicts=pep_conflicts) if pep_conflicts else pep,
+    }
+
+
+_SUPP_CONFLICT = [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding risk"}]
+
+
+def test_conflict_holds_declaring_domain_without_adjudicator(tmp_path):
+    # CORE mutation-proof: a declared cross-domain conflict HOLDS the declaring domain before
+    # recording (the safe default). Removing the `holds[domain] = CONFLICT_HELD` line records it
+    # here -> RED. The non-declaring peptide records.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read, tmp_path,
+                         plan_date=PLAN_DATE)
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == CONFLICT_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+    assert out["results"]["peptides"]["recorded"] is True
+    assert len(store.read("plan::peptides", root=tmp_path)) == 1
+
+
+def test_reconcile_sets_conflict_hold_purely():
+    # reconcile (pure, no I/O) sets the conflict hold on the declaring domain that carries a plan.
+    supp = {"domain": "supplements", "specialist": "supplement-specialist", "section": {},
+            "reason": None, "plan": {"items": [{"name": "Fish oil", "dose": "2 g"}]},
+            "meta": {"conflicts": _SUPP_CONFLICT}}
+    outcome = reconcile({"supplements": supp})
+    assert "supplements" in outcome["conflict_held"]  # tracked independently of `holds`
+    assert "supplements" not in outcome["holds"]
+    assert any(c["from"] == "supplements" for c in outcome["report"]["conflicts"])
+
+
+def test_conflict_no_plan_is_not_held():
+    # A domain that declares a conflict but computed NO plan has nothing to hold.
+    supp = {"domain": "supplements", "specialist": "supplement-specialist", "section": {},
+            "reason": "some-reason", "plan": None, "meta": {"conflicts": _SUPP_CONFLICT}}
+    outcome = reconcile({"supplements": supp})
+    assert "supplements" not in outcome["conflict_held"]
+    assert "supplements" not in outcome["holds"]
+
+
+def test_conflict_liaison_override_releases_and_records(tmp_path):
+    # The liaison gate clears a conflict-held domain via a content-valid override -> it records.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_conflict_liaison_autoblock_keeps_held(tmp_path):
+    # A non-overridable (CRITICAL) liaison adjudication holds the conflict-held domain.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=_liaison("CRITICAL"))
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["conflict_adjudications"]["supplements"]["non_overridable"] is True
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_conflict_liaison_vacuous_override_keeps_held(tmp_path):
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("HIGH", override=_override_record("HIGH", operator_reason="trust me"))
+    out = generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=liaison)
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_conflict_safety_finding_id_and_caution(tmp_path):
+    # The orchestrator routes a deterministic finding_id + a caution reproducing the conflict.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("MEDIUM")
+    generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read, tmp_path,
+                   plan_date=PLAN_DATE, adjudicator=liaison)
+    assert len(liaison.calls) == 1
+    finding = liaison.calls[0]
+    assert finding["finding_id"] == "conflict:supplements:peptides/bpc-157"
+    assert finding["held_domain"] == "supplements"
+    assert "bpc-157" in finding["caution"]
+
+
+def test_conflict_additive_ae_takes_precedence_over_conflict_hold(tmp_path):
+    # A supplement that BOTH declares a conflict AND trips the additive-AE screen is ADDITIVE_AE_HELD
+    # (the compound-band screen is more specific); the conflict hold does not shadow it.
+    store_read = _seed_store(tmp_path)
+    authors = _conflict_authors(supp_conflicts=_SUPP_CONFLICT)
+    authors["supplements"] = _recon(
+        _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist"),
+        conflicts=_SUPP_CONFLICT, ae_profile={"additive_classes": ["bleeding-risk"]},
+    )
+    authors["peptides"] = _recon(
+        _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist"),
+        ae_profile={"additive_classes": ["bleeding-risk"]},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+
+
+def test_conflict_adjudicator_not_called_without_conflict(tmp_path):
+    # Non-tautology control: no declared conflict -> no conflict hold, no conflict adjudication.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("MEDIUM")
+    out = generate_plans(_conflict_authors(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=liaison)
+    assert out["conflict_adjudications"] == {}
+    assert out["results"]["supplements"]["recorded"] is True
+
+
+def test_real_conflict_liaison_cleared_envelope_records(tmp_path):
+    # AC3 codified: the REAL captured medical-liaison conflict-adjudication envelope (a content-valid
+    # MEDIUM override of an author-declared cross-domain conflict), run through the production path,
+    # RELEASES the conflict-held supplement — the conflict axis closed via the SAME S74 gate, verified
+    # E2E with genuine liaison output (not a stub).
+    store_read = _seed_store(tmp_path)
+    env = _example_envelope("liaison-conflict-cleared.example.json")
+    conflict = [{"with_domain": "peptides", "with": "bpc-157",
+                 "reason": "additive bleeding risk, needs review"}]
+    out = generate_plans(_conflict_authors(supp_conflicts=conflict), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=lambda finding: env)
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_real_conflict_liaison_blocked_envelope_keeps_held(tmp_path):
+    # Tier-3 TEST-3 (parity with the additive-AE block companion): the REAL-shape blocked conflict
+    # envelope (a vacuous override at HIGH) keeps the conflict-declaring supplement held, with the
+    # rejection reasons pinned so the conflict E2E goes RED if the INV-OVERRIDE-RECORD-SCHEMA sub-gate
+    # regresses on this axis.
+    store_read = _seed_store(tmp_path)
+    env = _example_envelope("liaison-conflict-blocked.example.json")
+    conflict = [{"with_domain": "peptides", "with": "bpc-157",
+                 "reason": "additive bleeding risk, needs review"}]
+    out = generate_plans(_conflict_authors(supp_conflicts=conflict), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=lambda finding: env)
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+    reasons = out["conflict_adjudications"]["supplements"]["reasons"]
+    assert any("operator_reason" in r for r in reasons)
+    assert any("rung" in r for r in reasons)
+
+
+def test_conflict_from_non_compound_domain_held_and_adjudicated(tmp_path):
+    # A conflict declared by a NON-compound domain (workout) is held + adjudicated the same way —
+    # the gate is domain-agnostic (compute_plan lifts `reconciliation.conflicts` for every domain).
+    workout = _recon(_author(_workout_rec("Goblet squat", 3)),
+                     conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "load vs intake"}])
+    out = generate_plans({"workout": workout}, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["workout"]["reason"] == CONFLICT_HELD
+    cleared = generate_plans({"workout": workout}, _seed_store(tmp_path / "b"), tmp_path / "b",
+                             plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    assert cleared["conflict_adjudications"]["workout"]["outcome"] == "cleared"
+    assert cleared["results"]["workout"]["recorded"] is True
+
+
+def test_conflict_adjudicator_returning_none_keeps_held(tmp_path):
+    # Parity with the additive-AE path: a conflict adjudicator that returns None leaves the block held.
+    out = generate_plans(_conflict_authors(supp_conflicts=_SUPP_CONFLICT), _seed_store(tmp_path),
+                         tmp_path, plan_date=PLAN_DATE, adjudicator=lambda finding: None)
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_conflict_multiple_declaring_domains_each_adjudicated(tmp_path):
+    # The loop adjudicates EACH conflict-held domain independently (one entry per declarer).
+    authors = _conflict_authors(
+        supp_conflicts=[{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+        pep_conflicts=[{"with_domain": "supplements", "with": "fish oil", "reason": "additive bleeding"}],
+    )
+    out = generate_plans(authors, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_liaison("MEDIUM"))
+    assert set(out["conflict_adjudications"]) == {"supplements", "peptides"}
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["conflict_adjudications"]["peptides"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["results"]["peptides"]["recorded"] is True
+
+
+def test_red_s_lea_precedence_over_a_coincident_conflict(tmp_path):
+    # A workout short-circuited by the nutrition RED-S/LEA screen stays RED-S/LEA-held even if it
+    # declares a conflict — RED-S/LEA precedence; the conflict hold does not shadow it.
+    authors = {
+        "workout": _recon(_author(_workout_rec("Goblet squat", 3)), energy_cost_kcal=500,
+                          conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "x"}]),
+        "nutrition": _nutrition(_nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600)),
+    }
+    out = generate_plans(authors, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE,
+                         gates={"red_s_lea_screen": True})
+    assert out["results"]["workout"]["reason"] == RED_S_LEA_CROSS_DOMAIN
+
+
+def test_energy_bounce_and_conflict_are_independent_holds(tmp_path):
+    # Tier-3 BUG-1 fix: a workout that declares a conflict AND is energy-bounced (no reauthor) carries
+    # BOTH holds INDEPENDENTLY. The bounce hold makes it not record; the conflict is INDEPENDENTLY
+    # adjudicated (not "overwritten" by the bounce). With a clearing liaison, the conflict clears but
+    # the workout STILL does not record — the bounce hold stands. (Pre-fix the conflict was shadowed.)
+    authors = {
+        "workout": _recon(_author(_workout_rec("Heavy back squat", 5)), energy_cost_kcal=900,
+                          conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "x"}]),
+        "nutrition": _nutrition(
+            _nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600),
+            energy_budget={"sustains": False, "sustainable_training_kcal": 450},
+        ),
+    }
+    out = generate_plans(authors, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_liaison("MEDIUM"))
+    assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_HELD  # held (bounce), not recorded
+    assert out["conflict_adjudications"]["workout"]["outcome"] == "cleared"  # conflict adjudicated independently
+    assert store.read("plan::workout", root=tmp_path) == []  # the bounce hold still suppresses it
+
+
+def test_bounce_success_with_conflict_keeps_workout_conflict_held(tmp_path):
+    # Tier-3 BUG-1 fix: a workout that declares a conflict AND is energy-bounced but reauthored fuelable
+    # is NOT released by the successful bounce — its INDEPENDENT conflict hold stands (no adjudicator).
+    # Pre-fix the success path left a stale single-reason hold and could record the reauthored plan.
+    def reauthor(domain, constraint):
+        return _recon(_author(_workout_rec("Light goblet squat", 2)),
+                      energy_cost_kcal=constraint["sustainable_training_kcal"] - 50,
+                      conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "x"}])
+    authors = {
+        "workout": _recon(_author(_workout_rec("Heavy back squat", 5)), energy_cost_kcal=900,
+                          conflicts=[{"with_domain": "nutrition", "with": "deficit", "reason": "x"}]),
+        "nutrition": _nutrition(
+            _nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600),
+            energy_budget={"sustains": False, "sustainable_training_kcal": 450},
+        ),
+    }
+    out = generate_plans(authors, _seed_store(tmp_path), tmp_path, plan_date=PLAN_DATE, reauthor=reauthor)
+    assert out["reauthored"] is True
+    assert out["results"]["workout"]["recorded"] is False  # the independent conflict hold stands
+    assert out["results"]["workout"]["reason"] == CONFLICT_HELD
+    assert store.read("plan::workout", root=tmp_path) == []
+
+
+def test_additive_ae_cleared_but_distinct_conflict_keeps_supplement_held(tmp_path):
+    # Tier-3 SEC-1 MUST-FIX: a supplement that BOTH trips the additive-AE screen AND declares a DISTINCT
+    # cross-domain conflict is held by both. Clearing the additive-AE override must NOT release it — the
+    # distinct conflict still holds it. Pre-fix the additive-AE clear (del holds["supplements"]) recorded
+    # the supplement with the conflict never adjudicated. With a per-finding adjudicator that clears the
+    # additive-AE but BLOCKS the conflict (CRITICAL), the supplement stays held.
+    store_read = _seed_store(tmp_path)
+    authors = {
+        "supplements": _recon(
+            _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist"),
+            ae_profile={"additive_classes": ["bleeding-risk"]},
+            conflicts=[{"with_domain": "workout", "with": "high-volume", "reason": "recovery load"}],
+        ),
+        "peptides": _recon(
+            _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist"),
+            ae_profile={"additive_classes": ["bleeding-risk"]},
+        ),
+    }
+
+    def adjudicator(safety_finding):
+        # Clear the additive-AE finding (MEDIUM override); BLOCK the distinct conflict (CRITICAL auto-block).
+        band = "CRITICAL" if safety_finding["source"] == "cross-domain-conflict" else "MEDIUM"
+        env = _envelope(band=band, finding_id=safety_finding["finding_id"])
+        if env["override_record"] is not None:
+            env["override_record"]["caution_verbatim"] = safety_finding["caution"]
+        return env
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=adjudicator)
+    assert out["adjudication"]["outcome"] == "cleared"  # the additive-AE WAS cleared
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "block-stands"  # the conflict was NOT
+    assert out["results"]["supplements"]["recorded"] is False  # still held by the open conflict
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_conflict_safety_finding_multi_conflict_per_domain_sorted(tmp_path):
+    # Tier-3 TEST-2: a domain declaring 2+ conflicts aggregates into ONE finding with sorted, order-stable
+    # finding_id tokens AND caution detail (so the caution the liaison must reproduce verbatim is
+    # regenerable). Input is deliberately out-of-sorted-order.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("MEDIUM")
+    authors = _conflict_authors(supp_conflicts=[
+        {"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"},
+        {"with_domain": "nutrition", "with": "fish-protein", "reason": "allergen overlap"},
+    ])
+    generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+    finding = liaison.calls[0]
+    # sorted by (with_domain, with): nutrition/fish-protein before peptides/bpc-157
+    assert finding["finding_id"] == "conflict:supplements:nutrition/fish-protein;peptides/bpc-157"
+    assert finding["caution"].index("fish-protein") < finding["caution"].index("bpc-157")
 
 
 # --- supplement<->peptide additive-AE screen (pipeline Phase 3) ----------------
@@ -755,6 +1075,213 @@ def test_additive_ae_shared_class_and_interaction_combine(tmp_path):
     assert store.read("plan::supplements", root=tmp_path) == []
 
 
+# --- medical-liaison terminal adjudication gate (pipeline Phase 4) -------------
+
+
+def _liaison(band="HIGH", harm_class=None, override="auto", set_by="auto"):
+    """An adjudicator hook that echoes the received finding's id + caution into an envelope.
+
+    Records every call on `.calls` so a test can assert the gate ran (or did not) and on what.
+    """
+    calls = []
+
+    def hook(safety_finding):
+        calls.append(safety_finding)
+        env = _envelope(band=band, harm_class=harm_class, finding_id=safety_finding["finding_id"],
+                        override=override, set_by=set_by)
+        if env["override_record"] is not None:
+            env["override_record"]["caution_verbatim"] = safety_finding["caution"]
+        return env
+
+    hook.calls = calls
+    return hook
+
+
+def _held_pair():
+    """A fish-oil + BPC-157 pair that both declare bleeding-risk -> the supplement is held."""
+    return _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+
+
+def test_liaison_valid_override_releases_and_records_supplement(tmp_path):
+    # CORE mutation-proof: a held additive-AE supplement clears via a content-valid HIGH override
+    # -> the hold is RELEASED and the supplement RECORDS. Removing `del holds["supplements"]` (the
+    # release) leaves it held -> this test goes RED, the proof the gate actually clears.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("HIGH")
+
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+
+    assert out["adjudication"]["outcome"] == "cleared"
+    assert out["adjudication"]["override_record"] is not None
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+    # cross-stream: clearing the supplement does not disturb the peptide draft.
+    assert out["results"]["peptides"]["recorded"] is True
+    assert len(store.read("plan::peptides", root=tmp_path)) == 1
+
+
+def test_liaison_critical_autoblock_keeps_supplement_held(tmp_path):
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_liaison("CRITICAL"))
+
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["adjudication"]["non_overridable"] is True
+    assert out["adjudication"]["reasons"] == [adjudicate.AUTO_BLOCK_SENTINEL]
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_liaison_critical_override_path_rejected_keeps_held(tmp_path):
+    # INV-CRITICAL-NON-OVERRIDABLE at the wiring: a CRITICAL finding that arrives WITH an override
+    # path never releases — the block stands. Mutation: dropping the non-overridable gate would let
+    # the override path clear the supplement -> RED.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("CRITICAL", override=_override_record("HIGH"), set_by=adjudicate.LIAISON_SET_BY)
+
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["adjudication"]["non_overridable"] is True
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_liaison_vacuous_override_keeps_held(tmp_path):
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("HIGH", override=_override_record("HIGH", operator_reason="trust me"))
+
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_no_adjudicator_keeps_held_supplement_held(tmp_path):
+    # The safe default (S73 behavior, unchanged): no adjudicator wired -> the supplement stays held
+    # and no adjudication ran.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE)
+
+    assert out["adjudication"] is None
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_adjudicator_returning_none_keeps_held(tmp_path):
+    # A wired adjudicator that returns None (a real liaison dispatch can fail / decline to emit) is
+    # treated as no adjudication -> the block stands (parity with the reauthor-returns-None path).
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=lambda finding: None)
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_adjudicator_that_raises_is_fail_loud_and_records_nothing(tmp_path):
+    # Review TEST-3: a liaison dispatch that ERRORS is fail-loud — the exception propagates out of
+    # generate_plans (matching the unguarded reauthor hook), and because it raises BEFORE the
+    # recording loop, NOTHING is recorded. The safe no-release direction: an errored adjudication
+    # never silently records the held supplement.
+    store_read = _seed_store(tmp_path)
+
+    def boom(safety_finding):
+        raise RuntimeError("liaison dispatch failed")
+
+    with pytest.raises(RuntimeError):
+        generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=boom)
+    assert store.read("plan::supplements", root=tmp_path) == []
+    assert store.read("plan::peptides", root=tmp_path) == []
+
+
+def test_adjudicator_not_called_without_a_held_finding(tmp_path):
+    # Non-tautology control: a clean (no declared additive-AE) compound pair is NOT held, so the
+    # liaison gate never runs and both compounds record.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("HIGH")
+
+    out = generate_plans(_compound_authors(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=liaison)
+
+    assert out["adjudication"] is None
+    assert liaison.calls == []
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["results"]["peptides"]["recorded"] is True
+
+
+def test_liaison_receives_deterministic_finding_id_and_caution(tmp_path):
+    # The orchestrator routes a `safety_finding` with a deterministic id + the caution the override
+    # record must reproduce verbatim — the contract the real liaison echoes.
+    store_read = _seed_store(tmp_path)
+    liaison = _liaison("HIGH")
+
+    generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+
+    assert len(liaison.calls) == 1
+    finding = liaison.calls[0]
+    assert finding["finding_id"] == "additive-ae:class:bleeding-risk"
+    assert finding["held_domain"] == "supplements"
+    assert "bleeding-risk" in finding["caution"]
+
+
+def test_liaison_cleared_supplement_renders_on_dashboard(tmp_path):
+    # Integration: a cleared supplement reaches the store and renders on the dashboard.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_liaison("HIGH"))
+
+    assert out["adjudication"]["outcome"] == "cleared"
+    rendered = generate.run(
+        "dashboard", _root=tmp_path, _out_dir=tmp_path,
+        _today=datetime.date.fromisoformat(PLAN_DATE),
+    )
+    html = rendered.read_text(encoding="utf-8")
+    assert "Fish oil" in html  # the cleared supplement renders
+    assert "BPC-157" in html  # the peptide draft renders alongside
+
+
+def _example_envelope(name):
+    """Load a captured medical-liaison adjudication envelope from docs/plan-generation/examples."""
+    path = Path(__file__).resolve().parents[2] / "docs/plan-generation/examples" / name
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_real_liaison_cleared_envelope_releases_supplement(tmp_path):
+    # AC5 codified: the REAL captured medical-liaison cleared envelope (a content-valid MEDIUM
+    # informed-refusal override), run through the production path, RELEASES the held supplement —
+    # the held-line closer verified end-to-end with genuine liaison output, not a stub.
+    store_read = _seed_store(tmp_path)
+    env = _example_envelope("liaison-adjudication-cleared.example.json")
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=lambda finding: env)
+    assert out["adjudication"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_real_liaison_blocked_envelope_keeps_held(tmp_path):
+    # The companion: the REAL refusal scenario (a vacuous override at HIGH) leaves the block
+    # standing — the supplement is never recorded on insistence.
+    store_read = _seed_store(tmp_path)
+    env = _example_envelope("liaison-adjudication-blocked.example.json")
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=lambda finding: env)
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+    # Single-gate isolation (review TEST-1): the blocked fixture is rejected on BOTH the vacuous
+    # operator_reason AND the sub-HIGH rung. Pinning each rejection reason makes this E2E go RED if
+    # EITHER INV-OVERRIDE-RECORD-SCHEMA sub-gate regresses (not only if both fail at once).
+    reasons = out["adjudication"]["reasons"]
+    assert any("operator_reason" in r for r in reasons)
+    assert any("rung" in r for r in reasons)
+
+
 # --- reconcile is pure (no I/O) ------------------------------------------------
 
 
@@ -870,3 +1397,564 @@ def test_orchestrator_end_to_end_renders_on_dashboard(tmp_path):
     assert "2600" in html
     assert "Creatine" in html
     assert "BPC-157" in html
+
+
+# --- supplement<->Rx BPMH screen + adjudication (rxbp, pipeline Phase 4) ---------
+#
+# The operator's present Rx-interaction classes are seeded as the curated, de-identified
+# `rx-interaction-classes` store item (never raw drug names — that boundary is proven in
+# tests/plan/test_router.py). generate_plans reads them through `router.summarize` and holds a
+# compound whose declared additive-AE class stacks against them, routing it through the SAME gate.
+
+
+def _bpmh_store(tmp_path, rx_classes):
+    """A seeded store whose operator carries the given curated Rx-interaction-class token list."""
+    return _seed_store(tmp_path, **{"rx-interaction-classes": rx_classes})
+
+
+def _bpmh_supp_authors(supp_classes, pep_classes=None):
+    """A supplement (declaring `supp_classes`) + a peptide pair for the BPMH screen."""
+    return _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": supp_classes}},
+        pep_recon={"ae_profile": {"additive_classes": pep_classes}} if pep_classes else None,
+    )
+
+
+def _selective_liaison(by_source):
+    """An adjudicator returning a band per finding `source` (or None -> no envelope, block stands).
+
+    Lets a test clear ONE concern while leaving another open — the interaction probe (PF-S75-01).
+    """
+    calls = []
+
+    def hook(safety_finding):
+        calls.append(safety_finding)
+        band = by_source.get(safety_finding["source"])
+        if band is None:
+            return None
+        env = _envelope(band=band, finding_id=safety_finding["finding_id"])
+        if env["override_record"] is not None:
+            env["override_record"]["caution_verbatim"] = safety_finding["caution"]
+        return env
+
+    hook.calls = calls
+    return hook
+
+
+def _supp_candidate(additive_classes):
+    """A raw supplements candidate dict (no I/O) declaring `additive_classes` for the BPMH screen."""
+    return {"domain": "supplements", "specialist": "supplement-specialist", "section": {},
+            "reason": None, "plan": {"items": [{"name": "Fish oil", "dose": "2 g"}]},
+            "meta": {"ae_profile": {"additive_classes": additive_classes}}}
+
+
+def test_reconcile_sets_rx_bpmh_hold_purely():
+    # CORE mutation-proof: reconcile (pure, no I/O) holds a compound whose declared additive-AE class
+    # intersects the operator's present Rx classes, in the INDEPENDENT rx_bpmh_held set. Remove the
+    # screen -> empty.
+    outcome = reconcile({"supplements": _supp_candidate(["bleeding-risk"])},
+                        operator_rx_classes={"bleeding-risk"})
+    assert "supplements" in outcome["rx_bpmh_held"]
+    assert outcome["report"]["rx_bpmh"] == [{"held_domain": "supplements", "classes": ["bleeding-risk"]}]
+    assert "supplements" not in outcome["holds"]  # tracked independently of `holds`
+
+
+def test_reconcile_no_rx_bpmh_hold_when_disjoint():
+    outcome = reconcile({"supplements": _supp_candidate(["bleeding-risk"])},
+                        operator_rx_classes={"cyp3a4-pgp"})  # operator on a different class
+    assert outcome["rx_bpmh_held"] == []
+    assert outcome["report"]["rx_bpmh"] == []
+
+
+def test_reconcile_no_rx_bpmh_hold_without_operator_classes():
+    # The default (no operator_rx_classes arg) is the backward-compatible no-Rx surface -> no hold.
+    outcome = reconcile({"supplements": _supp_candidate(["bleeding-risk"])})
+    assert outcome["rx_bpmh_held"] == []
+
+
+def test_rx_bpmh_holds_supplement_without_adjudicator(tmp_path):
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+    # cross-stream: the peptide (no operator-Rx match, declared no class) still records.
+    assert out["results"]["peptides"]["recorded"] is True
+
+
+def test_rx_bpmh_no_hold_without_operator_rx(tmp_path):
+    # BACKWARD-COMPAT: a no-medication operator (no curated rx-interaction-classes item) -> no BPMH hold.
+    store_read = _seed_store(tmp_path)  # no rx-interaction-classes seeded -> "" -> empty set
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["reconciliation"]["rx_bpmh"] == []
+
+
+def test_rx_bpmh_match_is_case_insensitive(tmp_path):
+    store_read = _bpmh_store(tmp_path, "Bleeding-Risk")  # curated value normalizes to bleeding-risk
+    out = generate_plans(_bpmh_supp_authors(["  BLEEDING-risk "]), store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+
+
+def test_rx_bpmh_screens_peptides_too(tmp_path):
+    # GENERALIZATION: the screen is symmetric — a PEPTIDE stacking against the operator's Rx is held
+    # too (a peptide + anticoagulant is the same watchlist case as a supplement + anticoagulant).
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+    assert out["results"]["peptides"]["recorded"] is False
+    assert out["results"]["peptides"]["reason"] == RX_BPMH_HELD
+    assert {f["held_domain"] for f in out["reconciliation"]["rx_bpmh"]} == {"peptides"}
+
+
+def test_rx_bpmh_liaison_override_releases_and_records(tmp_path):
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_rx_bpmh_liaison_autoblock_keeps_held(tmp_path):
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=_liaison("CRITICAL"))
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+
+
+def test_rx_bpmh_liaison_vacuous_override_keeps_held(tmp_path):
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    liaison = _liaison("HIGH", override=_override_record("HIGH", operator_reason="trust me"))
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=liaison)
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+
+
+def test_rx_bpmh_adjudicator_returning_none_keeps_held(tmp_path):
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=lambda finding: None)
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+
+
+def test_rx_bpmh_adjudicator_not_called_without_match(tmp_path):
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")  # operator on a class the supplement does not declare
+    liaison = _liaison("MEDIUM")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=liaison)
+    assert out["results"]["supplements"]["recorded"] is True
+    assert out["rx_bpmh_adjudications"] == {}
+    assert liaison.calls == []
+
+
+def test_rx_bpmh_safety_finding_id_and_caution(tmp_path):
+    # The deterministic finding_id + caution the liaison echoes (sorted classes; verbatim caution).
+    store_read = _bpmh_store(tmp_path, "bleeding-risk;cyp3a4-pgp")
+    liaison = _liaison("MEDIUM")
+    generate_plans(_bpmh_supp_authors(["cyp3a4-pgp", "bleeding-risk"]), store_read, tmp_path,
+                   plan_date=PLAN_DATE, adjudicator=liaison)
+    finding = next(c for c in liaison.calls if c["source"] == "rx-bpmh")
+    assert finding["finding_id"] == "rx-bpmh:supplements:bleeding-risk;cyp3a4-pgp"
+    assert finding["held_domain"] == "supplements"
+    assert "bleeding-risk, cyp3a4-pgp" in finding["caution"]
+
+
+# --- PF-S75-01 interaction probe: rx-bpmh COMPOSES with the other holds ----------
+# A compound can carry several concurrent concerns (additive-AE + rx-bpmh + conflict). Each clears
+# on its OWN adjudication; clearing one MUST NOT release a domain whose other concern is still open.
+# (This is exactly the S74/S75 safety-design-hole class — probed at Tier-1, not left to Tier-3.)
+
+
+def test_rx_bpmh_and_additive_ae_are_independent_holds(tmp_path):
+    # The supplement is held by BOTH additive-AE (bleeding-risk shared with the peptide) AND rx-bpmh
+    # (cyp3a4-pgp matches the operator's Rx). Clearing the additive-AE override must NOT release it
+    # while the rx-bpmh concern is open — the SEC-1 analog.
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    # additive-AE clears (MEDIUM), rx-bpmh blocks (CRITICAL): the supplement STAYS held.
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison({"additive-ae": "MEDIUM", "rx-bpmh": "CRITICAL"}))
+    assert out["adjudication"]["outcome"] == "cleared"  # additive-AE DID clear
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False  # but the supplement is NOT released
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_rx_bpmh_cleared_but_additive_ae_keeps_held(tmp_path):
+    # The reverse direction: rx-bpmh clears, additive-AE blocks -> still held (additive-AE open).
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison({"additive-ae": "CRITICAL", "rx-bpmh": "MEDIUM"}))
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["adjudication"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == ADDITIVE_AE_HELD
+
+
+def test_rx_bpmh_and_additive_ae_both_cleared_records(tmp_path):
+    # Both concerns cleared -> the supplement records. (Proves the dual hold is RELEASABLE, not a deadlock.)
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison({"additive-ae": "MEDIUM", "rx-bpmh": "MEDIUM"}))
+    assert out["adjudication"]["outcome"] == "cleared"
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_rx_bpmh_and_conflict_are_independent_holds(tmp_path):
+    # A supplement held by BOTH a cross-domain conflict AND rx-bpmh: clearing the conflict must NOT
+    # release it while the rx-bpmh is open (the conflict_held x rx_bpmh_held interaction).
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk"]},
+        },
+    )
+    # conflict clears (MEDIUM), rx-bpmh blocks (CRITICAL) -> still held.
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison({"cross-domain-conflict": "MEDIUM", "rx-bpmh": "CRITICAL"}))
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+
+
+# --- AC4: real medical-liaison rxbp dispatch, captured + run through the production path ---------
+# Two REAL captured envelopes adjudicating the SAME finding_id (rx-bpmh:supplements:bleeding-risk) to
+# OPPOSITE outcomes on the specific medication — the BPMH gate's marquee clinical discrimination:
+# aspirin (antiplatelet) -> HIGH/H3 overridable -> clears; warfarin (anticoagulant, narrow TI) ->
+# CRITICAL/H2 -> non-overridable auto-block. Not stubs — captured out-of-band per the integration mandate.
+
+
+def test_real_rx_bpmh_liaison_cleared_envelope_records(tmp_path):
+    # The REAL aspirin+fish-oil envelope (HIGH/H3, content-valid HIGH-rung informed-refusal override),
+    # run through the production path, RELEASES the BPMH-held supplement: it records.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    env = _example_envelope("liaison-rxbp-cleared.example.json")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=lambda finding: env)
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "cleared"
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_real_rx_bpmh_liaison_blocked_envelope_keeps_held(tmp_path):
+    # The REAL warfarin+fish-oil envelope (CRITICAL/H2 mechanical-auto-block, null override path), run
+    # through the production path, KEEPS the supplement held — the marquee BPMH safety property: an
+    # anticoagulant interaction is non-overridable, and the operator's informed-refusal does not lower it.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    env = _example_envelope("liaison-rxbp-blocked.example.json")
+    out = generate_plans(_bpmh_supp_authors(["bleeding-risk"]), store_read, tmp_path,
+                         plan_date=PLAN_DATE, adjudicator=lambda finding: env)
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"
+    assert out["rx_bpmh_adjudications"]["supplements"]["non_overridable"] is True
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_rx_bpmh_additive_ae_and_conflict_all_three_independent(tmp_path):
+    # PF-S75-01 triple-concern probe (QA Tier-2 SHOULD-FIX): ONE supplement held by ALL THREE concerns
+    # at once — additive-AE (`holds`, shared bleeding-risk with the peptide), a cross-domain conflict
+    # (`conflict_held`), AND rx-bpmh (`rx_bpmh_held`, cyp3a4-pgp matches the operator Rx). Clearing TWO
+    # while the third is open must keep it held — the sequential recording-loop check past two cleared
+    # concerns must not short-circuit. The supplement declares cyp3a4-pgp (operator-matched) PLUS
+    # bleeding-risk (peptide-shared) so the three holds land on the one domain, isolated from the peptide.
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]},
+        },
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    # additive-AE + conflict CLEAR (MEDIUM), rx-bpmh BLOCKS (CRITICAL): the supplement STAYS held.
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison(
+                             {"additive-ae": "MEDIUM", "cross-domain-conflict": "MEDIUM", "rx-bpmh": "CRITICAL"}))
+    assert out["adjudication"]["outcome"] == "cleared"  # additive-AE cleared
+    assert out["conflict_adjudications"]["supplements"]["outcome"] == "cleared"  # conflict cleared
+    assert out["rx_bpmh_adjudications"]["supplements"]["outcome"] == "block-stands"  # rx-bpmh open
+    assert out["results"]["supplements"]["recorded"] is False  # but the supplement is NOT released
+    assert out["results"]["supplements"]["reason"] == RX_BPMH_HELD  # the still-open concern
+    assert store.read("plan::supplements", root=tmp_path) == []
+
+
+def test_rx_bpmh_additive_ae_and_conflict_all_three_cleared_records(tmp_path):
+    # The releasable proof: with ALL THREE concerns cleared, the triple-held supplement records (not a deadlock).
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]},
+        },
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison(
+                             {"additive-ae": "MEDIUM", "cross-domain-conflict": "MEDIUM", "rx-bpmh": "MEDIUM"}))
+    assert out["results"]["supplements"]["recorded"] is True
+    assert len(store.read("plan::supplements", root=tmp_path)) == 1
+
+
+def test_rx_bpmh_peptide_hold_composes_with_additive_ae_supplement_hold(tmp_path):
+    # QA Tier-2 SHOULD-FIX (multi-DOMAIN composition in one pass): the supplement is additive-AE-held
+    # (`holds`) while the PEPTIDE is rx-bpmh-held (`rx_bpmh_held`) — distinct domains, distinct concerns,
+    # each cleared on its own gate call. With no adjudicator BOTH stay held; the two independent sets do
+    # not interfere across domains.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+    # supplement: additive-AE held (shared bleeding-risk); also rx-bpmh-matches but additive-AE is the shown reason.
+    assert out["results"]["supplements"]["recorded"] is False
+    # peptide: rx-bpmh held (its bleeding-risk class matches the operator Rx) — held on its OWN concern.
+    assert out["results"]["peptides"]["recorded"] is False
+    assert out["results"]["peptides"]["reason"] == RX_BPMH_HELD
+    assert {f["held_domain"] for f in out["reconciliation"]["rx_bpmh"]} == {"supplements", "peptides"}
+
+
+def test_rx_bpmh_and_conflict_both_open_without_adjudicator_held(tmp_path):
+    # TEST-rxbp-2 (Tier-3): a supplement held by BOTH an open conflict AND an open rx-bpmh match, with
+    # NO adjudicator, stays held — pinning the recording loop's fixed precedence (holds -> conflict_held
+    # -> rx_bpmh_held) so a reorder is a decision, not a silent change of the surfaced reason. Both
+    # concerns are detected in their INDEPENDENT sets; conflict is surfaced as the reason (checked first).
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk"]},
+        },
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE)  # no adjudicator
+    assert out["results"]["supplements"]["recorded"] is False
+    assert out["results"]["supplements"]["reason"] == CONFLICT_HELD  # precedence: conflict before rx-bpmh
+    assert "supplements" in {f["held_domain"] for f in out["reconciliation"]["rx_bpmh"]}  # rx-bpmh detected too
+    assert any(c["from"] == "supplements" for c in out["reconciliation"]["conflicts"])
+
+
+# --- doctor-visit-queue collation (S77, the medical-liaison's owned collation surface) ----------
+# collate_doctor_visit_queue reads a generate_plans result + records each ADJUDICATED safety finding
+# (additive-AE / conflict / rx-bpmh; cleared-with-override OR block-stands) into the dvq::queue stream,
+# severity-ranked on read. generate_plans itself is unchanged (the collation is a separate call).
+
+
+def test_generate_plans_writes_no_queue_stream(tmp_path):
+    # BACKWARD-COMPAT: generate_plans alone never writes the dvq:: stream (the collation is separate).
+    store_read = _seed_store(tmp_path)
+    generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    assert queue_schema.read_doctor_visit_queue(tmp_path) == []
+
+
+def test_collate_records_cleared_additive_ae(tmp_path):
+    # An additive-AE supplement cleared via a MEDIUM override -> one queue entry, the finding_id +
+    # caution matching the adjudicated safety_finding verbatim (so the SBAR render reproduces it).
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    recorded = collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    assert len(recorded) == 1
+    queue = queue_schema.read_doctor_visit_queue(tmp_path)
+    assert len(queue) == 1
+    e = queue[0]
+    assert e["axis"] == "additive-ae"
+    assert e["finding_id"].startswith("additive-ae:")
+    assert e["caution"].startswith("Supplement<->peptide additive")  # verbatim from the safety_finding
+    assert e["outcome"] == "cleared-with-override"
+    assert e["composite_band"] == "MEDIUM"
+    assert e["non_overridable"] is False
+    assert e["held_domain"] == "supplements"
+    assert e["source_specialist"] == "supplement-specialist"
+
+
+def test_collate_non_overridable_block_stands_entry(tmp_path):
+    # A CRITICAL auto-block -> a block-stands entry flagged non_overridable (ranks highest for the MD).
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("CRITICAL"))
+    collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    e = queue_schema.read_doctor_visit_queue(tmp_path)[0]
+    assert e["outcome"] == "block-stands"
+    assert e["non_overridable"] is True
+    assert e["composite_band"] == "CRITICAL"
+
+
+def test_collate_records_conflict_and_rx_bpmh(tmp_path):
+    # A supplement that declares a conflict AND trips rx-bpmh (operator on the matching Rx class),
+    # both adjudicated MEDIUM -> two queue entries (one per axis), both cleared.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk"]},
+        },
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    queue = queue_schema.read_doctor_visit_queue(tmp_path)
+    axes = {e["axis"] for e in queue}
+    assert "cross-domain-conflict" in axes and "rx-bpmh" in axes
+    assert all(e["source_specialist"] == "supplement-specialist" for e in queue)
+
+
+def test_collate_empty_without_adjudicator(tmp_path):
+    # No adjudicator -> nothing reached the gate -> nothing adjudicated -> empty queue.
+    store_read = _seed_store(tmp_path)
+    out = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE)
+    assert collate_doctor_visit_queue(out, PLAN_DATE, tmp_path) == []
+    assert queue_schema.read_doctor_visit_queue(tmp_path) == []
+
+
+def test_collate_severity_ranked_e2e(tmp_path):
+    # E2E: a supplement held by additive-AE (CRITICAL auto-block) AND a conflict (MEDIUM cleared) ->
+    # the queue surfaces the non-overridable auto-block FIRST (the MD-priority ordering).
+    store_read = _seed_store(tmp_path)
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk"]},
+        },
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison({"additive-ae": "CRITICAL", "cross-domain-conflict": "MEDIUM"}))
+    collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    queue = queue_schema.read_doctor_visit_queue(tmp_path)
+    assert queue[0]["non_overridable"] is True  # the CRITICAL additive-AE auto-block leads
+    assert queue[0]["axis"] == "additive-ae"
+    assert any(e["axis"] == "cross-domain-conflict" and e["outcome"] == "cleared-with-override" for e in queue)
+
+
+def test_real_liaison_collation_agrees_on_safety_tier_lead(tmp_path):
+    # AC4: the REAL captured medical-liaison collation (doctor-visit-queue-collated.example.json) ranked
+    # the non-overridable CRITICAL warfarin auto-block FIRST. The code's resolve_doctor_visit_queue
+    # reproduces that SAFETY-TIER lead (the integration check). Intra-band the liaison refines clinically
+    # (conflict above the generic additive-AE) while the code's tiebreak is deterministic finding_id —
+    # the liaison's refinement is its dispatch-time judgment, not the data layer's, so only the
+    # safety-critical lead is asserted equal here.
+    collation = _example_envelope("doctor-visit-queue-collated.example.json")
+    raw_entries = [
+        {"finding_id": "additive-ae:class:bleeding-risk", "axis": "additive-ae",
+         "caution": "Supplement<->peptide additive adverse-event risk (shared additive-AE classes: bleeding-risk)",
+         "held_domain": "supplements", "source_specialist": "supplement-specialist",
+         "outcome": "cleared-with-override", "non_overridable": False, "composite_band": "MEDIUM"},
+        {"finding_id": "rx-bpmh:supplements:bleeding-risk", "axis": "rx-bpmh",
+         "caution": "Supplement<->Rx BPMH interaction: supplements contributes additive-AE class(es) bleeding-risk that stack against the operator's present medication interaction class(es) bleeding-risk",
+         "held_domain": "supplements", "source_specialist": "supplement-specialist",
+         "outcome": "block-stands", "non_overridable": True, "composite_band": "CRITICAL"},
+        {"finding_id": "conflict:supplements:peptides/bpc-157", "axis": "cross-domain-conflict",
+         "caution": "Author-declared cross-domain conflict from supplements: bpc-157 (peptides) — additive bleeding risk, needs review",
+         "held_domain": "supplements", "source_specialist": "supplement-specialist",
+         "outcome": "cleared-with-override", "non_overridable": False, "composite_band": "MEDIUM"},
+    ]
+    for e in raw_entries:
+        queue_schema.record_doctor_visit_queue_entry(e, PLAN_DATE, tmp_path)
+    ranked = queue_schema.read_doctor_visit_queue(tmp_path)
+    # the code leads with the non-overridable auto-block — matching the liaison's rank-1
+    assert ranked[0]["finding_id"] == collation["ranked_finding_ids"][0] == "rx-bpmh:supplements:bleeding-risk"
+    assert ranked[0]["non_overridable"] is True
+    # the liaison rendered no clinical verdict (the queue is questions/observations for the doctor)
+    assert collation["clinical_verdict_rendered"] is False
+    # all three findings are present in the data-layer queue (none dropped)
+    assert {e["finding_id"] for e in ranked} == set(collation["ranked_finding_ids"])
+
+
+def test_collate_cumulative_latest_disposition_wins(tmp_path):
+    # SHOULD-FIX-2 (Tier-2): re-collating the SAME finding on a LATER date supersedes its earlier
+    # disposition through the collation path (block-stands at date 1 -> cleared at date 2 -> the queue
+    # shows cleared). Pins latest-wins at the collation-integration level, not only the schema layer.
+    store_read = _seed_store(tmp_path)
+    blocked = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("CRITICAL"))
+    collate_doctor_visit_queue(blocked, "2026-06-19", tmp_path)
+    assert queue_schema.read_doctor_visit_queue(tmp_path)[0]["outcome"] == "block-stands"
+    cleared = generate_plans(_held_pair(), store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=_liaison("MEDIUM"))
+    collate_doctor_visit_queue(cleared, "2026-06-20", tmp_path)  # later date, same finding_id
+    queue = queue_schema.read_doctor_visit_queue(tmp_path)
+    assert len(queue) == 1  # one finding, the latest record wins
+    assert queue[0]["outcome"] == "cleared-with-override"  # the 06-20 cleared disposition supersedes
+
+
+def test_collate_entry_matches_adjudicated_finding_verbatim(tmp_path):
+    # Tier-3 TEST-1: the queued finding_id + caution EXACTLY equal the safety_finding the liaison
+    # adjudicated (so the SBAR render reproduces it verbatim), not merely startswith.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    liaison = _liaison("MEDIUM")
+    authors = _compound_authors(supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}})
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+    collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    queue = queue_schema.read_doctor_visit_queue(tmp_path)
+    rx_call = next(c for c in liaison.calls if c["source"] == "rx-bpmh")  # the finding the liaison saw
+    rx_entry = next(e for e in queue if e["axis"] == "rx-bpmh")
+    assert rx_entry["finding_id"] == rx_call["finding_id"]  # EXACT, not startswith
+    assert rx_entry["caution"] == rx_call["caution"]  # verbatim caution match
+
+
+def test_collate_overridable_block_stands_keeps_real_band(tmp_path):
+    # Tier-3 BUG-1: an OVERRIDABLE block-stands (vacuous HIGH override -> block-stands, non_overridable
+    # False) keeps its REAL band (HIGH) threaded from the envelope, NOT None — so it ranks by band within
+    # the block-stands tier, not collapsed to the unknown sub-tier. Reds if the band threading is removed.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}})
+    vacuous_high = _liaison("HIGH", override=_override_record("HIGH", operator_reason="trust me"))
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=vacuous_high)
+    e = next(e for e in collate_doctor_visit_queue(out, PLAN_DATE, tmp_path) if e["axis"] == "rx-bpmh")
+    assert e["outcome"] == "block-stands"
+    assert e["non_overridable"] is False
+    assert e["composite_band"] == "HIGH"  # the real band preserved, NOT None (BUG-1 fix)
+
+
+def test_collate_non_overridable_via_harm_class_keeps_real_band(tmp_path):
+    # Tier-3 BUG-2: a non-overridable-via-harm_class finding (band HIGH, harm_class H1) keeps its REAL
+    # band (HIGH) + harm_class (H1), NOT a fabricated "CRITICAL"; non_overridable still ranks it tier 0.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    authors = _compound_authors(supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}})
+    h1 = _liaison("HIGH", harm_class="H1")
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=h1)
+    e = next(e for e in collate_doctor_visit_queue(out, PLAN_DATE, tmp_path) if e["axis"] == "rx-bpmh")
+    assert e["non_overridable"] is True
+    assert e["composite_band"] == "HIGH"  # real band, NOT fabricated CRITICAL (BUG-2 fix)
+    assert e["harm_class"] == "H1"
+
+
+def test_collate_derives_non_overridable_lead_via_collation(tmp_path):
+    # Tier-3 TEST-4: the safety-tier lead is DERIVED by collate_doctor_visit_queue from a real
+    # generate_plans result (not a hand-built fixture) — a non-overridable rx-bpmh (CRITICAL auto-block)
+    # while the additive-AE + conflict clear (MEDIUM) -> the rx-bpmh non-overridable entry leads the
+    # ranked queue. Exercises the _doctor_visit_queue_entry band/non_overridable derivation end-to-end.
+    store_read = _bpmh_store(tmp_path, "cyp3a4-pgp")
+    authors = _compound_authors(
+        supp_recon={
+            "conflicts": [{"with_domain": "peptides", "with": "bpc-157", "reason": "additive bleeding"}],
+            "ae_profile": {"additive_classes": ["bleeding-risk", "cyp3a4-pgp"]},
+        },
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+    )
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                         adjudicator=_selective_liaison(
+                             {"additive-ae": "MEDIUM", "cross-domain-conflict": "MEDIUM", "rx-bpmh": "CRITICAL"}))
+    collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    ranked = queue_schema.read_doctor_visit_queue(tmp_path)
+    assert ranked[0]["axis"] == "rx-bpmh"  # the derived non-overridable auto-block leads
+    assert ranked[0]["non_overridable"] is True
+    assert {e["axis"] for e in ranked} == {"additive-ae", "cross-domain-conflict", "rx-bpmh"}

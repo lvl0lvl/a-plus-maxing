@@ -1,0 +1,24 @@
+{
+  "_comment": "The block-stands case for the conflict axis (S75, cfaj), in the canonical envelope schema (parity with liaison-conflict-cleared + the additive-AE blocked example). Given the SAME held author-declared conflict but a VACUOUS operator override request at HIGH, the medical-liaison refuses to release: a content-free operator_reason on its stop-list, below the HIGH rung. The orchestrator's adjudicate() rejects the override (INV-OVERRIDE-RECORD-SCHEMA) and the conflict-declaring domain STAYS HELD — never released on insistence.",
+  "finding_id": "conflict:supplements:peptides/bpc-157",
+  "status": "adjudicated",
+  "composite_band": "HIGH",
+  "harm_class": "H3",
+  "verdict": "BLOCK_WITH_OVERRIDE_PATH",
+  "severity_final": {"set_by": "medical-liaison", "verdict": "BLOCK_WITH_OVERRIDE_PATH"},
+  "override_record": {
+    "caution_verbatim": "Author-declared cross-domain conflict from supplements: bpc-157 (peptides) — additive bleeding risk, needs review",
+    "composite_band": "HIGH",
+    "risks_communicated": {
+      "general": "The supplement author flagged its fish-oil plan conflicts with the peptide BPC-157 (additive bleeding risk).",
+      "risks_of_proceeding": "Proceeding raises bleeding/bruising risk above either compound alone; the conflict needs a clinician + a database interaction lookup, not a bare clearance."
+    },
+    "operator_reason": "I just want to try both — go ahead and clear it",
+    "evidence_tier_required": "understanding+appreciation+reasoning",
+    "evidence_provided": {"rung": "clear-choice"},
+    "override_literal": "operator is overriding a safety block",
+    "voluntariness_note": "Request appears voluntary, but voluntariness alone does not satisfy the HIGH rung; understanding+appreciation+reasoning is unmet, so the block is NOT released.",
+    "timestamp": "2026-06-19T12:30:00-04:00",
+    "contradictions_log_ref": "vault/meta/contradictions.md#C-2"
+  }
+}

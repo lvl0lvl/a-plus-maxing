@@ -1,0 +1,45 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-tb500-i1",
+  "draft_path": "vault/library/peptides/tb-500/research-report.md",
+  "findings": [
+    {
+      "category": "logical-inconsistency",
+      "severity": "minor",
+      "description": "Severe-dry-eye Phase 2: prose (\u00a73.4) hedges NCT01393132 as a best-fit inference and gives 'n=9, 12 eyes treated', but the \u00a73.9 trial table lists NCT01393132 as a firm n=9 row with no '(inferred)' marker, presenting an inference as settled fact when read in isolation. Annotate the table row as NCT-inferred."
+    },
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "In-text citations use per-section local bracket numbers (and a separate '-D' series in \u00a77) while the shipped bibliography is a single unified deduped list [1]-[79]; no mechanical mapping is provided, so a reader cannot resolve e.g. \u00a77.3 [4-D] -> unified [35]. Renumber to the unified scheme or add a per-section local->unified crosswalk."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "Registered-trial arithmetic is soft: text asserts '~19 registered studies / 19 NCTs' with a breakdown summing to 19, but the \u00a73.9 table enumerates ~21 distinct NCT rows (incl. the [62] cluster). The count is defensible but its components don't transparently reconcile to the table. State the counting rule so the number is auditable."
+    },
+    {
+      "category": "unexamined-counter-evidence",
+      "severity": "minor",
+      "description": "The pro-metastatic safety floor ('active/recent solid malignancy a contraindication') leans on a 2003 adenoviral OVER-EXPRESSION model [64]; the caveat that forced over-expression is a weaker proxy for exogenous peptide dosing is not made explicit. Adding it strengthens the report's honesty without changing the conservative conclusion."
+    },
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "The token '[19]' is overloaded: unified bibliography [19] is Kumar 2016 (Ac-SDKP cascade, grounds \u00a72.4) but the cross-reference notation '= Section G [19]' attaches '19' to the Esposito identity paper, creating momentary ambiguity about which source grounds the Ac-SDKP claim. Disambiguate via the crosswalk."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T13:36:34.165382+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T13:33:40.623235+00:00",
+    "attest_ts": "2026-06-19T13:36:34.165385+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "161b12903bd7385c50cea2164afe0e305d0f8bb3137c5bf8ec77cd8f2c8a73c3",
+    "agent_source_mtime": "2026-06-19T13:35:50.498466+00:00"
+  }
+}

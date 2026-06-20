@@ -1,0 +1,30 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T13:44:06Z",
+  "iterations": 1,
+  "compound_risk_tier": "experimental",
+  "compound_entry_path": "vault/compounds/tb-500.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "placeholder-with-pointer"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "new/growing-lesion surveillance + baseline malignancy screening (clinical exam + imaging)",
+    "injection-site and hypersensitivity clinical examination",
+    "WADA doping-control LC-MS detection of N-acetylated LKKTETQ in urine/plasma (objective analytical marker)",
+    "NOTE: no validated efficacy/PD lab biomarker exists (FMD/hs-CRP/NT-proBNP are exploratory-only in NCT07487363)"
+  ],
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T13:43:21.198602+00:00",
+    "attest_ts": "2026-06-19T13:45:26.659004+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "371f4c03bacdda5ca194a032725d87de3ebd7424b7f39c77cacaa39fbcef08e7",
+    "agent_source_mtime": "2026-06-19T13:44:50.700094+00:00"
+  }
+}

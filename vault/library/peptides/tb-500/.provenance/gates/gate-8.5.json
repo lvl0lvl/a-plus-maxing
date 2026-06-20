@@ -1,0 +1,36 @@
+{
+  "phase": "8.5",
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/tb-500/practitioner-layer.md",
+    "present": true,
+    "compounding_sheets_count": 0,
+    "compounding_sheets_or_null_finding": true,
+    "named_physicians_count": 1,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/tb-500/non-english-layer.md",
+    "present": true,
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "Other"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T13:57:54.148228+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T13:56:29.611433+00:00",
+    "attest_ts": "2026-06-19T13:57:54.148232+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "1d1b6bd2561e93a69b35bf1075df025f28f5e03a8284bcc51bb673887a944f7c",
+    "agent_source_mtime": "2026-06-19T13:57:27.308189+00:00"
+  }
+}

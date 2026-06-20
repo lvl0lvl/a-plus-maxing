@@ -1,3 +1,15 @@
+---
+title: Plan-Author Dispatch Process (V1, runtime A)
+type: guide
+status: active
+owner: walter
+created: 2026-06-13
+last_reviewed: 2026-06-20
+depends_on: [vault/design/plan-generation-pipeline-v1.md]
+superseded_by: ""
+review_cadence: phase
+---
+
 # Plan-Author Dispatch Process (V1, runtime A)
 
 **What this is.** The repeatable process for generating one plan domain end-to-end: dispatch a
@@ -108,9 +120,15 @@ silently shipped.
   an operator-approved directive. The peptide-specialist anchored BPC-157 at H2 (angiogenic auto-block)
   and surfaced it as a decision-support draft with the H2 block + `clinician-clearance:NOT_GRANTED`
   caveat RENDERED on the card (verified in the E2E). "Four authors wired" is NOT "operator-usable":
-  the cross-compound additive-AE screen is WIRED (S73, the compound band); the **medical-liaison
-  terminal gate** (S74) is the remaining gate between build-complete and operator-usable. The build
-  runs on synthetic fixtures (no real operator data).
+  the cross-compound additive-AE screen is WIRED (S73, the compound band) and the **medical-liaison
+  terminal gate** (WIRED S74, `scripts/plan/adjudicate.py`) adjudicates the held additive-AE finding —
+  a content-valid override releases the supplement, a non-overridable / invalid adjudication holds it.
+  The author-conflict adjudication (`cfaj`) is WIRED S75, the supplement↔Rx BPMH axis (`rxbp`) is
+  WIRED S76, and the doctor-visit-queue DATA LAYER (the `dvq::` store stream + the collation of the
+  adjudicated safety findings) is WIRED S77 (see the liaison-gate / behavior-3 / behavior-5 sections
+  below). The remaining surface is the design-led rendered SBAR handout (a visual artifact — Pencil +
+  operator sign-off + the design agents, never originated solo). The build runs on synthetic
+  fixtures (no real operator data).
 
 ## The cross-domain layer (orchestrator + reconciler) — WIRED S72
 
@@ -136,7 +154,9 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
   workout cost). `bounce_reason` is an OPTIONAL human-readable note a `sustains:false` verdict may carry;
   the reconciler reads only `sustains` + `sustainable_training_kcal`, so it is annotation, not a contract key.
 - any author — `{"reconciliation": {"conflicts": [{"with_domain": ..., "with": ..., "reason": ...}]}}`
-  declares a known cross-domain conflict for the report.
+  declares a known cross-domain conflict. Surfaced in the report AND (cfaj, WIRED S75) HOLDS the
+  declaring domain pending the liaison gate — the safe default; the orchestrator pins `from` (the
+  declaring domain), so an author-supplied `from` cannot shadow it.
 - **supplements / peptides** — `{"reconciliation": {"ae_profile": {"additive_classes": [<token>, ...],
   "interactions": [{"with": <other compound>, "mechanism": <str>, "severity": "low|moderate|high"}]}}}`
   declares the compound's adverse-event profile for the additive-AE screen. `additive_classes` are the
@@ -148,9 +168,13 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
   `hypoglycemia`, `immunomodulation`, `sedation`, `stimulant-load` (grounded in the supplement Core-Rule-5
   interaction screen + the peptide Rule-6 H-class axes). `with` matching is exact (normalized
   lowercase/strip): name the compound as the other domain records it; a parenthetical qualifier
-  (`fish oil (EPA/DHA)`) is a known V1 precision gap (the shared-class path still catches it).
+  (`fish oil (EPA/DHA)`) is a known V1 precision gap (the shared-class path still catches it). The SAME
+  `additive_classes` tokens also feed the supplement↔Rx BPMH screen (behavior 5, `rxbp`): a token that
+  intersects the operator's PRESENT Rx-interaction classes (read de-identified from the store, behavior 5)
+  holds the compound through the liaison gate — so the canonical vocabulary is shared across the
+  compound↔compound and compound↔Rx axes.
 
-**`reconcile(candidates)` — four behaviors (no recording):**
+**`reconcile(candidates, *, operator_rx_classes=...)` — five behaviors (no recording):**
 
 1. **RED-S/LEA cross-domain short-circuit** (pipeline Phase 0.5). When nutrition tripped its
    critical-floor screen (`gates["red_s_lea_screen"]` → nutrition reason `red-s-lea-clinical-routing`),
@@ -162,10 +186,15 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
    second personal-trainer dispatch under the energy ceiling). The re-authored plan is recorded only if
    its `energy_cost_kcal` ≤ the ceiling; otherwise the workout is HELD (`energy-bounce-unresolved`), and
    with no `reauthor` hook it is HELD (`energy-bounce-held`) — never an un-fuelable load on the dashboard.
-3. **Overlap + conflict detection** (the step-4 integration). An intervention identity surfacing in 2+
-   domains (a compound recommended as both a supplement and a peptide) and any author-declared conflict
-   are surfaced in the returned report. V1 DETECTS + REPORTS; the medical-liaison contradiction
-   adjudication is the deferred S74 clinical slice.
+3. **Overlap detection + author-conflict adjudication** (the step-4 integration). An intervention
+   identity surfacing in 2+ domains is surfaced in the report (detect-only). An author-declared
+   cross-domain conflict is surfaced AND (cfaj, WIRED S75) HOLDS the declaring (`from`) domain
+   (`cross-domain-conflict-held`) pending the liaison gate — the safe default; `generate_plans` routes
+   each conflict-held domain to `adjudicate` (the SAME gate as additive-AE), and a content-valid
+   override releases it. The conflict hold is tracked INDEPENDENTLY (a `conflict_held` set, not the
+   single-reason `holds` dict): a domain can carry both an additive-AE / bounce / RED-S-LEA hold AND a
+   conflict, and each concern clears on its own — clearing one never releases a domain whose other
+   concern is still open (Tier-3 SEC-1/BUG-1). A domain records only when in NEITHER set.
 4. **Supplement↔peptide additive-AE screen** (pipeline Phase 3, the compound band, WIRED S73). Runs only
    when BOTH a supplement and a peptide candidate carry a plan. A SHARED author-declared additive-AE class
    (`ae_profile.additive_classes`) or an author-declared pairwise interaction naming the other compound
@@ -173,10 +202,27 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
    the SUPPLEMENT (`additive-ae-held`; it finalizes last against the settled compound surface). The honest
    no-stack state, never an un-screened additive-AE combination written. Bidirectional (either author's
    declaration fires it; "component tolerability does not compose to combination safety"). The
-   medical-liaison terminal gate (S74) adjudicates the held finding + the supplement↔Rx axis. Real-dispatch
+   medical-liaison terminal gate (`adjudicate`, WIRED S74 — see next section) adjudicates the held finding.
+   Real-dispatch
    E2E (S73, PII-free synthetic operator): `compound-screen-supplement-{fishoil,creatine}-author-output`
    + `compound-screen-peptide-bpc157-author-output.example.json` (the additive fish-oil↔BPC-157 hold via a
    shared `bleeding-risk` axis, and the clean creatine↔BPC-157 pair that records both).
+5. **Supplement↔Rx BPMH screen** (pipeline Phase 4, the medical-liaison's marquee watchlist check, WIRED
+   S76). The operator's PRESENT medication interaction classes are read de-identified through the
+   `router.summarize` PII boundary — a new `rx-interaction-classes` summary field carrying operator/
+   liaison-curated class tokens (the SAME canonical AE-class vocabulary the compound authors declare),
+   NEVER the raw drug names (the raw `medication-list` is a named-excluded raw-PII class dropped at the
+   boundary; the drug-name→class de-identification is an operator/liaison CURATION step at the store layer,
+   so no pharmacology DB enters `scripts/`). A compound-bearing domain (supplements AND peptides) whose
+   declared `ae_profile.additive_classes` intersect the operator's present Rx-classes is an rx-bpmh finding
+   — surfaced in `report["rx_bpmh"]` AND HELD in an INDEPENDENT `rx_bpmh_held` set (`rx-bpmh-held`), routed
+   through the SAME gate (`adjudicate`); a content-valid override releases it, a non-overridable / invalid
+   adjudication holds it. Tracked independently of the additive-AE and conflict holds (a compound can carry
+   several concurrent concerns, each cleared on its own — a domain records only when in NONE of the three
+   sets). Real-dispatch E2E (S76, PII-free SYNTHETIC operator on a synthetic Rx; no real medication data):
+   `liaison-rxbp-{cleared,blocked}.example.json` — the SAME finding_id adjudicated to OPPOSITE outcomes on
+   the specific medication (aspirin+fish-oil → HIGH/H3 overridable → clears; warfarin+fish-oil → CRITICAL/H2
+   vitamin-K/warfarin watchlist → non-overridable auto-block).
 
 The reconciliation report is RETURNED (`generate_plans(...)["reconciliation"]`), never persisted — no new
 store stream; plans record via the existing `record_plan` (the store-adversarial battery surface is
@@ -188,18 +234,91 @@ Real-dispatch E2E (S72, both paths, PII-free synthetic operator):
 real bounce: a 700-kcal cleared session → the nutritionist's real `sustains:false` (ceiling 300) →
 re-author to a 260-kcal reduced session, recorded; the bounced 700-kcal load never reaches the store).
 
+## The medical-liaison terminal adjudication gate (Phase 4) — WIRED S74
+
+The reconciler HOLDS the additive-AE supplement; the medical-liaison terminal gate
+(`scripts/plan/adjudicate.py`) ADJUDICATES the held finding — the held-line closer. Under runtime A
+`generate_plans` is given an `adjudicator(safety_finding) -> liaison envelope | None` hook (a real
+`medical-liaison` dispatch, full profile inlined per INV-ROLE-INLINING); the gate validates the
+envelope and either RELEASES the hold (a content-valid override → the supplement records) or leaves
+the block STANDING (a non-overridable auto-block, or any invalid/absent override). No `adjudicator`
+wired → the supplement stays held (the safe no-stack default). The override record rides the returned
+`generate_plans(...)["adjudication"]`, NOT a new store stream.
+
+```
+generate_plans(authors, store_read, root, *, plan_date, gates, reauthor, adjudicator)
+  ... reconcile → held additive-AE supplement → adjudicator(safety_finding) → adjudicate() → release | hold
+```
+
+**The liaison adjudication envelope** (the deployed medical-liaison's runtime-A output; `adjudicate`
+consumes it). The orchestrator routes a `safety_finding` (`finding_id` + `caution` + `held_domain`)
+to the liaison; the liaison returns:
+
+- `finding_id` — must echo the safety_finding's id (a mismatch → block stands).
+- `composite_band` — `HIGH` | `MEDIUM` | `CRITICAL` (the liaison assigns it).
+- `harm_class` — `H1`…`Hn` | `null` (the liaison assigns it).
+- `verdict` — `BLOCK` | `BLOCK_WITH_OVERRIDE_PATH`.
+- `severity_final` — `{"set_by": "medical-liaison"}` for an overridable HIGH/MEDIUM; `{"set_by":
+  "mechanical-auto-block-per-R3"}` for a CRITICAL / H1-H2 auto-block.
+- `override_record` — the 10-field record below, or `null` (always `null` for an auto-block).
+
+**The override-record schema** (validated on CONTENT, not presence — INV-OVERRIDE-RECORD-SCHEMA):
+`caution_verbatim` (reproduces the finding's `caution` exactly); `composite_band` (HIGH or MEDIUM
+only); `risks_communicated` (`{general, risks_of_proceeding}` — a content-bearing `risks_of_proceeding`
+clause is required); `operator_reason` (content-bearing — a length floor + a vacuous stop-list reject
+"because I want to try it"; required at HIGH); `evidence_tier_required` (MEDIUM→`clear-choice`;
+HIGH→`understanding+appreciation+reasoning`); `evidence_provided` (`{rung}` — must be ≥
+`evidence_tier_required`); `override_literal` (the canonical "operator is overriding a safety block",
+referenced never redefined); `voluntariness_note`; `timestamp`; `contradictions_log_ref`.
+
+**The two gate invariants** (bead `mdv`, promoted S74): **INV-OVERRIDE-RECORD-SCHEMA** (a held finding
+clears only via a content-valid record — the rubber-stamp is rejected) and **INV-CRITICAL-NON-OVERRIDABLE**
+(a `composite_band == CRITICAL` OR `harm_class ∈ {H1, H2}` finding never gets an override path; an
+envelope that builds one is a violation, block stands). Mechanical gate:
+`scripts/audit-medical-liaison-override.sh <envelope.json>` (delegates to `adjudicate.py
+--audit-envelope` — the same validation the in-code gate runs). Real-dispatch E2E (S74, PII-free
+synthetic operator): `liaison-adjudication-cleared.example.json` (the real deployed liaison built a
+content-valid MEDIUM override for an informed-refusal request → the held supplement records) +
+`liaison-adjudication-blocked.example.json` (a vacuous "just want to try both" at HIGH → refused →
+block stands). Tests: `tests/plan/test_adjudicate.py` (the validator + critical gate, mutation-proven
+RED) + the `test_orchestrate.py` liaison-gate section (the wiring + the real-envelope E2E).
+
 ## What is deliberately NOT here yet (deferred per the build sequence)
 
 - All four plan-domain authors are WIRED (workout S70; nutrition / supplements / peptides S71); the
   step-4 orchestrator reconciler — the nutrition→workout energy bounce + the RED-S/LEA cross-domain
   short-circuit + cross-domain overlap/conflict detection — is WIRED (S72); the supplement↔peptide
-  additive-AE screen (Phase-3 compound band) is WIRED (S73, behavior 4 above).
-- The **clinical-adjudication slice (S74)** — the held line's closer: the **medical-liaison terminal
-  safety gate** (Phase-4 — collates the doctor-visit queue + every risk HALT, runs BPMH reconciliation,
-  adjudicates the held additive-AE findings + author-declared conflicts + the supplement↔Rx axis before
-  operator approval). This is the gate that turns the clinician-gated compound DRAFTS (and the held
-  supplement) into operator-approvable plans. Until it lands, the reconciler's additive-AE screen HOLDS
-  (the safe no-stack state) and the overlap/conflict output is DETECT+REPORT.
+  additive-AE screen (Phase-3 compound band) is WIRED (S73, behavior 4 above); the **medical-liaison
+  terminal adjudication gate** for the held additive-AE finding is WIRED (S74, the section above); the
+  **author-conflict adjudication** (`cfaj`) is WIRED (S75 — `report["conflicts"]` HOLDS the declaring
+  domain + routes it through the SAME gate; verified E2E over a real medical-liaison conflict dispatch,
+  `liaison-conflict-cleared.example.json`); the **supplement↔Rx BPMH axis** (`rxbp`) is WIRED (S76 —
+  the operator medication-list read THROUGH the `router.summarize` PII de-identification boundary, as
+  de-identified Rx-interaction-class tokens never raw drug names, holds a class-stacking compound +
+  routes it through the SAME gate; verified E2E over real medical-liaison BPMH dispatches,
+  `liaison-rxbp-{cleared,blocked}.example.json`).
+- The **doctor-visit-queue DATA LAYER** is WIRED (S77, `scripts/store/queue_schema.py` +
+  `scripts/plan/orchestrate.py`): a `dvq::queue` store stream (disjoint namespace; the store-adversarial
+  battery — cross-stream, dedupe, mutation — is in `tests/store/test_queue_schema.py`) and
+  `collate_doctor_visit_queue(result, on_date, root)`, which records each ADJUDICATED safety finding
+  (additive-AE + every conflict-held + every Rx-BPMH-held domain's finding, cleared-via-override OR
+  block-stands) as a severity-ranked queue entry (non-overridable auto-block first, then HIGH, then
+  MEDIUM); the queued `finding_id` + `caution` match the adjudicated finding verbatim. Verified over a
+  real medical-liaison collation dispatch (`doctor-visit-queue-collated.example.json`): the liaison's
+  ranking agrees with the code on the safety-tier lead, refining intra-band clinically at dispatch.
+  Until the render lands, the reconciler holds the additive-AE supplement + a conflict-declaring domain
+  + a BPMH-matched compound (cleared only via the liaison gate), overlap output stays DETECT+REPORT, and
+  the queue persists the adjudicated findings for the MD handout.
+- The closed-loop **measure leg + adjust read-back** is WIRED (S78, `scripts/plan/track.py`): `record_tracking`
+  is the production caller for `plan_schema.record_plan_tracking` (the no-production-caller gap) — it
+  records one operator-OBSERVED tracking snapshot against a domain's plan, with the honest no-plan-to-track
+  boundary (a domain with no recorded plan has nothing to have been done — records nothing); and
+  `resolve_plan_progress` joins the plan + tracking into the plan-vs-actual view the re-plan + dashboard
+  read. Tracking is operator-observed (no agent dispatch in this flow); verified by the closed-loop E2E
+  (`generate_plan` → `record_tracking` → `resolve_plan_progress`). The remaining surfaces, deferred to
+  their own sessions, are the design-led **rendered SBAR handout** (Pencil + operator sign-off + the design
+  agents, never originated solo) and the adjust leg's domain-specific **progression algorithm** (how a
+  specialist changes the prescription from the progress — a specialist-reasoning surface, not invented solo).
 - The `/generate-plan` slash-command/skill wrapper (the orchestrator is wired as the `generate_plans`
   callable the interactive main agent invokes; the command surface is a later convenience).
 - A standalone full-plan render screen (the dashboard plan card is Slice 1's surface; the operator is

@@ -1,0 +1,129 @@
+{
+  "phase": "3.5",
+  "verdict": "PASS",
+  "timestamp": "2026-06-19T15:50:33.162678+00:00",
+  "mode_threshold": 99,
+  "iterations": 2,
+  "judge_verdicts": [
+    {
+      "section": "A",
+      "retrieve_agent_id": "retrieve-A-iter1",
+      "judge_agent_id": "judge-A-iter1",
+      "brief_hash": "a843ca273a71a83ecfcebf22a8fd0c172c056181a5f7f30c744a4344714cc59a",
+      "score": 99,
+      "verdict": "PASS",
+      "iteration": 1
+    },
+    {
+      "section": "B",
+      "retrieve_agent_id": "retrieve-B-iter1",
+      "judge_agent_id": "judge-B-iter1",
+      "brief_hash": "af04ba7089c006820dff900faee78878f62d8c71a6a544a2983e74d8da1ca165",
+      "score": 99,
+      "verdict": "PASS",
+      "iteration": 1
+    },
+    {
+      "section": "C",
+      "retrieve_agent_id": "retrieve-C-iter2",
+      "judge_agent_id": "judge-C-iter2",
+      "brief_hash": "657ca3a22de608e5dcd962475619a8791e7352e281225d3ce8772a7d8566a743",
+      "score": 99,
+      "verdict": "PASS",
+      "iteration": 2
+    },
+    {
+      "section": "D",
+      "retrieve_agent_id": "retrieve-D-iter1",
+      "judge_agent_id": "judge-D-iter1",
+      "brief_hash": "5ac6825bebe64e128323333be624268debe0b9c10702df42bccabe6a35ef9b57",
+      "score": 99,
+      "verdict": "PASS",
+      "iteration": 1
+    },
+    {
+      "section": "E",
+      "retrieve_agent_id": "retrieve-E-iter1",
+      "judge_agent_id": "judge-E-iter1",
+      "brief_hash": "9073e7e744076ae3372ea74e26f9065e17d273fb4338804326a1a330aa9bc281",
+      "score": 100,
+      "verdict": "PASS",
+      "iteration": 1
+    },
+    {
+      "section": "F",
+      "retrieve_agent_id": "retrieve-F-iter2",
+      "judge_agent_id": "judge-F-iter2",
+      "brief_hash": "e2584d1fce17520155ba047868e67f86f649c3dfe445a7dfff4584c5f299ad4f",
+      "score": 99,
+      "verdict": "PASS",
+      "iteration": 2
+    },
+    {
+      "section": "G",
+      "retrieve_agent_id": "retrieve-G-iter2",
+      "judge_agent_id": "judge-G-iter2",
+      "brief_hash": "4bb501b3cab2bc0baa6b3ddf0b0cc7aca8219d24b33f98a1b8cc456f4fe69593",
+      "score": 99,
+      "verdict": "PASS",
+      "iteration": 2
+    }
+  ],
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-19T15:41:57.121468+00:00",
+    "attest_ts": "2026-06-19T15:50:33.162681+00:00",
+    "iteration": 1,
+    "judge_sources": [
+      {
+        "section": "A",
+        "iteration": 1,
+        "sha256": "da757e988d8dc54410c0f76d3247c3da6e893e534e35b8a57be8592ccf01ecd0",
+        "path": "judges/judge-A.json",
+        "mtime": "2026-06-19T15:43:55.123660+00:00"
+      },
+      {
+        "section": "B",
+        "iteration": 1,
+        "sha256": "8f162aaca006ac685b13be4f66e96409a6cd42ecc60fb0c08860b7b5b844e71d",
+        "path": "judges/judge-B.json",
+        "mtime": "2026-06-19T15:44:09.957234+00:00"
+      },
+      {
+        "section": "C",
+        "iteration": 2,
+        "sha256": "4fc20942c691025cd1ccabcc600d63c763401acbe07da77f35b5e8e11f8d03fa",
+        "path": "judges/judge-C.json",
+        "mtime": "2026-06-19T15:49:52.598682+00:00"
+      },
+      {
+        "section": "D",
+        "iteration": 1,
+        "sha256": "71bd4fdf294a2c7e060d4d04cf289b7b5f1c9a664ebdf664f442e7d2f2aa797c",
+        "path": "judges/judge-D.json",
+        "mtime": "2026-06-19T15:44:43.990407+00:00"
+      },
+      {
+        "section": "E",
+        "iteration": 1,
+        "sha256": "c0d5f0b018011d5fddf5939f29bcc05842abddad253c0fbcd72e3a90d94476db",
+        "path": "judges/judge-E.json",
+        "mtime": "2026-06-19T15:45:02.243999+00:00"
+      },
+      {
+        "section": "F",
+        "iteration": 2,
+        "sha256": "6e1996183462126fffae0473089bd1a3b14bc50d2c79d574c494ebc0543f4f77",
+        "path": "judges/judge-F.json",
+        "mtime": "2026-06-19T15:50:00.620936+00:00"
+      },
+      {
+        "section": "G",
+        "iteration": 2,
+        "sha256": "569a8804fa405073b24cc7881524f19674b2dca4a9660babf7a5730a297c5d62",
+        "path": "judges/judge-G.json",
+        "mtime": "2026-06-19T15:50:07.611529+00:00"
+      }
+    ]
+  }
+}

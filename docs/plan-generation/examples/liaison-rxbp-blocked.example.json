@@ -1,0 +1,10 @@
+{
+  "_comment": "REAL captured medical-liaison adjudication envelope (S76, rxbp). The deployed medical-liaison, full profile inlined, adjudicated a held supplement<->Rx BPMH finding where the synthetic operator is on warfarin 5 mg/day — an oral anticoagulant with a NARROW THERAPEUTIC INDEX and INR monitoring, prescribed for a prior VTE (bleeding-risk class) — stacked with high-dose fish oil 2 g/day (bleeding-risk; can potentiate vitamin-K-antagonist anticoagulation and shift INR). This is the vitamin-K/warfarin watchlist pairing named in the liaison's Core Rule 4. The liaison assessed harm_class H2 (life-threatening: worst-case-reachable GI/intracranial hemorrhage + INR destabilization), grounding the H2 against the project's OWN substrate (design/supplement-specialist-design.md F-03 classes the vitamin-K/warfarin axis H2), composite_band CRITICAL. Per Core Rule 2 / the do-not-self-finalize HALT / INV-CRITICAL-NON-OVERRIDABLE this is mechanical-auto-block-per-R3 with a NULL override path — the operator's informed-refusal does NOT lower the band, and the block STANDS non-overridable. The orchestrator's adjudicate() confirms block-stands and the supplement remains held. The SAME finding_id that liaison-rxbp-cleared.example.json (aspirin -> HIGH/H3) clears: the BPMH gate's marquee discrimination on the specific medication.",
+  "finding_id": "rx-bpmh:supplements:bleeding-risk",
+  "status": "auto-block-preserved",
+  "composite_band": "CRITICAL",
+  "harm_class": "H2",
+  "verdict": "BLOCK",
+  "severity_final": {"set_by": "mechanical-auto-block-per-R3", "verdict": "BLOCK", "override_path": null},
+  "override_record": null
+}
