@@ -1,0 +1,27 @@
+{
+  "section": "B",
+  "brief_hash": "ae98572697962bc53272c2a819b5fed72e3bab00b4585e3e61adbf5f4bee89c4",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 97,
+    "type_tag_discipline": 98,
+    "population_annotation": 96,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 97
+  },
+  "total": 97,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "FLAG_WHITELIST",
+      "blocking": false,
+      "description": "acpjournals.org (the authoritative full-text host for Annals of Internal Medicine, ACP/Atypon platform) is NOT on the source whitelist. The Prati 2002 citation (PMID 12093239) is correctly routed through pubmed.ncbi.nlm.nih.gov (Tier 1, whitelisted), so no HALT. However, acpjournals.org should be added to the Tier 1 whitelist to allow future direct-host citation of Ann Intern Med and other ACP journals."
+    }
+  ],
+  "summary": "Section B is a well-constructed, fully-cited treatment of the ALT reference-range debate: conventional ULN heterogeneity, the Prati 2002 landmark (30/19 U/L thresholds, PMID 12093239 verified — first author Daniele Prati, correct co-author list, correct journal/pages/DOI), Ruhl/NHANES 29/22 U/L corroboration, Lee 2010 biopsy-confirmed Korean cohort, ACG 2017 Kwo et al. synthesis (PMID 27995906 verified — first author Paul Y. Kwo, co-authors Cohen + Lim, Am J Gastroenterol 112(1):18-35, journals.lww.com whitelisted), and AASLD 2018 Terrault — all attributed correctly with accurate thresholds, appropriate type tags, and consistent U/L units; one non-blocking host-whitelist flag for acpjournals.org."
+}

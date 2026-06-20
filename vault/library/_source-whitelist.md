@@ -76,6 +76,10 @@ Always admissible. Cite as `rct`, `meta_analysis`, `cohort`, `open_label`, `anim
 - `sagepub.com` / `journals.sagepub.com` (SAGE — peer-reviewed journals incl. Annals of Clinical Biochemistry; added 2026-06-19 wiki-research)
 - `scielo.br` (SciELO Brazil — open-access peer-reviewed journals incl. Archives of Endocrinology and Metabolism (SBEM); PMC-indexed; added 2026-06-19 wiki-research)
 - `e-alm.org` (Annals of Laboratory Medicine — Korean Society for Laboratory Medicine, peer-reviewed, PMC-indexed; added 2026-06-19 wiki-research)
+- `journals.lww.com` / `lww.com` (Wolters Kluwer / Lippincott Williams & Wilkins — major medical publisher; American Journal of Gastroenterology (ACG), Hepatology (print), and many flagship peer-reviewed journals; added 2026-06-20 wiki-research, CMP cluster)
+- `acpjournals.org` (American College of Physicians — Annals of Internal Medicine; added 2026-06-20 wiki-research)
+- `biochemia-medica.com` (Biochemia Medica — Croatian Society of Medical Biochemistry, peer-reviewed, PMC-indexed; added 2026-06-20 wiki-research)
+- `cell.com` (Cell Press / Elsevier — Cell, Cell Reports, Cell Metabolism, and other flagship peer-reviewed journals; added 2026-06-20 wiki-research)
 - `biorxiv.org` (preprint — admissible but flag as `not-peer-reviewed`)
 - `medrxiv.org` (preprint — same)
 
