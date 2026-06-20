@@ -1,0 +1,21 @@
+{
+  "section": "C",
+  "brief_hash": "2ecb2b9d5932081aab06b6788065678f0fcb5bb9545f74b551eea7043c6267be",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 96,
+    "type_tag_discipline": 90,
+    "population_annotation": 93,
+    "route_fidelity": null,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 97
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section C is a well-constructed, fully sourced treatment of DHEA-S measurement and standardization: the Büttler 7-assay comparison (PMID 23665079, slope range 0.84–1.28, verified first author Rahel M Büttler + co-authors Kruit/Blankenstein/Heijboer), the CDC-HoSt standardization gap, the no-diurnal-variation pre-analytic advantage with half-life mechanistic reasoning (Rosenfeld PMID 123927, verified RS Rosenfeld + Rosenberg/Fukushima/Hellman), and the biotin/heterophile/cross-reactivity interference directions are all present and correctly sourced; Middle 2007 (PMID 17362583, solo author Jonathan G Middle, Ann Clin Biochem — sagepub.com whitelisted) verified; all 10 bibliography hosts are whitelisted; no bare citations; type_tag_discipline scores 90 rather than higher because Rosenfeld 1975 and Krasowski 2014 are primary observational/experimental studies tagged mechanism_review rather than the stricter cohort designation, though both are defensible given the mechanistic-characterization nature of the findings."
+}

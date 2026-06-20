@@ -1,0 +1,21 @@
+{
+  "section": "A",
+  "brief_hash": "ca05025c204b831ff0fca502c64ba48fe57c041e2c09fe8f4e06f4b2ce723f23",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 94,
+    "type_tag_discipline": 92,
+    "population_annotation": 93,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 93,
+    "completeness_vs_brief": 97
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section A is mechanistically sound and bibliographically clean: all five cited sources are Tier 1 whitelisted (Diabetologia, Diabetes Care), first-author surnames and PMIDs for [1] and [2] verified against PubMed, formula constants (22.5 / 405) correct and internally consistent, hepatic-predominance claim accurately grounded in Tripathy [2], and all required rubric elements (HOMA1 vs HOMA2, proinsulin/renal-loss corrections, HOMA-%S/%B, clamp-needed caveat) present. Two sub-threshold notes not rising to HALT: (a) [4] Levy 1998 carries tag `cohort` but is a 2-page correction letter — `mechanism_review` would be more precise, though the rubric permits `cohort` for model/validation papers; (b) the text attributes the 40% variance finding to 'subjects with impaired glucose tolerance' whereas Tripathy's IFG/IGT subgroup includes both IFG and IGT, a minor terminological imprecision that does not misrepresent the finding."
+}

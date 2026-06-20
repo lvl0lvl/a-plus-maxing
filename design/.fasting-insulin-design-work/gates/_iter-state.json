@@ -1,0 +1,73 @@
+{
+  "3.5": {
+    "phase_iterations": [
+      {
+        "iteration": 1,
+        "iter_start_ts": "2026-06-19T15:18:33.114821+00:00"
+      }
+    ],
+    "sections": {
+      "A": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-06-19T17:46:32.683484+00:00",
+          "section": "A"
+        },
+        {
+          "iteration": 2,
+          "iter_start_ts": "2026-06-19T17:51:12.510809+00:00",
+          "section": "A"
+        },
+        {
+          "iteration": 3,
+          "iter_start_ts": "2026-06-19T17:54:46.151077+00:00",
+          "section": "A"
+        }
+      ],
+      "B": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-06-19T17:46:32.741713+00:00",
+          "section": "B"
+        }
+      ],
+      "D": [
+        {
+          "iteration": 1,
+          "iter_start_ts": "2026-06-19T17:46:32.798548+00:00",
+          "section": "D"
+        },
+        {
+          "iteration": 2,
+          "iter_start_ts": "2026-06-19T17:56:58.741371+00:00",
+          "section": "D"
+        },
+        {
+          "iteration": 3,
+          "iter_start_ts": "2026-06-19T18:04:58.515457+00:00",
+          "section": "D"
+        }
+      ]
+    }
+  },
+  "4.25": [
+    {
+      "iteration": 1,
+      "iter_start_ts": "2026-06-19T18:07:54.239983+00:00"
+    },
+    {
+      "iteration": 2,
+      "iter_start_ts": "2026-06-19T18:13:20.457436+00:00"
+    }
+  ],
+  "4.75": [
+    {
+      "iteration": 1,
+      "iter_start_ts": "2026-06-19T18:07:54.294866+00:00"
+    },
+    {
+      "iteration": 2,
+      "iter_start_ts": "2026-06-19T18:19:24.383825+00:00"
+    }
+  ]
+}

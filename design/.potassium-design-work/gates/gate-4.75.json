@@ -1,0 +1,75 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "WARN"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 0
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 31,
+    "largest_cluster_count": 2,
+    "share": 0.065,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 16,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: 9 paywall-limited corpus-missing WARNs \u2014 Montague 18%/52% sensitivity + 55-62% physician-reader figures (PMID 18235147 full text); Goyal OR 6.44 for K+\u22655.5 (PMID 22235086 full-text table); ZS-9 80-94% normokalemia (PMID 25415807 full text); hemolysis \u0394K figures for DiToro/Balasubramanian/Koseoglu (all confirmed real papers, abstract-level); ~98% intracellular and 30-40:1 gradient (Gumz NEJM full text). All parent papers confirmed real; no number-not-found failures."
+  ],
+  "iterations": 1,
+  "timestamp": "2026-06-20T06:35:05.797843+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T06:29:40.933668+00:00",
+    "attest_ts": "2026-06-20T06:35:05.797846+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "55bae1995a52a5ee1729b2171da01edde91fbdf50fa608824038d0a907fdd715",
+    "agent_source_mtime": "2026-06-20T06:34:39.083580+00:00"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 0
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 4,
+    "largest_cluster_count": 1,
+    "share": 0.25,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 13,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-10-WARN: Section A bibliography entry [7] (Tomlinson 2004, PMID 15466942) has no corresponding inline citation in section body \u2014 dangling bib entry. Not a fabrication; PMID is real.",
+    "IC-13-WARN: Item 3 \u2014 Bornstein 26760044 ACTH-stim 18 \u00b5g/dL threshold: corpus-missing (paywall); directional claim plausible from guideline context; no contradiction.",
+    "IC-13-WARN: Item 4 \u2014 Krasowski 25071417 cross-reactivity 148%/249%: abstract confirms high cross-reactivity for prednisolone/methylprednisolone on Roche Elecsys; exact percentages are in full-text tables; no contradiction detected.",
+    "IC-13-WARN: Item 7 \u2014 Cadegiani 27557747 percentages 51.9%/65.5%/61.5%: study counts (27/29/26) confirmed; derived percentages require full-text table verification; no contradiction detected.",
+    "IC-13-WARN: Item 11 \u2014 Stalder 39177247 CAR surge 50\u2013156%: 30\u201345 min timeframe confirmed; specific percentage range requires full-text verification; no contradiction detected."
+  ],
+  "iterations": 1,
+  "timestamp": "2026-06-20T00:30:35.950627+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T00:26:28.856028+00:00",
+    "attest_ts": "2026-06-20T00:30:35.950631+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "0dac81ff82ccba851927bf33abe44876679941ba3e0db1f2563febc6c8bfed42",
+    "agent_source_mtime": "2026-06-20T00:30:16.468401+00:00"
+  }
+}

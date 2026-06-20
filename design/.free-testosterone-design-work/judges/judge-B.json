@@ -1,0 +1,21 @@
+{
+  "section": "B",
+  "brief_hash": "58a5c1f333673c54118cb44d10a080f2515f4c2353d62c524d68aabe7e3023dc",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 95,
+    "type_tag_discipline": 97,
+    "population_annotation": 94,
+    "route_fidelity": null,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 95,
+    "completeness_vs_brief": 95
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "All four prior defects confirmed fixed: the five off-enum '[primary]' tags are now correctly '[cohort]' (Vermeulen, Södergård, Fritz, Chen, Travison); Jasuja first author corrected to 'R'; the garbled conversion example replaced with the clean '100 pg/mL = 10 ng/dL = 347 pmol/L (100 × 3.467)'; and the pmol/L orientation for the 46–224 pg/mL clinical range is present (~160–776 pmol/L). No bare [N] tags found; all tags are within the 12-enum. Total 95 exceeds threshold 92; verdict PASS."
+}

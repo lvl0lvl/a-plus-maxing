@@ -77,7 +77,7 @@ Measurable values: blood panels, wearable metrics, functional tests, subjective 
 - source: lab | wearable | manual | calculation
 - confidence: established | supported | provisional
 - last_verified: YYYY-MM-DD
-- review_cadence: monthly | quarterly | per-lab-panel
+- review_cadence: monthly | quarterly | per-lab-panel | per-wearable-sync
 
 ## Target Range
 - ideal: x-y

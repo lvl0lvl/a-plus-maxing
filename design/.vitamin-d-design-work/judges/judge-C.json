@@ -1,0 +1,40 @@
+{
+  "section": "C",
+  "brief_hash": "714a231a207741291e0de786d6e1fef644823216e0d197df19b5e554f47fb342",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 97,
+    "type_tag_discipline": 74,
+    "population_annotation": 95,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 97
+  },
+  "total": 93,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "id": "C-TTD-01",
+      "severity": "non-halting",
+      "dimension": "type_tag_discipline",
+      "location": "§C.1, inline cite for ref [2] (DBP-interference bullet)",
+      "description": "Inline tag reads '[2, mechanism_review]' but bibliography ref [2] (Heijboer AC et al., Clin Chem 2012, PMID 22247500) assigns 'tag: cohort'. The Heijboer study is an accuracy-comparison study of six routine assays in clinical patient groups, not a mechanism review. Inline must read '[2, cohort]' to match the bibliography tag."
+    },
+    {
+      "id": "C-TTD-02",
+      "severity": "non-halting",
+      "dimension": "type_tag_discipline",
+      "location": "§C.1, inline cite for ref [4] (LC-MS/MS epimer-resolving sentence)",
+      "description": "Inline tag reads '[4, mechanism_review]' in the LC-MS/MS paragraph ('A modified LC-MS/MS protocol…can additionally resolve 3-epi-25(OH)D3'), but bibliography ref [4] (Singh RJ et al., JCEM 2006) assigns 'tag: cohort', and §C.3 correctly cites it as '[4, cohort]'. A single reference cannot carry two different inline tags across sections. Correct the §C.1 instance to '[4, cohort]'."
+    }
+  ],
+  "webfetch_confirmations": {
+    "PMID_34010687": "CONFIRMED — first author Wise SA (Stephen A Wise); author order Wise SA, Camara JE, Sempos CT verified; J Steroid Biochem Mol Biol 2021; VDSP intralaboratory assay variability and bias study.",
+    "PMID_22247500": "CONFIRMED — first author Heijboer AC (Annemieke C Heijboer); authors Heijboer AC, Blankenstein MA, Kema IP, Buijs MM; Clin Chem 2012; subject: accuracy of six routine 25(OH)D assays and influence of DBP concentration — this is the correct DBP-assay-accuracy study, not a physics paper."
+  },
+  "summary": "Section C passes at 93/100 (threshold 92). All three prior HALT defects are resolved: ref [1] author order is now correct (Wise SA first, WebFetch-confirmed PMID 34010687), ref [5] J AOAC Int inline tag is consistently '[5, cohort]' throughout, and ref [2] Heijboer is now a clean standard bibliography entry at PMID 22247500 (WebFetch-confirmed as the Clin Chem 2012 DBP-assay-accuracy study). Two non-halting type-tag discipline defects remain: ref [2] inline in §C.1 reads '[2, mechanism_review]' but bib assigns 'cohort', and ref [4] inline in §C.1 reads '[4, mechanism_review]' but bib assigns 'cohort' (§C.3 correctly uses '[4, cohort]'). These should be corrected before final wiki ingest but do not block passage."
+}

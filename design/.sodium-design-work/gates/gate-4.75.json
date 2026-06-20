@@ -1,0 +1,88 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "WARN"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "WARN"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 0
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 12,
+    "largest_cluster_count": 1,
+    "share": 0.08,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 13,
+    "claims_failed": [
+      {
+        "claim": "Sterns 1986 studied 60 patients with serum sodium below 116 mmol/L [D:10, cohort]",
+        "cite_key": "sterns-1986-pmid3713747",
+        "failure_mode": "paraphrase-no-token-match",
+        "grep_command": "PubMed abstract fetch PMID 3713747",
+        "grep_output": "Abstract states 'eight patients' and threshold '<106 mmol/L'; '116 mmol/L' and '60 patients' not confirmed in abstract text"
+      }
+    ]
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-10: Section A cite [4] Ranieri et al. F1000Research 2019 (PMID 30800291) hosted at f1000research.com \u2014 not on source whitelist; grounds mechanism only (AQP2/V2 cascade), no numerical claim attached; WARN not HALT",
+    "IC-10: Arzhan et al. bib DOI 10.34067/KID.0007272021 resolves via redirect to journals.lww.com with 402 paywall; PMID 35919520 verified on PubMed with all claimed numbers confirmed; minor DOI variant possible between prepress and final assignment",
+    "IC-13: paraphrase-no-token-match \u2014 Section D Sterns 1986 description states 'below 116 mmol/L' but PubMed abstract states '<106 mmol/L'; '60 patients' not confirmed in abstract (abstract says 'eight patients' with ODS); core threshold finding (>12 mmol/day) confirmed",
+    "IC-13: corpus-missing (paywall) \u2014 Katrangi 2019 JALM PMID not in bib, DOI 10.1373/jalm.2018.028720; claims -6.1 mmol/L and 70% figure unverifiable from abstract",
+    "IC-13: corpus-missing (paywall) \u2014 Dimeski 2006 Clin Chemistry DOI 10.1373/clinchem.2005.054981; ~1 mmol/L per 10 mmol/L triglyceride claim unverifiable from abstract",
+    "IC-13: corpus-missing (CAPTCHA) \u2014 Bastos 2023 J Bras Nefrol PMID 37523718; 10.4% / 96 ODS cases claim unverifiable from abstract"
+  ],
+  "iterations": 1,
+  "timestamp": "2026-06-20T05:50:31.568471+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T05:44:33.118906+00:00",
+    "attest_ts": "2026-06-20T05:50:31.568474+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "bf3d2a09fad4874a1408c07d1565635f046035cf940b6eef42a1821a569998d6",
+    "agent_source_mtime": "2026-06-20T05:49:43.464785+00:00"
+  }
+}

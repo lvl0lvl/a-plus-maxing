@@ -1,0 +1,21 @@
+{
+  "section": "D",
+  "brief_hash": "a4e1d2f2451774428d7e05656f28de2cb9467597f32631b3cb6b4241e60b320f",
+  "iteration": 4,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 96,
+    "type_tag_discipline": 96,
+    "population_annotation": 96,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 96
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "All 15 bibliography entries now carry confirmed first authors, PMIDs, and DOIs following the completed PubMed verification round; [7] Gast KB spot-checked live and returned exact author, N=516,325, 65 studies, and HOMA-IR RR 1.64 (1.35–2.00) matching the text verbatim. The section covers every brief-required domain (earliest-marker trajectory, four outcome clusters with named cohorts and verified effect sizes, determinants raising/lowering, assay-standardization and single-point limitations) with internally consistent reasoning and no tag-discipline violations."
+}

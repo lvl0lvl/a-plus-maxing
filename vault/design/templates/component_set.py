@@ -20,6 +20,8 @@ from the decision, not from here).
 """
 
 import datetime
+import re
+from pathlib import Path
 
 from scripts.store import biomarker_meta
 
@@ -700,3 +702,119 @@ def _escape(text):
         .replace("'", "&#39;")
         .replace('"', "&quot;")
     )
+
+
+# --- Physician-artifact shared helpers (report + handout) -------------------
+# The face sheet and the doctor-visit handout are sibling one-page print
+# artifacts. The header profile read (initials-only — the data-out PII rule),
+# the long-date format, and the colored source-tier legend are IDENTICAL across
+# both, so they live here ONCE: a single enforcement point for "the operator
+# renders as INITIALS only, never the full name" (a public-repo health-tool
+# rule that must not diverge between templates).
+
+# The self-reported tier's base amber — the facesheet-v3 spec's ONE unregistered
+# hex: non-text tier chrome only (glyph fills, stat-box top edges), never text
+# (tier TEXT renders the registered `*-text` shades).
+_SELF_REPORTED_BASE = "#B7791F"
+
+# Source tier -> (glyph, non-text base chrome, AA text shade). Glyph SHAPES are
+# distinct so monochrome print preserves the tiers (facesheet spec): ◆ lab-grade,
+# ● consumer wearable, ○ self-reported.
+TIER_CHROME = {
+    "lab-grade": ("◆", ACCENTS["training"], CHROME["training-text"]),
+    "consumer wearable": ("●", ACCENTS["supplements"], CHROME["supplements-text"]),
+    "self-reported": ("○", _SELF_REPORTED_BASE, CHROME["watch-text"]),
+}
+
+# Reading source tag -> tier. Only the sources that exist are mapped
+# (loop_schema's biomarker writer tags "manual" = operator-entered =
+# self-reported); an unmapped source renders NO tier claim — a gap is stated,
+# never inferred. Lab-grade/wearable land here when those ingest sources exist.
+SOURCE_TIERS = {"manual": "self-reported"}
+
+
+def read_profile(profile_paths):
+    """Parse a physician artifact's header fields from the first existing profile.
+
+    Reads the FIRST existing `profile_paths` entry (the caller orders them: the
+    gitignored ADR-0005 filled copy first, then the tracked scaffold). Returns
+    INITIALS (from the profile title — never the full name; the data-out PII
+    rule), the age BAND (decade, e.g. `40s`, from a filled, plausible Age — the
+    exact age never renders), and the issue status (a filled Current status). An
+    unfilled scaffold prompt (`<...>`) or absent field reads None, and no profile
+    file at all reads all-None — the header renders its em-dash awaiting slots
+    either way (ADR-0009 D2 honest absence; a fresh clone still generates).
+
+    Args:
+        profile_paths (tuple): The candidate profile `Path`s in preference order —
+            a non-empty tuple of `Path` (the empty tuple `()` reads all-None).
+            Passing None, or entries that are not `Path`, is a caller error and is
+            not coerced.
+
+    Returns:
+        (dict) Keys `initials`, `age_band`, `issue_status`; None = unfilled.
+    """
+    fields = {"initials": None, "age_band": None, "issue_status": None}
+    path = next((p for p in profile_paths if p.exists()), None)
+    if path is None:
+        return fields
+    text = path.read_text(encoding="utf-8")
+    title = re.search(r"^# Operator Profile — (.+)$", text, re.M)
+    if title:
+        initials = "".join(
+            word[0].upper() for word in title.group(1).split() if word[0].isalpha()
+        )
+        fields["initials"] = initials or None
+    age = re.search(r"^- \*\*Age:\*\* (.+)$", text, re.M)
+    if age:
+        years = re.match(r"(\d+)", age.group(1).strip())
+        # Plausible-age bound: a DOB-shaped value ("1982-03-15" -> 1982) or a
+        # zero is not an age in years — render the em-dash, never a fabricated
+        # band like "1980s" (ADR-0009 D2).
+        if years and 0 < int(years.group(1)) < 120:
+            fields["age_band"] = f"{int(years.group(1)) // 10 * 10}s"
+    status = re.search(r"^- \*\*Current status:\*\* (.+)$", text, re.M)
+    if status:
+        value = status.group(1).strip()
+        if value and not value.startswith("<"):
+            fields["issue_status"] = value
+    return fields
+
+
+def long_date(day):
+    """Format a date in the physician artifacts' long form, e.g. `June 12, 2026`."""
+    return f"{MONTH_NAMES[day.month - 1]} {day.day}, {day.year}"
+
+
+def tier_markup(tier, with_word=False):
+    """Render a source tier's glyph span in its base chrome, plus a trailing space.
+
+    Args:
+        tier (str): A `TIER_CHROME` key.
+        with_word (bool, optional): Append the tier word in its AA `*-text` shade
+            (the page-2 captions and the footer legend form).
+
+    Returns:
+        (str) The assembled tier markup.
+    """
+    glyph, base, text = TIER_CHROME[tier]
+    markup = f"<span style='color:{base}'>{glyph}</span> "
+    if with_word:
+        markup += f"<span style='color:{text}'>{tier}</span>"
+    return markup
+
+
+def tier_glyph(source):
+    """Render a reading source's tier glyph (non-text chrome), or '' if unmapped.
+
+    Only a mapped source renders a glyph — an unmapped source states no tier.
+    """
+    tier = SOURCE_TIERS.get(source)
+    if tier is None:
+        return ""
+    return tier_markup(tier)
+
+
+def tier_legend():
+    """Render the colored source-tier legend: glyph + word per tier (footer form)."""
+    return " · ".join(tier_markup(tier, with_word=True) for tier in TIER_CHROME)

@@ -1,0 +1,21 @@
+{
+  "section": "D",
+  "brief_hash": "86b630b158f65ddc658f8dff420191f8560c00d427a79e97c715246a5f0a8c74",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 95,
+    "type_tag_discipline": 96,
+    "population_annotation": 98,
+    "route_fidelity": null,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 98
+  },
+  "total": 97,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "All iter-1 remediation confirmed: 39%/54% nephropathy figures now carry 'across both cohorts combined' label matching PMID 8366922 combined-cohort results; [2] inline tag is now mechanism_review matching the bibliography; DCCT start year corrected to 1982. Bib [5] Bergenstal Ann Intern Med 2017 167(2):95-102 (PMID 28605777) verified correct via WebFetch — 0.4% racial offset figure and journal attribution accurate. All 15 citations are Tier 1 whitelisted sources; every trial effect size names the trial with correct rct/cohort/meta_analysis tag; no bare [N] citations; population n and setting annotated throughout; all brief elements covered."
+}

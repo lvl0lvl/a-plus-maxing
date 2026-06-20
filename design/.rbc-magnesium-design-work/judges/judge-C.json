@@ -1,0 +1,21 @@
+{
+  "section": "C",
+  "brief_hash": "b783d4d1078de91357e0cf8ca17b958f9649fc93608dcd705c45dd831d5ac6bf",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 93,
+    "citation_fidelity": 95,
+    "type_tag_discipline": 92,
+    "population_annotation": 97,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 95
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section C covers all load-bearing brief requirements — 5-step RBC procedure, 3 normalization conventions, the Bithi 2024 two-interval-in-one-lab illustration, hemolysis-falsely-elevates and EDTA/citrate/oxalate-chelation-falsely-lows with mechanisms, ionized Mg/ISE, and the loading test — with every citation tagged, tiered, and sourced from whitelisted hosts. Spot-checks on Bithi 2024 (PMID 39469428), Lippi 2018 (PMID 29373316), Simundic 2018 (PMID 30004902), and Jahnen-Dechent 2012 (PMID 26069819) all verified first author, co-authors, DOI, and journal. Minor: ref [8] IFCC guideline carries tag 'mechanism_review' where 'regulatory' would be more precise for an issuing-body measurement standard, but this does not misrepresent the source's claims."
+}

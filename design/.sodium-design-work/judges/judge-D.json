@@ -1,0 +1,21 @@
+{
+  "section": "D",
+  "brief_hash": "4fa6d0d6a5bde5c972d88870e72f792e507a175b21ee098de02408d68e804bfb",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 98,
+    "citation_fidelity": 100,
+    "type_tag_discipline": 100,
+    "population_annotation": 99,
+    "route_fidelity": null,
+    "concentration_audit_handling": 98,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 94,
+    "completeness_vs_brief": 99
+  },
+  "total": 98,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section D passes at 98/100 across all 7 scored dimensions: the cite-renumber reconciliation is clean (all 10 inline [N, tag] pairs verified to resolve to the correct bib entry with matching enum tags), the three highest-stakes effect sizes (Almond PMID 15829535 OR 4.2/7.4, Waikar PMID 19699382 OR 1.47, Gheorghiade PMID 17309900 19.5%/3 mmol) were confirmed against PubMed and match exactly, every major cohort is named and N-annotated inline, Spasovski is correctly tagged `regulatory`, and the concentration/pseudohyponatremia/translocational interpretive-limitations layer is complete; a minor 6-point deduction on reasoning_integrity reflects the use of the older Katz glucose-correction factor (1.6 mmol/L per 5.6 mmol/L) rather than the updated Hillier figure (2.4 mmol/L per 5.6 mmol/L) noted in the Section B rubric, though this is not a Section D brief requirement and does not materially compromise the section."
+}

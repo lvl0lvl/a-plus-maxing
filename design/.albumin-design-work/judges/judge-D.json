@@ -1,0 +1,21 @@
+{
+  "section": "D",
+  "brief_hash": "2de9c9af38abf3d06036844bd9cc9b1a709892f1048280a8f27ff9e8b56c6d2f",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 98,
+    "type_tag_discipline": 99,
+    "population_annotation": 98,
+    "route_fidelity": null,
+    "concentration_audit_handling": 99,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 98,
+    "completeness_vs_brief": 98
+  },
+  "total": 98,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "All four iteration-1 defects confirmed fixed: Dove Press [3] removed and its three claims re-sourced to Soeters/ASPEN/Merlot (all whitelisted); Seidu CHD-death figure WebFetch-confirmed at RR 0.57 (95% CI 0.36-0.91) exact match; ACS meta now a direct primary cite (Zhu PMID 31815281, portlandpress.com whitelisted); JASN [5] on asnjournals.org now whitelisted. All 12 bib entries sequential, on-whitelist, carry full tag/tier suffix; every inline citation uses [N, tag] format with no bare references; causality caveat, ALBIOS null result, and Mendelian randomization nuance correctly stated."
+}
