@@ -113,11 +113,11 @@ Operator override of the two-pass triage model: **every peptide in the taxonomy 
 PR cycle. Deep-mode baselines (25+ sources / 10k words / 99 judge) hold; lower a ceiling ONLY
 with a documented evidence reason in `_research-log.md` (e.g. "total admissible Tier-1/2
 literature = N after exhaustive search"), never a guess.
-Order (BPC-157 done): **TB-500 ✅** → **GHK-Cu ✅** → **KPV ✅** → **LL-37 ✅** → Ipamorelin → CJC-1295 → Tesamorelin
+Order (BPC-157 done): **TB-500 ✅** → **GHK-Cu ✅** → **KPV ✅** → **LL-37 ✅ (PR #181)** → **Ipamorelin ✅** → CJC-1295 → Tesamorelin
 → Sermorelin → Hexarelin → MK-677 → Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank
 → Semax → Cerebrolysin → Dihexa → N-Acetyl-Selank-Amidate → PT-141 → Melanotan-II → Kisspeptin-10
 → Thymosin-α1 → Epitalon → FOXO4-DRI → Humanin → SS-31 → MOTS-c.
-**Next: Ipamorelin.** This sweep is the peptide-library track only — disjoint from the biomarker
+**Next (my/primary lane): CJC-1295.** (Sweep split across two sessions 2026-06-20 — primary session: top 12 incl. Ipamorelin✅; `feature/wiki-peptides`: bottom 13 [MOTS-c…Semax]. Neither deep-passes the other's set.) This sweep is the peptide-library track only — disjoint from the biomarker
 wiki-research session (`feature/wiki-research`) and the plan-generation track
 (`feature/compound-ae-screen`). See `_research-log.md` for per-entry DONE/CLAIMED status.
 
@@ -140,6 +140,7 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 | GHK-Cu | [[compounds/ghk-cu]] | **deep-passed 2026-06-19 (deep mode, all 7 gates attested PASS 2.75→8.5, chain intact). evidence_tier C / risk_tier experimental; human evidence TOPICAL-only (1 pos [Mulder] + 1 neg [Miller] RCT; no injectable/systemic human study); review-layer ~70-85% Pickart/Skin-Biology COI (efficacy-primary ~0.11); gene-reset/anti-cancer = cMap predictions; topical CIR-safe vs injectable copper-overload (Wilson's contraindication); WADA not-named (S0/S2 caveat).** |
 | KPV | [[compounds/kpv]] | **deep-passed 2026-06-19 (deep mode, all 7 gates attested PASS 2.75→8.5, chain intact). evidence_tier C / risk_tier experimental; α-MSH(11-13) anti-inflammatory tripeptide, MC-receptor-independent / PepT1; ENTIRELY preclinical — zero human studies; ~75% gut-IBD primaries single-lab (Merlin/GSU); antimicrobial contested; acne/gout = KdPT/(CKPV)₂ analogues not monomer; KPV≠KdPT; FDA removed from Cat-2 ~Apr 2026 (NOT approval); WADA not-named (S0).** |
 | LL-37 | [[compounds/ll-37]] | **deep-passed 2026-06-20 (deep mode, all 7 gates attested PASS 2.75→8.5, chain intact; + independent full-bib re-audit: 61/80 verified, 0 fabrications, 4 nits fixed). evidence_tier C / risk_tier experimental; human cathelicidin, genuinely DUAL-NATURED — antimicrobial/wound-healing AND psoriasis autoantigen / self-DNA→pDC→type-I-IFN disease driver + context-dependent cancer; 4 small human trials incl. Mahlapuu Phase IIb PRIMARY-NEGATIVE; FDA removed from Cat-2 ~Apr 2026 (NOT approval); WADA not-named (S0).** |
+| Ipamorelin | [[compounds/ipamorelin]] | **deep-passed 2026-06-20 (deep mode, all 7 gates attested PASS 2.75→8.5, chain intact; + independent full-bib audit 18/18 verified, 0 fabrications, 1 PMID fixed). evidence_tier C / risk_tier experimental; NNC 26-0161 selective GH-secretagogue (no cortisol/prolactin — ANIMAL-grounded); only human efficacy program (postop-ileus Phase 2, Beck 2014) FAILED → development discontinued; no approval, zero human efficacy for marketed uses; ~80% Novo-Nordisk single-lineage; FDA never approved / PCAC voted against Oct 2024 / NOT in Apr-2026 action; WADA S2.2 prohibited.** |
 
 ---
 

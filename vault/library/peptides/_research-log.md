@@ -149,7 +149,21 @@ a ceiling may be lowered only with a documented evidence reason here (no guessin
 ### Process note
 This entry was finished under the operator's "Step 0" trust protocol after a long inefficiency failure: independent re-verification of the existing draft FIRST (passed: 0 fabrications), then the 3 remaining gates run via the actual skill machinery, then PR opened for OPERATOR review/merge (not auto-merged).
 
-### NEXT (reserved): **Ipamorelin** (sweep entry 5), then CJC-1295 → Tesamorelin → … per [[_triage]] order.
+## 2026-06-20 — Ipamorelin (NNC 26-0161) deep-pass (sweep entry 5, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **Ipamorelin entry shipped:** `compounds/ipamorelin.md` + `library/peptides/ipamorelin/research-report.md` (~10.2K words, 31-entry bibliography) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections w/ id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Ran under the EFFICIENT calibration** (after the LL-37 inefficiency): lean single-pass, 6 sections, judge bar 92, genuine-defects-only, recurring-error self-checks in retrieval briefs. Result: 5/6 sections passed first-pass; gates caught real defects in ONE round each — E's wrong 12-peptide Apr-2026 list (MK-677→PEG-MGF), a Section-D **Wikipedia citation IC-12 HALT** (removed, re-grounded to registry+RCT). Final independent full-bib audit: 18/18 identifier entries verified, **0 fabrications, 0 Wikipedia**, 1 misattributed PMID fixed (37139855→37066827); compound-entry consistency PASS (no invented PMID this time).
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- "First SELECTIVE GH secretagogue" — GH without ACTH/cortisol/prolactin — but ANIMAL-grounded (Raun 1998), not human-proven.
+- Human evidence: acute PK/PD only (Gobburu 1999, IV); the sole efficacy program (postoperative ileus Phase 2, Beck 2014, n≈114, p=0.15) FAILED → Novo Nordisk/Helsinn discontinued development. No approval, no Phase 3, zero human efficacy for muscle/fat/anti-aging. Human PK IV-only (no human SC PK).
+- ~80% Novo-Nordisk single-lineage concentration (≥70% flag, surfaced first-class). Bone = content/area not volumetric BMD; intermittent dosing did NOT raise IGF-1 in rats.
+- FDA never approved; removed from 503A interim Cat-2 ~Sept 2024; PCAC voted AGAINST 503A bulks listing Oct 29 2024 (fluid-retention/hyperglycemia/CHF); NOT in the Apr-2026 FR 2026-07361 action. WADA S2.2 prohibited (named). Monitoring: IGF-1 (keep in age/sex range) + fasting glucose/HbA1c.
+- Canonical FR-2026-07361 removed-12 (verified, for cross-entry consistency): BPC-157, TB-500, Epitalon, GHK-Cu, MOTS-c, DSIP/Emideltide, Dihexa, **PEG-MGF**, Melanotan-II, KPV, Semax, LL-37 — **MK-677 is NOT in it** (a prior-entry error to watch).
+
+### NEXT (reserved, my/primary lane): **CJC-1295** (sweep entry 6), then Tesamorelin → Sermorelin → Hexarelin → MK-677 → Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
 
 ---
 

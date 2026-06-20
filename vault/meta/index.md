@@ -26,6 +26,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/ghk-cu]] (status: researching; evidence_tier: C; risk_tier: experimental)
 - [[compounds/kpv]] (status: researching; evidence_tier: C; risk_tier: experimental)
 - [[compounds/ll-37]] (status: researching; evidence_tier: C; risk_tier: experimental)
+- [[compounds/ipamorelin]] (status: researching; evidence_tier: C; risk_tier: experimental)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -108,6 +109,9 @@ _(none yet)_
 - [[library/peptides/ll-37/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~15K words; 80 entries; 7 paired-judge sections @99; gates 2.75→8.5 attested PASS; chain intact; independently re-audited [61/80 verified, 0 fabrications, 4 citation nits fixed])
 - [[library/peptides/ll-37/practitioner-layer]] (2026-06-20; SC/topical conventions; autoimmunity-autoantigen caution; no admissible compounding data sheet)
 - [[library/peptides/ll-37/non-english-layer]] (2026-06-20; 2 Russian + 3 Chinese genuine non-English primaries; Swedish-originator review)
+- [[library/peptides/ipamorelin/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~10.2K words; 31 entries; 6 sections; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 18/18 verified, 0 fabrications, 1 PMID fixed)
+- [[library/peptides/ipamorelin/practitioner-layer]] (2026-06-20; SC/CJC-1295-stack conventions; no admissible compounding data sheet — PCAC-rejected Oct 2024)
+- [[library/peptides/ipamorelin/non-english-layer]] (2026-06-20; 2 Russian + 1 Chinese (provisional) non-English; Danish-originator English-published)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)
