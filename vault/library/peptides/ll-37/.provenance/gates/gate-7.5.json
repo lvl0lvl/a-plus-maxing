@@ -1,0 +1,28 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "timestamp": "2026-06-20T15:16:34Z",
+  "iterations": 2,
+  "compound_risk_tier": "experimental",
+  "compound_entry_path": "vault/library/peptides/ll-37/research-report.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "placeholder-with-pointer"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "hs-CRP",
+    "ESR"
+  ],
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T15:14:57.586083+00:00",
+    "attest_ts": "2026-06-20T15:25:24.870038+00:00",
+    "iteration": 2,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "73cd2cd389ec2aefe1d412deb7d053d04f955fa702b07042fc70169919f849a9",
+    "agent_source_mtime": "2026-06-20T15:17:41.766292+00:00"
+  }
+}
