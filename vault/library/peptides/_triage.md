@@ -113,11 +113,11 @@ Operator override of the two-pass triage model: **every peptide in the taxonomy 
 PR cycle. Deep-mode baselines (25+ sources / 10k words / 99 judge) hold; lower a ceiling ONLY
 with a documented evidence reason in `_research-log.md` (e.g. "total admissible Tier-1/2
 literature = N after exhaustive search"), never a guess.
-Order (BPC-157 done): **TB-500 ✅** → **GHK-Cu ✅** → **KPV ✅** → LL-37 → Ipamorelin → CJC-1295 → Tesamorelin
+Order (BPC-157 done): **TB-500 ✅** → **GHK-Cu ✅** → **KPV ✅** → **LL-37 ✅ (PR #181)** → **Ipamorelin ✅ (PR #185)** → **CJC-1295 ✅** → Tesamorelin
 → Sermorelin → Hexarelin → MK-677 → Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank
 → Semax → Cerebrolysin → Dihexa → N-Acetyl-Selank-Amidate → PT-141 → Melanotan-II → Kisspeptin-10
 → Thymosin-α1 → Epitalon → FOXO4-DRI → Humanin → SS-31 → MOTS-c.
-**Next: LL-37.** This sweep is the peptide-library track only — disjoint from the biomarker
+**Next (my/primary lane): Tesamorelin.** (Sweep split across two sessions 2026-06-20 — primary session: top 12 incl. LL-37/Ipamorelin/CJC-1295✅; `feature/wiki-peptides`: bottom 13 [MOTS-c…Semax]. Neither deep-passes the other's set.) This sweep is the peptide-library track only — disjoint from the biomarker
 wiki-research session (`feature/wiki-research`) and the plan-generation track
 (`feature/compound-ae-screen`). See `_research-log.md` for per-entry DONE/CLAIMED status.
 
@@ -139,6 +139,7 @@ Peptides actively excluded with reason. Trigger column = what would warrant reop
 | TB-500 (Tβ4) | [[compounds/tb-500]] | **deep-passed 2026-06-19 (deep mode, all 7 gates attested PASS 2.75→8.5, chain intact). evidence_tier C / risk_tier experimental; marketed product is the Ac-LKKTETQ fragment ≠ studied full-length Tβ4; no human RCT met a primary endpoint; zero athletic human evidence; bidirectional (net solid-tumor pro-metastatic) cancer signal; single-lab share ~20% but 100% of clinical-translation in Goldstein/RegeneRx nexus; FDA removed from 503A Cat-2 ~Apr 2026 (FR 2026-07361, NOT approval); WADA-S2.3.** |
 | GHK-Cu | [[compounds/ghk-cu]] | **deep-passed 2026-06-19 (deep mode, all 7 gates attested PASS 2.75→8.5, chain intact). evidence_tier C / risk_tier experimental; human evidence TOPICAL-only (1 pos [Mulder] + 1 neg [Miller] RCT; no injectable/systemic human study); review-layer ~70-85% Pickart/Skin-Biology COI (efficacy-primary ~0.11); gene-reset/anti-cancer = cMap predictions; topical CIR-safe vs injectable copper-overload (Wilson's contraindication); WADA not-named (S0/S2 caveat).** |
 | KPV | [[compounds/kpv]] | **deep-passed 2026-06-19 (deep mode, all 7 gates attested PASS 2.75→8.5, chain intact). evidence_tier C / risk_tier experimental; α-MSH(11-13) anti-inflammatory tripeptide, MC-receptor-independent / PepT1; ENTIRELY preclinical — zero human studies; ~75% gut-IBD primaries single-lab (Merlin/GSU); antimicrobial contested; acne/gout = KdPT/(CKPV)₂ analogues not monomer; KPV≠KdPT; FDA removed from Cat-2 ~Apr 2026 (NOT approval); WADA not-named (S0).** |
+| CJC-1295 | [[compounds/cjc-1295]] | **deep-passed 2026-06-20 (deep mode, all 7 gates attested PASS 2.75→8.5, chain intact; + independent full-bib audit 16/16 verified, 0 fabrications, 0 fixes). evidence_tier C / risk_tier experimental; tetrasubstituted GRF(1-29) GHRH analogue = TWO molecules: WITH DAC (albumin-bound, t½ ~5.8–8.1 d, Teichman 2006) vs WITHOUT DAC = "Mod GRF 1-29" (~30 min, ipamorelin-stack partner) — never cross-attributed; only human efficacy program (ConjuChem with-DAC Phase II, NCT00267527) TERMINATED July 2006 after a participant death (causation NOT established); zero human efficacy endpoint ever met; ConjuChem single-lineage ~100% of efficacy/PK primaries; never approved / interim Cat-2 2023 / PCAC voted against Dec 4 2024 / NOT in the Apr-2026 removed-12; WADA S2.2.4 named.** |
 
 ---
 

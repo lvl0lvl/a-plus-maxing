@@ -25,6 +25,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/tb-500]] (status: researching; evidence_tier: C; risk_tier: experimental)
 - [[compounds/ghk-cu]] (status: researching; evidence_tier: C; risk_tier: experimental)
 - [[compounds/kpv]] (status: researching; evidence_tier: C; risk_tier: experimental)
+- [[compounds/cjc-1295]] (status: researching; evidence_tier: C; risk_tier: experimental)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -104,6 +105,9 @@ _(none yet)_
 - [[library/peptides/kpv/research-report]] (2026-06-19 via /aplus-research --mode=deep; ~11.1K words; 47 dedup entries; 7 paired-judge sections @99; gates 2.75→8.5 attested PASS; chain intact)
 - [[library/peptides/kpv/practitioner-layer]] (2026-06-19; oral/SC/topical conventions; no admissible compounding data sheet)
 - [[library/peptides/kpv/non-english-layer]] (2026-06-19; Russian/Chinese/Italian all none-located — Chinese KPV science is English-published)
+- [[library/peptides/cjc-1295/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~9.7K words; 31 unified citations + crosswalk; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 16/16 identifier entries verified, 0 fabrications, 0 Wikipedia, 0 fixes)
+- [[library/peptides/cjc-1295/practitioner-layer]] (2026-06-20; DAC ~1–2 mg/wk vs no-DAC "Mod GRF 1-29" ~100 mcg + ipamorelin — kept separate; only a historical Tailor Made data sheet)
+- [[library/peptides/cjc-1295/non-english-layer]] (2026-06-20; Russian/Chinese/originator all none-located — ConjuChem lineage is English-published)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)
