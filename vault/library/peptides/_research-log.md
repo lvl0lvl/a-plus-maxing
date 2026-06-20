@@ -195,7 +195,24 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 - Regulatory: FDA approved 2010 (exact indication "reduction of excess abdominal fat in HIV-infected adult patients with lipodystrophy"); Egrifta SV 2019 / Egrifta WR 2025; EMA NOT approved (withdrawn, Ferrer); WADA S2.2.4 prohibited (tesamorelin named); ~$3000/mo brand. Contraindications (label): HPA-axis disruption, active malignancy, hypersensitivity incl. mannitol, pregnancy. Monitoring: IGF-1 + fasting glucose/HbA1c.
 - Optional post-ship (non-blocking, no claim depends): refresh NCT02572323 status to "Completed"; note NCT07481734 "Mock Study" flag.
 
-### NEXT (reserved, my/primary lane): **Sermorelin** (sweep entry 8), then Hexarelin → MK-677 → Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
+---
+
+## 2026-06-20 — Sermorelin (GRF(1-29)NH2, brand Geref) deep-pass (sweep entry 8, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **Sermorelin entry shipped:** `compounds/sermorelin.md` + `library/peptides/sermorelin/research-report.md` (~11.7K words, 35 unified citations + crosswalk) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections incl. id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Efficient calibration held** — gates earned keep: §E HALT (90) on sourcing-tier (Apr-2026/503A facts rested on legal blogs → re-anchored to primary FR Doc 2026-07361 govinfo + 21 USC 353a statute; "Category 1" over-claim dropped/hedged to the component-of-approved-drug pathway). 4.75 json needed a structure fix (population_mismatch nested in ic_checks → lifted to top-level).
+- **Final independent full-bib audit: 17/17 identifier entries verified, 0 fabrications, 0 Wikipedia, 0 fixes** (one optional §503A cascade-vs-alternatives wording nuance applied at ship). Compound-entry consistency PASS.
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- GRF(1-29)NH2 = shortest fully bioactive GHRH fragment, the PROTOTYPE of the GRF(1-29) class (CJC-1295 no-DAC = "Mod GRF 1-29" is a stabilized sermorelin analogue). GHRH-R agonist → pulsatile GH → IGF-1; short half-life ~11-12 min (Geref label); DPP-IV degradation.
+- **Genuine FDA-approval history → evidence_tier B** (above the unapproved C-tier peptides): Geref — diagnostic NDA 19-863 (1990) + pediatric idiopathic-GHD growth NDA 20-443 (1997); pivotal pediatric trial Thorner/Geref-Intl 1996 (PMID 8772599, n=110, height velocity 4.1→7.2 cm/yr). **WITHDRAWN ~2008 for COMMERCIAL reasons — FR 2013-04827 explicitly "not withdrawn for safety or effectiveness"** ("withdrawn" ≠ banned/unsafe).
+- **INTEGRITY AXIS:** evidenced/approved use = pediatric-GHD + diagnostic; the popular ADULT anti-aging/body-comp/sleep use is OFF-LABEL, resting only on 4 small old aging-adult GHRH(1-29) studies (Corpas 1992 / Vittone 1997 / Khorram 1997 / Vitiello 2006 — biomarker-level GH/IGF-1, not robust clinical outcomes). Healthy-adult anti-aging/athletic/fat-loss = ZERO robust data.
+- **Tesamorelin-miscredit guard held:** Baker 2012 (PMID 22869065) is tesamorelin and the GHRH-1,44 walk/stair/visceral-fat results are full-length GHRH — explicitly NOT credited to sermorelin (vendor blogs routinely conflate them). Single-lineage ~50% (below the 0.70 flag); folding in the miscredits would spuriously raise it.
+- Regulatory: no marketed FDA product today but heavily §503A-COMPOUNDED via the component-of-a-formerly-approved-drug pathway (21 USC 353a(b)(1)(A); interim bulks-list category honestly hedged as not primary-confirmable); NOT among the Apr-2026 removed-12; FR Doc 2026-07361 = the July-2026 PCAC meeting notice (not "the removal action"). WADA S2.2.4 prohibited (named). Compounded convention ~100-500 mcg SC nightly ± GHRP/ipamorelin (Empower/Strive/Olympia data sheets); pediatric label 30 µg/kg/day kept distinct.
+
+### NEXT (reserved, my/primary lane): **Hexarelin** (sweep entry 9), then MK-677 → Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
 
 ---
 

@@ -1,0 +1,93 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 126,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 1
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 4,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 3
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 11,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 29,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 0,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 4,
+    "largest_cluster_name": "Johns Hopkins / NIH (Blackman lineage)",
+    "largest_cluster_count": 2,
+    "share": 0.5,
+    "threshold_triggered": false,
+    "surfaced_section_heading": "Concentration audit (Section C)"
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 11,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-10: FederalRegister.gov direct fetch returns access redirect; resolved via govinfo primary record (not a fabrication)",
+    "IC-13: Khorram 1997 and Vittone 1997 full text paywalled; numerical claims verified abstract-only via Europe PMC (corpus-missing WARN, not HALT)"
+  ],
+  "timestamp": "2026-06-20T21:25:37.627403+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T21:19:21.581636+00:00",
+    "attest_ts": "2026-06-20T21:25:37.627406+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "2733da03c6b93e1cec5f51052f5561cd73faa246a70fc3baa0e4e32dae375f43",
+    "agent_source_mtime": "2026-06-20T21:25:26.556798+00:00"
+  }
+}

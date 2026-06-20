@@ -1,0 +1,29 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "compound_risk_tier": "medium",
+  "compound_entry_path": "vault/library/peptides/sermorelin/research-report.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "populated"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "IGF-1",
+    "fasting glucose",
+    "HbA1c"
+  ],
+  "halt_reasons": [],
+  "iterations": 1,
+  "timestamp": "2026-06-20T21:37:55.957795+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T21:36:56.027058+00:00",
+    "attest_ts": "2026-06-20T21:37:55.957798+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "a25065f44d0e819f2bac0dd051efaaaef3dd36f2202d53725d6aa29eecd21f56",
+    "agent_source_mtime": "2026-06-20T21:37:39.959285+00:00"
+  }
+}
