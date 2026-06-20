@@ -1,0 +1,21 @@
+{
+  "section": "A",
+  "brief_hash": "6a64885bc6f33b7f6289e99e4eee11ca256e7f6764756a9441c03db5ac7f533c",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 93,
+    "citation_fidelity": 92,
+    "type_tag_discipline": 97,
+    "population_annotation": 94,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 93
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section A covers all load-bearing physiology accurately — liver-exclusive synthesis, 19-21d half-life, oncotic/transport/Cys34-antioxidant/IL-6-negative-acute-phase mechanisms, dual-unit reference ranges — with correct mechanism_review tags throughout and full bib suffixes; spot-checked PMIDs 24333308 and 34638659 verified first author + co-authors exactly; minor advisory observations (cshlp.org host not on explicit whitelist; ~50-60% of total plasma protein fraction omitted from the section; ref 4 is a lower-prestige Cogent OA journal) do not reach blocking threshold."
+}

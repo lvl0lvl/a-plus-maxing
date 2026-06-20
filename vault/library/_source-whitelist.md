@@ -97,6 +97,9 @@ Always admissible. Cite as `regulatory`.
 - `kdigo.org` (Kidney Disease: Improving Global Outcomes — international CKD/kidney clinical practice guidelines; added 2026-06-20 wiki-research)
 - `kidney.org` (National Kidney Foundation — KDOQI guidelines, NKDEP creatinine standardization; added 2026-06-20 wiki-research)
 - `ejifcc.org` (eJIFCC — the official journal of the International Federation of Clinical Chemistry and Laboratory Medicine; added 2026-06-20 wiki-research)
+- `asnjournals.org` (American Society of Nephrology — Journal of the American Society of Nephrology [JASN], CJASN; peer-reviewed flagship nephrology journals; added 2026-06-20 wiki-research)
+- `cshlp.org` (Cold Spring Harbor Laboratory Press — Cold Spring Harbor Perspectives in Biology/Medicine; peer-reviewed; added 2026-06-20 wiki-research)
+- `bloodtransfusion.it` (Blood Transfusion / Blood Transfus — SIMTI, Italian transfusion-medicine societies; peer-reviewed, PMC-indexed; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`

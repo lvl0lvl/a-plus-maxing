@@ -1,0 +1,75 @@
+{
+  "section": "B",
+  "brief_hash": "0c8304d672049256c35b49e43d7b976373debb60dc093b1d391dec9b9d89d21c",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 96,
+    "citation_fidelity": 97,
+    "type_tag_discipline": 97,
+    "population_annotation": 95,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 97
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "remediation_confirmation": [
+    {
+      "id": "F-B-01",
+      "prior_finding": "Ref [1] inline tag was `cohort`; paper is a laboratory methods comparison, not an epidemiological cohort",
+      "status": "FIXED",
+      "evidence": "Line 9: inline citation reads [1, mechanism_review]; bib entry [1] carries `— tag: mechanism_review — tier: 1`"
+    },
+    {
+      "id": "F-B-02",
+      "prior_finding": "Three bibliography entries bundled two distinct papers under single reference numbers ([4]/[8]/[9])",
+      "status": "FIXED",
+      "evidence": "Bib now sequential [1]-[13] with no gaps: ref [4] = Soma-Pillay standalone; ref [8] = Child & Turcotte standalone; ref [9] = Johnson standalone; refs [11]/[12]/[13] are the three split-out entries (Teasdale, Xu WJG 2024, Guan Discov Oncol 2025)"
+    },
+    {
+      "id": "F-B-03",
+      "prior_finding": "Ref [4] Cardiovasc J Afr primary host cvja.co.za off-whitelist",
+      "status": "FIXED",
+      "evidence": "Bib [4] URL now `https://pmc.ncbi.nlm.nih.gov/articles/PMC6295771/` (whitelisted pmc.ncbi.nlm.nih.gov)"
+    },
+    {
+      "id": "F-B-11-URL",
+      "prior_finding": "Ref [11] Teasdale was on duplicated PMC6295771 URL (wrong article); prompt specifies pubmed.ncbi.nlm.nih.gov/30574177",
+      "status": "FIXED",
+      "evidence": "Bib [11] URL is `https://pubmed.ncbi.nlm.nih.gov/30574177/`; PMID 30574177 matches Teasdale & Morton, Obstet Med 2018"
+    }
+  ],
+  "bib_sequential_audit": {
+    "range": "[1]-[13]",
+    "gaps": "none",
+    "all_entries_carry_tag_tier_suffix": true
+  },
+  "inline_tag_match_audit": {
+    "all_inline_match_bib": true,
+    "bare_citations_found": false,
+    "citations_checked": ["[1,mechanism_review]","[2,mechanism_review]","[3,cohort]","[4,mechanism_review]","[11,mechanism_review]","[5,mechanism_review]","[6,mechanism_review]","[7,cohort]","[8,mechanism_review]","[12,mechanism_review]","[9,mechanism_review]","[13,mechanism_review]","[10,cohort]"]
+  },
+  "host_whitelist_audit": {
+    "off_whitelist_hosts_found": false,
+    "entries_checked": [
+      {"ref": 1, "host": "degruyter.com", "whitelisted": true},
+      {"ref": 2, "host": "pubmed.ncbi.nlm.nih.gov (PMID 41098225)", "whitelisted": true},
+      {"ref": 3, "host": "sciencedirect.com / pubmed (PMID 1569417)", "whitelisted": true},
+      {"ref": 4, "host": "pmc.ncbi.nlm.nih.gov (PMC6295771)", "whitelisted": true},
+      {"ref": 5, "host": "wiley.com / pmc (PMC7379941)", "whitelisted": true},
+      {"ref": 6, "host": "acpjournals.org / pmc (PMC8340960)", "whitelisted": true},
+      {"ref": 7, "host": "journals.lww.com (PMID 9824071)", "whitelisted": true},
+      {"ref": 8, "host": "no URL — 1964 monograph; no off-whitelist host cited", "whitelisted": true},
+      {"ref": 9, "host": "oup.com (J Clin Oncol / ASCO)", "whitelisted": true},
+      {"ref": 10, "host": "academic.oup.com (Am J Clin Nutr, PMID 16210706)", "whitelisted": true},
+      {"ref": 11, "host": "pubmed.ncbi.nlm.nih.gov/30574177", "whitelisted": true},
+      {"ref": 12, "host": "pmc.ncbi.nlm.nih.gov/articles/PMC10989493", "whitelisted": true},
+      {"ref": 13, "host": "pmc.ncbi.nlm.nih.gov/articles/PMC11936848", "whitelisted": true}
+    ]
+  },
+  "summary": "All three iteration-1 findings are confirmed fixed: ref [1] inline tag corrected from `cohort` to `mechanism_review`; the three bundled bibliography entries split cleanly into distinct numbered refs — [4] Soma-Pillay standalone, [8] Child & Turcotte standalone, [9] Johnson standalone, with new refs [11] Teasdale / [12] Xu WJG / [13] Guan carrying their own entries; ref [4] host moved from off-whitelist cvja.co.za to whitelisted pmc.ncbi.nlm.nih.gov (PMC6295771); ref [11] Teasdale now on pubmed.ncbi.nlm.nih.gov/30574177 (not the duplicated PMC6295771). Bibliography is sequential [1]-[13] with no gaps; all 13 entries carry full `— tag: <type> — tier: <n>` suffixes; all inline citations are in `[N, tag]` form with no bare [N]; all hosts are on the whitelist. Section scores 96/100 — well above threshold."
+}
