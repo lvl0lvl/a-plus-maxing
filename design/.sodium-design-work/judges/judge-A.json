@@ -1,0 +1,21 @@
+{
+  "section": "A",
+  "brief_hash": "96586ccbe0d6239f3e67a5f63e623e569305fcb37ce3c8f6cfa408b7c05b8177",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 96,
+    "type_tag_discipline": 97,
+    "population_annotation": 95,
+    "route_fidelity": null,
+    "concentration_audit_handling": 95,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 97,
+    "completeness_vs_brief": 96
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section A is mechanistically complete and accurately sourced: all 8 bibliography entries carry full tag/tier suffixes, all inline citations are tagged (no bare [N]), three NEJM Tier-1 anchors dominate, all whitelisted hosts confirmed with no rejected sources, and PMID spot-checks for 10824078 (Adrogué-Madias hyponatremia) and 25551526 (Sterns) verify correctly. Every load-bearing physiological concept—Na⁺/K⁺-ATPase stoichiometry, osmolality formula, Edelman water-balance identity, AVP/AQP2 vs RAAS dual-axis distinction, and correction-rate dangers in both dysnatremia directions—is accurately stated with appropriate sourcing."
+}

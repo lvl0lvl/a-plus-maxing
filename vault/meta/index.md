@@ -50,6 +50,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/ast]] (AST — aspartate aminotransferase; category: blood; confidence: established)
 - [[biomarkers/egfr]] (eGFR & creatinine — kidney function; category: blood; confidence: established)
 - [[biomarkers/albumin]] (Serum albumin; category: blood; confidence: established)
+- [[biomarkers/sodium]] (Serum sodium — Na⁺; category: blood; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -106,6 +107,7 @@ _(none yet)_
 - [[library/biomarkers/ast/research-report]] (AST standard /aplus-research; 31 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/egfr/research-report]] (eGFR & creatinine standard /aplus-research; 28 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/albumin/research-report]] (Serum albumin standard /aplus-research; 37 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/sodium/research-report]] (Serum sodium standard /aplus-research; 32 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/
