@@ -104,6 +104,8 @@ Always admissible. Cite as `regulatory`.
 - `f1000research.com` (F1000Research — open-research platform with transparent post-publication peer review, PMC-indexed; acceptable for mechanism/physiology context, not sole-source for a numeric efficacy claim; added 2026-06-20 wiki-research)
 - `rcpa.edu.au` (Royal College of Pathologists of Australasia — the RCPA Manual reference-interval / pathology-test authority; professional pathology college; added 2026-06-20 wiki-research)
 - `clinmedres.org` (Clinical Medicine & Research — Marshfield Clinic Health System, peer-reviewed, PMC-indexed; added 2026-06-20 wiki-research)
+- `nationalacademies.org` / `nap.edu` (National Academies of Sciences, Engineering, and Medicine — the IOM/NAM Dietary Reference Intakes reports; authoritative; added 2026-06-20 wiki-research)
+- `ods.od.nih.gov` (NIH Office of Dietary Supplements — vitamin/mineral fact sheets; US-government authoritative; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`
