@@ -294,11 +294,19 @@ RED) + the `test_orchestrate.py` liaison-gate section (the wiring + the real-env
   MEDIUM); the queued `finding_id` + `caution` match the adjudicated finding verbatim. Verified over a
   real medical-liaison collation dispatch (`doctor-visit-queue-collated.example.json`): the liaison's
   ranking agrees with the code on the safety-tier lead, refining intra-band clinically at dispatch.
-  The remaining surface, beaded as a design-led follow-on, is the **rendered SBAR handout** (a one-page
-  visual artifact — Pencil + operator sign-off + the design agents, never originated solo). Until it
-  lands, the reconciler holds the additive-AE supplement + a conflict-declaring domain + a BPMH-matched
-  compound (cleared only via the liaison gate), overlap output stays DETECT+REPORT, and the queue
-  persists the adjudicated findings for the MD handout.
+  Until the render lands, the reconciler holds the additive-AE supplement + a conflict-declaring domain
+  + a BPMH-matched compound (cleared only via the liaison gate), overlap output stays DETECT+REPORT, and
+  the queue persists the adjudicated findings for the MD handout.
+- The closed-loop **measure leg + adjust read-back** is WIRED (S78, `scripts/plan/track.py`): `record_tracking`
+  is the production caller for `plan_schema.record_plan_tracking` (the no-production-caller gap) — it
+  records one operator-OBSERVED tracking snapshot against a domain's plan, with the honest no-plan-to-track
+  boundary (a domain with no recorded plan has nothing to have been done — records nothing); and
+  `resolve_plan_progress` joins the plan + tracking into the plan-vs-actual view the re-plan + dashboard
+  read. Tracking is operator-observed (no agent dispatch in this flow); verified by the closed-loop E2E
+  (`generate_plan` → `record_tracking` → `resolve_plan_progress`). The remaining surfaces, deferred to
+  their own sessions, are the design-led **rendered SBAR handout** (Pencil + operator sign-off + the design
+  agents, never originated solo) and the adjust leg's domain-specific **progression algorithm** (how a
+  specialist changes the prescription from the progress — a specialist-reasoning surface, not invented solo).
 - The `/generate-plan` slash-command/skill wrapper (the orchestrator is wired as the `generate_plans`
   callable the interactive main agent invokes; the command surface is a later convenience).
 - A standalone full-plan render screen (the dashboard plan card is Slice 1's surface; the operator is
