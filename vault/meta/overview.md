@@ -76,6 +76,12 @@ Arrive at the July 2026 doctor visit with a structured baseline: meal template, 
 - Markdown substrate, HTML output (per Thariq's HTML-effectiveness argument)
 - A → B → C phased build; C designed from observed friction, not speculation
 
+## Status as of 2026-06-20 (S80) — the CLOSED LOOP is complete end-to-end (plan → act → measure → ADJUST)
+
+The plan-generation pipeline's closed loop is now wired end-to-end on SYNTHETIC data — the milestone the vision predicted ("closes the loop"). The arc since S64: the per-domain authors → `generate_plan` (the plan leg, with `assemble`'s four safety filters + the workout clearance gate), `orchestrate` reconciles cross-domain (energy-bounce / additive-AE / conflict / Rx-BPMH holds), `adjudicate` gates (S74), the `dvq::queue` data layer collates the adjudicated safety findings (S77), `track.record_tracking` + `resolve_plan_progress` are the measure + read-back legs (S78), the doctor-visit SBAR handout + physician face sheet RENDER the safety output (S79), and **S80 wired the ADJUST leg** (`scripts/plan/adjust.py` `adjust_plan`, PR #187 → `main` @ `41e2c83`): it reads the plan-vs-actual progress, gates the honest "nothing to progress from" boundary + a forward-date gate, then records the domain SPECIALIST'S adjusted output via the reused `generate_plan` as a new dated plan (the safety floor applies to the re-plan; the de-load/advance reasoning is the specialist's, never invented in code). Full suite 1132 passed / 2 skipped on `main`; core-capability gate green (`--self-test` PASS).
+
+**The core-capability-first gate (PF-S63-02) is SATISFIED.** Every remaining V1 item is operator-data-dependent (the filled profile scaffold, labs, the Whoop baseline/LM-02, 23andMe/LM-03, the MD-visit outcome/LM-01) or design-led polish (the dashboard's plan-vs-actual + adjust render surface; the `/generate-plan` convenience wrapper) — NOT new pipeline mechanism. No actual artifact reflects the real operator until `generate.run` + the loop are fed real data (LM-04 / operator-pending). Session detail: `vault/sessions/session-80.md` (the S64-S79 pipeline arc detail is in the respective session notes; this status stack had not been maintained across that arc).
+
 ## Status as of 2026-06-14 (S63) — WHOOP/noop ingestion adapter built + wired (read-only sqlite) + model-eval noop-AI-Coach prior art
 
 S63 ran one substantive PR lifecycle (#136) + the close PR, merged to `main` (`9cfbfef`; suite 833/2,
