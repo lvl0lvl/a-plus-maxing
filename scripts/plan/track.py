@@ -53,8 +53,11 @@ def record_tracking(domain, tracking, on_date, root):
         `recorded` (bool), and `plan_date` (the date of the plan tracked against, or None).
 
     Raises:
-        ValueError: An untracked domain, a malformed date, or a snapshot failing its field-type
-            table (raised by `record_plan_tracking` — never a silent drop).
+        ValueError: An untracked domain (always). And — ONLY when a plan exists for the date (the
+            record path past the no-plan-to-track gate) — a malformed date or a snapshot failing its
+            field-type table (raised by `record_plan_tracking`, never a silent drop). On the no-plan
+            path a malformed date/snapshot is never validated: there is no plan to track against, so
+            `record_tracking` returns the no-plan-to-track boundary rather than raising.
     """
     if domain not in plan_schema.TRACKED_DOMAINS:
         raise ValueError(
@@ -84,9 +87,11 @@ def resolve_plan_progress(domain, on_date, root):
     dated `on_date` (`resolve_plan` state None), so `has_plan` is True iff `plan` is not None — no
     plan for the date (zero plans, or plans on file but none dated `on_date`) is `has_plan` False with
     `plan` None (never an invented plan); a plan with no tracking snapshot is plan-only (`has_tracking`
-    False, the operator has not logged yet). `plan_date` carries the latest on-file plan date even when
-    `has_plan` is False (informational — "a plan exists on file, dated `plan_date`, just not for this
-    date"). Pure read; computes no progression verdict (that is the deferred specialist-reasoning adjust).
+    False, the operator has not logged yet). `plan_date` is the date of the plan FOR `on_date` (== `on_date`
+    when `has_plan`, else None) — the SAME meaning `record_tracking`'s result `plan_date` carries (the plan
+    tracked against), so the two surfaces agree on the field. A consumer wanting the latest on-file plan
+    date for a no-plan-today domain reads `plan_schema.read_plan` directly. Pure read; computes no
+    progression verdict (that is the deferred specialist-reasoning adjust).
 
     Args:
         domain (str): A `plan_schema.TRACKED_DOMAINS` member.
@@ -95,8 +100,8 @@ def resolve_plan_progress(domain, on_date, root):
 
     Returns:
         (dict) `domain`, `plan` (the plan dict for `on_date` | None), `specialist` (str | None),
-        `plan_date` (str | None — the latest on-file plan date), `tracking` (the snapshot dict | None),
-        `has_plan` (bool — a plan dated `on_date`), `has_tracking` (bool).
+        `plan_date` (str | None — `on_date` when a plan is dated `on_date`, else None), `tracking`
+        (the snapshot dict | None), `has_plan` (bool — a plan dated `on_date`), `has_tracking` (bool).
 
     Raises:
         ValueError: An untracked domain.
@@ -112,7 +117,9 @@ def resolve_plan_progress(domain, on_date, root):
         "domain": domain,
         "plan": plan["plan"],
         "specialist": plan["specialist"],
-        "plan_date": plan["plan_date"],
+        # plan_date means the same on both surfaces: the date of the plan FOR on_date (else None),
+        # NOT the latest on-file date — so record_tracking + resolve_plan_progress never diverge (CONTRACTS-TRACK-1).
+        "plan_date": plan["plan_date"] if has_plan else None,
         "tracking": tracking,
         "has_plan": has_plan,
         "has_tracking": tracking is not None,
