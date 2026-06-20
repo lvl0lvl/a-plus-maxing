@@ -1,0 +1,21 @@
+{
+  "section": "A",
+  "brief_hash": "2a61a704df2aaefbca2789bef52f038e585ed4fab6e77908592dc611a5f2fc8e",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 98,
+    "type_tag_discipline": 99,
+    "population_annotation": 94,
+    "route_fidelity": null,
+    "concentration_audit_handling": null,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 93,
+    "completeness_vs_brief": 97
+  },
+  "total": 96,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section A delivers accurate GOT1/GOT2 isoenzyme biochemistry, a correctly sequenced malate-aspartate shuttle, verified author lists on both spot-checked PMIDs (6698365 Diehl and 31422819 van Karnebeek), full tag discipline on every inline citation and bibliography entry, and complete coverage of all rubric-required brief elements; total 96/100 clears the 92 threshold."
+}

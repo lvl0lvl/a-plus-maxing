@@ -80,6 +80,8 @@ Always admissible. Cite as `rct`, `meta_analysis`, `cohort`, `open_label`, `anim
 - `acpjournals.org` (American College of Physicians — Annals of Internal Medicine; added 2026-06-20 wiki-research)
 - `biochemia-medica.com` (Biochemia Medica — Croatian Society of Medical Biochemistry, peer-reviewed, PMC-indexed; added 2026-06-20 wiki-research)
 - `cell.com` (Cell Press / Elsevier — Cell, Cell Reports, Cell Metabolism, and other flagship peer-reviewed journals; added 2026-06-20 wiki-research)
+- `e-kjg.org` (Korean Journal of Gastroenterology — Korean Society of Gastroenterology, peer-reviewed, PMC-indexed; added 2026-06-20 wiki-research)
+- `aacb.asn.au` / Clinical Biochemist Reviews (Australasian Association of Clinical Biochemists — peer-reviewed, PMC-indexed; added 2026-06-20 wiki-research)
 - `biorxiv.org` (preprint — admissible but flag as `not-peer-reviewed`)
 - `medrxiv.org` (preprint — same)
 
