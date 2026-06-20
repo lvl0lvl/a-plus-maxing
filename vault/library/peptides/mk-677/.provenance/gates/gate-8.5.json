@@ -1,0 +1,37 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/mk-677/practitioner-layer.md",
+    "present": true,
+    "sha256": "480822497d71d60537cb6ef9c56c06f26b95314b1c79ce52eb238e0ea353e8ec",
+    "compounding_sheets_count": 0,
+    "compounding_sheets_or_null_finding": true,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/mk-677/non-english-layer.md",
+    "present": true,
+    "sha256": "4f394b0de1fb304f46d8be1a06395adefbdc1d801a272f3355175a2d3e918936",
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "Other"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-20T23:14:54.987792+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T23:13:41.970126+00:00",
+    "attest_ts": "2026-06-20T23:14:54.987795+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "9b77249603dcf26f97fac49173c870f3afd4e208740a67003cb963908d4e0e4a",
+    "agent_source_mtime": "2026-06-20T23:14:33.914287+00:00"
+  }
+}

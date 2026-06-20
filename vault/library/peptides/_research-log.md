@@ -231,7 +231,25 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 - Concentration audit: Turin/Ghigo first-author ~25% (below 0.70 flag), but Deghenghi/Mediolanum developer footprint ~50% + no cross-lab human replication of the cardiac signal — surfaced.
 - Regulatory: never approved (Mediolanum Phase II discontinued); §503A NOT in the Apr-2026 removed-12, effectively unlisted/not-nominated (honest hedge); FR-2026-07361 = July-2026 PCAC notice; WADA S2.2.4 prohibited at all times (examorelin/hexarelin named, primary-anchored). No compounding data sheet found; gray-market only.
 
-### NEXT (reserved, my/primary lane): **MK-677 (Ibutamoren)** (sweep entry 10 — note: an orally-active small-molecule ghrelin-receptor agonist, NOT strictly a peptide), then Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank. (Semaglutide/Tirzepatide/Retatrutide have stale predecessor branches → push as `-gated`. Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
+---
+
+## 2026-06-20 — MK-677 (Ibutamoren; Merck MK-0677) deep-pass (sweep entry 10, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **MK-677 entry shipped:** `compounds/mk-677.md` + `library/peptides/mk-677/research-report.md` (~11.3K words, 38 unified citations + crosswalk) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections incl. id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Gates earned keep:** §F HALTed (91) on a "~24h half-life" misstatement → fixed (molecular ~4-6 h vs PD ~24 h). 4.75 concentration_audit threshold_triggered=TRUE (Merck 6/8=75%). Phase-6 critique near-clean (1 cosmetic age-range nit).
+- **Final independent full-bib audit: 16/16 identifier entries verified, 0 fabrications, 0 first-author mismatches, 0 Wikipedia — cleanest GH-secretagogue run** (the misattribution failure mode absent); 2 optional epub-vs-print year nits tidied ([5] Sigalos 2018, [6] Abizaid 2020). Compound-entry consistency PASS.
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- MK-677 is an **ORAL, NON-PEPTIDIC SMALL MOLECULE** ghrelin-receptor (GHS-R1a) agonist (Merck MK-0677/L-163,191; spiroindane; Patchett/Nargund PNAS 1995; GHS-R1a cloned Howard 1996 Science) — NOT a peptide, NOT a GHRH analogue. Molecular elimination t½ ~4-6 h (~4.7 h); the "~24 h" figure is the PHARMACODYNAMIC GH/IGF-1 duration (don't conflate). Oral once-daily is the defining differentiator from the injectable peptide secretagogues.
+- **Most-studied GH secretagogue in long-term human RCTs**, but biomarker-only: Nass 2008 (Ann Intern Med, 2-yr healthy elderly, PMID 18981485) — IGF-1 → young-adult range + fat-free mass **+1.1 kg**, but **NO strength/function** improvement + insulin sensitivity ↓; Chapman 1996 (JCEM). **biomarker/lean-mass ↑ ≠ functional benefit.**
+- **Two major disease programs FAILED despite raising IGF-1:** Alzheimer's Phase 2b/3 (Sevigny 2008, Neurology, PMID 19015485, n=563 — IGF-1 +72.9% but no cognitive benefit on any endpoint); hip-fracture functional recovery (Adunsky 2011, Arch Gerontol Geriatr, PMID 21067829 — primary missed AND terminated early for a **CHF safety signal ~6.5% vs 1.7%**). Bodybuilding/athletic efficacy = ABSENT (no RCT).
+- **DOMINANT safety issue = METABOLIC:** raised fasting glucose, reduced insulin sensitivity, ↑HbA1c (Nass +0.3 mmol/L; Chapman 5.4→6.8) — the key risk for diabetics/pre-diabetics; plus appetite ↑, edema, modest cortisol, lethargy; + the CHF signal. Malignancy/IGF-1 flagged EXTRAPOLATED class risk.
+- Concentration audit: **Merck 6/8 (75%) — FLAGGED ≥0.70**; no Merck-independent disease-endpoint trial.
+- Regulatory: never approved (Merck discontinued; LUM-201 successor still investigational); **NOT a lawful dietary ingredient** — FDA Dec-2025 warning letters (Prime Sports Nutrition; Agebox/iKids-Growth); as a SMALL MOLECULE it is **NOT** part of the §503A peptide action / FR-2026-07361 (distinction stated, not conflated); WADA S2 prohibited at all times (ibutamoren named). No compounding data sheet (not on §503A); oral gray-market "research chemical" ~10-25 mg/day.
+
+### NEXT (reserved, my/primary lane): **Semaglutide** (sweep entry 11 — the GLP-1 metabolic class begins; FDA-APPROVED [Ozempic/Wegovy], so expect evidence_tier A/B). **Push branch as `research/semaglutide-deep-pass-gated`** (a stale predecessor `research/semaglutide-deep-pass` exists). Then Tirzepatide (`-gated`) → Retatrutide (`-gated`) → AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
 
 ---
 
