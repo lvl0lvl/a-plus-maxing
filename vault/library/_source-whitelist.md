@@ -73,7 +73,7 @@ Always admissible. Cite as `rct`, `meta_analysis`, `cohort`, `open_label`, `anim
 - `liebertpub.com` (Mary Ann Liebert — *Thyroid* (official ATA journal) + other peer-reviewed titles; added 2026-06-19 wiki-research, thyroid cluster)
 - `tandfonline.com` (Taylor & Francis — peer-reviewed journals incl. Annals of Clinical Biochemistry, Critical Reviews in Clin Lab Sciences; added 2026-06-19 wiki-research)
 - `degruyter.com` (De Gruyter — peer-reviewed journals incl. Clinical Chemistry and Laboratory Medicine (CCLM); added 2026-06-19 wiki-research)
-- `sagepub.com` / `journals.sagepub.com` (SAGE — peer-reviewed journals incl. Annals of Clinical Biochemistry; added 2026-06-19 wiki-research)
+- `sagepub.com` / `journals.sagepub.com` (SAGE Publishing — peer-reviewed journals incl. Annals of Clinical Biochemistry + Int J Sports Science & Coaching + other titles; added 2026-06-19–20 wiki-research)
 - `scielo.br` (SciELO Brazil — open-access peer-reviewed journals incl. Archives of Endocrinology and Metabolism (SBEM); PMC-indexed; added 2026-06-19 wiki-research)
 - `e-alm.org` (Annals of Laboratory Medicine — Korean Society for Laboratory Medicine, peer-reviewed, PMC-indexed; added 2026-06-19 wiki-research)
 - `journals.lww.com` / `lww.com` (Wolters Kluwer / Lippincott Williams & Wilkins — major medical publisher; American Journal of Gastroenterology (ACG), Hepatology (print), and many flagship peer-reviewed journals; added 2026-06-20 wiki-research, CMP cluster)
@@ -125,7 +125,6 @@ Always admissible. Cite as `regulatory`.
 - `iopscience.iop.org` (IOP Publishing — Physiological Measurement; peer-reviewed; the primary venue for physiological-signal/PPG measurement methods; added 2026-06-20 wiki-research)
 - `mja.com.au` (Medical Journal of Australia — MJA; peer-reviewed general medical journal; added 2026-06-20 wiki-research)
 - `rcp.ac.uk` / `rcplondon.ac.uk` (Royal College of Physicians — NEWS2 / National Early Warning Score standard + clinical guidelines; authoritative issuing body; added 2026-06-20 wiki-research)
-- `journals.sagepub.com` / `sagepub.com` (SAGE Publishing — Int J Sports Science & Coaching + other peer-reviewed titles; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`

@@ -189,9 +189,7 @@ Liquid chromatography–tandem mass spectrometry (LC-MS/MS) separates cortisol f
 | 21-Deoxycortisol | Clinically significant | High in 21-hydroxylase deficiency |
 | Cortisone | 0.3–31.1% depending on assay | Ubiquitous endogenous interferent |
 
-[10, mechanism_review]
-
-Prednisolone's cross-reactivity of 148% means that patients receiving therapeutic prednisolone can generate immunoassay cortisol readings elevated by the prednisolone itself — making a falsely suppressed or falsely normal result impossible to interpret without switching to LC-MS/MS. Methylprednisolone at 249% is clinically the most dangerous interferent in this class. By contrast, dexamethasone and betamethasone do not generally cross-react with cortisol immunoassays, which is why dexamethasone is used in suppression tests without LC-MS/MS interference — although confirmation of dexamethasone non-reactivity should be verified for any specific platform [11, mechanism_review].
+Prednisolone's cross-reactivity of 148% means that patients receiving therapeutic prednisolone can generate immunoassay cortisol readings elevated by the prednisolone itself — making a falsely suppressed or falsely normal result impossible to interpret without switching to LC-MS/MS [10, mechanism_review]. Methylprednisolone at 249% is clinically the most dangerous interferent in this class. By contrast, dexamethasone and betamethasone do not generally cross-react with cortisol immunoassays, which is why dexamethasone is used in suppression tests without LC-MS/MS interference — although confirmation of dexamethasone non-reactivity should be verified for any specific platform [11, mechanism_review].
 
 Topical and inhaled corticosteroids are a subtler source of falsely elevated readings; prednisolone contamination of a salivary cortisol sample taken shortly after an oral dose has been documented as a clinically significant confounder for late-night salivary cortisol (LNSC) testing [10, mechanism_review].
 

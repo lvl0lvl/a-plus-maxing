@@ -8,7 +8,7 @@ source: lab | wearable | manual | calculation
 confidence: established | supported | provisional
 created: YYYY-MM-DD
 last_verified: YYYY-MM-DD
-review_cadence: monthly | quarterly | per-lab-panel
+review_cadence: monthly | quarterly | per-lab-panel | per-wearable-sync
 ---
 
 # <Biomarker Name>

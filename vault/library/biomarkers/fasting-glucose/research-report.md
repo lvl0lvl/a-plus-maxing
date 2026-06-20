@@ -222,7 +222,7 @@ A blood glucose of 70 mg/dL (3.9 mmol/L) has been recognized as the threshold at
 
 The enzymatic hexokinase/glucose-6-phosphate dehydrogenase (HK/G6PD) method is the accepted reference method for plasma glucose measurement. In this two-step reaction, hexokinase catalyzes the phosphorylation of glucose to glucose-6-phosphate (G6P) by ATP; G6P is then oxidized by glucose-6-phosphate dehydrogenase in the presence of NADP⁺, generating NADPH. The resulting increase in NADPH absorbance at 340 nm is directly proportional to glucose concentration [17, mechanism_review]. Because it measures glucose stoichiometrically, is highly specific, and is traceable to the isotope-dilution mass spectrometry (ID-MS) primary reference, the HK method serves as the calibration anchor for all clinical glucose assays [17, mechanism_review].
 
-Glucose oxidase (GOD) methods are also widely used. GOD catalyzes the oxidation of β-D-glucose to gluconic acid and hydrogen peroxide; the H₂O₂ is then detected colorimetrically (Trinder reaction) or amperometrically. GOD methods are inherently selective for glucose but can be subject to oxygen tension interference and peroxidase inhibitors. Many point-of-care (POC) meters exploit glucose oxidase or glucose dehydrogenase (GDH) electrochemistry [18, cohort].
+Glucose oxidase (GOD) methods are also widely used. GOD catalyzes the oxidation of β-D-glucose to gluconic acid and hydrogen peroxide; the H₂O₂ is then detected colorimetrically (Trinder reaction) or amperometrically. GOD methods are inherently selective for glucose but can be subject to oxygen tension interference and peroxidase inhibitors. Many point-of-care (POC) meters exploit glucose oxidase or glucose dehydrogenase (GDH) electrochemistry [18, mechanism_review].
 
 **Reference matrix:** Venous plasma is the reference specimen for FPG. Plasma glucose values are approximately 10–15% higher than whole-blood values because plasma excludes the glucose-poor red cell volume. Serum glucose is analytically acceptable but subject to a brief post-clot glycolytic window before gel barrier separation; it is not the preferred matrix for diagnostic testing [19, mechanism_review].
 
@@ -429,7 +429,7 @@ FPG and HbA1c are moderately correlated (r ~0.45–0.57 in large observational d
 
 [17]. NHANES Fasting Plasma Glucose Laboratory Procedure Manual (2015–2016). CDC/NCHS. Method: hexokinase (HK/G6PD) reference method; traceability to ID/MS. URL: https://wwwn.cdc.gov/nchs/data/nhanes/public/2015/labmethods/GLU_I_MET_C311.pdf — tag: mechanism_review — tier: 2
 
-[18]. Heng SY, Adnan A, Nadia OS, et al. Benchmarking Point-of-Care Glucometers: A Comparative Study Using the Hexokinase Test and International Organization for Standardization (ISO) Standards. PMC11539051. *Cureus*. 2024. PMID: PMC11539051. — tag: cohort — tier: 1
+[18]. Ferri S, Kojima K, Sode K. Review of glucose oxidases and glucose dehydrogenases: a bird's eye view of glucose sensing enzymes. *J Diabetes Sci Technol*. 2011;5(5):1068–1076. DOI: 10.1177/193229681100500507. PMID: 22027299. PMC: PMC3208862. — tag: mechanism_review — tier: 1
 
 [19]. Nikolac N. The impact of preanalytical factors on glucose concentration measurement. *Biochemia Medica*. 2014;24(1):5–8. URL: https://www.biochemia-medica.com/assets/images/upload/Clanci/24/N.Nikolac-_The_imapct_of_preanalytical_factors_on_glucose_concetration_measurement.pdf — tag: mechanism_review — tier: 1
 

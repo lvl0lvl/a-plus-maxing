@@ -210,7 +210,7 @@ The 2014 ATA guidelines on thyroid hormone replacement (Jonklaas et al.) are exp
 
 ### Non-Thyroidal Illness (NTI) / Low-T3 Syndrome
 
-In any significant acute or chronic illness — infection, cardiac failure, surgery, malignancy, starvation, major trauma — circulating fT3 falls, sometimes dramatically, without primary thyroid pathology. This is called **non-thyroidal illness syndrome** (NTIS) or "low-T3 syndrome." The mechanism involves downregulation of type 1 deiodinase (D1) in liver and kidney (which normally supplies ~80% of circulating T3 from T4), concurrent upregulation of type 3 deiodinase (D3, which inactivates T3 to T2 and T4 to reverse T3), and suppressed hypothalamic–pituitary TRH/TSH signaling. The net result is low fT3, low-to-normal fT4, and a TSH that is inappropriately normal or mildly suppressed — a pattern that can superficially resemble central hypothyroidism [20, meta_analysis; 34, mechanism_review].
+In any significant acute or chronic illness — infection, cardiac failure, surgery, malignancy, starvation, major trauma — circulating fT3 falls, sometimes dramatically, without primary thyroid pathology. This is called **non-thyroidal illness syndrome** (NTIS) or "low-T3 syndrome." The mechanism involves downregulation of type 1 deiodinase (D1) in liver and kidney (which normally supplies ~80% of circulating T3 from T4), concurrent upregulation of type 3 deiodinase (D3, which inactivates T3 to T2 and T4 to reverse T3), and suppressed hypothalamic–pituitary TRH/TSH signaling. The net result is low fT3, low-to-normal fT4, and a TSH that is inappropriately normal or mildly suppressed — a pattern that can superficially resemble central hypothyroidism [20, meta_analysis; 26, mechanism_review].
 
 **Prognostic signal.** Low fT3 in illness carries robust prognostic weight across multiple cardiac cohorts:
 
@@ -260,68 +260,68 @@ Several factors limit the clinical utility of fT3 beyond its core hyperthyroid a
 
 ## Bibliography
 
-[1]. Bianco AC, Dumitrescu A, Gereben B, Ribeiro MO, Fonseca TL, Fernandes GW, Bocco BMLC. Paradigms of Dynamic Control of Thyroid Hormone Signaling. *Endocr Rev*. 2019;40(4):1000–1047. PMID: 31033998. DOI: 10.1210/er.2018-00275. [mechanism_review]
+[1]. Bianco AC, Dumitrescu A, Gereben B, Ribeiro MO, Fonseca TL, Fernandes GW, Bocco BMLC. Paradigms of Dynamic Control of Thyroid Hormone Signaling. *Endocr Rev*. 2019;40(4):1000–1047. PMID: 31033998. DOI: 10.1210/er.2018-00275. — tag: mechanism_review — tier: 1
 
-[2]. Salas-Lucia F, Bianco AC. T3 levels and thyroid hormone signaling. *Front Endocrinol (Lausanne)*. 2022;13:1044691. PMID: 36387853. DOI: 10.3389/fendo.2022.1044691. [mechanism_review]
+[2]. Salas-Lucia F, Bianco AC. T3 levels and thyroid hormone signaling. *Front Endocrinol (Lausanne)*. 2022;13:1044691. PMID: 36387853. DOI: 10.3389/fendo.2022.1044691. — tag: mechanism_review — tier: 2
 
-[3]. Wejaphikul K, Groeneweg S, Hilhorst-Hofstee Y, Chatterjee VKK, Peeters RP, Visser WE, Meima ME. Insight Into Molecular Determinants of T3 vs T4 Recognition From Mutations in Thyroid Hormone Receptor α and β. *J Clin Endocrinol Metab*. 2019;104(8):3491–3500. PMID: 30817817. DOI: 10.1210/jc.2018-02794. [mechanism_review]
+[3]. Wejaphikul K, Groeneweg S, Hilhorst-Hofstee Y, Chatterjee VKK, Peeters RP, Visser WE, Meima ME. Insight Into Molecular Determinants of T3 vs T4 Recognition From Mutations in Thyroid Hormone Receptor α and β. *J Clin Endocrinol Metab*. 2019;104(8):3491–3500. PMID: 30817817. DOI: 10.1210/jc.2018-02794. — tag: mechanism_review — tier: 1
 
-[4]. Brent GA. Mechanisms of thyroid hormone action. *J Clin Invest*. 2012;122(9):3035–3043. PMID: 22945636. DOI: 10.1172/JCI60047. [mechanism_review]
+[4]. Brent GA. Mechanisms of thyroid hormone action. *J Clin Invest*. 2012;122(9):3035–3043. PMID: 22945636. DOI: 10.1172/JCI60047. — tag: mechanism_review — tier: 1
 
-[5]. Sabatino L, Vassalle C, Del Seppia C, Iervasi G. Deiodinases and the Three Types of Thyroid Hormone Deiodination Reactions. *Endocrinol Metab (Seoul)*. 2021;36(5):952–964. PMID: 34674502. DOI: 10.3803/EnM.2021.1198. [mechanism_review]
+[5]. Sabatino L, Vassalle C, Del Seppia C, Iervasi G. Deiodinases and the Three Types of Thyroid Hormone Deiodination Reactions. *Endocrinol Metab (Seoul)*. 2021;36(5):952–964. PMID: 34674502. DOI: 10.3803/EnM.2021.1198. — tag: mechanism_review — tier: 2
 
-[6]. Van Uytfanghe K, Ehrenkranz J, Refetoff S, Roti E, Ross D, Spitzweg C, Robbins J. Thyroid Stimulating Hormone and Thyroid Hormones (Triiodothyronine and Thyroxine): An American Thyroid Association-Commissioned Review of Current Clinical and Laboratory Status. *Thyroid*. 2023;33(9):1013–1028. PMID: 37655789. DOI: 10.1089/thy.2023.0265. [regulatory]
+[6]. Van Uytfanghe K, Ehrenkranz J, Refetoff S, Roti E, Ross D, Spitzweg C, Robbins J. Thyroid Stimulating Hormone and Thyroid Hormones (Triiodothyronine and Thyroxine): An American Thyroid Association-Commissioned Review of Current Clinical and Laboratory Status. *Thyroid*. 2023;33(9):1013–1028. PMID: 37655789. DOI: 10.1089/thy.2023.0265. — tag: regulatory — tier: 1
 
-[7]. Ortiga-Carvalho TM, Chiamolera MI, Pazos-Moura CC, Wondisford FE. Hypothalamus-Pituitary-Thyroid Axis. *Compr Physiol*. 2016;6(3):1387–1428. PMID: 27347897. DOI: 10.1002/cphy.c150027. [mechanism_review]
+[7]. Ortiga-Carvalho TM, Chiamolera MI, Pazos-Moura CC, Wondisford FE. Hypothalamus-Pituitary-Thyroid Axis. *Compr Physiol*. 2016;6(3):1387–1428. PMID: 27347897. DOI: 10.1002/cphy.c150027. — tag: mechanism_review — tier: 2
 
-[8]. González-Sagrado M, et al. Population-specific reference values for thyroid hormones on the Abbott ARCHITECT i2000 analyzer. *Clin Chem Lab Med*. 2004;42(4):404–8. PMID: 15202791. [cohort]
+[8]. González-Sagrado M, et al. Population-specific reference values for thyroid hormones on the Abbott ARCHITECT i2000 analyzer. *Clin Chem Lab Med*. 2004;42(4):404–8. PMID: 15202791. — tag: cohort — tier: 2
 
-[9]. Yildiz Z, et al. Reference intervals for thyroid disorders calculated by indirect method and comparison with reference change values. *Biochemia Medica (Zagreb)*. 2022;32(3):030704. PMID: 36627974. [cohort]
+[9]. Yildiz Z, et al. Reference intervals for thyroid disorders calculated by indirect method and comparison with reference change values. *Biochemia Medica (Zagreb)*. 2022;32(3):030704. PMID: 36627974. — tag: cohort — tier: 3
 
-[10]. Xiong J, et al. Study of reference intervals for free triiodothyronine, free thyroxine, and thyroid-stimulating hormone in an elderly Chinese Han population. *PLoS One*. 2020;15(9):e0239465. PMID: 32970739. [cohort]
+[10]. Xiong J, et al. Study of reference intervals for free triiodothyronine, free thyroxine, and thyroid-stimulating hormone in an elderly Chinese Han population. *PLoS One*. 2020;15(9):e0239465. PMID: 32970739. — tag: cohort — tier: 3
 
-[11]. Welsh KJ, Soldin SJ. DIAGNOSIS OF ENDOCRINE DISEASE: How reliable are free thyroid and total T3 hormone assays? *Eur J Endocrinol*. 2016;175(6):R255–R263. PMID: 27737898. [mechanism_review]
+[11]. Welsh KJ, Soldin SJ. DIAGNOSIS OF ENDOCRINE DISEASE: How reliable are free thyroid and total T3 hormone assays? *Eur J Endocrinol*. 2016;175(6):R255–R263. PMID: 27737898. — tag: mechanism_review — tier: 2
 
-[12]. Soldin OP. Thyroid function testing in pregnancy and thyroid disease: trimester-specific reference intervals. *Ther Drug Monit*. 2006;28(1):8–11. PMID: 16418685. [mechanism_review]
+[12]. Soldin OP. Thyroid function testing in pregnancy and thyroid disease: trimester-specific reference intervals. *Ther Drug Monit*. 2006;28(1):8–11. PMID: 16418685. — tag: mechanism_review — tier: 2
 
-[13]. Lin Y. To test or not to test? Clinical utility and considerations for triiodothyronine (T3) testing. *Academy of Diagnostics & Laboratory Medicine Scientific Short*. Published March 26, 2024. Available at: https://myadlm.org/science-and-research/scientific-shorts/2024/clinical-utility-and-considerations-for-triiodothyronine-testing. [mechanism_review]
+[13]. Lin Y. To test or not to test? Clinical utility and considerations for triiodothyronine (T3) testing. *Academy of Diagnostics & Laboratory Medicine Scientific Short*. Published March 26, 2024. Available at: https://myadlm.org/science-and-research/scientific-shorts/2024/clinical-utility-and-considerations-for-triiodothyronine-testing. — tag: mechanism_review — tier: 3
 
-[14]. Koulouri O, Moran C, Halsall D, Chatterjee K, Gurnell M. Pitfalls in the measurement and interpretation of thyroid function tests. *Best Pract Res Clin Endocrinol Metab*. 2013;27(6):745–762. PMID: 24275187. [mechanism_review]
+[14]. Koulouri O, Moran C, Halsall D, Chatterjee K, Gurnell M. Pitfalls in the measurement and interpretation of thyroid function tests. *Best Pract Res Clin Endocrinol Metab*. 2013;27(6):745–762. PMID: 24275187. — tag: mechanism_review — tier: 2
 
-[15]. Ginsberg J. Diagnosis and management of Graves' disease. *CMAJ*. 2003;168(5):575–85. PMID: 12615754. [mechanism_review]
+[15]. Ginsberg J. Diagnosis and management of Graves' disease. *CMAJ*. 2003;168(5):575–85. PMID: 12615754. — tag: mechanism_review — tier: 2
 
-[16]. Sue LY, Leung AM. Reducing Inappropriate Serum T3 Laboratory Test Ordering in Patients With Treated Hypothyroidism. *Endocr Pract*. 2019;25(12):1247–1252. PMID: 31412225. [cohort]
+[16]. Sue LY, Leung AM. Reducing Inappropriate Serum T3 Laboratory Test Ordering in Patients With Treated Hypothyroidism. *Endocr Pract*. 2019;25(12):1247–1252. PMID: 31412225. — tag: cohort — tier: 2
 
-[17]. Economidou F, et al. Thyroid function during critical illness. *Hormones (Athens)*. 2011;10(2):117–24. PMID: 21724536. [mechanism_review]
+[17]. Economidou F, et al. Thyroid function during critical illness. *Hormones (Athens)*. 2011;10(2):117–24. PMID: 21724536. — tag: mechanism_review — tier: 3
 
-[18]. Jonklaas J, Bianco AC, Bauer AJ, et al. Guidelines for the Treatment of Hypothyroidism: Prepared by the American Thyroid Association Task Force on Thyroid Hormone Replacement. *Thyroid*. 2014;24(12):1670–1751. PMID: 25266247. [regulatory]
+[18]. Jonklaas J, Bianco AC, Bauer AJ, et al. Guidelines for the Treatment of Hypothyroidism: Prepared by the American Thyroid Association Task Force on Thyroid Hormone Replacement. *Thyroid*. 2014;24(12):1670–1751. PMID: 25266247. — tag: regulatory — tier: 1
 
-[19]. Ross DS, Burch HB, Cooper DS, et al. 2016 American Thyroid Association Guidelines for Diagnosis and Management of Hyperthyroidism and Other Causes of Thyrotoxicosis. *Thyroid*. 2016;26(10):1343–1421. PMID: 27521067. [regulatory]
+[19]. Ross DS, Burch HB, Cooper DS, et al. 2016 American Thyroid Association Guidelines for Diagnosis and Management of Hyperthyroidism and Other Causes of Thyrotoxicosis. *Thyroid*. 2016;26(10):1343–1421. PMID: 27521067. — tag: regulatory — tier: 1
 
-[20]. Vidart J, Wajner SM, Seminotti B, et al. Non-thyroidal illness syndrome predicts outcome in adult critically ill patients: a systematic review and meta-analysis. *Endocr Connect*. 2022;11(2):e210533. PMID: 35015701. [meta_analysis]
+[20]. Vidart J, Wajner SM, Seminotti B, et al. Non-thyroidal illness syndrome predicts outcome in adult critically ill patients: a systematic review and meta-analysis. *Endocr Connect*. 2022;11(2):e210533. PMID: 35015701. — tag: meta_analysis — tier: 2
 
-[21]. Favresse J, Burlacu MC, Maiter D, Gruson D. Interferences With Thyroid Function Immunoassays: Clinical Implications and Detection Algorithm. *Endocr Rev*. 2018;39(5):830–850. PMID: 29982406. [mechanism_review]
+[21]. Favresse J, Burlacu MC, Maiter D, Gruson D. Interferences With Thyroid Function Immunoassays: Clinical Implications and Detection Algorithm. *Endocr Rev*. 2018;39(5):830–850. PMID: 29982406. — tag: mechanism_review — tier: 1
 
-[22]. Karakosta P, et al. First- and Second-Trimester Reference Intervals for Thyroid Hormones during Pregnancy in 'Rhea' Mother-Child Cohort, Crete, Greece. *J Thyroid Res*. 2011;2011:490380. PMID: 22175032. [cohort]
+[22]. Karakosta P, et al. First- and Second-Trimester Reference Intervals for Thyroid Hormones during Pregnancy in 'Rhea' Mother-Child Cohort, Crete, Greece. *J Thyroid Res*. 2011;2011:490380. PMID: 22175032. — tag: cohort — tier: 3
 
-[23]. De Groot L, Abalovich M, Alexander EK, et al. Management of thyroid dysfunction during pregnancy and postpartum: an Endocrine Society clinical practice guideline. *J Clin Endocrinol Metab*. 2012;97(8):2543–65. PMID: 22869843. [regulatory]
+[23]. De Groot L, Abalovich M, Alexander EK, et al. Management of thyroid dysfunction during pregnancy and postpartum: an Endocrine Society clinical practice guideline. *J Clin Endocrinol Metab*. 2012;97(8):2543–65. PMID: 22869843. — tag: regulatory — tier: 1
 
-[24]. Lewandowski KC, Dąbrowska K, Lewiński A. Case report: When measured free T4 and free T3 may be misleading. Interference with free thyroid hormones measurements on Roche® and Siemens® platforms. *Thyroid Res*. 2012;5(1):11. PMID: 23107155. [mechanism_review]
+[24]. Lewandowski KC, Dąbrowska K, Lewiński A. Case report: When measured free T4 and free T3 may be misleading. Interference with free thyroid hormones measurements on Roche® and Siemens® platforms. *Thyroid Res*. 2012;5(1):11. PMID: 23107155. — tag: mechanism_review — tier: 3
 
-[25]. Courcelles L, Luyten U, Wauthier L, Verbeke N, Burlacu MC, Gruson D. Characterisation of an interference affecting the triiodothyronine measurement on two different immunoassays. *Acta Clin Belg*. 2023;78(5):406–409. PMID: 37042022. [mechanism_review]
+[25]. Courcelles L, Luyten U, Wauthier L, Verbeke N, Burlacu MC, Gruson D. Characterisation of an interference affecting the triiodothyronine measurement on two different immunoassays. *Acta Clin Belg*. 2023;78(5):406–409. PMID: 37042022. — tag: mechanism_review — tier: 3
 
-[26]. Fliers E, Boelen A. An update on non-thyroidal illness syndrome. *J Endocrinol Invest*. 2021;44(8):1597–1607. PMID: 33320308. [mechanism_review]
+[26]. Fliers E, Boelen A. An update on non-thyroidal illness syndrome. *J Endocrinol Invest*. 2021;44(8):1597–1607. PMID: 33320308. — tag: mechanism_review — tier: 2
 
-[27]. IFCC Committee for Standardization of Thyroid Function Tests (C-STFT). IFCC C-STFT: Standardization of Thyroid Function Tests. Available at: https://www.ifcc.org/ifcc-scientific-division/sd-committees/c-stft/. [regulatory]
+[27]. IFCC Committee for Standardization of Thyroid Function Tests (C-STFT). IFCC C-STFT: Standardization of Thyroid Function Tests. Available at: https://www.ifcc.org/ifcc-scientific-division/sd-committees/c-stft/. — tag: regulatory — tier: 3
 
-[28]. Iervasi G, Pingitore A, Landi P, et al. Low-T3 syndrome: a strong prognostic predictor of death in patients with heart disease. *Circulation*. 2003;107(5):708–713. PMID: 12578873. [cohort]
+[28]. Iervasi G, Pingitore A, Landi P, et al. Low-T3 syndrome: a strong prognostic predictor of death in patients with heart disease. *Circulation*. 2003;107(5):708–713. PMID: 12578873. — tag: cohort — tier: 1
 
-[29]. Sato Y, Yoshihisa A, Kimishima Y, et al. Low T3 syndrome is associated with high mortality in hospitalized patients with heart failure. *J Card Fail*. 2019;25(3):195–203. PMID: 30682427. [cohort]
+[29]. Sato Y, Yoshihisa A, Kimishima Y, et al. Low T3 syndrome is associated with high mortality in hospitalized patients with heart failure. *J Card Fail*. 2019;25(3):195–203. PMID: 30682427. — tag: cohort — tier: 2
 
-[30]. Zhao X, Tian Z, Sun M, Dong J. Combined use of low T3 syndrome and NT-proBNP as predictors for death in patients with acute decompensated heart failure. *BMC Endocr Disord*. 2021;21(1):136. PMID: 34215247. [cohort]
+[30]. Zhao X, Tian Z, Sun M, Dong J. Combined use of low T3 syndrome and NT-proBNP as predictors for death in patients with acute decompensated heart failure. *BMC Endocr Disord*. 2021;21(1):136. PMID: 34215247. — tag: cohort — tier: 3
 
-[31]. Asai K, Kamiya M, Oguchi K, et al. Relation of low triiodothyronine syndrome associated with aging and malnutrition to adverse outcome in patients with acute heart failure. *Am J Cardiol*. 2020;125(3):399–406. PMID: 31806208. [cohort]
+[31]. Asai K, Kamiya M, Oguchi K, et al. Relation of low triiodothyronine syndrome associated with aging and malnutrition to adverse outcome in patients with acute heart failure. *Am J Cardiol*. 2020;125(3):399–406. PMID: 31806208. — tag: cohort — tier: 2
 
-[32]. Wiersinga WM. T4+T3 combination therapy: an unsolved problem of increasing magnitude and complexity. *Endocrinol Metab (Seoul)*. 2021;36(5):971–981. PMID: 34587734. [mechanism_review]
+[32]. Wiersinga WM. T4+T3 combination therapy: an unsolved problem of increasing magnitude and complexity. *Endocrinol Metab (Seoul)*. 2021;36(5):971–981. PMID: 34587734. — tag: mechanism_review — tier: 2
 
-[33]. Spaulding SW, Chopra IJ, Sherwin RS, Lyall SS. Effect of caloric restriction and dietary composition of serum T3 and reverse T3 in man. *J Clin Endocrinol Metab*. 1976;42(1):197–200. PMID: 1249190. [rct]
+[33]. Spaulding SW, Chopra IJ, Sherwin RS, Lyall SS. Effect of caloric restriction and dietary composition of serum T3 and reverse T3 in man. *J Clin Endocrinol Metab*. 1976;42(1):197–200. PMID: 1249190. — tag: rct — tier: 1
