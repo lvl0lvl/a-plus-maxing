@@ -1,0 +1,21 @@
+{
+  "section": "A",
+  "brief_hash": "38dec70002f3957c892f91aac2bf32c6c94daad25be24a7b59b8d35ddfc501a5",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 90,
+    "citation_fidelity": 98,
+    "type_tag_discipline": 97,
+    "population_annotation": 94,
+    "route_fidelity": null,
+    "concentration_audit_handling": 96,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 96,
+    "completeness_vs_brief": 97
+  },
+  "total": 95,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [],
+  "summary": "Section A covers all rubric-mandated physiology elements (2-enzyme cofactor detail, 5-step absorption cascade, 80/20 transport split, multi-year store physiology, dual-unit reference ranges, measurement-limitation framing) with accurate mechanistic reasoning and no tag, host, or PMID mismatches; both spot-checked PMIDs (Stabler 23301732, Carmel 18606874) resolve exactly to the cited papers with correct sole-author attribution. Minor evidence-quality deduction for using two MDPI lower-trust open-access journals ([1] Int J Mol Sci, [2] Nutrients) as mechanism anchors, though no load-bearing claim is sole-sourced from them."
+}

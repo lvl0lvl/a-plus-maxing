@@ -108,6 +108,7 @@ Always admissible. Cite as `regulatory`.
 - `ods.od.nih.gov` (NIH Office of Dietary Supplements — vitamin/mineral fact sheets; US-government authoritative; added 2026-06-20 wiki-research)
 - `ashpublications.org` (American Society of Hematology — Blood, Blood Advances; flagship peer-reviewed hematology journals; added 2026-06-20 wiki-research)
 - `haematologica.org` (Haematologica — European Hematology Association / Ferrata Storti Foundation, peer-reviewed; added 2026-06-20 wiki-research)
+- `nice.org.uk` (National Institute for Health and Care Excellence — UK clinical guidelines [e.g. NG239 vitamin B12 deficiency]; authoritative guideline body; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`
