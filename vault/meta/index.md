@@ -53,6 +53,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[biomarkers/sodium]] (Serum sodium — Na⁺; category: blood; confidence: established)
 - [[biomarkers/potassium]] (Serum potassium — K⁺; category: blood; confidence: established)
 - [[biomarkers/vitamin-d]] (25-hydroxyvitamin D — vitamin D status; category: blood; confidence: established)
+- [[biomarkers/ferritin]] (Serum ferritin — iron stores / acute-phase; category: blood; confidence: established)
 
 ## protocols/
 - [[protocols/exercise]]
@@ -112,6 +113,7 @@ _(none yet)_
 - [[library/biomarkers/sodium/research-report]] (Serum sodium standard /aplus-research; 32 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/potassium/research-report]] (Serum potassium standard /aplus-research; 30 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/vitamin-d/research-report]] (25-hydroxyvitamin D standard /aplus-research; 33 sources; gates 2.75/3.5/4.25/4.75 attested)
+- [[library/biomarkers/ferritin/research-report]] (Serum ferritin standard /aplus-research; 35 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[methodology/anthropic-skill-evaluation-rubric]]
 
 ## dna/

@@ -106,6 +106,8 @@ Always admissible. Cite as `regulatory`.
 - `clinmedres.org` (Clinical Medicine & Research — Marshfield Clinic Health System, peer-reviewed, PMC-indexed; added 2026-06-20 wiki-research)
 - `nationalacademies.org` / `nap.edu` (National Academies of Sciences, Engineering, and Medicine — the IOM/NAM Dietary Reference Intakes reports; authoritative; added 2026-06-20 wiki-research)
 - `ods.od.nih.gov` (NIH Office of Dietary Supplements — vitamin/mineral fact sheets; US-government authoritative; added 2026-06-20 wiki-research)
+- `ashpublications.org` (American Society of Hematology — Blood, Blood Advances; flagship peer-reviewed hematology journals; added 2026-06-20 wiki-research)
+- `haematologica.org` (Haematologica — European Hematology Association / Ferrata Storti Foundation, peer-reviewed; added 2026-06-20 wiki-research)
 - `endocrine.org` (Endocrine Society — clinical practice guidelines; added 2026-06-19 wiki-research)
 - `nih.gov` (broader NIH content beyond PubMed)
 - `who.int`

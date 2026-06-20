@@ -377,7 +377,7 @@ table; after picking, append your claim** so the two tracks don't duplicate. A c
 | `feature/wiki-metabolic` worktree | **Thyroid** — TSH ✓, free T4 ✓, free T3 ✓ (3 entries) | 1 | standard | **DONE — all 3 ingested** (gates 2.75/3.5/4.25/4.75 attested + bda-clean) | 2026-06-19 |
 | `feature/wiki-metabolic` worktree | **Hormones (endocrine)** — total testosterone ✓, free testosterone ✓, SHBG ✓, estradiol ✓, cortisol (AM) ✓, DHEA-S ✓, IGF-1 ✓ (7 entries) | 1 | standard | **DONE — all 7 ingested** (gates 2.75/3.5/4.25/4.75 attested + bda-clean) | 2026-06-20 |
 | `feature/wiki-metabolic` worktree | **Metabolic — CMP organ markers** — ALT ✓, AST ✓, eGFR/creatinine ✓, albumin ✓, sodium ✓, potassium ✓ (6 entries; the executor-judged CMP liver/kidney/electrolyte subset worth standalone entries) | 1 | standard | **DONE** — 6/6 ingested (ALT/AST/eGFR/albumin/sodium/potassium), all gates attested + bda-clean | 2026-06-20 |
-| `feature/wiki-metabolic` worktree | **Vitamins / minerals** — vitamin D (25-OH) ✓, ferritin, vitamin B12, RBC magnesium (4 entries) | 1 | standard | **IN PROGRESS** — 1/4 done (vit-D ingested, gates attested + bda-clean); ferritin/B12/RBC-Mg remain | 2026-06-20 |
+| `feature/wiki-metabolic` worktree | **Vitamins / minerals** — vitamin D (25-OH) ✓, ferritin ✓, vitamin B12, RBC magnesium (4 entries) | 1 | standard | **IN PROGRESS** — 2/4 done (vit-D/ferritin ingested, gates attested + bda-clean); B12/RBC-Mg remain | 2026-06-20 |
 
 **Claim update mandate:** update this table when a subject is *claimed/started* (status `IN PROGRESS`), not only when it is done and ingested — so the parallel track never duplicates work that is underway. Flip a row to `DONE` as its entries land in the wiki.
 

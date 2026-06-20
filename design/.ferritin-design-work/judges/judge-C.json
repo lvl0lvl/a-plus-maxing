@@ -1,0 +1,73 @@
+{
+  "section": "C",
+  "brief_hash": "a9b9d0c109d9a60c8b72a65c6c70e1d503abc873aaf330e86dc1381012e6a994",
+  "iteration": 1,
+  "dimension_scores": {
+    "evidence_quality": 95,
+    "citation_fidelity": 87,
+    "type_tag_discipline": 95,
+    "population_annotation": 94,
+    "route_fidelity": null,
+    "concentration_audit_handling": 97,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 91,
+    "completeness_vs_brief": 97
+  },
+  "total": 94,
+  "threshold": 92,
+  "verdict": "PASS",
+  "findings": [
+    {
+      "id": "C-F01",
+      "dimension": "citation_fidelity",
+      "severity": "minor",
+      "location": "Standardization section, paragraph on Braga 2022",
+      "claim_in_section": "Braga et al. (2022) found that two major platforms — the Abbott Alinity and Roche Cobas — remained traceable to the long-depleted IS 80/602 rather than to IS 94/572, creating two independent calibration hierarchies in simultaneous clinical use.",
+      "verified_fact": "The Braga 2022 study (DOI: 10.1093/clinchem/hvac099, confirmed via academic.oup.com) compared FOUR platforms: Access Dxl (Beckman Coulter), Advia Centaur CP (Siemens), Alinity i (Abbott), and Cobas e801 (Roche). The dual-calibration-hierarchy conclusion is correct — Alinity and Cobas traced to IS 80/602, while Access Dxl traced to IS 94/572 directly and Advia traced to it indirectly through IS 80/578 — but the narrative characterizes the study as a two-platform comparison, omitting Beckman Coulter and Siemens. The oversimplification slightly misrepresents the study's scope while preserving the directionally accurate harmonization conclusion.",
+      "impact": "Minor fidelity gap; the load-bearing claims (22.9% CV, P < 0.00001, IS 80/602 traceability for the named platforms, dual-hierarchy conclusion) are all verified correct. No numeric claim is wrong. The simplification could mislead a reader about how broadly the inter-assay CV was established."
+    }
+  ],
+  "spot_checks": [
+    {
+      "ref": "[4] Braga 2022",
+      "doi": "10.1093/clinchem/hvac099",
+      "host": "academic.oup.com",
+      "host_whitelisted": true,
+      "first_author_verified": "Braga F (Federica Braga)",
+      "co_authors_verified": "Pasqualetti S, Frusciante E, Borrillo F, Chibireva M, Panteghini M — all confirmed",
+      "key_facts_verified": "CV 22.9% ✓; P < 0.00001 ✓; IS 80/602 traceability for Alinity + Cobas ✓; four platforms in study (section says two — finding C-F01)"
+    },
+    {
+      "ref": "[7] Wu & Hayden 2018",
+      "doi": "10.11613/BM.2018.010903",
+      "host": "biochemia-medica.com",
+      "host_whitelisted": true,
+      "first_author_verified": "Wu SJ (Shu Juan Wu)",
+      "co_authors_verified": "Hayden JA (Joshua A. Hayden) — confirmed",
+      "key_facts_verified": "Platform Siemens Centaur XP ✓; hook onset 86,028 µg/L ✓; 5-fold pre-dilution ✓; no hook up to 126,050 µg/L ✓"
+    },
+    {
+      "ref": "[5] Fox et al. 2022 (IS 19/118)",
+      "pmid": "34939377",
+      "doi": "10.1515/cclm-2021-1139",
+      "host": "degruyter.com",
+      "host_whitelisted": true,
+      "first_author_verified": "Fox B (Bernard Fox)",
+      "co_authors_verified": "Roberts G, Atkinson E, Rigsby P, Ball C — all confirmed",
+      "key_facts_verified": "IS 19/118 assigned potency 10.5 µg/ampoule ✓; 12 laboratories ✓; 9 countries ✓; recombinant human L-chain ferritin ✓"
+    }
+  ],
+  "host_whitelist_audit": {
+    "[1] Journal of Clinical Laboratory Analysis": "wiley.com — PASS",
+    "[2] Clinical Chemistry and Laboratory Medicine": "degruyter.com — PASS",
+    "[3] Blood": "ashpublications.org — PASS",
+    "[4] Clinical Chemistry": "academic.oup.com — PASS",
+    "[5] Clinical Chemistry and Laboratory Medicine": "degruyter.com — PASS",
+    "[6] Pediatric Blood & Cancer": "wiley.com — PASS",
+    "[7] Biochemia Medica": "biochemia-medica.com — PASS",
+    "[8] Clinical Chemistry": "academic.oup.com — PASS",
+    "[9] Clinical Biochemistry": "sciencedirect.com — PASS",
+    "[10] Inflammatory Bowel Diseases": "oup.com/lww.com — PASS"
+  },
+  "summary": "Section C is a rigorous, well-sourced treatment of ferritin immunoassay measurement: all three load-bearing requirements (WHO IS generation history, Braga 2022 inter-assay CV 22.9% + dual-calibration-hierarchy, hook effect onset at 86,028 µg/L + dilution fix) are present, numerically correct, and traceable to spot-checked whitelisted sources. One minor citation-fidelity finding: the Braga study is characterized as a two-platform comparison when it enrolled four platforms; the harmonization conclusion is correct but the narrative undersells the study's breadth."
+}
