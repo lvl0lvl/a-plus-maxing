@@ -88,6 +88,9 @@ def test_held_finding_without_adjudicator_records_and_queues_nothing(tmp_path):
     assert store.read("plan::supplements", root=tmp_path) == []
     assert out["dvq_entries"] == []                                   # un-adjudicated -> not queued
     assert store.read("dvq::queue", root=tmp_path) == []
+    # PARTIAL split at the seam: the non-conflicting peptides domain still records alongside the hold
+    assert out["results"]["peptides"]["recorded"] is True
+    assert len(store.read("plan::peptides", root=tmp_path)) == 1
 
 
 # --- block-stands: no plan, but the MD still sees the finding ------------------
@@ -169,3 +172,42 @@ def test_adversarial_mutation_records_authored_content(tmp_path):
     pipeline.run_generation(authors, store_read, tmp_path, plan_date=PLAN_DATE)
     names = [ex["name"] for ex in plan_schema.read_plan("workout", PLAN_DATE, tmp_path)["plan"]["exercises"]]
     assert "Distinctive-pipeline-lift" in names
+
+
+# --- the seam FORWARDS gates + reauthor to generate_plans (the wiring contract) ---
+
+def test_gates_forwarded_clearance_keeps_load(tmp_path):
+    """gates reach compute_plan THROUGH the seam: a non-default clearance_granted=True KEEPS load.
+    (A severed gates=None at the seam would default-deny and drop the load -> this goes RED.)"""
+    store_read = _seed_store(tmp_path)
+    authors = {"workout": _recon(_author(_workout_rec("Back squat", 3, load="70% 1RM")),
+                                 energy_cost_kcal=500)}
+    out = pipeline.run_generation(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                                  gates={"clearance_granted": True})
+    assert out["results"]["workout"]["recorded"] is True
+    ex = plan_schema.read_plan("workout", PLAN_DATE, tmp_path)["plan"]["exercises"][0]
+    assert ex.get("load") == "70% 1RM"                               # cleared load survived -> gates forwarded
+
+
+def test_reauthor_forwarded_energy_bounce_records(tmp_path):
+    """The reauthor hook reaches generate_plans THROUGH the seam: an energy bounce re-dispatches and
+    the reduced workout records. (A severed reauthor=None at the seam would HOLD it -> this goes RED.)"""
+    store_read = _seed_store(tmp_path)
+    authors = {
+        "workout": _recon(_author(_workout_rec("Heavy back squat", 5)), energy_cost_kcal=900),
+        "nutrition": _nutrition(
+            _nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600),
+            energy_budget={"sustains": False, "sustainable_training_kcal": 450}),
+    }
+    calls = []
+
+    def reauthor(domain, constraint):
+        calls.append((domain, constraint))
+        return _recon(_author(_workout_rec("Light goblet squat", 2)), energy_cost_kcal=400)
+
+    out = pipeline.run_generation(authors, store_read, tmp_path, plan_date=PLAN_DATE, reauthor=reauthor)
+    assert out["reauthored"] is True                                 # the bounce re-dispatch ran via the seam
+    assert calls == [("workout", {"sustainable_training_kcal": 450})]
+    assert out["results"]["workout"]["recorded"] is True
+    recorded = plan_schema.read_plan("workout", PLAN_DATE, tmp_path)["plan"]
+    assert recorded["exercises"][0]["name"] == "Light goblet squat"  # the reduced re-author, not the bounced load
