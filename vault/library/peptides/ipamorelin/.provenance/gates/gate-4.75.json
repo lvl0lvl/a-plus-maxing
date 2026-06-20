@@ -1,0 +1,116 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "timestamp": "2026-06-20T16:50:06.828415+00:00",
+  "iterations": 2,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 41,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 2,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 13,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 10,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS",
+      "findings": [
+        "Prior IC-12 HALT resolved: Section D bibliography [5] (en.wikipedia.org/wiki/Ipamorelin) removed; D bibliography now 4 entries [1]-[4]; no dangling [5] in D live body; D-4/D-5 re-grounded on [1]+[3]+[4] (Beck RCT + 2 ClinicalTrials.gov registry records); grep 'wikipedia' over all live section bodies (Post-fix grep audit blocks excluded) = 0 matches."
+      ],
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "findings": [
+        "6 load-bearing numerical claims spot-verified (Beck 2014 25.3/32.6h p=0.15 n=114; Gobburu t1/2 2h, CL 0.078, Vss 0.22, SC50 214; Raun potency; Svensson + Venkova PMIDs resolve) \u2014 all MATCH.",
+        "corpus-missing (paywall, WARN not HALT): glucocorticoid-bone 2001 (\u00a7F[4], ScienceDirect 403) and Svensson 2000 (\u00a7C[2]/\u00a7F[3], paywalled full text)."
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 13,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 5,
+    "largest_cluster_name": "Novo Nordisk",
+    "largest_cluster_count": 4,
+    "share": 0.8,
+    "threshold_triggered": true,
+    "surfaced_section_heading": "Concentration audit (dominant labs; estimated single-lab share + method)",
+    "surfaced_before_first_indication": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 6,
+    "claims_failed": [
+      {
+        "claim": "ipamorelin counteracts glucocorticoid-induced decrease in bone formation (Growth Horm IGF Res 2001)",
+        "cite_key": "glucocorticoid-bone-2001",
+        "failure_mode": "corpus-missing",
+        "grep_command": "WebFetch ScienceDirect S1096637401902394",
+        "grep_output": "403 paywalled \u2014 full text not retrievable; bibliographic listing verified"
+      },
+      {
+        "claim": "ipamorelin 0.5 mg/kg/day continuous SC increased tibial/vertebral BMC (Svensson 2000)",
+        "cite_key": "svensson-2000",
+        "failure_mode": "corpus-missing",
+        "grep_command": "efetch PMID 10828840 + journal full text (J Endocrinol 165:569)",
+        "grep_output": "PMID 10828840 resolves to exact cited title/journal/year; full text paywalled, abstract figures corroborated via search"
+      }
+    ]
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: 2 corpus-missing (paywalled primaries: glucocorticoid-bone 2001, Svensson 2000) \u2014 WARN not HALT per IC-13 policy.",
+    "corpus_scoping.claims_failed entries are corpus-missing (paywall) WARNs, not quote/number-not-found failures."
+  ],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T16:43:37.131910+00:00",
+    "attest_ts": "2026-06-20T16:52:12.941576+00:00",
+    "iteration": 2,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "3f8e2a97d5bc40049dc595749b0e944091c78ee58f969819414ce8a8d3d8431a",
+    "agent_source_mtime": "2026-06-20T16:51:08.486390+00:00"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "mode": "deep",
+  "timestamp": "2026-06-20T17:26:28Z",
+  "iterations": 1,
+  "practitioner_layer": {
+    "path": "vault/library/peptides/ipamorelin/practitioner-layer.md",
+    "present": true,
+    "sha256": "7a008435171ba602921bf92fe012c386e7e191a0b1b4b1c97d1590f0fab3afd6",
+    "compounding_sheets_count": 0,
+    "compounding_sheets_or_null_finding": true,
+    "named_physicians_count": 2,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/ipamorelin/non-english-layer.md",
+    "present": true,
+    "sha256": "f230a8e40d501dde3c2167e8a1bce14c51e059151e9c5c304ffbd6d67177ad7f",
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "Other"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T17:25:09.533145+00:00",
+    "attest_ts": "2026-06-20T17:27:50.291974+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "e6f20428f254660ef08262e39f8ffc6724c8ae68e2f2587879a470ee7845a457",
+    "agent_source_mtime": "2026-06-20T17:26:57.081239+00:00"
+  }
+}
