@@ -24,7 +24,9 @@ from tests.plan.test_generate_plan import (
     _author,
     _nutrition_meal_rec,
     _nutrition_target_rec,
+    _peptide_rec,
     _seed_store,
+    _supplement_rec,
     _workout_rec,
 )
 from tests.plan.test_orchestrate import (
@@ -106,6 +108,7 @@ def test_block_stands_not_recorded_but_still_queued(tmp_path):
     entry = out["dvq_entries"][0]
     assert entry["held_domain"] == "supplements" and entry["outcome"] == "block-stands"
     assert entry["non_overridable"] is True
+    assert entry["composite_band"] == "CRITICAL"                      # the REAL band threaded for MD ranking, not None
 
 
 # --- on_date value domain: defaults to plan_date ------------------------------
@@ -125,6 +128,15 @@ def test_on_date_defaults_to_plan_date(tmp_path):
         plan_date=PLAN_DATE, on_date="2026-07-15", adjudicator=_liaison("MEDIUM"))
     assert all(r["timepoint"] == "2026-07-15"
                for r in store.read("dvq::queue", root=tmp_path / "apart"))
+
+    # the collation date is the caller's FREE choice (by design — no plan_date-coherence guard):
+    # an EARLIER on_date back-dates the queue, accepted.
+    store_read3 = _seed_store(tmp_path / "back")
+    pipeline.run_generation(
+        _conflict_authors(supp_conflicts=_SUPP_CONFLICT), store_read3, tmp_path / "back",
+        plan_date=PLAN_DATE, on_date="2026-01-01", adjudicator=_liaison("MEDIUM"))
+    assert all(r["timepoint"] == "2026-01-01"
+               for r in store.read("dvq::queue", root=tmp_path / "back"))
 
 
 # --- empty authors record nothing ---------------------------------------------
@@ -211,3 +223,37 @@ def test_reauthor_forwarded_energy_bounce_records(tmp_path):
     assert out["results"]["workout"]["recorded"] is True
     recorded = plan_schema.read_plan("workout", PLAN_DATE, tmp_path)["plan"]
     assert recorded["exercises"][0]["name"] == "Light goblet squat"  # the reduced re-author, not the bounced load
+
+
+# --- the collation emits one dvq entry PER adjudicated axis (multi-entry, rx-bpmh) ---
+
+def test_multi_axis_collates_both_findings_through_seam(tmp_path):
+    """A supplement held under BOTH additive-AE AND cross-domain-conflict yields TWO dvq entries
+    through the seam — collate emits one per adjudicated axis (the >1-entry collation path)."""
+    store_read = _seed_store(tmp_path)
+    authors = _conflict_authors(supp_conflicts=_SUPP_CONFLICT)
+    authors["supplements"] = _recon(
+        _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist"),
+        conflicts=_SUPP_CONFLICT, ae_profile={"additive_classes": ["bleeding-risk"]})
+    authors["peptides"] = _recon(
+        _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist"),
+        ae_profile={"additive_classes": ["bleeding-risk"]})
+    out = pipeline.run_generation(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                                  adjudicator=_liaison("MEDIUM"))
+    axes = sorted(e["axis"] for e in out["dvq_entries"])
+    assert axes == ["additive-ae", "cross-domain-conflict"]           # both adjudicated axes collated
+    assert len(store.read("dvq::queue", root=tmp_path)) == 2          # both finding_ids landed in the stream
+
+
+def test_rx_bpmh_axis_collates_through_seam(tmp_path):
+    """The supplement<->Rx BPMH axis flows through the seam: a compound whose declared class stacks
+    against the operator's curated Rx-interaction classes is held, adjudicated, and collated rx-bpmh."""
+    store_read = _seed_store(tmp_path, **{"rx-interaction-classes": "bleeding-risk"})
+    authors = {"supplements": _recon(
+        _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist"),
+        ae_profile={"additive_classes": ["bleeding-risk"]})}
+    out = pipeline.run_generation(authors, store_read, tmp_path, plan_date=PLAN_DATE,
+                                  adjudicator=_liaison("MEDIUM"))
+    rx = [e for e in out["dvq_entries"] if e["axis"] == "rx-bpmh"]
+    assert len(rx) == 1                                               # the rx-bpmh collation branch ran
+    assert any(r["value"]["axis"] == "rx-bpmh" for r in store.read("dvq::queue", root=tmp_path))

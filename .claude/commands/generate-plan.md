@@ -26,7 +26,9 @@ Invoke the `generate-plan` skill to produce a plan for a date. Skill is project-
 2. **Dispatch** each domain specialist (full profile inlined per INV-ROLE-INLINING) over the summary →
    capture the `{specialist, recommendations[], reconciliation{}}` envelope → build `authors`.
 3. **Run** `scripts/plan/pipeline.py` `run_generation(authors, …, reauthor=<2nd-PT-dispatch hook>,
-   adjudicator=<medical-liaison hook>)` — the reconciled pass + the doctor-visit-queue collation.
+   adjudicator=<medical-liaison hook>)` — the reconciled pass + the doctor-visit-queue collation. It
+   returns the `generate_plans` record (`results` / `reconciliation` / `adjudication` / …) merged with
+   a `dvq_entries` key (the collated doctor-visit-queue entries; `[]` when no finding reached the gate).
 4. **Render** via `python -m scripts.generate.generate <artifact>`.
 5. **Report** what recorded, what HELD (the honest no-plan states), and the dvq entries for the MD.
 
