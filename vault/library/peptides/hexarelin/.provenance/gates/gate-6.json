@@ -1,0 +1,19 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-hex-i1",
+  "draft_path": "vault/library/peptides/hexarelin/research-report.md",
+  "findings": [],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-20T22:21:48.778068+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T22:18:56.037143+00:00",
+    "attest_ts": "2026-06-20T22:21:48.778071+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "196f751a3b33fd0db7416a832788c250a1daed247e5fb23bd0615770e1dd2345",
+    "agent_source_mtime": "2026-06-20T22:21:28.959996+00:00"
+  }
+}

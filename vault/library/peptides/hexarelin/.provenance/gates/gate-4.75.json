@@ -1,0 +1,94 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 120,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 7,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 2
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 2,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 2
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 3,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 7,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 3,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 8,
+    "largest_cluster_name": "University of Turin (Ghigo/Arvat/Broglio/Bisi) \u2014 largest single first-author lineage",
+    "largest_cluster_count": 2,
+    "share": 0.25,
+    "threshold_triggered": false,
+    "surfaced_section_heading": "Concentration audit (Section C)"
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 7,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-10/IC-13: WADA 2026 Prohibited List primary PDF (wada-ama.org) not renderable through WebFetch (binary PDF + JS landing page); drugs.com mirror HTTP 403 \u2014 corpus-missing fetch-tooling artifact, not a non-resolving URL; substantive 'hexarelin = examorelin, WADA-prohibited at all times under S2 as named GHRP' independently corroborated via navigation-aid source; exact 'S2.2.4' decimal not re-verified through tooling this pass",
+    "concentration_audit: developer-footprint caveat \u2014 Deghenghi/Mediolanum (developer) is co-author or supplier on 4/8=50% of primaries and the two human cardiac-inotropy confirmations [4][5] are both from the same Turin lab (no cross-lab independent human replication); below 0.70 threshold so threshold_triggered=false, but surfaced as a caveat per brief",
+    "minor cross-section population-descriptor nit: Section B [7] tags Rahim/O'Neill/Shalet 1998 JCEM (PMID 9589671) as '[adults]' while Section C [2] (same paper) describes it as '12 healthy elderly subjects' \u2014 Section C 'elderly' descriptor is the precise one; minor within-corpus inconsistency, not a population-mismatch-gate violation (no animal/in_vitro number unflagged)"
+  ],
+  "timestamp": "2026-06-20T22:10:15.493261+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T22:05:51.008099+00:00",
+    "attest_ts": "2026-06-20T22:10:15.493264+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "8a9f8a5c5452524e4cc2ee250084a44dc80c9f60729ce28da4c071df5850bc57",
+    "agent_source_mtime": "2026-06-20T22:09:42.648177+00:00"
+  }
+}
