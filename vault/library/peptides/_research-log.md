@@ -212,7 +212,26 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 - **Tesamorelin-miscredit guard held:** Baker 2012 (PMID 22869065) is tesamorelin and the GHRH-1,44 walk/stair/visceral-fat results are full-length GHRH — explicitly NOT credited to sermorelin (vendor blogs routinely conflate them). Single-lineage ~50% (below the 0.70 flag); folding in the miscredits would spuriously raise it.
 - Regulatory: no marketed FDA product today but heavily §503A-COMPOUNDED via the component-of-a-formerly-approved-drug pathway (21 USC 353a(b)(1)(A); interim bulks-list category honestly hedged as not primary-confirmable); NOT among the Apr-2026 removed-12; FR Doc 2026-07361 = the July-2026 PCAC meeting notice (not "the removal action"). WADA S2.2.4 prohibited (named). Compounded convention ~100-500 mcg SC nightly ± GHRP/ipamorelin (Empower/Strive/Olympia data sheets); pediatric label 30 µg/kg/day kept distinct.
 
-### NEXT (reserved, my/primary lane): **Hexarelin** (sweep entry 9), then MK-677 → Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
+---
+
+## 2026-06-20 — Hexarelin (GHRP, GHS-R1a + CD36) deep-pass (sweep entry 9, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **Hexarelin entry shipped:** `compounds/hexarelin.md` + `library/peptides/hexarelin/research-report.md` (~11.5K words, 40 unified citations + crosswalk) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections incl. id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Gates earned keep:** §E HALTed (91) on sourcing-tier (WADA naming rested on mirror sites with a "did not parse / indicative" hedge) → re-anchored to the **wada-ama.org primary 2026 List**, S2.2.4 verbatim (examorelin/hexarelin named). 4.75 json needed a structure fix (population_mismatch nested → lifted top-level). Phase-6 critique was zero-findings.
+- **Final independent full-bib audit: 22/23 identifier entries verified, 0 fabrications, 0 Wikipedia; 1 fix** — citation [25] lead author Murphy N → **Knuppel A** (UK Biobank IGF-I/30-cancers, PMID 32709735) + 2 omitted PMIDs added ([7] 9589671, [9] 10404825). Compound-entry consistency PASS.
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- Hexarelin is a **GHRP — a ghrelin-receptor (GHS-R1a) agonist + CD36 binder**, the SAME class as GHRP-6/GHRP-2/ipamorelin — **NOT a GHRH analogue** (contrast sermorelin/CJC-1295/tesamorelin). Synthetic hexapeptide (Deghenghi/Mediolanum; Turin/Ghigo research lineage). Short half-life; Ghigo 1994 human PK.
+- **DEFINING LIMITATION = tachyphylaxis:** Rahim/O'Neill/Shalet 1998 (JCEM, PMID 9589671) — 1.5 µg/kg SC BID × 16 wk in healthy elderly (n=12) → GH AUC 19.1→10.5 µg/L·h (~45% decline), **IGF-1/IGFBP-3 UNCHANGED** (p=0.24/0.74), body-comp/BMD unchanged, reversible by wk-20. Acute GH spikes ≠ durable effect.
+- **Less selective than ipamorelin:** meaningfully raises cortisol/ACTH (CRH-independent, AVP-mediated — Korbonits 1999) and prolactin.
+- **CD36 cardiac line** (Bodart 2002 Circ Res; Broglio/Bisi): GH-independent cardioprotection, but mostly PRECLINICAL (rat I/R, perfused heart) — human = acute positive inotropy only; the diseased-heart (dilated-CMP) human study did NOT respond. INVESTIGATIONAL.
+- **ABSENT:** body-composition/fat-loss/muscle, anti-aging/longevity, athletic performance, any Phase-3/approval — ZERO robust human data. Acute hexarelin did NOT alter glucose/insulin (unlike ghrelin); GH-axis metabolic risks flagged EXTRAPOLATED.
+- Concentration audit: Turin/Ghigo first-author ~25% (below 0.70 flag), but Deghenghi/Mediolanum developer footprint ~50% + no cross-lab human replication of the cardiac signal — surfaced.
+- Regulatory: never approved (Mediolanum Phase II discontinued); §503A NOT in the Apr-2026 removed-12, effectively unlisted/not-nominated (honest hedge); FR-2026-07361 = July-2026 PCAC notice; WADA S2.2.4 prohibited at all times (examorelin/hexarelin named, primary-anchored). No compounding data sheet found; gray-market only.
+
+### NEXT (reserved, my/primary lane): **MK-677 (Ibutamoren)** (sweep entry 10 — note: an orally-active small-molecule ghrelin-receptor agonist, NOT strictly a peptide), then Semaglutide → Tirzepatide → Retatrutide → AOD-9604 → Selank. (Semaglutide/Tirzepatide/Retatrutide have stale predecessor branches → push as `-gated`. Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
 
 ---
 

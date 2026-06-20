@@ -30,6 +30,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/cjc-1295]] (status: researching; evidence_tier: C; risk_tier: experimental)
 - [[compounds/tesamorelin]] (status: researching; evidence_tier: B; risk_tier: medium)
 - [[compounds/sermorelin]] (status: researching; evidence_tier: B; risk_tier: medium)
+- [[compounds/hexarelin]] (status: researching; evidence_tier: C; risk_tier: experimental)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -124,6 +125,9 @@ _(none yet)_
 - [[library/peptides/sermorelin/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~11.7K words; 35 unified citations + crosswalk; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 17/17 verified, 0 fabrications, 0 Wikipedia, 0 fixes; GRF(1-29) prototype, formerly-approved Geref [withdrawn 2008, commercial] — evidence_tier B / risk_tier medium)
 - [[library/peptides/sermorelin/practitioner-layer]] (2026-06-20; compounded ~100–500 mcg SC nightly ± GHRP [Empower/Strive/Olympia data sheets]; pediatric Geref label 30 µg/kg/day kept distinct)
 - [[library/peptides/sermorelin/non-english-layer]] (2026-06-20; one Russian-language review context-only; Chinese none-located; originator English-published)
+- [[library/peptides/hexarelin/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~11.5K words; 40 unified citations + crosswalk; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 22/23 verified + 1 author fixed, 0 fabrications, 0 Wikipedia; GHRP/ghrelin-receptor+CD36, tachyphylaxis-limited — evidence_tier C / risk_tier experimental)
+- [[library/peptides/hexarelin/practitioner-layer]] (2026-06-20; ~100 mcg SC 2–3×/day cycled for tachyphylaxis; NO compounding data sheet found [never §503A-nominated]; gray-market only)
+- [[library/peptides/hexarelin/non-english-layer]] (2026-06-20; one Russian-language review context-only; Chinese/Italian none-located; Mediolanum originator English-published)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)

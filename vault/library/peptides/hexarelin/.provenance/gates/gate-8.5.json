@@ -1,0 +1,37 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/hexarelin/practitioner-layer.md",
+    "present": true,
+    "sha256": "f57818d8c8f5d4033caee76f4c030778bf8793d00ae00235441bf06b465968dd",
+    "compounding_sheets_count": 0,
+    "compounding_sheets_or_null_finding": true,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/hexarelin/non-english-layer.md",
+    "present": true,
+    "sha256": "0f41b02bbab49a3f089f89eefe1d0eb417e986789216e2ef191b5d8f60464689",
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "Other"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-20T22:28:16.157228+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T22:26:46.514766+00:00",
+    "attest_ts": "2026-06-20T22:28:16.157231+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "251fefd4d923d521c76a0200706456d9676206379951fc42a832cc91514b176c",
+    "agent_source_mtime": "2026-06-20T22:27:53.331670+00:00"
+  }
+}
