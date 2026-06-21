@@ -20,6 +20,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import hk_record, write_healthkit_export as _write_healthkit_export
+
 from scripts.store import store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -31,27 +33,6 @@ def _write_json_export(path, rows):
     import json
 
     path.write_text(json.dumps(rows))
-
-
-def _write_healthkit_export(path, records):
-    """Write a real-shape Apple Health `export.xml` with the given `<Record>` samples.
-
-    Mirrors the Apple Health export format: a `<HealthData>` root over per-sample `<Record>`
-    elements (`type` = an HKQuantityTypeIdentifier, `startDate`/`endDate` = "YYYY-MM-DD HH:MM:SS
-    -ZZZZ", `value`). `records` is a list of dicts keyed `type`/`startDate`/`value` (+ optional
-    `endDate`). Building the real XML shape (not a stand-in) keeps the test exercising the adapter's
-    actual streamed-parse path.
-    """
-    lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<HealthData locale="en_US">',
-             ' <ExportDate value="2026-06-20 12:00:00 -0500"/>']
-    for r in records:
-        lines.append(
-            f' <Record type="{r["type"]}" sourceName="Apple Watch" '
-            f'startDate="{r["startDate"]}" endDate="{r.get("endDate", r["startDate"])}" '
-            f'value="{r["value"]}"/>'
-        )
-    lines.append('</HealthData>')
-    path.write_text("\n".join(lines))
 
 
 def _numstat_rows(baseline_ref, paths):
@@ -223,8 +204,8 @@ def test_healthkit_read_fails_loud_on_bad_export(tmp_path, make_bad):
 
 def _hk_hrv(day, value):
     """One HealthKit HRV `<Record>` dict for the given day (08:00 sample)."""
-    return {"type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
-            "startDate": f"{day} 08:00:00 -0500", "value": value}
+    return hk_record("HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+                     f"{day} 08:00:00 -0500", value)
 
 
 def test_healthkit_cross_stream_no_collision(tmp_path, store_root):
