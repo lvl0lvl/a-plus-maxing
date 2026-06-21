@@ -1,0 +1,106 @@
+## ADR-0014: Web-Form Capture and Persistence of Operator Profile/Training/Nutrition/Supplement Input
+
+> **Y-Statement:** In the context of a single-operator health system whose personalization inputs are fully scaffolded but populated today only by manual fill — no code writes operator input into the scaffolds, the intake wizard renders read-only, and `init_instance.run` "rewrites no scaffold" — facing the tension that a point-and-click capture form must persist training/nutrition/supplement input that is operator PII the moment it is entered, without breaching either the PII-free trunk (ADR-0005) or the model boundary (ADR-0001), we decided to sanction the intake wizard as the first automated scaffold-write path that routes each captured field by data class — de-identified `SUMMARY_FIELD_SET`-token fields to the local time-series store under their token name with `source: "intake"`, raw/rich context to the gitignored `vault/scaffold/filled/` prefix — so captured input reaches specialists only through `router.summarize`'s closed de-identification gate, to achieve point-and-click profile capture that flows into the wired plan through the existing consumer contract, accepting that this introduces the first automated scaffold-writer on the PII fault line (a capture bug could mis-route raw PII) and that nutrition and the supplement/peptide stack have no de-identified consumer today, so they are captured to the gitignored scaffold as record-only until a future field-set extension.
+
+```yaml
+id: ADR-0014
+title: "Web-Form Capture and Persistence of Operator Profile/Training/Nutrition/Supplement Input"
+status: accepted
+date: 2026-06-21
+decision-makers: [Walter McGivney]
+tags: [intake, capture, persistence, pii, scaffold, store, personalization]
+```
+
+### Context
+
+The personalization data layer is fully scaffolded but, by verified on-disk state, has no automated writer. `vault/meta/operator-profile.md`, `goals.md`, and `current-state.md` exist as `status: scaffold` pages holding placeholder prompts and no real values; filling them is what creates the PII surface ([PRD-v1, Finding 2 L353](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]). The PRD's only capture assumption is manual fill: "The operator fills the scaffolded profile/goals/current-state with real values before plan production" ([PRD-v1, A-1 L292](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]). Three live code paths confirm nothing automates this today: `init_instance.run` "seeds no reading and rewrites no scaffold" ([scripts/clone/init_instance.py L9, L162-163](../../scripts/clone/init_instance.py) [VERIFIED]); the intake wizard `render` produces a "static flow shell" whose Steps 3-5 (Training / Nutrition / Supplements & peptides) carry placeholder fields only ([vault/design/templates/intake.py L6-7, L206-239](../../vault/design/templates/intake.py) [VERIFIED]); and the `vault/scaffold/filled/` prefix that ADR-0005 pinned as the filled-value path does not yet exist on disk, so this decision is the first real producer of that forward convention ([ADR-0005, AMENDED 2026-06-09 rnm](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) [VERIFIED]; [.gitignore L5](../../.gitignore) [VERIFIED]).
+
+Several forces pull against each other across more than one stakeholder. The operator wants point-and-click capture rather than hand-editing markdown scaffolds — the friction A-1's manual fill imposes. Against that, the data subject's PII is at stake the moment a field is entered: training maxes, dietary restrictions, a supplement/peptide stack, raw symptoms, date of birth, and address are all operator PII, and once one lands in a tracked commit, git history cannot be cleanly scrubbed ([ADR-0005, Context](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) [VERIFIED]). The model boundary adds a third constraint: captured raw values must never reach a specialist except through the single de-identification gate — `router.summarize` reads store state over the closed `SUMMARY_FIELD_SET`, derives bands/classes from raw-PII source items, and `dispatch` rejects any payload field outside that set ([scripts/plan/router.py L18-36, L435-475](../../scripts/plan/router.py) [VERIFIED]). A capture path that wrote operator input anywhere these guards do not see it would defeat them. The decision therefore sits at the intersection of capture ergonomics, version-control PII exclusion, and the model trust boundary.
+
+### Decision
+
+Sanction the interactive intake wizard as an automated path that populates operator profile/goals/current-state, alongside — not replacing — manual scaffold fill. Captured input is persisted by data class: de-identified fields that map to a `SUMMARY_FIELD_SET` token are written to the local time-series store via `store.append`, the item named exactly as the token and tagged `source: "intake"`; raw and rich context is written to the gitignored `vault/scaffold/filled/` prefix and never to a tracked scaffold page. Raw PII is written only to the raw-PII items that `router.summarize` de-identifies (so a raw symptom derives `active-issue-class`) or to the gitignored scaffold — never directly into a `SUMMARY_FIELD_SET` store item, where the `summarize` PII gate would raise on a named-excluded token. Captured input reaches specialists only through `router.summarize`'s closed `SUMMARY_FIELD_SET` de-identification gate.
+
+### Rationale
+
+The capture/persistence model was evaluated against three alternatives across four criteria the existing architecture makes load-bearing: PII-free-trunk preservation, model-boundary preservation, consumer-contract reuse, and capture ergonomics.
+
+On **PII-free-trunk preservation**, the two-surface rule keeps every captured value off the tracked tree: de-identified tokens land in the gitignored store (`vault/store/`), raw/rich context lands in the gitignored `vault/scaffold/filled/` — both already excluded ([.gitignore L4-5](../../.gitignore) [VERIFIED]) and the latter the exact literal `block-pii-commit.sh` denies a staged commit on ([ADR-0005, AMENDED 2026-06-09 rnm](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) [VERIFIED]). Writing into the tracked scaffold pages (Alternative B) fails this outright. On **model-boundary preservation**, routing de-identified fields to store items named for their `SUMMARY_FIELD_SET` token means `summarize` reads them through the same path it already reads, and the raw-PII a capture form collects (date-of-birth, raw symptom free-text, postal address) goes to the raw-PII source items `summarize` derives a band/class from — never into a field-set item, where the 8j6 gate raises ([scripts/plan/router.py L80-85, L405-430](../../scripts/plan/router.py) [VERIFIED]). On **consumer-contract reuse**, the store's line schema already carries a `source` field, so `source: "intake"` is a provenance tag the existing append/read surface accepts with no schema change ([scripts/store/keying.py L11](../../scripts/store/keying.py) [VERIFIED]; [scripts/store/store.py L134-162](../../scripts/store/store.py) [VERIFIED]), and `assemble` reasons only over the `summarize` summary, so a captured field that lands under its token name flows into the plan with no new consumer ([scripts/plan/assemble.py L1-21](../../scripts/plan/assemble.py) [VERIFIED]). A new namespace/stream (Alternative C) would force a parallel consumer the wired path does not read. On **capture ergonomics**, this turns the read-only wizard shell into a working point-and-click flow, removing the A-1 manual-fill friction the operator asked to remove ([vault/design/templates/intake.py L6-7](../../vault/design/templates/intake.py) [VERIFIED]).
+
+Long-term, the de-identified-vs-raw routing becomes a standing discipline: every captured field must be classified against the `SUMMARY_FIELD_SET` / `EXCLUDED_RAW_PII` split before it is written, and fields with no de-identified consumer today (nutrition, the supplement/peptide stack) are captured to the gitignored scaffold as record-only until the field-set is extended by a future PII-boundary decision — they do not silently flow into the plan in the meantime.
+
+### Consequences
+
+**Positive:**
+- Point-and-click profile capture that flows into the plan through the existing de-identification gate: a captured de-identified field written to its `SUMMARY_FIELD_SET`-named store item is read by `summarize` and reaches `assemble` with no new consumer contract ([scripts/plan/router.py L390-432](../../scripts/plan/router.py) [VERIFIED]; [scripts/plan/assemble.py L1-21](../../scripts/plan/assemble.py) [VERIFIED]).
+- Reuses the existing store and the existing gitignore/PII guard rather than introducing new mechanism: `store.append` with `source: "intake"` needs no schema change, and `vault/store/` + `vault/scaffold/filled/` are already gitignored and guarded by `block-pii-commit` ([scripts/store/store.py L134-162](../../scripts/store/store.py) [VERIFIED]; [.gitignore L4-5](../../.gitignore) [VERIFIED]).
+- This is the capture half of the profile/goals/current-state inputs ADR-0006's roster reasons over, so an operator who completes the wizard produces a personalized plan from their own inputs without hand-editing markdown ([ADR-0006, Decision](ADR-0006-multi-domain-plan-assembly-via-roster.md) [VERIFIED]).
+
+**Negative:**
+- It introduces the FIRST automated scaffold-writer, so a capture bug could write raw PII to the wrong surface — a raw value mis-routed into a `SUMMARY_FIELD_SET` store item, or a filled scaffold written to a tracked page. The risk is mitigated but not eliminated by the two-surface rule, the `summarize` 8j6 gate raising on raw PII in a field-set item, and `block-pii-commit` denying a staged filled scaffold; none of these is a substrate-level prevention of the wrong write happening before the guard fires ([scripts/plan/router.py L405-430](../../scripts/plan/router.py) [VERIFIED]; [ADR-0005, Consequences Negative](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) [VERIFIED]).
+- Nutrition (Step 4) and the supplement/peptide stack (Step 5) have no de-identified `SUMMARY_FIELD_SET` consumer today: the closed field-set carries no dietary-pattern or supplement-stack token ([scripts/plan/router.py L18-36](../../scripts/plan/router.py) [VERIFIED]; [vault/design/templates/intake.py L219-239](../../vault/design/templates/intake.py) [VERIFIED]). This ADR captures them to the gitignored scaffold as record/future-use only; they do NOT flow into the plan until the field-set is extended by a separate future ADR-0006-T0 PII-boundary decision — a standing 1+ year constraint that closes only when that token forms are decided and reviewed.
+- The de-identified-vs-raw routing is a permanent discipline cost: every captured field, and every field added to the wizard later, must be classified against the field-set / excluded-PII split before it is persisted, or it lands on the wrong surface ([scripts/plan/router.py L307-313](../../scripts/plan/router.py) [VERIFIED]).
+
+**Neutral:**
+- `source: "intake"` becomes a provenance tag in the store, distinguishing wizard-captured readings from adapter-ingested ones, carried on the existing `source` line field ([scripts/store/keying.py L11](../../scripts/store/keying.py) [VERIFIED]).
+
+### Alternatives Considered
+
+#### Alternative A: Manual-fill-only (status quo, PRD A-1)
+Keep capture as hand-editing the `status: scaffold` markdown pages, with no automated writer — the PRD's A-1 assumption.
+- **Supporting evidence:** Simplest — no new write path, no capture bug surface, and the scaffold pages are already the documented fill target. It is the current verified behavior: nothing writes operator input today ([PRD-v1, A-1 L292](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]; [scripts/clone/init_instance.py L9](../../scripts/clone/init_instance.py) [VERIFIED]).
+- **Trade-offs:** It is precisely the friction the wizard removes — hand-editing structured markdown per field, with no point-and-click affordance, which the operator asked to replace. Rejected because it forfeits the capture ergonomics this decision exists to deliver.
+- **When this becomes the right choice:** For an operator who prefers editing the scaffolds directly, or before the wizard's interactive write path is built — manual fill remains a valid path alongside this one, not a removed one.
+
+#### Alternative B: Write captured input directly into the TRACKED scaffold pages (`vault/meta/*.md`)
+Have the wizard write operator values straight into the version-controlled `operator-profile.md` / `goals.md` / `current-state.md` pages.
+- **Supporting evidence:** Single tracked surface, no store/scaffold split to maintain, and the captured values are versioned and visible in the same pages the schema defines ([PRD-v1, Finding 2 L353](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- **Trade-offs:** It commits operator PII into the version-controlled trunk — a direct ADR-0005 violation that `block-pii-commit` denies (the `vault/scaffold/filled/` prefix and the store are the gitignored value paths; the tracked `vault/meta/*.md` pages are the empty-scaffold state only) ([ADR-0005, Decision + AMENDED rnm](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) [VERIFIED]; [.gitignore L4-5](../../.gitignore) [VERIFIED]). Because committed history cannot be cleanly scrubbed, this is the irreversible failure ADR-0005 exists to prevent. Rejected because it breaks the PII-free-trunk guarantee outright.
+- **When this becomes the right choice:** Only if the scaffold-vs-value split and the PII-free-trunk requirement were dropped — which ADR-0005 forbids for V1.
+
+#### Alternative C: Persist to a new store stream / new namespace instead of the existing store items + scaffold
+Write captured input to a purpose-built capture stream or a new `intake::` namespace, separate from the `SUMMARY_FIELD_SET` item names and the scaffold.
+- **Supporting evidence:** Keeps wizard-captured data cleanly separable from adapter data and avoids any chance of a capture write colliding with an existing item; a dedicated namespace is self-documenting about provenance.
+- **Trade-offs:** It diverges from the FR-2 consumer contract `router.summarize` already reads — `summarize` keys on the existing `SUMMARY_FIELD_SET` item names, so a parallel namespace would not be read by the wired plan path and would force a second consumer (or a copy step) to bridge it back ([scripts/plan/router.py L390-432](../../scripts/plan/router.py) [VERIFIED]). The `source: "intake"` tag already provides provenance separation on the existing items without a new stream ([scripts/store/keying.py L11](../../scripts/store/keying.py) [VERIFIED]). Rejected because it adds a parallel consumer the existing contract makes unnecessary.
+- **When this becomes the right choice:** If captured input needed a fundamentally different read model than the plan summary consumes — e.g. an audit/replay stream of every keystroke — which is out of scope for V1 capture.
+
+### Related Decisions
+
+| Decision | Relationship | Description |
+|----------|-------------|-------------|
+| [ADR-0005 (Operator-Agnostic Clonable PII-Free Trunk)](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) | constrained-by | The write path obeys the scaffold-vs-value split and lands raw/rich context at the gitignored `vault/scaffold/filled/`; this ADR is the first real producer of that ADR-0005 forward convention (no producer exists on disk today). |
+| [ADR-0001 (No-Train PII Trust-Boundary Routing)](ADR-0001-pii-trust-boundary-no-train-routing.md) | constrained-by | Captured raw values stay off the model; they reach specialists only via `router.summarize`'s closed `SUMMARY_FIELD_SET` de-identification gate, never as raw PII. |
+| [ADR-0006 (Multi-Domain Plan Assembly via Roster Specialists)](ADR-0006-multi-domain-plan-assembly-via-roster.md) | enables | This is the capture half of the profile/goals/current-state personalization inputs ADR-0006's roster reasons over; without captured inputs the roster has nothing operator-specific to tailor against. |
+| [ADR-0013 (Operator-Started Loopback Intake Server)](ADR-0013-operator-started-loopback-intake-server.md) | complements | The ADR-0013 loopback server hosts these capture forms; the two are distinct decisions — transport/network surface (ADR-0013) versus data-write/persistence path (this ADR) — neither requiring the other. ([ADR-0013 authored in parallel this session](ADR-0013-operator-started-loopback-intake-server.md) [UNVERIFIED: file not yet on disk at authoring time]) |
+
+### Validation Approach
+
+**Confirmation criteria:**
+- Captured de-identified fields appear as store items under their `SUMMARY_FIELD_SET` token and flow through `summarize` — verified by a round-trip test per wired field: capture the field, confirm a `vault/store/<token>.ndjson` item exists tagged `source: "intake"`, and confirm `summarize` returns it under the token name (expected: ≥1 round-trip test per wired field, 0 wired fields missing from the summary) ([scripts/plan/router.py L390-432](../../scripts/plan/router.py) [VERIFIED]; [scripts/store/store.py L214-238](../../scripts/store/store.py) [VERIFIED]).
+- Raw captured input lands ONLY under gitignored paths — verified by a fresh-clone PII scan returning 0 operator tokens in tracked files after a capture session (expected: 0 hits, identical to the ADR-0005 NFR-2 fresh-clone guarantee) ([ADR-0005, Validation Approach](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) [VERIFIED]).
+- `block-pii-commit` denies an attempt to commit a filled scaffold — verified by staging a `vault/scaffold/filled/` value and confirming the hook denies the commit (expected: deny) ([ADR-0005, AMENDED 2026-06-10 am4](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) [VERIFIED]).
+
+**Falsification criteria:**
+- If any raw PII is written into a `SUMMARY_FIELD_SET` store item, the routing has failed — the `summarize` 8j6 gate must raise on it; if it does not, halt capture and repair the field-class routing before any plan ships ([scripts/plan/router.py L405-430](../../scripts/plan/router.py) [VERIFIED]).
+- If any operator value appears in a tracked file on a fresh-clone scan (≥1 hit), the two-surface rule has failed; because history cannot be cleanly scrubbed, treat as a release-blocking incident and scrub-or-rewrite before release ([ADR-0005, Falsification](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) [VERIFIED]).
+- If any captured field reaches a specialist outside the `summarize` gate (a capture-to-`assemble` path that bypasses the summary), the model boundary has been breached; halt the path and re-route through `summarize` before any plan ships ([scripts/plan/assemble.py L1-21](../../scripts/plan/assemble.py) [VERIFIED]; [ADR-0001, Decision](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+- Time horizon: re-run all checks at every release and on a second-operator clone of the repository.
+
+**Review triggers:**
+- The nutrition / supplement-stack field-set extension lands (OQ-1) — re-validate that the newly de-identified tokens flow through `summarize` and that their raw inputs still land on the gitignored surface only.
+- A capture field is added to the wizard — re-classify it against the `SUMMARY_FIELD_SET` / `EXCLUDED_RAW_PII` split before it is persisted, and re-run the round-trip + fresh-clone-scan checks.
+- ADR-0001's `SUMMARY_FIELD_SET` or summary contract changes — re-validate that every wired capture field still maps to a current token.
+- The ADR-0013 loopback server's transport surface changes — re-confirm the hosted forms still write only through this persistence path.
+
+### Open Questions
+
+| # | Question | Owner | Target Date | Impact on This Decision |
+|---|----------|-------|-------------|------------------------|
+| OQ-1 | What are the de-identified token forms for nutrition and the supplement/peptide stack (e.g. `dietary-pattern-class`, `allergen-classes`), and what PII-boundary review do they require before joining `SUMMARY_FIELD_SET`? | Walter McGivney | TBD | Until decided by a future ADR-0006-T0 PII-boundary decision, Steps 4-5 are captured to the gitignored scaffold as record-only and do not flow into the plan; resolving this is what lets nutrition/supplement input personalize a plan section ([scripts/plan/router.py L18-36](../../scripts/plan/router.py) [VERIFIED]). |
+| OQ-2 | What is the curation surface for `rx-interaction-classes` — how does the operator/liaison emit de-identified interaction-class tokens (never raw drug names) from the Step 5 stack capture, and where does that curation step live? | Walter McGivney | TBD | The supplement/peptide stack capture collects raw drug/peptide names (named-excluded raw PII); the de-identified `rx-interaction-classes` token that crosses the boundary is a curation step, not a code lookup, and its capture mechanism is TBD at build ([scripts/plan/router.py L104-176](../../scripts/plan/router.py) [VERIFIED]). |
+
+### Revision History
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2026-06-21 | Initial draft (v1.0) — accepted | Walter McGivney |
