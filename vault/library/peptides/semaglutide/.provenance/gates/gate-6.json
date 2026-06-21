@@ -1,0 +1,30 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-sema-i1",
+  "draft_path": "vault/library/peptides/semaglutide/research-report.md",
+  "findings": [
+    {
+      "category": "logical-inconsistency",
+      "severity": "minor",
+      "description": "SUSTAIN-6 (\u00a73.1) reports HR 0.74 (95% CI 0.58\u20130.95; P<0.001 for noninferiority); the CI excludes 1.0 (nominally superiority-significant) while the P-value is labeled for noninferiority. This is faithful to the trial's noninferiority-powered design (and the draft says so explicitly), but a lay reader could momentarily misread it. Non-blocking."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "Lean-mass loss (\u00a75.3) is given as ~39\u201345% with two underlying ratios (~6.9/15.3 kg \u224845%; ~5.3 kg lean vs ~8.4 kg fat). Presented as a reported range rather than a single figure; internally bounded and not contradictory, but the two ratios are not reconciled. Non-blocking."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-21T00:04:33.337863+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T00:02:18.571778+00:00",
+    "attest_ts": "2026-06-21T00:04:33.337866+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "ad9a46ff6d5e13cb545e9013cf1c5870d502f4e77446442b39f486056ea2a63f",
+    "agent_source_mtime": "2026-06-21T00:04:13.274124+00:00"
+  }
+}

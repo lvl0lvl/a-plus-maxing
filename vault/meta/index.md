@@ -32,6 +32,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/sermorelin]] (status: researching; evidence_tier: B; risk_tier: medium)
 - [[compounds/hexarelin]] (status: researching; evidence_tier: C; risk_tier: experimental)
 - [[compounds/mk-677]] (status: researching; evidence_tier: B; risk_tier: medium)
+- [[compounds/semaglutide]] (status: researching; evidence_tier: A; risk_tier: medium)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -132,6 +133,9 @@ _(none yet)_
 - [[library/peptides/mk-677/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~11.3K words; 38 unified citations + crosswalk; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 16/16 verified, 0 fabrications, 0 Wikipedia; ORAL small-molecule ghrelin-receptor agonist [not a peptide], biomarker-only efficacy + FAILED Alzheimer's/hip-fracture — evidence_tier B / risk_tier medium)
 - [[library/peptides/mk-677/practitioner-layer]] (2026-06-20; oral ~10–25 mg/day once daily; glucose-monitoring caveat; NO compounding data sheet [unapproved small molecule, not on §503A])
 - [[library/peptides/mk-677/non-english-layer]] (2026-06-20; no non-English clinical primary located; Japanese patent ≠ clinical primary; Merck/academic English-published)
+- [[library/peptides/semaglutide/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~10.6K words; 48 unified citations + crosswalk; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 19/19 verified, 0 fabrications, 0 Wikipedia; the FIRST A-tier entry — approved GLP-1 RA with landmark RCTs — evidence_tier A / risk_tier medium)
+- [[library/peptides/semaglutide/practitioner-layer]] (2026-06-20; label titration Ozempic 0.25→2 mg / Wegovy →2.4 mg / Rybelsus 3→7→14 mg; compounded-semaglutide shortage arc; muscle-preservation adjuncts)
+- [[library/peptides/semaglutide/non-english-layer]] (2026-06-20; no distinct non-English-language primary stream — pivotal trials incl. China-population PIONEER 11/12 English-published)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)
