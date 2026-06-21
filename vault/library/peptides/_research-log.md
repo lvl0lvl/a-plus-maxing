@@ -249,7 +249,24 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 - Concentration audit: **Merck 6/8 (75%) — FLAGGED ≥0.70**; no Merck-independent disease-endpoint trial.
 - Regulatory: never approved (Merck discontinued; LUM-201 successor still investigational); **NOT a lawful dietary ingredient** — FDA Dec-2025 warning letters (Prime Sports Nutrition; Agebox/iKids-Growth); as a SMALL MOLECULE it is **NOT** part of the §503A peptide action / FR-2026-07361 (distinction stated, not conflated); WADA S2 prohibited at all times (ibutamoren named). No compounding data sheet (not on §503A); oral gray-market "research chemical" ~10-25 mg/day.
 
-### NEXT (reserved, my/primary lane): **Semaglutide** (sweep entry 11 — the GLP-1 metabolic class begins; FDA-APPROVED [Ozempic/Wegovy], so expect evidence_tier A/B). **Push branch as `research/semaglutide-deep-pass-gated`** (a stale predecessor `research/semaglutide-deep-pass` exists). Then Tirzepatide (`-gated`) → Retatrutide (`-gated`) → AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
+---
+
+## 2026-06-20 — Semaglutide (GLP-1 receptor agonist; Ozempic/Wegovy/Rybelsus) deep-pass (sweep entry 11, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **Semaglutide entry shipped:** `compounds/semaglutide.md` + `library/peptides/semaglutide/research-report.md` (~10.6K words, 48 unified citations + crosswalk) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections incl. id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact.
+- **Gates earned keep:** §E HALTed (89) — the elevated "2026 WADA Monitoring Program" claim rested on a non-authoritative secondary → downgraded to reported, with the load-bearing "NOT on the Prohibited List" anchored to the USADA list. 4.75 concentration_audit threshold_triggered=TRUE (Novo ~76% — expected for an approved drug, surfaced honestly). Phase-6 critique near-clean (2 cosmetic minors).
+- **Final independent full-bib audit: 19/19 identifier entries verified, 0 fabrications, 0 first-author mismatches, 0 Wikipedia** (the misattribution failure mode absent). Compound-entry consistency PASS.
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- **FIRST A-tier entry of the sweep.** Acylated long-acting GLP-1(7-37) analogue (Aib8/Arg34 + C18 diacid → albumin binding → ~1-wk t½); GLP-1 receptor agonist; SC-weekly (Ozempic/Wegovy) + oral-daily+SNAC (Rybelsus); Novo Nordisk. Distinct from tirzepatide (dual GIP/GLP-1).
+- **REAL benefits (population-annotated):** glycemic (SUSTAIN ~1.5-1.8% HbA1c; PIONEER oral); **~14.9% weight loss in NON-DIABETIC obesity** (STEP-1 Wilding 2021 PMID 33567185) vs **~9.6% in T2D** (STEP-2 — magnitude is population-dependent); **CV MACE −20%** in overweight/obese WITHOUT diabetes + CVD (SELECT Lincoff 2023 PMID 37952131, HR 0.80); **renal** benefit (FLOW Perkovic 2024).
+- **REAL caveats (not buried):** GI AEs (nausea/vomiting/diarrhea) dominate + are the main discontinuation driver; **~two-thirds weight REGAIN on discontinuation** (STEP-1 extension); **lean/muscle-mass loss** (~39-45% of weight lost); gallbladder; pancreatitis; gastroparesis/peri-op aspiration; SUSTAIN-6 retinopathy signal; the **thyroid C-cell/MTC BOXED WARNING is RODENT-based and NOT demonstrated in humans** (human meta null); **suicidality investigated and NOT confirmed** (Wang 2024 RWE points the other way).
+- **Integrity:** SURMOUNT-OSA is **tirzepatide, NOT semaglutide** — OSA not credited to semaglutide. ~76% of pivotal primaries are Novo-sponsored (single-sponsor caveat, partially offset by adjudicated endpoints + regulatory review).
+- Regulatory: FDA-approved Ozempic (T2D, Dec 2017), Rybelsus (oral T2D, Sept 2019), Wegovy (obesity, June 2021; +CV-risk Mar 2024) — obesity vs T2D are SEPARATE approvals/doses; EMA approved. The 2022-24 shortage enabled 503A/503B compounded semaglutide; FDA resolved the shortage Feb 2025 (compounding wind-down) + counterfeit/salt-form warnings. WADA: **NOT prohibited** (reportedly on the 2026 Monitoring Program — secondary-reported; the final audit later primary-confirmed the Monitoring-Program status via German NADO + EMJ).
+
+### NEXT (reserved, my/primary lane): **Tirzepatide** (sweep entry 12 — dual GIP/GLP-1 agonist, Mounjaro/Zepbound, FDA-APPROVED → expect evidence_tier A; SURMOUNT/SURPASS trials). **Push branch as `research/tirzepatide-deep-pass-gated`** (stale predecessor exists). Then Retatrutide (`-gated`) → AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
 
 ---
 

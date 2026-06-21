@@ -1,0 +1,37 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/semaglutide/practitioner-layer.md",
+    "present": true,
+    "sha256": "a98cf12f6d07cba6a263b3613264670fd54cf1c7b6525225085d2391790d790d",
+    "compounding_sheets_count": 0,
+    "compounding_sheets_or_null_finding": true,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/semaglutide/non-english-layer.md",
+    "present": true,
+    "sha256": "bfc4b7bdddcf5054c6a3a0145df933bf9606c7e8c8e471e897586a204d5739b2",
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "Other"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-21T00:11:04.578639+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T00:09:19.349646+00:00",
+    "attest_ts": "2026-06-21T00:11:04.578642+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "eb99d9e8d7d48b67e802ba9a905aa03e9c05164ff7d315df5e552d1becd1f34b",
+    "agent_source_mtime": "2026-06-21T00:10:44.001407+00:00"
+  }
+}

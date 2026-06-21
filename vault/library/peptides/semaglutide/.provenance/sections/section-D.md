@@ -1,0 +1,67 @@
+## Section D — Safety & adverse effects
+
+Semaglutide is among the most extensively characterized GLP-1 receptor agonists in clinical use, with a safety profile defined by large randomized cardiovascular and weight-management trials, two mature FDA labels (Ozempic for type 2 diabetes; Wegovy for chronic weight management), and a growing real-world pharmacovigilance and pharmaco-epidemiologic record. The dominant safety story is gastrointestinal and class-typical; the most consequential long-term caveats relate to weight regain after discontinuation and to body-composition (lean-mass) change; and the most prominent label warnings (thyroid C-cell tumors, suicidality) are, on close reading of the regulatory and human evidence, considerably more qualified than their prominence suggests.
+
+### Gastrointestinal adverse effects (the dominant signal)
+
+GI adverse events are by far the most common class of reactions and the principal driver of discontinuation [regulatory]. In the Wegovy (semaglutide 2.4 mg) weight-management program, the most common adverse reactions (incidence ≥5%) were nausea (44%), diarrhea (30%), vomiting (24%), constipation (24%), and abdominal pain (20%), with headache (14%), fatigue (11%), and dyspepsia (9%) following [1, regulatory]. At the lower diabetes doses (Ozempic 0.5–1 mg), GI rates are correspondingly lower — nausea 15.8–20.3%, vomiting 5–9.2%, diarrhea 8.5–8.8%, constipation 3.1–5.0% [2, regulatory] — illustrating the clear dose-dependence of GI burden.
+
+A comprehensive 2026 update synthesizing the trial and real-world literature confirms GI events as the leading reason patients stop therapy: a meta-analysis of 48 RCTs (27,729 participants) reported an overall GI-AE incidence of 11.6% with nausea the most common symptom (21.4%), and a physician survey identified persistent nausea and vomiting as the primary reasons for discontinuation within the first six months [3, meta_analysis]. Critically, GI symptoms are mitigated by slow dose titration: standard practice begins at a low dose with gradual weekly-to-biweekly escalation, and persistent symptoms are managed with dose stabilization, dose reduction, or re-titration on a slower schedule [3, mechanism_review]. Most GI events are mild-to-moderate, dose-related, and concentrated in the titration window. Because vomiting/diarrhea can cause volume depletion, the labels carry an acute-kidney-injury caution: postmarketing AKI has occurred, mostly in the setting of GI-driven dehydration, and renal function should be monitored in affected patients [1, regulatory].
+
+### Weight regain after discontinuation (a defining limitation)
+
+Semaglutide is a chronic therapy, and its weight benefit is largely contingent on continued use. In the STEP 1 trial extension (Wilding et al., *Diabetes, Obesity and Metabolism* 2022), participants stopped semaglutide 2.4 mg at week 68 and were followed off-treatment to week 120. Over that year off-drug, the semaglutide group regained a mean of 11.6 percentage points of body weight (vs 1.9 points in placebo) — roughly two-thirds of the weight previously lost — leaving net weight loss from baseline of 5.6% (vs 0.1% placebo) at week 120 [4, rct]. Cardiometabolic improvements (e.g., waist circumference, HbA1c, blood pressure) largely reverted toward baseline, though HDL, triglycerides, and CRP retained some relative benefit [4, rct]. This regain-on-withdrawal is one of the most important honest caveats for counseling: the drug manages, rather than cures, the underlying physiology.
+
+### Body-composition / lean-mass loss
+
+Weight loss with semaglutide is not exclusively fat. In STEP 1 body-composition analysis, lean (fat-free) mass accounted for a substantial fraction of total weight lost — on the order of ~39–45% (reported figures include ~5.3 kg lean vs ~8.4 kg fat, and a lean-mass contribution of roughly 6.9 kg of ~15.3 kg total) [5, mechanism_review]. Whether this constitutes pathologic muscle loss or expected physiologic remodeling is debated: the proportion is broadly comparable to what is seen with other forms of substantial weight loss, and muscle *quality* may improve, but the absolute lean-mass loss is a genuine concern for older, frail, or sarcopenia-prone patients [5, mechanism_review]. Resistance exercise and adequate protein intake are the standard mitigations. This caveat should not be buried: rapid, large-magnitude weight loss carries an obligatory lean-mass cost.
+
+### Hepatobiliary and pancreatic
+
+**Gallbladder disease.** Cholelithiasis and cholecystitis are increased on therapy. The Wegovy label reports cholelithiasis in 1.6% vs 0.7% (placebo) [1, regulatory], and a meta-analysis of 76 RCTs (>100,000 participants) found GLP-1 RA use raised the risk of gallstones/biliary disease by ~37% (RR 1.37), though without a significant increase in *serious* biliary disease [3, meta_analysis]. Rapid weight loss itself promotes gallstone formation, compounding the drug effect.
+
+**Pancreatitis.** Acute pancreatitis, including fatal cases, is a labeled warning across GLP-1 RAs; the label advises discontinuation if pancreatitis is suspected [1, regulatory]. However, contemporary pooled data do not demonstrate a consistent or clinically meaningful increase in pancreatitis risk attributable to GLP-1 RA therapy — the label warning is precautionary and class-based rather than a confirmed strong signal [3, meta_analysis].
+
+### Gastroparesis, ileus, and peri-operative aspiration
+
+Delayed gastric emptying is an on-target pharmacologic effect of GLP-1 RAs and underlies both the satiety benefit and a cluster of GI risks. Evidence on frank gastroparesis and intestinal obstruction is inconsistent — some analyses report associations (including a ~4-fold obstruction signal), while large population studies find no significant increase [3, mechanism_review]. The most actionable downstream concern is **peri-operative pulmonary aspiration**: delayed emptying can leave residual gastric contents despite standard fasting, raising aspiration risk under general anesthesia or deep sedation. The Wegovy label notes rare postmarketing aspiration reports during anesthesia/sedation [1, regulatory], and the American Society of Anesthesiologists recommends withholding GLP-1 RAs on the day of the procedure for daily formulations and approximately one week before surgery for weekly formulations such as semaglutide; some authors argue even these holds may be insufficient given the long half-life and documented retained gastric contents past fasting cutoffs [6, mechanism_review].
+
+### Diabetic retinopathy
+
+A diabetic-retinopathy-complications signal emerged in the SUSTAIN-6 cardiovascular outcomes trial: complications occurred in 3.0% of semaglutide-treated patients vs 1.8% with placebo, rising to 8.2% vs 5.2% among those with pre-existing retinopathy [2, regulatory/rct]. The leading hypothesis attributes this to the rapid early improvement in glycemia (an "early worsening" phenomenon known from intensive glucose lowering) rather than direct retinal toxicity. Patients with a history of diabetic retinopathy warrant monitoring [2, regulatory].
+
+### Thyroid C-cell tumors / medullary thyroid carcinoma — the boxed warning, stated precisely
+
+Both labels carry a **boxed warning** for thyroid C-cell tumors. The warning's own wording is the key to interpreting it: *"In rodents, semaglutide causes thyroid C-cell tumors at clinically relevant exposures. It is unknown whether [semaglutide] causes thyroid C-cell tumors, including medullary thyroid carcinoma (MTC), in humans"* [1, 2, regulatory]. In other words, the signal is **rodent-derived and has NOT been demonstrated in humans** — the human risk is explicitly stated by FDA as undetermined, not established. Human evidence is reassuring on this point: a 2026 systematic review and meta-analysis of 15 RCTs (84,237 participants) found no statistically significant association between incretin-based therapy and thyroid cancer (pooled OR 1.52, 95% CI 0.86–2.68; GLP-1 RA subgroup OR 1.46, 0.64–3.35), with the certainty of evidence rated very low owing to the rarity of events and limited follow-up rather than because harm was shown [7, meta_analysis]. The honest framing: a real, dose-dependent rodent C-cell tumorigenesis signal drives a precautionary boxed warning and contraindication, but no human C-cell/MTC excess has been demonstrated; long-term surveillance remains warranted.
+
+### Suicidality / self-harm — investigated, not confirmed
+
+A suicidality signal was raised in 2023, prompting regulatory review. The precise status is that investigation has **not confirmed a causal association**. A real-world emulation cohort (Wang et al., *Nature Medicine* 2024) compared semaglutide with non-GLP-1 anti-obesity and anti-diabetes medications and found *lower*, not higher, associations with suicidal ideation: in overweight/obesity, incident-ideation HR 0.27 (95% CI 0.20–0.36) and recurrent HR 0.44 (0.32–0.60); in type 2 diabetes, incident HR 0.36 (0.25–0.53) and recurrent HR 0.51 (0.31–0.83). The authors conclude the data do not support higher suicidal-ideation risk with semaglutide [8, cohort]. This aligns with regulators not having established causation. The defensible statement is therefore: a suicidality signal was investigated; available controlled and pharmacovigilance evidence has not confirmed a causal link — not "semaglutide causes suicidality." Standard clinical vigilance for new/worsening mood symptoms remains appropriate.
+
+### Contraindications, monitoring, and stopping criteria
+
+**Contraindications** (both labels): personal or family history of medullary thyroid carcinoma (MTC); Multiple Endocrine Neoplasia syndrome type 2 (MEN 2); and prior serious hypersensitivity to semaglutide or any excipient [1, 2, regulatory]. Pregnancy is a further important caution — semaglutide is not recommended in pregnancy (animal reproductive toxicity; weight loss offers no benefit to a pregnancy), and the long half-life argues for discontinuation well before a planned conception.
+
+**Monitoring:** renal function during episodes of significant GI-driven volume loss; gallbladder symptoms; signs of pancreatitis; retinal status in patients with prior diabetic retinopathy; and, when co-administered with insulin or sulfonylureas, hypoglycemia (semaglutide alone is not a major hypoglycemia driver) [1, 2, regulatory]. **Stopping criteria:** discontinue promptly if pancreatitis is suspected; hold per ASA guidance before anesthesia; and discontinue for serious hypersensitivity [1, 6, regulatory/mechanism_review].
+
+### Bottom line
+
+The safety burden is dominated by titration-window GI effects (manageable, dose-related, the main discontinuation driver). The most important honest caveats are weight regain on cessation (~two-thirds of lost weight within a year) and lean-mass loss. Gallbladder disease is modestly increased; pancreatitis, gastroparesis/ileus, and diabetic retinopathy are real but qualified concerns; peri-operative aspiration is an actionable, mechanism-driven risk. The two most alarming-sounding warnings are the most qualified on the human evidence: the thyroid C-cell boxed warning is rodent-based and not demonstrated in humans, and the suicidality signal has been investigated but not confirmed.
+
+## Section D bibliography
+
+[1] DailyMed — WEGOVY (semaglutide) injection, prescribing information (FDA label). Boxed warning (thyroid C-cell tumors); contraindications; warnings (pancreatitis, gallbladder disease, acute kidney injury, diabetic retinopathy, pulmonary aspiration); adverse-reaction rates. https://dailymed.nlm.nih.gov/ — type: regulatory. Tier-2.
+
+[2] DailyMed — OZEMPIC (semaglutide) injection, prescribing information (FDA label). Boxed warning; contraindications; SUSTAIN-6 diabetic-retinopathy data (3.0% vs 1.8%); adverse-reaction rates; hypoglycemia. https://dailymed.nlm.nih.gov/ — type: regulatory. Tier-2.
+
+[3] Yılmaz N, Bastemir M. Gastrointestinal Adverse Effects of GLP-1 and Dual GLP-1/GIP Receptor Agonists: A Comprehensive Update in Diabetic and Obese Populations. *Diabetes Metab Syndr Obes* 2026. PMC13012139. (Aggregates a 48-RCT GI meta-analysis and a 76-RCT gallbladder meta-analysis.) — type: meta_analysis / mechanism_review. Tier-1 (PMC).
+
+[4] Wilding JPH, et al. Weight regain and cardiometabolic effects after withdrawal of semaglutide: The STEP 1 trial extension. *Diabetes, Obesity and Metabolism* 2022. PMC9542252. — type: rct. Tier-1.
+
+[5] Qaseem M, et al. Semaglutide-induced lean mass loss: clinical concern or physiological adaptation. *Annals of Medicine and Surgery* 2026. PMC13236199. (Summarizes STEP 1 body-composition data.) — type: mechanism_review. Tier-1 (PMC).
+
+[6] Merhavy ZI, Kowal Z, Spencer T, et al. Perioperative anesthesia management of GLP-1 receptor agonists: a systematic review of potential risks. *Perioperative Medicine (London)* 2026. PMC13032261. (Cites ASA consensus hold guidance.) — type: mechanism_review. Tier-1 (PMC).
+
+[7] Eisa N, et al. Incretin-Based Therapy and Thyroid Cancer Risk: A Systematic Review and Meta-Analysis of Randomized Controlled Trials (15 RCTs, 84,237 participants). *AACE Endocrinology, Diabetes & Metabolism* 2026. PMC13221932. — type: meta_analysis. Tier-1 (PMC).
+
+[8] Wang W, Volkow ND, Berger NA, et al. Association of semaglutide with risk of suicidal ideation in a real-world cohort. *Nature Medicine* 2024. PMID 38182782; PMC11034947. — type: cohort. Tier-1.
