@@ -255,7 +255,7 @@ def _step6():
 
 def _default_status(store_read):
     """Standalone-render status: wearable from store_read; DNA/labs unknown without their roots."""
-    return {"wearable": ingest_status._wearable(store_read),
+    return {"wearable": ingest_status.wearable_status(store_read),
             "dna": {"loaded": False, "files": []},
             "labs": {"loaded": False, "files": []}}
 

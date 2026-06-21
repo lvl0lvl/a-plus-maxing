@@ -41,12 +41,16 @@ def run(artifact_name, *, _root=None, _out_dir=None, _today=None, _dna_root=None
     and binds no listening socket.
 
     Args:
-        artifact_name (str): The artifact to render: 'dashboard', 'handout', or
-            'report'.
+        artifact_name (str): The artifact to render: 'dashboard', 'handout',
+            'intake', or 'report'.
         _root (str | Path, optional): Test-only store-root seam. Defaults to the
             store's `vault/store/`.
         _out_dir (Path, optional): Test-only output-dir seam, forwarded to
             `render.emit`. Defaults to the engine-owned `vault/artifacts/generated/`.
+        _dna_root (str | Path, optional): Test-only DNA-dropzone seam for the
+            'intake' load-state. Defaults to `vault/dna/raw/`.
+        _labs_root (str | Path, optional): Test-only labs-dropzone seam for the
+            'intake' load-state. Defaults to `vault/labs/raw/`.
         _today (datetime.date, optional): Test-only date seam forwarded to the
             template render's `_today` (the dashboard's calendar + plan
             resolution; the report's prepared/generated dates + plan

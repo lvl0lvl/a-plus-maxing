@@ -14,8 +14,18 @@ from pathlib import Path
 _WEARABLE_SOURCES = ("healthkit", "whoop", "oura", "garmin")
 
 
-def _wearable(store_read):
-    """Load-state of the wearable stream: loaded?, total readings, items, day range, source."""
+def wearable_status(store_read):
+    """Load-state of the wearable stream: loaded?, total readings, items, day range, source.
+
+    The public wearable-only resolver — `resolve` uses it for the full status, and the intake
+    template's standalone render path consumes it directly (so it does not reach a private helper).
+
+    Args:
+        store_read (list): The store read model (reading dicts).
+
+    Returns:
+        (dict) `{"loaded": bool}` plus, when loaded, `count`/`items`/`range`/`source`.
+    """
     rows = [r for r in store_read if r.get("source") in _WEARABLE_SOURCES]
     if not rows:
         return {"loaded": False}
@@ -50,7 +60,7 @@ def resolve(store_read, *, dna_root, labs_root):
         (dict) `{"wearable": {...}, "dna": {...}, "labs": {...}}` — load-state + counts only.
     """
     return {
-        "wearable": _wearable(store_read),
+        "wearable": wearable_status(store_read),
         "dna": _dropzone(dna_root, {".txt"}),
         "labs": _dropzone(labs_root, {".pdf", ".csv", ".txt", ".json"}),
     }
