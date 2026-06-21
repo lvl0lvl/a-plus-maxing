@@ -16,6 +16,7 @@ fork-point/distinctness rationale.
 
 import subprocess
 import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,13 @@ from scripts.store import store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SHARED_ROUTINE_PATHS = ("scripts/ingest/ingest.py", "scripts/ingest/adapter.py")
+# ADR-0013-T3 / ADR-0003-T2: the three shared-routine files the zip-awareness must NOT touch
+# (the zip extraction lives in the adapter, never the shared routine — recipe AC-5).
+SHARED_ROUTINE_PATHS_FULL = (
+    "scripts/ingest/ingest.py",
+    "scripts/ingest/adapter.py",
+    "scripts/ingest/scheduler.py",
+)
 
 
 def _write_json_export(path, rows):
@@ -1081,3 +1089,225 @@ def test_garmin_traversing_item_raises_writes_nothing(tmp_path, bad_item):
         ingest.run(garmin.GarminAdapter(), export, root=root)
     # Nothing was written outside the store root (the escape target does not exist).
     assert not outside.exists()
+
+
+# --- ADR-0013-T3: zip-aware HealthKit adapter (read_readings accepts an Apple Health zip) ---
+#
+# read_readings now detects an Apple Health export `.zip` (zipfile.is_zipfile),
+# extracts its single `*/export.xml` member (streamed, mirroring dna.land), and runs
+# the existing iterparse read over it. A raw export.xml reads as today; a zip with no
+# export.xml (or a non-zip non-xml) fails loud. The extraction lives ONLY in the
+# adapter — ingest.py / adapter.py / scheduler.py are byte-unchanged (AC-5).
+
+
+def _zip_apple_health_export(zip_path, xml_bytes, *, member="apple_health_export/export.xml",
+                             noise=True):
+    """Write an Apple-Health-shaped export `.zip` wrapping `xml_bytes` at `member`.
+
+    Mirrors a real Apple export: the `export.xml` lives under a directory member, and
+    the zip carries macOS noise (a `__MACOSX/` resource-fork entry + the directory
+    entry) the member-locate must skip. When `member` is None, NO `export.xml`-shaped
+    member is written (the fail-loud fixture).
+    """
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        if noise:
+            zf.writestr("apple_health_export/", b"")               # a directory entry
+            zf.writestr("__MACOSX/._export.xml", b"resource-fork") # an Apple resource fork
+            zf.writestr("apple_health_export/export_cda.xml", b"<ClinicalDocument/>")  # a sibling
+        if member is not None:
+            zf.writestr(member, xml_bytes)
+
+
+# Cycle 1: zip == extracted-xml + raw passthrough + fail-loud (AC-1, AC-2, AC-3)
+
+
+def test_healthkit_zip_yields_same_readings_as_extracted_xml(tmp_path, store_root):
+    """AC-1: read_readings on an Apple-Health zip yields the SAME readings as on its export.xml.
+
+    Builds one synthetic export.xml, then a zip wrapping that SAME xml under
+    `apple_health_export/export.xml` (+ __MACOSX noise + a directory entry). The
+    reading list read from the zip must equal the reading list read from the raw xml.
+    A read that ignored the zip (ran iterparse over the zip's bytes) would raise or
+    yield nothing and red this.
+    """
+    from scripts.ingest.adapters import healthkit
+
+    xml_path = tmp_path / "export.xml"
+    _write_healthkit_export(xml_path, [
+        {"type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+         "startDate": "2026-05-01 08:00:00 -0500", "value": "55"},
+        {"type": "HKQuantityTypeIdentifierRestingHeartRate",
+         "startDate": "2026-05-01 06:00:00 -0500", "value": "48"},
+        {"type": "HKQuantityTypeIdentifierOxygenSaturation",
+         "startDate": "2026-05-01 03:00:00 -0500", "value": "0.97"},
+    ])
+    zip_path = tmp_path / "apple_health_export.zip"
+    _zip_apple_health_export(zip_path, xml_path.read_bytes())
+
+    adapter = healthkit.HealthKitAdapter()
+    from_xml = list(adapter.read_readings(xml_path))
+    from_zip = list(adapter.read_readings(zip_path))
+    assert from_zip == from_xml
+    # Pin the content too, so an empty-equals-empty pass cannot sneak through.
+    assert {r["item"]: r["value"] for r in from_zip} == {"hrv": 55.0, "rhr": 48.0, "spo2": 97.0}
+
+
+def test_healthkit_zip_ingests_through_run(tmp_path, store_root):
+    """AC-1 (store leg): an Apple-Health zip ingests through the UNCHANGED ingest.run.
+
+    The zip flows adapter.read_readings -> ingest.run -> store.append exactly as a
+    raw export.xml does; the inner readings land on their (item, day, "healthkit")
+    streams. Confirms zip-awareness composes with the unchanged shared routine.
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    xml_path = tmp_path / "export.xml"
+    _write_healthkit_export(xml_path, [
+        {"type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+         "startDate": "2026-05-02 08:00:00 -0500", "value": "60"},
+    ])
+    zip_path = tmp_path / "apple_health_export.zip"
+    _zip_apple_health_export(zip_path, xml_path.read_bytes())
+
+    ingest.run(healthkit.HealthKitAdapter(), zip_path, root=store_root)
+    hrv = store.read("hrv", root=store_root)
+    assert len(hrv) == 1
+    assert hrv[0]["value"] == 60.0 and hrv[0]["timepoint"] == "2026-05-02"
+    assert hrv[0]["source"] == "healthkit"
+
+
+def test_healthkit_raw_xml_reads_as_today(tmp_path, store_root):
+    """AC-2: a raw export.xml still reads exactly as today (the non-zip passthrough).
+
+    The dna.land raw-.txt passthrough analog — a pre-extracted export.xml is not a
+    zip, so the existing iterparse read runs over it unchanged.
+    """
+    from scripts.ingest.adapters import healthkit
+
+    xml_path = tmp_path / "export.xml"
+    _write_healthkit_export(xml_path, [
+        {"type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+         "startDate": "2026-05-03 08:00:00 -0500", "value": "57"},
+        {"type": "HKQuantityTypeIdentifierRespiratoryRate",
+         "startDate": "2026-05-03 03:00:00 -0500", "value": "14.0"},
+    ])
+    readings = list(healthkit.HealthKitAdapter().read_readings(xml_path))
+    assert {r["item"]: r["value"] for r in readings} == {"hrv": 57.0, "resp-rate": 14.0}
+
+
+def test_healthkit_zip_without_export_xml_fails_loud(tmp_path):
+    """AC-3a: a zip with NO `*/export.xml` member raises, naming the missing member.
+
+    The `_genotype_member` fail-loud analog — a zip that is not an Apple Health export
+    (no export.xml inside) is not silently imported as nothing.
+    """
+    from scripts.ingest.adapters import healthkit
+
+    zip_path = tmp_path / "wrong.zip"
+    # member=None: no export.xml-shaped member is written (only the noise members).
+    _zip_apple_health_export(zip_path, b"", member=None)
+
+    with pytest.raises(ValueError, match="export.xml"):
+        list(healthkit.HealthKitAdapter().read_readings(zip_path))
+
+
+def test_healthkit_non_zip_non_xml_fails_loud(tmp_path):
+    """AC-3b: a non-zip non-xml file raises (the existing fail-loud-on-malformed posture).
+
+    Not a zip (so the extraction branch is skipped) and not valid XML (so iterparse
+    raises). The fail-loud signal of a misconfigured path / wrong file.
+    """
+    from scripts.ingest.adapters import healthkit
+
+    junk = tmp_path / "junk.bin"
+    junk.write_bytes(b"this is neither a zip nor xml \x00\x01\x02 <<<")
+
+    with pytest.raises((OSError, ET.ParseError, ValueError)):
+        list(healthkit.HealthKitAdapter().read_readings(junk))
+
+
+# Cycle 2: streamed copy + 0-shared-routine-edit proof + dual-entry-point (AC-4, AC-5, AC-6)
+
+
+def test_healthkit_inner_xml_copy_is_streamed(tmp_path):
+    """AC-4 (Risk 07f6): the inner-xml copy is streamed (shutil.copyfileobj), not single-shot.
+
+    The extracted export.xml can be hundreds of MB; the copy must stream it like
+    dna.land does. Asserts the adapter source uses `shutil.copyfileobj` and does NOT
+    do a single-shot full-member `.read()` of the zip member (which would buffer the
+    whole xml in memory).
+    """
+    src = (REPO_ROOT / "scripts" / "ingest" / "adapters" / "healthkit.py").read_text()
+    assert "shutil.copyfileobj" in src, "the inner-xml copy must stream via shutil.copyfileobj"
+    # No single-shot full-member read of the zip member: a `member.read()` / `zf.read(` with no
+    # size arg would buffer the whole (100s-of-MB) member — the anti-pattern AC-4 forbids.
+    assert ".read()" not in src, "no single-shot full-member .read() of the zip member"
+    assert "zf.read(" not in src, "no single-shot zf.read() of the whole member"
+
+
+def test_healthkit_zip_extraction_zero_shared_routine_edits():
+    """AC-5: the zip-awareness changes 0 lines in the shared routine (ingest/adapter/scheduler).
+
+    `git diff --numstat <pre-task> -- ingest.py adapter.py scheduler.py` emits 0 rows.
+    The fork-point baseline (_baseline_ref) is the pre-task tree, so a COMMITTED edit
+    to any of the three would emit a row and red this. healthkit.py is EXCLUDED (it is
+    the adapter under edit). The gate's teeth are proven by the negative control below.
+    """
+    pre_task = _baseline_ref("pre-zip-healthkit")
+    rows = _numstat_rows(pre_task, SHARED_ROUTINE_PATHS_FULL)
+    assert rows == [], (
+        f"expected 0 changed lines in {SHARED_ROUTINE_PATHS_FULL} vs pre-zip-healthkit; "
+        f"got numstat rows {rows} — the zip-awareness leaked into the shared routine"
+    )
+
+
+def test_healthkit_zip_zero_edit_gate_is_falsifiable(tmp_path):
+    """Negative control for AC-5: the 0-edit numstat gate turns RED on a real shared-routine edit.
+
+    Runs the SAME `git diff --numstat` row-detection against a one-line-modified COPY
+    of the committed ingest.py (via `git diff --no-index`) and asserts it emits one
+    changed-file row — proving the AC-5 assertion is failing-capable, not tautological.
+    The real ingest.py is never touched.
+    """
+    committed = REPO_ROOT / "scripts" / "ingest" / "ingest.py"
+    probed = tmp_path / "ingest_probe.py"
+    probed.write_text(committed.read_text() + "# zip-task negative-control probe line\n")
+
+    out = subprocess.run(
+        ["git", "diff", "--no-index", "--numstat", str(committed), str(probed)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    ).stdout
+    rows = [line for line in out.splitlines() if line.strip()]
+    assert len(rows) == 1, f"the one-line probe must make numstat emit exactly one row; got {rows}"
+    assert rows[0].split("\t")[0] == "1"
+
+
+def test_healthkit_zip_ingests_via_cli_dual_entry_point(tmp_path, monkeypatch):
+    """AC-6: an Apple-Health zip ingests via the CLI path (`-m scripts.ingest --source healthkit`).
+
+    Invokes the CLI `main(["<zip>", "--source", "healthkit", "--root", <store>])`
+    in-process; the now-zip-aware adapter accepts the zip with NO manual unzip, and
+    the inner readings land in the store. This is the dual-entry-point ingestability
+    the adapter-layer extraction delivers (vs a serve-layer extraction that would
+    leave the CLI needing a manual unzip).
+    """
+    from scripts.ingest import __main__ as cli
+
+    xml_path = tmp_path / "export.xml"
+    _write_healthkit_export(xml_path, [
+        {"type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+         "startDate": "2026-05-04 08:00:00 -0500", "value": "62"},
+        {"type": "HKQuantityTypeIdentifierRestingHeartRate",
+         "startDate": "2026-05-04 06:00:00 -0500", "value": "50"},
+    ])
+    zip_path = tmp_path / "apple_health_export.zip"
+    _zip_apple_health_export(zip_path, xml_path.read_bytes())
+    store_dir = tmp_path / "store"
+
+    rc = cli.main([str(zip_path), "--source", "healthkit", "--root", str(store_dir)])
+    assert rc == 0
+    assert store.read("hrv", root=store_dir)[0]["value"] == 62.0
+    assert store.read("rhr", root=store_dir)[0]["value"] == 50.0
