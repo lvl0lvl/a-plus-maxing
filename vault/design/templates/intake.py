@@ -18,6 +18,8 @@ composed from the established intake vocabulary, pending the ui-designer pass in
 interactive-ingest build.
 """
 
+from html import escape as _esc
+
 from scripts.ingest import status as ingest_status
 
 # The intake mocks (2vFFC / khCNX / BRAUE) use a neutral gray palette + a blue accent
@@ -132,8 +134,11 @@ def _doc_cards(status):
     """The four 'Link your documents' cards, driven by the live load-state."""
     we = status["wearable"]
     if we.get("loaded"):
-        sub = (f"{we['source']} · {we['count']} readings · {', '.join(we['items'])} · "
-               f"{we['range'][0]} – {we['range'][1]}")
+        # The values are store-derived, but escape on the way into HTML regardless — item/source
+        # strings flow from adapter data, and the filename strings below flow from the operator's
+        # own filesystem (a `<`/`&` in a name must not break or inject into the page).
+        sub = (f"{_esc(we['source'])} · {we['count']} readings · {_esc(', '.join(we['items']))} · "
+               f"{_esc(we['range'][0])} – {_esc(we['range'][1])}")
         wearable = _doc("wearable", "Wearable export (Apple Health)", sub, "✓ loaded", True)
     else:
         wearable = _doc("wearable", "Wearable export (Apple Health)",
@@ -141,7 +146,7 @@ def _doc_cards(status):
 
     dna = status["dna"]
     if dna.get("loaded"):
-        dna_card = _doc("dna", "DNA (23andMe)", f"{dna['files'][0]} landed in vault/dna/raw/",
+        dna_card = _doc("dna", "DNA (23andMe)", f"{_esc(dna['files'][0])} landed in vault/dna/raw/",
                         "✓ loaded", True)
     else:
         dna_card = _doc("dna", "DNA (23andMe)",
@@ -149,7 +154,7 @@ def _doc_cards(status):
 
     labs = status["labs"]
     if labs.get("loaded"):
-        labs_card = _doc("labs", "Labs & bloodwork", f"{', '.join(labs['files'])}", "✓ loaded", True)
+        labs_card = _doc("labs", "Labs & bloodwork", _esc(", ".join(labs["files"])), "✓ loaded", True)
     else:
         labs_card = _doc("labs", "Labs & bloodwork", "PDF or CSV → vault/labs/raw/", "+ Link", False)
 
