@@ -69,24 +69,36 @@ def _write_json_export(path, records):
     path.write_text(json.dumps(records))
 
 
+def _write_healthkit_export(path, records):
+    """Write a real-shape Apple Health `export.xml` with the given `<Record>` samples."""
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<HealthData locale="en_US">']
+    for r in records:
+        lines.append(
+            f' <Record type="{r["type"]}" sourceName="Apple Watch" '
+            f'startDate="{r["startDate"]}" endDate="{r["startDate"]}" value="{r["value"]}"/>'
+        )
+    lines.append('</HealthData>')
+    path.write_text("\n".join(lines))
+
+
 def _sample_exports(tmp_path, healthkit_records, oura_records, garmin_records):
     """Write one sample export per wired source; return the {source: path} map.
 
-    Each adapter parses its own source-specific schema, so the records carry the
-    per-source field names (`type`/`startDate`/`qty` for HealthKit, etc.).
+    Each adapter parses its own source-specific schema: HealthKit reads the real
+    `export.xml` (per-sample `<Record>` elements); Oura/Garmin read JSON.
     """
-    hk = tmp_path / "healthkit.json"
+    hk = tmp_path / "export.xml"
     ou = tmp_path / "oura.json"
     ga = tmp_path / "garmin.json"
-    _write_json_export(hk, healthkit_records)
+    _write_healthkit_export(hk, healthkit_records)
     _write_json_export(ou, oura_records)
     _write_json_export(ga, garmin_records)
     return {"healthkit": hk, "oura": ou, "garmin": ga}
 
 
-def _hk(item, ts, qty):
-    """A HealthKit-shaped export record."""
-    return {"type": item, "startDate": ts, "qty": qty}
+def _hk(hk_type, start_date, value):
+    """A HealthKit `export.xml` <Record> dict (a real HK type identifier + value)."""
+    return {"type": hk_type, "startDate": start_date, "value": value}
 
 
 def _ou(item, day, avg):
@@ -130,7 +142,7 @@ def test_run_completes_unattended_exit_zero(tmp_path, monkeypatch):
 
     exports = _sample_exports(
         tmp_path,
-        healthkit_records=[_hk("steps", "2026-01-01T08:00", 1000)],
+        healthkit_records=[_hk("HKQuantityTypeIdentifierRestingHeartRate", "2026-01-01", 48)],
         oura_records=[_ou("hrv", "2026-01-01", 55)],
         garmin_records=[_ga("stress", "2026-01-01", 30)],
     )
@@ -152,7 +164,7 @@ def test_run_completes_unattended_exit_zero(tmp_path, monkeypatch):
 
     assert rc == 0
     # Every wired source's reading landed (the run actually ran the wired set).
-    assert len(store.read("steps", root=store_root)) == 1
+    assert len(store.read("rhr", root=store_root)) == 1
     assert len(store.read("hrv", root=store_root)) == 1
     assert len(store.read("stress", root=store_root)) == 1
 
@@ -173,31 +185,24 @@ def test_second_run_appends_only_new_timepoint_delta(tmp_path):
     from scripts.ingest import scheduler
 
     store_root = tmp_path / "store"
-    hk = tmp_path / "healthkit.json"
+    hk = tmp_path / "export.xml"
+    _rhr = "HKQuantityTypeIdentifierRestingHeartRate"
 
-    # First run: two timepoints.
-    _write_json_export(
-        hk,
-        [_hk("steps", "2026-01-01T08:00", 1000), _hk("steps", "2026-01-02T08:00", 1100)],
-    )
+    # First run: two days (HealthKit keys its timepoint to the day).
+    _write_healthkit_export(hk, [_hk(_rhr, "2026-01-01", 48), _hk(_rhr, "2026-01-02", 50)])
     scheduler.run(exports={"healthkit": hk}, root=store_root)
-    before = len(store.read("steps", root=store_root))
+    before = len(store.read("rhr", root=store_root))
 
-    # The export GAINED two new timepoints (the original two are still present).
-    _write_json_export(
-        hk,
-        [
-            _hk("steps", "2026-01-01T08:00", 1000),
-            _hk("steps", "2026-01-02T08:00", 1100),
-            _hk("steps", "2026-01-03T08:00", 1200),
-            _hk("steps", "2026-01-04T08:00", 1300),
-        ],
-    )
+    # The export GAINED two new days (the original two are still present).
+    _write_healthkit_export(hk, [
+        _hk(_rhr, "2026-01-01", 48), _hk(_rhr, "2026-01-02", 50),
+        _hk(_rhr, "2026-01-03", 52), _hk(_rhr, "2026-01-04", 54),
+    ])
     scheduler.run(exports={"healthkit": hk}, root=store_root)
-    after = len(store.read("steps", root=store_root))
+    after = len(store.read("rhr", root=store_root))
 
     new_count = 2
-    assert after - before == new_count  # exact new-timepoint delta, not "<=" first
+    assert after - before == new_count  # exact new-day delta, not "<=" first
 
 
 # --- AC-3 / Risk ADR-0003 N1: idempotent unattended re-run ---
@@ -242,7 +247,7 @@ def test_wired_set_invoked_includes_whoop(tmp_path, monkeypatch):
 
     exports = _sample_exports(
         tmp_path,
-        healthkit_records=[_hk("steps", "2026-01-01T08:00", 1000)],
+        healthkit_records=[_hk("HKQuantityTypeIdentifierRestingHeartRate", "2026-01-01", 48)],
         oura_records=[_ou("hrv", "2026-01-01", 55)],
         garmin_records=[_ga("stress", "2026-01-01", 30)],
     )
@@ -536,7 +541,7 @@ def test_missing_export_adapter_is_skipped(tmp_path):
 
     assert rc == 0
     assert len(store.read("hrv", root=store_root)) == 1  # oura ran
-    assert store.read("steps", root=store_root) == []  # healthkit skipped (no export)
+    assert store.read("rhr", root=store_root) == []  # healthkit skipped (no export)
     assert store.read("stress", root=store_root) == []  # garmin skipped (no export)
 
 
@@ -560,7 +565,7 @@ def test_scheduler_run_zero_egress(tmp_path):
 
     exports = _sample_exports(
         tmp_path,
-        healthkit_records=[_hk("steps", "2026-01-01T08:00", 1000)],
+        healthkit_records=[_hk("HKQuantityTypeIdentifierRestingHeartRate", "2026-01-01", 48)],
         oura_records=[_ou("hrv", "2026-01-01", 55)],
         garmin_records=[_ga("stress", "2026-01-01", 30)],
     )
