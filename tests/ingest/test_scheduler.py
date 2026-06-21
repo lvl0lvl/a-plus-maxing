@@ -22,6 +22,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import hk_record, write_healthkit_export as _write_healthkit_export
+
 from scripts.store import store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -69,18 +71,6 @@ def _write_json_export(path, records):
     path.write_text(json.dumps(records))
 
 
-def _write_healthkit_export(path, records):
-    """Write a real-shape Apple Health `export.xml` with the given `<Record>` samples."""
-    lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<HealthData locale="en_US">']
-    for r in records:
-        lines.append(
-            f' <Record type="{r["type"]}" sourceName="Apple Watch" '
-            f'startDate="{r["startDate"]}" endDate="{r["startDate"]}" value="{r["value"]}"/>'
-        )
-    lines.append('</HealthData>')
-    path.write_text("\n".join(lines))
-
-
 def _sample_exports(tmp_path, healthkit_records, oura_records, garmin_records):
     """Write one sample export per wired source; return the {source: path} map.
 
@@ -98,7 +88,7 @@ def _sample_exports(tmp_path, healthkit_records, oura_records, garmin_records):
 
 def _hk(hk_type, start_date, value):
     """A HealthKit `export.xml` <Record> dict (a real HK type identifier + value)."""
-    return {"type": hk_type, "startDate": start_date, "value": value}
+    return hk_record(hk_type, start_date, value)
 
 
 def _ou(item, day, avg):
