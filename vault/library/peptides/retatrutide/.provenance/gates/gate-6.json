@@ -1,0 +1,19 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-reta-i1",
+  "draft_path": "vault/library/peptides/retatrutide/research-report.md",
+  "findings": [],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 1,
+  "verdict": "PASS",
+  "timestamp": "2026-06-21T01:30:55.576617+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T01:29:01.203479+00:00",
+    "attest_ts": "2026-06-21T01:30:55.576620+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "564580c35ecfc51227880a470414284e2597edc5a74a8330a2120e62e9bdb040",
+    "agent_source_mtime": "2026-06-21T01:30:32.254457+00:00"
+  }
+}
