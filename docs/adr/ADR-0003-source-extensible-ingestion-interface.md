@@ -73,6 +73,7 @@ Each source is an adapter mapping its export to the store's reading shape; a sha
 | [ADR-0001 (No-Train PII Trust-Boundary Routing)](ADR-0001-pii-trust-boundary-no-train-routing.md) | constrained-by | ADR-0001 forbids any ingestion path that routes raw operator readings through a model step; ingestion writes only to the local store, eliminating any adapter that passes readings to the model. |
 | [ADR-0002 (Local-First Time-Series Store)](ADR-0002-local-first-time-series-store.md) | constrained-by | The store's per-item (item, timepoint) keying fixes the idempotency-key surface and the write target; this interface's dedupe + manual-entry fallback must fit the (item, timepoint) line model, so the key cannot be finalized independently of D2. |
 | [ADR-0004 (On-Demand Single-File Artifact Generation)](ADR-0004-on-demand-single-file-artifact-generation.md) | complements | Ingestion (write path) and generation (read path) reinforce each other across the same store data and share the cron/unattended-run mechanism; neither is a prerequisite for the other (generation can render manually-entered data; an importer is useful with no artifact). |
+| [ADR-0013 (Operator-Started Loopback Intake Server)](ADR-0013-operator-started-loopback-intake-server.md) | complements | ADR-0013 is a new front door (browser upload) to this ingestion interface, routing to the unchanged `ingest.run` / `dna.land` — adding no adapter/dedupe/store-write, so the 0-shared-routine-edit invariant holds. |
 
 Cross-reference authority: [.pipeline/dag.md §6](.pipeline/dag.md) is the canonical bidirectional reference map for the V1-DAG edges above. ADR-0006 (D5) and ADR-0007 (D7) have no direct edge to this interface — any coupling to them is mediated through the ADR-0002 store, not this interface ([.pipeline/dag.md §2 D3–D5, D3–D7](.pipeline/dag.md) [VERIFIED]).
 
@@ -110,3 +111,4 @@ Cross-reference authority: [.pipeline/dag.md §6](.pipeline/dag.md) is the canon
 |------|--------|--------|
 | 2026-06-04 | Initial draft (v1.0) — accepted | Walter McGivney |
 | 2026-06-04 | v1.1 — backfilled cross-references to the completed ADR set. | Walter McGivney |
+| 2026-06-21 | v1.2 — Phase-5 verify: added inverse `complements` edge to ADR-0013 (new browser-upload front door to this interface). | Walter McGivney |

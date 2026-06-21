@@ -84,6 +84,8 @@ Produce the plan with deterministic local tooling and pre-written templates, app
 | [ADR-0007 (Lab-Loop / Biomarker-Matrix / Projection Data-Flow)](ADR-0007-lab-loop-biomarker-matrix-projection-data-flow.md) | constrains | Lab values and symptom answers are PII; forced onto the local-store side, off any model-egress projection step. |
 | [ADR-0006 (Multi-Domain Plan Assembly via Roster Specialists)](ADR-0006-multi-domain-plan-assembly-via-roster.md) | is-prerequisite-of | Plan assembly is the PII-touching dispatch; it depends on this routing decision and cannot be authored until the lane is fixed. |
 | [ADR-0005 (Operator-Agnostic Clonable PII-Free Trunk)](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) | complements | Two halves of the PII posture on orthogonal leak vectors: this decision keeps PII off the model; ADR-0005 keeps PII out of version-control history. Neither is a prerequisite. |
+| [ADR-0013 (Operator-Started Loopback Intake Server)](ADR-0013-operator-started-loopback-intake-server.md) | constrains | ADR-0013's loopback-only, zero-egress posture realizes this decision's no-egress boundary on the new intake-server network surface. |
+| [ADR-0014 (Web-Form Capture and Persistence of Operator Input)](ADR-0014-web-form-capture-operator-input-persistence.md) | constrains | ADR-0014's captured raw values stay off the model — they reach specialists only via `router.summarize`'s closed `SUMMARY_FIELD_SET` de-identification gate. |
 
 Note on [2026-05-16-system-architecture.md](../../vault/decisions/2026-05-16-system-architecture.md): this ADR reframes the conversational-only threat posture that decision assumed ("LLM-driven agent, not a tracker"), but it is not a formal superseder of any specific 2026-05-16 decision — the threat-model-B boundary is a new decision, not a reversal of one. The formal supersession of 2026-05-16 is carried by ADR-0002, ADR-0004, and ADR-0006 per the discovery Supersession map; it is therefore a prose reframing note here, not a Related Decisions edge.
 
@@ -122,3 +124,4 @@ Cross-reference authority: [.pipeline/dag.md §6](.pipeline/dag.md) is the canon
 | 2026-06-03 | Initial draft (v1.0) — accepted | Walter McGivney |
 | 2026-06-04 | v1.1 — backfilled cross-references to the completed ADR set. | Walter McGivney |
 | 2026-06-04 | v1.2 — Phase-8 red-team fixes (RT-01). | Walter McGivney |
+| 2026-06-21 | v1.3 — Phase-5 verify: added inverse `constrains` edges to ADR-0013 (intake-server no-egress surface) and ADR-0014 (capture stays off the model). | Walter McGivney |

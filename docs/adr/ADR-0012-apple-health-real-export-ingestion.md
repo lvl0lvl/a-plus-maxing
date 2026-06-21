@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-06-20, S82) — operator-chosen (the operator uses Apple Health, not Whoop, as the first real wearable source).
 **Owner:** Walter McGivney
-**Relates to:** ADR-0003 (the source-extensible ingestion interface — this upgrades the HealthKit adapter that plugs into its seam; the 0-shared-routine-edit invariant holds), ADR-0011 (the WHOOP adapter — this is the same scaffold→real-format upgrade pattern applied to HealthKit), ADR-0002 (the local-first store — the (item, timepoint, source) dedupe key the adapter inherits), `vault/meta/landmarks.md` LM-02 (the wearable-baseline landmark — Apple Health is now the operator's source).
+**Relates to:** ADR-0003 (the source-extensible ingestion interface — this upgrades the HealthKit adapter that plugs into its seam; the 0-shared-routine-edit invariant holds), ADR-0011 (the WHOOP adapter — this is the same scaffold→real-format upgrade pattern applied to HealthKit), ADR-0002 (the local-first store — the (item, timepoint, source) dedupe key the adapter inherits), **ADR-0013 (`complements`)** (ADR-0013's browser upload delivers the Apple Health zip this amended adapter now accepts — see the 2026-06-21 amendment below; the inverse `complements ADR-0012` edge is recorded on ADR-0013's Related Decisions table), `vault/meta/landmarks.md` LM-02 (the wearable-baseline landmark — Apple Health is now the operator's source).
 
 ## Context
 
@@ -25,6 +25,16 @@ What the real Apple Health export is:
 
 **0-shared-routine-edit invariant (ADR-0003-T2).** The upgrade touches only `healthkit.py` + its tests; `ingest.py`, `adapter.py`, and `scheduler.py` are byte-unchanged. The `tests/ingest/test_adapters.py` numstat gate mechanically proves `ingest.py` + `adapter.py` (its `SHARED_ROUTINE_PATHS`); `scheduler.py` is byte-unchanged by inspection (`git diff main..HEAD -- scripts/ingest/scheduler.py` empty), and its own adapter-add 0-edit gate lives in `tests/ingest/test_scheduler.py`.
 
+### Amendment (2026-06-21, v1.1) — accept the Apple Health export zip, extracting `export.xml` itself
+
+**The gap.** D1 above reads `export.xml` directly (`healthkit.read_readings` takes the already-extracted file, and `ET.iterparse(export_file, …)` opens it as XML). But the Apple Health app exports a **zip** (Health app → *Export All Health Data*), and the ADR-0013 operator-started loopback intake server delivers exactly what the operator drops in the browser — the Apple-produced zip. So a browser-uploaded Apple Health zip cannot reach `ingest.run`: it would need a manual operator pre-step to unzip and locate `export.xml` before the existing read path could touch it. That manual pre-step defeats the point-and-click upload ADR-0013 exists to provide. The DNA path already solved the analogous problem — `dna.land` accepts the export `.zip` and extracts the genotype member itself — but the Apple Health path did not.
+
+**Decision (extends D1's input handling; the D2 daily-aggregation / D3 metric-map / D4 coexistence decisions are unchanged).** The Apple Health ingest path **accepts the export zip** and extracts the `export.xml` member itself — locating the single `*/export.xml` entry inside the zip — before the existing streamed daily-aggregation read runs over that extracted xml. This **mirrors `dna.land`'s existing zip-member extraction** ([`scripts/ingest/dna.py` `land()` L88-108 + `_genotype_member` L49-68](../../scripts/ingest/dna.py)): `zipfile.is_zipfile` to branch, locate the one member of interest by shape/name, stream it out via `zf.open(member)`. Where the extraction lives — a small helper in the ingest path, or the adapter accepting a zip — is a spec/build detail; the **decision recorded here** is that the Apple Health upload accepts the zip rather than requiring an already-extracted `export.xml`. The streamed `iterparse` read (D1) still handles the large extracted xml, so the memory-bounded read is unchanged.
+
+**Rationale.** Two forces make this the right input format. (1) The `dna.land` **precedent**: the system already extracts a member from an operator-uploaded `.zip` for the analogous "Apple/23andMe hands you a zip, the reader wants the inner file" problem, so accepting the Apple Health zip is the consistent shape, not a new mechanism. (2) The ADR-0013 **point-and-click need**: the browser upload delivers the zip Apple produces, and removing the manual unzip pre-step is what lets that uploaded zip ingest directly.
+
+**Consequence.** The healthkit ingest path gains **zip-awareness** (it accepts the zip and extracts `export.xml`, no longer assuming a pre-extracted file). The SEC decompression-size concern tracked for the DNA zip (bead `07f6` — an unbounded zip-member copy can amplify a small zip into a large landed/extracted file or OOM the process) **now extends to the Apple Health zip too**, and on a larger scale (the Apple export can be hundreds of MB extracted): the same streamed-copy-with-a-byte-ceiling mitigation should cover this path when `07f6` is decided. This is operator-owned (self-DoS on an operator-owned file, local-only, no egress), tracked under `07f6`, not resolved here. The status stays `accepted` — this extends the input-format handling only; the daily-aggregation, metric-map, and coexistence decisions are untouched.
+
 ## Deferred (value-domain-grounded, not arbitrary) — a follow-on
 
 Two metrics are deliberately **not** mapped, because mapping them naively would land a wrong-domain value on the wrong stream — the exact class the WHOOP strain-scale guard (ADR-0011) exists to prevent:
@@ -39,3 +49,10 @@ Both are tracked as a follow-on bead. The SpO2 fraction→percent convention (D3
 - The operator's real Apple Health export now imports `hrv`/`rhr`/`resp-rate`/`spo2` end-to-end (export.xml → daily-mean readings → the store → the dashboard wearable zone + the specialists, all source-agnostic — they key on the item, not the device).
 - The fabricated JSON scaffold is gone; the adapter exercises a real-format read path under the store-adversarial battery (cross-stream, dedupe-idempotent, distinct-days, same-identity-changed-value, distinct-source-from-Whoop, fail-loud).
 - Verified on a synthetic `export.xml` fixture; the operator's real export is the production validation (and confirms the SpO2 scale).
+
+## Revision History
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2026-06-20 | Initial draft (v1.0) — accepted (S82). | Walter McGivney |
+| 2026-06-21 | v1.1 — Red-team amendment: the Apple Health ingest path accepts the export **zip** and extracts the `export.xml` member itself (mirroring `dna.land`'s zip-member extraction), removing the manual unzip pre-step so the ADR-0013 browser upload can ingest the zip Apple produces directly; added the `complements` ADR-0013 edge (inverse on ADR-0013); noted the `07f6` decompression-size concern now extends to the Apple Health zip. Status stays `accepted`; the D2/D3/D4 decisions are unchanged. | Walter McGivney |
