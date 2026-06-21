@@ -229,13 +229,20 @@ def stage_uploads(content_type, body_stream, temp_root):
     reader = _BoundaryStream(body_stream, boundary)
     files = []
     fields = {}
-    for params, body_iter in reader.parts():
+    for i, (params, body_iter) in enumerate(reader.parts()):
         name = params.get("name", "")
-        if "filename" in params:
-            dest = temp_root / _safe_name(params["filename"])
+        if params.get("filename"):
+            # Prefix the sanitized basename with the part index so two parts sharing a
+            # basename stage to DISTINCT paths (else the second overwrites the first on
+            # disk and the first upload's data is silently lost). The traversal-safe
+            # basename is preserved; the unique prefix is added on top of it.
+            dest = temp_root / f"{i}-{_safe_name(params['filename'])}"
             _stage_file(body_iter, dest)
             files.append({"name": name, "filename": params["filename"], "path": dest})
         else:
+            # An empty `filename=""` part (a browser sending an unchosen file) is NOT a
+            # file part — `params.get("filename")` is falsy, so it falls through to here
+            # rather than staging a zero-byte upload.
             value = b"".join(body_iter)
             fields[name] = value.decode("utf-8", errors="replace")
     return {"files": files, "fields": fields}
