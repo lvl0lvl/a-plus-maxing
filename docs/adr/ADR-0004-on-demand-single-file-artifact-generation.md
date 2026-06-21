@@ -72,6 +72,7 @@ Generate each dashboard/report as an HTML file plus separate external CSS, JS, a
 | [ADR-0007 (Lab-Loop / Biomarker-Matrix / Projection Data-Flow)](ADR-0007-lab-loop-biomarker-matrix-projection-data-flow.md) | is-prerequisite-of | The biomarker matrix and projections are render-time views over stored timepoints; the artifact generation model must be decided before those views are placed. |
 | [ADR-0007 (Lab-Loop / Biomarker-Matrix / Projection Data-Flow)](ADR-0007-lab-loop-biomarker-matrix-projection-data-flow.md) | tensions-with | This ADR's <500KB / self-contained / offline budget pulls against the render-richness ADR-0007's asset-heavy biomarker-matrix and multi-timepoint projection views want; the budget is the hard constraint and those views must fit within it (see Open Questions OQ-1). |
 | [2026-05-16-system-architecture.md](../../vault/decisions/2026-05-16-system-architecture.md) | supersedes | That decision deferred any built interface (its Decision 3 — phased A→B→C, defer until friction); this ADR reverses that by making the single-file artifact V1's first deliverable (LM-04). Orchestrator handles its status flip per the discovery Supersession map. |
+| [ADR-0013 (Operator-Started Loopback Intake Server)](ADR-0013-operator-started-loopback-intake-server.md) | amended-by | ADR-0013 narrows this decision's no-server scope to the artifact-delivery axis and adds the operator-started loopback intake-server carve-out; this ADR's no-live-server Decision + falsification criterion are read with that carve-out. |
 
 Cross-reference authority: [.pipeline/dag.md §6 and §7](.pipeline/dag.md) is the canonical bidirectional reference map for the V1-DAG edges above; the ADR-0007 tension is recorded on both sides per dag.md §7. The `2026-05-16-system-architecture.md` edge is vault-native (not a V1-DAG edge) and carries no DAG-mirroring obligation.
 
@@ -110,3 +111,4 @@ Note: the template-engine / rendering-library choice (which tool emits the HTML)
 | 2026-06-04 | Initial draft (v1.0) — accepted | Walter McGivney |
 | 2026-06-04 | v1.1 — backfilled cross-references to the completed ADR set. | Walter McGivney |
 | 2026-06-04 | v1.2 — Phase-8 red-team fixes (RT-01, RT-06). | Walter McGivney |
+| 2026-06-21 | v1.3 — Phase-5 verify: added inverse `amended-by` edge to ADR-0013 (loopback intake-server carve-out on the no-server scope). | Walter McGivney |
