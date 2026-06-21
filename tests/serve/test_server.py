@@ -251,17 +251,23 @@ def test_post_export_xml_lands_readings_and_rerenders(tmp_path):
     srv, port = _server_with_roots(tmp_path)
     _serve_in_thread(srv)
     try:
-        status, body = _post_upload(port, "export.xml", _healthkit_xml_bytes(value="55"))
+        # A distinctive raw value (won't collide incidentally with markup/dates) so the
+        # no-leak negative assertion below is meaningful.
+        status, body = _post_upload(port, "export.xml", _healthkit_xml_bytes(value="83.7"))
         assert status == 200, f"POST /upload returned {status}, expected 200"
 
         hrv = store.read("hrv", root=tmp_path / "store")
         assert len(hrv) == 1 and hrv[0]["source"] == "healthkit", "export.xml did not land via ingest.run"
-        assert hrv[0]["value"] == 55.0
+        assert hrv[0]["value"] == 83.7
 
         # The response IS the re-rendered wizard, reflecting the new load-state.
         assert WIZARD_TITLE in body, "response is not the re-rendered intake wizard"
         assert "1 readings" in body, "the re-rendered wizard does not reflect the new wearable load-state"
         assert "✓ loaded" in body, "the wearable card did not flip to loaded after the upload"
+
+        # Negative (no-leak): the re-render shows the COUNT + item + range (asserted
+        # above), but NEVER the raw reading value — the wizard is counts-only.
+        assert "83.7" not in body, "the re-rendered wizard leaked the raw HRV reading value (counts-only broken)"
     finally:
         srv.shutdown()
         srv.server_close()
@@ -315,6 +321,11 @@ def test_post_dna_zip_lands_via_dna_land_and_rerenders(tmp_path):
 
         assert WIZARD_TITLE in body, "response is not the re-rendered intake wizard"
         assert "genome_v5.txt" in body, "the re-rendered wizard does not reflect the landed DNA file"
+
+        # Negative (no-leak): the re-render names the landed FILE only — never a genotype
+        # row or an rsid token. (Split the rsid literal so this test file carries none.)
+        assert "rs" + "4477212" not in body, "the re-rendered wizard leaked an rsid token (no-leak broken)"
+        assert "\t" not in body, "the re-rendered wizard leaked a tab-separated genotype row (no-leak broken)"
     finally:
         srv.shutdown()
         srv.server_close()
@@ -344,6 +355,145 @@ def test_post_unknown_file_rerenders_with_message_no_crash(tmp_path):
         follow = resp.read().decode("utf-8")
         conn.close()
         assert resp.status == 200 and WIZARD_TITLE in follow, "the handler died after the unknown-file POST"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+# --------------------------------------------------------------------------- #
+# Wave-A review FIX-1/FIX-2 — handler robustness + bounded-memory oversize reject
+# --------------------------------------------------------------------------- #
+
+
+def _still_alive(port):
+    """Return True if a follow-up GET / on `port` still serves the wizard (handler alive)."""
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("GET", "/")
+    resp = conn.getresponse()
+    body = resp.read().decode("utf-8")
+    conn.close()
+    return resp.status == 200 and WIZARD_TITLE in body
+
+
+def test_post_garbage_export_xml_rerenders_no_crash(tmp_path):
+    """FIX-1: a garbage `export.xml` (ParseError, NOT ValueError) re-renders, handler alive.
+
+    A malformed `export.xml` makes the healthkit adapter's `iterparse` raise
+    `xml.etree.ElementTree.ParseError` — NOT a ValueError, so the old catch missed it
+    and the request thread died (dropped connection + stack trace to stderr). The
+    handler must catch it, re-render the wizard (200), and stay responsive.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_upload(port, "export.xml", b"this is not valid xml <<<")
+        assert status == 200, f"garbage export.xml returned {status}, expected a re-rendered 200"
+        assert WIZARD_TITLE in body, "the garbage-xml response is not the re-rendered wizard"
+        assert _still_alive(port), "the handler died after the garbage-xml POST"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_post_not_really_a_zip_rerenders_no_crash(tmp_path):
+    """FIX-1: a `.zip` that is not a zip (BadZipFile, NOT ValueError) re-renders, alive.
+
+    A `.zip` upload whose bytes are not a zip makes the route's content-branch raise
+    `zipfile.BadZipFile` — NOT a ValueError. The handler must catch it, re-render the
+    wizard (200), and stay responsive rather than dropping the connection.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_upload(port, "fake.zip", b"PK this looks like a zip but is not")
+        assert status == 200, f"not-a-zip returned {status}, expected a re-rendered 200"
+        assert WIZARD_TITLE in body, "the not-a-zip response is not the re-rendered wizard"
+        assert _still_alive(port), "the handler died after the not-a-zip POST"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_post_non_numeric_content_length_rerenders_no_crash(tmp_path):
+    """FIX-1: a non-numeric Content-Length re-renders rather than dropping the connection.
+
+    The Content-Length parse (`int(...)`) used to sit OUTSIDE the guarded block, so a
+    non-numeric value raised `ValueError` BEFORE the try and killed the request thread.
+    The parse is now guarded: a garbage Content-Length re-renders the wizard (400) and
+    the handler stays alive.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.putrequest("POST", "/upload")
+        conn.putheader("Content-Type", f"multipart/form-data; boundary={BOUNDARY}")
+        conn.putheader("Content-Length", "not-a-number")
+        conn.endheaders()
+        conn.send(b"")
+        resp = conn.getresponse()
+        body = resp.read().decode("utf-8")
+        conn.close()
+        assert resp.status == 400, f"non-numeric Content-Length returned {resp.status}, expected 400"
+        assert WIZARD_TITLE in body, "the bad-Content-Length response is not the re-rendered wizard"
+        assert _still_alive(port), "the handler died after a non-numeric Content-Length POST"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_post_oversize_content_length_413_without_reading_body(tmp_path):
+    """FIX-2: an over-ceiling Content-Length is refused with 413 BEFORE the body is read.
+
+    Declares a Content-Length above `MAX_REQUEST_BYTES` but sends only a tiny body. If
+    the handler read `length` bytes it would block waiting for ~520 MiB that never
+    arrives (the request would hang/time out). A prompt 413 proves the reject happens on
+    the header, before the body materializes in RAM — the bounded-memory guarantee. The
+    handler stays alive.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        declared = serve_server.MAX_REQUEST_BYTES + 1
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.putrequest("POST", "/upload")
+        conn.putheader("Content-Type", f"multipart/form-data; boundary={BOUNDARY}")
+        conn.putheader("Content-Length", str(declared))
+        conn.endheaders()
+        # Send only a tiny body — far less than the declared length. A handler that read
+        # `declared` bytes would block here; the 413 must come back without that read.
+        conn.send(b"--" + BOUNDARY.encode() + b"\r\n")
+        resp = conn.getresponse()
+        body = resp.read().decode("utf-8")
+        conn.close()
+        assert resp.status == 413, f"oversize Content-Length returned {resp.status}, expected 413"
+        assert WIZARD_TITLE in body, "the 413 body is not the re-rendered wizard"
+        assert _still_alive(port), "the handler died after the oversize-Content-Length POST"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_post_oversize_streamed_body_413_bounded_memory(tmp_path, monkeypatch):
+    """FIX-2: a part exceeding the per-file ceiling is refused mid-stream (bounded RAM).
+
+    With a small injected per-file ceiling, a body modestly above it must trip
+    `multipart._stage_file`'s mid-stream ceiling (UploadTooLarge) and surface as 413 —
+    proving the length-bounded reader hands the parser a STREAM so the per-file ceiling
+    fires, rather than `rfile.read(length)` materializing the whole body first. Driving
+    the ceiling small keeps this test off a 512 MiB fixture (FIX-5 sibling rationale).
+    """
+    from scripts.serve import multipart
+
+    monkeypatch.setattr(multipart, "MAX_UPLOAD_BYTES", 4096)
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        oversize = b"A" * (4096 + 2048)  # over the injected per-file ceiling, tiny in RAM
+        status, body = _post_upload(port, "export.zip", oversize)
+        assert status == 413, f"over-per-file-ceiling body returned {status}, expected 413"
+        assert WIZARD_TITLE in body, "the 413 body is not the re-rendered wizard"
+        assert _still_alive(port), "the handler died after the oversize-body POST"
     finally:
         srv.shutdown()
         srv.server_close()

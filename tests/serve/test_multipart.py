@@ -12,7 +12,7 @@ copy is chunked (no single-shot full-body read).
 import io
 from pathlib import Path
 
-from scripts.serve.multipart import MAX_UPLOAD_BYTES, UploadTooLarge, stage_uploads
+from scripts.serve.multipart import UploadTooLarge, stage_uploads
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -120,14 +120,20 @@ def test_form_fields_returned_alongside_files(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-def test_over_ceiling_body_refused_before_full_write(tmp_path):
+def test_over_ceiling_body_refused_before_full_write(tmp_path, monkeypatch):
     """AC-3 / Risk `07f6`: an over-ceiling file part is refused, 0 residual file.
 
-    Stages a file part whose body exceeds MAX_UPLOAD_BYTES. The reader must raise
+    Drives the ceiling via a small injected `MAX_UPLOAD_BYTES` (test seam) so the
+    refusal is proved WITHOUT a 512 MiB in-memory fixture (the prior fixture flaked
+    under memory pressure). A body modestly above the injected ceiling must raise
     UploadTooLarge before the full body is written, and the partial temp file is
-    removed — no residual oversize temp file remains in the temp root.
+    removed — no residual oversize temp file remains. Failing-capable: remove the
+    ceiling and the over-ceiling body stages instead of raising.
     """
-    oversize = b"A" * (MAX_UPLOAD_BYTES + 4096)
+    import scripts.serve.multipart as multipart
+
+    monkeypatch.setattr(multipart, "MAX_UPLOAD_BYTES", 4096)
+    oversize = b"A" * (4096 + 2048)  # over the injected ceiling, tiny in RAM
     body = _multipart_body([{"name": "export", "filename": "big.zip", "body": oversize}])
 
     raised = False
@@ -141,17 +147,22 @@ def test_over_ceiling_body_refused_before_full_write(tmp_path):
     assert residual == [], f"partial oversize temp file left behind: {residual}"
 
 
-def test_at_ceiling_body_is_accepted(tmp_path):
+def test_at_ceiling_body_is_accepted(tmp_path, monkeypatch):
     """AC-3 boundary: a body at exactly the ceiling is accepted (refusal is for OVER).
 
     A part whose body is exactly MAX_UPLOAD_BYTES must stage successfully — the
     ceiling refuses strictly-greater, not equal, so the boundary is not off-by-one.
+    Drives the ceiling via a small injected `MAX_UPLOAD_BYTES` (test seam) so the
+    boundary is proved WITHOUT a 512 MiB in-memory fixture.
     """
-    at_ceiling = b"B" * MAX_UPLOAD_BYTES
+    import scripts.serve.multipart as multipart
+
+    monkeypatch.setattr(multipart, "MAX_UPLOAD_BYTES", 4096)
+    at_ceiling = b"B" * 4096
     body = _multipart_body([{"name": "export", "filename": "atlimit.zip", "body": at_ceiling}])
     result = stage_uploads(_content_type(), io.BytesIO(body), tmp_path)
     staged = Path(result["files"][0]["path"])
-    assert staged.exists() and staged.stat().st_size == MAX_UPLOAD_BYTES, "at-ceiling body not staged whole"
+    assert staged.exists() and staged.stat().st_size == 4096, "at-ceiling body not staged whole"
 
 
 def test_copy_is_chunked_not_single_shot():
