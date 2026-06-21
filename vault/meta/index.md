@@ -33,6 +33,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/hexarelin]] (status: researching; evidence_tier: C; risk_tier: experimental)
 - [[compounds/mk-677]] (status: researching; evidence_tier: B; risk_tier: medium)
 - [[compounds/semaglutide]] (status: researching; evidence_tier: A; risk_tier: medium)
+- [[compounds/tirzepatide]] (status: researching; evidence_tier: A; risk_tier: medium)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -136,6 +137,9 @@ _(none yet)_
 - [[library/peptides/semaglutide/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~10.6K words; 48 unified citations + crosswalk; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 19/19 verified, 0 fabrications, 0 Wikipedia; the FIRST A-tier entry — approved GLP-1 RA with landmark RCTs — evidence_tier A / risk_tier medium)
 - [[library/peptides/semaglutide/practitioner-layer]] (2026-06-20; label titration Ozempic 0.25→2 mg / Wegovy →2.4 mg / Rybelsus 3→7→14 mg; compounded-semaglutide shortage arc; muscle-preservation adjuncts)
 - [[library/peptides/semaglutide/non-english-layer]] (2026-06-20; no distinct non-English-language primary stream — pivotal trials incl. China-population PIONEER 11/12 English-published)
+- [[library/peptides/tirzepatide/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~9.8K words; 42 unified citations; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 23/23 verified, 0 fabrications, 0 Wikipedia; A-tier dual GIP/GLP-1 — SURMOUNT-1 ~20.9%, OSA-approved; evidence_tier A / risk_tier medium)
+- [[library/peptides/tirzepatide/practitioner-layer]] (2026-06-20; label titration 2.5→15 mg SC weekly; compounded-tirzepatide shortage arc [resolved 2024]; muscle-preservation adjuncts)
+- [[library/peptides/tirzepatide/non-english-layer]] (2026-06-20; no distinct non-English-language primary stream — Asian-population SURMOUNT-J/CN/SURPASS-J English-published)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)

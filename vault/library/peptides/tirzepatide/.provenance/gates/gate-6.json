@@ -1,0 +1,25 @@
+{
+  "phase": "6",
+  "critique_agent_id": "critique-tzp-i2",
+  "draft_path": "vault/library/peptides/tirzepatide/research-report.md",
+  "findings": [
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "The token [6] appears once inside the Provenance/Deduplication prose ('Section E [6]') describing the original per-section numbering; it is historical documentation, not a claim citation, and has no line-start bibliography entry by design. Harmless but could read as a stray token to a naive grep. No fix required."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "iterations": 2,
+  "verdict": "PASS",
+  "timestamp": "2026-06-21T00:52:21.990896+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T00:48:46.967902+00:00",
+    "attest_ts": "2026-06-21T00:52:21.990899+00:00",
+    "iteration": 2,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "eeef1178fbd8105d76b04894e29728bb641cfed11e1a89ff6b05da418f125de7",
+    "agent_source_mtime": "2026-06-21T00:51:54.305675+00:00"
+  }
+}
