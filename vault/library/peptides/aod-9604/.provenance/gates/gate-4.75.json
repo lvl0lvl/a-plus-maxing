@@ -1,0 +1,95 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 169,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 18,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 1
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 7,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 12,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "PASS",
+      "count_checked": 18,
+      "count_flagged": 0
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 7,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 5,
+    "largest_cluster_name": "Metabolic Pharmaceuticals / Monash",
+    "largest_cluster_count": 5,
+    "share": 1.0,
+    "threshold_triggered": true,
+    "surfaced_section_heading": "Concentration audit (Section C)"
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 18,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-9: concentration-risk surfaced as Section-C subsection; at synthesis hoist to top-level section before first indication per health-gates \u00a73.2",
+    "IC-13: Kwon&Park lameness numbers 11\u00b14 vs 25\u00b12 days are full-text-only (paywall) corpus-missing \u2014 qualitative direction verified in abstract; Herd 2005 12-week figures are non-PubMed conference-abstract, correctly lower-tier-tagged"
+  ],
+  "timestamp": "2026-06-21T01:57:51.189441+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T01:53:13.748664+00:00",
+    "attest_ts": "2026-06-21T01:57:51.189444+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "61aa896603f2b0736926ab0a3cfc8b7f8eacdc64cdf625a26af021659b57167d",
+    "agent_source_mtime": "2026-06-21T01:57:21.301819+00:00"
+  }
+}

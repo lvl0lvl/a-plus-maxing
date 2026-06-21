@@ -299,7 +299,24 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 - ~100% Eli-Lilly single-sponsor (no independent replication, surfaced). FDA Fast Track for retatrutide = UNVERIFIED (not asserted; only tirzepatide had it).
 - Regulatory: NOT approved (investigational); FDA gray-market caution (cannot be compounded / not a component of an approved drug / not safe-and-effective / warning letters). **Gray-market retatrutide is especially premature** (no approved product, China-sourced research-chem with documented sterility-test failures). WADA: **NOT prohibited** (2026 Prohibited List S4.4 has no GLP-1/glucagon agonists; 2026 Monitoring tracks only "Markers of semaglutide and tirzepatide" — retatrutide not individually named; verified by directly parsing the WADA PDFs).
 
-### NEXT (reserved, my/primary lane): **AOD-9604** (sweep entry 14 — a GH-fragment [hGH 176-191] marketed for fat-loss; expect evidence_tier C/experimental, mostly-unproven, the Phase-2 obesity trials FAILED). Then Selank (the last in my lane). (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
+---
+
+## 2026-06-20 — AOD-9604 (hGH(176-191) lipolytic fragment) deep-pass (sweep entry 14, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **AOD-9604 entry shipped:** `compounds/aod-9604.md` + `library/peptides/aod-9604/research-report.md` (~11.1K words, 32 unified citations) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections incl. id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact. All 6 judges PASS first-pass; §6 critique PASS (2 minor); citations renumbered to unified first-pass (a dangling [6] caught + fixed at synthesis).
+- **Final independent full-bib audit: 6/6 load-bearing identifier entries verified, 0 fabrications, 0 first-author mismatches, 0 Wikipedia.** Compound-entry consistency PASS. (Applied the audit's optional §6.3-vs-§8.2 §503A-timeline reconciliation polish.)
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- AOD-9604 = synthetic **C-terminal fragment of human GH, hGH(176-191)/Tyr-hGH(177-191)** ("lipolytic fragment"; Metabolic Pharmaceuticals/Monash/Ng). Claimed lipolysis + anti-lipogenesis WITHOUT GH-receptor binding or IGF-1 elevation — **verified at receptor/IGF-1/glucose levels** (the GH-axis-sparing differentiator vs full GH and the GH secretagogues). Very short t½ (~4 min).
+- **THE CENTRAL FACT: pivotal human efficacy FAILED.** The Phase-2b obesity RCT (~536 pts, 24 wk, oral 0.25/0.5/1 mg) did NOT beat placebo → obesity development discontinued ~2007. The Herd 2005 12-wk study (conference abstract, modest unconfirmed signal) was not confirmed. All robust lipolysis is PRECLINICAL (Ng 2000 Zucker rats PMID 11146367; Heffernan 2001 mice PMID 11673763). **No proven human fat-loss efficacy.** Never registered on ClinicalTrials.gov.
+- **Safety:** well-tolerated/placebo-indistinguishable in 6 RCTs (~893 adults); **failed on EFFICACY, not safety**; no IGF-1 rise, no glucose/insulin impairment (verified). BUT short-term-only (≤24 wk), NO published human SC-route data (the gray-market route), FDA flagged immunogenicity/aggregation/impurity for uncharacterized injectable.
+- **OA/cartilage pivot = PRECLINICAL-only** (Kwon&Park 2015 rabbit PMID 26275694 + patent; ZERO registered human OA trials). **The "Paradigm Phase-II knee-OA" claim is a MOLECULE CONFLATION — that program is pentosan polysulfate (iPPS/Zilosul), NOT AOD-9604 — correctly excluded.**
+- ~100% Metabolic Pharmaceuticals/Monash single-lineage (no sponsor-independent replication).
+- Regulatory: never approved as a drug (FDA/TGA/EMA); **self-affirmed GRAS ≠ FDA approval and NOT a lawful US dietary ingredient** (DSHEA drug-exclusion); TGA Schedule-4; NOT in the Apr-2026 §503A removed-12 (interim Cat-2 Sept 2023 → removed ~Sep 2024 by nominator withdrawal; never Cat-1 → not lawfully compoundable). **WADA: PROHIBITED** (S0 non-approved-substance [clarified to ASADA 2013-04-22] + S2 GH-fragment scope; the Essendon AFL saga, CAS 2016). Gray-market ~300 mcg SC/day convention (trial doses were oral ~1 mg — trial-derived, not a label).
+
+### NEXT (reserved, my/primary lane): **Selank** (sweep entry 15 — the LAST in my lane; a Russian synthetic Tuftsin-analogue heptapeptide anxiolytic/nootropic, Institute of Molecular Genetics RAS; Russia-registered NOT FDA/EMA; mostly Russian literature → expect evidence_tier C/experimental + a non-English-literature-heavy entry). NOTE: its sister peptide **Semax is the OTHER session's (bottom-13) — do NOT touch Semax.** (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
 
 ---
 
