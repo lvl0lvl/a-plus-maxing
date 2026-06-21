@@ -47,9 +47,9 @@ Append-only register of project landmarks. Each landmark declares relevant scope
 - **rationale:** First primary-care relationship establishment for this operator. Without this visit, all `risk_tier: medium+` compounds remain blocked by operator-profile.md January-2026-section HALT rule. The visit is the first downstream consumer of the vault's research layer.
 - **on_status_change (when status flips to `completed`):** Archive this entry (status: completed); register LM-02 (next MD follow-up) with new date. Do NOT delete — the historical entry stays. Next landmark of similar class registers as its own LM-NN.
 
-### LM-02 — Whoop strap + first 30-day wearable baseline
-- **date:** TBD (Whoop owned per ADR-0011 D3; baseline-start pending the strap-data window)
-- **relevant_scopes:** `vault/meta/current-state.md` Wearable (Whoop) section; `vault/biomarkers/hrv.md` (TODO); `vault/biomarkers/rhr.md` (TODO); `vault/biomarkers/sleep-efficiency.md` (TODO)
+### LM-02 — wearable strap + first 30-day wearable baseline
+- **date:** TBD (source re-anchored to **Apple Health** per ADR-0012 — the operator uses Apple Health, not Whoop; the `healthkit` adapter reading the real `export.xml` is built S82; baseline-start pending the first real export)
+- **relevant_scopes:** `vault/meta/current-state.md` Wearable (Apple Health) section; `vault/biomarkers/hrv.md` (TODO); `vault/biomarkers/rhr.md` (TODO); `vault/biomarkers/sleep-efficiency.md` (TODO)
 - **trigger_windows:**
   - **baseline-start + 30 days:** ingest first 30-day baseline into `current-state.md` Wearable section; create biomarker pages with `last_verified` set to the 30-day window end
 - **status:** active
