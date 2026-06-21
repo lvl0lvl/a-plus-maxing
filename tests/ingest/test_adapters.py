@@ -403,6 +403,24 @@ def test_healthkit_spo2_sub_percent_rounds_to_two_decimals(tmp_path, store_root)
     assert store.read("spo2", root=store_root)[0]["value"] == 97.6
 
 
+def test_healthkit_daily_mean_rounds_to_two_decimals(tmp_path, store_root):
+    """A non-terminating daily mean on a NON-spo2 metric is stored rounded to 2 decimals (ADR-0012 D2).
+
+    Three hrv samples 50/51/53 mean to 51.333333…; the stored value must be 51.33. The spo2 case
+    cannot catch this — 0.976×100 is exact in IEEE-754 — so this pins the round() on a metric whose
+    raw mean has >2 decimals. Removing `round(...)` stores 51.333333333333336 and REDs this.
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    export = tmp_path / "export.xml"
+    _write_healthkit_export(export, [
+        _hk_hrv("2026-04-06", "50"), _hk_hrv("2026-04-06", "51"), _hk_hrv("2026-04-06", "53"),
+    ])
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
+    assert store.read("hrv", root=store_root)[0]["value"] == 51.33
+
+
 def test_healthkit_two_metrics_same_day_aggregate_independently(tmp_path, store_root):
     """Two DIFFERENT metrics with two samples each on ONE day produce two INDEPENDENT daily means — the
     per-(item, day) accumulator key. A regression keying on day-only (dropping item) would average across
