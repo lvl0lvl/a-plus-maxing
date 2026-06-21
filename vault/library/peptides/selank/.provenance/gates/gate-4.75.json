@@ -1,0 +1,76 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "timestamp": "2026-06-20T00:00:00Z",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS"
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS"
+    },
+    "IC-4": {
+      "status": "PASS"
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS"
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS"
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 8
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 7,
+    "largest_cluster_name": "IMG RAS / Zakusov lineage",
+    "largest_cluster_count": 7,
+    "share": 1.0,
+    "threshold_triggered": true,
+    "surfaced_section_heading": "Section C \u2014 DEFINING FACT (read first)",
+    "surfaced_before_first_indication": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 6,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T02:45:10.346011+00:00",
+    "attest_ts": "2026-06-21T02:47:56.525697+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "0ccde0c60dbc9a6cb70d34bf5549ef50f6fabf3c5b47b336c187c17bbc76ec46",
+    "agent_source_mtime": "2026-06-21T02:47:39.230167+00:00"
+  }
+}

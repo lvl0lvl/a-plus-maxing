@@ -316,7 +316,23 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 - ~100% Metabolic Pharmaceuticals/Monash single-lineage (no sponsor-independent replication).
 - Regulatory: never approved as a drug (FDA/TGA/EMA); **self-affirmed GRAS ≠ FDA approval and NOT a lawful US dietary ingredient** (DSHEA drug-exclusion); TGA Schedule-4; NOT in the Apr-2026 §503A removed-12 (interim Cat-2 Sept 2023 → removed ~Sep 2024 by nominator withdrawal; never Cat-1 → not lawfully compoundable). **WADA: PROHIBITED** (S0 non-approved-substance [clarified to ASADA 2013-04-22] + S2 GH-fragment scope; the Essendon AFL saga, CAS 2016). Gray-market ~300 mcg SC/day convention (trial doses were oral ~1 mg — trial-derived, not a label).
 
-### NEXT (reserved, my/primary lane): **Selank** (sweep entry 15 — the LAST in my lane; a Russian synthetic Tuftsin-analogue heptapeptide anxiolytic/nootropic, Institute of Molecular Genetics RAS; Russia-registered NOT FDA/EMA; mostly Russian literature → expect evidence_tier C/experimental + a non-English-literature-heavy entry). NOTE: its sister peptide **Semax is the OTHER session's (bottom-13) — do NOT touch Semax.** (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
+---
+
+## 2026-06-20 — Selank (TP-7, Tuftsin-analogue heptapeptide) deep-pass (sweep entry 15, primary-session lane — **PRIMARY LANE COMPLETE**)
+
+### DONE (verified — mechanical evidence on disk)
+- **Selank entry shipped:** `compounds/selank.md` + `library/peptides/selank/research-report.md` (~75K file, full bibliography) + practitioner-layer + non-english-layer + full `.provenance/`.
+- **All 7 gates attested PASS** (2.75→8.5, chain intact).
+- **Independent full-bib audit: 21/21 PMIDs verified, 0 fabrications, 0 fixes.** Compound-entry consistency PASS.
+- **This is the LAST entry of the primary lane — all top-12/primary-lane peptides are now done.** (Bottom-13 [MOTS-c…Semax] remain owned by `feature/wiki-peptides`.)
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- Selank = synthetic **Tuftsin-analogue heptapeptide Thr-Lys-Pro-Arg-Pro-Gly-Pro** (IMG RAS / Zakusov Institute, Russia) — a stabilized tuftsin analogue. **Russia-REGISTERED intranasal anxiolytic** (reg. no. **ЛСР-003338/09**, 0.15% solution, GAD/neurasthenia) but **NOT FDA/EMA-approved**.
+- Mechanism: **enkephalinase inhibition** (slows enkephalin degradation) + **BDNF/monoamine/GABAergic modulation** + **Tuftsin-lineage immunomodulation** (incl. an antiviral/IFN signal).
+- **INTEGRITY AXIS:** the headline "anxiolysis comparable to a benzodiazepine but WITHOUT sedation, amnesia, dependence, or withdrawal" is a **Russian-clinical claim, honestly scoped** — backed by 4 small (n≈60–70) benzodiazepine-comparator (NOT placebo-controlled) Russian-language trials, **NOT Western-validated**, with **no dedicated dependence trial**. Western counterweight cited first-class (**Doyno & White 2021** flags class-level abuse/dependence as unsettled).
+- Evidence is **predominantly Russian-language** and **~100% single-lineage** (IMG RAS / Zakusov / Serbsky-Korsakov network; ~7/7 admissible primaries) — internally consistent but the opposite of independent corroboration; limited independent Western replication surfaced first-class.
+- Regulatory: outside Russia an unapproved gray-market "research chemical"; **§503A Selank-acetate/TP-7 was Category-2, removed Sept 27 2024 by nomination withdrawal → PCAC, NEVER Category-1 → not lawfully compoundable**; WADA **NOT prohibited** (not on the 2026 List; holds a governmental approval so not swept under S0). evidence_tier **C** / risk_tier **experimental**.
+- **Kept DISTINCT from Semax and from N-Acetyl-Selank-Amidate** throughout. NOTE: **Semax is the OTHER session's (bottom-13) — NOT touched.** (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
 
 ---
 

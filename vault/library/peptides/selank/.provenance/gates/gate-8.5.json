@@ -1,0 +1,38 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "timestamp": "2026-06-21T03:12:00Z",
+  "iterations": 1,
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "/Users/Flybottle/Documents/Projects/a+research/vault/library/peptides/selank/practitioner-layer.md",
+    "present": true,
+    "sha256": "c088f263b7d655bb42b8a47cabf1df99e8551e1a357afdb123f5a70c62e928ed",
+    "compounding_sheets_count": 0,
+    "compounding_sheets_or_null_finding": true,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "/Users/Flybottle/Documents/Projects/a+research/vault/library/peptides/selank/non-english-layer.md",
+    "present": true,
+    "sha256": "6963e965b3d465a151e1f5a7da56d26817915b2c860321f7938a66ea72df8489",
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "German"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T03:11:03.428314+00:00",
+    "attest_ts": "2026-06-21T03:12:12.269686+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "4fc42bd0d69db48e3a96967c5cc0cf523c30a7b3dbe0816bc16a9a5a4e01d76f",
+    "agent_source_mtime": "2026-06-21T03:11:56.963963+00:00"
+  }
+}

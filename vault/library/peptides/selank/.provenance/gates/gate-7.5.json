@@ -1,0 +1,30 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "timestamp": "2026-06-21T03:02:00Z",
+  "iterations": 1,
+  "compound_risk_tier": "experimental",
+  "compound_entry_path": "/tmp/aplus-research/selank/synthesis/research-report.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "populated"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "no validated Selank safety biomarker or therapeutic drug level \u2014 monitoring is clinical",
+    "gray-market product caution: no clinical oversight, no GMP assurance",
+    "cautious step-down reasonable on discontinuation (clinical-judgment marker)",
+    "Doyno & White 2021 call for abuse-potential evaluation before public access [19]"
+  ],
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T02:59:43.550771+00:00",
+    "attest_ts": "2026-06-21T03:00:57.222509+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "30b0584d6ad37409e916703ab40e5e7ff6a3839950d9057992ea86b492a9aec8",
+    "agent_source_mtime": "2026-06-21T03:00:37.675772+00:00"
+  }
+}
