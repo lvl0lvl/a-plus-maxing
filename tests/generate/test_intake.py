@@ -59,6 +59,18 @@ def test_intake_dna_card_reflects_dropzone(tmp_path):
     assert "genome.txt landed" in path.read_text()
 
 
+def test_intake_escapes_dropzone_filenames(tmp_path):
+    """A dropzone filename with HTML-special chars is escaped, not injected raw into the page."""
+    dna_root = tmp_path / "dna"
+    dna_root.mkdir()
+    (dna_root / "x&y<z>.txt").write_text("# rsid\nrs1\t1\t1\tAA\n")
+    path = generate.run("intake", _root=tmp_path / "store", _out_dir=tmp_path / "out",
+                        _dna_root=dna_root, _labs_root=tmp_path / "labs")
+    html = path.read_text()
+    assert "x&amp;y&lt;z&gt;.txt" in html       # escaped
+    assert "x&y<z>.txt landed" not in html      # never the raw string
+
+
 def test_intake_emits_self_contained_file(tmp_path):
     """generate.run -> render.emit RAISES on any external asset; a clean emit proves self-contained."""
     path = generate.run("intake", _root=tmp_path / "store", _out_dir=tmp_path / "out",
