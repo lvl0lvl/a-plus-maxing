@@ -1,0 +1,37 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/tirzepatide/practitioner-layer.md",
+    "present": true,
+    "sha256": "8087e8a1aaa1c32407745aafae827cf69c3ecd03f1473836959e2f7a8a199e27",
+    "compounding_sheets_count": 0,
+    "compounding_sheets_or_null_finding": true,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/tirzepatide/non-english-layer.md",
+    "present": true,
+    "sha256": "3074ea02b21cfbe7046e8548627f020d249ba1217799f2c1db315da9ca378bfe",
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "Other"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-21T00:59:05.897703+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T00:57:33.766987+00:00",
+    "attest_ts": "2026-06-21T00:59:05.897706+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "9a5cc90fe5da4e9fce3146ef640e7c48643fadcc0fb0d0650e67fc308af499a0",
+    "agent_source_mtime": "2026-06-21T00:58:44.055271+00:00"
+  }
+}
