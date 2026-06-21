@@ -20,14 +20,18 @@ from pathlib import Path
 
 from scripts.generate import render
 from scripts.store import store
-from vault.design.templates import dashboard, handout, report
+from vault.design.templates import dashboard, handout, intake, report
 
 # The artifact_name -> template-module selection. A template is a module exposing
 # render(store_read); render.emit names the output file from the module.
-_TEMPLATES = {"dashboard": dashboard, "handout": handout, "report": report}
+_TEMPLATES = {"dashboard": dashboard, "handout": handout, "intake": intake, "report": report}
+
+# The gitignored dropzones the intake screen's load-state reads (siblings of the store).
+_DEFAULT_DNA_ROOT = Path("vault/dna/raw")
+_DEFAULT_LABS_ROOT = Path("vault/labs/raw")
 
 
-def run(artifact_name, *, _root=None, _out_dir=None, _today=None):
+def run(artifact_name, *, _root=None, _out_dir=None, _today=None, _dna_root=None, _labs_root=None):
     """Render the named artifact from the current store state and return its path.
 
     One code path for both the on-demand and the unattended/cron entry mode:
@@ -62,6 +66,23 @@ def run(artifact_name, *, _root=None, _out_dir=None, _today=None):
     template = _TEMPLATES[artifact_name]
     root = _root if _root is not None else store.DEFAULT_ROOT
     store_read = store.read_all(root)
+
+    if artifact_name == "intake":
+        # The intake screen renders the live ingestion load-state: the wearable stream from
+        # store_read + the DNA/labs dropzones (siblings of the store, not in store_read), so it
+        # is resolved here and injected — render.emit's contract stays callable(store_read).
+        from scripts.ingest import status as ingest_status
+
+        dna_root = _dna_root if _dna_root is not None else _DEFAULT_DNA_ROOT
+        labs_root = _labs_root if _labs_root is not None else _DEFAULT_LABS_ROOT
+        ingestion_status = ingest_status.resolve(store_read, dna_root=dna_root, labs_root=labs_root)
+
+        def intake_seamed(store_read):
+            return template.render(store_read, status=ingestion_status, _today=_today)
+
+        intake_seamed.__name__ = template.__name__
+        return render.emit(intake_seamed, store_read, _out_dir=_out_dir)
+
     if _today is None:
         return render.emit(template, store_read, _out_dir=_out_dir)
 
