@@ -84,7 +84,7 @@ a ceiling may be lowered only with a documented evidence reason here (no guessin
 - Marketed "TB-500" = Ac-LKKTETQ fragment ≠ studied full-length Tβ4 (Esposito 2012). 
 - No human RCT met a primary endpoint for ANY Tβ4 indication (SEER-1 p=0.0656 terminated; ARISE-3 missed); ZERO athletic human evidence.
 - Bidirectional cancer signal (pro-metastatic melanoma over-expression; myeloma suppressor) — net prudent contraindication for active/recent malignancy.
-- FDA removed from 503A Cat-2 ~Apr 2026 (FR 2026-07361, NOT approval); WADA S2.3 prohibited; evidence_tier C / risk_tier experimental.
+- FDA removed from interim §503A Cat-2 ~Apr 2026 (parallel FDA Cat-2 action, NOT approval; FR Doc 2026-07361 = the July-2026 PCAC meeting notice, not the removal action); WADA S2.3 prohibited; evidence_tier C / risk_tier experimental.
 - Methodology caveat: WebSearch/WebFetch substituted for Tavily MCP (AR-2); gate logic tool-agnostic, retrieval breadth may differ from a Tavily run.
 
 ### Process / skill meta-findings surfaced (for skill_consolidator beads)
@@ -143,7 +143,7 @@ a ceiling may be lowered only with a documented evidence reason here (no guessin
 ### CLAIMED (asserted this session — backed by `.provenance/` + independent re-audit)
 - Genuinely DUAL-NATURED: antimicrobial/LPS-neutralizing/wound-healing/angiogenic AND a disease driver — psoriasis autoantigen + self-DNA/RNA→pDC→type-I-IFN (psoriasis/lupus/rosacea/atherosclerosis); context-dependent cancer (pro-tumor ovarian/lung/breast; anti-tumor colon/gastric).
 - Human administration evidence = 4 small trials: Grönberg 2014 (positive Phase I/II VLU) → Mahlapuu 2021 HEAL (Phase IIb, PRIMARY ENDPOINT NEGATIVE) → Miranda 2023 DFU (granulation only) → melanoma n=4 dose-finding (skin toxicity). No Phase III, no approval. Endogenous-biomarker data is separate.
-- FDA: 503A Cat-2 (2023) → removed ~Apr 2026 (FR 2026-07361), not approval; deferred off Jul-2026 PCAC to ~Feb 2027. WADA not individually named but prohibited under S0. Native short half-life; no established human PK figure.
+- FDA: 503A Cat-2 (2023) → removed ~Apr 2026 (parallel FDA Cat-2 action, not approval; FR Doc 2026-07361 = the July-2026 PCAC meeting notice, not the removal action); deferred off Jul-2026 PCAC to ~Feb 2027. WADA not individually named but prohibited under S0. Native short half-life; no established human PK figure.
 - Monitoring: no LL-37-specific validated biomarker; objective via hs-CRP/inflammation markers. Dominant safety consideration = autoimmunity/psoriasis-flare risk (LL-37 is the autoantigen).
 
 ### Process note
@@ -160,8 +160,8 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 - "First SELECTIVE GH secretagogue" — GH without ACTH/cortisol/prolactin — but ANIMAL-grounded (Raun 1998), not human-proven.
 - Human evidence: acute PK/PD only (Gobburu 1999, IV); the sole efficacy program (postoperative ileus Phase 2, Beck 2014, n≈114, p=0.15) FAILED → Novo Nordisk/Helsinn discontinued development. No approval, no Phase 3, zero human efficacy for muscle/fat/anti-aging. Human PK IV-only (no human SC PK).
 - ~80% Novo-Nordisk single-lineage concentration (≥70% flag, surfaced first-class). Bone = content/area not volumetric BMD; intermittent dosing did NOT raise IGF-1 in rats.
-- FDA never approved; removed from 503A interim Cat-2 ~Sept 2024; PCAC voted AGAINST 503A bulks listing Oct 29 2024 (fluid-retention/hyperglycemia/CHF); NOT in the Apr-2026 FR 2026-07361 action. WADA S2.2 prohibited (named). Monitoring: IGF-1 (keep in age/sex range) + fasting glucose/HbA1c.
-- Canonical FR-2026-07361 removed-12 (verified, for cross-entry consistency): BPC-157, TB-500, Epitalon, GHK-Cu, MOTS-c, DSIP/Emideltide, Dihexa, **PEG-MGF**, Melanotan-II, KPV, Semax, LL-37 — **MK-677 is NOT in it** (a prior-entry error to watch).
+- FDA never approved; removed from 503A interim Cat-2 ~Sept 2024; PCAC voted AGAINST 503A bulks listing Oct 29 2024 (fluid-retention/hyperglycemia/CHF); NOT among the Apr-2026 Cat-2 removed-12 (and not among the 7 in FR Doc 2026-07361, the July-2026 PCAC meeting notice). WADA S2.2 prohibited (named). Monitoring: IGF-1 (keep in age/sex range) + fasting glucose/HbA1c.
+- Canonical interim §503A Cat-2 removed-12 (verified, for cross-entry consistency) — this is the PARALLEL FDA Cat-2 action, NOT FR Doc 2026-07361 (which is the July-2026 PCAC meeting notice listing 7 peptides under review): BPC-157, TB-500, Epitalon, GHK-Cu, MOTS-c, DSIP/Emideltide, Dihexa, **PEG-MGF**, Melanotan-II, KPV, Semax, LL-37 — **MK-677 is NOT in it** (a prior-entry error to watch). [corrected 2026-06-20, fix/fr-2026-07361-consistency: heading previously mis-attributed the removed-12 to FR 2026-07361.]
 
 ## 2026-06-20 — CJC-1295 (GRF(1-29) GHRH analogue) deep-pass (sweep entry 6, primary-session lane)
 
@@ -176,8 +176,8 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 - GHRH-receptor agonist (NOT ghrelin/GHSR — contrast ipamorelin); GH→hepatic IGF-1; DAC raises basal GH/IGF-1 over days.
 - **No human efficacy, ever.** The only efficacy program (ConjuChem with-DAC Phase II HIV-lipodystrophy, NCT00267527) was TERMINATED July 2006 after a participant death; causation NOT established (on-scene MD: likely occult coronary disease). GH/IGF-1 elevation is a biomarker, not benefit. No approval, no Phase 3. no-DAC has zero human efficacy data.
 - ConjuChem single-lineage ~100% of the 2 efficacy/PK preclinical primaries (Jette 2005 PMID 15817669 rat; Alba 2006 PMID 16822960 GHRHKO mouse) — concentration alert surfaced first-class.
-- Regulatory: never approved; interim 503A Cat-2 (2023); PCAC voted AGAINST positive-list addition Dec 4 2024 (FR Doc 2024-24828); **NOT** among the 12 removed by FR Doc 2026-07361. WADA S2.2.4 prohibited (CJC-1295 named).
-- **META-FINDING (cross-entry):** the independent judge verified the govinfo primary — **FR Doc 2026-07361 is the JULY-2026 PCAC MEETING NOTICE (7 peptides), not itself the "removal of 12" enumeration**; the removed-12 trace to FDA's parallel Category-2 action + secondaries. Prior entries (LL-37, KPV, etc.) framed 2026-07361 as "the removal action" — worth a consistency pass on those.
+- Regulatory: never approved; interim 503A Cat-2 (2023); PCAC voted AGAINST positive-list addition Dec 4 2024 (FR Doc 2024-24828); **NOT** among the 12 removed in the parallel FDA Cat-2 action (and not among the 7 in FR Doc 2026-07361, the July-2026 PCAC meeting notice — see META-FINDING below). WADA S2.2.4 prohibited (CJC-1295 named).
+- **META-FINDING (cross-entry):** the independent judge verified the govinfo primary — **FR Doc 2026-07361 is the JULY-2026 PCAC MEETING NOTICE (7 peptides), not itself the "removal of 12" enumeration**; the removed-12 trace to FDA's parallel Category-2 action + secondaries. Prior entries (LL-37, KPV, etc.) framed 2026-07361 as "the removal action" — worth a consistency pass on those. **RESOLVED 2026-06-20: consistency pass applied across entries (fix/fr-2026-07361-consistency)** — BPC-157 + TB-500 (_triage.md), TB-500 + LL-37 + Ipamorelin + this CJC-1295 entry + the "Canonical removed-12" heading (_research-log.md), and the BPC-157 Cat-2 record (meta/contradictions.md) all re-framed so 2026-07361 = the July-2026 PCAC meeting notice (7 peptides) and the removal-of-12 = the parallel FDA Cat-2 action.
 
 ## 2026-06-20 — Tesamorelin (GHRH(1-44) analogue, Egrifta) deep-pass (sweep entry 7, primary-session lane)
 
@@ -202,7 +202,7 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 ### DONE (verified — mechanical evidence on disk)
 - **Sermorelin entry shipped:** `compounds/sermorelin.md` + `library/peptides/sermorelin/research-report.md` (~11.7K words, 35 unified citations + crosswalk) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections incl. id-reconcile).
 - **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact.
-- **Efficient calibration held** — gates earned keep: §E HALT (90) on sourcing-tier (Apr-2026/503A facts rested on legal blogs → re-anchored to primary FR Doc 2026-07361 govinfo + 21 USC 353a statute; "Category 1" over-claim dropped/hedged to the component-of-approved-drug pathway). 4.75 json needed a structure fix (population_mismatch nested in ic_checks → lifted to top-level).
+- **Efficient calibration held** — gates earned keep: §E HALT (90) on sourcing-tier (Apr-2026/503A facts rested on legal blogs → re-anchored to primaries: the FDA Cat-2 page (the parallel removal action) + FR Doc 2026-07361 govinfo (the July-2026 PCAC meeting notice) + 21 USC 353a statute; "Category 1" over-claim dropped/hedged to the component-of-approved-drug pathway). 4.75 json needed a structure fix (population_mismatch nested in ic_checks → lifted to top-level).
 - **Final independent full-bib audit: 17/17 identifier entries verified, 0 fabrications, 0 Wikipedia, 0 fixes** (one optional §503A cascade-vs-alternatives wording nuance applied at ship). Compound-entry consistency PASS.
 
 ### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)

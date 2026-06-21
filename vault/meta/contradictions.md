@@ -82,10 +82,11 @@ _(none open)_
 ### 2026-05-24 — FDA Cat 2 status currency (Phase 4 triangulation finding C5)
 - **Pages involved:** [[library/peptides/bpc-157/research-report]] §10
 - **Claim A (Section D pre-update):** "FDA September 2023 placed BPC-157 in Category 2; designation remained in effect as of March 2025"
-- **Claim B (Section F current):** FDA REMOVED BPC-157 from Cat 2 / nominations withdrawn April 22, 2026 (Fed Reg 2026-07361, docket FDA-2025-N-6895); PCAC review scheduled July 23, 2026
+- **Claim B (Section F current):** FDA REMOVED BPC-157 from interim §503A Category 2 (parallel FDA Cat-2 action ~April 2026; primary: FDA "Certain Bulk Drug Substances..." Cat-2 page, corroborated by Orrick Apr 2026 + FDA Law Blog); PCAC review scheduled July 23, 2026 per Fed Reg FR Doc 2026-07361 (docket FDA-2025-N-6895)
 - **Why it mattered:** removal was VIA NOMINATIONS WITHDRAWAL, NOT safety clearance — the FDA's 2023 safety concerns (impurity profile, insufficient safety data, chronic-exposure unknown) remain formally unresolved
 - **Resolution plan:** Section F authoritative; Section D updated with cross-reference; framing carried through Phase 7 refine
 - **Status:** resolved 2026-05-24
+- **RESOLVED 2026-06-20 (consistency pass, fix/fr-2026-07361-consistency):** prior phrasing implied FR Doc 2026-07361 WAS the Cat-2 removal action. CANON: FR Doc 2026-07361 = the July 23–24 2026 PCAC meeting notice (7 peptides under review); the removal of twelve peptides from interim §503A Category 2 is a PARALLEL FDA Cat-2 action (primary FDA Cat-2 page + secondaries). Claim B above re-stated to separate the two. Cat-2 removal ≠ FDA approval.
 
 ### 2026-05-24 — Xue 2004 institution (Phase 4.75 IC-10 finding C6 — secondary concentration finding)
 - **Pages involved:** [[library/peptides/bpc-157/research-report]] §5.1, §2 (concentration enumeration)
