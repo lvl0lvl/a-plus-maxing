@@ -35,6 +35,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/semaglutide]] (status: researching; evidence_tier: A; risk_tier: medium)
 - [[compounds/tirzepatide]] (status: researching; evidence_tier: A; risk_tier: medium)
 - [[compounds/retatrutide]] (status: researching; evidence_tier: B; risk_tier: experimental)
+- [[compounds/aod-9604]] (status: researching; evidence_tier: C; risk_tier: experimental)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -144,6 +145,9 @@ _(none yet)_
 - [[library/peptides/retatrutide/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~10.6K words; 22 unified citations; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 11/11 verified, 0 fabrications, 0 Wikipedia; INVESTIGATIONAL triple GIP/GLP-1/glucagon agonist — Phase-2 ~24.2% wt loss but NOT approved; evidence_tier B / risk_tier experimental)
 - [[library/peptides/retatrutide/practitioner-layer]] (2026-06-20; NO label dose — only trial titration 1-12 mg; gray-market especially premature [no compounding pathway, China-sourced sterility failures])
 - [[library/peptides/retatrutide/non-english-layer]] (2026-06-20; no distinct non-English-language primary stream — all primary evidence English-published/Lilly-sponsored)
+- [[library/peptides/aod-9604/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~11.1K words; 32 unified citations; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 6/6 verified, 0 fabrications, 0 Wikipedia; hGH(176-191) fat-loss fragment whose Phase-2b obesity RCT FAILED placebo; evidence_tier C / risk_tier experimental)
+- [[library/peptides/aod-9604/practitioner-layer]] (2026-06-20; gray-market ~300 mcg SC/day [efficacy FAILED]; NOT lawfully compoundable [§503A Cat-2 then withdrawn])
+- [[library/peptides/aod-9604/non-english-layer]] (2026-06-20; none located — Australian/English-origin; non-English hits are vendor pages restating the English trials)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)

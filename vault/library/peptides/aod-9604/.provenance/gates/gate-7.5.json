@@ -1,0 +1,28 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "compound_risk_tier": "experimental",
+  "compound_entry_path": "vault/library/peptides/aod-9604/research-report.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "populated"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "IGF-1",
+    "fasting glucose"
+  ],
+  "halt_reasons": [],
+  "iterations": 1,
+  "timestamp": "2026-06-21T02:10:24.878722+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T02:09:08.719760+00:00",
+    "attest_ts": "2026-06-21T02:10:24.878725+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "57a8531acfbaef320b030ab26a49dcc735e822335f23ddcb8c199227409febd6",
+    "agent_source_mtime": "2026-06-21T02:10:04.992925+00:00"
+  }
+}

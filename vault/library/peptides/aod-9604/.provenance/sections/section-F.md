@@ -1,0 +1,50 @@
+## Section F — Practitioner-practice + non-English
+
+**Framing (defining fact).** AOD-9604 (the hGH 176–191 fragment with an N-terminal tyrosine) has **no approved clinical dose**. Its obesity development program was terminated in 2007 after the lipolytic signal in animals/early human pharmacology failed to translate into a statistically significant fat-loss effect in the largest Phase IIb human trial [1][2]. Everything in this section is therefore either (a) a *gray-market convention*, (b) a *trial-derived* dose, or (c) a *regulatory/access* fact. **No practitioner or vendor source in this section grounds any efficacy or adverse-event-rate claim** — those are Tier-1 only and live in §B, where the human efficacy is recorded as FAILED.
+
+### Dosing conventions
+
+**Gray-market fat-loss convention.** Across vendor and clinic-marketing pages the dominant convention is **~300 mcg subcutaneously once daily, in the morning, in a fasted state** (typically 30–60 min before food), run in cycles of roughly 8–12 weeks [3][4]. The fasted-AM rationale offered is that low circulating insulin removes an anti-lipolytic brake; this is a *mechanistic rationale asserted by gray-market sources*, not a clinically validated dosing instruction `[vendor_label / practitioner_protocol]` [3][4]. A common escalation pattern is to advance to **500 mcg/day**, sometimes split (250 mcg AM + 250 mcg pre-bed), "if results plateau after ~4 weeks" `[vendor_label]` [4]. These figures are **convention, not a label** — there is no approved label to anchor them.
+
+**One named-prescriber data point.** A dated, named clinician page exists: **Dr. Dan Wool, NMD** (Practical Vitality PLLC / "Natural Gastro," 20801 N Scottsdale Rd #205, Scottsdale, AZ 85255; article published 26 Feb 2026, medically reviewed Apr 2026) describes a clinical-use range of **250–500 mcg/day, morning, empty stomach**, explicitly under medical supervision with labs and monitoring `[practitioner_protocol]` [5]. This is a single named source and is consistent with the gray-market convention; it does **not** elevate any efficacy claim. Beyond this, most "clinic" pages (e.g., San Diego, Las Vegas, Beverly Hills med-spa entries surfaced in search) are marketing pages that name a clinic but **no individual prescriber, venue-specific protocol, or date**, so they do not meet the name+venue+date bar for a practitioner_protocol and are recorded here only as evidence that off-label clinic offering occurs `[practitioner_protocol — weak/venue-only]` [3].
+
+**Trial-derived doses (for contrast, NOT a convention).** The human program used defined research doses that should be cited as *trial-derived*, not as a clinical regimen: the Phase II obesity work evaluated **oral 1 mg/day** (and a dose range across the 6 trials / >900 subjects), with SC ranges used in earlier pharmacology [1][2]. The frequent gray-market claim that "clinical trials used up to 1,000 mcg/day" is therefore *trial-derived* and must not be repackaged as a recommended dose `[vendor_label — misattribution risk]` [4]. Self-check: the ~300 mcg/day figure is reported above strictly as gray-market convention; the 1 mg / ~1000 mcg figures are reported strictly as trial-derived.
+
+### Compounding / access
+
+**Compounding gate result: AOD-9604 is NOT lawfully compoundable in the U.S. under §503A.** The mechanical chain:
+
+- AOD-9604 was placed in **Category 2** of the FDA interim 503A bulks list in **September 2023** — the "may present significant safety risks" bucket that effectively bars compounding use `[regulatory]` [6][7].
+- FDA's cited concerns were **potential immune reactions, manufacturing/peptide-synthesis impurities, and a lack of human safety data** `[regulatory]` [6].
+- It was **removed from Category 2 effective ~27 Sep 2024**, but **only because the nominator withdrew the nomination** — not because it was cleared. Critically, AOD-9604 **was never on Category 1**, and only Category 1 substances may be lawfully compounded under §503A. So removal from Category 2 did **not** make it compoundable `[regulatory]` [6][8].
+- Litigation (Evexias/Farmakeio, Texas, APA challenge) named AOD-9604 among four peptides, and an April 2026 Federal Register notice set PCAC review dates — but **AOD-9604 is not on the July 2026 or February 2027 PCAC dockets**, so no near-term path to Category 1 is scheduled `[regulatory]` [8].
+
+**Compounding data-sheet search result: NONE FOUND.** A targeted search for compounding-pharmacy data sheets (Empower, Tailor Made, Hallandale, Belmar, APS, Strive) returned **no AOD-9604 compounding_data_sheet**. This is the *expected* result given the regulatory gate — it is an unapproved, non-API fragment that is not lawfully compoundable, so reputable 503A/503B compounders should not be carrying it. (Historically some clinics/pharmacies offered it before the 2023 Category 2 action; that historical offering is *not* current lawful access) `[regulatory]`. The practical access channel today is therefore **gray-market research-chemical vendors**, sold "for research use only," with COA/purity but no clinical labeling `[vendor_label]` [9].
+
+**Reconstitution (math only, vendor_label).** A common 5 mg vial is reconstituted with bacteriostatic water: e.g., **2.0 mL → 2.5 mg/mL (2500 mcg/mL)**, or **3.0 mL → ~1.667 mg/mL (1667 mcg/mL)** `[vendor_label]` [10][11]. On a U-100 insulin syringe at the 3.0 mL fill, **1 unit (0.01 mL) ≈ 16.7 mcg**, so a 300 mcg dose ≈ **18 units (0.18 mL)** `[vendor_label]` [10]. Vendor pages claim reconstituted stability of ~30–45 days refrigerated `[vendor_label]` [11]. These are arithmetic/handling figures only and carry no efficacy weight.
+
+**Cost (qualitative).** Gray-market pricing is **cheap** — AOD-9604 is one of the lower-cost research peptides, sold as 5 mg vials by both Western and Russian-language vendors at commodity prices `[vendor_label]` [9][12]. No clinical-grade pricing exists because there is no approved product.
+
+### Non-English literature
+
+AOD-9604 is **Australian in origin** (Metabolic Pharmaceuticals / Monash University), so its primary literature is overwhelmingly **English-published**, including English papers by non-English-named authors — those are English-LANGUAGE primaries and do not count as non-English literature.
+
+- **Russian:** A survey of Russian-language sources (and targeted queries against eLibrary.ru / CyberLeninka) located **no original Russian-language primary research** on AOD-9604. All Russian hits are **commercial**: peptide retail shops (purepeptides, elixirpeptide, musclesmart, peptits, podpitka) and clinic-marketing pages (e.g., Refresh Clinic, St. Petersburg), plus a vendor blog (peptidx.ru). These restate the English Australian trials and offer the same ~300 mcg fat-loss convention; none is a primary study `[vendor_label]` [12]. **Result: none located.**
+- **Chinese:** A survey of Chinese-language sources (and CNKI/Wanfang-oriented queries) located **no original Chinese-language clinical primary research**. The one substantive Chinese-language hit (invivochem.cn) is a **chemical-reagent vendor catalog** (CAS 221231-10-3, ≥98.45% purity, HPLC/MS COA, 1 mg–1 g sizes) that cites English PubMed references, not novel Chinese research `[vendor_label]` [9]. **Result: none located.**
+
+**Honest non-English bottom line:** No non-English-language primary literature was located in Russian or Chinese; the non-English footprint is entirely vendor/clinic commerce derivative of the English trial record. This is consistent with the compound's Australian/English provenance and its failed, abandoned clinical program.
+
+## Section F bibliography
+
+[1] Empire Medical Training — "AOD-9604: What Clinicians Should Know." https://www.empiremedicaltraining.com/antiaging-regenerative-workshops/resources/peptide-therapy/aod-9604/ `[practitioner_protocol — clinician-education; used for trial-program facts attribution only]`
+[2] Meto blog / Regeneris — AOD-9604 program history (6 trials, >900 subjects, Phase IIb failure, development terminated 2007). https://meto.co/blog/aod-9604-fat-loss-peptide-body-composition `[vendor_label — used only for program-history framing, not efficacy]`
+[3] thepeptidecatalog.com — "AOD-9604 Dosing: 300mcg/Day Fat Loss Protocol (2026)." https://thepeptidecatalog.com/articles/aod-9604-dosing-guide `[vendor_label]`
+[4] peptidedeck.com — "AOD-9604 Dosage Guide: Protocols, Timing & Cycle Length (2026)." https://www.peptidedeck.com/peptides/aod-9604-dosage-guide `[vendor_label]`
+[5] Dr. Dan Wool, NMD — "Peptide Series: What to Know About AOD-9604" (Practical Vitality PLLC, Scottsdale AZ; pub. 26 Feb 2026). https://drdanwool.com/blog/aod-9604 `[practitioner_protocol]`
+[6] FDA — "Certain Bulk Drug Substances for Use in Compounding that May Present Significant Safety Risks." https://www.fda.gov/drugs/human-drug-compounding/certain-bulk-drug-substances-use-compounding-may-present-significant-safety-risks `[regulatory]`
+[7] Lexology — "FDA removes certain peptide bulk drug substances from Category 2 of interim 503A bulks list and sets dates for PCAC review." https://www.lexology.com/library/detail.aspx?g=2e55b76a-3173-4e04-beda-bf021202f18d `[regulatory]`
+[8] The FDA Law Blog — "FDA's Pep(tide) Rally! What Compounders and Industry Need to Know (Post 1 of 2)" (Apr 2026). https://www.thefdalawblog.com/2026/04/fdas-peptide-rally-what-compounders-and-industry-need-to-know-post-1-of-2/ `[regulatory]`
+[9] InvivoChem (CN) — AOD9604 reagent catalog page (CAS 221231-10-3, ≥98.45%). https://www.invivochem.cn/aod9604.html `[vendor_label — Chinese-language]`
+[10] PeptideDosages.com — "AOD-9604 Dosage Chart – 5 mg Vial Protocol." https://peptidedosages.com/single-peptide-dosages/aod-9604-5-mg-vial-dosage-protocol/ `[vendor_label]`
+[11] realpeptides.co — "AOD 9604 Reconstitution: How Much Bac Water for a 5mg Vial?" https://www.realpeptides.co/how-much-bac-water-for-5mg-aod-9604-2/ `[vendor_label]`
+[12] peptidx.ru — "AOD-9604: пептид для жиросжигания и метаболического восстановления" (Russian vendor blog). https://peptidx.ru/blog/nashi-novosti/ `[vendor_label — Russian-language]`
