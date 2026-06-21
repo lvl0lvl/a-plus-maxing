@@ -1,8 +1,13 @@
-"""HealthKit (Apple Health) ingestion adapter — reads the real Apple Health export.xml.
+"""HealthKit (Apple Health) ingestion adapter — reads an Apple Health export zip or export.xml.
 
 Apple Health exports a zip whose `export.xml` holds one `<Record>` element per RAW sample
 (`type` = an HKQuantityTypeIdentifier, `startDate`/`endDate` timestamps, `value`, `unit`). This
-adapter STREAMS that XML (`iterparse`, clearing each parsed element — the export can be hundreds of
+adapter accepts EITHER the export `.zip` (it extracts the single `*/export.xml` member, mirroring
+`dna.land`'s zip-member extraction — `zipfile.is_zipfile` → locate the member → streamed
+`shutil.copyfileobj` to a staged path) OR a pre-extracted raw `export.xml`. The extraction lives in
+THIS adapter (not the serve layer, not the shared routine), so an Apple Health zip is ingestable
+from both the CLI and the web upload without a manual unzip (ADR-0012 amendment / ADR-0013). It then
+STREAMS that XML (`iterparse`, clearing each parsed element — the export can be hundreds of
 MB) and AGGREGATES the raw per-sample records to ONE value per (item, day): Apple records many
 samples a day (dozens of HRV / heart-rate readings), so the adapter takes the daily MEAN, keyed on
 the sample's `startDate` calendar date, to match the store's one-reading-per-(item, day, source)
@@ -26,8 +31,12 @@ The "export" is a file the operator owns (exported from the Health app); the rea
 read-only (parse only). Conforms to the frozen `ADR-0003-T1` contract (`source_tag` + `read_readings`).
 """
 
+import shutil
+import tempfile
 import xml.etree.ElementTree as ET
+import zipfile
 from collections import defaultdict
+from pathlib import Path
 from typing import Iterable
 
 # HealthKit `Record@type` -> the store `item` it maps to. The store items are already registered
@@ -49,32 +58,80 @@ _RECORD_TYPE_ITEMS = {
 _ITEM_SCALE = {"spo2": 100.0}
 
 
+def _export_xml_member(zf):
+    """Return the name of the single `*/export.xml` member in an open zip, or raise.
+
+    Mirrors `dna.land`'s `_genotype_member`: skips directory entries and macOS
+    `__MACOSX` resource forks, and returns the first member whose basename is
+    `export.xml`. Apple's export nests it under a directory (`apple_health_export/
+    export.xml`), so the match is on the basename, not the full path.
+
+    Args:
+        zf (zipfile.ZipFile): The open Apple Health export zip.
+    """
+    for name in zf.namelist():
+        if name.endswith("/") or name.startswith("__MACOSX"):
+            continue
+        if Path(name).name == "export.xml":
+            return name
+    raise ValueError(
+        "no */export.xml found inside the zip "
+        "(expected an Apple Health export.xml member)"
+    )
+
+
 class HealthKitAdapter:
-    """The HealthKit (Apple Health) source adapter, reading the real `export.xml`.
+    """The HealthKit (Apple Health) source adapter, reading an export zip or `export.xml`.
 
     Attributes:
         source_tag: Returns `"healthkit"`, the store `source` (device provenance) every reading this
             adapter emits carries — device-specific so a HealthKit reading and another wearable's
             reading at the same (item, timepoint) stay distinct under the (item, timepoint, source)
             dedupe key.
-        read_readings: Streams Apple Health's `export.xml` and maps each mapped `<Record>`'s value
-            into the daily MEAN per (item, day) as a Line-Field-Set reading.
+        read_readings: Accepts an Apple Health export `.zip` (extracting its `*/export.xml` member) or
+            a raw `export.xml`, streams the XML, and maps each mapped `<Record>`'s value into the daily
+            MEAN per (item, day) as a Line-Field-Set reading.
     """
 
     def source_tag(self) -> str:
         return "healthkit"
 
     def read_readings(self, export_file) -> Iterable[dict]:
-        """Stream `export.xml`'s `<Record>` samples into daily-mean Line-Field-Set readings.
+        """Stream an Apple Health export (zip or `export.xml`) into daily-mean readings.
+
+        If `export_file` is an Apple Health export `.zip` (`zipfile.is_zipfile`), its single
+        `*/export.xml` member is extracted (streamed via `shutil.copyfileobj`, mirroring `dna.land`)
+        to a staged path that the existing read runs over; a raw `export.xml` reads directly. A zip
+        with no `*/export.xml` member raises (the fail-loud `_genotype_member` analog), and a missing
+        / non-XML file raises in the read — never silently importing nothing.
 
         Accumulates every mapped record's value under (day, item), then yields the daily MEAN per
         (item, day). A day with no samples of a metric yields no reading (honest absence, never a
-        fabricated value). A missing file or a non-XML / malformed file raises (the fail-loud signal
-        of a misconfigured path or a non-Apple-Health export), rather than silently importing nothing.
+        fabricated value).
 
         Args:
-            export_file (str | Path): Path to Apple Health's `export.xml` (extracted from the export
-                zip the operator produces in the Health app).
+            export_file (str | Path): Path to the Apple Health export `.zip` OR a pre-extracted
+                `export.xml`.
+        """
+        if zipfile.is_zipfile(export_file):
+            # Extract the `*/export.xml` member to a staged path (mirroring `dna.land`), then read it.
+            # TemporaryDirectory keeps the staged xml alive across every yield below and removes it when
+            # the generator is exhausted/closed, so the extraction does not leak temp files.
+            with tempfile.TemporaryDirectory() as staging:
+                staged = Path(staging) / "export.xml"
+                with zipfile.ZipFile(export_file) as zf:
+                    member = _export_xml_member(zf)
+                    with zf.open(member) as src, open(staged, "wb") as out:
+                        shutil.copyfileobj(src, out)  # streamed: the export can be hundreds of MB
+                yield from self._read_xml(staged)
+        else:
+            yield from self._read_xml(export_file)
+
+    def _read_xml(self, export_file) -> Iterable[dict]:
+        """Stream `export.xml`'s `<Record>` samples into daily-mean Line-Field-Set readings.
+
+        The unchanged ADR-0012 D2/D3 read (streamed `iterparse` + per-(item, day) daily MEAN); the
+        zip-awareness in `read_readings` feeds it either the raw `export.xml` or the staged member.
         """
         # day -> item -> [values] accumulated across the streamed records, then averaged. Holds only
         # floats (the parsed XML elements are cleared as we go), so memory is bounded by the number of
