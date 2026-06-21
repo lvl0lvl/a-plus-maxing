@@ -91,8 +91,10 @@ class HealthKitAdapter:
             if item is not None and start and value is not None:
                 # The day is the first 10 chars of "YYYY-MM-DD HH:MM:SS -ZZZZ".
                 per_day[start[:10]][item].append(float(value))
-            # Bounded memory over a 100s-of-MB export: drop the processed records from the root so the
-            # parsed tree does not accumulate (the stdlib iterparse memory-safety pattern).
+            # Bounded memory over a 100s-of-MB export: drop root's ENTIRE accumulated child subtree on
+            # each Record-end so the parsed tree does not grow (the stdlib iterparse memory-safety
+            # pattern). Safe ONLY because this record's value was already copied into `per_day` above —
+            # the extract-before-clear invariant; clearing earlier would discard an unread value.
             root.clear()
 
         for day in sorted(per_day):
