@@ -1,0 +1,30 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "compound_risk_tier": "experimental",
+  "compound_entry_path": "vault/library/peptides/retatrutide/research-report.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "populated"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "heart rate",
+    "HbA1c",
+    "fasting glucose",
+    "eGFR/creatinine"
+  ],
+  "halt_reasons": [],
+  "iterations": 1,
+  "timestamp": "2026-06-21T01:32:05.700133+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T01:30:55.661287+00:00",
+    "attest_ts": "2026-06-21T01:32:05.700136+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "449f149a6a0daaf63e46737e566d2a48ecada01bc3b4042f569fc3ce721c6b79",
+    "agent_source_mtime": "2026-06-21T01:31:43.986094+00:00"
+  }
+}

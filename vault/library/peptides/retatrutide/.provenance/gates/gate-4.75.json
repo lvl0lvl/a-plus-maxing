@@ -1,0 +1,97 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 117,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS"
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 4,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "WARN",
+      "count_checked": 1,
+      "count_flagged": 1
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS"
+    },
+    "IC-9": {
+      "status": "PASS"
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 15,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "PASS"
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 1,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 6,
+    "largest_cluster_name": "Eli Lilly (sponsor)",
+    "largest_cluster_count": 6,
+    "share": 1.0,
+    "threshold_triggered": true,
+    "surfaced_section_heading": "Concentration / sponsor audit (Section C)"
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 15,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-4: anecdote_aggregate cite (Section D ref 5, SeekPeptides) co-located with 5-10 bpm secondary magnitude estimate; load-bearing dose-dependent HR pattern is RCT-grounded [1]; recommend dropping or re-grounding the bpm figure",
+    "IC-10/IC-13 corpus-missing: drugs.com (Section F ref 4) returned HTTP 403 bot-block; Rosenstock 2023 (Section D ref 2) full text paywalled but abstract-verified for cited numbers",
+    "concentration_audit: 100% single-sponsor (Eli Lilly) \u2014 expected for an investigational single-sponsor drug; honestly surfaced as a first-class Section C subsection"
+  ],
+  "timestamp": "2026-06-21T01:21:46.127093+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T01:16:36.073302+00:00",
+    "attest_ts": "2026-06-21T01:21:46.127097+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "695e251079fe8a9c12335ba67aae37a0c00874ac9eee4fae59b94b43c3121ac0",
+    "agent_source_mtime": "2026-06-21T01:21:01.242166+00:00"
+  }
+}

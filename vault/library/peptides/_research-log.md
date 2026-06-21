@@ -283,7 +283,23 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 - ~95% of pivotal primaries are Eli-Lilly-sponsored (single-sponsor caveat, surfaced).
 - Regulatory: FDA-approved Mounjaro (T2D, May 2022), Zepbound (obesity, Nov 2023), Zepbound-OSA (Dec 2024); EMA approved. The 2022-24 shortage enabled 503A/503B compounded tirzepatide; FDA resolved the shortage 2024 (before semaglutide) + 2025 wind-down + OFA litigation + counterfeit/salt-form warnings. WADA: **NOT prohibited** (on the 2026 Monitoring Program — NADA-anchored, WADA-verbatim-verified).
 
-### NEXT (reserved, my/primary lane): **Retatrutide** (sweep entry 13 — triple GIP/GLP-1/glucagon agonist, Eli Lilly, INVESTIGATIONAL Phase 2/3; the largest weight-loss signal yet ~24% but NOT approved → expect evidence_tier B + a "promising-but-investigational" framing). **Push branch as `research/retatrutide-deep-pass-gated`** (stale predecessor exists). Then AOD-9604 → Selank. (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
+---
+
+## 2026-06-20 — Retatrutide (LY3437943; triple GIP/GLP-1/glucagon agonist) deep-pass (sweep entry 13, primary-session lane)
+
+### DONE (verified — mechanical evidence on disk)
+- **Retatrutide entry shipped:** `compounds/retatrutide.md` + `library/peptides/retatrutide/research-report.md` (~10.6K words, 22 unified citations) + practitioner-layer + non-english-layer + full `.provenance/` (7 attested gate JSONs + 6 judges + 7 sections incl. id-reconcile).
+- **All 7 gates attested PASS** (2.75/3.5@92/4.25/4.75/6/7.5/8.5); verify-chain intact. All 6 judges PASS first-pass; §6 critique zero-findings (citations renumbered to the unified scheme FIRST-PASS — the tirzepatide lesson applied in the synthesis brief).
+- **Final independent full-bib audit: 11/11 load-bearing identifier entries verified, 0 fabrications, 0 first-author mismatches, 0 Wikipedia.** Compound-entry consistency PASS.
+
+### CLAIMED (asserted this session — backed by `.provenance/` + independent audit)
+- **TRIPLE GIP + GLP-1 + GLUCAGON receptor agonist** (LY3437943, Eli Lilly; single acylated peptide, ~6-day t½, once-weekly SC) — the glucagon arm (energy expenditure + hepatic fat) is the differentiator vs tirzepatide (dual) and semaglutide (GLP-1-only).
+- **CENTRAL FACT: INVESTIGATIONAL — NOT approved anywhere.** The LARGEST weight-loss signal of any incretin agent yet (**~24.2% at 48 wk/12 mg, Phase 2**, Jastreboff 2023 NEJM PMID 37366315, non-diabetic obesity) — but **Phase-2 only**; Rosenstock 2023 Lancet (T2D Phase 2); Sanyal 2024 Nat Med PMID 38858523 (MASH liver-fat −86%, Phase-2a imaging surrogate). **Phase 3 (TRIUMPH) ongoing with only sponsor TOPLINE PRESS RELEASES** (TRIUMPH-1 ~28%, TRIUMPH-4) — quarantined as not-peer-reviewed/not-verified, NOT treated as established efficacy.
+- **Safety (Phase-2 only):** GI dominant (dose-dependent, discontinuation driver); the glucagon-component **dose-dependent heart-rate increase** (peaks wk24, grounded in the Tier-1 NEJM trial — a vendor-sourced ~bpm figure was DROPPED at §5); retatrutide-specific **cutaneous hyperesthesia ~7% vs 1%**; transient **eGFR** dip→recovery; NO long-term/CV/human-thyroid data (C-cell = class-extrapolated).
+- ~100% Eli-Lilly single-sponsor (no independent replication, surfaced). FDA Fast Track for retatrutide = UNVERIFIED (not asserted; only tirzepatide had it).
+- Regulatory: NOT approved (investigational); FDA gray-market caution (cannot be compounded / not a component of an approved drug / not safe-and-effective / warning letters). **Gray-market retatrutide is especially premature** (no approved product, China-sourced research-chem with documented sterility-test failures). WADA: **NOT prohibited** (2026 Prohibited List S4.4 has no GLP-1/glucagon agonists; 2026 Monitoring tracks only "Markers of semaglutide and tirzepatide" — retatrutide not individually named; verified by directly parsing the WADA PDFs).
+
+### NEXT (reserved, my/primary lane): **AOD-9604** (sweep entry 14 — a GH-fragment [hGH 176-191] marketed for fat-loss; expect evidence_tier C/experimental, mostly-unproven, the Phase-2 obesity trials FAILED). Then Selank (the last in my lane). (Bottom-13 [MOTS-c…Semax] owned by `feature/wiki-peptides`.)
 
 ---
 
