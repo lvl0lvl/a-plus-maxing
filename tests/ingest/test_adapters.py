@@ -321,6 +321,129 @@ def test_healthkit_distinct_source_from_whoop_does_not_collide(tmp_path, store_r
     assert {r["source"] for r in hrv} == {"healthkit", "whoop"}
 
 
+# --- healthkit boundary / realism coverage (QA Tier-2) ---
+
+
+def test_healthkit_parses_nested_children_records(tmp_path, store_root):
+    """The REAL Apple shape: a <Record> with NESTED children still maps on the Record's own attributes.
+
+    Real Apple exports nest children inside a Record (MetadataEntry, HeartRateVariabilityMetadataList ->
+    InstantaneousBeatsPerMinute); the `_write_healthkit_export` fixture emits only flat Records, so this
+    pins the nested case. A regression in the iterparse/clear interaction (reading a child's attrs, or
+    clearing on the wrong event) would red here — the value must be the Record's 55, never the nested bpm.
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    export = tmp_path / "export.xml"
+    export.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n<HealthData locale="en_US">\n'
+        ' <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="Apple Watch"'
+        ' startDate="2026-04-01 08:00:00 -0500" endDate="2026-04-01 08:00:00 -0500" value="55">\n'
+        '  <MetadataEntry key="HKMetadataKeyHeartRateMotionContext" value="0"/>\n'
+        '  <HeartRateVariabilityMetadataList>\n'
+        '   <InstantaneousBeatsPerMinute bpm="62" time="08:00:00.00"/>\n'
+        '  </HeartRateVariabilityMetadataList>\n'
+        ' </Record>\n'
+        ' <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch"'
+        ' startDate="2026-04-01 06:00:00 -0500" endDate="2026-04-01 06:00:00 -0500" value="48"/>\n'
+        '</HealthData>\n'
+    )
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
+
+    hrv = store.read("hrv", root=store_root)
+    assert len(hrv) == 1 and hrv[0]["value"] == 55.0   # the Record's attr, NOT the nested bpm="62"
+    assert len(store.read("rhr", root=store_root)) == 1
+
+
+def test_healthkit_skips_record_missing_startdate_or_value(tmp_path, store_root):
+    """A Record missing startDate OR value is SKIPPED (honest absence — the guard), not fabricated."""
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    export = tmp_path / "export.xml"
+    export.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n<HealthData>\n'
+        ' <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" value="55"/>\n'           # no startDate
+        ' <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN"'
+        ' startDate="2026-04-02 08:00:00 -0500"/>\n'                                                # no value
+        ' <Record type="HKQuantityTypeIdentifierRestingHeartRate"'
+        ' startDate="2026-04-02 06:00:00 -0500" value="48"/>\n'
+        '</HealthData>\n'
+    )
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
+
+    assert store.read("hrv", root=store_root) == []          # both incomplete hrv records skipped
+    assert len(store.read("rhr", root=store_root)) == 1      # the complete record imported
+
+
+def test_healthkit_fails_loud_on_non_numeric_value(tmp_path):
+    """A non-numeric value on a MAPPED record raises (record-level fail-loud, distinct from a bad file).
+
+    A future refactor wrapping float() in a try/except would silently drop corrupt samples — this REDs.
+    """
+    from scripts.ingest.adapters import healthkit
+
+    export = tmp_path / "export.xml"
+    export.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n<HealthData>\n'
+        ' <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN"'
+        ' startDate="2026-04-03 08:00:00 -0500" value="not-a-number"/>\n'
+        '</HealthData>\n'
+    )
+    with pytest.raises(ValueError):
+        list(healthkit.HealthKitAdapter().read_readings(export))
+
+
+def test_healthkit_empty_export_yields_nothing(tmp_path, store_root):
+    """An empty-but-valid export (no Records) yields 0 readings and does NOT raise (the absence complement
+    of the fail-loud-on-bad-file test)."""
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    export = tmp_path / "export.xml"
+    export.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<HealthData></HealthData>\n')
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
+    assert store.read("hrv", root=store_root) == []
+
+
+def test_healthkit_spo2_sub_percent_rounds_to_two_decimals(tmp_path, store_root):
+    """spo2 sub-percent precision: 0.976 -> 97.6 (round to 2 decimals after ×100). The clean 0.97 map
+    case cannot catch a rounding regression (0.97×100=97.0 is already clean); this sub-percent case can."""
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    export = tmp_path / "export.xml"
+    _write_healthkit_export(export, [
+        {"type": "HKQuantityTypeIdentifierOxygenSaturation",
+         "startDate": "2026-04-04 03:00:00 -0500", "value": "0.976"},
+    ])
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
+    assert store.read("spo2", root=store_root)[0]["value"] == 97.6
+
+
+def test_healthkit_two_metrics_same_day_aggregate_independently(tmp_path, store_root):
+    """Two DIFFERENT metrics with two samples each on ONE day produce two INDEPENDENT daily means — the
+    per-(item, day) accumulator key. A regression keying on day-only (dropping item) would average across
+    metrics (hrv contaminated by rhr) and red this."""
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    hrv_t = "HKQuantityTypeIdentifierHeartRateVariabilitySDNN"
+    rhr_t = "HKQuantityTypeIdentifierRestingHeartRate"
+    export = tmp_path / "export.xml"
+    _write_healthkit_export(export, [
+        {"type": hrv_t, "startDate": "2026-04-05 02:00:00 -0500", "value": "50"},
+        {"type": hrv_t, "startDate": "2026-04-05 08:00:00 -0500", "value": "60"},
+        {"type": rhr_t, "startDate": "2026-04-05 03:00:00 -0500", "value": "46"},
+        {"type": rhr_t, "startDate": "2026-04-05 09:00:00 -0500", "value": "50"},
+    ])
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
+
+    assert store.read("hrv", root=store_root)[0]["value"] == 55.0   # mean(50,60) — not contaminated by rhr
+    assert store.read("rhr", root=store_root)[0]["value"] == 48.0   # mean(46,50)
+
+
 def test_oura_maps_export_to_store(tmp_path, store_root):
     """AC-2: the Oura adapter maps a sample export into field-set readings.
 
