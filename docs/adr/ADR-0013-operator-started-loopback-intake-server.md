@@ -1,0 +1,110 @@
+## ADR-0013: Operator-Started Loopback-Only Intake/Upload Server (Ingest Convenience, Not Artifact Delivery)
+
+> **Y-Statement:** In the context of a local-first single-operator health system whose only way to bring an export in is the terminal (`python -m scripts.ingest <path>`), facing the tension between giving the operator a point-and-click browser upload and the V1 prohibition on a hosted/live/always-on server (PRD NG-4, ADR-0004), we decided to permit a single operator-started, ephemeral, loopback-only HTTP intake server that serves the intake wizard and routes browser uploads into the existing `ingest.run` / `dna.land` seam, to achieve point-and-click ingest without re-crossing the no-live-artifact-server boundary, accepting a new local listening socket that must be proven egress-free and loopback-bound by test and a stated non-goal that now carries an axis-scoped carve-out future readers must track.
+
+```yaml
+id: ADR-0013
+title: "Operator-Started Loopback-Only Intake/Upload Server (Ingest Convenience, Not Artifact Delivery)"
+status: accepted
+date: 2026-06-21
+decision-makers: [Walter McGivney]
+tags: [ingestion, intake, server, loopback, no-egress, pii, delivery-model]
+```
+
+### Context
+
+Today the operator brings an export into the store one way: the terminal. The ingestion seam ADR-0003 fixed exposes `ingest.run(adapter, export_file, root)` ([scripts/ingest/ingest.py L39](../../scripts/ingest/ingest.py) [VERIFIED]) and `dna.land(source_file, dna_root)` ([scripts/ingest/dna.py L71](../../scripts/ingest/dna.py) [VERIFIED]), invoked as `python -m scripts.ingest <path>`. That is a command-line UX: it asks a non-developer operator to know a file path and a shell, which is exactly the friction the point-and-click browser upload is meant to remove ([PRD-v1, US-3 AC L66-67](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+
+Two forces pull against each other across more than one stakeholder. The operator wants to drop a file from a browser the way every other app accepts an upload — drag, click, done. Against that, V1 is deliberately serverless: the PRD's NG-4 forbids "No hosted, live, always-on web application or server… a running web app/server that serves it live is deferred to v2+" ([PRD-v1, NG-4 L280](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]), and ADR-0004 made that concrete on the output side — "Run no live, always-on server or daemon: 'scheduled' means an unattended cron-style run that produces the file and exits, not a process that stays up to serve it" ([ADR-0004, Decision](ADR-0004-on-demand-single-file-artifact-generation.md) [VERIFIED]). The plain text of both reads as "no server at all," and a `scripts.serve` process — which does not exist in the tree today ([VERIFIED: no `scripts/serve*` present]) — would be questioned against that text by every future reader.
+
+The tension is resolvable only by naming an axis the two prohibitions never separated. NG-4 and ADR-0004 forbid a server on the **artifact-delivery axis**: a hosted, always-on surface that serves the always-fresh dashboard/report live — the North-Star surface, deferred ([ADR-0004, Decision + Alternative A](ADR-0004-on-demand-single-file-artifact-generation.md) [VERIFIED]). They say nothing about an operator-started, ephemeral file-drop on the **ingest/intake-convenience axis**. The data subject's perspective binds the resolution: this server touches operator PII at the moment of upload, so ADR-0001's no-egress boundary — "0 outbound calls carrying store content" ([ADR-0001, Confirmation criteria](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]) — governs the new network surface as hard as it governs the store. Because the reconciling distinction is architectural (which axis the server lives on), not a coding choice, the rationale cannot live in a code comment beside `scripts/serve`.
+
+### Decision
+
+Permit a single, operator-started, ephemeral, loopback-only HTTP server (`python -m scripts.serve`) whose only purpose is the *intake* surface: serve the existing intake wizard and receive browser file uploads, routing each into the existing `ingest.run` / `dna.land` seam. It binds `127.0.0.1` only (never `0.0.0.0` or `""`), rejects non-loopback origins, parses uploads locally, writes only to the existing local store and dropzones, makes zero outbound network calls, and is operator-started and operator-stopped — not a daemon, not cron-installed — exiting when done. This server does not serve any generated artifact (dashboard/report) live; that surface remains prohibited by ADR-0004 and NG-4.
+
+### Rationale
+
+The intake-convenience need was evaluated against three options — CLI-only (status quo), an always-on local daemon/autostarted service, and a hosted/remote upload endpoint — against four criteria the governing decisions make load-bearing: the point-and-click capability the operator asked for, the no-live-server boundary (NG-4 / ADR-0004), the PII no-egress boundary (ADR-0001), and reuse of the unchanged ingestion seam (ADR-0003).
+
+On the **point-and-click capability**, only a browser-served upload surface delivers it; the CLI status quo cannot, by construction. On the **no-live-server boundary**, the decisive move is the axis split: NG-4 and ADR-0004 forbid a *process that stays up to serve artifacts live* ([ADR-0004, Decision](ADR-0004-on-demand-single-file-artifact-generation.md) [VERIFIED]; [PRD-v1, NG-4 L280](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]), and an operator-started ephemeral intake server that exits when done is neither always-on nor an artifact-delivery surface — it satisfies the clonable/serverless guarantee that a fresh clone has "0 runtime dependency on any shared service" because nothing is left running ([PRD-v1, NFR-3 AC L242-243](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]). On the **PII no-egress boundary**, binding `127.0.0.1` and making zero outbound calls is the direct realization of ADR-0001's "0 outbound calls carrying store content" on this new surface: a loopback-bound listener is unreachable off-machine and an egress-free request path cannot leak an upload to a vendor or CDN ([ADR-0001, Confirmation criteria + Falsification](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]). On **reuse of the ingestion seam**, the server is a new *front door* to `ingest.run` / `dna.land`, not a new ingestion path: it adds no adapter, no dedupe, no store-write logic of its own, so ADR-0003's 0-shared-routine-edit invariant holds ([ADR-0003, Decision](ADR-0003-source-extensible-ingestion-interface.md) [VERIFIED]).
+
+The accepted trade-off is that this is the first network listening socket the system has ever opened, and it reinterprets a stated non-goal — so NG-4 and ADR-0004 now carry an axis-scoped carve-out that future readers must track, and an operator who leaves the process up holds an open local port until they stop it. We accept this because the carve-out is narrow and falsifiable (loopback-bound, egress-free, intake-only, ephemeral) and the alternative — leaving the operator at the terminal — fails the point-and-click need the system exists to serve at the intake surface. Long-term, the same loopback-bound, egress-free posture is the V1 realization of an upload surface the North-Star hosted product re-homes behind authentication and the regulated-PHI trust model — not a dead end.
+
+### Consequences
+
+**Positive:**
+- The operator brings an export in by drag-and-drop in a browser instead of typing a file path in a shell — the point-and-click intake the CLI status quo cannot deliver ([PRD-v1, US-3 AC L66-67](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- The server reuses the unchanged `ingest.run` / `dna.land` seam ([scripts/ingest/ingest.py L39](../../scripts/ingest/ingest.py), [scripts/ingest/dna.py L71](../../scripts/ingest/dna.py) [VERIFIED]) as a new front door, adding 0 adapters and 0 store-write logic, so ADR-0003's 0-shared-routine-edit invariant holds ([ADR-0003, Decision](ADR-0003-source-extensible-ingestion-interface.md) [VERIFIED]).
+- Binding `127.0.0.1` only makes the listener unreachable off-machine, so the upload surface cannot be reached by another host on the network — the loopback realization of ADR-0001's no-egress boundary ([ADR-0001, Confirmation criteria](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+- The process is operator-started and exits when done, so a fresh clone keeps its "0 runtime dependency on any shared service" guarantee — nothing is left running for a second operator to inherit or depend on ([PRD-v1, NFR-3 AC L242-243](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+
+**Negative:**
+- A listening socket is a new local attack/leak surface that did not exist in any prior V1 decision: it must be proven egress-free and loopback-bound by test on every release, an added verification burden the CLI path never carried ([ADR-0001, Falsification criteria](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+- It reinterprets a stated non-goal, so NG-4 and ADR-0004's Decision now carry an axis-scoped carve-out (artifact-delivery vs intake) that every future reader of those documents must hold in mind when they encounter a `scripts.serve` process — a standing documentation-coherence cost (1+ year horizon), and the PRD NG-4 wording itself still reads "no server at all" until amended (see Open Questions) ([PRD-v1, NG-4 L280](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]; [ADR-0004, Decision](ADR-0004-on-demand-single-file-artifact-generation.md) [VERIFIED]).
+- An operator who starts the server and walks away holds an open local port for as long as the process lives: the ephemeral/operator-stopped lifecycle mitigates this (it is not a daemon and not cron-installed) but does not eliminate it — a still-running process is reachable on `127.0.0.1` until the operator stops it.
+
+**Neutral:**
+- Adds an HTTP-serving dependency. The framework choice is stdlib `http.server` (no third-party web framework); that choice is a reversible implementation detail of this server, decided inside this ADR rather than as a separate decision, with no cross-component impact as long as the bind stays loopback-only and the request path stays egress-free.
+- The intake-wizard markup served by this server is the same wizard surface the system already renders; the server adds a transport for it, not a new wizard.
+
+### Alternatives Considered
+
+#### Alternative A: CLI-only upload (status quo)
+Keep the only intake path as `python -m scripts.ingest <path>`, with no browser upload surface.
+- **Supporting evidence:** Opens 0 network sockets and adds 0 new surface — the strongest possible posture against both NG-4 and ADR-0001, and it already works end-to-end through `ingest.run` / `dna.land` ([scripts/ingest/ingest.py L39](../../scripts/ingest/ingest.py) [VERIFIED]). It needs no new code and no new test burden.
+- **Trade-offs:** It is the exact terminal UX the operator asked to replace with point-and-click — it requires knowing a file path and a shell, and delivers none of the browser-upload capability this decision exists to provide ([PRD-v1, US-3 AC L66-67](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]). Rejected because it fails the load-bearing convenience need, not because it is technically inferior.
+- **When this becomes the right choice:** If the operator is content driving ingestion from a shell, or if any local listening socket is judged an unacceptable surface regardless of the loopback/egress-free guarantees — the CLI remains the zero-surface path.
+
+#### Alternative B: Always-on local daemon / autostarted service
+Run a persistent local upload service that is installed to autostart (launchd/systemd/cron) and stays listening so the operator can upload at any time without starting anything.
+- **Supporting evidence:** Most convenient at the moment of use — the operator never has to start a process; the upload page is always there. It is the conventional shape for a personal local web tool.
+- **Trade-offs:** A process that stays up is precisely the NG-4-prohibited "running web app/server… deferred to v2+" and ADR-0004's "not a process that stays up" ([PRD-v1, NG-4 L280](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]; [ADR-0004, Decision](ADR-0004-on-demand-single-file-artifact-generation.md) [VERIFIED]). A persistent listener is also a standing attack/egress surface that lives even when the operator is not ingesting — strictly more exposure than an ephemeral process bound to the act of uploading. Rejected as a direct NG-4 boundary violation, not as inferior convenience.
+- **When this becomes the right choice:** At the North-Star transition to a hosted product where an always-on, authenticated upload surface behind the regulated-PHI trust model is the intended design.
+
+#### Alternative C: Hosted/remote upload endpoint
+Accept browser uploads at a hosted endpoint (a small cloud function or remote service) that receives the file over the network and forwards it to the local store.
+- **Supporting evidence:** Removes any local-listener concern entirely (nothing runs on the operator's machine) and gives a stable URL the operator can hit from any device.
+- **Trade-offs:** It routes operator PII (the upload itself) over the network to a remote host — a direct violation of ADR-0001's no-egress boundary, which requires "0 outbound calls carrying store content" ([ADR-0001, Confirmation criteria](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]) — and reintroduces exactly the hosted surface NG-4 defers ([PRD-v1, NG-4 L280](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]). Rejected as a no-egress violation, the most load-bearing constraint on any PII-touching path.
+- **When this becomes the right choice:** Only under the North-Star regulated-PHI trust model (HIPAA + BAA + per-tenant isolation), where remote handling of others' PHI is contractually and architecturally provisioned — out of V1 scope.
+
+### Related Decisions
+
+| Decision | Relationship | Description |
+|----------|-------------|-------------|
+| [ADR-0004 (On-Demand Single-File Artifact Generation)](ADR-0004-on-demand-single-file-artifact-generation.md) | tensions-with | This ADR narrows ADR-0004's no-server scope to the artifact-delivery axis and adds an intake-server carve-out on the ingest axis; ADR-0004's Decision ("not a process that stays up to serve it") and its no-live-server falsification criterion must now be read with that carve-out — friction lives at the shared word "server," resolved by the axis split (this server never serves a generated artifact). |
+| [ADR-0001 (No-Train PII Trust-Boundary Routing)](ADR-0001-pii-trust-boundary-no-train-routing.md) | constrained-by | ADR-0001's "0 outbound calls carrying store content" governs this new network surface; the loopback-bind + zero-egress posture is that boundary's realization on the intake server, and any non-loopback bind or outbound call during request handling is a boundary violation. |
+| [ADR-0003 (Source-Extensible Ingestion Interface)](ADR-0003-source-extensible-ingestion-interface.md) | complements | The server is a new front door to the existing ingestion interface — it routes uploads into `ingest.run` / `dna.land` and adds no adapter, dedupe, or store-write logic, so it is not a new ingestion path; neither requires the other (the CLI front door still works without the server). |
+
+Note on PRD NG-4: NG-4 is the product-requirement this decision reinterprets ("no *live artifact-serving* surface" vs "no server at all"). It is not an ADR, so it carries no Related-Decisions edge; the wording-update follow-up is recorded in Open Questions (OQ-1).
+
+### Validation Approach
+
+**Confirmation criteria:**
+- The server is constructed against `127.0.0.1` and never `0.0.0.0` or `""` — verified by a structural assertion over the server's bind call (expected: 0 non-loopback binds) ([ADR-0001, Confirmation criteria](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+- The upload→ingest→re-render request path makes 0 outbound network calls — verified by running the path under the existing OS-level egress guard with sockets blocked and inspecting for outbound connections (expected: 0 outbound bytes leaving the machine), the ADR-0001 "0 outbound calls carrying store content" check extended to the server path ([ADR-0001, Confirmation criteria + Falsification](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+- A client-supplied `filename=../../x` is written only inside the server-chosen temp path and never outside it — verified by uploading a path-traversal filename and confirming the write location (expected: 0 path escapes).
+
+**Falsification criteria:**
+- If the server binds any non-loopback address (`0.0.0.0`, `""`, or a routable interface), the off-machine-unreachable guarantee has failed — halt the server and repair the bind before release ([ADR-0001, Falsification criteria](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+- If ≥1 outbound connection is observed during request handling, the no-egress boundary has failed on this surface — block the upload path and remove the egress before release ([ADR-0001, Falsification criteria](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+- If the server serves any generated artifact (dashboard/report) live, it has re-crossed onto the artifact-delivery axis ADR-0004 and NG-4 prohibit — a direct NG-4 / ADR-0004 breach; remove the artifact-serving route and return the server to intake-only before release ([ADR-0004, Decision](ADR-0004-on-demand-single-file-artifact-generation.md) [VERIFIED]; [PRD-v1, NG-4 L280](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]).
+- Time horizon: run all three checks at the first build of `scripts.serve` and at every release thereafter.
+
+**Review triggers:**
+- A change to the intake wizard or the `ingest.run` / `dna.land` signatures the server routes into ([scripts/ingest/ingest.py L39](../../scripts/ingest/ingest.py), [scripts/ingest/dna.py L71](../../scripts/ingest/dna.py) [VERIFIED]) — re-confirm the front door still routes without editing the shared routine.
+- Any proposal to add an artifact-serving route to this server (dashboard/report) — re-open this decision against the ADR-0004 / NG-4 artifact-delivery boundary before adding it.
+- The North-Star transition is initiated — the loopback ephemeral intake server is superseded by an authenticated hosted upload surface under the regulated-PHI trust model.
+
+### Open Questions
+
+| # | Question | Owner | Target Date | Impact on This Decision |
+|---|----------|-------|-------------|------------------------|
+| OQ-1 | Update the PRD NG-4 wording to record the artifact-vs-ingest axis distinction (NG-4 still reads "no hosted, live, always-on web application or server" with no carve-out for an operator-started ephemeral loopback intake server). | Walter McGivney | 2026-06-30 | A follow-up to make NG-4's text coherent with this decision; until amended, NG-4 reads as forbidding this server, leaving the carve-out documented only here. Does not change the decision. ([PRD-v1, NG-4 L280](../prd/PRD-v1-local-first-health-tracking-planning.md) [VERIFIED]) |
+| OQ-2 | What default port does `scripts.serve` bind on `127.0.0.1`, and what is the collision behavior when that port is already in use? | Walter McGivney | TBD (resolved at build) | An implementation detail of the server's startup; it refines how the operator reaches the wizard but does not change the loopback-only/ephemeral/egress-free decision. |
+
+### Revision History
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2026-06-21 | Initial draft (v1.0) — accepted | Walter McGivney |
