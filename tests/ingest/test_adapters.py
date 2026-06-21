@@ -15,6 +15,7 @@ fork-point/distinctness rationale.
 """
 
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -30,6 +31,27 @@ def _write_json_export(path, rows):
     import json
 
     path.write_text(json.dumps(rows))
+
+
+def _write_healthkit_export(path, records):
+    """Write a real-shape Apple Health `export.xml` with the given `<Record>` samples.
+
+    Mirrors the Apple Health export format: a `<HealthData>` root over per-sample `<Record>`
+    elements (`type` = an HKQuantityTypeIdentifier, `startDate`/`endDate` = "YYYY-MM-DD HH:MM:SS
+    -ZZZZ", `value`). `records` is a list of dicts keyed `type`/`startDate`/`value` (+ optional
+    `endDate`). Building the real XML shape (not a stand-in) keeps the test exercising the adapter's
+    actual streamed-parse path.
+    """
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<HealthData locale="en_US">',
+             ' <ExportDate value="2026-06-20 12:00:00 -0500"/>']
+    for r in records:
+        lines.append(
+            f' <Record type="{r["type"]}" sourceName="Apple Watch" '
+            f'startDate="{r["startDate"]}" endDate="{r.get("endDate", r["startDate"])}" '
+            f'value="{r["value"]}"/>'
+        )
+    lines.append('</HealthData>')
+    path.write_text("\n".join(lines))
 
 
 def _numstat_rows(baseline_ref, paths):
@@ -95,39 +117,208 @@ def store_root(tmp_path):
 # --- Cycle 1: HealthKit + Oura adapters (AC-1, AC-2) ---
 
 
-def test_healthkit_maps_export_to_store(tmp_path, store_root):
-    """AC-1: the HealthKit adapter maps a sample export into field-set readings.
+def test_healthkit_maps_export_xml_to_store(tmp_path, store_root):
+    """AC-1: the HealthKit adapter maps the REAL Apple Health export.xml into field-set readings.
 
-    Constructs the HealthKit adapter over a sample HealthKit-shaped export, runs
-    it through the UNCHANGED ingest.run, then asserts via store.read that every
-    mapped reading carries every Line Field Set field and round-trips.
+    Builds a real-shape export.xml, runs it through the UNCHANGED ingest.run, and asserts each mapped
+    HK type lands on its OWN (item, day, "healthkit") stream with the CORRECT value — pinning the
+    value per stream REDs a transposed type->item map (the S41 fabricated-biomarker class). spo2's
+    0-1 fraction is scaled ×100 to the store's percent.
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapter import Adapter
+    from scripts.ingest.adapters import healthkit
+
+    adapter = healthkit.HealthKitAdapter()
+    assert isinstance(adapter, Adapter)  # exposes the frozen contract surface
+    assert adapter.source_tag() == "healthkit"
+
+    export = tmp_path / "export.xml"
+    _write_healthkit_export(export, [
+        {"type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+         "startDate": "2026-01-01 08:00:00 -0500", "value": "55"},
+        {"type": "HKQuantityTypeIdentifierRestingHeartRate",
+         "startDate": "2026-01-01 06:00:00 -0500", "value": "48"},
+        {"type": "HKQuantityTypeIdentifierRespiratoryRate",
+         "startDate": "2026-01-01 03:00:00 -0500", "value": "14.2"},
+        {"type": "HKQuantityTypeIdentifierOxygenSaturation",
+         "startDate": "2026-01-01 03:00:00 -0500", "value": "0.97"},
+    ])
+    ingest.run(adapter, export, root=store_root)
+
+    expected = {"hrv": 55.0, "rhr": 48.0, "resp-rate": 14.2, "spo2": 97.0}  # spo2 = 0.97 * 100
+    for item, value in expected.items():
+        readings = store.read(item, root=store_root)
+        assert len(readings) == 1, item
+        assert readings[0]["value"] == value, item
+        assert readings[0]["timepoint"] == "2026-01-01"
+        assert readings[0]["source"] == "healthkit"
+        assert set(readings[0]) >= set(store.keying.LINE_FIELDS)
+
+
+def test_healthkit_aggregates_raw_samples_to_daily_mean(tmp_path, store_root):
+    """AC-2: Apple's RAW per-sample records aggregate to ONE daily-MEAN reading per (item, day).
+
+    Apple records many samples a day; the adapter rolls them up to one value per (item, day) — the
+    granularity difference from Whoop's pre-aggregated DB. Two HRV samples on one day -> one reading
+    carrying their mean; a regression that yielded a reading PER sample (no aggregation) would red
+    this (len 2 -> 1, and the value would not be the mean).
     """
     from scripts.ingest import ingest
     from scripts.ingest.adapters import healthkit
 
-    # HealthKit (Apple Health) export shape: per-sample records with HK-specific
-    # field names the adapter maps into the store reading shape.
-    export = tmp_path / "healthkit.json"
-    _write_json_export(
-        export,
-        [
-            {"type": "hrv", "startDate": "2026-01-01T08:00", "qty": 55},
-            {"type": "rhr", "startDate": "2026-01-01T08:00", "qty": 48},
-        ],
-    )
-
-    adapter = healthkit.HealthKitAdapter()
-    ingest.run(adapter, export, root=store_root)
+    export = tmp_path / "export.xml"
+    _write_healthkit_export(export, [
+        {"type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+         "startDate": "2026-01-02 02:00:00 -0500", "value": "50"},
+        {"type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+         "startDate": "2026-01-02 08:00:00 -0500", "value": "60"},
+    ])
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
 
     hrv = store.read("hrv", root=store_root)
-    rhr = store.read("rhr", root=store_root)
-    assert len(hrv) == 1 and len(rhr) == 1
-    # Every reading carries every Line Field Set field, with the adapter's source.
-    for reading in (*hrv, *rhr):
-        assert set(reading) >= set(store.keying.LINE_FIELDS)
-        assert reading["source"] == adapter.source_tag()
-    assert hrv[0]["timepoint"] == "2026-01-01T08:00" and hrv[0]["value"] == 55
-    assert rhr[0]["value"] == 48
+    assert len(hrv) == 1                            # one daily reading, not one per sample
+    assert hrv[0]["timepoint"] == "2026-01-02"
+    assert hrv[0]["value"] == 55.0                  # mean(50, 60)
+
+
+def test_healthkit_unmapped_type_yields_no_reading(tmp_path, store_root):
+    """An unmapped HK type (e.g. step count) yields no reading — only the mapped metrics import."""
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    export = tmp_path / "export.xml"
+    _write_healthkit_export(export, [
+        {"type": "HKQuantityTypeIdentifierStepCount",
+         "startDate": "2026-01-03 08:00:00 -0500", "value": "8000"},
+        {"type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+         "startDate": "2026-01-03 08:00:00 -0500", "value": "57"},
+    ])
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
+
+    assert len(store.read("hrv", root=store_root)) == 1
+    assert store.read("steps", root=store_root) == []   # the unmapped type wrote nothing
+
+
+@pytest.mark.parametrize("make_bad", ["missing", "not-xml"])
+def test_healthkit_read_fails_loud_on_bad_export(tmp_path, make_bad):
+    """A missing file and a non-XML file each RAISE (never silently import nothing).
+
+    read_readings is a generator, so the raise fires on consumption — list(...) forces it.
+    """
+    from scripts.ingest.adapters import healthkit
+
+    if make_bad == "missing":
+        path = tmp_path / "nope.xml"
+    else:  # not-xml: a file that is not valid XML
+        path = tmp_path / "junk.xml"
+        path.write_text("this is not xml at all <<<")
+
+    with pytest.raises((OSError, ET.ParseError)):
+        list(healthkit.HealthKitAdapter().read_readings(path))
+
+
+# --- Store-adversarial battery on the healthkit path (docs/checklists/store-adversarial-tests.md) ---
+
+
+def _hk_hrv(day, value):
+    """One HealthKit HRV `<Record>` dict for the given day (08:00 sample)."""
+    return {"type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+            "startDate": f"{day} 08:00:00 -0500", "value": value}
+
+
+def test_healthkit_cross_stream_no_collision(tmp_path, store_root):
+    """Adversarial (1: cross-stream): an hrv read never returns an rhr value (S41 namespacing)."""
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    export = tmp_path / "export.xml"
+    _write_healthkit_export(export, [
+        _hk_hrv("2026-03-01", "58"),
+        {"type": "HKQuantityTypeIdentifierRestingHeartRate",
+         "startDate": "2026-03-01 06:00:00 -0500", "value": "52"},
+    ])
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
+
+    assert [r["value"] for r in store.read("hrv", root=store_root)] == [58.0]
+    assert [r["value"] for r in store.read("rhr", root=store_root)] == [52.0]
+    assert all(r["item"] == "hrv" for r in store.read("hrv", root=store_root))
+
+
+def test_healthkit_rerun_appends_zero_duplicates(tmp_path, store_root):
+    """Adversarial (2: same-key dedupe): re-running the same export appends 0 duplicate lines."""
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    export = tmp_path / "export.xml"
+    _write_healthkit_export(export, [_hk_hrv("2026-03-02", "58"), _hk_hrv("2026-03-03", "60")])
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
+    first = len(store.read("hrv", root=store_root))
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)   # identical re-run
+    assert first == 2
+    assert len(store.read("hrv", root=store_root)) - first == 0
+
+
+def test_healthkit_distinct_days_both_persist(tmp_path, store_root):
+    """Adversarial (2/4: same-key + keying mutation): two hrv readings on distinct days persist.
+
+    A mutation mapping every sample to one constant timepoint would collide the two days on
+    (item, timepoint, source) and silently drop one — this REDs (len 2 -> 1).
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    export = tmp_path / "export.xml"
+    _write_healthkit_export(export, [_hk_hrv("2026-03-04", "55"), _hk_hrv("2026-03-05", "62")])
+    ingest.run(healthkit.HealthKitAdapter(), export, root=store_root)
+
+    hrv = store.read("hrv", root=store_root)
+    assert {r["timepoint"] for r in hrv} == {"2026-03-04", "2026-03-05"}
+    assert len(hrv) == 2
+
+
+def test_healthkit_same_identity_changed_value_drops_second(tmp_path, store_root):
+    """Adversarial (3: dedupe-key boundary — value): same (item, day, source), new value -> second
+    write dropped, first value wins (value is EXCLUDED from the dedupe key)."""
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit
+
+    export1 = tmp_path / "export1.xml"
+    _write_healthkit_export(export1, [_hk_hrv("2026-03-06", "55")])
+    ingest.run(healthkit.HealthKitAdapter(), export1, root=store_root)
+
+    export2 = tmp_path / "export2.xml"   # same day, recomputed value
+    _write_healthkit_export(export2, [_hk_hrv("2026-03-06", "80")])
+    ingest.run(healthkit.HealthKitAdapter(), export2, root=store_root)
+
+    hrv = store.read("hrv", root=store_root)
+    assert len(hrv) == 1            # same identity -> second dropped
+    assert hrv[0]["value"] == 55.0  # first stored value wins
+
+
+def test_healthkit_distinct_source_from_whoop_does_not_collide(tmp_path, store_root):
+    """Adversarial (3: dedupe-key boundary — source): a HealthKit hrv and a Whoop hrv at the same
+    (item, day) BOTH persist; `source` distinguishes device provenance.
+
+    This is WHY the adapter emits source="healthkit" (device-specific) not a shared "wearable" tag —
+    a shared tag would collide the two and silently drop one (the S41 dropped-reading class). It also
+    demonstrates the operator can run Apple Health and Whoop side by side (the answer to 'instead of
+    Whoop' is to provide a HealthKit export; the sources never collide).
+    """
+    from scripts.ingest import ingest
+    from scripts.ingest.adapters import healthkit, whoop
+
+    hk = tmp_path / "export.xml"
+    _write_healthkit_export(hk, [_hk_hrv("2026-03-07", "58")])
+    ingest.run(healthkit.HealthKitAdapter(), hk, root=store_root)
+
+    db = tmp_path / "whoop.sqlite"
+    _write_whoop_sqlite(db, [{"day": "2026-03-07", "avgHrv": 61.0}])
+    ingest.run(whoop.WhoopAdapter(), db, root=store_root)
+
+    hrv = store.read("hrv", root=store_root)
+    assert len(hrv) == 2
+    assert {r["source"] for r in hrv} == {"healthkit", "whoop"}
 
 
 def test_oura_maps_export_to_store(tmp_path, store_root):
@@ -723,10 +914,12 @@ def test_cross_source_same_item_timepoint_does_not_dedupe(tmp_path, store_root):
     from scripts.ingest import ingest
     from scripts.ingest.adapters import healthkit, oura
 
-    hk_export = tmp_path / "healthkit.json"
-    _write_json_export(hk_export, [{"type": "hrv", "startDate": "2026-01-06T08:00", "qty": 55}])
+    # HealthKit keys its timepoint to the DAY; the Oura fixture uses the same date so the two land
+    # on the SAME (item, timepoint) and the test exercises source-distinguishes-identity.
+    hk_export = tmp_path / "export.xml"
+    _write_healthkit_export(hk_export, [_hk_hrv("2026-01-06", "55")])
     oura_export = tmp_path / "oura.json"
-    _write_json_export(oura_export, [{"metric": "hrv", "day": "2026-01-06T08:00", "average": 58}])
+    _write_json_export(oura_export, [{"metric": "hrv", "day": "2026-01-06", "average": 58}])
 
     ingest.run(healthkit.HealthKitAdapter(), hk_export, root=store_root)
     ingest.run(oura.OuraAdapter(), oura_export, root=store_root)
