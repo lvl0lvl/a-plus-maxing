@@ -103,6 +103,27 @@ def _post_upload(port, filename, payload):
     return resp.status, text
 
 
+def _file_part(filename, payload):
+    """Build one multipart file part (name=export, given filename + payload bytes)."""
+    out = bytearray()
+    out += f"--{BOUNDARY}\r\n".encode()
+    out += (f'Content-Disposition: form-data; name="export"; filename="{filename}"\r\n\r\n').encode()
+    out += payload
+    out += b"\r\n"
+    return bytes(out)
+
+
+def _post_raw(port, body):
+    """POST a raw multipart body to `/upload`; return (status, response_text)."""
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("POST", "/upload", body=body,
+                 headers={"Content-Type": f"multipart/form-data; boundary={BOUNDARY}"})
+    resp = conn.getresponse()
+    text = resp.read().decode("utf-8")
+    conn.close()
+    return resp.status, text
+
+
 def _server_with_roots(tmp_path):
     """Build a loopback server whose handler ingests into / re-renders from tmp roots.
 
@@ -547,3 +568,154 @@ def test_serve_layer_has_no_artifact_serving_route():
         assert "run('report')" not in src and 'run("report")' not in src, (
             f"{py.name} renders the report artifact (intake-only broken)"
         )
+
+
+# --------------------------------------------------------------------------- #
+# Review FIX-A/FIX-B/FIX-C — collision-safe staging, no-file submit, inner ValueError
+# --------------------------------------------------------------------------- #
+
+
+def test_post_dual_upload_export_and_dna_both_land(tmp_path):
+    """COV-2 (FIX-A): a dual upload (export.xml + 23andMe .zip) lands BOTH in one POST.
+
+    POSTs ONE request carrying an `export.xml` (HRV) AND a 23andMe `.zip` (genotype).
+    Both must land: the HRV reading in the store AND the genotype in the DNA dropzone,
+    and the re-render reflects both. The realistic dual-upload coexistence case the
+    server-loop iterates over every staged file part.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        body = bytearray()
+        body += _file_part("export.xml", _healthkit_xml_bytes(day="2026-05-05", value="71.5"))
+        body += _file_part("23andme_export.zip", _dna_zip_bytes())
+        body += f"--{BOUNDARY}--\r\n".encode()
+        status, text = _post_raw(port, bytes(body))
+        assert status == 200, f"dual-upload POST returned {status}, expected 200"
+
+        # The export.xml part landed an HRV reading in the store.
+        hrv = store.read("hrv", root=tmp_path / "store")
+        assert len(hrv) == 1 and hrv[0]["value"] == 71.5, "the export.xml part did not land"
+        # The DNA-zip part landed a genotype file in the DNA dropzone.
+        landed = list((tmp_path / "dna").glob("*.txt"))
+        assert landed and landed[0].name == "genome_v5.txt", "the DNA zip part did not land"
+
+        # The re-render reflects both load-states.
+        assert WIZARD_TITLE in text, "response is not the re-rendered intake wizard"
+        assert "1 readings" in text, "the re-render does not reflect the landed HRV reading"
+        assert "genome_v5.txt" in text, "the re-render does not reflect the landed DNA file"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_post_two_same_basename_parts_both_land_in_store(tmp_path):
+    """COV-2 (FIX-A, E2E failing-capable): two SAME-basename file parts both ingest.
+
+    POSTs two file parts BOTH named `export.xml` (the on-disk collision), carrying
+    DIFFERENT days. Both must ingest via the unchanged seam — the store carries TWO
+    readings (one per day). Failing-capable: revert the per-part-unique staged path
+    and the second part overwrites the first on disk, so only ONE day's reading lands
+    and this assertion reds on the silently-lost first upload.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        body = bytearray()
+        body += _file_part("export.xml", _healthkit_xml_bytes(day="2026-05-06", value="51"))
+        body += _file_part("export.xml", _healthkit_xml_bytes(day="2026-05-07", value="52"))
+        body += f"--{BOUNDARY}--\r\n".encode()
+        status, text = _post_raw(port, bytes(body))
+        assert status == 200, f"two-same-basename POST returned {status}, expected 200"
+
+        hrv = store.read("hrv", root=tmp_path / "store")
+        days = sorted(r["timepoint"] for r in hrv)
+        assert days == ["2026-05-06", "2026-05-07"], (
+            f"both same-basename parts did not land (first upload lost?): got {days}"
+        )
+        assert WIZARD_TITLE in text, "response is not the re-rendered intake wizard"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_post_collision_basename_parts_both_persist_on_disk(tmp_path):
+    """COV-2 (FIX-A, direct): two parts with the SAME basename stage to distinct paths.
+
+    Hits the exact collision the fix targets: two file parts both named `export.xml`.
+    Staged under per-part-unique paths, both bodies persist on disk. Asserts both
+    distinct payloads survived staging (the second did not overwrite the first).
+    Failing-capable: revert the per-part prefix and the second part overwrites the
+    first on disk — only one payload survives and this assertion reds.
+    """
+    import io
+
+    from scripts.serve.multipart import stage_uploads
+
+    body = bytearray()
+    body += _file_part("export.xml", b"FIRST-payload-bytes")
+    body += _file_part("export.xml", b"SECOND-payload-bytes")
+    body += f"--{BOUNDARY}--\r\n".encode()
+
+    result = stage_uploads(f"multipart/form-data; boundary={BOUNDARY}", io.BytesIO(bytes(body)), tmp_path)
+    assert len(result["files"]) == 2, "expected two staged file parts"
+    paths = [Path(f["path"]) for f in result["files"]]
+    assert paths[0] != paths[1], "two same-basename parts staged to the SAME path (collision)"
+    contents = {p.read_bytes() for p in paths}
+    assert contents == {b"FIRST-payload-bytes", b"SECOND-payload-bytes"}, (
+        "a same-basename part overwrote the other on disk (first upload silently lost)"
+    )
+
+
+def test_post_no_file_chosen_not_staged(tmp_path):
+    """FIX-B: a part with filename="" (no file chosen) is NOT staged as a file.
+
+    A browser submitting the upload form with no file chosen sends a part with
+    `filename=""`. The old `if "filename" in params` treated it as a file part and
+    staged a zero-byte `upload`. The handler must treat it as a non-file: 200
+    re-render, handler stays alive, and no reading/file landed.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        body = bytearray()
+        body += f"--{BOUNDARY}\r\n".encode()
+        body += b'Content-Disposition: form-data; name="export"; filename=""\r\n\r\n'
+        body += b"\r\n"
+        body += f"--{BOUNDARY}--\r\n".encode()
+        status, text = _post_raw(port, bytes(body))
+        assert status == 200, f"no-file submit returned {status}, expected 200"
+        assert WIZARD_TITLE in text, "the no-file response is not the re-rendered wizard"
+
+        # Nothing was staged/ingested — the store and dropzone stay empty.
+        assert store.read_all(tmp_path / "store") == [], "a no-file submit wrongly wrote into the store"
+        dna_root = tmp_path / "dna"
+        assert not (dna_root.exists() and list(dna_root.glob("*"))), "a no-file submit wrongly wrote a DNA file"
+        assert _still_alive(port), "the handler died after a no-file submit"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_post_unterminated_multipart_body_rerenders_no_crash(tmp_path):
+    """COV-1 (FIX-C): a multipart body missing the closing `--BOUNDARY--` re-renders, alive.
+
+    A file part with NO closing terminator makes `stage_uploads` raise the INNER
+    `ValueError("malformed multipart body ...")` (distinct from the OUTER non-numeric
+    Content-Length ValueError). The handler's inner `except (..., ValueError, ...)` arm
+    must catch it, re-render the wizard (200), and keep the handler responsive — a
+    follow-up GET / still 200s. Coverage-only; no production change.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        # A file part with NO closing `--BOUNDARY--` terminator: the parser streams the
+        # part body looking for the next boundary, hits EOF, and raises the inner ValueError.
+        body = _file_part("export.xml", _healthkit_xml_bytes())  # no trailing close delimiter
+        status, text = _post_raw(port, body)
+        assert status == 200, f"unterminated body returned {status}, expected a re-rendered 200"
+        assert WIZARD_TITLE in text, "the unterminated-body response is not the re-rendered wizard"
+        assert _still_alive(port), "the handler died after an unterminated multipart body"
+    finally:
+        srv.shutdown()
+        srv.server_close()

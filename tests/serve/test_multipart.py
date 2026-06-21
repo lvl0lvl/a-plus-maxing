@@ -165,6 +165,22 @@ def test_at_ceiling_body_is_accepted(tmp_path, monkeypatch):
     assert staged.exists() and staged.stat().st_size == 4096, "at-ceiling body not staged whole"
 
 
+def test_empty_filename_part_not_staged_as_file(tmp_path):
+    """FIX-B: a part with filename="" is NOT staged as a file (treated as a field).
+
+    A browser submitting the upload form with no file chosen sends a part with
+    `filename=""`. `params.get("filename")` is falsy, so it falls through to the
+    form-field branch — NOT staged as a zero-byte `upload`. Asserts `files` is empty.
+    Failing-capable: revert to `if "filename" in params` and the empty-filename part
+    stages a zero-byte file, making `files` non-empty.
+    """
+    body = _multipart_body([{"name": "export", "filename": "", "body": b""}])
+    result = stage_uploads(_content_type(), io.BytesIO(body), tmp_path)
+    assert result["files"] == [], "an empty-filename part was wrongly staged as a file"
+    staged = [p for p in tmp_path.rglob("*") if p.is_file()]
+    assert staged == [], f"an empty-filename part staged a file on disk: {staged}"
+
+
 def test_copy_is_chunked_not_single_shot():
     """AC-4: the staging copy is chunked — no single-shot full-body part read.
 

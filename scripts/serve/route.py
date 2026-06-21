@@ -23,6 +23,7 @@ from pathlib import Path
 
 from scripts.ingest import dna, ingest
 from scripts.ingest.__main__ import _adapter, _detect_source
+from scripts.ingest.adapters.healthkit import _export_xml_member
 from scripts.store import store
 
 # The production DNA dropzone — the CLI's `_load_dna` default (scripts/ingest/__main__.py:120).
@@ -35,8 +36,10 @@ def _zip_is_apple_health(zip_path):
 
     The content-disambiguation between the two zip shapes the browser uploads: an
     Apple-Health export nests `export.xml` under a directory member, a 23andMe export
-    carries a genotype `.txt` and no `export.xml`. Skips directory entries and macOS
-    `__MACOSX` resource forks, mirroring the adapter/`dna.land` member scans.
+    carries a genotype `.txt` and no `export.xml`. DELEGATES the member scan to the
+    healthkit adapter's `_export_xml_member` so the "what makes a zip Apple-Health" rule
+    lives in ONE place (the adapter that extracts it) — a True here means the same scan
+    the adapter then runs will succeed.
 
     Args:
         zip_path (str | Path): Path to the staged `.zip` upload.
@@ -45,12 +48,11 @@ def _zip_is_apple_health(zip_path):
         (bool) True for an Apple-Health-export shape, False for a 23andMe shape.
     """
     with zipfile.ZipFile(zip_path) as zf:
-        for name in zf.namelist():
-            if name.endswith("/") or name.startswith("__MACOSX"):
-                continue
-            if Path(name).name == "export.xml":
-                return True
-    return False
+        try:
+            _export_xml_member(zf)
+        except ValueError:
+            return False
+        return True
 
 
 def route_upload(staged_path, *, root=None, dna_root=None):
