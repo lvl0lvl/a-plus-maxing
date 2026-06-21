@@ -13,14 +13,15 @@ stage the multipart body (`multipart.stage_uploads`, ADR-0013-T2) -> route the
 staged file into the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`)
 -> re-render the wizard via `generate.run('intake')` reflecting the new load-state.
 The server serves NO generated artifact live — intake-only (ADR-0013 Falsification 3;
-the route table is exactly {GET `/`, POST `/upload`}). `ADR-0013-T5` wraps the request
-dispatch in `egress_guard.run` (the import here keeps that wrap point ready). Stopping
-is `srv.shutdown()` + `srv.server_close()`, the clean operator-stop path.
+the route table is exactly {GET `/`, POST `/upload`}). Stopping is `srv.shutdown()` +
+`srv.server_close()`, the clean operator-stop path.
 """
 
-import io
-import tempfile
+import xml.etree.ElementTree as ET
+import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from scripts.serve.multipart import MAX_UPLOAD_BYTES, UploadTooLarge
 
 # The single loopback-bind site. Changing this away from 127.0.0.1 breaks the
 # ADR-0013-T1 criterion-1 structural assertion + the off-machine-unreachable
@@ -30,9 +31,40 @@ _LOOPBACK = "127.0.0.1"
 # The default operator port for `python -m scripts.serve` (OQ-2 fail-loud names it).
 DEFAULT_PORT = 8765
 
-# The egress guard is imported so the server-start path is guard-ready: ADR-0013-T5
-# wraps the request dispatch in egress_guard.run; the wrap point exists from here.
-from scripts.guard.egress_guard import run as _egress_run  # noqa: E402,F401
+# The whole-request byte ceiling, rejected on Content-Length BEFORE the body is read
+# (HTTP 413) so a giant body never materializes in RAM. It sits a multipart-overhead
+# margin above the per-file ceiling so a real Apple-Health export (the file at the
+# per-file ceiling, plus boundary/header framing) still fits.
+_MULTIPART_OVERHEAD_MARGIN = 8 * 1024 * 1024
+MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_MARGIN
+
+
+class _BoundedReader:
+    """A read-bounded view over `rfile` that never yields more than `length` bytes.
+
+    `read(n)` reads in chunks but stops at the Content-Length so the multipart
+    parser sees a body capped at the declared length — `self.rfile.read(length)`
+    materialized the whole body in RAM (defeating multipart's mid-stream ceiling);
+    this hands the parser a stream instead, so `multipart._stage_file`'s per-file
+    ceiling bounds memory.
+
+    Attributes:
+        stream (BinaryIO): The underlying request rfile.
+        remaining (int): Bytes still permitted before the declared length is hit.
+    """
+
+    def __init__(self, stream, length):
+        self.stream = stream
+        self.remaining = length
+
+    def read(self, size=-1):
+        """Read up to `size` bytes, never crossing the declared Content-Length."""
+        if self.remaining <= 0:
+            return b""
+        want = self.remaining if size is None or size < 0 else min(size, self.remaining)
+        data = self.stream.read(want)
+        self.remaining -= len(data)
+        return data
 
 
 def _render_intake(*, store_root=None, dna_root=None):
@@ -78,30 +110,56 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         if self.path != "/upload":
             self.send_error(404)
             return
+        import tempfile
+
         from scripts.serve import route
         from scripts.serve.multipart import stage_uploads
 
-        length = int(self.headers.get("Content-Length") or 0)
-        body = self.rfile.read(length)
+        # Reject an over-ceiling Content-Length BEFORE reading the body so a giant
+        # upload never materializes in RAM (HTTP 413, not a dropped connection).
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            # A non-numeric Content-Length raised here, OUTSIDE the old guarded block,
+            # killing the request thread. Re-render the wizard rather than drop.
+            self._write_html(400, _render_intake(store_root=self.store_root, dna_root=self.dna_root))
+            return
+        if length > MAX_REQUEST_BYTES:
+            self._413_too_large()
+            return
 
-        with tempfile.TemporaryDirectory() as staging:
-            staged = stage_uploads(self.headers.get("Content-Type"), io.BytesIO(body), staging)
-            files = staged["files"]
-            store_root = self.store_root
-            dna_root = self.dna_root
-            try:
-                for file_part in files:
+        store_root = self.store_root
+        dna_root = self.dna_root
+        try:
+            # A length-bounded reader streams the body to the multipart parser, so
+            # multipart's mid-stream per-file ceiling bounds memory (the prior
+            # `rfile.read(length)` read the whole body into RAM, defeating it).
+            with tempfile.TemporaryDirectory() as staging:
+                staged = stage_uploads(
+                    self.headers.get("Content-Type"), _BoundedReader(self.rfile, length), staging
+                )
+                for file_part in staged["files"]:
                     route.route_upload(file_part["path"], root=store_root, dna_root=dna_root)
-            except (SystemExit, ValueError):
-                # An ambiguous/unknown extension (`_detect_source` raises SystemExit) or a
-                # fail-loud landing rejection (`dna.land`/the adapter raise ValueError) must
-                # NOT kill the request handler: re-render the wizard so the operator can
-                # pick a source / re-upload, rather than dropping the connection.
-                self._write_html(200, _render_intake(store_root=store_root, dna_root=dna_root))
-                return
+        except (SystemExit, ValueError, zipfile.BadZipFile, ET.ParseError):
+            # A real operator input must NOT kill the request thread. SystemExit: an
+            # ambiguous/unknown extension (`_detect_source`). ValueError: a fail-loud
+            # land rejection (`dna.land`/the adapter) or a malformed multipart body.
+            # BadZipFile/ParseError: a corrupt `.zip`/`export.xml`. Re-render the wizard
+            # so the operator can pick a source / re-upload, not a stack trace + drop.
+            self._write_html(200, _render_intake(store_root=store_root, dna_root=dna_root))
+            return
+        except UploadTooLarge:
+            # A part crossed multipart's per-file ceiling mid-stream — same 413 surface
+            # as the up-front Content-Length reject (the body was bounded, not RAM-held).
+            self._413_too_large()
+            return
 
         # Re-render reflecting the new load-state (the store/dropzone were just written).
         self._write_html(200, _render_intake(store_root=store_root, dna_root=dna_root))
+
+    def _413_too_large(self):
+        """Write a 413 wizard re-render for an over-ceiling upload (no dropped connection)."""
+        self._write_html(413, _render_intake(store_root=self.store_root, dna_root=self.dna_root))
 
     def _write_html(self, status, html):
         """Write an HTTP response with the HTML body (the single response-write site)."""
