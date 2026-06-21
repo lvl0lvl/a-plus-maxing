@@ -53,7 +53,7 @@ Append-only register of project landmarks. Each landmark declares relevant scope
 - **trigger_windows:**
   - **baseline-start + 30 days:** ingest first 30-day baseline into `current-state.md` Wearable section; create biomarker pages with `last_verified` set to the 30-day window end
 - **status:** active
-- **rationale:** First continuous-measurement biomarkers become available; current-state.md transitions from labs-only to labs+wearable. Specialist agents (recovery-specialist, sleep-coach) gain queryable data. Re-anchored Oura→Whoop per ADR-0011 D3 (Whoop owned; the source is noop's read-only local-access surface — the `noop-local-access` MCP / read-only store — per ADR-0011 D2 (re-decided S62); the subscription-free CSV export is the fallback).
+- **rationale:** First continuous-measurement biomarkers become available; current-state.md transitions from labs-only to labs+wearable. Specialist agents (recovery-specialist, sleep-coach) gain queryable data. **Source re-anchored Oura→Whoop→Apple Health: as of ADR-0012 (S82) the operator uses Apple Health, and the `healthkit` adapter reads the operator's real `export.xml` (streamed + daily-aggregated). (Prior anchoring: Oura→Whoop per ADR-0011 D2/D3, re-decided S62 — superseded; the Whoop adapter remains wired for coexistence but is not the operator's source.)**
 
 ### LM-03 — 23andMe raw file ingest
 - **date:** TBD (pending Walter at desktop)
