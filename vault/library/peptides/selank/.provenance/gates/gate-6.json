@@ -1,0 +1,20 @@
+{
+  "phase": "6",
+  "verdict": "PASS",
+  "timestamp": "2026-06-21T03:00:00Z",
+  "iterations": 2,
+  "critique_agent_id": "selank-critic-2",
+  "draft_path": "/tmp/aplus-research/selank/synthesis/research-report.md",
+  "draft_sha256": "bbf7cd0fcdab76139a4b5a276a3b1d04848de99922ee71897f3c9fe5b6b3226e",
+  "findings": [],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T02:55:03.928402+00:00",
+    "attest_ts": "2026-06-21T02:59:43.465604+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "bfa81c299954cd8dd6a99a171bfd8e33bc4490e898d5bb412880154e3f0bd10d",
+    "agent_source_mtime": "2026-06-21T02:59:12.669878+00:00"
+  }
+}

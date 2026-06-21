@@ -36,6 +36,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/tirzepatide]] (status: researching; evidence_tier: A; risk_tier: medium)
 - [[compounds/retatrutide]] (status: researching; evidence_tier: B; risk_tier: experimental)
 - [[compounds/aod-9604]] (status: researching; evidence_tier: C; risk_tier: experimental)
+- [[compounds/selank]] (status: researching; evidence_tier: C; risk_tier: experimental)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -148,6 +149,9 @@ _(none yet)_
 - [[library/peptides/aod-9604/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~11.1K words; 32 unified citations; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 6/6 verified, 0 fabrications, 0 Wikipedia; hGH(176-191) fat-loss fragment whose Phase-2b obesity RCT FAILED placebo; evidence_tier C / risk_tier experimental)
 - [[library/peptides/aod-9604/practitioner-layer]] (2026-06-20; gray-market ~300 mcg SC/day [efficacy FAILED]; NOT lawfully compoundable [§503A Cat-2 then withdrawn])
 - [[library/peptides/aod-9604/non-english-layer]] (2026-06-20; none located — Australian/English-origin; non-English hits are vendor pages restating the English trials)
+- [[library/peptides/selank/research-report]] (2026-06-20 via /aplus-research --mode=deep; full bibliography; gates 2.75→8.5 attested PASS; chain intact; independent full-bib audit 21/21 PMIDs verified, 0 fabrications, 0 fixes; synthetic Tuftsin-analogue heptapeptide, Russia-registered intranasal anxiolytic (ЛСР-003338/09) NOT FDA/EMA-approved, ~100% single-lineage IMG-RAS/Zakusov; evidence_tier C / risk_tier experimental — LAST primary-lane entry)
+- [[library/peptides/selank/practitioner-layer]] (2026-06-20; Russian intranasal 0.15% reg. dosing + gray-market SC/intranasal conventions; §503A never Cat-1 — not lawfully compoundable)
+- [[library/peptides/selank/non-english-layer]] (2026-06-20; Russian-language-heavy — the predominant evidence stream; IMG-RAS/Zakusov lineage primaries; kept DISTINCT from Semax)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)

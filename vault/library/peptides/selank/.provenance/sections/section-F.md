@@ -1,0 +1,61 @@
+## Section F — Practitioner-practice + non-English
+
+**Compound scope note:** This section concerns **Selank** (Thr-Lys-Pro-Arg-Pro-Gly-Pro, TKPRPGP) — the synthetic heptapeptide analogue of the endogenous tetrapeptide **tuftsin** (Thr-Lys-Pro-Arg), extended by a C-terminal Pro-Gly-Pro for serum stability. It is held distinct throughout from **Semax** (an ACTH(4-10) analogue, a different molecule) and from **N-Acetyl-Selank-Amidate** (a separate N-acetylated, C-amidated research-chem derivative marketed by gray-market vendors). Claims below are practitioner/regulatory convention only; per the gate, **practitioner and vendor sources NEVER ground efficacy or AE-rate claims** — those Tier-1 claims live in §B/§C/§D.
+
+### Dosing conventions
+
+**The Russian registered regimen (`regulatory`).** Selank is a registered medicine in the Russian Federation, marketed as **Селанк 0.15% intranasal drops** (capli nazal'nye Selank 0,15%), developed jointly by the Institute of Molecular Genetics RAS (acad. N.F. Myasoedov) and the Zakusov/RAMS Research Institute of Pharmacology (acad. S.B. Seredenin) [1][6]. The labeled formulation delivers **75 mcg of active substance per drop** of 0.15% solution [2]. The registered anxiety regimen is **2-3 drops per nostril, three times daily, for a 14-day course**, i.e. a total daily dose in the **~1.5-2.25 mg/day** band, with the registered clinical-trial regimen running as high as **2700 mcg/day** in the pivotal GAD/neurasthenia study [1][2]. Indications on the Russian registration are **generalized anxiety disorder, neurasthenia, and adjustment disorders** [1]. (`regulatory`)
+
+**Western gray-market nootropic convention (`practitioner_protocol` / `vendor_label`).** Outside Russia, Selank has no approved medicinal status, so all Western dosing is gray-market convention reported by nootropic vendors and protocol aggregators — NOT a label. The reported convention clusters at **intranasal ~250-500 mcg per dose, 1-3 times daily**, run in short cycles (commonly **2-4 weeks on, ~1-2 weeks off**; some sources cite 10-day-on / 5-day-off blocks) [3][4]. Vendor pages report that lower doses (~250-500 mcg) are used for the anxiety endpoint and higher (~1500-3000 mcg/day) for the cognitive endpoint, with a "start low, titrate after 3-5 days" pattern [3][4]. This is reported strictly as **convention**, not as evidence of dose-response — the only controlled human dose-response data are the Russian trials in §B/§D. (`practitioner_protocol` for the cycling patterns from protocol aggregators; `vendor_label` for the per-dose mcg figures from research-chem vendor pages.)
+
+**Distinction from N-Acetyl-Selank-Amidate.** Gray-market vendors sell both plain Selank and "N-Acetyl-Selank-Amidate." Western dosing pages frequently blur the two; the figures above are reported for **plain Selank** only. The amidated analogue is a distinct research chemical with its own (sparser, non-clinical) vendor literature and is out of scope here. (`vendor_label`)
+
+### Compounding / access
+
+**Gate result: Selank is NOT a Western-approved drug and is NOT lawfully compoundable for human use in the US.** It is not FDA-approved; for its entire Western history it could be sold only as a **research chemical under research-use-only / not-for-human-consumption labeling**, with marketing for human consumption illegal under federal law [5][7]. Selank acetate (TP-7) had been placed on the FDA's **Category 2** bulk-drug-substances list (substances that may present significant safety risks for compounding), and was **removed from Category 2 in September 2024 (effective Sept 27, 2024) when the nomination was withdrawn**, then referred into the Pharmacy Compounding Advisory Committee (PCAC) review process [7]. See §E for the verified status; this section defers to it.
+
+**Regulatory state (report as pending, `regulatory`).** Removal from Category 2 is **not** placement into Category 1 — these peptides were never in Category 1, and a bulks-list category is not "approval." A 2026 FDA interim-policy update (published April 2026, with a PCAC meeting noticed for **23-24 Jul 2026**) again removed peptides from Category 2 and referred a slate of substances to PCAC for *consideration* for the 503A bulks list [5]. Popular and vendor commentary has framed this as Secretary R.F. Kennedy Jr "moving peptides to Category 1," but that reclassification is **not** established by any finalized FDA rule: the PCAC review had not occurred as of this writing, and inclusion on the 503A bulks list — which would be what permits compounding — remains a pending advisory-committee process. Even if such inclusion were finalized, it **would not establish proven safety, efficacy, or standardized dosing** [5]. The lawful-compounding gate is therefore reported as **NOT lawfully compoundable — pending/not finalized**, never as "now legal." (`regulatory`)
+
+Net: outside Russia, real-world access remains predominantly gray-market research-chem; any future US compounded access is contingent on an unfinished mid-2026 PCAC/FDA determination. No claim here grounds efficacy.
+
+### Non-English (Russian) literature
+
+This is the substantive case: Selank's primary evidence base is **Russian-language**, originating from the IMG-RAS / Zakusov Institute / Serbsky National Center axis. Genuine Russian-LANGUAGE primaries identified (cited by full bibliographic record):
+
+1. **Zozulya A.A., Neznamov G.G., Syunyakov T.S., Kost N.V., Gabaeva M.V., Sokolov O.Yu., Serebryakova E.V., Siranchieva O.A., Andryushchenko A.V., Telesheva E.S., Syunyakov S.A., Smulevich A.B., Myasoedov N.F., Seredenin S.B.** "Эффективность и возможные механизмы действия нового пептидного анксиолитика селанка при терапии генерализованного тревожного расстройства и неврастении." *Журнал неврологии и психиатрии им. С.С. Корсакова* **108(4):38-48 (2008)**. PMID 18454096. *Russian-language primary*; the pivotal comparator-controlled GAD/neurasthenia trial (Selank 0.15% intranasal vs. medazepam). [translated] design figures: 62 patients (30 Selank / 32 medazepam), Hamilton/Zung/CGI scales; Selank dose 2700 mcg/day [1][8]. **Efficacy/AE numbers belong to §B/§C/§D, not here.**
+
+2. **Medvedev V.E., Tereshchenko O.N., Israelyan A.Yu., et al.** "Сравнение анксиолитического эффекта и переносимости селанка и феназепама при лечении тревожных расстройств." *Журнал неврологии и психиатрии им. С.С. Корсакова* **114(7):17-22 (2014)**. PMID 25176261. *Russian-language primary*; comparative Selank vs. phenazepam tolerability/efficacy study. [9]
+
+3. **Medvedev V.E., Tereshchenko O.N., et al.** "Оптимизация терапии тревожных расстройств пептидным препаратом селанк." *Журнал неврологии и психиатрии им. С.С. Корсакова* **115(6):33-40 (2015)**. *Russian-language primary*; phenazepam monotherapy (n=30) vs. combined Selank+phenazepam (n=40) in anxiety-phobic/hypochondriac/somatoform disorders. [9]
+
+4. **Seredenin S.B., Kozlovskaya M.M., Blednov Yu.A., et al.** "Изучение противотревожного действия аналога эндогенного пептида тафтсина на инбредных мышах." *Журнал высшей нервной деятельности им. И.П. Павлова* **48(1):153-160 (1998)**. *Russian-language primary (preclinical)*; foundational anxiolytic characterization in inbred mice. [6]
+
+5. **Zolotarev Yu.A., Dadayan A.K., Dolotov O.V., et al. (incl. Zozulya A.A.)** "Равномерно меченные тритием пептиды и их биодеградация in vivo и in vitro" [evenly tritium-labeled peptides; biodegradation of TKPRPGP/Selank]. *Биоорганическая химия (Bioorg. Khim.)* **(2006)**. PMID 16637290. *Russian-language primary (pharmacokinetic)*; Selank biodegradation pathways and brain-tissue PK. [8]
+
+**Secondary Russian review surveyed:** Skrebitsky V.G., Kasyan A.P., Povarov I.S., Kondratenko R.V., Slominsky P.A. "Нейропептидный препарат Селанк: биологическая активность и фундаментальные механизмы действия." *Нервные болезни* (2016), CyberLeninka. *Russian-language review* used as a bibliographic map to the primaries above; it itself cites Kolik/Kolodin transcriptome work from IMG-RAS and experimental doses of 1000-2000 µg/kg [6]. (Not a primary; surveyed for citation tracing only.)
+
+**Distinguishing Russian-LANGUAGE primaries from Russian-author English-published work.** All five numbered items above are Russian-LANGUAGE publications (the three Korsakova-journal items appear in PubMed only as bracketed-title English translations of Russian originals, language=Russian). These are distinct from Russian-author work published in **English-language** venues — chiefly the Springer-translated journals (**Bulletin of Experimental Biology and Medicine**, e.g. Kolik et al. on ethanol-withdrawal BDNF protection 2019 and the morphine-withdrawal paper 2022; **Neuroscience and Behavioral Physiology**; **Doklady Biological Sciences**) and the *Eksperimental'naya i Klinicheskaya Farmakologiya* output — which, being English-published (or English-translated and indexed as such), are catalogued in the §B/§C preclinical layer rather than counted here as Russian-language primaries. Where any numeric in this section derives from machine translation it is flagged **[translated]**.
+
+**Count: 5 genuine Russian-LANGUAGE primaries** opened/verified (3 clinical in *Zh. Nevrol. Psikhiatr. im. Korsakova*; 1 preclinical in *Zh. Vyssh. Nerv. Deyat.*; 1 pharmacokinetic in *Bioorg. Khim.*), plus 1 Russian-language secondary review used for citation tracing.
+
+---
+
+## Section F bibliography
+
+[1] Zozulya A.A. et al. "[Efficacy and possible mechanisms of action of a new peptide anxiolytic selank in the therapy of generalized anxiety disorders and neurasthenia]." *Zh Nevrol Psikhiatr Im S S Korsakova* 108(4):38-48 (2008). PMID 18454096. — bibliographic record via PubMed: https://pubmed.ncbi.nlm.nih.gov/18454096/ and SciRP reference index. (`regulatory`/primary)
+
+[2] Russian registered-formulation detail: Selank 0.15% intranasal solution, 75 mcg/drop; registered anxiety regimen — search-aggregated from registration/label descriptions (helloregimen / peptidewiki dosing pages summarizing the Russian label). (`regulatory` for label dose; reported as label-derived)
+
+[3] peptidedeck.com — Selank dosage guide (Western gray-market dosing convention 250-500 mcg, cycling). https://www.peptidedeck.com/blog/selank-dosage-guide (`vendor_label`/`practitioner_protocol`)
+
+[4] helloregimen.com — Selank dosing guide 2026 (intranasal protocol, cycle conventions). https://helloregimen.com/blog/selank-dosing-guide (`practitioner_protocol`)
+
+[5] FDA — 503A interim bulks-list actions: Selank acetate (TP-7) removed from Category 2 effective Sept 27, 2024 (nomination withdrawn), referred to PCAC; 2026 interim-policy update (published April 2026) removing peptides from Category 2 with a PCAC meeting noticed for Jul 23-24, 2026 — referral for *consideration* only, not a finalized Category-1 reclassification. https://www.fda.gov/drugs/human-drug-compounding/certain-bulk-drug-substances-use-compounding-may-present-significant-safety-risks (`regulatory`) [Popular framing of an "RFK Jr Category-1 reclassification" (e.g. pharmacytimes.com) is NOT relied upon as a finalized regulatory action.]
+
+[6] Skrebitsky V.G. et al. "Нейропептидный препарат Селанк: биологическая активность и фундаментальные механизмы действия." *Нервные болезни* (2016). CyberLeninka: https://cyberleninka.ru/article/n/neyropeptidnyy-preparat-selank-biologicheskaya-aktivnost-i-fundamentalnye-mehanizmy-deystviya — Russian-language review; source for Seredenin 1998 primary record and IMG-RAS attribution. (Russian secondary)
+
+[7] FDA — Certain Bulk Drug Substances for Use in Compounding that May Present Significant Safety Risks (Category 2 list context). https://www.fda.gov/drugs/human-drug-compounding/certain-bulk-drug-substances-use-compounding-may-present-significant-safety-risks (`regulatory`)
+
+[8] PubMed Selank query results (Zozulia 2008 PMID 18454096; Zolotarev 2006 PMID 16637290 *Bioorg Khim*, Selank/TKPRPGP biodegradation). https://pubmed.ncbi.nlm.nih.gov/?term=Selank+anxiolytic+Zozulia (primary records)
+
+[9] Medvedev V.E. et al. (2014) PMID 25176261 *Zh Nevrol Psikhiatr Im S S Korsakova* 114(7):17-22 [Selank vs phenazepam]; and (2015) 115(6):33-40 [Selank+phenazepam optimization]. Records via unboundmedicine/MEDLINE and Semantic Scholar. (Russian-language primaries)
