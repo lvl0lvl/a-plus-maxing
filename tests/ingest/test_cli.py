@@ -42,13 +42,27 @@ def test_cli_lands_dna_zip_into_dropzone(tmp_path, capsys):
     assert "2 variant" in out and "nothing was uploaded" in out
 
 
-def test_cli_source_override_forces_adapter(tmp_path):
-    """--source forces the adapter rather than relying on extension auto-detect."""
-    export = tmp_path / "export.xml"
-    write_healthkit_export(export, [hk_record(_HK_HRV, "2026-01-03 08:00:00 -0500", "58")])
+def test_cli_source_override_loads_a_file_autodetect_refuses(tmp_path):
+    """--source loads a file that auto-detect REFUSES (a .json is oura|garmin) — proving the override
+    path is consulted. Goes RED if `args.source or ...` is dropped (a .json then SystemExits)."""
+    import json
+    export = tmp_path / "oura.json"
+    export.write_text(json.dumps([{"metric": "hrv", "day": "2026-01-05", "average": 62}]))
     store_root = tmp_path / "store"
-    rc = cli.main([str(export), "--source", "healthkit", "--root", str(store_root)])
-    assert rc == 0 and len(store.read("hrv", root=store_root)) == 1
+    rc = cli.main([str(export), "--source", "oura", "--root", str(store_root)])
+    assert rc == 0
+    readings = store.read("hrv", root=store_root)
+    assert len(readings) == 1 and readings[0]["source"] == "oura"
+
+
+def test_cli_and_status_source_sets_match_scheduler_wired_set():
+    """The CLI's adapter map + status's wearable sources stay congruent with the scheduler's DISCOVERED
+    wired set. A new/removed/UNWIRED-flagged adapter that drifts these hardcoded lists fails loud here
+    (rather than silently mis-classifying load-state) — the single-source-of-truth guard."""
+    from scripts.ingest import scheduler, status
+    discovered = {adapter.source_tag() for adapter in scheduler._wired_adapters()}
+    assert set(cli._ADAPTERS) == discovered
+    assert set(status._WEARABLE_SOURCES) == discovered
 
 
 def test_cli_missing_file_exits(tmp_path):
