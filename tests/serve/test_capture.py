@@ -332,6 +332,38 @@ def test_out_of_enum_goal_domains_routes_record_only_not_the_token(tmp_path):
     assert gd and gd[0]["value"] == "Workout;Nutrition", "an in-enum goal-domains did not land in the token"
 
 
+def test_separators_only_goal_domains_routes_record_only_not_the_token(tmp_path):
+    """FIX (F3): a separators-only goal-domains value routes record-only, never the token.
+
+    `_bounded_value_ok` split a `;`-joined value and required every NON-EMPTY token to be
+    in the enum — but a separators-only value (`";;;"`) filters to an EMPTY token list, so
+    `all()` over nothing was vacuously True and `";;;"` was written verbatim into the
+    model-bound goal-domains token. An empty token list is INVALID; the value routes
+    record-only to the gitignored scaffold.
+
+    Failing-capable: under the old vacuous-true `all(... if tok.strip())`, `";;;"` lands in
+    the token store item, reddening the negative assertion.
+    """
+    assert capture._bounded_value_ok("goal-domains", ";;;") is False, (
+        "a separators-only goal-domains value was accepted (vacuous all() over empty tokens)"
+    )
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    capture.persist_capture(
+        {"goal-domains": ";;;"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read("goal-domains", root=store_root) == [], (
+        "a separators-only goal-domains value reached the model-bound token store item"
+    )
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert ";;;" in scaffold_text, "the separators-only value did not route record-only"
+    # A whitespace-padded separators-only value is likewise rejected by the gate.
+    assert capture._bounded_value_ok("goal-domains", " ; ; ") is False, (
+        "a whitespace-padded separators-only goal-domains value was accepted"
+    )
+
+
 def test_rx_interaction_classes_is_not_a_wired_capture_token():
     """FIX-A: the capture seam does NOT wire `rx-interaction-classes` to the store.
 
@@ -391,6 +423,73 @@ def test_free_text_token_pii_past_the_4096_cap_routes_record_only(tmp_path):
     )
     hl = store.read("hard-limits", root=store_root)
     assert hl and hl[0]["value"] == "no overhead pressing", "a clean free-text value did not land in the token"
+
+
+# A PII token whose match span EXCEEDS the old `overlap=64`, so positioned across the
+# old window step boundary (~char 4032) it was seen WHOLE by neither overlapping window
+# and leaked. A 79-char postal (span > 64) and an email — both real `scan_text_full`
+# hits (proven below) — are the straddle probes.
+_STRADDLE_POSTAL = "12345 Northwest Industrial Distribution Center Boulevard, Springfield, IL 62704."
+_STRADDLE_EMAIL = "reach me at operator.fieldtest@example.com."
+# The OLD window geometry the straddle targets: window length 4096, step 4096-64=4032,
+# so the boundary the old code stepped past sits at char 4032.
+_OLD_WINDOW = 4096
+_OLD_STEP = _OLD_WINDOW - 64
+
+
+def _straddle_value(token, boundary):
+    """A >4096-char free-text value with `token` centred on `boundary` (clean padding).
+
+    The padding is digit-free, sentence-terminated prose so it forms no spurious PII
+    match and ends cleanly before `token`; the trailing prose follows the token's own
+    terminating `.` so the postal ZIP tail-guard is satisfied.
+    """
+    unit = "add weight to my squat slowly. "  # 31 chars, no digits, ends '. '
+    start = boundary - len(token) // 2
+    prefix = (unit * (start // len(unit) + 1))[:start]
+    return prefix + token + " " + unit * 300
+
+
+def test_free_text_pii_straddling_the_old_window_boundary_routes_record_only(tmp_path):
+    """FIX-C straddle: PII across the old window step boundary routes record-only.
+
+    The earlier FIX-C past-cap test planted PII only at the very END of the value (wholly
+    inside the final window), so `overlap` was never exercised — mutating it to 0 left the
+    capture tests green. This sweeps a long postal AND an email across a band of offsets
+    around the old step boundary (char 4032) inside a >4096-char value, asserting at EVERY
+    offset the value routes record-only (absent from the store token, present in the
+    gitignored scaffold). Under the old `overlap=64` windowing a postal of span > 64 sat
+    in the dead zone between the two windows and leaked; the single non-truncating scan
+    has no boundary to straddle.
+
+    Failing-capable: pre-condition asserts each probe is a real `scan_text_full` hit; the
+    fix is proven RED by reverting `_value_has_pii` to the `overlap=64` windowing.
+    """
+    for probe, marker in ((_STRADDLE_POSTAL, "62704"), (_STRADDLE_EMAIL, "operator.fieldtest@example.com")):
+        # Pre-condition: the probe IS a real full-value PII hit (else the test proves nothing).
+        assert pii_scan.scan_text_full(probe, token_config=_ABSENT_IDENTITY) >= 1, (
+            f"straddle probe {probe!r} is not a value-PII hit — fixture invalid"
+        )
+        # Sweep the band of boundary offsets that straddle the old [4032, 4096] dead zone.
+        for boundary in range(_OLD_STEP - 40, _OLD_WINDOW + 8):
+            value = _straddle_value(probe, boundary)
+            assert len(value) > 4096, "the straddle fixture must exceed the 4096-char cap"
+            store_root = tmp_path / f"store-{marker[:6]}-{boundary}"
+            scaffold_root = tmp_path / f"scaffold-{marker[:6]}-{boundary}"
+            capture.persist_capture(
+                {"goal-targets": value},
+                root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+            )
+            # Negative (load-bearing): the PII value never reached the model-bound token.
+            assert store.read("goal-targets", root=store_root) == [], (
+                f"PII probe {marker!r} at boundary offset {boundary} reached the model-bound "
+                f"goal-targets token (straddle leak)"
+            )
+            # Positive: it landed record-only in the gitignored scaffold instead.
+            scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+            assert marker in scaffold_text, (
+                f"PII probe {marker!r} at boundary offset {boundary} did not route record-only"
+            )
 
 
 # --------------------------------------------------------------------------- #

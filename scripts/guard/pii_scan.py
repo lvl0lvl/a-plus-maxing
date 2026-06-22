@@ -243,6 +243,36 @@ def scan(tracked_files, token_config=_SENTINEL, include_structural=True,
     return total
 
 
+def _resolve_token_config(token_config, identity_config, caller):
+    """Resolve the token_config/identity_config kwarg pair to a single config path.
+
+    The shared deprecated-alias resolution for `scan_text`/`scan_text_full`: an
+    explicit `identity_config` is the deprecated alias for `token_config` (the
+    two are mutually exclusive); an unset `token_config` falls through to the
+    default identity config.
+
+    Args:
+        token_config: The `token_config` kwarg as passed (`_SENTINEL` if unset).
+        identity_config: The deprecated `identity_config` kwarg (None if unset).
+        caller (str): The public function name, for the DeprecationWarning text.
+
+    Returns:
+        (str | Path) The resolved token-config path.
+    """
+    if identity_config is not None:
+        if token_config is not _SENTINEL:
+            raise TypeError("pass token_config or identity_config, not both")
+        warnings.warn(
+            f"pii_scan.{caller}: the 'identity_config' kwarg is deprecated; use 'token_config'",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return identity_config
+    if token_config is _SENTINEL:
+        return DEFAULT_IDENTITY_CONFIG
+    return token_config
+
+
 def scan_text(text, token_config=_SENTINEL, identity_config=None):
     """Count operator-PII matches in a single in-memory string.
 
@@ -278,18 +308,40 @@ def scan_text(text, token_config=_SENTINEL, identity_config=None):
     Returns:
         (int) Total operator-PII (value-class + identity) matches in `text`.
     """
-    if identity_config is not None:
-        if token_config is not _SENTINEL:
-            raise TypeError("pass token_config or identity_config, not both")
-        warnings.warn(
-            "pii_scan.scan_text: the 'identity_config' kwarg is deprecated; use 'token_config'",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        token_config = identity_config
-    elif token_config is _SENTINEL:
-        token_config = DEFAULT_IDENTITY_CONFIG
+    token_config = _resolve_token_config(token_config, identity_config, "scan_text")
     normalized = unicodedata.normalize("NFKC", text)[:_MAX_SCAN_TEXT_LEN]
+    patterns = _VALUE_COMPILED + _load_token_patterns(token_config)
+    return sum(len(pattern.findall(normalized)) for pattern in patterns)
+
+
+def scan_text_full(text, token_config=_SENTINEL, identity_config=None):
+    """Count operator-PII matches in a string's FULL length (no `_MAX_SCAN_TEXT_LEN` cap).
+
+    Identical to `scan_text` except it does NOT truncate at `_MAX_SCAN_TEXT_LEN`, so
+    a value-PII match anywhere in `text` is caught. `scan_text`'s cap leaves a
+    straddle hole at a value boundary: two value-PII patterns — `email` (unbounded
+    local/domain) and `postal-street-zip` (unbounded street-name word) — have NO
+    finite maximum match span, so no fixed-overlap windowing of the value can
+    provably contain every match in some window. A single non-truncating pass is the
+    only construction that has no window boundaries to straddle. For the bounded
+    operator FORM-FIELD values on the capture path (`capture._value_has_pii`) the
+    cap that bounds `scan_text`'s worst-case match cost on large pasted documents
+    does not apply. `scan_text`'s own cap/signature are unchanged (it has other
+    callers).
+
+    Args:
+        text (str): The value to scan in full.
+        token_config (str | Path, optional): The gitignored operator-identity token
+            file; absent -> identity detection is empty. Mutually exclusive with
+            `identity_config`.
+        identity_config (str | Path, optional): Deprecated alias for `token_config`;
+            emits DeprecationWarning. Mutually exclusive with `token_config`.
+
+    Returns:
+        (int) Total operator-PII (value-class + identity) matches in `text`.
+    """
+    token_config = _resolve_token_config(token_config, identity_config, "scan_text_full")
+    normalized = unicodedata.normalize("NFKC", text)
     patterns = _VALUE_COMPILED + _load_token_patterns(token_config)
     return sum(len(pattern.findall(normalized)) for pattern in patterns)
 
