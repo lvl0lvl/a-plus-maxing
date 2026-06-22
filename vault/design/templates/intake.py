@@ -274,6 +274,7 @@ def _step2():
     # the de-identified goal text (Wave-B FIX-C; the model path is no-train, and a typed
     # diagnosis is an accepted V1 residual — see the field hints).
     _goal_hint = "<div class='note'>Describe your goal — no names or medical details.</div>"
+    _limit_hint = "<div class='note'>List limits — no names or medical details.</div>"
     body = (_check_chips("goal-domains", list(GOAL_DOMAINS), legend="Goal areas")
             + "<div class='seclab'>Targets</div>"
             + _textarea_field("What should the plan optimize for?", "goal-targets",
@@ -285,7 +286,7 @@ def _step2():
             + "<div class='seclab'>Hard limits</div>"
             + _textarea_field("Anything the plan must never do", "hard-limits",
                               "e.g. no overhead pressing; at least one full rest day")
-            + _goal_hint)
+            + _limit_hint)
     return _panel(2, "Goals &amp; priorities",
                   "What should the plan optimize for, and in what order?", body)
 
@@ -352,7 +353,7 @@ def _step5():
             + _text_field("Medications to screen against (saved to your record)", "rx-interaction-classes",
                           "e.g. blood thinner; thyroid medication"))
     return _panel(5, "Supplements &amp; peptides",
-                  "Your current stack — so interactions are screened before anything is recommended.", body)
+                  "Your current stack — saved to your record; interaction screening runs later, in plan generation.", body)
 
 
 def _step6():
