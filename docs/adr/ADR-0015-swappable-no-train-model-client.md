@@ -1,0 +1,116 @@
+## ADR-0015: Introduce a Swappable No-Train Model Client as the System's First Programmatic Model Boundary
+
+> **Y-Statement:** In the context of the conversational-intake pivot, which requires the codebase's first programmatic model call while the plan-author dispatch is still a captured agent output fed in as data, facing the tension between needing a headless-runnable model boundary now and the local-first/North-Star pull not to entrench a commercial API, we decided to introduce one swappable no-train model client as the single programmatic model boundary that both the intake conversation and the plan-author dispatch call, defaulting to a Claude no-train commercial API and swappable at the seam for the local-model North Star, to achieve a single, headless, swap-ready model boundary that closes the PF-S63-02 core-capability gap, accepting a first hard runtime dependency on a commercial API and network, a swap seam that must be kept honest or it ossifies, per-call cost and latency, and a real amendment to ADR-0006's plan-author dispatch mechanism.
+
+```yaml
+id: ADR-0015
+title: "Introduce a Swappable No-Train Model Client as the System's First Programmatic Model Boundary"
+status: accepted
+date: 2026-06-22
+decision-makers: [Walter McGivney]
+tags: [model-integration, intake, plan-generation, architecture, swappability]
+```
+
+### Context
+
+The system has never made a programmatic model call. A repository scan for any model-client import — `anthropic`, `openai`, `httpx`, `requests`, `api_key`, `.messages.create` — over `scripts/` returns zero matching files ([rg over scripts/, 2026-06-22](../../scripts/) [VERIFIED: no model-client import in scripts/]). The plan-reasoning path the system runs is not a counterexample: `generate_plan.py` is `assemble`'s production caller, but the author's reasoning is a captured agent output handed in as data — `_author_callable` wraps the captured envelope and its `specialist(domain, summary)` ignores the `(domain, summary)` arguments `assemble` passes, returning the captured output verbatim ([generate_plan.py L65-81](../../scripts/plan/generate_plan.py) [VERIFIED]). The model is reached today only by an out-of-process interactive Claude Code agent dispatch (runtime A), never by code.
+
+Two forces pull against each other. The conversational-intake pivot needs a programmatic, headless-runnable model boundary: the intake conversation cannot be an interactive agent session, and closing the long-standing core-capability gap (PF-S63-02 / bead `71s4`) means a plan can be generated without a human orchestrating an agent dispatch — the assembly pipeline already exists and is wired (`author → assemble → record_plan → render`, exercised by the `core-capability self-test`, [generate_plan.py L402, L466](../../scripts/plan/generate_plan.py) [VERIFIED]), so what is missing is a programmatic *caller*. Against that stands the local-first commitment: ADR-0001 keeps the store, ingestion, and generation model-independent and names a fully-local model as its deferred Alternative C ([ADR-0001, Decision L24, Alternative C L65-69](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]), so adopting a commercial API as the model caller risks entrenching a vendor the North Star is meant to retire. A second tension is temporal: V1 needs something that works fast, but the cheapest path — calling an SDK inline wherever a model is needed — is the one that scatters the boundary and forecloses the swap. Because reconciling these means fixing *where the model lives and how it is replaced* across two model-touching paths, it is a decision, not an implementation detail.
+
+### Decision
+
+Introduce one swappable no-train model client as the system's single programmatic model boundary. Both model-touching paths — the intake conversation and the plan-author dispatch — call the model through this one client. The default is a Claude no-train commercial API (the swappable default), and the client is swappable at the boundary for the local-model North Star.
+
+### Rationale
+
+The boundary was evaluated against three options — inline SDK calls at each call site (A), committing to a local model now (B), and keeping the captured-agent-output status quo (C) — across four criteria the pivot and ADR-0001 make load-bearing: swappability / local-model non-foreclosure, single-boundary vs. scattered call sites, headless-runnability / core-capability closure, and V1 speed.
+
+On **single-boundary vs. scattered call sites**, there are exactly two model-touching paths (the intake conversation and the plan-author dispatch); one client makes the model a single import point both paths route through, whereas inline SDK calls (A) re-implement auth, retry, and provider selection at each of the two sites and grow with every future path. On **swappability / local-model non-foreclosure**, a named boundary seam is precisely the "constrains future choices" property that keeps ADR-0001's deferred Alternative C reachable: swapping the provider edits the client, not its callers, so the local model becomes a drop-in at the seam rather than a re-plumb — the condition ADR-0001 names for Alternative C ("local open-weight models reach parity … AND hardware cost is acceptable", [ADR-0001, Alternative C L69](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]). Inline calls (A) forfeit this: the provider is hard-coded at two sites. On **headless-runnability / core-capability closure**, only a programmatic client lets a plan be generated without an interactive agent session; the status quo (C) cannot run headless because the author reasoning is fed in as captured data, so the core-capability gap stays open by construction ([generate_plan.py L65-81](../../scripts/plan/generate_plan.py) [VERIFIED]). On **V1 speed**, the no-train commercial lane ADR-0001 already selected is reusable as the client's default ([ADR-0001, Rationale L30](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]), so the default needs no new trust posture and no wait on local-model parity (B's cost).
+
+Long-term, the seam is the migration path, not a dead end: when the North-Star local model reaches ADR-0001's Alternative-C parity, the swap happens at the client and both callers are unchanged. The cost the decision accepts is that a swap seam is only as honest as it is exercised — a single never-swapped provider lets the seam ossify into one vendor's shape, which the validation section makes falsifiable.
+
+### Consequences
+
+**Positive:**
+- The system gains its first programmatic model boundary, so a plan can be generated headless through the already-wired `author → assemble → record_plan → render` path instead of an interactive agent dispatch — the move that closes the PF-S63-02 / `71s4` core-capability gap ([generate_plan.py L402, L466](../../scripts/plan/generate_plan.py) [VERIFIED]).
+- Both model-touching paths (count = 2: the intake conversation and the plan-author dispatch) route through one client, so auth, retry, and provider selection live at a single import point rather than being re-implemented per call site.
+- The provider is swappable at the seam: replacing the default Claude no-train API with the North-Star local model edits the client, not its callers, keeping ADR-0001's deferred Alternative C reachable as a drop-in ([ADR-0001, Alternative C L65-69](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+
+**Negative:**
+- This introduces the system's first hard runtime dependency on a commercial API and a network: once the plan-author dispatch is wired through the client, headless plan generation is no longer possible offline — a standing 1+ year dependency the prior captured-agent-output and model-independent generation paths never carried ([ADR-0001, Decision L24](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+- The swap seam must be kept honest or it ossifies: if the boundary is shaped to one provider's request/response idioms and never exercised against a second, the "swappable" property degrades to a single-vendor coupling that a future local-model swap must then re-plumb — exactly the cost this ADR exists to avoid, re-incurred silently.
+- Every model call now carries the no-train commercial API's per-call cost and latency, paid on each intake turn and each plan-author dispatch — a recurring operational cost the interactive-agent path externalized to the operator's Claude Code session.
+- Wiring the plan-author dispatch programmatically changes ADR-0006's dispatch mechanism (from captured-agent-output to a programmatic call through this client) — a real amendment to an accepted ADR that future readers of ADR-0006 must track ([ADR-0006, Decision L22, Context L18](ADR-0006-multi-domain-plan-assembly-via-roster.md) [VERIFIED]; recorded in Related Decisions).
+
+**Fail-closed on a failed model call (decided now):**
+- A failed, timed-out, rate-limited, empty, or errored model call MUST NEVER yield a fabricated or silently-partial result; it extends the system's existing fail-closed posture — `router.dispatch` already raises on a partial summary ([router.py L454-461](../../scripts/plan/router.py) [VERIFIED]) and `generate_plan` already records the honest no-plan state rather than a fabricated regimen on a struck or coverage-gap section ([generate_plan.py L347-390](../../scripts/plan/generate_plan.py) [VERIFIED]) — to the new model call. For the intake conversation, a failed call degrades to the demographic form / surfaces the failure to the operator, never a fabricated extraction; for the plan-author dispatch, a failed call yields the honest no-plan state, never a degraded or fabricated plan. This is the load-bearing contract; the exact retry/degrade mechanics are the spec-stage concern in OQ-3.
+
+**Neutral:**
+- "The model client" becomes a shared contract the intake conversation, the plan-author dispatch, and any future model-touching path must call through; a path that reaches the model another way is out of bounds.
+- The no-train commercial API becomes a runtime dependency for intake and plan generation specifically; the store, ingestion, and dashboard/report generation stay model-independent per ADR-0001 ([ADR-0001, Decision L24](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+
+### Alternatives Considered
+
+#### Alternative A: Inline SDK calls at each call site, no client seam
+Call the provider SDK directly at each model-touching site — one call in the intake conversation handler, one in the plan-author path — with no shared client boundary.
+- **Supporting evidence:** Fewest moving parts for a two-site system: no client abstraction to design or maintain, and each call site reads as a direct SDK use a future maintainer can follow without indirection. It is the fastest path to a first working model call.
+- **Trade-offs:** It scatters the model boundary across the two sites, so each re-implements auth, retry, and provider selection, and a third model-touching path adds a third copy. Worse, it forecloses the swap: the provider is hard-coded at each site, so the North-Star local-model migration ADR-0001 keeps open ([ADR-0001, Alternative C L65-69](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]) becomes an edit-every-call-site re-plumb instead of a one-seam swap. Rejected because it trades the load-bearing swappability for a marginal speed gain.
+- **When this becomes the right choice:** If the model were ever called from exactly one site and the local-model swap were abandoned as a goal, a single inline call would carry no boundary cost and the client seam would be pure overhead.
+
+#### Alternative B: Commit to a local model now (ADR-0001's deferred Alternative C)
+Run a fully-local open-weight model as the programmatic caller for both intake and plan reasoning, so no commercial API is introduced and no egress relaxation is needed for the model call.
+- **Supporting evidence:** Maximal privacy and zero vendor dependency — the model call never leaves the machine, and it is the genuine North-Star end state ADR-0001 already named as Alternative C ([ADR-0001, Alternative C L65-69](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]). It would make the swap seam unnecessary by arriving at the destination directly.
+- **Trade-offs:** ADR-0001 deferred this for V1 because a local model cannot match the specialist reasoning the plan requires and the roster is built against the commercial model ([ADR-0001, Alternative C trade-offs L68](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]); committing now forfeits V1 capability and conversational quality. Rejected as the same scope deferral ADR-0001 already adjudicated, not as inferior privacy.
+- **When this becomes the right choice:** When local open-weight models reach parity for the intake and clinical-reasoning tasks AND hardware cost is acceptable on the operator's machine — ADR-0001's Alternative-C condition; at that point the swap this ADR's seam enables is taken and the client's default flips to local.
+
+#### Alternative C: Keep the captured-agent-output / agent-dispatch-only status quo (no programmatic client)
+Leave the model reachable only by the out-of-process interactive Claude Code agent dispatch, feeding the author's captured output in as data and adding no programmatic client at all.
+- **Supporting evidence:** Adds zero new code and zero new runtime dependency — the model is reached through the existing agent session, and `generate_plan.py` already consumes a captured author envelope, so nothing in the assembly pipeline changes ([generate_plan.py L65-81](../../scripts/plan/generate_plan.py) [VERIFIED]). It keeps the codebase model-independent.
+- **Trade-offs:** It cannot run headless or programmatically: every plan requires a human-orchestrated Claude Code session to produce the captured author output, and the intake conversation has no agent-session equivalent at all — so the PF-S63-02 / `71s4` core-capability gap never closes and the conversational intake is impossible ([generate_plan.py L65-81](../../scripts/plan/generate_plan.py) [VERIFIED]). Rejected because it forecloses the capability the pivot exists to deliver.
+- **When this becomes the right choice:** For a development or audit pass where a human deliberately drives the author dispatch interactively to inspect a single plan's reasoning before any programmatic run — a build-time intermediate, not the shipped path.
+
+### Related Decisions
+
+| ADR | Relationship | Description |
+|-----|-------------|-------------|
+| [ADR-0016 (Relax the Zero-Egress Boundary for Raw Intake Conversation)](ADR-0016-intake-conversation-egress-relaxation.md) | depends-on | The client cannot send raw intake conversation until ADR-0016's relaxed-but-bounded egress boundary is decided; the client's first consumer (the intake conversation) only exists if raw conversation may egress. ADR-0016 also `constrains` this client (the only raw send permitted is the live conversation on the no-train lane). |
+| ADR-0017 (Conversation→De-Identified-Store Extraction Contract) | enables | The extraction contract consumes this client's conversation output; without a programmatic conversation there is nothing for the extractor to de-identify into store facts. (ADR-0017 is the Tier-3 sibling authored after this client; its file lands as the conversational-intake set completes.) |
+| [ADR-0006 (Multi-Domain Plan Assembly via Roster Specialists)](ADR-0006-multi-domain-plan-assembly-via-roster.md) | enables | This client becomes the programmatic caller that produces the plan-author output `assemble` filters, replacing the captured-agent-output `_author_callable` feed; ADR-0006's plan-reasoning dispatch becomes a programmatic model call through it. |
+
+This ADR `amends` ADR-0001 and ADR-0006 (documentation relationships, not DAG edges). It `amends` ADR-0001 by adding the programmatic-client MECHANISM ADR-0001 never specified and a SECOND model-touching path — the intake conversation — alongside ADR-0001's "Only plan reasoning touches the model" ([ADR-0001, Decision L24](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]); it pairs with ADR-0016's egress relaxation, and ADR-0001's no-train-lane routing and summaries-not-raw discipline for the store-read survive unchanged. It `amends` ADR-0006 by changing ADR-0006's plan-author dispatch from a captured agent output fed in as data (`generate_plan._author_callable`, [generate_plan.py L65-81](../../scripts/plan/generate_plan.py) [VERIFIED]) to a programmatic call through this client; what survives unchanged is ADR-0006's routing, composition, attribution, and safety-filter architecture (`assemble`'s four filters — attribution, sourcing-completeness, population-mismatch, the fail-closed class-aware HALT filter, [generate_plan.py L12-14](../../scripts/plan/generate_plan.py) [VERIFIED]; and the clearance gate, [generate_plan.py L94-101](../../scripts/plan/generate_plan.py) [VERIFIED]) — only the dispatch mechanism changes. ADR-0017 is authored after this client in the conversational-intake set (DAG order ADR-0016 → ADR-0015 → {ADR-0017 ∥ ADR-0018} → ADR-0019).
+
+### Validation Approach
+
+**Confirmation criteria:**
+- The client is the single import point for model calls: a scan of `scripts/` for any model-client import (`anthropic`/`openai`/`httpx`/`.messages.create`) finds them only inside the client module — expected: 0 model-client imports outside the client, against today's baseline of 0 anywhere ([rg over scripts/, 2026-06-22](../../scripts/) [VERIFIED: no model-client import in scripts/]).
+- Both model-touching paths route through the one client: the intake conversation and the plan-author dispatch each reach the model only via the client — expected: 2 model-touching paths, 2 routing through the client, 0 reaching the model another way.
+- The plan-author path runs programmatically through the client end-to-end: `core-capability-audit.sh --self-test` passes with the author output produced by the client rather than fed in as captured data — expected: the wired `author → assemble → record_plan → render` self-test passes with the programmatic author path ([generate_plan.py L402, L466](../../scripts/plan/generate_plan.py) [VERIFIED]).
+
+**Falsification criteria:**
+- If a model call exists outside the client seam (≥1 `anthropic`/`openai`/`.messages.create` use in `scripts/` outside the client module), the single-boundary decision has failed — consolidate that call into the client before release.
+- If swapping the provider requires editing more than 1 file outside the client (>1 caller-side edit to change the model), the seam has ossified to one provider — refactor the boundary so the swap is contained to the client before the North-Star transition.
+- If the plan-author dispatch still reads a captured agent output instead of calling the client (the `_author_callable` captured-data feed persists in the production path, [generate_plan.py L65-81](../../scripts/plan/generate_plan.py) [VERIFIED]), the core-capability gap is not closed — block the close of `71s4` until the programmatic author path is wired.
+- If a failed / timed-out / rate-limited / empty / errored model call yields a fabricated or silently-partial plan or extraction (≥1 such result reaching the store, the planner, or the operator as if complete), the fail-closed contract has been breached — halt and restore the fail-closed degrade (honest no-plan state for the author; degrade-to-form / surfaced error for intake) before release.
+- Time horizon: run the single-import-point and both-paths-route checks at the first build of the client and at every release thereafter; run the swap-cost check before the North-Star local-model transition; run the fail-closed check (inject a failed/empty model call, confirm no fabricated/partial result) at the first build of each consumer and at every release thereafter.
+
+**Review triggers:**
+- A third model-touching path is added — re-confirm it routes through the client and does not re-scatter the boundary.
+- A change to the no-train commercial API's request/response contract or a provider swap — re-verify the seam contains the change to the client module.
+- The North-Star transition is initiated — the default provider swaps to the local model; re-validate the swap is contained to the client.
+- ADR-0001's no-train routing or summary contract changes — re-validate the client's plan-author call still runs on the correct lane over summaries.
+- The no-train provider's failure modes or SLA change (new error/timeout/rate-limit behavior, a contractual availability change) — re-evaluate the fail-closed failure contract and OQ-3's retry/degrade mechanics against the new failure surface.
+
+### Open Questions
+
+| # | Question | Owner | Target Date | Impact on This Decision |
+|---|----------|-------|-------------|------------------------|
+| OQ-1 | Is a Claude no-train commercial API acceptable as the recorded default, or does the operator want a non-Claude provider behind the same seam? | Walter McGivney | 2026-06-30 | The seam makes the specific provider non-binding (swappable), so the default does not change the decision; a non-Claude preference only changes which provider the client defaults to, not the single-boundary architecture. |
+| OQ-2 | What is the boundary contract the swap seam exposes — the minimal interface (e.g. a conversation turn and a structured-author call) the client guarantees across providers? | Walter McGivney | 2026-06-30 | The contract shape is a spec-stage concern (kept out of this ADR per the no-blueprint constraint), but a too-thin or too-provider-specific contract is the mechanism by which the seam ossifies — it sets how cleanly the local-model swap lands. |
+| OQ-3 | What are the EXACT retry policy and degrade behavior per consumer of the failed-model-call fail-closed contract — retry count / backoff; degrade-to-form versus surface-error for the intake conversation; halt versus honest-no-plan for the plan-author dispatch? | Walter McGivney | 2026-06-30 | The fail-closed PRINCIPLE is decided in Consequences (no fabricated / silently-partial result on a failed call); only the per-consumer retry/degrade MECHANICS are deferred here (kept out of this ADR per the no-blueprint constraint, AP-07). Until pinned, a build-planner cannot write the failure tests for the first hard model dependency; the fail-closed contract holds regardless of which mechanics land. |
+
+### Revision History
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2026-06-22 | Initial draft | Walter McGivney |
+| 2026-06-22 | v1.1 — Phase-7 red-team (RT-01): added the fail-closed model-call-failure contract (Consequence + falsification criterion + OQ-3 spec-stage mechanics + a no-train-provider-failure-mode review trigger) | Walter McGivney |
