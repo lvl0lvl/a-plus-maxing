@@ -98,6 +98,27 @@ def test_intake_markup_form_fields_match_capture_wired_tokens():
         )
 
 
+def test_intake_step5_subtitle_is_record_only_honest():
+    """F6: the Step-5 subtitle makes no present-tense screening promise the form cannot keep.
+
+    The rx-interaction form field routes RECORD-ONLY (Wave-B FIX-A) — its label says
+    "saved to your record" and the panel recnote says the raw stack is "not yet used by the
+    plan". The old subtitle ("interactions are screened before anything is recommended")
+    asserted a screening capability the form no longer performs. Assert the dishonest
+    present-tense promise is gone and the honest record-only text is rendered.
+
+    Failing-capable: restore the old "screened before anything is recommended" subtitle and
+    the negative assertion reds.
+    """
+    html = intake.render([])
+    assert "screened before anything is recommended" not in html, (
+        "the Step-5 subtitle still promises present-tense interaction screening the form does not perform"
+    )
+    assert "interaction screening runs later, in plan generation" in html, (
+        "the Step-5 subtitle does not carry the honest record-only screening statement"
+    )
+
+
 def test_intake_goal_domains_group_has_fieldset_legend():
     """FIX-F2: the goal-domains checkbox group is a `<fieldset>` with a `<legend>`.
 
