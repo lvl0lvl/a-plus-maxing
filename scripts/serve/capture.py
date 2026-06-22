@@ -93,42 +93,33 @@ _BOUNDED_ENUMS = {
 # is NOT caught here — the field is FOR de-identified goal text, the model path is
 # no-train, and a clinical-PHI detector is out of scope. The UI field carries guidance.
 _FREE_TEXT_TOKENS = ("goal-targets", "hard-limits", "goal-priority-order")
-_PII_SCAN_WINDOW = pii_scan._MAX_SCAN_TEXT_LEN
 
 
 def _value_has_pii(value, identity_config):
     """Whether a free-text value carries operator PII anywhere in its FULL length.
 
     `pii_scan.scan_text` caps at `_MAX_SCAN_TEXT_LEN`, so a long value could hide PII
-    past the cap. This windows the value into overlapping ≤cap chunks (overlap = the
-    longest pattern span, so a token straddling a chunk boundary is still seen whole)
-    and reports a hit if any chunk scans positive. Scoped to the capture path — it does
-    NOT change `scan_text`'s own default cap (which has other callers).
+    past the cap. The earlier fix windowed the value into overlapping ≤cap chunks, but
+    two value-PII patterns — `email` (unbounded local/domain) and `postal-street-zip`
+    (unbounded street-name word) — have no finite maximum match span, so NO fixed
+    overlap can provably contain every match in some window: a long postal straddling
+    a window step boundary is seen whole by neither window and leaks past the gate.
+    Instead this scans the value in a SINGLE non-truncating pass via
+    `pii_scan.scan_text_full`, which has no window boundaries to straddle. Scoped to the
+    capture path — it does NOT change `scan_text`'s own default cap (which has other
+    callers); the capture-path values are bounded operator form fields.
 
     Args:
         value (str): The free-text field value to scan in full.
         identity_config (str | Path | None): The operator-identity token config passed
-            to `scan_text`; None falls through to its default.
+            to `scan_text_full`; None falls through to its default.
 
     Returns:
-        (bool) True when any window scans positive for operator PII.
+        (bool) True when the full value scans positive for operator PII.
     """
-    if len(value) <= _PII_SCAN_WINDOW:
-        return _scan_window(value, identity_config) > 0
-    overlap = 64  # > the longest value-PII span (email/phone/postal), so a token on a
-    #               window boundary is wholly inside the next window.
-    step = _PII_SCAN_WINDOW - overlap
-    for start in range(0, len(value), step):
-        if _scan_window(value[start:start + _PII_SCAN_WINDOW], identity_config) > 0:
-            return True
-    return False
-
-
-def _scan_window(chunk, identity_config):
-    """Run `scan_text` over one ≤cap chunk, threading the capture's identity config."""
     if identity_config is None:
-        return pii_scan.scan_text(chunk)
-    return pii_scan.scan_text(chunk, token_config=identity_config)
+        return pii_scan.scan_text_full(value) > 0
+    return pii_scan.scan_text_full(value, token_config=identity_config) > 0
 
 
 def _bounded_value_ok(name, value):
@@ -140,15 +131,20 @@ def _bounded_value_ok(name, value):
 
     Returns:
         (bool) True when `name` is unbounded, or every token of `value` is in the enum.
-        A `goal-domains` with any out-of-set token, or a `recovery-status-band` not in
-        the band set, is False (-> routed record-only).
+        A `goal-domains` with any out-of-set token, a separators-only `goal-domains`
+        (no in-enum token at all), or a `recovery-status-band` not in the band set, is
+        False (-> routed record-only).
     """
     enum = _BOUNDED_ENUMS.get(name)
     if enum is None:
         return True  # not a bounded field — no enum to check
     allowed, multi = enum
-    tokens = value.split(";") if multi else [value]
-    return all(tok.strip().lower() in allowed for tok in tokens if tok.strip())
+    raw_tokens = value.split(";") if multi else [value]
+    # A separators-only value (";;;") filters to an EMPTY list — `all()` over nothing is
+    # vacuously True, which would write garbage into the model-bound token. Require at
+    # least one non-empty token, AND every one of them in the enum.
+    tokens = [tok.strip().lower() for tok in raw_tokens if tok.strip()]
+    return bool(tokens) and all(tok in allowed for tok in tokens)
 
 # Load-time tripwire (mirrors router.py's change-control asserts): every wired token must
 # be a SUMMARY_FIELD_SET member. A field-set edit that drops a wired token reds this at
