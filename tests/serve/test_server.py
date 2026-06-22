@@ -127,12 +127,40 @@ def _post_raw(port, body):
 def _server_with_roots(tmp_path):
     """Build a loopback server whose handler ingests into / re-renders from tmp roots.
 
-    Points the POST handler's store + DNA roots at tmp dirs so the upload->ingest->
-    re-render E2E never touches the real `vault/store/` / `vault/dna/raw/`, and the
+    Points the POST handler's store + DNA + scaffold roots at tmp dirs so the
+    upload->ingest->re-render and form-submit->capture->re-render E2Es never touch the
+    real `vault/store/` / `vault/dna/raw/` / `vault/scaffold/filled/`, and the
     re-rendered intake screen reflects the tmp load-state.
     """
-    srv = serve_server.build_server(0, store_root=tmp_path / "store", dna_root=tmp_path / "dna")
+    srv = serve_server.build_server(
+        0, store_root=tmp_path / "store", dna_root=tmp_path / "dna",
+        scaffold_root=tmp_path / "scaffold",
+    )
     return srv, srv.server_address[1]
+
+
+def _field_part(name, value):
+    """Build one multipart NON-FILE form-field part (no filename= -> staged in `fields`)."""
+    out = bytearray()
+    out += f"--{BOUNDARY}\r\n".encode()
+    out += (f'Content-Disposition: form-data; name="{name}"\r\n\r\n').encode()
+    out += value.encode("utf-8")
+    out += b"\r\n"
+    return bytes(out)
+
+
+def _multipart_fields(fields):
+    """Build a multipart/form-data body carrying only plain form fields (no files)."""
+    body = bytearray()
+    for name, value in fields.items():
+        body += _field_part(name, value)
+    body += f"--{BOUNDARY}--\r\n".encode()
+    return bytes(body)
+
+
+def _post_fields(port, fields):
+    """POST a fields-only multipart capture to `/upload`; return (status, body)."""
+    return _post_raw(port, _multipart_fields(fields))
 
 
 # --------------------------------------------------------------------------- #
@@ -719,3 +747,127 @@ def test_post_unterminated_multipart_body_rerenders_no_crash(tmp_path):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0014-T1 Cycle 2 — form-submit POST: stage -> capture -> re-render
+# --------------------------------------------------------------------------- #
+
+
+def test_post_capture_fields_land_wired_tokens_and_rerenders(tmp_path):
+    """AC-1 (E2E): a form-submit POST lands the wired tokens via store.append + re-renders.
+
+    POSTs a multipart body whose parts are plain `fields` (no filename= -> they decode
+    into `staged["fields"]`): a Step-2 `goal-domains` + `hard-limits` capture. The
+    handler routes them through `capture.persist_capture` into the tmp store, then
+    re-renders the wizard via `generate.run('intake')`. Asserts the tokens landed
+    tagged source:"intake" AND the 200 response is the re-rendered wizard.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_fields(port, {
+            "goal-domains": "strength;recovery",
+            "hard-limits": "no overhead pressing",
+        })
+        assert status == 200, f"capture POST returned {status}, expected 200"
+
+        gd = store.read("goal-domains", root=tmp_path / "store")
+        assert len(gd) == 1 and gd[0]["source"] == "intake", "goal-domains did not land via capture.persist_capture"
+        assert gd[0]["value"] == "strength;recovery"
+        hl = store.read("hard-limits", root=tmp_path / "store")
+        assert hl and hl[0]["value"] == "no overhead pressing", "hard-limits did not land"
+
+        assert WIZARD_TITLE in body, "the capture response is not the re-rendered wizard"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_post_capture_record_only_lands_in_scaffold_not_store(tmp_path):
+    """AC-2 / Risk Negative-2 (E2E two-surface negative placement): record-only -> scaffold ONLY.
+
+    POSTs a record-only capture (a Step-4 dietary-pattern, a raw Step-5 supplement
+    name). Both land under the tmp `scaffold_root` AND `store.read(<any
+    SUMMARY_FIELD_SET token>)` does NOT carry that record-only value (the negative
+    assertion — the project assert-placement mandate). Iterates every field-set token.
+    """
+    from scripts.plan.router import SUMMARY_FIELD_SET
+
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_fields(port, {
+            "dietary-pattern": "mediterranean high protein",
+            "supplement-stack": "creatine monohydrate 5g",
+        })
+        assert status == 200, f"record-only capture POST returned {status}, expected 200"
+
+        # Positive: the values landed under the scaffold root.
+        scaffold_root = tmp_path / "scaffold"
+        scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+        assert "mediterranean" in scaffold_text, "the dietary-pattern record-only value did not land in the scaffold"
+        assert "creatine" in scaffold_text, "the supplement-stack record-only value did not land in the scaffold"
+
+        # Negative (load-bearing): NO field-set store item carries a record-only value.
+        for token in SUMMARY_FIELD_SET:
+            for reading in store.read(token, root=tmp_path / "store"):
+                v = str(reading["value"])
+                assert "mediterranean" not in v and "creatine" not in v, (
+                    f"a record-only value leaked into the {token!r} field-set store item"
+                )
+        assert WIZARD_TITLE in body, "the record-only capture response is not the re-rendered wizard"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0014-T1 Cycle 4 — Step-6 handoff (AC-5 / Risk Falsification-3)
+# --------------------------------------------------------------------------- #
+
+
+def test_post_step6_is_a_generate_plan_handoff_not_in_app_generation(tmp_path):
+    """AC-5 / Risk Falsification-3: the Step-6 submit is a /generate-plan handoff, 0 generation.
+
+    The Step-6 "Save & open plan generation" submit persists any still-transient
+    inputs and returns the HANDOFF state: a readiness summary + the instruction to
+    run `/generate-plan` (the agent path), NOT a generated plan. The handler performs
+    0 in-app generation.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_fields(port, {
+            "goal-domains": "strength",
+            "step": "6",  # the Step-6 "Save & open plan generation" submit
+        })
+        assert status == 200, f"Step-6 submit returned {status}, expected 200"
+        # The response instructs the operator to run /generate-plan (the handoff), and
+        # is the re-rendered wizard — never a generated plan artifact.
+        assert "/generate-plan" in body, "the Step-6 response does not instruct the /generate-plan handoff"
+        assert WIZARD_TITLE in body, "the Step-6 response is not the re-rendered wizard"
+        # Still-transient inputs were persisted via the same capture path.
+        assert store.read("goal-domains", root=tmp_path / "store"), "the Step-6 submit did not persist the inputs"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_serve_layer_has_no_in_app_plan_generation_call():
+    """AC-5 / Risk Falsification-3: scripts/serve/ carries 0 assemble/plan-generation call.
+
+    Step 6 is a `/generate-plan` HANDOFF; the serve layer adds no in-app plan
+    generation. Assert no `assemble` import/call and no plan-generation reference in
+    scripts/serve/. Reds if an in-app generation call is added (the negative control
+    in the recipe: temporarily add an assemble call -> this reds).
+    """
+    serve_dir = REPO_ROOT / "scripts" / "serve"
+    for py in serve_dir.glob("*.py"):
+        src = py.read_text()
+        assert "assemble" not in src, (
+            f"{py.name} references plan assembly — Step 6 is a /generate-plan handoff, 0 in-app generation"
+        )
+        assert "orchestrator" not in src, (
+            f"{py.name} references the plan orchestrator — no in-app generation in the serve layer"
+        )

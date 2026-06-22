@@ -103,9 +103,26 @@ body {{ font-family: {_FONT}; background: {_CANVAS}; color: {_INK};
 .rev h4 {{ font-size: 13.5px; font-weight: 700; margin-bottom: 6px; }}
 .rev p {{ font-size: 12.5px; color: {_INK2}; line-height: 1.55; }}
 .foot {{ display: flex; justify-content: space-between; align-items: center; margin-top: 26px; }}
-.btn {{ font-size: 13.5px; font-weight: 600; border-radius: 9px; padding: 11px 18px; cursor: default; }}
+.btn {{ font-size: 13.5px; font-weight: 600; border-radius: 9px; padding: 11px 18px; cursor: pointer; }}
 .btn.back {{ border: 1px solid {_LINE}; color: {_INK2}; background: {_SHEET}; }}
 .btn.next {{ background: {_BLUE}; color: #fff; border: 1px solid {_BLUE_DEEP}; }}
+/* Interactive capture controls — reuse the .box visual vocabulary (ADR-0014-T1). */
+.inp, textarea.inp, select.inp {{ width: 100%; border: 1px solid {_LINE}; border-radius: 8px;
+        padding: 10px 12px; font-size: 13.5px; color: {_INK}; background: {_SHEET};
+        font-family: {_FONT}; }}
+textarea.inp {{ min-height: 44px; resize: vertical; line-height: 1.45; }}
+.inp:focus, textarea.inp:focus, select.inp:focus {{ outline: none; border-color: {_BLUE}; }}
+.chk {{ display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; padding: 6px 12px;
+        border-radius: 999px; border: 1px solid {_LINE}; color: {_INK2}; cursor: pointer; }}
+.chk input {{ accent-color: {_BLUE}; }}
+.recnote {{ font-size: 11.5px; font-weight: 600; color: {_INK3}; font-style: italic;
+        margin: 18px 0 8px; }}
+.handoff {{ border: 1px solid {_BLUE_SOFT}; background: {_BLUE_SOFT}; border-radius: 10px;
+        padding: 16px 18px; margin-top: 18px; }}
+.handoff h4 {{ font-size: 13.5px; font-weight: 700; color: {_BLUE_DEEP}; margin-bottom: 6px; }}
+.handoff p {{ font-size: 12.5px; color: {_INK2}; line-height: 1.55; }}
+.handoff code {{ font-family: {_MONO}; font-size: 12px; color: {_BLUE_DEEP}; background: {_SHEET};
+        padding: 1px 6px; border-radius: 5px; }}
 </style>"""
 
 
@@ -162,9 +179,16 @@ def _doc_cards(status):
     return f"<div class='docs'>{wearable}{labs_card}{medical}{dna_card}</div>"
 
 
-def _panel(num, title, subtitle, body, *, note=False):
-    foot = ("<div class='foot'><span class='btn back'>Back</span>"
-            f"<span class='btn next'>{'Next: ' + _STEPS[num] if num < 6 else 'Generate my plan'} →</span></div>")
+def _panel(num, title, subtitle, body, *, note=False, submit=False):
+    if submit:
+        # The Step-6 submit: a real POST submit carrying `step=6` so the handler routes
+        # the captured fields and re-renders the wizard's `/generate-plan` handoff state.
+        foot = ("<div class='foot'><span class='btn back'>Back</span>"
+                "<button class='btn next' type='submit' name='step' value='6'>"
+                "Save &amp; open plan generation →</button></div>")
+    else:
+        foot = ("<div class='foot'><span class='btn back'>Back</span>"
+                f"<span class='btn next'>Next: {_STEPS[num]} →</span></div>")
     note_html = ("<div class='note'>\U0001F512 Parsed locally into your store — nothing is uploaded.</div>"
                  if note else "")
     return (f"<section class='panel'><div class='eyebrow'>Step {num} of 6</div>"
@@ -180,6 +204,36 @@ def _chips(items, on=()):
     return f"<div class='chips'>{''.join(out)}</div>"
 
 
+def _text_field(label, name, placeholder=""):
+    """A labeled single-line text input bound to the capture field `name`."""
+    return (f"<div class='field'><label for='{name}'>{label}</label>"
+            f"<input class='inp' type='text' id='{name}' name='{name}' "
+            f"placeholder='{_esc(placeholder)}'></div>")
+
+
+def _textarea_field(label, name, placeholder=""):
+    """A labeled multi-line text input bound to the capture field `name`."""
+    return (f"<div class='field'><label for='{name}'>{label}</label>"
+            f"<textarea class='inp' id='{name}' name='{name}' "
+            f"placeholder='{_esc(placeholder)}'></textarea></div>")
+
+
+def _select_field(label, name, options):
+    """A labeled select bound to the capture field `name` (first option is the prompt)."""
+    opts = "".join(f"<option value='{_esc(v)}'>{_esc(t)}</option>" for v, t in options)
+    return (f"<div class='field'><label for='{name}'>{label}</label>"
+            f"<select class='inp' id='{name}' name='{name}'>{opts}</select></div>")
+
+
+def _check_chips(name, options):
+    """Checkbox chips that all submit under one repeated capture field `name`."""
+    out = []
+    for value in options:
+        out.append(f"<label class='chk'><input type='checkbox' name='{name}' "
+                   f"value='{_esc(value)}'>{_esc(value)}</label>")
+    return f"<div class='chips'>{''.join(out)}</div>"
+
+
 def _step1(status):
     about = ("<div class='seclab'>About you</div><div class='grid2'>"
              + _field("Birth year", "—", True) + _field("Sex (for dosing)", "—", True)
@@ -192,65 +246,104 @@ def _step1(status):
 
 
 def _step2():
+    # Goal areas -> the de-identified `goal-domains` token (repeated checkbox field).
+    # Targets -> `goal-targets`; priority -> `goal-priority-order`; the highest-priority
+    # add, `hard-limits` (the fail-closed HALT-filter input), is a real free-text field.
     body = ("<div class='seclab'>Goal areas</div>"
-            + _chips(["Workout", "Nutrition", "Supplements", "Peptides"], on=["Workout", "Nutrition", "Supplements"])
-            + "<div class='seclab'>Targets</div><div class='rows'>"
-            + "<div class='box ph'>Add a target — e.g. “add 10 lb to squat by September”</div>"
-            + "<div class='box ph'>Add a target — e.g. “bring resting heart rate under 50”</div></div>"
+            + _check_chips("goal-domains", ["Workout", "Nutrition", "Supplements", "Peptides"])
+            + "<div class='seclab'>Targets</div>"
+            + _textarea_field("What should the plan optimize for?", "goal-targets",
+                              "e.g. add 10 lb to squat by September; bring resting heart rate under 50")
             + "<div class='seclab'>Priority order</div>"
-            + _chips(["1 · Workout", "2 · Nutrition", "3 · Supplements"]))
+            + _text_field("Order your goals", "goal-priority-order",
+                          "e.g. 1 workout, 2 nutrition, 3 supplements")
+            + "<div class='seclab'>Hard limits</div>"
+            + _textarea_field("Anything the plan must never do", "hard-limits",
+                              "e.g. no overhead pressing; at least one full rest day"))
     return _panel(2, "Goals &amp; priorities",
                   "What should the plan optimize for, and in what order?", body)
 
 
 def _step3():
-    body = ("<div class='grid2'>" + _field("Training experience", "—", True)
-            + _field("Sessions per week", "—", True) + _field("Session length", "—", True)
-            + _field("Preferred style / split", "—", True) + "</div>"
-            + "<div class='seclab'>Current main lifts (optional)</div><div class='grid2'>"
-            + _field("Squat", "—", True) + _field("Bench", "—", True)
-            + _field("Deadlift", "—", True) + _field("Overhead press", "—", True) + "</div>"
+    # `recovery-status-band` (the wired plan input, ADD) is a select; "Train around"
+    # -> the `train-around` raw-symptom field summarize de-identifies into
+    # active-issue-class. The training detail has no de-identified consumer today — it
+    # is captured to the gitignored record, honestly labeled.
+    body = (_select_field("Recovery status", "recovery-status-band",
+                          [("", "How recovered do you feel lately?"),
+                           ("low", "Low — run down / under-recovered"),
+                           ("moderate", "Moderate — about normal"),
+                           ("high", "High — fresh and recovering well")])
             + "<div class='seclab'>Train around</div>"
-            + _chips(["Lower-back caution", "Shoulder", "Knee", "+ add"]))
+            + _text_field("Anything to train around (injury / caution)", "train-around",
+                          "e.g. lower-back caution, left shoulder")
+            + "<div class='recnote'>The fields below are saved to your record — not yet used by the plan.</div>"
+            + "<div class='grid2'>" + _text_field("Training experience", "training-experience", "e.g. 20 years")
+            + _text_field("Sessions per week", "sessions-per-week", "e.g. 4")
+            + _text_field("Session length", "session-length", "e.g. 60 min")
+            + _text_field("Preferred style / split", "training-split", "e.g. upper/lower") + "</div>"
+            + "<div class='seclab'>Current main lifts (optional)</div><div class='grid2'>"
+            + _text_field("Squat", "lift-squat", "e.g. 315 lb")
+            + _text_field("Bench", "lift-bench", "e.g. 225 lb")
+            + _text_field("Deadlift", "lift-deadlift", "e.g. 405 lb")
+            + _text_field("Overhead press", "lift-ohp", "e.g. 135 lb") + "</div>")
     return _panel(3, "Training",
                   "How you train now, so the workout plan meets you where you are.", body)
 
 
 def _step4():
-    body = ("<div class='grid2'>" + _field("Dietary pattern", "—", True)
-            + _field("Meals per day", "—", True) + "</div>"
+    # All nutrition has no de-identified plan consumer today (ADR-0014 Negative-2) — it
+    # is captured to the gitignored record, honestly labeled, never pretended into the plan.
+    body = ("<div class='recnote'>Nutrition is saved to your record — not yet used by the plan.</div>"
+            + "<div class='grid2'>" + _text_field("Dietary pattern", "dietary-pattern", "e.g. high protein")
+            + _text_field("Meals per day", "meals-per-day", "e.g. 3") + "</div>"
             + "<div class='seclab'>Allergies &amp; intolerances</div>"
-            + _chips(["Dairy", "Gluten", "Shellfish", "Nuts", "+ add"])
+            + _text_field("Allergies / intolerances", "allergies", "e.g. dairy, shellfish")
             + "<div class='seclab'>Foods to avoid / preferences</div>"
-            + "<div class='rows'><div class='box ph'>Add a preference — e.g. “no pork”, “high protein”</div></div>")
+            + _textarea_field("Preferences", "food-preferences", "e.g. no pork, high protein"))
     return _panel(4, "Nutrition",
                   "Dietary pattern and constraints, so nutrition fits how you actually eat.", body)
 
 
 def _step5():
-    body = ("<div class='seclab'>Current supplement stack</div><div class='rows'>"
-            + "<div class='box ph'>Add a supplement — name &amp; dose (e.g. “creatine monohydrate · 5 g”)</div>"
-            + "<div class='box ph'>Add a supplement — name &amp; dose</div></div>"
-            + "<div class='seclab'>Peptides (current or considered)</div><div class='rows'>"
-            + "<div class='box ph'>Add a peptide — name &amp; dose</div></div>"
-            + "<div class='seclab'>What are you hoping to address?</div>"
-            + _chips(["Recovery", "Sleep", "Longevity", "Body composition", "+ add"]))
+    # The raw supplement/peptide stack (raw names/doses) is named-excluded PII -> the
+    # gitignored record, honestly labeled. The supplement<->Rx interaction screen
+    # crosses the boundary ONLY as curated de-identified CLASS tokens
+    # (`rx-interaction-classes`), never raw drug names. The redundant
+    # "what are you hoping to address" is dropped (covered by Step-2 goals).
+    body = ("<div class='recnote'>Your raw stack is saved to your record — not yet used by the plan.</div>"
+            + "<div class='seclab'>Current supplement stack</div>"
+            + _textarea_field("Supplements (name &amp; dose)", "supplement-stack",
+                              "e.g. creatine monohydrate · 5 g")
+            + "<div class='seclab'>Peptides (current or considered)</div>"
+            + _textarea_field("Peptides (name &amp; dose)", "peptide-stack", "name &amp; dose")
+            + "<div class='seclab'>Medication interaction classes</div>"
+            + _text_field("De-identified interaction classes (not drug names)", "rx-interaction-classes",
+                          "e.g. bleeding-risk; cyp3a4-pgp"))
     return _panel(5, "Supplements &amp; peptides",
                   "Your current stack — so interactions are screened before anything is recommended.", body)
 
 
 def _step6():
+    # The HANDOFF state: a readiness summary + the instruction to run `/generate-plan`
+    # (the agent path). The server performs 0 in-app generation; this step routes the
+    # operator to the generate leg, never renders a plan.
     body = ("<div class='rows'>"
-            + "<div class='rev'><h4>Workout</h4><p>Generated from your inputs by the personal-trainer "
-              "specialist. Every recommendation cites a source; coverage gaps are disclosed, not "
-              "filled with a fabricated protocol.</p></div>"
+            + "<div class='rev'><h4>Workout</h4><p>Generated by the personal-trainer specialist when "
+              "you run plan generation. Every recommendation cites a source; coverage gaps are "
+              "disclosed, not filled with a fabricated protocol.</p></div>"
             + "<div class='rev'><h4>Nutrition</h4><p>Targets and structure aligned to your goals + "
               "training load.</p></div>"
             + "<div class='rev'><h4>Supplements &amp; peptides</h4><p>Screened for additive-AE and "
               "Rx interactions; anything flagged routes to the medical-liaison gate.</p></div></div>"
-            + "<div class='note'>Generated locally; only a de-identified summary reaches the model.</div>")
+            + "<div class='handoff'><h4>Ready to generate your plan</h4>"
+              "<p>Your inputs are saved locally. Plan generation runs as the next step — "
+              "run <code>/generate-plan</code> to have the specialists build your plan from a "
+              "de-identified summary. Nothing is generated in this app; nothing is final until "
+              "you say so.</p></div>")
     return _panel(6, "Review &amp; generate",
-                  "Review your inputs, then generate your plan. Nothing is final until you say so.", body)
+                  "Review your inputs, then generate your plan. Nothing is final until you say so.",
+                  body, submit=True)
 
 
 def _default_status(store_read):
@@ -276,7 +369,16 @@ def render(store_read, *, status=None, _today=None):
     status = status if status is not None else _default_status(store_read)
     head = ("<div class='head'><div class='brand'>A+ Maxing<div class='sub'>Build your plan</div></div>"
             "<div class='stepno'>6 steps</div></div>")
-    body = (_step1(status) + _step2() + _step3() + _step4() + _step5() + _step6())
+    # Step 1 keeps its own document-upload affordance (the Wave-A file path). Steps 2-6
+    # are one capture form POSTing their fields to `/upload` (multipart, so the handler's
+    # `stage_uploads` parses them into `staged["fields"]`); the Step-6 submit carries
+    # `step=6` and routes the `/generate-plan` handoff re-render.
+    capture_form = (
+        "<form method='post' action='/upload' enctype='multipart/form-data'>"
+        + _step2() + _step3() + _step4() + _step5() + _step6()
+        + "</form>"
+    )
+    body = _step1(status) + capture_form
     return (f"<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
             f"<meta name='viewport' content='width=device-width, initial-scale=1'>"
             f"<title>A+ Maxing — Build your plan</title>{_style()}</head>"
