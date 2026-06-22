@@ -95,10 +95,14 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             re-renders from (None -> the production `vault/store/` default).
         dna_root: The DNA dropzone the POST handler lands DNA into and re-renders from
             (None -> the production `vault/dna/raw/` default).
+        scaffold_root: The gitignored operator-record root the POST handler's
+            form-field capture writes record-only values into (None -> the production
+            `vault/scaffold/filled/` default).
     """
 
     store_root = None
     dna_root = None
+    scaffold_root = None
 
     def do_GET(self):
         if self.path != "/":
@@ -112,7 +116,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         import tempfile
 
-        from scripts.serve import route
+        from scripts.serve import capture, route
         from scripts.serve.multipart import stage_uploads
 
         # Reject an over-ceiling Content-Length BEFORE reading the body so a giant
@@ -130,6 +134,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
 
         store_root = self.store_root
         dna_root = self.dna_root
+        scaffold_root = self.scaffold_root
+        step = None
         try:
             # A length-bounded reader streams the body to the multipart parser, so
             # multipart's mid-stream per-file ceiling bounds memory (the prior
@@ -140,6 +146,18 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                 )
                 for file_part in staged["files"]:
                     route.route_upload(file_part["path"], root=store_root, dna_root=dna_root)
+                # The form-field capture (ADR-0014-T1): route each submitted field by its
+                # data class — a wired de-identified token to the store via the unchanged
+                # store.append, a record-only/raw value to the gitignored scaffold. The
+                # `step` field (a control field, not captured) selects the Step-6 handoff
+                # re-render; capture.persist_capture ignores it as a non-wired record field
+                # — strip it so it never lands as a stray scaffold value.
+                fields = dict(staged["fields"])
+                step = fields.pop("step", None)
+                if fields:
+                    capture.persist_capture(
+                        fields, root=store_root, scaffold_root=scaffold_root
+                    )
         except (SystemExit, ValueError, zipfile.BadZipFile, ET.ParseError):
             # A real operator input must NOT kill the request thread. SystemExit: an
             # ambiguous/unknown extension (`_detect_source`). ValueError: a fail-loud
@@ -155,6 +173,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
 
         # Re-render reflecting the new load-state (the store/dropzone were just written).
+        # The re-render carries the wizard's Step-6 `/generate-plan` handoff state — the
+        # server performs 0 in-app generation; Step 6 routes the operator to the agent path.
         self._write_html(200, _render_intake(store_root=store_root, dna_root=dna_root))
 
     def _413_too_large(self):
@@ -174,24 +194,29 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         """Silence the default per-request stderr access log."""
 
 
-def build_server(port, *, store_root=None, dna_root=None):
+def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None):
     """Construct the loopback-bound intake server on `port`.
 
-    The POST `/upload` handler ingests into `store_root`/`dna_root` and re-renders the
-    wizard from them; both default to None, which falls through to the production
-    `vault/store/` / `vault/dna/raw/` defaults (so the operator entry `python -m
-    scripts.serve` serves the real instance). Tests bind tmp roots so the E2E never
-    touches the real store/dropzone.
+    The POST `/upload` handler ingests file uploads into `store_root`/`dna_root`,
+    captures form fields by data class (wired tokens -> `store_root`, record-only
+    values -> `scaffold_root`), and re-renders the wizard from the store. All three
+    default to None, which falls through to the production `vault/store/` /
+    `vault/dna/raw/` / `vault/scaffold/filled/` defaults (so the operator entry
+    `python -m scripts.serve` serves the real instance). Tests bind tmp roots so the
+    E2E never touches the real store/dropzone/scaffold.
 
     Args:
         port (int): The TCP port to bind on loopback; 0 picks an ephemeral port.
         store_root (str | Path, optional): The store root the POST handler ingests into.
         dna_root (str | Path, optional): The DNA dropzone the POST handler lands into.
+        scaffold_root (str | Path, optional): The gitignored operator-record root the
+            form-field capture writes record-only values into.
 
     Returns:
         (ThreadingHTTPServer) A server bound to ("127.0.0.1", port). Stop it with
         `srv.shutdown()` + `srv.server_close()`.
     """
     handler = type("BoundIntakeRequestHandler", (IntakeRequestHandler,),
-                   {"store_root": store_root, "dna_root": dna_root})
+                   {"store_root": store_root, "dna_root": dna_root,
+                    "scaffold_root": scaffold_root})
     return ThreadingHTTPServer((_LOOPBACK, port), handler)
