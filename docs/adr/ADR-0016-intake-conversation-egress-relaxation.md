@@ -1,0 +1,120 @@
+## ADR-0016: Relax the Zero-Egress Boundary to Permit Raw Intake Conversation While Persisted Facts Stay De-Identified
+
+> **Y-Statement:** In the context of the operator-confirmed conversational-intake pivot, where a back-and-forth intake agent must hold a real dialogue with the operator to capture the richness the rigid form lost, facing the tension between that conversational value and ADR-0001's crown-jewel "zero operator PII to any model" boundary, we decided to scope ADR-0001's egress boundary so the LIVE intake conversation may egress raw over the no-train commercial API while everything persisted (the store, the plan-reasoning summary) stays de-identified and nothing raw is ever committed, to achieve a genuine conversational intake without re-plumbing onto the deferred local-model North Star, accepting that raw operator conversation now leaves the device into the no-train provider's bounded retention (threat-model B) and that the zero-egress invariant is henceforth a scoped carve-out future readers must not silently widen.
+
+```yaml
+id: ADR-0016
+title: "Relax the Zero-Egress Boundary to Permit Raw Intake Conversation While Persisted Facts Stay De-Identified"
+status: accepted
+date: 2026-06-22
+decision-makers: [Walter McGivney]
+tags: [security, pii-boundary, model-integration, intake]
+```
+
+### Context
+
+ADR-0001 fixed the system's most load-bearing invariant: the store, ingestion, and generation run locally and model-independently, "sending zero operator PII to any model," and "Only plan reasoning touches the model, over summaries rather than raw PII" ([ADR-0001, Decision L24](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]). Today that boundary is mechanical: `summarize()` is the 0-raw-PII derivation point, raising at the boundary if a pass-through value carries raw PII ([router.py L352-432](scripts/plan/router.py) [VERIFIED]), and `dispatch()` enforces a whitelist that rejects any field outside the closed `SUMMARY_FIELD_SET` before the model send ([router.py L435-495](scripts/plan/router.py) [VERIFIED]). The only thing the model has ever seen is a de-identified summary.
+
+Two forces pull against each other. The operator-confirmed pivot establishes that the rigid form captures too little — its lossiness was caught in the session-87 intake-wiring audit, where only 6 form-sourced signals reach the planner (the 5 wired `SUMMARY_FIELD_SET` tokens plus the train-around→active-issue-class derivation) ([session-87.md](../../vault/sessions/session-87.md) [VERIFIED]; [capture.py L50-56](scripts/serve/capture.py), [capture.py L230-234](scripts/serve/capture.py) [VERIFIED]) — so a conversational intake agent is required, and a real back-and-forth is only possible if the operator's own words reach the model as they are spoken, not after a de-identification pass that strips the unstructured detail the dialogue exists to surface. Against that stands the zero-egress boundary itself: the value of the system to the data subject rests on the assurance that their raw labs, DNA, and health history never leave the machine to a model, and ADR-0001 records that raw PII reaching a model is a falsification of the privacy posture ([ADR-0001, Falsification criteria L102-104](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+
+A second tension is temporal and crosses the operator and the maintainer. V1 must produce a working conversational intake against a commercial no-train API now; the North Star is a fully-local model that would make any egress moot, but ADR-0001 already deferred that as its rejected Alternative C, conditioned on local clinical-reasoning parity that does not exist at V1 ([ADR-0001, Alternative C L65-69](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]). Choosing to egress raw conversation now is choosing V1 capability over the zero-egress purity the local model would eventually restore. The reconciling move is to name an axis ADR-0001 never separated: *what may cross the model boundary as raw* (now: the live conversation, and only it) versus *what is persisted* (still: de-identified facts and de-identified summaries only). Because that distinction redraws a settled invariant rather than implementing one, it is a decision, not a code comment.
+
+### Decision
+
+Scope ADR-0001's zero-egress boundary so that the live intake conversation may egress raw to the no-train commercial API, while every persisted fact — the time-series store and the plan-reasoning summary — stays de-identified, and no raw conversation or raw operator value is ever written to a tracked (committed) file. The raw-egress carve-out is bounded to the live conversation on the no-train lane and to nothing else; every other model-bound path remains summary-only.
+
+### Rationale
+
+The relaxation was evaluated against the rejected status quo and two narrower or stricter options across three criteria the pivot and ADR-0001 make load-bearing: conversational fidelity (can the intake hold a real back-and-forth), the persisted-side PII boundary (does the store/summary discipline survive), and V1-fit (does it work without the deferred local model or regulated-PHI infrastructure).
+
+On **conversational fidelity**, only raw-conversation egress delivers it: a dialogue model that receives a de-identified summary instead of the operator's words cannot ask the contextual follow-up the rich sections need, which is the exact lossiness the form already exhibits (only 6 form-sourced signals reach the planner — the 5 wired `SUMMARY_FIELD_SET` tokens plus the train-around→active-issue-class derivation; [session-87.md](../../vault/sessions/session-87.md) [VERIFIED], [capture.py L50-56](scripts/serve/capture.py), [capture.py L230-234](scripts/serve/capture.py) [VERIFIED]). On the **persisted-side PII boundary**, the relaxation is deliberately surgical: it touches only the model-egress vector for the conversation, leaving the store-side `summarize()` 0-raw-PII derivation and the `dispatch()` whitelist unchanged ([router.py L352-432, L435-495](scripts/plan/router.py) [VERIFIED]), so the plan-reasoning path the system already runs keeps sending de-identified summaries only — raw conversation is *added to* the egress set, not *substituted for* the summary discipline. On **V1-fit**, the no-train commercial lane ADR-0001 selected is already the contractually training-exempt path ([ADR-0001, Rationale L30](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]), so the relaxation reuses the existing threat-model-B posture rather than building ZDR/BAA infrastructure or waiting on local-model parity.
+
+Long-term, the carve-out is reversible by design: when the North-Star local model reaches the parity ADR-0001's Alternative C conditions on, the raw-conversation egress retracts to zero because nothing leaves the machine — the relaxation does not foreclose that path, it bridges to it. The cost the decision accepts permanently for V1 is that the zero-egress invariant is no longer absolute but scoped, and a scoped invariant invites silent widening; the bound (conversation-only, no-train-only, persisted-de-identified) is therefore stated as a falsifiable boundary, not a disposition.
+
+### Consequences
+
+**Positive:**
+- The intake agent can hold a genuine back-and-forth over the operator's own words, capturing the rich-section detail the form lost (the pivot's load-bearing capability gain) rather than the 6 form-sourced signals the rigid form yields — the 5 wired `SUMMARY_FIELD_SET` tokens plus the train-around→active-issue-class derivation ([session-87.md](../../vault/sessions/session-87.md) [VERIFIED]; [capture.py L50-56](scripts/serve/capture.py), [capture.py L230-234](scripts/serve/capture.py) [VERIFIED]).
+- The store-side PII boundary is untouched: `summarize()` still derives a de-identified summary and raises on raw-PII pass-through, and `dispatch()` still rejects any out-of-field-set payload before the send ([router.py L352-432, L435-495](scripts/plan/router.py) [VERIFIED]), so the plan-reasoning egress set does not change shape.
+- The relaxation reuses ADR-0001's existing no-train commercial lane and threat-model B, so it needs no new trust infrastructure (no ZDR tier, no BAA) and no wait on local-model parity ([ADR-0001, Rationale L30, Alternative B L59-63](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+
+**Negative:**
+- Raw operator conversation now egresses to the no-train commercial API: the operator's unstructured words — which may name medications, the January-2026 issue, lab specifics, and identity — leave the device, where ADR-0001 previously guaranteed only de-identified summaries crossed. This is a real expansion of the egress surface, not a relabeling.
+- Off-device bounded retention now covers raw conversation, not only summaries: the no-train lane carries bounded (not zero) retention — the project records a ~30-day no-train profile, the precise window unconfirmed against published policy ([ADR-0001, Consequences-Negative L42, OQ-2 L118](ADR-0001-pii-trust-boundary-no-train-routing.md) [VENDOR-CLAIM; window UNVERIFIED]). The accepted exposure that ADR-0001 bounded for summaries now extends to the raw conversation under threat-model B.
+- A committed or tracked conversation transcript would breach ADR-0005's PII-free-trunk guarantee, which cannot be cleanly scrubbed once landed ([ADR-0005, Decision + Falsification L96-98](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) [VERIFIED]). The relaxation does not authorize any tracked transcript; the mitigation is that raw residue lands only on gitignored scaffold surfaces and the registered `block-pii-commit.sh` PreToolUse hook plus the `pre-push-pii-scan.sh` backstop deny a committed filled-value path ([.claude/hooks/block-pii-commit.sh, pre-push-pii-scan.sh](.claude/hooks/block-pii-commit.sh) [VERIFIED]) — but the discipline burden of keeping raw conversation off the tracked tree is new and permanent (1+ year horizon).
+- The zero-egress invariant is now a SCOPED carve-out, not an absolute: every future intake or PII-bearing path must be checked against the bound (conversation-only, no-train-only, persisted-de-identified), and the standing risk is that a future change widens the raw-egress class silently — a documentation-coherence and review cost that did not exist while the boundary was absolute.
+- (Tension with ADR-0019, the field-set extension, recorded in §Related Decisions): expanding the de-identified token vocabulary that crosses to the plan model enlarges the crossing surface; accepted because every such token stays de-identified (band/class, never raw), honoring this ADR's persisted-side-de-identified half.
+- (Tension with ADR-0013, the loopback intake server, recorded in §Related Decisions): the chat endpoint makes the first outbound model call from a server ADR-0013 validated as making "0 outbound calls carrying store content" ([ADR-0013, Confirmation criteria L87](ADR-0013-operator-started-loopback-intake-server.md) [VERIFIED]); this ADR owns that single egress class.
+
+**Neutral:**
+- "Live conversation" becomes a named data class distinct from "persisted fact" and "summary" — a vocabulary the intake, extraction, and persistence sides must all share.
+- The no-train commercial API becomes a runtime dependency for intake specifically, alongside its existing role for plan reasoning; the rest of the system stays vendor-independent.
+
+### Alternatives Considered
+
+#### Alternative A: De-identify before the model sees it (form-only status quo)
+Keep ADR-0001's boundary absolute — the model never sees raw operator input; the rigid form captures structured fields, which are de-identified into `SUMMARY_FIELD_SET` tokens before any model touch.
+- **Supporting evidence:** Preserves the zero-egress invariant exactly as ADR-0001 fixed it — no raw operator PII ever crosses to a model, the strongest possible privacy posture, and it requires no change to `summarize()`/`dispatch()` ([router.py L352-432, L435-495](scripts/plan/router.py) [VERIFIED]).
+- **Trade-offs:** It is the rejected status quo the pivot overturns: the form is too lossy — the session-87 intake-wiring audit found only 6 form-sourced signals reaching the planner (the 5 wired `SUMMARY_FIELD_SET` tokens plus the train-around→active-issue-class derivation; [session-87.md](../../vault/sessions/session-87.md) [VERIFIED], [capture.py L50-56](scripts/serve/capture.py), [capture.py L230-234](scripts/serve/capture.py) [VERIFIED]) — and a de-identified summary cannot sustain a conversational back-and-forth, because the model has nothing of the operator's actual words to follow up on. Rejected because it fails the conversational-fidelity force the pivot exists to satisfy.
+- **When this becomes the right choice:** If the intake reverts to a structured-form-only capture where no dialogue is required, or once the local-model North Star (Alternative B) makes egress moot, the de-identify-before-model posture is again the right one.
+
+#### Alternative B: Local-model-only now (ADR-0001's deferred Alternative C)
+Run a fully-local open-weight model for the intake conversation so the raw dialogue never leaves the machine and no egress relaxation is needed.
+- **Supporting evidence:** Maximal privacy — raw conversation never egresses, so the zero-egress invariant holds without a carve-out; it is the genuine North-Star end state ADR-0001 already named ([ADR-0001, Alternative C L65-69](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]).
+- **Trade-offs:** ADR-0001 deferred this for V1 because a local model cannot match the specialist reasoning the system requires and the roster is built against the commercial model; switching now forfeits capability and re-plumbs the path at V1 cost ([ADR-0001, Alternative C trade-offs L68](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]). Rejected as the same scope deferral ADR-0001 already adjudicated, not as inferior privacy.
+- **When this becomes the right choice:** When local open-weight models reach parity for the intake/clinical-reasoning tasks AND hardware cost is acceptable on the operator's machine — exactly ADR-0001's Alternative-C condition; at that point the raw-egress carve-out this ADR opens retracts to zero.
+
+#### Alternative C: Narrower relaxation — stream only de-identified summaries to the chat model
+Permit a chat surface but feed the conversation model only de-identified rolling summaries of the operator's turns, never the raw words, so the egress stays summary-only.
+- **Supporting evidence:** Keeps egress strictly de-identified — no raw conversation crosses, so the bounded-retention exposure stays at ADR-0001's existing summary level, and the carve-out this ADR otherwise opens is avoided entirely.
+- **Trade-offs:** A summary-only chat defeats the back-and-forth: each operator turn would be lossily compressed before the model could respond to it, so the model cannot ask the contextual follow-up that distinguishes a conversation from a form — it reproduces the form's lossiness inside a chat shell. Rejected because it fails the conversational-fidelity force while paying the cost of a chat surface.
+- **When this becomes the right choice:** If a future privacy constraint forbids raw-conversation egress but a chat surface is still wanted, summary-streaming is the fallback that keeps egress de-identified at the cost of conversational depth.
+
+#### Dissent: The zero-egress purist position
+**Source:** ADR-0001's anchor principle — "the operator's private data may be transiently processed by the model but is never retained" was realized as zero raw PII to any model; relaxing it to permit raw conversation egress is a genuine weakening of the system's most load-bearing privacy guarantee, and a reasonable reviewer can hold that no V1 capability justifies sending raw operator health conversation off-device into bounded retention.
+**Conditions under which this becomes the right choice:** If the no-train provider's no-train or retention terms degrade (raw conversation becoming training-eligible or indefinitely retained), OR if local open-weight models reach intake-task parity on the operator's hardware (ADR-0001 Alternative C's condition) — in either case the raw-egress carve-out should be closed and the boundary restored to absolute, the purist position becoming the correct one.
+
+### Related Decisions
+
+| ADR | Relationship | Description |
+|-----|-------------|-------------|
+| ADR-0015 | constrains | This ADR bounds the client: it may egress raw ONLY for the live intake conversation on the no-train lane; any non-conversation raw send (raw persisted facts, raw store reads) remains a violation. |
+| ADR-0017 | constrains | The extraction contract is the mechanism that keeps the PERSISTED side de-identified, honoring this ADR's "store stays de-identified" half; it may emit only de-identified field-set-class facts. |
+| ADR-0019 | tensions-with | ADR-0019 expands the de-identified token set crossing to the plan model; that enlarges the crossing surface but stays de-identified-only (band/class, never raw), so it honors this ADR's persisted-side half — boundary defined, tension not eliminated. |
+| [ADR-0005 (Operator-Agnostic Clonable PII-Free Trunk)](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) | complements | Orthogonal leak vectors: ADR-0005 keeps PII out of git history (the conversation transcript must NOT be committed; residue lands only on gitignored surfaces); this ADR relaxes the MODEL-egress vector only. Neither is a prerequisite. |
+| [ADR-0013 (Operator-Started Loopback Intake Server)](ADR-0013-operator-started-loopback-intake-server.md) | tensions-with | ADR-0013's loopback server is validated by "0 outbound calls carrying store content"; the chat endpoint makes the one outbound call carrying LIVE conversation (never store content). This ADR authorizes that single egress class — read ADR-0013's no-egress criterion with this carve-out. |
+
+This ADR `amends` ADR-0001 (a documentation relationship, not a DAG edge): it scopes ADR-0001's zero-egress Decision so raw intake conversation may egress to the no-train lane, while the store/persistence side keeps the 0-raw-PII boundary unchanged. It does NOT supersede ADR-0001 wholesale — the no-train-lane routing, the no-committed-PII guarantee, and the summaries-not-raw discipline for the plan-reasoning store read all survive ([ADR-0001, Decision L24](ADR-0001-pii-trust-boundary-no-train-routing.md) [VERIFIED]). ADR-0015, ADR-0017, and ADR-0019 are the proposed conversational-intake set authored alongside this ADR (DAG order 0016 → 0015 → {0017 ∥ 0018} → 0019); their files land as that set completes.
+
+### Validation Approach
+
+**Confirmation criteria:**
+- During an intake conversation, the ONLY raw operator data egressing is the live conversation, and it goes to the no-train commercial lane — verified by inspecting every outbound call during a session (expected: raw egress class = {live conversation}, lane = no-train, count of other-raw-egress = 0).
+- The persisted side stays de-identified: after a conversation, every store-write and every plan-reasoning summary carries only de-identified field-set-class values — verified by scanning the post-conversation store and the `summarize()` output for raw operator PII (expected: 0 raw-PII hits), the boundary `summarize()` already enforces ([router.py L352-432](scripts/plan/router.py) [VERIFIED]).
+- A content scan of all tracked files for raw conversation or operator-PII tokens returns 0 hits on a fresh clone — verified by the registered `block-pii-commit.sh` + `pre-push-pii-scan.sh` path over the tracked set ([.claude/hooks/block-pii-commit.sh](.claude/hooks/block-pii-commit.sh) [VERIFIED]; [ADR-0005, Validation L89-93](ADR-0005-operator-agnostic-clonable-pii-free-trunk.md) [VERIFIED]).
+
+**Falsification criteria:**
+- If any raw operator PII is found in a COMMITTED file or git history on a fresh-clone scan (≥1 hit), the relaxation has leaked beyond its scope — because history cannot be cleanly scrubbed, treat as a release-blocking incident, halt and revert the leaking path before any release.
+- If a persisted store item or a plan-reasoning summary is found carrying raw operator PII (≥1 hit), the de-identified-persistence half has failed — the extraction contract / `summarize()` 8j6 gate is broken; block the path and repair the de-identification before the next intake run.
+- If any raw egress OTHER than the live conversation is observed (≥1 outbound call carrying raw persisted facts, raw store content, or a raw transcript), the carve-out has been widened — halt and remove the out-of-scope egress before release.
+- If the no-train provider's no-train or retention terms change (raw conversation becoming training-eligible or its retention window growing), re-evaluate the relaxation — the bounded-retention exposure this ADR accepts is conditioned on the no-train profile holding.
+- Time horizon: run the egress-class, persisted-side, and tracked-file checks at the first build of the chat surface and at every release thereafter, and before the July-2026 physician-visit deliverable ships.
+
+**Review triggers:**
+- A change to Anthropic's (or the swapped provider's) commercial no-train terms or retention policy — re-verify the no-train claim and the bounded-retention window.
+- The North-Star transition to a local model is initiated — the raw-conversation egress carve-out retracts to zero (nothing leaves the machine), and this relaxation is closed.
+- Any proposal to add a second raw-egress class (beyond the live conversation) — re-open this decision against the conversation-only bound before adding it.
+- A second operator clones the repository — re-run the tracked-file scan to confirm no raw conversation residue is committed.
+
+### Open Questions
+
+| # | Question | Owner | Target Date | Impact on This Decision |
+|---|----------|-------|-------------|------------------------|
+| OQ-1 | What is the precise no-train commercial-API retention window for raw conversation, and is it the same ~30-day no-train profile ADR-0001 recorded for summaries? | Walter McGivney | 2026-06-30 | Sets the exact size of the accepted bounded-retention exposure now extended to raw conversation; could not be confirmed against published policy this run ([ADR-0001, OQ-2 L118](ADR-0001-pii-trust-boundary-no-train-routing.md) [UNVERIFIED]). Does not change the decision (B accepts bounded retention) but quantifies the negative consequence. |
+| OQ-2 | What is the exact local-residue handling for the raw transcript during a live session — held in memory only, written to a gitignored scaffold for replay, or discarded after extraction? | Walter McGivney | 2026-06-30 | Load-bearing for ADR-0005: a tracked transcript would breach the PII-free trunk. The egress/retention posture is settled here (transient for the live session; off-device retention = the no-train lane's bounded window; nothing raw committed); the local-residue routing mechanism is owned by ADR-0017. Until that mechanism is pinned, the no-committed-transcript guarantee rests on the `block-pii-commit`/pre-push backstop, not a residue-routing rule. |
+
+### Revision History
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2026-06-22 | Initial draft | Walter McGivney |
