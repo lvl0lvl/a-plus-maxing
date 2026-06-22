@@ -53,13 +53,14 @@ def _summary(root):
 # The de-identified wired tokens this task captures, each with a synthetic value
 # that is a valid de-identified token (no raw PII) and is distinctive enough that a
 # cross-stream leak would be detectable.
+# `rx-interaction-classes` is NOT here (Wave-B FIX-A): the untrusted form field routes
+# record-only, never into the model-bound store item — see the FIX-A tests below.
 _WIRED_VALUES = {
-    "goal-domains": "strength;recovery",
+    "goal-domains": "Workout;Nutrition",  # in the FIX-B chip enum (Workout/Nutrition/…)
     "goal-targets": "add 10 lb to squat by september",
     "goal-priority-order": "1-strength;2-recovery;3-longevity",
     "hard-limits": "no overhead pressing; one rest day minimum",
     "recovery-status-band": "moderate",
-    "rx-interaction-classes": "bleeding-risk;cyp3a4-pgp",
 }
 
 
@@ -114,7 +115,7 @@ def test_wired_token_value_is_a_utc_offset_timepoint(tmp_path):
     """
     store_root = tmp_path / "store"
     capture.persist_capture(
-        {"goal-domains": "strength"}, root=store_root, scaffold_root=tmp_path / "scaffold",
+        {"goal-domains": "Workout"}, root=store_root, scaffold_root=tmp_path / "scaffold",
         identity_config=_ABSENT_IDENTITY,
     )
     tp = store.read("goal-domains", root=store_root)[0]["timepoint"]
@@ -128,21 +129,22 @@ def test_wired_token_value_is_a_utc_offset_timepoint(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-def test_rx_interaction_classes_written_only_from_supplied_class_tokens(tmp_path):
-    """AC-6: rx-interaction-classes stores the supplied de-identified class tokens verbatim.
+def test_rx_form_field_never_writes_the_model_bound_store_item(tmp_path):
+    """AC-6 (Wave-B FIX-A): the rx FORM field never writes the `rx-interaction-classes` store item.
 
-    The form supplies CURATED de-identified class tokens (a `;`-joined scalar); the
-    seam writes them to the `rx-interaction-classes` store item as-is. No raw-drug
-    name -> class derivation happens in the seam.
+    Even a value that LOOKS like clean class tokens (`bleeding-risk;cyp3a4-pgp`) from the
+    untrusted form field must NOT reach the model-bound store item — the server cannot
+    distinguish it from a raw drug name. The field is captured record-only; the model-bound
+    item is fed only by the liaison curation path (the beaded ADR-0014 OQ-2 surface).
     """
     store_root = tmp_path / "store"
     capture.persist_capture(
         {"rx-interaction-classes": "bleeding-risk;cyp3a4-pgp"},
         root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
     )
-    readings = store.read("rx-interaction-classes", root=store_root)
-    assert readings[0]["value"] == "bleeding-risk;cyp3a4-pgp"
-    assert readings[0]["source"] == "intake"
+    assert store.read("rx-interaction-classes", root=store_root) == [], (
+        "the rx form field wrote the model-bound store item (must route record-only)"
+    )
 
 
 def test_serve_layer_has_no_raw_drug_to_class_lookup():
@@ -165,12 +167,14 @@ def test_serve_layer_has_no_raw_drug_to_class_lookup():
             )
 
 
-def test_raw_drug_name_is_never_written_into_rx_interaction_classes(tmp_path):
-    """AC-6: a raw drug name supplied as a record-only field never reaches the rx item.
+def test_raw_drug_name_in_supplement_stack_never_reaches_a_field_set_item(tmp_path):
+    """AC-6 (Wave-B FIX-A): a raw drug name in the raw stack never reaches a field-set item.
 
     A raw supplement/drug name (Step-5 raw stack) is a record-only field -> the
-    gitignored scaffold, NEVER the `rx-interaction-classes` store item. Assert the
-    rx item carries only the supplied class tokens, not a raw drug name.
+    gitignored scaffold, NEVER any `SUMMARY_FIELD_SET` store item. With the rx form
+    field now also record-only (FIX-A), the `rx-interaction-classes` model-bound item
+    is never written by capture at all — assert it stays empty and no field-set item
+    carries the drug name.
     """
     store_root = tmp_path / "store"
     scaffold_root = tmp_path / "scaffold"
@@ -181,9 +185,14 @@ def test_raw_drug_name_is_never_written_into_rx_interaction_classes(tmp_path):
         },
         root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
     )
-    rx = store.read("rx-interaction-classes", root=store_root)
-    assert rx[0]["value"] == "bleeding-risk"
-    assert "warfarin" not in rx[0]["value"], "a raw drug name leaked into rx-interaction-classes"
+    assert store.read("rx-interaction-classes", root=store_root) == [], (
+        "the rx form field wrote the model-bound store item (must route record-only)"
+    )
+    for token in SUMMARY_FIELD_SET:
+        for reading in store.read(token, root=store_root):
+            assert "warfarin" not in str(reading["value"]), (
+                f"a raw drug name leaked into the {token!r} field-set store item"
+            )
 
 
 # --------------------------------------------------------------------------- #
@@ -215,6 +224,173 @@ def test_train_around_writes_raw_symptom_item_summarize_derives_issue_class(tmp_
     )
     # The raw free-text never appears under the field-set token.
     assert "deadlifting" not in str(summary.get("active-issue-class", ""))
+
+
+# --------------------------------------------------------------------------- #
+# Wave-B Tier-2 FIX-A — the rx field is captured record-only, never model-bound
+# --------------------------------------------------------------------------- #
+
+
+def test_rx_field_drug_name_lands_in_scaffold_never_a_field_set_item(tmp_path):
+    """FIX-A: a raw drug name in the rx field -> the gitignored scaffold, NEVER the store/summary.
+
+    The Step-5 `rx-interaction-classes` FORM field collects operator-typed text the
+    server cannot trust to be de-identified class tokens — a raw drug name ("warfarin
+    5mg") would route verbatim into the `rx-interaction-classes` field-set store item,
+    which `summarize` sends to the model, and the `pii_scan` value gate does NOT catch
+    drug names. So the capture seam routes that field to the gitignored scaffold
+    record-only (the curation surface that emits real de-identified class tokens is the
+    beaded ADR-0014 OQ-2 future consumer). Assert the drug name lands in the scaffold,
+    and appears in NO SUMMARY_FIELD_SET store item and NOT in the summary.
+
+    Failing-capable: re-add `rx-interaction-classes` to `capture.WIRED_TOKENS` and the
+    drug name reaches the store item + summary, reddening both negative assertions.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    capture.persist_capture(
+        {"rx-interaction-classes": "warfarin 5mg; metformin 500mg"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+
+    # Positive: the captured rx text landed in the gitignored scaffold record.
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert "warfarin" in scaffold_text, "the rx field value did not land in the gitignored scaffold"
+
+    # Negative (load-bearing): the drug name is in NO field-set store item.
+    for token in SUMMARY_FIELD_SET:
+        for reading in store.read(token, root=store_root):
+            assert "warfarin" not in str(reading["value"]), (
+                f"a raw drug name reached the {token!r} field-set store item (model-bound)"
+            )
+    # Negative (load-bearing): the drug name never reaches the summary the model sees.
+    summary = _summary(store_root)
+    assert "warfarin" not in str(summary.get("rx-interaction-classes", "")), (
+        "a raw drug name reached the rx-interaction-classes summary value (model-bound)"
+    )
+    assert "warfarin" not in str(summary), "a raw drug name reached the model-bound summary"
+
+
+def test_out_of_enum_recovery_band_routes_record_only_not_the_token(tmp_path):
+    """FIX-B: a crafted out-of-set recovery-status-band -> scaffold, NEVER the token.
+
+    `recovery-status-band` is a bounded `<select>` (low/moderate/high), enforced only
+    client-side. A crafted POST writing `extreme` must NOT land in the model-bound token
+    — the server re-validates against the enum and routes the out-of-set value
+    record-only to the gitignored scaffold.
+
+    Failing-capable: drop the bounded-value check and `extreme` lands in the token store
+    item, reddening the negative assertion.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    capture.persist_capture(
+        {"recovery-status-band": "extreme"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read("recovery-status-band", root=store_root) == [], (
+        "an out-of-enum recovery-status-band reached the model-bound token store item"
+    )
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert "extreme" in scaffold_text, "the out-of-enum value did not land record-only in the scaffold"
+    # A valid band still lands in the token (the gate is selective, not a blanket block).
+    capture.persist_capture(
+        {"recovery-status-band": "moderate"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    band = store.read("recovery-status-band", root=store_root)
+    assert band and band[0]["value"] == "moderate", "a valid recovery band did not land in the token"
+
+
+def test_out_of_enum_goal_domains_routes_record_only_not_the_token(tmp_path):
+    """FIX-B: a crafted out-of-set goal-domains token -> scaffold, NEVER the token.
+
+    `goal-domains` is a fixed chip set (Workout/Nutrition/Supplements/Peptides). A
+    crafted POST whose `;`-joined value carries an out-of-set token (`Workout;Hacking`)
+    must NOT land in the model-bound token — the server validates EVERY token against
+    the enum and routes the whole out-of-set value record-only.
+
+    Failing-capable: drop the bounded-value check and `Hacking` lands in the token.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    capture.persist_capture(
+        {"goal-domains": "Workout;Hacking"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read("goal-domains", root=store_root) == [], (
+        "an out-of-enum goal-domains value reached the model-bound token store item"
+    )
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert "Hacking" in scaffold_text, "the out-of-enum goal-domains did not land record-only"
+    # A wholly in-enum multi-value still lands in the token.
+    capture.persist_capture(
+        {"goal-domains": "Workout;Nutrition"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    gd = store.read("goal-domains", root=store_root)
+    assert gd and gd[0]["value"] == "Workout;Nutrition", "an in-enum goal-domains did not land in the token"
+
+
+def test_rx_interaction_classes_is_not_a_wired_capture_token():
+    """FIX-A: the capture seam does NOT wire `rx-interaction-classes` to the store.
+
+    The form field carries operator-typed text, not trusted curated class tokens, so it
+    is captured record-only — it must NOT be in `WIRED_TOKENS`. (The store item of that
+    name is still a SUMMARY_FIELD_SET member fed by the liaison curation path, unchanged.)
+    """
+    assert "rx-interaction-classes" not in capture.WIRED_TOKENS, (
+        "the rx form field must route record-only, not into the model-bound store item"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Wave-B Tier-2 FIX-C — full-value PII scan on free-text wired tokens
+# --------------------------------------------------------------------------- #
+
+
+def test_free_text_token_pii_past_the_4096_cap_routes_record_only(tmp_path):
+    """FIX-C: PII past `scan_text`'s 4096-char cap is caught on the capture path.
+
+    `pii_scan.scan_text` caps its input at 4096 chars, so an email planted PAST the cap
+    in a free-text wired token (`goal-targets`/`hard-limits`) would evade the single-call
+    8j6 gate and land in the model-bound token. The capture path scans the FULL value, so
+    PII anywhere in it is caught and the value routes record-only to the gitignored
+    scaffold, never the token.
+
+    Failing-capable: a single capped `scan_text(value)` returns 0 for this input (the
+    email is past 4096), so reverting the full-value scan lets the value reach the token,
+    reddening the negative assertion.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    # A long clean lead-in PAST 4096 chars, then an email — the email is beyond the cap.
+    padded = ("add 10 lb to my squat. " * 250) + " reach me at operator@example.com"
+    assert len(padded) > 4096, "the fixture must place the email past the 4096-char cap"
+    # Pre-condition: a single capped scan MISSES the past-cap email (the evasion).
+    assert pii_scan.scan_text(padded, token_config=_ABSENT_IDENTITY) == 0, (
+        "the capped single scan unexpectedly caught the past-cap email — fixture invalid"
+    )
+
+    capture.persist_capture(
+        {"goal-targets": padded},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Negative (load-bearing): the PII value never reached the model-bound token.
+    assert store.read("goal-targets", root=store_root) == [], (
+        "a free-text value carrying past-cap PII reached the model-bound goal-targets token"
+    )
+    # Positive: it landed record-only in the gitignored scaffold instead.
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert "operator@example.com" in scaffold_text, "the PII free-text value did not route record-only"
+
+    # The gate is selective: a clean free-text value still lands in the token.
+    capture.persist_capture(
+        {"hard-limits": "no overhead pressing"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    hl = store.read("hard-limits", root=store_root)
+    assert hl and hl[0]["value"] == "no overhead pressing", "a clean free-text value did not land in the token"
 
 
 # --------------------------------------------------------------------------- #

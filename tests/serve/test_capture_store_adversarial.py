@@ -44,16 +44,16 @@ def test_capture_write_to_one_token_never_cross_reads_as_another(tmp_path):
     """
     store_root = tmp_path / "store"
     capture.persist_capture(
-        {"goal-domains": "strength;recovery", "hard-limits": "no overhead pressing"},
+        {"goal-domains": "Workout;Nutrition", "hard-limits": "no overhead pressing"},
         root=store_root, scaffold_root=tmp_path / "scaffold",
     )
     gd = store.read("goal-domains", root=store_root)
     hl = store.read("hard-limits", root=store_root)
-    assert len(gd) == 1 and gd[0]["value"] == "strength;recovery"
+    assert len(gd) == 1 and gd[0]["value"] == "Workout;Nutrition"
     assert len(hl) == 1 and hl[0]["value"] == "no overhead pressing"
     # Cross-read negative: hard-limits' value never appears under goal-domains, vice versa.
     assert all("overhead" not in str(r["value"]) for r in gd), "hard-limits leaked into goal-domains"
-    assert all("strength" not in str(r["value"]) for r in hl), "goal-domains leaked into hard-limits"
+    assert all("Workout" not in str(r["value"]) for r in hl), "goal-domains leaked into hard-limits"
 
 
 # --------------------------------------------------------------------------- #

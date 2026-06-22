@@ -5,30 +5,34 @@ submitted intake form field BY ITS DATA CLASS, the load-bearing classification t
 ADR-0014 PII boundary rests on:
 
 - A wired de-identified `SUMMARY_FIELD_SET` token (`goal-domains`, `goal-targets`,
-  `goal-priority-order`, `hard-limits`, `recovery-status-band`, `rx-interaction-classes`)
+  `goal-priority-order`, `hard-limits`, `recovery-status-band`)
   -> the time-series store via the UNCHANGED `store.append`, item named EXACTLY as the
   token, tagged `source:"intake"`. The seam REUSES `store.append` — it never
   re-implements the NDJSON write/dedupe (that would fork the surface the store-adversarial
-  battery protects).
+  battery protects). `rx-interaction-classes` is a SUMMARY_FIELD_SET token but is NOT
+  wired here (Wave-B FIX-A): its model-bound form is liaison-curated, so the untrusted
+  form field routes record-only instead (see the WIRED_TOKENS note below).
 - The Step-3 "train around / injury" free-text -> a `raw-symptom-free-text` store item
   (the RAW item `router.summarize` DE-IDENTIFIES into `active-issue-class`), NEVER
   `active-issue-class` directly.
 - A record-only / raw value (Step-3 training detail, all Step-4 nutrition, the raw Step-5
-  supplement/peptide stack) -> the gitignored `vault/scaffold/filled/` operator record,
-  honestly labeled "for your record". NEVER a `SUMMARY_FIELD_SET` store item — a raw drug
-  name is named-excluded PII, never `rx-interaction-classes` (which carries only curated
-  de-identified class tokens).
+  supplement/peptide stack, the Step-5 rx-interaction text) -> the gitignored
+  `vault/scaffold/filled/` operator record, honestly labeled "for your record". NEVER a
+  `SUMMARY_FIELD_SET` store item — a raw drug name is named-excluded PII, never the
+  model-bound `rx-interaction-classes` item (which carries only curated de-identified
+  class tokens).
 
-`rx-interaction-classes` is written ONLY from the form's supplied de-identified class
-tokens; there is no raw-drug-name -> class lookup in this module (the de-identification is
-an operator/liaison CURATION step at the store layer per `router.py`, not serve-layer code).
-The `router.summarize` 8j6 PII gate is the runtime backstop that fail-closes if raw PII
-ever reaches a field-set item.
+There is no raw-drug-name -> class lookup in this module: de-identification is an
+operator/liaison CURATION step at the store layer per `router.py`, not serve-layer code,
+and the untrusted rx form field is captured record-only (Wave-B FIX-A) rather than wired
+into the model-bound item. The `router.summarize` 8j6 PII gate is the runtime backstop
+that fail-closes if raw PII ever reaches a field-set item.
 """
 
 import datetime
 from pathlib import Path
 
+from scripts.guard import pii_scan
 from scripts.plan.router import SUMMARY_FIELD_SET
 from scripts.store import store
 
@@ -49,14 +53,102 @@ WIRED_TOKENS = (
     "goal-priority-order",
     "hard-limits",
     "recovery-status-band",
-    "rx-interaction-classes",
 )
+# `rx-interaction-classes` is DELIBERATELY ABSENT from the wired set (Wave-B FIX-A).
+# Its store item IS a SUMMARY_FIELD_SET member, but the model-bound token may carry
+# only liaison-CURATED de-identified class tokens. The capture FORM field collects
+# operator-typed text the server cannot trust to be de-identified (a raw drug name +
+# dose would route verbatim into the model-bound item, and the `pii_scan` value gate
+# does not catch drug names). So the form field routes RECORD-ONLY to the gitignored
+# scaffold; the curation surface that emits real class tokens is the beaded ADR-0014
+# OQ-2 future consumer, not this serve-layer seam.
 
 # The Step-3 "train around / injury" form field -> the RAW-symptom store item
 # `summarize` de-identifies into `active-issue-class`. Written to the store (it is the
 # derivation INPUT, a named-excluded raw-PII class), never as a field-set token.
 _TRAIN_AROUND_FIELD = "train-around"
 _RAW_SYMPTOM_ITEM = "raw-symptom-free-text"
+
+# Server-side enumerated value sets for the bounded wired fields (Wave-B FIX-B). The
+# markup enforces these client-side (a `<select>` / a fixed chip set), but a crafted
+# POST can write any string into the token — so the server re-validates here BEFORE
+# `store.append`. `intake.py` builds its `<select>`/chips from these same constants so
+# the markup and this gate cannot drift. An out-of-set value is routed RECORD-ONLY to
+# the gitignored scaffold (never garbage into the model-bound token). Matching is
+# case-insensitive on the stripped value; `goal-domains` is a `;`-joined multi-value,
+# so EVERY token must be in the enum for the whole value to be accepted.
+RECOVERY_STATUS_BANDS = ("low", "moderate", "high")
+GOAL_DOMAINS = ("Workout", "Nutrition", "Supplements", "Peptides")
+_BOUNDED_ENUMS = {
+    "recovery-status-band": ({b.lower() for b in RECOVERY_STATUS_BANDS}, False),
+    "goal-domains": ({d.lower() for d in GOAL_DOMAINS}, True),
+}
+
+
+# The free-text wired tokens (operator-typed prose, not a bounded enum). Their full
+# value is PII-scanned on the capture path before it is written to the model-bound
+# token (Wave-B FIX-C): `pii_scan.scan_text` caps a single call at 4096 chars, so a
+# value longer than that could carry PII past the cap that the single 8j6 gate misses.
+# Accepted V1 residual: an operator deliberately typing a diagnosis into a goals field
+# is NOT caught here — the field is FOR de-identified goal text, the model path is
+# no-train, and a clinical-PHI detector is out of scope. The UI field carries guidance.
+_FREE_TEXT_TOKENS = ("goal-targets", "hard-limits", "goal-priority-order")
+_PII_SCAN_WINDOW = pii_scan._MAX_SCAN_TEXT_LEN
+
+
+def _value_has_pii(value, identity_config):
+    """Whether a free-text value carries operator PII anywhere in its FULL length.
+
+    `pii_scan.scan_text` caps at `_MAX_SCAN_TEXT_LEN`, so a long value could hide PII
+    past the cap. This windows the value into overlapping ≤cap chunks (overlap = the
+    longest pattern span, so a token straddling a chunk boundary is still seen whole)
+    and reports a hit if any chunk scans positive. Scoped to the capture path — it does
+    NOT change `scan_text`'s own default cap (which has other callers).
+
+    Args:
+        value (str): The free-text field value to scan in full.
+        identity_config (str | Path | None): The operator-identity token config passed
+            to `scan_text`; None falls through to its default.
+
+    Returns:
+        (bool) True when any window scans positive for operator PII.
+    """
+    if len(value) <= _PII_SCAN_WINDOW:
+        return _scan_window(value, identity_config) > 0
+    overlap = 64  # > the longest value-PII span (email/phone/postal), so a token on a
+    #               window boundary is wholly inside the next window.
+    step = _PII_SCAN_WINDOW - overlap
+    for start in range(0, len(value), step):
+        if _scan_window(value[start:start + _PII_SCAN_WINDOW], identity_config) > 0:
+            return True
+    return False
+
+
+def _scan_window(chunk, identity_config):
+    """Run `scan_text` over one ≤cap chunk, threading the capture's identity config."""
+    if identity_config is None:
+        return pii_scan.scan_text(chunk)
+    return pii_scan.scan_text(chunk, token_config=identity_config)
+
+
+def _bounded_value_ok(name, value):
+    """Whether a bounded field's value is within its server-side enum (Wave-B FIX-B).
+
+    Args:
+        name (str): The wired field name (only `_BOUNDED_ENUMS` members are bounded).
+        value (str): The submitted value (a scalar; `goal-domains` is `;`-joined).
+
+    Returns:
+        (bool) True when `name` is unbounded, or every token of `value` is in the enum.
+        A `goal-domains` with any out-of-set token, or a `recovery-status-band` not in
+        the band set, is False (-> routed record-only).
+    """
+    enum = _BOUNDED_ENUMS.get(name)
+    if enum is None:
+        return True  # not a bounded field — no enum to check
+    allowed, multi = enum
+    tokens = value.split(";") if multi else [value]
+    return all(tok.strip().lower() in allowed for tok in tokens if tok.strip())
 
 # Load-time tripwire (mirrors router.py's change-control asserts): every wired token must
 # be a SUMMARY_FIELD_SET member. A field-set edit that drops a wired token reds this at
@@ -108,10 +200,10 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
             Defaults to `store.DEFAULT_ROOT` (`vault/store/`).
         scaffold_root (str | Path, optional): The gitignored operator-record root the
             record-only values write under. Defaults to `vault/scaffold/filled/`.
-        identity_config (str | Path, optional): Accepted for the published-surface
-            contract (the boundary's identity config); the runtime PII backstop is
-            `router.summarize`'s 8j6 gate, not enforced here — this seam ROUTES by data
-            class so raw PII never reaches a field-set item in the first place.
+        identity_config (str | Path, optional): The operator-identity token config for
+            the free-text full-value PII scan (Wave-B FIX-C); threaded into
+            `pii_scan.scan_text`. The seam ROUTES by data class so raw PII never reaches
+            a field-set item; `router.summarize`'s 8j6 gate remains the runtime backstop.
 
     Returns:
         (dict) The routing outcome: `{"store": [tokens written], "scaffold": [field
@@ -125,7 +217,17 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
     for name, value in fields.items():
         if value is None or (isinstance(value, str) and not value.strip()):
             continue  # an unfilled field carries nothing to route
-        if name in WIRED_TOKENS:
+        if name in WIRED_TOKENS and not _bounded_value_ok(name, value):
+            # A crafted out-of-enum value for a bounded field (recovery-status-band /
+            # goal-domains) — do NOT write garbage into the model-bound token. Route it
+            # record-only to the gitignored scaffold (Wave-B FIX-B).
+            record_only[name] = value
+        elif name in _FREE_TEXT_TOKENS and _value_has_pii(value, identity_config):
+            # A free-text wired token whose FULL value carries operator PII (caught past
+            # scan_text's 4096-char cap, Wave-B FIX-C) — route it record-only, never into
+            # the model-bound token where PII past the single 8j6 gate's cap would evade.
+            record_only[name] = value
+        elif name in WIRED_TOKENS:
             # A wired de-identified token -> the store under its own name, source:"intake".
             store.append(name, _reading(name, value), root=store_root)
             written_tokens.append(name)
