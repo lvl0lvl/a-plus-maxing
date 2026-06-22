@@ -8,6 +8,7 @@ dropzones), injected by `generate.run('intake')`.
 from scripts.generate import generate
 from scripts.ingest import ingest
 from scripts.ingest.adapters import healthkit
+from scripts.serve import capture
 from vault.design.templates import intake
 
 _HK_HRV = "HKQuantityTypeIdentifierHeartRateVariabilitySDNN"
@@ -69,6 +70,61 @@ def test_intake_escapes_dropzone_filenames(tmp_path):
     html = path.read_text()
     assert "x&amp;y&lt;z&gt;.txt" in html       # escaped
     assert "x&y<z>.txt landed" not in html      # never the raw string
+
+
+def test_intake_markup_has_no_double_escaped_ampersand():
+    """FIX-D: no placeholder/label renders a double-escaped ampersand (`&amp;amp;`).
+
+    A pre-escaped string (`"name &amp; dose"`) passed where `_esc` escapes it again
+    renders the literal `name &amp; dose` in the browser (the `&amp;amp;` artifact).
+    The peptide placeholder hit this; assert the rendered HTML carries no `&amp;amp;`.
+    """
+    html = intake.render([])
+    assert "&amp;amp;" not in html, "a pre-escaped string was escaped again (double-escape bug)"
+
+
+def test_intake_markup_form_fields_match_capture_wired_tokens():
+    """FIX-E2: every wired capture token (+ `train-around`) is a rendered form field.
+
+    Closes the markup<->token wiring seam: a field-name typo in the markup would
+    silently break the capture round-trip with the suite otherwise green. Assert each
+    `capture.WIRED_TOKENS` member and `train-around` appears as a `name='<token>'`
+    attribute in the rendered HTML. Failing-capable: rename a markup field and this reds.
+    """
+    html = intake.render([])
+    for token in (*capture.WIRED_TOKENS, "train-around"):
+        assert f"name='{token}'" in html, (
+            f"the wired token {token!r} has no rendered form field (markup<->token seam broken)"
+        )
+
+
+def test_intake_goal_domains_group_has_fieldset_legend():
+    """FIX-F2: the goal-domains checkbox group is a `<fieldset>` with a `<legend>`.
+
+    Group semantics: the chip group's purpose is programmatically associated so the
+    grouping is conveyed to assistive tech. Assert the rendered markup wraps the
+    `goal-domains` checkboxes in a fieldset whose legend names the group.
+    """
+    html = intake.render([])
+    assert "<fieldset" in html and "<legend" in html, "the goal-domains group is not a fieldset/legend"
+    # The legend names the group, and the group contains the goal-domains checkboxes.
+    fs_start = html.index("<fieldset")
+    fs_end = html.index("</fieldset>", fs_start)
+    group = html[fs_start:fs_end]
+    assert "Goal areas" in group, "the goal-domains group legend does not name the group"
+    assert "name='goal-domains'" in group, "the fieldset does not wrap the goal-domains checkboxes"
+
+
+def test_intake_inputs_have_a_visible_focus_ring():
+    """FIX-F1: the input focus state adds a visible ring (not the border swap alone).
+
+    WCAG 2.4.7 / 1.4.11: a 1px border-color swap is not a sufficient focus indicator.
+    Assert the `:focus` rule carries a `box-shadow` ring.
+    """
+    html = intake.render([])
+    focus_rule = html[html.index(".inp:focus"):]
+    focus_rule = focus_rule[:focus_rule.index("}")]
+    assert "box-shadow" in focus_rule, "the input :focus state has no visible focus ring"
 
 
 def test_intake_emits_self_contained_file(tmp_path):

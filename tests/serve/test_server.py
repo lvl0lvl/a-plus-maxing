@@ -767,14 +767,14 @@ def test_post_capture_fields_land_wired_tokens_and_rerenders(tmp_path):
     _serve_in_thread(srv)
     try:
         status, body = _post_fields(port, {
-            "goal-domains": "strength;recovery",
+            "goal-domains": "Workout;Nutrition",
             "hard-limits": "no overhead pressing",
         })
         assert status == 200, f"capture POST returned {status}, expected 200"
 
         gd = store.read("goal-domains", root=tmp_path / "store")
         assert len(gd) == 1 and gd[0]["source"] == "intake", "goal-domains did not land via capture.persist_capture"
-        assert gd[0]["value"] == "strength;recovery"
+        assert gd[0]["value"] == "Workout;Nutrition"
         hl = store.read("hard-limits", root=tmp_path / "store")
         assert hl and hl[0]["value"] == "no overhead pressing", "hard-limits did not land"
 
@@ -839,7 +839,7 @@ def test_post_step6_is_a_generate_plan_handoff_not_in_app_generation(tmp_path):
     _serve_in_thread(srv)
     try:
         status, body = _post_fields(port, {
-            "goal-domains": "strength",
+            "goal-domains": "Workout",
             "step": "6",  # the Step-6 "Save & open plan generation" submit
         })
         assert status == 200, f"Step-6 submit returned {status}, expected 200"
@@ -849,6 +849,34 @@ def test_post_step6_is_a_generate_plan_handoff_not_in_app_generation(tmp_path):
         assert WIZARD_TITLE in body, "the Step-6 response is not the re-rendered wizard"
         # Still-transient inputs were persisted via the same capture path.
         assert store.read("goal-domains", root=tmp_path / "store"), "the Step-6 submit did not persist the inputs"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_post_step6_step_control_field_never_lands_in_the_record(tmp_path):
+    """FIX-E1: the `step` control field is stripped — it never lands in the operator record.
+
+    The Step-6 submit carries a `step=6` control field that selects the handoff re-render.
+    The handler pops it (`fields.pop("step")`) so it never reaches `persist_capture` as a
+    stray record-only scaffold value. Assert the tmp scaffold carries no `"step"` key/value
+    after a Step-6 submit. Failing-capable: drop the `fields.pop("step")` and `step` lands
+    in the scaffold record, reddening this.
+    """
+    srv, port = _server_with_roots(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        # A record-only field forces a scaffold write so a leaked `step` would appear there.
+        status, _ = _post_fields(port, {
+            "dietary-pattern": "high protein",
+            "step": "6",
+        })
+        assert status == 200, f"Step-6 submit returned {status}, expected 200"
+
+        scaffold_root = tmp_path / "scaffold"
+        scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+        assert "dietary-pattern" in scaffold_text, "the record-only field did not land (no scaffold written)"
+        assert '"step"' not in scaffold_text, "the `step` control field leaked into the operator record"
     finally:
         srv.shutdown()
         srv.server_close()

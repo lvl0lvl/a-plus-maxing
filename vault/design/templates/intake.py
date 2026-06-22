@@ -21,11 +21,19 @@ interactive-ingest build.
 from html import escape as _esc
 
 from scripts.ingest import status as ingest_status
+from scripts.serve.capture import GOAL_DOMAINS, RECOVERY_STATUS_BANDS
 
 # The intake mocks (2vFFC / khCNX / BRAUE) use a neutral gray palette + a blue accent
 # (distinct from the dashboard's clin-* tokens). Held here so the render matches the mock.
 _INK, _INK2, _INK3 = "#111827", "#4B5563", "#6B7280"
 _CANVAS, _SHEET, _LINE, _LINE2 = "#F3F4F6", "#FFFFFF", "#E5E7EB", "#F1F2F4"
+# Control-boundary border (Wave-B FIX-F): #8A9099 on white is 3.22:1, clearing the WCAG
+# 1.4.11 3:1 control-boundary bar (#E5E7EB on white is only 1.24:1). Used for the input/
+# select/textarea + the .box resting border so a control's edge is perceivable.
+_CTRL_BORDER = "#8A9099"
+# Focus ring (Wave-B FIX-F): a visible on-theme blue ring for WCAG 2.4.7 / 1.4.11, since
+# the resting->focus 1px border swap alone is not a sufficient focus indicator.
+_FOCUS_RING = "rgba(37, 99, 235, 0.35)"  # the _BLUE accent at 35% — a 3px soft ring
 _BLUE, _BLUE_DEEP, _BLUE_SOFT = "#2563EB", "#1D4ED8", "#EFF2FE"
 _GREEN, _GREEN_BG = "#059669", "#ECFDF5"
 _FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
@@ -74,9 +82,12 @@ body {{ font-family: {_FONT}; background: {_CANVAS}; color: {_INK};
 .ptitle {{ font-size: 21px; font-weight: 700; }}
 .psub {{ font-size: 14px; color: {_INK2}; margin-top: 6px; line-height: 1.5; }}
 .seclab {{ font-size: 12.5px; font-weight: 700; color: #374151; margin: 22px 0 10px; }}
+/* Grouped controls (Wave-B FIX-F): fieldset reset so the legend keeps the .seclab look. */
+.grp {{ border: 0; padding: 0; margin: 0; min-width: 0; }}
+.grp legend.seclab {{ padding: 0; margin: 22px 0 10px; }}
 .grid2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }}
 .field label {{ display: block; font-size: 12.5px; font-weight: 600; color: #374151; margin-bottom: 6px; }}
-.box {{ border: 1px solid {_LINE}; border-radius: 8px; padding: 10px 12px; font-size: 13.5px;
+.box {{ border: 1px solid {_CTRL_BORDER}; border-radius: 8px; padding: 10px 12px; font-size: 13.5px;
         color: {_INK}; background: {_SHEET}; min-height: 40px; display: flex; align-items: center;
         justify-content: space-between; }}
 .box.ph {{ color: {_INK3}; }}
@@ -107,11 +118,13 @@ body {{ font-family: {_FONT}; background: {_CANVAS}; color: {_INK};
 .btn.back {{ border: 1px solid {_LINE}; color: {_INK2}; background: {_SHEET}; }}
 .btn.next {{ background: {_BLUE}; color: #fff; border: 1px solid {_BLUE_DEEP}; }}
 /* Interactive capture controls — reuse the .box visual vocabulary (ADR-0014-T1). */
-.inp, textarea.inp, select.inp {{ width: 100%; border: 1px solid {_LINE}; border-radius: 8px;
+.inp, textarea.inp, select.inp {{ width: 100%; border: 1px solid {_CTRL_BORDER}; border-radius: 8px;
         padding: 10px 12px; font-size: 13.5px; color: {_INK}; background: {_SHEET};
         font-family: {_FONT}; }}
 textarea.inp {{ min-height: 44px; resize: vertical; line-height: 1.45; }}
-.inp:focus, textarea.inp:focus, select.inp:focus {{ outline: none; border-color: {_BLUE}; }}
+/* Focus: a visible blue ring (WCAG 2.4.7 / 1.4.11) — not the border swap alone. */
+.inp:focus, textarea.inp:focus, select.inp:focus {{ outline: none; border-color: {_BLUE};
+        box-shadow: 0 0 0 3px {_FOCUS_RING}; }}
 .chk {{ display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; padding: 6px 12px;
         border-radius: 999px; border: 1px solid {_LINE}; color: {_INK2}; cursor: pointer; }}
 .chk input {{ accent-color: {_BLUE}; }}
@@ -225,13 +238,21 @@ def _select_field(label, name, options):
             f"<select class='inp' id='{name}' name='{name}'>{opts}</select></div>")
 
 
-def _check_chips(name, options):
-    """Checkbox chips that all submit under one repeated capture field `name`."""
+def _check_chips(name, options, legend=None):
+    """Checkbox chips that all submit under one repeated capture field `name`.
+
+    When `legend` is given, the group is wrapped in a `<fieldset>`/`<legend>` so the
+    group purpose is programmatically associated (WCAG group semantics, Wave-B FIX-F).
+    """
     out = []
     for value in options:
         out.append(f"<label class='chk'><input type='checkbox' name='{name}' "
                    f"value='{_esc(value)}'>{_esc(value)}</label>")
-    return f"<div class='chips'>{''.join(out)}</div>"
+    chips = f"<div class='chips'>{''.join(out)}</div>"
+    if legend is None:
+        return chips
+    return (f"<fieldset class='grp'><legend class='seclab'>{_esc(legend)}</legend>"
+            f"{chips}</fieldset>")
 
 
 def _step1(status):
@@ -249,17 +270,22 @@ def _step2():
     # Goal areas -> the de-identified `goal-domains` token (repeated checkbox field).
     # Targets -> `goal-targets`; priority -> `goal-priority-order`; the highest-priority
     # add, `hard-limits` (the fail-closed HALT-filter input), is a real free-text field.
-    body = ("<div class='seclab'>Goal areas</div>"
-            + _check_chips("goal-domains", ["Workout", "Nutrition", "Supplements", "Peptides"])
+    # The two free-text fields carry brief guidance to keep names/medical details out of
+    # the de-identified goal text (Wave-B FIX-C; the model path is no-train, and a typed
+    # diagnosis is an accepted V1 residual — see the field hints).
+    _goal_hint = "<div class='note'>Describe your goal — no names or medical details.</div>"
+    body = (_check_chips("goal-domains", list(GOAL_DOMAINS), legend="Goal areas")
             + "<div class='seclab'>Targets</div>"
             + _textarea_field("What should the plan optimize for?", "goal-targets",
                               "e.g. add 10 lb to squat by September; bring resting heart rate under 50")
+            + _goal_hint
             + "<div class='seclab'>Priority order</div>"
             + _text_field("Order your goals", "goal-priority-order",
                           "e.g. 1 workout, 2 nutrition, 3 supplements")
             + "<div class='seclab'>Hard limits</div>"
             + _textarea_field("Anything the plan must never do", "hard-limits",
-                              "e.g. no overhead pressing; at least one full rest day"))
+                              "e.g. no overhead pressing; at least one full rest day")
+            + _goal_hint)
     return _panel(2, "Goals &amp; priorities",
                   "What should the plan optimize for, and in what order?", body)
 
@@ -269,11 +295,14 @@ def _step3():
     # -> the `train-around` raw-symptom field summarize de-identifies into
     # active-issue-class. The training detail has no de-identified consumer today — it
     # is captured to the gitignored record, honestly labeled.
+    # The option VALUES are RECOVERY_STATUS_BANDS (the server-side FIX-B enum), so the
+    # markup and capture's bounded-value gate cannot drift; the display text is local.
+    _band_labels = {"low": "Low — run down / under-recovered",
+                    "moderate": "Moderate — about normal",
+                    "high": "High — fresh and recovering well"}
     body = (_select_field("Recovery status", "recovery-status-band",
-                          [("", "How recovered do you feel lately?"),
-                           ("low", "Low — run down / under-recovered"),
-                           ("moderate", "Moderate — about normal"),
-                           ("high", "High — fresh and recovering well")])
+                          [("", "How recovered do you feel lately?")]
+                          + [(b, _band_labels[b]) for b in RECOVERY_STATUS_BANDS])
             + "<div class='seclab'>Train around</div>"
             + _text_field("Anything to train around (injury / caution)", "train-around",
                           "e.g. lower-back caution, left shoulder")
@@ -307,19 +336,21 @@ def _step4():
 
 def _step5():
     # The raw supplement/peptide stack (raw names/doses) is named-excluded PII -> the
-    # gitignored record, honestly labeled. The supplement<->Rx interaction screen
-    # crosses the boundary ONLY as curated de-identified CLASS tokens
-    # (`rx-interaction-classes`), never raw drug names. The redundant
-    # "what are you hoping to address" is dropped (covered by Step-2 goals).
+    # gitignored record, honestly labeled. The medication-interaction text is ALSO saved
+    # to the record only (Wave-B FIX-A): the model-bound `rx-interaction-classes` token
+    # carries only liaison-CURATED de-identified class tokens, so this untrusted form
+    # field does NOT cross the model boundary — it is honestly labeled as record-only,
+    # not promised as de-identified-by-the-form. The redundant "what are you hoping to
+    # address" is dropped (covered by Step-2 goals).
     body = ("<div class='recnote'>Your raw stack is saved to your record — not yet used by the plan.</div>"
             + "<div class='seclab'>Current supplement stack</div>"
             + _textarea_field("Supplements (name &amp; dose)", "supplement-stack",
                               "e.g. creatine monohydrate · 5 g")
             + "<div class='seclab'>Peptides (current or considered)</div>"
-            + _textarea_field("Peptides (name &amp; dose)", "peptide-stack", "name &amp; dose")
-            + "<div class='seclab'>Medication interaction classes</div>"
-            + _text_field("De-identified interaction classes (not drug names)", "rx-interaction-classes",
-                          "e.g. bleeding-risk; cyp3a4-pgp"))
+            + _textarea_field("Peptides (name &amp; dose)", "peptide-stack", "name & dose")
+            + "<div class='seclab'>Medications &amp; interactions</div>"
+            + _text_field("Medications to screen against (saved to your record)", "rx-interaction-classes",
+                          "e.g. blood thinner; thyroid medication"))
     return _panel(5, "Supplements &amp; peptides",
                   "Your current stack — so interactions are screened before anything is recommended.", body)
 
