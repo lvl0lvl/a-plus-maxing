@@ -1,0 +1,139 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 47,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 47,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 3,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 22,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 8,
+      "count_flagged": 0
+    },
+    "IC-9": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 8,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 10,
+      "count_flagged": 4,
+      "findings": [
+        "Lee 2014 (PMID 25040290) \u2014 numerical figures (-70%/+40%/+45%/-70%/+80%, r=-0.69, n=11 children, n=6 Laron) are in full text; abstract confirms only negative GH/IGF-I\u2192humanin direction. Status: corpus-missing WARN.",
+        "Yen 2018 (PMID 30242290) \u2014 BVAIT n=146, HRS n=15,620, ~20% lower humanin in African Americans, ~2-year cognitive age acceleration are in full text; abstract confirms SNP rs2854128 and accelerated cognitive aging direction. Status: corpus-missing WARN.",
+        "Sharp 2020 (PMID 32760857) \u2014 41% infarct size reduction and 50% apoptosis reduction are in full text; abstract confirms significant infarct-sparing at 60 min and abolished effect at 75 min. Status: corpus-missing WARN.",
+        "D.2 PK figures (30-min plasma half-life native HN, sub-4-hour HNG, 1,000-fold potency, CNS penetration by ELISA) \u2014 sourced via ALZFDN Cognitive Vitality review (alzdiscovery.org), which is not a whitelisted Tier 1/2 host. No Tier 1 primary PK paper is cited directly. These are mechanism/PK characterization claims, not efficacy numbers. Status: corpus-missing + off-whitelist source advisory WARN."
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 22,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 47,
+    "largest_cluster_name": "Nishimoto/Hashimoto/Niikura (Keio University)",
+    "largest_cluster_count": 15,
+    "share": 0.32,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 10,
+    "claims_failed": [
+      {
+        "claim": "Lee 2014: GH-transgenic mice plasma humanin reduced ~70%, Ames dwarf ~40% elevated, LID mice ~45% elevated, BP3KO ~70% reduced; Laron syndrome ~80% elevated; GH-deficient children n=11 r=-0.69 p<0.05; GH therapy reduced humanin ~20%",
+        "cite_key": "lee-2014-25040290",
+        "failure_mode": "corpus-missing",
+        "grep_command": "WebFetch pubmed.ncbi.nlm.nih.gov/25040290 \u2014 abstract only; full text paywalled (Aging Cell)",
+        "grep_output": "Abstract confirms negative GH/IGF-I:humanin relationship and GH treatment effect direction; specific percentages, n, and r-value not in abstract."
+      },
+      {
+        "claim": "Yen 2018: BVAIT n=146, ~20% lower humanin in African Americans; HRS n=15,620; SNP rs2854128 ~14% lower humanin; ~2-year accelerated cognitive age in African Americans",
+        "cite_key": "yen-2018-30242290",
+        "failure_mode": "corpus-missing",
+        "grep_command": "WebFetch pubmed.ncbi.nlm.nih.gov/30242290 \u2014 abstract only; full text paywalled (Sci Rep)",
+        "grep_output": "Abstract confirms SNP rs2854128 and accelerated cognitive aging direction; BVAIT/HRS study names, n, and ~20%/~2-year specifics not in abstract."
+      },
+      {
+        "claim": "Sharp 2020: HNG reduced infarct size by 41% (p=0.017) and apoptosis by 50% (p=0.019) in 60-min ischemia group",
+        "cite_key": "sharp-2020-32760857",
+        "failure_mode": "corpus-missing",
+        "grep_command": "WebFetch pubmed.ncbi.nlm.nih.gov/32760857 \u2014 abstract only; full text paywalled (JACC Basic Transl Sci)",
+        "grep_output": "Abstract confirms HNG 2 mg/kg, porcine model, significant infarct-sparing at 60 min, abolished at 75 min; 41%/50% exact values not in abstract."
+      },
+      {
+        "claim": "D.2 PK: native humanin plasma half-life ~30 min (mice, IP); HNG sub-4-hour half-life in rodents; HNG detectable in plasma, liver, heart, brain by ELISA",
+        "cite_key": "alzfdn-cognitive-vitality-2020",
+        "failure_mode": "corpus-missing",
+        "grep_command": "alzdiscovery.org PDF not directly fetchable; source is off-whitelist (not Tier 1/2 peer-reviewed primary literature)",
+        "grep_output": "Source is ALZFDN Cognitive Vitality report \u2014 not whitelisted. PK figures corroborated descriptively by ResearchGate abstract reference in bib note but no Tier 1 primary PK paper directly cited."
+      }
+    ]
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: 4 corpus-missing WARNs (paywalled full texts) \u2014 all directionally confirmed at abstract level except D.2 PK source off-whitelist",
+    "IC-13/D.2: alzdiscovery.org PK review source not on whitelist \u2014 PK mechanism claims should ideally be backed by a whitelisted Tier 1 primary (e.g., a direct rodent PK paper from a PubMed-indexed journal); recommend orchestrator adds or substitutes a primary PK citation for D.2"
+  ],
+  "timestamp": "2026-06-20T21:39:09.814311+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T21:33:00.937188+00:00",
+    "attest_ts": "2026-06-20T21:39:09.814314+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "808f96494e1a3c5d4004d748644ff1b4b38f1a1a64a9f5e4e2ffbdf558ab7489",
+    "agent_source_mtime": "2026-06-20T21:39:09.756412+00:00"
+  }
+}
