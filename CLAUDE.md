@@ -161,6 +161,14 @@ This project uses a basic-memory vault at `vault/` for structured knowledge trac
 
 Query the vault: `mcp__basic-memory__search` with project `a-plus-maxing`.
 
+### Vault / daemon hygiene (S90)
+
+The basic-memory daemon watches the **main checkout's** `vault/` (`~/.basic-memory/config.json` → project `a-plus-maxing`) and **rewrites `vault/**/*.md` frontmatter on every sync** (`ensure_frontmatter_on_sync: true`): it injects `permalink: a-plus-maxing/<path>`, folds long titles, strips trailing newlines, and — on files with `{placeholder}` / flow-collection / inline-comment YAML (the **templates**) — DESTRUCTIVELY re-serializes them (`name: {x}` → `name:\n  x: null`). This is the perpetual `git status` churn.
+
+- **NEVER `git add vault/` blindly or commit the daemon frontmatter-churn.** Stage close/build artifacts by explicit path. The churn is cosmetic on normal content files but corrupts template frontmatter if committed; the committed versions are canonical, the working-tree churn is daemon noise to leave uncommitted (it re-appears every sync). `git restore vault/<file>` discards it (the daemon re-churns within ~1s — that is expected).
+- **Cross-worktree model (single-trunk, since S90):** the daemon watches ONE path (the main checkout). Do Wave-B / research work on a **short-lived branch IN the main checkout**, or in a worktree the daemon does NOT watch (its vault then stays clean); on merge to `main` the daemon re-scans and catches up. Do NOT repoint the daemon at a worktree (it breaks when the worktree is removed).
+- **The complete fix** (stop the rewriting via global `ensure_frontmatter_on_sync: false`) is operator-owned — it is GLOBAL to all ~24 basic-memory projects — and tracked in bead `a-plus-maxing-02m1` with exact steps.
+
 ## Hooks
 
 Six PreToolUse hooks are registered (`.claude/settings.json`; the roster is pinned by `scripts/tests/test_settings_hook_paths.sh`), plus one git-native pre-push hook installed outside settings:
