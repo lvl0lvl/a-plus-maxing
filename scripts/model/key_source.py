@@ -1,9 +1,11 @@
 """The runtime key source — resolves the no-train API key at call time, never tracked.
 
-`resolve()` fetches the no-train API key from a SET env var (`APLUS_NOTRAIN_API_KEY`) or,
-as a fallback, a macOS-keychain `security find-generic-password` command — AT CALL TIME,
-never captured at module load and never read from a tracked file. An absent key raises
-`KeyUnavailableError` fail-loud, naming the env var + the `keychain-setup.md` runbook.
+`resolve()` fetches the no-train API key from a SET env var (`ANTHROPIC_API_KEY` — the
+anthropic SDK's native var AND the operator's documented injection var) or, as a fallback,
+a macOS-keychain `security find-generic-password` command against the `quant-primary-api`
+keychain item — AT CALL TIME, never captured at module load and never read from a tracked
+file. An absent key raises `KeyUnavailableError` fail-loud, naming the env var + the
+`keychain-setup.md` runbook.
 
 This mirrors the project's runtime-config-resolution discipline (`pii_scan`'s gitignored
 identity config is resolved at call time, never tracked): no API-key literal ever lands in
@@ -14,11 +16,17 @@ call time, so the key is fetched at runtime, never imported from a constant.
 import os
 import subprocess
 
-ENV_VAR = "APLUS_NOTRAIN_API_KEY"
+# The anthropic SDK's native var AND the operator's documented runtime-injection var
+# (S90 directive: `export ANTHROPIC_API_KEY=$(security find-generic-password -s
+# "quant-primary-api" -w)`). Reading it directly means the operator's existing shell
+# export resolves with no extra setup.
+ENV_VAR = "ANTHROPIC_API_KEY"
 
 # The keychain item the runbook stores the key under (`keychain-setup.md`). The service
 # name is a label, not a secret — the key VALUE lives only in the keychain at runtime.
-_KEYCHAIN_SERVICE = "aplus-notrain-api-key"
+# Matches the operator's existing keychain item (`quant-primary-api`), so the keychain
+# fallback resolves the same key the operator already injects via the env var.
+_KEYCHAIN_SERVICE = "quant-primary-api"
 
 _RUNBOOK = "scripts/model/keychain-setup.md"
 

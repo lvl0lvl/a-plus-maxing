@@ -425,6 +425,41 @@ def test_free_text_token_pii_past_the_4096_cap_routes_record_only(tmp_path):
     assert hl and hl[0]["value"] == "no overhead pressing", "a clean free-text value did not land in the token"
 
 
+def test_canadian_postal_in_free_text_token_routes_record_only(tmp_path):
+    """nue-CA: a Canadian postal typed into a free-text wired token routes record-only.
+
+    The operator is in Nova Scotia. A Canadian street address (`B2Y 1A1`) typed into a
+    free-text goals field must NOT reach the model-bound `goal-priority-order` token (a
+    raw-PII egress on the crown-jewel boundary) — it routes record-only to the gitignored
+    scaffold instead. Failing-capable: without the Canadian postal pattern the value scans
+    0 and lands in the token, reddening the negative assertion.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    value = "prioritize squat first, ship gear to 27 Portland St, Dartmouth NS B2Y 1A1"
+    # Pre-condition: the full-value scan catches the Canadian postal (the gate's trigger).
+    assert pii_scan.scan_text_full(value, token_config=_ABSENT_IDENTITY) >= 1, (
+        "the Canadian postal was not detected by scan_text_full — fixture/pattern invalid"
+    )
+
+    capture.persist_capture(
+        {"goal-priority-order": value},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Negative (load-bearing): the Canadian-postal value never reached the model-bound token.
+    assert store.read("goal-priority-order", root=store_root) == [], (
+        "a free-text value carrying a Canadian postal reached the model-bound token"
+    )
+    for token in SUMMARY_FIELD_SET:
+        readings = store.read(token, root=store_root)
+        assert all("B2Y" not in str(r.get("value")) for r in readings), (
+            f"the Canadian postal leaked into the {token!r} field-set store item"
+        )
+    # Positive: it landed record-only in the gitignored scaffold instead.
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert "B2Y 1A1" in scaffold_text, "the Canadian-postal value did not route record-only"
+
+
 # A PII token whose match span EXCEEDS the old `overlap=64`, so positioned across the
 # old window step boundary (~char 4032) it was seen WHOLE by neither overlapping window
 # and leaked. A 79-char postal (span > 64) and an email — both real `scan_text_full`
