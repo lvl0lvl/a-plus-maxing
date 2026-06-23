@@ -817,8 +817,11 @@ def test_identity_config_seam_threads_to_every_capture_call_site():
 # (chat form field, named-excluded raw source, derived band token, a realistic raw value,
 #  a distinctive raw fragment, the expected coarse band).
 _CHAT_CAPTURE_CASES = [
+    # BUG-5 (Wave-B review): "allergic" makes this `restricted` — the allergy/restriction
+    # signal takes precedence over the leading plant pattern (the masked-allergy fix). The
+    # value is unchanged (a realistic mixed pattern+allergy input); the band is corrected.
     ("nutrition-detail", "raw-nutrition-free-text", "dietary-pattern-class",
-     "vegan, allergic to SHELLFISH-XYZ, 5 small meals", "SHELLFISH-XYZ", "plant-based"),
+     "vegan, allergic to SHELLFISH-XYZ, 5 small meals", "SHELLFISH-XYZ", "restricted"),
     ("supplement-stack", "raw-supplement-free-text", "supplement-stack-class",
      "creatine 5g, whey BRAND-XYZ, omega-3", "BRAND-XYZ", "multi-supplement"),
     ("peptide-stack", "raw-peptide-free-text", "peptide-use-class",
@@ -863,6 +866,37 @@ def test_chat_field_writes_raw_source_summarize_derives_band(
     # The raw free-text fragment never appears under the field-set token.
     assert fragment not in str(summary.get(token, "")), (
         f"raw fragment {fragment!r} leaked into the {token!r} token"
+    )
+
+
+@pytest.mark.parametrize("bad_year", ["not-a-year", "86", "3026", "198"])
+def test_malformed_birth_year_through_capture_seam_bands_unknown(bad_year, tmp_path):
+    """BUG-2 + TEST-3: a malformed birth year through the capture seam derives
+    `age-band-unknown`, with the raw string nowhere in the emitted token.
+
+    The Step-1 birth-year field writes the RAW `date-of-birth` store item; `summarize`
+    de-identifies it via `_age_band`. A malformed/non-numeric/out-of-range year must band
+    `age-band-unknown` (post-BUG-2-fix) rather than garble into a fake born-decade, and
+    the raw string must not appear under the field-set token. Failing-capable: the pre-fix
+    `_age_band` garbled '86'->'born-860s', '3026'->'born-3020s', '198'->'born-1980s'.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"date-of-birth": bad_year},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    # The raw year landed in the named-excluded raw source, never the band token directly.
+    assert store.read("date-of-birth", root=store_root), "the birth-year field wrote no raw source"
+    assert store.read("training-age-band", root=store_root) == [], (
+        "the birth-year field wrongly wrote training-age-band directly (must be derived)"
+    )
+    summary = _summary(store_root)
+    assert summary.get("training-age-band") == "age-band-unknown", (
+        f"a malformed birth year {bad_year!r} did not band age-band-unknown"
+    )
+    # The raw malformed string appears nowhere in the emitted token.
+    assert bad_year not in str(summary.get("training-age-band", "")), (
+        f"the raw birth-year string {bad_year!r} leaked into the training-age-band token"
     )
 
 

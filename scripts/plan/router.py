@@ -10,6 +10,8 @@ version-controlled source-of-truth for the PII boundary (Security MEDIUM-2); the
 field NAMES were supplied by the spike at build time.
 """
 
+from datetime import datetime, timezone
+
 from scripts.guard import pii_scan
 from scripts.store import biomarker_meta
 
@@ -218,14 +220,33 @@ _POLARITY_FEED = tuple(
 )
 
 
+# BUG-1 sentinel (Wave-B review): the DISTINCT "source absent — not elicited" token for
+# the 4 chat-sourced always-set derivers. Kept separate from each deriver's no-signal
+# default (`general-diet`/`none`/`moderate`), which means "there IS source data and it
+# says so". `not-discussed` (absent) is token-distinguishable from `none` (confirmed-none)
+# — a fresh operator with no chat data reads as "not elicited", never "confirmed no
+# peptides". Still a value, so the always-set contract holds (dispatch's partial-summary
+# raise does not trip).
+_NOT_DISCUSSED = "not-discussed"
+
+
 def _age_band(readings):
     """Bucket a raw date-of-birth into a coarse training-age band.
 
     Buckets by birth-decade (minimal sensible boundaries — the spike pins the
     band SHAPE, not exact cutoffs); the raw date never appears in the token.
+    Requires EXACTLY 4 digits after stripping surrounding whitespace and a year
+    inside a sane range (1900..the current UTC year) — a malformed value ('86',
+    '198', a future year, a non-numeric string) bands `age-band-unknown` rather
+    than fabricating a born-decade.
     """
-    year = str(readings[-1]["value"])[:4]
-    return f"born-{year[:3]}0s" if year.isdigit() else "age-band-unknown"
+    raw = str(readings[-1]["value"]).strip()
+    year = raw[:4]
+    if len(year) != 4 or not year.isdigit():
+        return "age-band-unknown"
+    if not 1900 <= int(year) <= datetime.now(timezone.utc).year:
+        return "age-band-unknown"
+    return f"born-{year[:3]}0s"
 
 
 def _trend_token(readings):
@@ -325,19 +346,27 @@ def _dietary_pattern_class(readings):
     Emits a coarse diet class only — the raw food/allergen text never appears in the
     token (the per-token output scan, AC-2, proves this). Mirrors `_issue_class`'s
     keyword-bucketing coarseness: the class is a pattern bucket, not the raw meal log.
-    An empty readings series (no chat-extracted nutrition yet) -> the no-signal
-    `general-diet` default (the always-set contract — never a false specific class).
+    An ABSENT readings series (no chat-extracted nutrition yet) -> the `not-discussed`
+    sentinel (BUG-1: distinguishable from a confirmed pattern). A PRESENT value with no
+    matched pattern -> the `general-diet` no-signal default.
+
+    Precedence (BUG-5): the allergy/restriction keyword set is checked FIRST, before the
+    plant-pattern buckets, so a mixed "pattern + allergy" value ('vegetarian but allergic
+    to nuts') bands `restricted` consistently with the omnivore-with-allergy case
+    ('eat everything but allergic to shellfish') — the allergy signal is never masked by
+    a leading plant pattern. Single coarse class only (no second allergen token — that is
+    a vocabulary change out of scope).
     """
     if not readings:
-        return "general-diet"
+        return _NOT_DISCUSSED
     text = str(readings[-1]["value"]).lower()
+    if any(w in text for w in ("keto", "carnivore", "elimination", "allergic", "allergy",
+                               "intolerant", "restricted", "gluten-free")):
+        return "restricted"
     if any(w in text for w in ("vegan", "plant-based", "plant based", "wholly plant")):
         return "plant-based"
     if any(w in text for w in ("vegetarian", "plant-forward", "plant forward", "pescatarian")):
         return "plant-forward"
-    if any(w in text for w in ("keto", "carnivore", "elimination", "allergic", "allergy",
-                               "intolerant", "restricted", "gluten-free")):
-        return "restricted"
     if any(w in text for w in ("meat", "chicken", "beef", "fish", "omnivore", "everything")):
         return "omnivore"
     return "general-diet"
@@ -348,15 +377,22 @@ def _supplement_stack_class(readings):
 
     Emits a coarse presence/category class only — raw product names and doses never
     appear in the token (AC-2). The cut is presence + rough breadth (one vs several),
-    never the itemized stack. An empty series -> the no-signal `none` (always-set).
+    never the itemized stack. An ABSENT series -> the `not-discussed` sentinel (BUG-1:
+    distinguishable from a confirmed-none). A PRESENT empty / no-supplement / separators-
+    only value (the operator typed something that resolves to nothing) -> the confirmed
+    `none`.
     """
     if not readings:
-        return "none"
+        return _NOT_DISCUSSED
     text = str(readings[-1]["value"]).strip().lower()
     if not text or text in ("none", "no", "n/a", "na"):
         return "none"
     # Count distinct comma/semicolon/newline-separated items as a rough breadth signal.
+    # BUG-4: filter the empties FIRST so a separators-only value (';;;', ',,') resolves to
+    # 0 parts -> `none`, never a false single-supplement off a len<=1 empty list.
     parts = [p.strip() for p in text.replace(";", ",").replace("\n", ",").split(",") if p.strip()]
+    if not parts:
+        return "none"
     return "multi-supplement" if len(parts) > 1 else "single-supplement"
 
 
@@ -365,12 +401,20 @@ def _peptide_use_class(readings):
 
     Emits a coarse use/presence class only — raw compound names and doses never appear
     in the token (AC-2). The cut is binary presence (the peptide axis is high-sensitivity:
-    presence, not the itemized compounds). An empty series -> the no-signal `none`.
+    presence, not the itemized compounds). An ABSENT series -> the `not-discussed` sentinel
+    (BUG-1: distinguishable from a confirmed-none — a fresh operator never reads as
+    "confirmed no peptides"). A PRESENT empty / no-peptide / separators-only value -> the
+    confirmed `none`.
     """
     if not readings:
-        return "none"
+        return _NOT_DISCUSSED
     text = str(readings[-1]["value"]).strip().lower()
     if not text or text in ("none", "no", "n/a", "na"):
+        return "none"
+    # BUG-4: a separators-only value (';;;', ',,') is PRESENT-but-empty -> confirmed `none`,
+    # not a false `peptide-in-use`. Strip the separators and re-check for residual content.
+    parts = [p.strip() for p in text.replace(";", ",").replace("\n", ",").split(",") if p.strip()]
+    if not parts:
         return "none"
     return "peptide-in-use"
 
@@ -381,19 +425,30 @@ def _training_volume_band(readings):
     Emits a coarse weekly-volume band only — raw set counts / the itemized split never
     appear in the token (AC-2). DISTINCT from `_age_band`'s `training-age-band` (a
     demographic born-decade band): this is a chat-sourced training-VOLUME band. Bands by
-    weekly session frequency parsed loosely from the free-text (`low`/`moderate`/`high`),
-    defaulting to `moderate` when no count is determinable (the no-signal middle). An
-    empty series (no chat-extracted training detail yet) -> the `moderate` no-signal
-    default (the always-set contract).
+    weekly session frequency parsed loosely from the free-text (`low`/`moderate`/`high`).
+    An ABSENT series (no chat-extracted training detail yet) -> the `not-discussed`
+    sentinel (BUG-1). A PRESENT value with no determinable count -> the `moderate`
+    no-signal middle.
+
+    BUG-3: the frequency capture is one-or-two digits (not a single digit), so a
+    double-digit count ('10x', '12 sessions') bands `high` instead of being misread.
+    Parsed counts are clamped to 1..14 (a sane weekly-session range). When two unrelated
+    numbers appear ('5 days and 2x'), the CONTEXTUAL/last frequency match wins over
+    `max()` of unrelated integers. A range like '4-5x' captures the digit adjacent to the
+    unit ('5' -> high).
     """
     import re
 
     if not readings:
-        return "moderate"
+        return _NOT_DISCUSSED
     text = str(readings[-1]["value"]).lower()
-    days = [int(n) for n in re.findall(r"\b([1-9])\s*x", text)]
-    days += [int(n) for n in re.findall(r"\b([1-9])\s*(?:days?|sessions?|/week|per week)", text)]
-    sessions = max(days) if days else None
+    # All frequency matches across both unit patterns, in text order; the LAST wins (the
+    # contextual per-week count), not max() of unrelated integers.
+    matches = sorted(
+        re.finditer(r"\b(\d{1,2})\s*(?:x|days?|sessions?|/week|per week)", text),
+        key=lambda m: m.start(),
+    )
+    sessions = max(1, min(14, int(matches[-1].group(1)))) if matches else None
     if sessions is None:
         if any(w in text for w in ("twice", "2x", "minimal", "light")):
             return "low"
