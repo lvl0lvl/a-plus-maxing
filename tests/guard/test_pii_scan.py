@@ -445,6 +445,57 @@ def test_scan_text_detects_postal_address(value, label):
     assert pii_scan.scan_text(value, token_config=NO_CONFIG) >= 1, label
 
 
+@pytest.mark.parametrize("value, label", [
+    ("ship to 27 portland st, dartmouth ns b2y 1a1", "lowercase Canadian postal (spaced)"),
+    ("27 Portland St, Dartmouth NS B2Y 1A1", "Title-case Canadian postal (spaced)"),
+    ("MAIL TO 27 PORTLAND ST DARTMOUTH NS B2Y1A1", "uppercase, no inner space"),
+    ("near halifax ns b3h 4r2", "bare Canadian postal in free text"),
+    ("the code is k1a0b1 for ottawa", "Canadian postal, no space, mid-text"),
+])
+def test_scan_text_detects_canadian_postal(value, label):
+    """nue-CA: a Canadian postal code (A1A 1A1 / A1A1A1) in a free-text value scores >=1.
+
+    The operator is in Nova Scotia, Canada — directly in-population. The US-ZIP-anchored
+    postal detectors miss `B2Y 1A1`, so a Canadian street address typed into a goals field
+    scored 0 and leaked. The additive `[A-Za-z]\\d[A-Za-z]\\s?\\d[A-Za-z]\\d` pattern is the
+    high-confidence token; case-insensitive, optional inner space. Reds on the
+    US-ZIP-only `_VALUE_PII_PATTERNS`.
+    """
+    assert pii_scan.scan_text(value, token_config=NO_CONFIG) >= 1, label
+
+
+@pytest.mark.parametrize("value", [
+    "did 3x5 at b2y rpe 8",                 # 'b2y' fragment, not the full 6-char postal
+    "set 1a1 to failure",                   # '1a1' fragment alone — no letter-digit-letter lead
+    "ns province check-in",                 # bare province abbrev — deliberately not added
+    "macro split 40 30 30 today",           # numeric run, no letter-digit-letter-digit-letter-digit
+    "zone 2 for a1 b2 c3 intervals",        # spaced letter-digit pairs, not a contiguous postal
+])
+def test_scan_text_canadian_postal_negative_controls(value):
+    """nue-CA: health free-text near-misses do NOT trip the Canadian postal pattern (== 0).
+
+    Pins the false-positive boundary: a 3-char postal fragment, a bare province token, and
+    rep/macro/interval numerics with stray letters must not register. The leading liveness
+    assert proves the value patterns are ACTIVE so a regression that disabled them reds here
+    too.
+    """
+    assert pii_scan.scan_text("b2y 1a1 from dartmouth", token_config=NO_CONFIG) >= 1  # pattern live
+    assert pii_scan.scan_text(value, token_config=NO_CONFIG) == 0
+
+
+def test_scan_text_full_detects_canadian_postal():
+    """nue-CA: scan_text_full (the capture-path scanner) also catches a Canadian postal.
+
+    `capture._value_has_pii` calls `scan_text_full`; this pins that the additive pattern is
+    in `_VALUE_COMPILED` (shared by both entry points), so a Canadian postal anywhere in a
+    full-length value is caught on the capture path.
+    """
+    assert pii_scan.scan_text_full(
+        "train at the new place, mail me at 27 Portland St, Dartmouth NS B2Y 1A1",
+        token_config=NO_CONFIG,
+    ) >= 1
+
+
 def test_scan_text_detects_compatibility_homograph_email():
     """g5x AC1: an NFKC compatibility-homograph email (fullwidth @) is caught.
 

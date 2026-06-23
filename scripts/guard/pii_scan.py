@@ -132,6 +132,22 @@ _VALUE_PII_PATTERNS = {
         rf"(?<!\d){_ZIP}(?!\s*\w)",
         re.IGNORECASE,
     ),
+    # Canadian postal code (bead nue-CA): the standard A1A 1A1 / A1A1A1 token —
+    # letter-digit-letter, optional single space, digit-letter-digit. The operator
+    # is in Nova Scotia (in-population), and the US-ZIP-anchored patterns above miss
+    # it, so a Canadian street address typed into a free-text goals field leaked
+    # verbatim into the model-bound token. The 6-char alternating-class token is the
+    # high-confidence PII signal — a province abbreviation alone ("NS") is too
+    # low-signal to add without flooding on training text, so the fix is scoped to
+    # the postal code only. Letter-boundaries (\b... \b) keep a 6-char run embedded
+    # in a longer alphanumeric ID off the pattern; case-insensitive (a postal is the
+    # same address in any case). The full Canada-Post first-letter exclusion
+    # (D/F/I/O/Q/U) is optional precision and deliberately omitted — the
+    # alternating letter/digit shape is already a strong co-signal.
+    "postal-canadian": (
+        r"\b[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d\b",
+        re.IGNORECASE,
+    ),
 }
 _VALUE_COMPILED = [re.compile(pat, flags) for pat, flags in _VALUE_PII_PATTERNS.values()]
 
@@ -279,11 +295,12 @@ def scan_text(text, token_config=_SENTINEL, identity_config=None):
     The value-level counterpart to `scan` (which reads file CONTENTS for the
     file-distribution boundary). Applies the operator-IDENTITY tokens + the tractable
     EXCLUDED_RAW_PII value classes — generic dotted-domain email (any provider),
-    phone (E.164 + NANP) (bead g5x), and US postal address via the precise
-    ZIP/state-anchored detector (bead nue) — and NOT the structural store-line
-    patterns (those detect a leaked store NDJSON FILE, not personal data inside a
-    scalar token). Used by the router summary boundary (bead 8j6) to fail-closed on
-    raw PII in a pass-through field value.
+    phone (E.164 + NANP) (bead g5x), US postal address via the precise
+    ZIP/state-anchored detector (bead nue), and a Canadian postal code (the
+    A1A 1A1 token, bead nue-CA — the operator is in-population) — and NOT the
+    structural store-line patterns (those detect a leaked store NDJSON FILE, not
+    personal data inside a scalar token). Used by the router summary boundary
+    (bead 8j6) to fail-closed on raw PII in a pass-through field value.
 
     The text is NFKC-folded first, so compatibility homographs (e.g. a fullwidth
     `＠`) normalise to their canonical form before matching, then capped at
