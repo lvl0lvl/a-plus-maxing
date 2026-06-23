@@ -1,0 +1,29 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "compound_risk_tier": "experimental",
+  "compound_entry_path": "vault/compounds/epitalon.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "populated"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "malignancy surveillance",
+    "hs-CRP",
+    "CBC"
+  ],
+  "halt_reasons": [],
+  "timestamp": "2026-06-21T01:42:55.108065+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T01:40:25.982086+00:00",
+    "attest_ts": "2026-06-21T01:42:55.108068+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "f0321e88c49f25b716bd0d9dd24400552e28cf86dbbf1ebcd4ae5ed12f75ca23",
+    "agent_source_mtime": "2026-06-21T01:42:13.078695+00:00"
+  }
+}

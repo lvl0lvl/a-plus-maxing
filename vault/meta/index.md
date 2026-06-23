@@ -44,6 +44,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/ss-31]] (status: researching; evidence_tier: C; risk_tier: experimental; FDA-approved for Barth syndrome only [Forzinity, Oct 2025], experimental off-label)
 - [[compounds/humanin]] (status: researching; evidence_tier: C; risk_tier: experimental; first-discovered MDP [MT-RNR2/16S]; human evidence biomarker-only, NO administration trial; anti-apoptotic→pro-tumor contraindication; WADA S0)
 - [[compounds/foxo4-dri]] (status: researching; evidence_tier: D; risk_tier: experimental; senolytic D-retro-inverso peptide [FOXO4-p53 disruptor]; ZERO human data [all preclinical]; on-target p53/cardiotox + Born-2023 pulmonary-hypertension adverse finding; unverifiable D-chirality; WADA S0)
+- [[compounds/epitalon]] (status: researching; evidence_tier: D; risk_tier: experimental; AEDG tetrapeptide [Khavinson]; telomerase claim in-vitro-only; human longevity claims open-label single-group on crude Epithalamin EXTRACT ≠ synthetic peptide; ≥80% Khavinson concentration; telomerase→oncogenic tension; FDA-unapproved/503A-pending-PCAC; WADA S0)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -180,6 +181,9 @@ _(none yet)_
 - [[library/peptides/foxo4-dri/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~11.3K words; 28 dedup sources; 5 paired-judge sections; gates 2.75→8.5 attested PASS; chain intact; bda 0-violation)
 - [[library/peptides/foxo4-dri/practitioner-layer]] (2026-06-20; no approved/compounding pathway [never on 503A]; D-chirality unverifiable by HPLC CoA; grey-market doses ~700-1400× below mouse-allometric equiv; Born-2023 PH adverse finding; 0 verifiable prescribers)
 - [[library/peptides/foxo4-dri/non-english-layer]] (2026-06-20; Chinese + Russian + Japanese surveyed; 1 admissible ZH TCM-review [no primary data]; RU + JP 0; Chinese-institution FOXO4-DRI work is English-published)
+- [[library/peptides/epitalon/research-report]] (2026-06-21 via /aplus-research --mode=deep; ~10.8K words; 23 dedup sources; 5 paired-judge sections; gates 2.75→8.5 attested PASS; chain intact; bda 0-violation)
+- [[library/peptides/epitalon/practitioner-layer]] (2026-06-21; no US pathway [Russian Epithalamin-extract registration ≠ synthetic epitalon]; 503A-removed-pending-PCAC [FR 91 FR 20465]; telomerase-oncogenic caution; grey-market + Epithalamin/Epitalon nomenclature confusion; 2 named practitioners)
+- [[library/peptides/epitalon/non-english-layer]] (2026-06-21; Russian [PRIMARY] + Chinese + Japanese surveyed; 10 Russian-language primaries [Khavinson + 2 independent Siberian/Far-Eastern groups]; ZH + JP 0 — the Russian corpus IS Epitalon's primary record)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)
