@@ -18,12 +18,21 @@ it via `record_plan` (the store write the dashboard plan zone reads). These test
 """
 
 import functools
+import subprocess
+from pathlib import Path
 
 import pytest
 
 from scripts.generate import generate
+from scripts.model.client import ModelCallError, ModelClient
+from scripts.plan import router
 from scripts.plan.assemble import THIN_LIBRARY_GAP
-from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, generate_plan
+from scripts.plan.generate_plan import (
+    AUTHOR_CALL_FAILED,
+    RED_S_LEA_CLINICAL_ROUTING,
+    compute_plan,
+    generate_plan,
+)
 from scripts.store import keying, store
 
 PLAN_DATE = "2026-06-18"
@@ -878,3 +887,179 @@ def test_peptides_end_to_end_renders_on_dashboard(tmp_path):
     assert "250 mcg" in html  # the dose renders in the protocol line
     assert "subcutaneous" in html  # the route renders in the protocol line
     assert "peptide-specialist" in html
+
+
+# --- ADR-0015-T3: wire the plan-author dispatch through the one model client ----
+#
+# The plan-author envelope is now PRODUCED by a programmatic call through
+# scripts/model/client.py's `author(domain, summary)` (the H-1 seam: `_author_callable`,
+# NOT router.dispatch). A deterministic MOCK backend is injected into the real ModelClient
+# at construction (no live API, no live agent dispatch). A FAILED author call (the typed
+# ModelCallError raise) yields the honest no-plan state (recorded == False), never a
+# fabricated plan. assemble's filters + the translators + record_plan stay byte-unchanged.
+
+PRE_TASK_HEAD = "0ecdce6017ed789ebb23f588be0a6ba11719f685"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+class _RecordingBackend:
+    """A deterministic author backend that records its (domain, summary) call args.
+
+    Returns `envelope` verbatim from `author(domain, summary)` — no live call. The recorded
+    `calls` prove `compute_plan`/`generate_plan` reach the client's `author` with the
+    de-identified summary (AC-1, AC-3).
+    """
+
+    def __init__(self, envelope):
+        self.envelope = envelope
+        self.calls = []
+
+    def author(self, domain, summary):
+        self.calls.append((domain, summary))
+        return self.envelope
+
+
+class _FailingBackend:
+    """A backend whose author always errors — drives the client's ModelCallError raise (AC-4)."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def author(self, domain, summary):
+        self.calls += 1
+        raise RuntimeError("backend author call failed (deterministic test failure)")
+
+
+def _mock_client(envelope):
+    """A real ModelClient over a deterministic recording backend (the seam mock)."""
+    backend = _RecordingBackend(envelope)
+    return ModelClient(backend=backend), backend
+
+
+# --- AC-1: the wired author path reaches the client's author -------------------
+
+
+def test_wired_author_reaches_client(tmp_path):
+    # With a mock client injected at the seam, compute_plan/generate_plan produce the
+    # envelope BY CALLING client.author(domain, summary) — not a captured-verbatim feed.
+    store_read = _seed_store(tmp_path)
+    envelope = _author(_workout_rec("Goblet squat", 3), _workout_rec("Bodyweight RDL", 3))
+    client, backend = _mock_client(envelope)
+
+    result = generate_plan(
+        "workout", None, store_read, tmp_path, plan_date=PLAN_DATE, client=client,
+    )
+
+    # the client's author was reached exactly once, for the workout domain
+    assert len(backend.calls) == 1
+    assert backend.calls[0][0] == "workout"
+    # the produced envelope flowed through assemble -> the recorded plan
+    assert result["recorded"] is True
+    names = [ex["name"] for ex in result["plan"]["exercises"]]
+    assert names == ["Goblet squat", "Bodyweight RDL"]
+
+
+def test_author_callable_source_is_rewired():
+    # The verbatim-return feed is re-wired into a client.author call (H-1 / Falsification).
+    # MUTATION: if `_author_callable` reverts to returning a captured envelope verbatim
+    # (no client.author call), this goes RED.
+    src = (REPO_ROOT / "scripts" / "plan" / "generate_plan.py").read_text(encoding="utf-8")
+    # isolate the _author_callable body
+    start = src.index("def _author_callable(")
+    end = src.index("\ndef ", start + 1)
+    body = src[start:end]
+    assert "client.author(" in body, "the seam closure must call client.author"
+    assert "return author_output" not in body, "the captured-verbatim feed must be gone"
+
+
+# --- AC-2: assemble / translators / record_plan are byte-UNCHANGED -------------
+
+
+def _git_diff_lines(path):
+    out = subprocess.run(
+        ["git", "diff", PRE_TASK_HEAD, "--", path],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    )
+    return out.stdout
+
+
+def test_assemble_byte_unchanged_vs_pretask():
+    # The re-wire amends ONLY ADR-0006's dispatch MECHANISM; the four filters + the clearance
+    # gate stay byte-identical to the pre-task commit (ADR-0015 Negative-4).
+    # NEGATIVE-CONTROL (documented): adding a scratch comment to assemble.py makes this go RED.
+    assert _git_diff_lines("scripts/plan/assemble.py") == ""
+
+
+def test_record_plan_byte_unchanged_vs_pretask():
+    assert _git_diff_lines("scripts/store/plan_schema.py") == ""
+
+
+# --- AC-3: the author payload is the de-identified summary (summary-only) -------
+
+
+def test_author_payload_is_deidentified_summary(tmp_path):
+    # The payload to client.author is the router.summarize de-identified summary (0 raw
+    # operator PII) — this path is summary-only, NOT the /chat raw-egress carve-out.
+    store_read = _seed_store(tmp_path, **{"hard-limits": "no fasting"})
+    envelope = _author(_workout_rec("Goblet squat", 3))
+    client, backend = _mock_client(envelope)
+
+    generate_plan("workout", None, store_read, tmp_path, plan_date=PLAN_DATE, client=client)
+
+    domain, summary = backend.calls[0]
+    assert summary == router.summarize(store_read)  # the exact de-identified summary
+    # the de-identified summary carries field-set tokens, never raw store internals
+    assert summary.get("hard-limits") == "no fasting"
+
+
+# --- AC-4: honest no-plan on a FAILED author call (the typed ModelCallError) ----
+
+
+def test_failed_author_call_records_nothing(tmp_path):
+    # A failed author call (the client's typed ModelCallError raise) yields the honest
+    # no-plan state: recorded == False, the honest reason, 0 fabricated plan written.
+    # MUTATION: if the failure path fabricates/records any plan, this goes RED.
+    store_read = _seed_store(tmp_path)
+    client = ModelClient(backend=_FailingBackend())
+
+    result = generate_plan(
+        "workout", None, store_read, tmp_path, plan_date=PLAN_DATE, client=client,
+    )
+
+    assert result["recorded"] is False
+    assert result["plan"] is None
+    assert result["reason"] == AUTHOR_CALL_FAILED
+    assert store.read("plan::workout", root=tmp_path) == []
+
+
+def test_failed_author_call_compute_records_nothing(tmp_path):
+    # The same fail-closed property at the compute_plan seam (the orchestrator's entry).
+    store_read = _seed_store(tmp_path)
+    client = ModelClient(backend=_FailingBackend())
+
+    candidate = compute_plan("workout", None, store_read, client=client)
+
+    assert candidate["plan"] is None
+    assert candidate["reason"] == AUTHOR_CALL_FAILED
+
+
+def test_failed_author_raises_modelcallerror_at_client():
+    # Ground the typed-raise contract this task routes on: the client raises ModelCallError
+    # (ADR-0015-T1's fail-closed boundary) when its backend author fails.
+    client = ModelClient(backend=_FailingBackend())
+    with pytest.raises(ModelCallError):
+        client.author("workout", {})
+
+
+# --- AC-5: the --self-test shape passes with the programmatic mock-client author -
+
+
+def test_self_test_passes_with_mock_client_author():
+    # The core-capability self-test runs the wired path with the author output produced BY
+    # a deterministic mock client at the seam (no live agent dispatch) and returns 0.
+    from scripts.plan.generate_plan import _self_test
+
+    assert _self_test() == 0
+
+
+# --- AC-6 closes as the suite pass (Step 8 regression).
