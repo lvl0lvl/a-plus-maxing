@@ -1,0 +1,35 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/pt-141/practitioner-layer.md",
+    "present": true,
+    "compounding_sheets_count": 3,
+    "named_physicians_count": 1,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/pt-141/non-english-layer.md",
+    "present": true,
+    "languages_surveyed": [
+      "Chinese",
+      "German",
+      "Russian"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-21T13:48:50.469475+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T13:46:39.401117+00:00",
+    "attest_ts": "2026-06-21T13:48:50.469479+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "256ca9cf3caa0da91a11df3316d73750f3bf9cfbafd8b1646896ba107aa8c5fa",
+    "agent_source_mtime": "2026-06-21T13:48:21.406499+00:00"
+  }
+}
