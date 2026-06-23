@@ -8,7 +8,6 @@ dropzones), injected by `generate.run('intake')`.
 from scripts.generate import generate
 from scripts.ingest import ingest
 from scripts.ingest.adapters import healthkit
-from scripts.serve import capture
 from vault.design.templates import intake
 
 _HK_HRV = "HKQuantityTypeIdentifierHeartRateVariabilitySDNN"
@@ -83,18 +82,39 @@ def test_intake_markup_has_no_double_escaped_ampersand():
     assert "&amp;amp;" not in html, "a pre-escaped string was escaped again (double-escape bug)"
 
 
-def test_intake_markup_form_fields_match_capture_wired_tokens():
-    """FIX-E2: every wired capture token (+ `train-around`) is a rendered form field.
+# The four Step-1 demographic form field names (ADR-0018-T1): the activated objective-only
+# form's ONLY capture fields. Birth year writes the `date-of-birth` raw source.
+_DEMOGRAPHIC_FORM_NAMES = ("date-of-birth", "sex-for-dosing", "bodyweight-band", "equipment-access-class")
+# The rich-section capture tokens that are now CHAT-only — they must NOT render as form
+# fields (ADR-0018-T1 form-objective-only). Drawn from the wired/free-text token sets that
+# were the old Steps 2-5 fields, minus the demographic tokens this task adds.
+_CHAT_ONLY_TOKENS = ("goal-domains", "goal-targets", "goal-priority-order", "hard-limits",
+                     "recovery-status-band", "train-around")
 
-    Closes the markup<->token wiring seam: a field-name typo in the markup would
-    silently break the capture round-trip with the suite otherwise green. Assert each
-    `capture.WIRED_TOKENS` member and `train-around` appears as a `name='<token>'`
-    attribute in the rendered HTML. Failing-capable: rename a markup field and this reds.
+
+def test_intake_markup_form_fields_match_capture_demographic_tokens():
+    """ADR-0018-T1: the activated form renders the four demographic inputs, 0 rich-section field.
+
+    The form is OBJECTIVE-ONLY (ADR-0018-T1): only the four Step-1 demographic fields are
+    rendered capture inputs; the rich-section tokens (goals/training/nutrition/supplements)
+    moved to the `/chat` panel. Updated from FIX-E2 (which asserted every WIRED_TOKENS member
+    rendered) to the new objective-only contract — a re-point to the new sourcing, not a
+    weakening: it still REDs if a demographic field name typo'd, AND newly REDs if a
+    rich-section field crept back onto the form.
+
+    Failing-capable: rename a demographic markup field and the positive assertion reds; add a
+    rich-section field back to the form and the negative assertion reds.
     """
     html = intake.render([])
-    for token in (*capture.WIRED_TOKENS, "train-around"):
+    # Positive: each demographic field is a rendered capture input (markup<->token seam).
+    for token in _DEMOGRAPHIC_FORM_NAMES:
         assert f"name='{token}'" in html, (
-            f"the wired token {token!r} has no rendered form field (markup<->token seam broken)"
+            f"the demographic token {token!r} has no rendered form field (markup<->token seam broken)"
+        )
+    # Negative (the objective-only contract): 0 rich-section token renders as a form field.
+    for token in _CHAT_ONLY_TOKENS:
+        assert f"name='{token}'" not in html, (
+            f"the rich-section token {token!r} still renders as a form field (form not objective-only)"
         )
 
 
@@ -119,21 +139,26 @@ def test_intake_step5_subtitle_is_record_only_honest():
     )
 
 
-def test_intake_goal_domains_group_has_fieldset_legend():
-    """FIX-F2: the goal-domains checkbox group is a `<fieldset>` with a `<legend>`.
+def test_intake_demographic_selects_have_associated_labels():
+    """ADR-0018-T1: each Step-1 demographic select has a programmatically associated label.
 
-    Group semantics: the chip group's purpose is programmatically associated so the
-    grouping is conveyed to assistive tech. Assert the rendered markup wraps the
-    `goal-domains` checkboxes in a fieldset whose legend names the group.
+    Replaces FIX-F2's goal-domains fieldset/legend check: the goal-domains checkbox group is
+    now CHAT-only (the form is objective-only), so its fieldset is gone — not weakened, the
+    feature moved. The activated Step-1 demographic selects keep the accessible group
+    semantics: each `<select name='<demographic>'>` is paired with a `<label for='<demographic>'>`
+    (the `_select_field` helper's `for=`/`id=` association). Assert the label association for
+    each bounded demographic select.
+
+    Failing-capable: drop the `for=`/`id=` association in `_select_field` and this reds.
     """
     html = intake.render([])
-    assert "<fieldset" in html and "<legend" in html, "the goal-domains group is not a fieldset/legend"
-    # The legend names the group, and the group contains the goal-domains checkboxes.
-    fs_start = html.index("<fieldset")
-    fs_end = html.index("</fieldset>", fs_start)
-    group = html[fs_start:fs_end]
-    assert "Goal areas" in group, "the goal-domains group legend does not name the group"
-    assert "name='goal-domains'" in group, "the fieldset does not wrap the goal-domains checkboxes"
+    for name in ("sex-for-dosing", "bodyweight-band", "equipment-access-class"):
+        assert f"<label for='{name}'>" in html, (
+            f"the {name!r} demographic select has no associated <label for=...>"
+        )
+        assert f"id='{name}' name='{name}'" in html, (
+            f"the {name!r} select's id/name do not match its label association"
+        )
 
 
 def test_intake_inputs_have_a_visible_focus_ring():
