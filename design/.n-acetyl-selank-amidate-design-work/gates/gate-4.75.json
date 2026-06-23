@@ -1,0 +1,113 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 47,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 38,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 8,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 4,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 12,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "WARN",
+      "findings": [
+        "Route-unverifiable for refs D[6][7][8] (Shram 2006, Dolotov 2008, Zolotarev 2016): these are Russian-language animal PK studies; abstracts do not specify the tested route in English-retrievable text; tagged route-unverifiable per IC-8 protocol, not HALT"
+      ]
+    },
+    "IC-9": {
+      "status": "PASS",
+      "count_checked": 15,
+      "count_flagged": 0
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "findings": [
+        "Volkova 2016 (PMID 26924987): 45-gene / 22-gene counts, r=0.86 correlation, and Gabre/Gabrq/Hcrt fold-changes \u2014 CONFIRMED via PMC4757669 full text; Section A claims '16\u2013128 fold' for Gabre/Gabrq/Hcrt \u2014 actual values are 16.1\u00d7, 13.3\u00d7, 128.3\u00d7 respectively \u2014 range stated in report is directionally accurate but the 13.3\u00d7 for Gabrq sits at the lower end of a claimed '16\u2013128' range; flagged WARN not HALT (no fabricated number, just a loose characterization of the range)",
+        "Zozulya 2001 IC50 (PMID 11550013): '~15 \u00b5M' IC50 for enkephalin inhibition CONFIRMED via abstract (exact: 'IC50 15 microM')",
+        "Zozulya 2008 (PMID 18454096): n=62, 30 Selank vs 32 medazepam CONFIRMED via abstract",
+        "Kolik 2019 (PMID 31625062): BDNF hippocampus + prefrontal cortex + ethanol memory CONFIRMED via abstract",
+        "Volkova 2016 rat n-per-group (n=10 each): CONFIRMED via PMC full text",
+        "PMID 26987969 (transposed, now corrected to 26924987): confirmed \u2014 26987969 is a condensed matter physics paper; 26924987 is the correct Volkova 2016 GABAergic paper; remediation verified CORRECT",
+        "Section A serotonin claim 'Semenova et al. [8, animal] 87 Wistar rats': corpus-missing \u2014 PMID 20919548 abstract not returned by efetch; claim is modest (species + n only), author/year verifiable from PMID record; flagged corpus-missing WARN not HALT"
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 12,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 15,
+    "largest_cluster_name": "Institute of Molecular Genetics RAS + V.V. Zakusov Institute of Pharmacology RAMS (Selank developer co-lineage)",
+    "largest_cluster_count": 13,
+    "share": 0.9,
+    "threshold_triggered": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 7,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-8: route-unverifiable for 3 Russian-language animal PK studies (D[6][7][8])",
+    "IC-13: loose range characterization of Gabrq fold-change (13.3\u00d7 stated as part of '16\u2013128' range)",
+    "IC-13: corpus-missing for Semenova 2010 PMID 20919548 (n=87 rats, brainstem 5-HT claim \u2014 abstract not retrievable via efetch in this session)"
+  ],
+  "timestamp": "2026-06-21T15:06:04.050785+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T14:59:24.951899+00:00",
+    "attest_ts": "2026-06-21T15:06:04.050788+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "03059ea582030cfe4e31f885d2d5bd13b62b47b0835129a887c27def0c3aae64",
+    "agent_source_mtime": "2026-06-21T15:06:03.993751+00:00"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "compound_risk_tier": "experimental",
+  "compound_entry_path": "vault/compounds/semax.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "populated"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "cognitive/symptom scales (MoCA, digit-span)"
+  ],
+  "halt_reasons": [],
+  "timestamp": "2026-06-22T15:59:43.755551+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-22T15:56:33.609645+00:00",
+    "attest_ts": "2026-06-22T15:59:43.755554+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "49c3729c299372ec859abd7aaa10a1849e7bd803c03dbff9496bf4e15f7744c7",
+    "agent_source_mtime": "2026-06-22T15:59:43.697397+00:00"
+  }
+}

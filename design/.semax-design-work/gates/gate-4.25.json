@@ -1,0 +1,42 @@
+{
+  "phase": "4.25",
+  "verdict": "PASS",
+  "iterations": 1,
+  "entity_classes": {
+    "citations": {
+      "scanned": 18,
+      "mismatch_count": 0,
+      "mismatches": []
+    },
+    "institutions": {
+      "scanned": 5,
+      "mismatch_count": 0,
+      "mismatches": []
+    },
+    "compound_identifiers": {
+      "scanned": 4,
+      "mismatch_count": 0,
+      "mismatches": []
+    },
+    "regulatory_dates": {
+      "scanned": 4,
+      "mismatch_count": 0,
+      "mismatches": []
+    },
+    "trial_registrations": {
+      "scanned": 0,
+      "mismatch_count": 0,
+      "mismatches": []
+    }
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-22T15:29:13.777299+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-22T15:22:04.887064+00:00",
+    "attest_ts": "2026-06-22T15:29:13.777302+00:00",
+    "iteration": 1,
+    "agent_source_path": "sections/id-reconcile-source.md",
+    "agent_source_sha256": "e5a057c9db990718e877b76a5223af9f246a2f1eb9b8e02ed8f3a8fc290af946",
+    "agent_source_mtime": "2026-06-22T15:29:13.718556+00:00"
+  }
+}

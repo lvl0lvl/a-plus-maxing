@@ -1,0 +1,35 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/melanotan-ii/practitioner-layer.md",
+    "present": true,
+    "compounding_sheets_count": 0,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/melanotan-ii/non-english-layer.md",
+    "present": true,
+    "languages_surveyed": [
+      "German",
+      "Spanish",
+      "Russian"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-21T12:03:47.716314+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T12:01:17.030463+00:00",
+    "attest_ts": "2026-06-21T12:03:47.716316+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "6d1fdd54b63e9210417e4d9e2a4cb502b8707b5d16e2d8de19c32f4ec6513e2d",
+    "agent_source_mtime": "2026-06-21T12:03:13.255822+00:00"
+  }
+}

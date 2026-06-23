@@ -1,0 +1,45 @@
+{
+  "phase": "6",
+  "verdict": "PASS",
+  "iterations": 1,
+  "critique_agent_id": "critique-cerebrolysin-deep",
+  "draft_path": "vault/library/peptides/cerebrolysin/research-report.md",
+  "findings": [
+    {
+      "category": "alternative-explanation",
+      "severity": "minor",
+      "description": "The Zhang et al. 2013 Shh-neurogenesis paper is cited as supporting intact preclinical ischemia evidence, but the report acknowledges an unspecified 2025 erratum (PMID 39869713) in-line. The report notes 'scope of correction unspecified' but then continues to treat the core Shh finding as part of the integrity-solid base without a parallel caveat matching the one applied to Masliah-cluster sources. Given the erratum scope is genuinely unknown, the report could add one sentence noting that the Shh finding should be independently corroborated before being treated as definitively established. This is minor: the report does flag the erratum each time it cites the paper, so the concern is visible."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "The CASTA severe-stroke subgroup (NIHSS >12; 90-day mortality 20.2% vs 10.5%) is labeled 'hypothesis-generating only' \u2014 which is correct. But the mortality difference in that subgroup (approximately a two-fold difference in absolute 90-day mortality across 1,070 enrolled patients) is a potentially clinically meaningful finding in a condition with no proven pharmacological neuroprotective. The report dismisses it in a single sentence. A balanced report could note that this subgroup finding is the primary rationale for ongoing research interest and was the basis for further investigation even among skeptical reviewers \u2014 while still being clear it is non-confirmatory. Not calling this a critical balance failure (the null on the primary endpoint is stated prominently and correctly), but the asymmetry between the thorough Cochrane-negative coverage and the one-sentence subgroup dismissal is a minor tilt."
+    },
+    {
+      "category": "missing-perspective",
+      "severity": "minor",
+      "description": "The report covers stroke, AD, VaD, and TBI but gives only a passing footnote to minor indications (cervical spondylotic myelopathy cited as [3, cohort]). More notably absent is any discussion of the pediatric/developmental claimed uses (autism, cerebral palsy, developmental disability) \u2014 these circulate actively in grey-market community contexts, represent a specific harm-vector (parents sourcing injectables for children), and the section B source actually notes their absence from indexed literature. A one-sentence statement in Section 5 or 7 explicitly noting that claimed pediatric/developmental uses lack any credible evidence base would round out the harm picture for a healthy-population wiki. Currently the research-report (as distinct from section B) is silent on this."
+    },
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "The Gevaert et al. 2015 peptidomic study \u2014 the entire 'no neurotrophic fragments' finding \u2014 was conducted on Internet-purchased Cerebrolysin, not manufacturer-certified reference lots. The report does flag this in Section 1.2, but only once and late in the paragraph. The composition section (the metadata bullet on 638 peptides, no BDNF/GDNF/NGF/CNTF) does not carry this caveat at the point of first assertion. A reader who reads only the Summary or the metadata block would take the 'no neurotrophic fragments' finding as stronger than it technically is. The characterization limitation should appear at the point of initial assertion, not only in the body elaboration."
+    },
+    {
+      "category": "objectivity-issue",
+      "severity": "minor",
+      "description": "The framing 'the caviar of nootropics' appears in Section 6.2 to describe community positioning. While the phrase is anecdote-aggregate tagged and accurately sourced, using it without qualifying prose introduces an inadvertent tone that either sensationalizes (making it sound glamorous) or mocks the community users. Either effect slightly compromises the objectivity posture of a report otherwise calibrated to clinical language. A brief attributive framing ('informally referred to by the community as...' \u2014 which the text does have) is present, but the phrase would benefit from one sentence noting what the positioning implies about the health-seeker motivation (expectation of high-efficacy matched against the evidence-null described above), to make it analytically useful rather than decorative."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "timestamp": "2026-06-22T13:31:58.942205+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-22T13:25:17.208249+00:00",
+    "attest_ts": "2026-06-22T13:31:58.942215+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "ebde5011db80e0f0a2c9e2469fd404a3eccbfcce7a267ec95a89791961e3aa2e",
+    "agent_source_mtime": "2026-06-22T13:31:58.849871+00:00"
+  }
+}
