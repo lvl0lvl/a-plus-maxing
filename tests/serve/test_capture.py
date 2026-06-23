@@ -664,3 +664,105 @@ def test_block_pii_commit_denies_a_staged_filled_scaffold(tmp_path):
     assert '"permissionDecision":"deny"' in proc.stdout, (
         f"block-pii-commit did not DENY a staged filled scaffold; stdout={proc.stdout!r} stderr={proc.stderr!r}"
     )
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0017-T1 H-2 — instance identity_config threading (AC-5)
+# --------------------------------------------------------------------------- #
+
+
+def test_identity_config_round_trip_changes_detection(tmp_path):
+    """AC-5/H-2: an operator-identity token routes record-only WITH identity_config, lands WITHOUT it.
+
+    The H-2 gap is empty operator-identity detection when the capture call DROPS
+    `identity_config` (the today's `/upload` omission). This round-trip proves the
+    threading is NOT a no-op: a free-text value carrying the operator's name routes
+    record-only WHEN an instance `identity_config` listing that name is threaded, and
+    lands in the model-bound token WHEN it is the empty/absent baseline (no identity
+    detection). Same value, same gate — only the threaded config differs.
+
+    Failing-capable: drop `identity_config` at the call (the baseline) and the name
+    reaches the model-bound token, reddening the record-only assertion.
+    """
+    # An instance identity config listing the operator name token (one regex per line).
+    identity_cfg = tmp_path / "operator-identity.txt"
+    identity_cfg.write_text("Walter McGivney\n")
+    value = "add 10 lb to squat; ask Walter McGivney before changing the program"
+
+    # WITH the instance config threaded: the name is detected -> record-only to scaffold.
+    store_with = tmp_path / "store-with"
+    scaffold_with = tmp_path / "scaffold-with"
+    capture.persist_capture(
+        {"goal-targets": value},
+        root=store_with, scaffold_root=scaffold_with, identity_config=str(identity_cfg),
+    )
+    assert store.read("goal-targets", root=store_with) == [], (
+        "an operator-identity value reached the model-bound token WITH identity_config threaded"
+    )
+    scaffold_text = "".join(p.read_text() for p in scaffold_with.rglob("*") if p.is_file())
+    assert "McGivney" in scaffold_text, "the identity value did not route record-only WITH the config"
+
+    # WITHOUT it (the empty-detection baseline): identity detection is empty, so the
+    # value lands in the model-bound token — the exact H-2 gap. This is the no-op
+    # baseline the threading changes.
+    store_without = tmp_path / "store-without"
+    capture.persist_capture(
+        {"goal-targets": value},
+        root=store_without, scaffold_root=tmp_path / "scaffold-without",
+        identity_config=_ABSENT_IDENTITY,
+    )
+    landed = store.read("goal-targets", root=store_without)
+    assert landed and "McGivney" in landed[0]["value"], (
+        "the empty-detection baseline did not land the value — the round-trip proves nothing"
+    )
+
+
+def test_upload_call_site_threads_identity_config():
+    """AC-5/H-2: the existing /upload persist_capture call threads `identity_config=`.
+
+    The H-2 factory-to-component wiring gap was the `/upload` handler calling
+    `persist_capture` WITHOUT `identity_config` (server.py:158-159), silently disabling
+    operator-identity detection at that capture call site. This asserts the call now
+    passes `identity_config=` — closing the omission. Reds if the parameter is dropped.
+    """
+    src = (REPO_ROOT / "scripts" / "serve" / "server.py").read_text()
+    # The /upload persist_capture call must thread identity_config — the H-2 fix.
+    import re as _re
+    call = _re.search(r"capture\.persist_capture\((.*?)\)", src, _re.DOTALL)
+    assert call is not None, "the /upload persist_capture call was not found in server.py"
+    assert "identity_config=" in call.group(1), (
+        "the /upload persist_capture call drops identity_config — the H-2 gap (empty "
+        "identity detection) is still open"
+    )
+
+
+def test_identity_config_seam_threads_to_every_capture_call_site():
+    """AC-5/H-2: the instance identity_config seam exists for every capture call site.
+
+    The H-2 invariant is that EVERY capture call site threads the instance
+    `identity_config` through the SAME class-attr seam as `store_root`/`scaffold_root`,
+    so operator-identity PII detection is non-empty at all of them. This task closes the
+    `/upload` site and pins the seam (`build_server(..., identity_config=...)` -> the
+    handler class attr -> the call) so `ADR-0016-T1`'s `/chat` capture call threads
+    `self.identity_config` the same way (the generic-seam form: the mechanism is wired
+    here, the `/chat` call site lands with the dispatch).
+
+    Reds if the seam is removed (no `identity_config` kwarg on `build_server`, or the
+    handler does not read `self.identity_config` into the call).
+    """
+    import inspect
+
+    from scripts.serve import server as serve_server
+
+    # The build_server seam carries identity_config (same shape as store/scaffold roots).
+    params = inspect.signature(serve_server.build_server).parameters
+    assert "identity_config" in params, (
+        "build_server lacks the identity_config seam — the /chat call cannot thread it"
+    )
+    src = (REPO_ROOT / "scripts" / "serve" / "server.py").read_text()
+    # The handler exposes the class-attr seam and reads it into the capture call.
+    assert "identity_config = None" in src, "the handler lacks the identity_config class-attr seam"
+    assert "self.identity_config" in src, (
+        "the handler does not thread self.identity_config into a capture call — the "
+        "instance config is not wired through the seam"
+    )
