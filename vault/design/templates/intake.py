@@ -33,13 +33,13 @@ _INK, _INK2, _INK3 = "#111827", "#4B5563", "#6B7280"
 _CANVAS, _SHEET, _LINE, _LINE2 = "#F3F4F6", "#FFFFFF", "#E5E7EB", "#F1F2F4"
 # Control-boundary border (Wave-B FIX-F): #8A9099 on white is 3.22:1, clearing the WCAG
 # 1.4.11 3:1 control-boundary bar (#E5E7EB on white is only 1.24:1). Used for the input/
-# select/textarea + the .box resting border so a control's edge is perceivable.
+# select/textarea resting border so a control's edge is perceivable.
 _CTRL_BORDER = "#8A9099"
 # Focus ring (Wave-B FIX-F): a visible on-theme blue ring for WCAG 2.4.7 / 1.4.11, since
 # the resting->focus 1px border swap alone is not a sufficient focus indicator.
 _FOCUS_RING = "rgba(37, 99, 235, 0.35)"  # the _BLUE accent at 35% — a 3px soft ring
 _BLUE, _BLUE_DEEP, _BLUE_SOFT = "#2563EB", "#1D4ED8", "#EFF2FE"
-_GREEN, _GREEN_BG = "#059669", "#ECFDF5"
+_GREEN = "#059669"
 _FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 _MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
 
@@ -86,15 +86,8 @@ body {{ font-family: {_FONT}; background: {_CANVAS}; color: {_INK};
 .ptitle {{ font-size: 21px; font-weight: 700; }}
 .psub {{ font-size: 14px; color: {_INK2}; margin-top: 6px; line-height: 1.5; }}
 .seclab {{ font-size: 12.5px; font-weight: 700; color: #374151; margin: 22px 0 10px; }}
-/* Grouped controls (Wave-B FIX-F): fieldset reset so the legend keeps the .seclab look. */
-.grp {{ border: 0; padding: 0; margin: 0; min-width: 0; }}
-.grp legend.seclab {{ padding: 0; margin: 22px 0 10px; }}
 .grid2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }}
 .field label {{ display: block; font-size: 12.5px; font-weight: 600; color: #374151; margin-bottom: 6px; }}
-.box {{ border: 1px solid {_CTRL_BORDER}; border-radius: 8px; padding: 10px 12px; font-size: 13.5px;
-        color: {_INK}; background: {_SHEET}; min-height: 40px; display: flex; align-items: center;
-        justify-content: space-between; }}
-.box.ph {{ color: {_INK3}; }}
 .docs {{ display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }}
 .doc {{ display: flex; align-items: center; gap: 14px; border: 1px solid {_LINE};
         border-radius: 10px; padding: 14px 16px; }}
@@ -108,11 +101,6 @@ body {{ font-family: {_FONT}; background: {_CANVAS}; color: {_INK};
 .dstate.ok {{ color: {_GREEN}; }}
 .dstate.no {{ color: {_BLUE}; }}
 .note {{ font-size: 12.5px; color: {_INK3}; margin-top: 16px; display: flex; align-items: center; gap: 7px; }}
-.chips {{ display: flex; flex-wrap: wrap; gap: 8px; }}
-.chip {{ font-size: 12.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid {_LINE};
-         color: {_INK2}; }}
-.chip.on {{ background: {_BLUE_SOFT}; border-color: {_BLUE_SOFT}; color: {_BLUE}; font-weight: 600; }}
-.chip.ok {{ background: {_GREEN_BG}; border-color: {_GREEN_BG}; color: {_GREEN}; font-weight: 600; }}
 .rows {{ display: flex; flex-direction: column; gap: 8px; }}
 .rev {{ border: 1px solid {_LINE}; border-radius: 10px; padding: 14px 16px; }}
 .rev h4 {{ font-size: 13.5px; font-weight: 700; margin-bottom: 6px; }}
@@ -121,7 +109,7 @@ body {{ font-family: {_FONT}; background: {_CANVAS}; color: {_INK};
 .btn {{ font-size: 13.5px; font-weight: 600; border-radius: 9px; padding: 11px 18px; cursor: pointer; }}
 .btn.back {{ border: 1px solid {_LINE}; color: {_INK2}; background: {_SHEET}; }}
 .btn.next {{ background: {_BLUE}; color: #fff; border: 1px solid {_BLUE_DEEP}; }}
-/* Interactive capture controls — reuse the .box visual vocabulary (ADR-0014-T1). */
+/* Interactive capture controls — the input/select/textarea control vocabulary (ADR-0014-T1). */
 .inp, textarea.inp, select.inp {{ width: 100%; border: 1px solid {_CTRL_BORDER}; border-radius: 8px;
         padding: 10px 12px; font-size: 13.5px; color: {_INK}; background: {_SHEET};
         font-family: {_FONT}; }}
@@ -129,11 +117,6 @@ textarea.inp {{ min-height: 44px; resize: vertical; line-height: 1.45; }}
 /* Focus: a visible blue ring (WCAG 2.4.7 / 1.4.11) — not the border swap alone. */
 .inp:focus, textarea.inp:focus, select.inp:focus {{ outline: none; border-color: {_BLUE};
         box-shadow: 0 0 0 3px {_FOCUS_RING}; }}
-.chk {{ display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; padding: 6px 12px;
-        border-radius: 999px; border: 1px solid {_LINE}; color: {_INK2}; cursor: pointer; }}
-.chk input {{ accent-color: {_BLUE}; }}
-.recnote {{ font-size: 11.5px; font-weight: 600; color: {_INK3}; font-style: italic;
-        margin: 18px 0 8px; }}
 .handoff {{ border: 1px solid {_BLUE_SOFT}; background: {_BLUE_SOFT}; border-radius: 10px;
         padding: 16px 18px; margin-top: 18px; }}
 .handoff h4 {{ font-size: 13.5px; font-weight: 700; color: {_BLUE_DEEP}; margin-bottom: 6px; }}
