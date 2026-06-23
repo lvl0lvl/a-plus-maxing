@@ -1,0 +1,35 @@
+{
+  "phase": "6",
+  "verdict": "PASS",
+  "iterations": 1,
+  "critique_agent_id": "critique-ss31-deep",
+  "draft_path": "vault/library/peptides/ss-31/research-report.md",
+  "findings": [
+    {
+      "category": "unexamined-counter-evidence",
+      "severity": "minor",
+      "description": "EMBRACE-STEMI \u00a72.4 states 'No improvement on any secondary outcome' as a blanket characterization. Section C of the raw research sections notes a numerically favorable but non-significant secondary signal (incident HF within 24h: 14% elamipretide vs 25% placebo). This signal does not achieve significance and the characterization is technically accurate, but omitting the numerically favorable secondary direction in the final synthesis creates a slightly more uniformly negative picture of EMBRACE-STEMI than the data warrant. Suggest adding a single qualifying phrase such as 'no statistically significant improvement on any secondary outcome, though incident HF within 24 hours was numerically lower (14% vs 25%, NS).' This is minor because the finding was non-significant and does not change the overall evidence tier."
+    },
+    {
+      "category": "alternative-explanation",
+      "severity": "minor",
+      "description": "The OLE design confound discussion in \u00a73.7 and \u00a76(point 2) correctly names 'absence of a control arm' and 'selection bias' but does not articulate specific sub-mechanisms: (1) practice effect \u2014 repeated 6MWT and knee-strength testing yields performance improvement from test familiarity independent of drug; (2) regression to the mean \u2014 OLE entrants may have been at a functional nadir relative to their personal trajectory; (3) survivor selection \u2014 the 2 of 10 OLE dropouts (ISR discontinuations) were presumably less able to tolerate injections, not necessarily less functionally impaired, so the 8 completers are not clearly a high-responder subset, but this nuance is unstated. These specific confound mechanisms are the most frequently raised critiques of OLE-based accelerated approvals in rare disease and their absence slightly weakens the alternative-explanation coverage. Minor because the draft does correctly conclude that OLE data 'cannot establish causality.'"
+    },
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "The LHON ophthalmic trial (Karanjia et al., Ophthalmology 2024, PMID 37923251) is listed in Section E's bibliography and acknowledged in \u00a72.5 of the report, but the draft states results 'have not been summarized in detail in any public document identified at research time.' A PMID-indexed Ophthalmology publication (PMID 37923251) is a public document; the absence of result detail is most likely due to the publication containing limited efficacy data or the paper being primarily a methods/safety report from a randomized trial in a rare disease. If results are available in the published paper, the current framing slightly understates what is known. The gap is minor because (a) the trial used an ophthalmic route distinct from the SC program and would not alter the overall evidence tier, and (b) LHON is not one of the four primary indications covered in depth."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "timestamp": "2026-06-20T20:12:55.648020+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T20:09:28.561132+00:00",
+    "attest_ts": "2026-06-20T20:12:55.648023+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "9076e9b1defa5b6ee20f29ad71ee3f6e9096007b0fa40bb96691445f5217d20f",
+    "agent_source_mtime": "2026-06-20T20:12:55.592121+00:00"
+  }
+}

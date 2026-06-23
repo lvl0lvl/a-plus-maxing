@@ -1,0 +1,131 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 47,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 47,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 18,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-9": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-10": {
+      "status": "WARN",
+      "count_checked": 9,
+      "count_flagged": 1,
+      "findings": [
+        "Section C bibliography entry [3]: stated PMID 32641818 resolves to a Nature climate-change commentary (Lehmann & Possinger 2020, DOI 10.1038/d41586-020-01965-7), NOT to the Allen et al. cristae paper. Correct PMID is 32680996. The DOI in the same entry (10.1038/s42003-020-1101-3) resolves correctly via PMC7368046. Content is real and properly grounded via DOI; PMID is bibliographically erroneous. Classified WARN (not HALT) because the DOI is the authoritative identifier and resolves to the correct paper, but the erroneous PMID will misdirect PMID-only retrieval."
+      ]
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 9,
+      "count_flagged": 3,
+      "findings": [
+        "PMID 23813215 (Birk 2013 JASN): creatinine 0.62 vs 1.72 mg/dL cited in Section C[1] \u2014 not present in PubMed abstract text retrieved; value likely in full text. Classified corpus-missing (abstract-only). NOT number-not-found.",
+        "PMID 37268435 (Karaa 2023 Neurology MMPOWER-3): specific 6MWT and PMMSA numeric results (-3.2 m, -0.07 points) cited in Section C \u2014 not confirmed in abstract retrieved (metadata/author page only). Classified corpus-missing (abstract-only). NOT number-not-found.",
+        "PMID 39605874 (ReCLAIM-2 2024): LL BCVA -2.8 vs -4.6 letters and GA area +0.328 vs +0.281 mm\u00b2 \u2014 not present in abstract (abstract states endpoints not met but does not give exact figures). Classified corpus-missing (abstract-only). NOT number-not-found."
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 18,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 10,
+    "largest_cluster_name": "Stealth BioTherapeutics",
+    "largest_cluster_count": 9,
+    "share": 0.9,
+    "threshold_triggered": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 9,
+    "claims_failed": [
+      {
+        "claim": "creatinine 0.62 vs 1.72 mg/dL at 24h post-reperfusion [1, animal] (Section C)",
+        "cite_key": "birk-2013-23813215",
+        "failure_mode": "corpus-missing",
+        "note": "abstract-only; value likely in full-text results section"
+      },
+      {
+        "claim": "6MWT difference -3.2 m (P=0.69); PMMSA difference -0.07 (P=0.37) [12, rct] (Section C)",
+        "cite_key": "karaa-2023-37268435",
+        "failure_mode": "corpus-missing",
+        "note": "abstract-only retrieval returned metadata page; specific figures not in abstract"
+      },
+      {
+        "claim": "LL BCVA -2.8 vs -4.6 letters; GA area +0.328 vs +0.281 mm\u00b2 [8, rct] (Section B/C)",
+        "cite_key": "reclaim2-2024-39605874",
+        "failure_mode": "corpus-missing",
+        "note": "abstract-only; exact figures not stated in abstract, only that primary endpoints not met"
+      }
+    ]
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-10: Section C bibliography [3] carries erroneous PMID 32641818 (resolves to unrelated climate paper); correct PMID is 32680996; DOI in same entry is correct",
+    "IC-13: 3 of 9 corpus checks returned abstract-only (corpus-missing); no number-not-found or quote-not-found failures"
+  ],
+  "timestamp": "2026-06-20T19:56:45.112573+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T19:50:48.864167+00:00",
+    "attest_ts": "2026-06-20T19:56:45.112576+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "d80f357629026686c3c01461e730ca404756100ef50341d03c38910c053ed6a5",
+    "agent_source_mtime": "2026-06-20T19:56:45.054984+00:00"
+  }
+}
