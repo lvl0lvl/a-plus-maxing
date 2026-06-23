@@ -12,6 +12,12 @@ The published surface is frozen here (ADR-0015-T1): `ADR-0016-T1` imports `conve
 `ADR-0015-T3` imports `author`, `ADR-0017-T1` validates `converse`'s extraction proposal.
 The SDK request/response wire detail is internal (NFR-5: interface pinned, internals
 discretionary).
+
+Two `author` conformance levels coexist: `ModelClient.author` validates the backend
+envelope and RAISES on a malformed shape, while the captured-envelope adapter
+(`generate_plan._FixedEnvelopeClient.author`) returns the pre-resolved envelope verbatim
+(backward-compat with existing callers — the envelope was already validated when first
+authored, so the adapter re-wrap fires no second model call and adds no second check).
 """
 
 
