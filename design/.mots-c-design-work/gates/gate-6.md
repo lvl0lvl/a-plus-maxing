@@ -1,0 +1,51 @@
+## Verdict
+
+verdict: PASS
+
+```json
+{"phase":"6","verdict":"PASS","iterations":1,"critique_agent_id":"critique-mots-c-deep","draft_path":"vault/library/peptides/mots-c/research-report.md","findings":[{"category":"missing-perspective","severity":"minor","description":"The MDP/humanin-family context is mentioned but the draft does not note that humanin's human pharmacology (receptor targets, PK, human PD signals) is substantially better characterized than MOTS-c's. A one-sentence comparative note that humanin is the only MDP with meaningful clinical-stage data would sharpen the 'MOTS-c is not the most advanced MDP' picture for a reader who encounters MDP marketing broadly."},{"category":"missing-perspective","severity":"minor","description":"The m.1382A>C exercise-interaction nuance (Zempo 2021: the K14Q pro-diabetogenic association was confined to SEDENTARY males — not athletes or exercisers) is present in the draft's §1.5 but not explicitly re-surfaced in the exercise section (§4). A reader focused on exercise would benefit from the cross-reference: the SNP's diabetes risk may be partially mitigated by exercise, which has implications for how the K14Q genotype interacts with the 'exercise-induced endogenous MOTS-c' narrative."},{"category":"alternative-explanation","severity":"minor","description":"The draft correctly flags reverse causation for the biomarker associations (e.g., '§3.2: reverse causation cannot be excluded'). However, the Yoon 2025 finding that MOTS-c REMAINED UNCHANGED after bariatric surgery-induced significant weight loss is briefly noted but not given its full alternative-interpretation weight: if MOTS-c is truly a compensatory signal, the null response to major metabolic improvement is also consistent with MOTS-c being a downstream CONSEQUENCE of elevated adipose mass (a 'bystander marker'), not a compensatory active signal at all. The draft mentions this possibility in §3.3.1 but qualifies it as 'also consistent with'—a slightly stronger explicit statement that this is a genuine interpretive fork would be more balanced."},{"category":"balance-issue","severity":"minor","description":"The draft is consistently and correctly skeptical of the evidence base. One area where it trends slightly over-negative without explicit caveats: the independent animal replications from 2023–2025 (Tang 2023, Yang 2024, Pham 2025) ALL report MOTS-c benefit in new disease models via AMPK, from groups with no USC/CohBar affiliation. The draft's §8 notes this but frames it primarily as 'following the Cohen/Lee scaffold.' A reader could benefit from the explicit counterpoint: three independent groups in three different species/models all finding AMPK-mediated benefit is more consistent with MOTS-c having a real pharmacological effect in rodents than with an artifact from a single lab, even if it does not confirm the primary therapeutic claim."},{"category":"citation-incomplete","severity":"minor","description":"The Dieli-Conwright 2021 exercise intervention in breast cancer survivors (n=49) is cited in §4.1 for the ethnic divergence in MOTS-c response, but the draft does not note that Cohen and co-authors (Wan J, Kim SJ) are on this paper too — consistent with the COI pattern documented in §2.1. This is a minor consistency gap: the COI table in §2.1 only enumerates the four 'landmark efficacy/mechanism' papers and does not capture the exercise-intervention human study as also being USC-connected."}],"additional_retrievals":[],"halt_reasons":[]}
+```
+
+## Prose Detail
+
+### Overall assessment
+
+The draft is rigorous, internally consistent, and — unusually for a peptide wiki entry — actively works against overclaiming. The evidence-tier assignment (C), risk-tier (experimental), the 100%-single-lab concentration finding, and the clear CB4211-is-not-native-MOTS-c distinction are all accurate and load-bearing. The Summary's upfront "honest evidence state" paragraph is a genuine feature of this entry. No critical gaps were found. All five findings below are minor and are offered as optional refinements.
+
+---
+
+### Finding 1 — missing-perspective (minor): humanin comparison depth
+
+The draft correctly positions MOTS-c within the MDP family and distinguishes it from humanin mechanistically (§1.1, §1.4.5). What it does not state explicitly is that humanin, as the first-identified MDP (2001), has progressed further in human pharmacology: humanin has established receptor targets (CNTFR/gp130/IL6ST, FPRL1), a reported half-life in humans (~6 hours for synthetic humanin after IV administration, from at least one published PK study), and some observational data on age-related decline in human serum. Stating explicitly that "of all MDPs, humanin is the only one with preliminary human PK data — MOTS-c does not yet have that" would give a reader who encounters broader MDP marketing a sharper anchor. This is a completeness note, not a factual error.
+
+### Finding 2 — missing-perspective (minor): m.1382A>C exercise interaction not cross-referenced in §4
+
+Section 1.5 correctly notes that the Zempo 2021 K14Q pro-diabetogenic association was restricted to **sedentary males**, not all males. This is a meaningful nuance: the implication is that exercise may attenuate or eliminate the metabolic risk conferred by the K14Q variant, which would be consistent with the peptide's exercise-inducibility described in §4.1. The draft handles both findings accurately but in isolation. A cross-reference at §4.1 (or a note in §1.5) connecting the sedentary-specificity of the SNP's diabetes risk to the exercise-induced elevation of MOTS-c would give the reader a more complete picture of how genotype and exercise phenotype might interact for this variant. This is a synthesis gap, not a factual error.
+
+### Finding 3 — alternative-explanation (minor): Yoon 2025 null bariatric result
+
+The draft's §3.3.1 correctly identifies the Yoon 2025 post-bariatric finding as consistent with a "compensation" framing or with "MOTS-c being a bystander marker." The bystander interpretation is the stronger alternative-explanation for this dataset and could be stated slightly more directly: if MOTS-c were a functionally active compensatory signal, one would expect it to fall as the metabolic insult resolves after major surgery; the null result is more consistent with MOTS-c tracking adipose mass (i.e., a passive consequence) than with it being an active homeostatic regulator whose level is titrated to metabolic need. The current phrasing is accurate but gives the two interpretations equal weight when the evidence slightly favors the passive-consequence model in this specific study. A brief explicit statement to that effect would be more epistemically complete.
+
+### Finding 4 — balance-issue (minor): independent animal replications framed as "following the scaffold"
+
+The draft's §8 is appropriately cautious but trends toward understating the probative value of the three independent animal studies. That three groups at three independent institutions in two countries (China, New Zealand), working on three distinct disease models (diabetic myocardial injury, cancer pain, diabetic cardiac mitochondria), all observe MOTS-c AMPK-mediated benefit is non-trivial evidence that the AMPK effect is pharmacologically real in rodents — it is not artifact-proof, but it is harder to explain as single-lab motivated reasoning than the foundational papers alone. The draft should note this explicitly alongside the current caveat that the specific insulin-sensitization dose-response in the Lee 2015 C57BL/6 model has not been independently replicated. The distinction is: "pharmacological AMPK effect is plausibly real in rodents (3 independent labs)" vs. "the specific translational claim has not been externally replicated." The draft conflates these two assessments slightly, which makes it slightly over-negative about the independent confirmation picture.
+
+### Finding 5 — citation-incomplete (minor): COI on the Dieli-Conwright 2021 exercise study
+
+The COI section (§2.1) enumerates the four foundational papers (Lee 2015, Lee/Kim/Cohen 2016, Kim 2018, Reynolds 2021) as the 100%-Cohen/Lee cluster. The Dieli-Conwright 2021 breast cancer survivor exercise intervention is cited in §4.1 as the source for the ethnic divergence finding. That paper lists Wan J, Kim SJ, and Cohen P as co-authors — meaning it is also a USC-connected study and falls under the same COI umbrella. The draft's COI discussion does not capture this, creating a minor inconsistency: a reader who wants to assess independence of the human exercise data would not see it flagged in §2.1. Recommended fix: either note in §4.1 that the Dieli-Conwright 2021 paper is also Cohen-group affiliated, or expand the §2.1 COI roster to include it.
+
+---
+
+### What was NOT found to be a problem
+
+- **Over-selling of efficacy:** Not present. The draft consistently marks animal findings as preclinical and does not extrapolate to human therapeutic claims.
+- **Logical inconsistency in the evidence synthesis table (§3.4):** Accurate and internally consistent.
+- **CB4211 / native peptide conflation:** Explicitly and accurately handled in §6.1 and throughout.
+- **Longevity genetics overclaim:** The Fuku 2015 hypothesis is correctly marked as refuted by Zempo 2021.
+- **WADA section accuracy:** Correctly identifies S4.4, in- and out-of-competition scope, non-specified substance status, and the contamination-defense implication.
+- **Biomarker vs. therapeutic distinction:** One of the draft's strongest features; well-maintained throughout §3 and §4.
+- **Exercise-mimetic marketing critique:** Well-grounded and logically correct (§4.5).
+- **Assay-standardization caveat on the four-orders-of-magnitude spread:** Present in §3.3.1 — this is an important methodological caveat that the draft handles correctly.
+- **CohBar dissolution framing:** §6.3 correctly distinguishes "business failure due to Nasdaq listing/merger failure" from "scientific failure due to negative efficacy finding" — an accurate and epistemically fair distinction.
+
+No additional targeted retrievals were needed. The draft's claims were cross-checked against the five source sections and no factual discrepancy was identified.
