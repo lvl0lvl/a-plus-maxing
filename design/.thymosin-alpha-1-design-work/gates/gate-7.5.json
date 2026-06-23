@@ -1,0 +1,29 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "compound_risk_tier": "medium",
+  "compound_entry_path": "vault/compounds/thymosin-alpha-1.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "populated"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "lymphocyte subsets (CD4:CD8)",
+    "hs-CRP",
+    "CBC / injection-site inspection"
+  ],
+  "halt_reasons": [],
+  "timestamp": "2026-06-21T03:32:21.586195+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T03:28:58.038886+00:00",
+    "attest_ts": "2026-06-21T03:32:21.586198+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "798bdd6394906da53f22197f2aedf3835b919979eddb256383135ea2bbb25a9c",
+    "agent_source_mtime": "2026-06-21T03:31:43.316609+00:00"
+  }
+}

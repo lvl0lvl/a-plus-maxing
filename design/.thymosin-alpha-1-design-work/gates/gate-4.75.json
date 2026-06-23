@@ -1,0 +1,106 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 68,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 44,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 3,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 8,
+      "count_flagged": 0
+    },
+    "IC-9": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 44,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 12,
+      "count_flagged": 1,
+      "findings": [
+        "D.3.1 '71% normalized liver enzymes / 35% monotherapy' sourced to [3, mechanism_review] (Ancell 2001 review); figures not independently verifiable at abstract level from a single primary RCT \u2014 plausible pooled-estimate from multi-trial review. Corpus-missing at abstract level. WARN, not HALT."
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 5,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 12,
+    "largest_cluster_name": "SciClone-co-sponsored registrational cluster (TESTS phase 3 sepsis)",
+    "largest_cluster_count": 1,
+    "share": 0.08,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 12,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: D.3.1 ALT-normalization rates (71%/35%) sourced to mechanism_review (Ancell 2001) \u2014 values not abstract-verifiable from a single primary; pooled-estimate interpretation is plausible but corpus-missing at abstract level."
+  ],
+  "timestamp": "2026-06-21T03:09:02.596211+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T03:04:38.639295+00:00",
+    "attest_ts": "2026-06-21T03:09:02.596214+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "b74881b8cfaf1180155181520858a9fad76d4dfa4f4ffb9c1e4603f42658991d",
+    "agent_source_mtime": "2026-06-21T03:09:02.539518+00:00"
+  }
+}
