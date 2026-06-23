@@ -1,0 +1,106 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 62,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 52,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 12,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 18,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 8,
+      "count_flagged": 0
+    },
+    "IC-9": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 13,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 9,
+      "count_flagged": 1,
+      "findings": [
+        "PMID 42021992 (Mavrych, Frontiers in Aging 2026): Section D cites as 'anticipated' with provisional DOI \u2014 PMID is now live; the parenthetical '(anticipated)' in the bibliography entry is stale but the PMID resolves correctly. Claim ('lack long-term safety data and systematic validation') cannot be abstract-verified because abstract language is not confirmed to include that exact quote. Flagged corpus-missing / abstract-only; not a number-not-found, not a HALT."
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 18,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 9,
+    "largest_cluster_name": "IMG-RAS/Zakusov inventor lineage (Myasoedov/Ashmarin cluster)",
+    "largest_cluster_count": 8,
+    "share": 0.89,
+    "threshold_triggered": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 9,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: PMID 42021992 abstract-only; quoted phrase not verifiable from abstract text alone \u2014 not a HALT."
+  ],
+  "timestamp": "2026-06-22T15:35:03.263550+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-22T15:29:35.165687+00:00",
+    "attest_ts": "2026-06-22T15:35:03.263553+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "256a6b35d8378f3fa5f7c709f860406b0dd7eef7eb2132d2c7cc1b0477785c0d",
+    "agent_source_mtime": "2026-06-22T15:35:03.206877+00:00"
+  }
+}

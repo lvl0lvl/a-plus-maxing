@@ -1,0 +1,35 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/mots-c/practitioner-layer.md",
+    "present": true,
+    "compounding_sheets_count": 0,
+    "named_physicians_count": 1,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/mots-c/non-english-layer.md",
+    "present": true,
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "Japanese"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-20T18:23:57.367363+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T18:11:36.130862+00:00",
+    "attest_ts": "2026-06-20T18:23:57.367366+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "881734112b83058e6f4e75f06f1de1e656d41ca000a6f48c6e86fa9dec05ced2",
+    "agent_source_mtime": "2026-06-20T18:23:44.183902+00:00"
+  }
+}

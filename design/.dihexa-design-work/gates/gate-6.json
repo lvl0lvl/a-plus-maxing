@@ -1,0 +1,30 @@
+{
+  "phase": "6",
+  "verdict": "PASS",
+  "iterations": 1,
+  "critique_agent_id": "critique-dihexa-deep",
+  "draft_path": "vault/library/peptides/dihexa/research-report.md",
+  "findings": [
+    {
+      "category": "citation-incomplete",
+      "severity": "minor",
+      "description": "Section C source section notes the Athira securities class action as '~$10 million' but the final report (\u00a75.2) correctly hedges this as '~$10 million securities class action was also filed' without citing a primary source \u2014 consistent with the Retraction Watch tier-3 sourcing pattern used throughout. However, the source section C.3 also quotes '$10 million to settle securities fraud lawsuits' (not merely filed), which overstates the settlement figure versus the research report's more accurate 'filed' phrasing. The discrepancy between source-section language and final report language is resolved correctly in the final report, but neither document cites a primary court record for the securities action amount. Minor because the final report's phrasing ('also filed') is appropriately hedged and the $4M DOJ settlement is the load-bearing financial fact, not the securities suit."
+    },
+    {
+      "category": "balance-issue",
+      "severity": "minor",
+      "description": "Section 3.2a ('Mechanistic Plausibility Without the Retracted Evidence') correctly distinguishes what the retractions destroy versus what they leave uncertain. However, this section could be read by a motivated reader as partially rehabilitating the HGF/c-Met mechanism via the observation that 'it is not impossible that Dihexa activates PI3K/AKT via an upstream receptor interaction that includes c-Met.' While the caveat is epistemically honest, the section does not equally foreground that this speculation has zero non-retracted experimental support and that the Sun 2021 paper explicitly does not test or confirm c-Met involvement. The balance is borderline: the intellectually honest framing at 3.2a's close ('the proposed HGF/c-Met mechanism is plausible in biological terms, unconfirmed by any trustworthy primary evidence') is correct, but the preceding speculative paragraph could be tightened to prevent it from doing soft rehabilitative work. Minor \u2014 the closing sentence of 3.2a is accurate and the overall report is strongly counterweighted against mechanism overclaiming."
+    }
+  ],
+  "additional_retrievals": [],
+  "halt_reasons": [],
+  "timestamp": "2026-06-22T10:24:12.326126+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-22T10:14:35.012842+00:00",
+    "attest_ts": "2026-06-22T10:24:12.326130+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-6.md",
+    "agent_source_sha256": "04f114d008dee1c9cc5d2588523f5a6dc86944aa217afbbab1c1be7f61664cf5",
+    "agent_source_mtime": "2026-06-22T10:24:12.267552+00:00"
+  }
+}

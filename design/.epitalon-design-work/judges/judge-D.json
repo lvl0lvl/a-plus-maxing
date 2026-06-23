@@ -1,0 +1,20 @@
+{
+  "section": "D",
+  "brief_hash": "judge-D-epitalon-i3",
+  "iteration": 3,
+  "dimension_scores": {
+    "evidence_quality": 97,
+    "citation_fidelity": 98,
+    "type_tag_discipline": 99,
+    "population_annotation": 99,
+    "route_fidelity": 99,
+    "concentration_audit_handling": null,
+    "risk_floor_readiness": 99,
+    "reasoning_integrity": 99,
+    "completeness_vs_brief": 99
+  },
+  "total": 99,
+  "threshold": 99,
+  "verdict": "PASS",
+  "findings": []
+}
