@@ -43,6 +43,7 @@ Non-wiki content (sessions, daily, weekly, reviews, interactions, artifacts) is 
 - [[compounds/mots-c]] (status: researching; evidence_tier: C; risk_tier: experimental)
 - [[compounds/ss-31]] (status: researching; evidence_tier: C; risk_tier: experimental; FDA-approved for Barth syndrome only [Forzinity, Oct 2025], experimental off-label)
 - [[compounds/humanin]] (status: researching; evidence_tier: C; risk_tier: experimental; first-discovered MDP [MT-RNR2/16S]; human evidence biomarker-only, NO administration trial; anti-apoptotic→pro-tumor contraindication; WADA S0)
+- [[compounds/foxo4-dri]] (status: researching; evidence_tier: D; risk_tier: experimental; senolytic D-retro-inverso peptide [FOXO4-p53 disruptor]; ZERO human data [all preclinical]; on-target p53/cardiotox + Born-2023 pulmonary-hypertension adverse finding; unverifiable D-chirality; WADA S0)
 
 ## biomarkers/
 - [[biomarkers/_template]] (template only)
@@ -176,6 +177,9 @@ _(none yet)_
 - [[library/peptides/humanin/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~12K words; 41 dedup sources; 5 paired-judge sections; gates 2.75→8.5 attested PASS; chain intact; bda 0-violation)
 - [[library/peptides/humanin/practitioner-layer]] (2026-06-20; no approved/compounding pathway [never on 503A]; off-label grey-market reality; pro-tumor contraindication dominant; native-vs-HNG-analog conflation)
 - [[library/peptides/humanin/non-english-layer]] (2026-06-20; Japanese + Chinese + Russian surveyed; 8 admissible non-English primaries [JP 2 reviews, ZH 4 incl. 2 HNG, RU 2 incl. n=59 CHD clinical])
+- [[library/peptides/foxo4-dri/research-report]] (2026-06-20 via /aplus-research --mode=deep; ~11.3K words; 28 dedup sources; 5 paired-judge sections; gates 2.75→8.5 attested PASS; chain intact; bda 0-violation)
+- [[library/peptides/foxo4-dri/practitioner-layer]] (2026-06-20; no approved/compounding pathway [never on 503A]; D-chirality unverifiable by HPLC CoA; grey-market doses ~700-1400× below mouse-allometric equiv; Born-2023 PH adverse finding; 0 verifiable prescribers)
+- [[library/peptides/foxo4-dri/non-english-layer]] (2026-06-20; Chinese + Russian + Japanese surveyed; 1 admissible ZH TCM-review [no primary data]; RU + JP 0; Chinese-institution FOXO4-DRI work is English-published)
 - [[library/biomarkers/lp-a/research-report]] (Lp(a) standard /aplus-research; 16 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/apob/research-report]] (ApoB standard /aplus-research; 23 sources; gates 2.75/3.5/4.25/4.75 attested)
 - [[library/biomarkers/ldl-c/research-report]] (LDL-C standard /aplus-research; 17 sources; gates 2.75/3.5/4.25/4.75 attested)
