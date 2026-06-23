@@ -336,6 +336,34 @@ This entry was finished under the operator's "Step 0" trust protocol after a lon
 
 ---
 
+## 2026-06-23 — BOTTOM-13 deep-pass + per-peptide adversarial review + merge (**BOTTOM-13 LANE COMPLETE**)
+
+### DONE (verified — on `main`, mechanical evidence on disk)
+- **All 13 bottom-13 peptides reviewed + merged individually to `main`** (`main` @ `9f8c08e`), each via its own per-peptide PR after a 3-lens adversarial review + efetch-verified fix:
+  Dihexa (PR #221), Cerebrolysin (#222), Semax (#223), MOTS-c (#224), SS-31/Elamipretide (#225), Humanin (#226), FOXO4-DRI (#227), Epitalon (#228), Thymosin-α1 (#229), Kisspeptin-10 (#230), Melanotan-II (#231), PT-141/Bremelanotide (#232), N-Acetyl-Selank-Amidate (#233).
+- Each entry: compound page + research-report + practitioner-layer + non-english-layer + provenance, registered (1 compound + 3 library lines in `meta/index.md`, log create-line, `_triage` Done-row), `wiki-ingest-lint` 0-violation.
+- V1 Python suite green throughout (1364 passed / 3 skipped).
+
+### Per-peptide review METHOD (the operator's S-correction: review+merge PER PEPTIDE, not bundled)
+- 3 independent adversarial lenses per peptide — **factual-accuracy**, **safety/risk-tier**, **citation-fidelity/consistency** — each eutils/ClinicalTrials/DailyMed-verified at source; then a 4th agent applied + efetch-RE-verified every fix; then a per-peptide REST merge (`gh api` PR-create + squash-merge, head-SHA-guarded). This catches the factual/citation/safety class the 9 research gates do NOT.
+
+### What the review CAUGHT that the 9-gate `/aplus-research` pipeline missed (every entry had real, plan-relevant errors)
+- **Fabricated author lists (5 entries):** Cerebrolysin ("Kanabar" → real Patel, a *Cureus* off-whitelist paper posing as Tier-2 evidence); Semax ("Brashkin DV" — nonexistent); MOTS-c (4 wrong co-author lists); Epitalon (a citation identity-theft laundering the Polish Araj paper as a "Khavinson independent" source + a fabricated safety quote); NASA (FOUR fabricated author lists incl. the cardiovascular-safety anchor + the key anxiety-RCT mis-attributed Siuniakov→Medvedev).
+- **PMIDs resolving to ENTIRELY UNRELATED papers:** MOTS-c [17]→a carbon-emissions economics paper, J3→an α-amylase docking paper, J4→a kidney-malformation paper; SS-31 [11]→a lung-volume-reduction meta-analysis, [32]→a PAH-genetics paper, [35]→a 1993 benzodiazepine paper (fabricated authors); Epitalon [23]→organic-chemistry, [15]→pulmonary.
+- **A 2× DOSING ERROR:** SS-31 compound page said Forzinity 40 mg/mL (→ a 1 mL/dose math); DailyMed confirms **80 mg/mL → 0.5 mL/dose** (the wrong math = an 80 mg overdose).
+- **A RESULT-SUPPRESSION:** Thymosin-α1 omitted that the largest COVID cohort (Liu 2021, n=2,282) found Tα1 associated with HARM (adjusted OR 1.5); presented as merely "contradicted."
+- **A FABRICATED EFFICACY NUMBER:** PT-141 practitioner-layer inflated the Safarinejad male-ED result (62%/21% → real 33.5%/8.5%) on an Expression-of-Concern paper; + 3 placebo AE rates contradicting the FDA label the table cited; + a receptor-selectivity inversion.
+- **Invalid research-report frontmatter enums (6 entries — a systematic pipeline pattern):** SS-31, Thymosin-α1, Kisspeptin-10, MT-II (both frontmatter AND inline metadata), PT-141, NASA each wrote a DESCRIPTIVE free-text `risk_tier`/`evidence_tier` instead of the controlled enum; the compound page had the valid enum. Passes the gate because `wiki-ingest-lint` enum-checks the COMPOUND page only, not the research-report. **Follow-up:** extend the research-report lint to enum-check these fields. (memory: `feedback_research_report_frontmatter_enum_drift`)
+- **Safety-completeness gaps surfaced from layers to the compound page:** MT-II T1DM/DKA + hypertensive-crisis contraindications + dermoscopy-only-surveillance caveat; SS-31 PI-mandated eosinophil monitoring + pregnancy; Kisspeptin-10 LH/FSH (the tachyphylaxis-detection markers) flagged REQUIRED; FOXO4-DRI troponin/CK-MB made unsuppressible; Dihexa/Semax/Humanin false-precision-biomarker reframes (IGF-1, hs-CRP).
+- The two FDA-approved entries (Thymosin-α1 evidence_tier B, PT-141 B) + the cleanest entries (Humanin, FOXO4-DRI) had only light metadata/safety-framing fixes — the heavy corruption clustered in specific synthesis runs (the USC-mitochondrial cluster + the Russian-transliteration entries).
+
+### CLAIMED (asserted — the per-peptide PR bodies + the fix-agent efetch logs carry the evidence)
+- Every flagged fix was efetch/DailyMed/ClinicalTrials-RE-verified at source by the applying agent before write (incl. the agent catching one error in its OWN brief — NASA [25] journal). The fix agents replaced wrong-paper PMIDs with their correct identifiers (verified resolution), not just flagged them.
+- Bottom-13 risk_tiers: 11 `experimental`, 2 `medium` (Thymosin-α1, PT-141 — both genuinely approved). evidence_tiers span B (the 2 approved) → D (FOXO4-DRI, NASA, the near-zero-data entries).
+- `feature/wiki-peptides` (the staging branch) is now redundant — its fixed content is fully on `main` (compound pages byte-identical, two-dot diff empty).
+
+---
+
 ## Prep checklist — run BEFORE the next peptide research session
 1. `cd ~/Documents/Projects/a+research && git checkout main && git pull --ff-only`
    (gets #148/#150/#151 — the operational skill).
