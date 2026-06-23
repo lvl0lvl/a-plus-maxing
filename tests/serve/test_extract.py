@@ -309,3 +309,23 @@ def test_clean_wired_token_proposal_still_lands_in_the_store(tmp_path):
     assert gt and gt[0]["value"] == "add 10 lb to squat by september", (
         "a clean wired-token proposal did not land in the store item"
     )
+
+
+def test_declined_domains_control_key_populates_field_and_is_not_dropped():
+    """The `declined_domains` control key feeds the result field, never the dropped receipt.
+
+    `declined_domains` is a control key, not a fact candidate. A list-valued
+    `declined_domains` populates `ExtractionResult.declined_domains` and must NOT appear
+    in `dropped` (it is not a malformed fact name) nor in `candidate_facts`. The other
+    well-formed facts in the same proposal still pass through.
+    """
+    result = extract.extract_facts(
+        {"declined_domains": ["nutrition", "peptides"], "recovery-status-band": "moderate"},
+        turn_text="t",
+    )
+    assert result.declined_domains == {"nutrition", "peptides"}
+    assert "declined_domains" not in result.dropped, (
+        "the declined_domains control key was mis-reported as a malformed fact name"
+    )
+    assert "declined_domains" not in result.candidate_facts
+    assert result.candidate_facts == {"recovery-status-band": "moderate"}
