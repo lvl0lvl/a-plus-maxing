@@ -90,25 +90,39 @@ def _seed(root, values):
 # --------------------------------------------------------------------------- #
 
 
-def _chat_module_executable_names():
-    """Every identifier referenced in chat.py's EXECUTABLE code (docstrings excluded).
+# The STRATEGY surface this AC-1 invariant scopes to: `plan_next_turn` + its private
+# gap-set helper `_missing_fields`. The module ALSO holds the ADR-0016-T1 per-turn
+# DISPATCH (`dispatch_turn`/`_model_messages`/`_degraded_turn`/`_progress`), which
+# legitimately references the model client + the raw turn — that is the dispatch's lane,
+# not the strategy's. Scoping the scan to the strategy functions keeps this invariant's
+# teeth (it still reds if `plan_next_turn` touches a raw/scaffold/model surface) without
+# false-flagging the dispatch the strategy module now also carries.
+_STRATEGY_FUNCTIONS = ("plan_next_turn", "_missing_fields")
 
-    Returns the set of attribute-access dotted names + bare names appearing in the
-    module's AST — so a raw/scaffold/model surface accessed in code is caught, while a
-    mention in a docstring or comment (which the recipe's `rg` would false-flag) is not.
+
+def _chat_module_executable_names():
+    """Every identifier referenced in the STRATEGY functions' EXECUTABLE code.
+
+    Scans the `_STRATEGY_FUNCTIONS` subtrees of `scripts/serve/chat.py`'s AST (docstrings
+    excluded) — so a raw/scaffold/model surface accessed in the STRATEGY is caught, while
+    a mention in a docstring/comment, or a legitimate reference in the ADR-0016-T1
+    dispatch (a different function in the same module), is not.
     """
     tree = ast.parse((REPO_ROOT / "scripts" / "serve" / "chat.py").read_text())
     names = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Name):
-            names.add(node.id)
-        elif isinstance(node, ast.Attribute):
-            names.add(node.attr)
-        elif isinstance(node, (ast.Import, ast.ImportFrom)):
-            mod = getattr(node, "module", "") or ""
-            names.add(mod)
-            for alias in node.names:
-                names.add(alias.name)
+    for func in tree.body:
+        if not (isinstance(func, ast.FunctionDef) and func.name in _STRATEGY_FUNCTIONS):
+            continue
+        for node in ast.walk(func):
+            if isinstance(node, ast.Name):
+                names.add(node.id)
+            elif isinstance(node, ast.Attribute):
+                names.add(node.attr)
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                mod = getattr(node, "module", "") or ""
+                names.add(mod)
+                for alias in node.names:
+                    names.add(alias.name)
     return names
 
 
