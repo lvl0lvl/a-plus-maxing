@@ -64,7 +64,7 @@ See [[library/peptides/ghk-cu/practitioner-layer]] (all `practitioner_protocol`/
 - adverse effects (literature): topical CIR "safe as used" (rare mild irritation/ACD); injectable AE existence only (injection-site reactions; the "8–12%" rate is vendor-sourced and inadmissible as a rate); no injectable human safety trial.
 - adverse effects (anecdotal): injection-site reactions, metallic taste, flushing (`anecdote_aggregate`, qualitative).
 - contraindications:    **Wilson's disease & copper-metabolism disorders (absolute, for systemic/injectable — delivers bioavailable copper)**; copper-chelation therapy; concurrent copper supplementation (caution); pregnancy/lactation (no data).
-- monitoring:           serum copper, ceruloplasmin, liver function for systemic use (copper status IS objectively monitorable; no GHK-Cu-specific validated protocol).
+- monitoring:           serum copper + ceruloplasmin (the direct copper-overload markers — no dedicated biomarker page yet), liver function [[biomarkers/alt]] / [[biomarkers/ast]] (copper accumulates hepatically) for systemic use — copper status IS objectively monitorable; these are a copper-safety screen, NOT a GHK-Cu-specific pharmacodynamic protocol (none is validated).
 - known interactions:   copper supplements / chelators.
 
 ## Trial Status

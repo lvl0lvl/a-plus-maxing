@@ -17,3 +17,22 @@ vault/compounds/bpc-157.md
 vault/library/peptides/bpc-157/research-report.md
 vault/library/peptides/bpc-157/practitioner-layer.md
 vault/library/peptides/bpc-157/non-english-layer.md
+
+# Metabolic-session peptides (feature/wiki-metabolic, PR #180). Same situation as
+# bpc-157: gate provenance lives under the .provenance/ subdir layout the gate does
+# not resolve (slug has no mode_floor in templates/specialist-risk-class.yaml, so
+# the bda backfill path is unavailable without extending that template). Back-fill
+# obligation, not a permanent exemption (bead 0hn2). The experimental-tier
+# monitoring-link check is NOT exempted here — it was fixed in-page for ghk-cu/tb-500.
+vault/compounds/ghk-cu.md
+vault/library/peptides/ghk-cu/research-report.md
+vault/library/peptides/ghk-cu/practitioner-layer.md
+vault/library/peptides/ghk-cu/non-english-layer.md
+vault/compounds/kpv.md
+vault/library/peptides/kpv/research-report.md
+vault/library/peptides/kpv/practitioner-layer.md
+vault/library/peptides/kpv/non-english-layer.md
+vault/compounds/tb-500.md
+vault/library/peptides/tb-500/research-report.md
+vault/library/peptides/tb-500/practitioner-layer.md
+vault/library/peptides/tb-500/non-english-layer.md
