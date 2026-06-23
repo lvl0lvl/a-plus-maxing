@@ -1,0 +1,35 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/n-acetyl-selank-amidate/practitioner-layer.md",
+    "present": true,
+    "compounding_sheets_count": 0,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/n-acetyl-selank-amidate/non-english-layer.md",
+    "present": true,
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "German"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-21T15:46:16.620787+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T15:43:32.488714+00:00",
+    "attest_ts": "2026-06-21T15:46:16.620790+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "508889408c9df6182759cdf7b34a97b473267d259b8884a96a1aede39e6298ed",
+    "agent_source_mtime": "2026-06-21T15:45:42.076575+00:00"
+  }
+}
