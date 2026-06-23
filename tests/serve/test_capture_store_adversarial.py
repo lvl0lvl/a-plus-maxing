@@ -242,20 +242,19 @@ def test_extractor_two_distinct_tokens_same_call_both_persist(tmp_path):
     assert store.read("recovery-status-band", root=store_root)[0]["value"] == "moderate"
 
 
-def test_extractor_identical_recapture_same_timepoint_is_idempotent(tmp_path):
+def test_extractor_identical_recapture_same_timepoint_is_idempotent(tmp_path, monkeypatch):
     """Cat-2 (extractor): an identical re-capture at the same (item, timepoint, source) is a no-op.
 
-    The extractor write path reuses `store.append`'s idempotent dedupe. Re-appending the
-    SAME `(item, timepoint, source)` identity is dropped — proved by routing two
-    extractor writes whose readings share the identity (same timepoint, via store.append
-    directly to pin the timepoint, mirroring what the gate produces on a double-submit).
+    Drives the EXTRACTOR path (`extract.persist_extraction` -> the gate -> `store.append`),
+    not `store.append` directly: two `persist_extraction` calls of the SAME proposal, with
+    the gate's timepoint pinned (`capture._now` -> a fixed stamp) so both produce the same
+    `(item, timepoint, source="intake")` identity. The second is a dedupe no-op, so the
+    store holds one line — the extractor path inherits `store.append`'s idempotent dedupe.
     """
+    monkeypatch.setattr(capture, "_now", lambda: _ts())
     store_root = tmp_path / "store"
-    ts = _ts()
-    reading = {"item": "goal-domains", "timepoint": ts, "source": "intake", "value": "Workout"}
-    # The extractor's only store path is the gate, whose store.append dedupes on identity.
-    store.append("goal-domains", dict(reading), root=store_root)
-    store.append("goal-domains", dict(reading), root=store_root)  # identical re-capture
+    _extract_persist({"goal-domains": "Workout"}, store_root, tmp_path / "scaffold")
+    _extract_persist({"goal-domains": "Workout"}, store_root, tmp_path / "scaffold")  # identical re-capture
     assert len(store.read("goal-domains", root=store_root)) == 1, (
         "an identical re-capture on the extractor write path duplicated the line"
     )
@@ -266,39 +265,45 @@ def test_extractor_identical_recapture_same_timepoint_is_idempotent(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-def test_extractor_same_identity_different_value_collides_second_dropped(tmp_path):
+def test_extractor_same_identity_different_value_collides_second_dropped(tmp_path, monkeypatch):
     """Cat-3 (extractor): same (item, timepoint, source) + a DIFFERENT value collides (second dropped).
 
-    `value` is EXCLUDED from the dedupe identity, so a second write at the same
-    `(item, timepoint, source)` with a different value is DROPPED — the extractor write
-    path inherits this (the S41 dropped-contraindication safety case, on the extractor
-    path). The first value stands.
+    Drives the EXTRACTOR path (`extract.persist_extraction` -> the gate -> `store.append`),
+    not `store.append` directly: two `persist_extraction` calls at the SAME pinned
+    timepoint (`capture._now` fixed) under the same token with DIFFERENT values. `value`
+    is EXCLUDED from the dedupe identity, so the second write is DROPPED (the S41
+    dropped-contraindication safety case, on the extractor path) and the first value
+    stands.
     """
+    monkeypatch.setattr(capture, "_now", lambda: _ts())
     store_root = tmp_path / "store"
-    ts = _ts()
-    store.append("hard-limits", {"item": "hard-limits", "timepoint": ts, "source": "intake", "value": "no pressing"}, root=store_root)
-    store.append("hard-limits", {"item": "hard-limits", "timepoint": ts, "source": "intake", "value": "DIFFERENT"}, root=store_root)
+    _extract_persist({"hard-limits": "no pressing"}, store_root, tmp_path / "scaffold")
+    _extract_persist({"hard-limits": "DIFFERENT"}, store_root, tmp_path / "scaffold")
     readings = store.read("hard-limits", root=store_root)
     assert len(readings) == 1, "a same-identity different-value second write was not dropped"
     assert readings[0]["value"] == "no pressing", "the second write wrongly overrode the first value"
 
 
-def test_extractor_any_single_differing_identity_field_does_not_collide(tmp_path):
-    """Cat-3 (extractor): differing item OR timepoint OR source does NOT collide (both persist).
+def test_extractor_any_single_differing_identity_field_does_not_collide(tmp_path, monkeypatch):
+    """Cat-3 (extractor): a differing item OR timepoint does NOT collide (both persist).
 
-    Each of the three identity fields contributes to the dedupe key on the extractor
-    write path; vary each in turn and assert both readings persist — none is silently
-    ignored in the identity.
+    Drives the EXTRACTOR path (`extract.persist_extraction` -> the gate -> `store.append`),
+    not `store.append` directly. Two identity fields the extractor path can vary —
+    `timepoint` (the gate's `capture._now`) and `item` (the proposal token) — each yield a
+    distinct identity, so both readings persist; none is silently ignored. (`source` is
+    NOT varied here: the gate fixes `source="intake"` for every extractor write, so a
+    source-variation is not reachable through this path — its contribution to the dedupe
+    key is held by the direct-store Cat-3 battery above.)
     """
     store_root = tmp_path / "store"
-    ts = _ts()
-    base = {"item": "goal-targets", "timepoint": ts, "source": "intake", "value": "v"}
-    store.append("goal-targets", dict(base), root=store_root)
-    store.append("goal-targets", {**base, "timepoint": _ts(60)}, root=store_root)
+    # Differing timepoint -> distinct identity -> both persist (same token, two pinned stamps).
+    monkeypatch.setattr(capture, "_now", lambda: _ts())
+    _extract_persist({"goal-targets": "v"}, store_root, tmp_path / "scaffold")
+    monkeypatch.setattr(capture, "_now", lambda: _ts(60))
+    _extract_persist({"goal-targets": "v"}, store_root, tmp_path / "scaffold")
     assert len(store.read("goal-targets", root=store_root)) == 2, "a differing timepoint wrongly collided"
-    store.append("goal-targets", {**base, "source": "correction"}, root=store_root)
-    assert len(store.read("goal-targets", root=store_root)) == 3, "a differing source wrongly collided"
-    store.append("hard-limits", {**base, "item": "hard-limits"}, root=store_root)
+    # Differing item -> a different store file entirely (its own stream).
+    _extract_persist({"hard-limits": "v"}, store_root, tmp_path / "scaffold")
     assert len(store.read("hard-limits", root=store_root)) == 1, "a differing item did not write its own stream"
 
 
@@ -310,11 +315,15 @@ def test_extractor_any_single_differing_identity_field_does_not_collide(tmp_path
 def test_extractor_widening_dedupe_to_include_value_breaks_collision(monkeypatch):
     """Cat-4 (mutation, extractor): widen the dedupe key to include `value` -> Cat-3 breaks.
 
-    Deliberately MUTATE the store's dedupe identity to include `value`, then re-run the
-    Cat-3 same-identity-collision scenario on the extractor write path and assert the
-    guarantee NO LONGER holds (the second write is NOT dropped — two lines persist). This
-    proves the extractor-path Cat-3 test is non-tautological: it genuinely depends on
-    `value` being EXCLUDED. monkeypatch reverts the mutation at teardown.
+    Drives the EXTRACTOR path (`extract.persist_extraction` -> the gate -> `store.append`),
+    not `store.append` directly: with the gate's timepoint pinned (`capture._now` fixed)
+    so two extractor writes share a `(item, timepoint, source)`, deliberately MUTATE the
+    store's dedupe identity to include `value` and re-run the Cat-3 same-identity-collision
+    scenario. Under the widened key the second (different-value) write is NO LONGER a
+    dedupe no-op — both lines persist. This proves the extractor-path Cat-3 test is
+    non-tautological: it genuinely depends on `value` being EXCLUDED AND on the extractor
+    path itself (it would pass identically only because `persist_extraction` drives the
+    gate). monkeypatch reverts both mutations at teardown.
 
     Observed-RED record: under the widened key `len(readings)` becomes 2 (the second
     write is no longer a dedupe no-op) — the exact assertion
@@ -325,13 +334,14 @@ def test_extractor_widening_dedupe_to_include_value_breaks_collision(monkeypatch
         return tuple(reading[f] for f in ("item", "timepoint", "source", "value"))
 
     monkeypatch.setattr(keying, "dedupe_key", _widened_key)
+    monkeypatch.setattr(capture, "_now", lambda: _ts())
 
     import tempfile
     from pathlib import Path
     store_root = Path(tempfile.mkdtemp()) / "store"
-    ts = _ts()
-    store.append("hard-limits", {"item": "hard-limits", "timepoint": ts, "source": "intake", "value": "no pressing"}, root=store_root)
-    store.append("hard-limits", {"item": "hard-limits", "timepoint": ts, "source": "intake", "value": "DIFFERENT"}, root=store_root)
+    scaffold_root = Path(tempfile.mkdtemp()) / "scaffold"
+    _extract_persist({"hard-limits": "no pressing"}, store_root, scaffold_root)
+    _extract_persist({"hard-limits": "DIFFERENT"}, store_root, scaffold_root)
     readings = store.read("hard-limits", root=store_root)
     assert len(readings) == 2, (
         "the dedupe-widening mutation did not change behavior — the extractor-path Cat-3 "
