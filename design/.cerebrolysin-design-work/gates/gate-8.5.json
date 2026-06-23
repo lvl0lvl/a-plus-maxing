@@ -1,0 +1,35 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/cerebrolysin/practitioner-layer.md",
+    "present": true,
+    "compounding_sheets_count": 0,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/cerebrolysin/non-english-layer.md",
+    "present": true,
+    "languages_surveyed": [
+      "Russian",
+      "Chinese",
+      "German"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-22T14:29:43.368055+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-22T14:26:58.015062+00:00",
+    "attest_ts": "2026-06-22T14:29:43.368058+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "349ec7ba80ab2d155d7761fe0184bb724c1d94c48cd7dd559f774114e87f6c38",
+    "agent_source_mtime": "2026-06-22T14:29:09.698602+00:00"
+  }
+}
