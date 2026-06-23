@@ -1,0 +1,108 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 44,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 44,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS"
+    },
+    "IC-6": {
+      "status": "PASS"
+    },
+    "IC-7": {
+      "status": "PASS",
+      "findings": [
+        "IC-7a: Zero human data stated explicitly in A.5, B.8, D.1, E.4 \u2014 PASS",
+        "IC-7b: Benoist 2014 retraction + McCoy 2013 EoC flagged at every invocation across all 5 sections \u2014 PASS",
+        "IC-7c: Fosgonimeton failure explicitly quarantined from Dihexa attribution in B.8, D.3, E.3/E.4 \u2014 PASS",
+        "IC-7d: c-Met oncogenic risk framed as unstudied theoretical concern; absence of carcinogenicity study stated as unstudied risk domain not evidence of safety \u2014 PASS",
+        "IC-7e: All numerical animal/in_vitro claims name species within sentence \u2014 PASS"
+      ]
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-9": {
+      "status": "PASS",
+      "findings": [
+        "WSU/Harding-Wright group primary in 6/9 papers (67%); headcount just below 70% threshold",
+        "Qualitative escalation: foundational HGF/c-Met mechanism evidence is effectively 100% single-group-AND-retracted post-2025; threshold_triggered = true",
+        "Concentration surfaced in first-class Section C.3 and full audit table in Section E.1"
+      ]
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 10,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS"
+    },
+    "IC-12": {
+      "status": "PASS"
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 12,
+      "count_flagged": 2,
+      "findings": [
+        "corpus-missing: Sun 2021 (PMID 34827486) dose numerics 1.44/2.88 mg/kg and 3-month duration \u2014 MDPI full text HTTP 403; abstract confirms PI3K/AKT, n=12/6, oral route but not specific doses",
+        "corpus-missing: McCoy 2013 (PMID 23055539) specific n=8 and 2.0 mg/kg dose figures \u2014 abstract confirms scopolamine reversal and oral route but not specific numerics (full text paywalled)"
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 12,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 9,
+    "largest_cluster_name": "WSU/Harding-Wright group (foundational mechanism papers retracted)",
+    "largest_cluster_count": 6,
+    "share": 0.67,
+    "threshold_triggered": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 12,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: corpus-missing for Sun 2021 (PMID 34827486) specific dose numerics (1.44/2.88 mg/kg, 3 months) \u2014 MDPI paywall/403; abstract-level confirms all non-numeric content",
+    "IC-13: corpus-missing for McCoy 2013 (PMID 23055539) specific n=8 and 2.0 mg/kg figures \u2014 PubMed abstract confirms scopolamine model and oral route; full text paywalled"
+  ],
+  "timestamp": "2026-06-22T10:03:23.154772+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-22T09:58:04.958355+00:00",
+    "attest_ts": "2026-06-22T10:03:23.154775+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "12362a269943e816b09aac184376d49c2b2ecdbea3f2fd4298690c5f7643aa8b",
+    "agent_source_mtime": "2026-06-22T10:03:23.098545+00:00"
+  }
+}
