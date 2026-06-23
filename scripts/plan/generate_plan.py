@@ -366,6 +366,8 @@ def compute_plan(domain, author_output=None, store_read=None, *, gates=None, cli
             "section": None, "reason": AUTHOR_CALL_FAILED, "meta": {},
         }
 
+    # The already-resolved `envelope` is replayed through a fixed adapter so `assemble`'s
+    # roster re-invocation makes NO second model call (the one author call is above).
     roster = {domain: _author_callable(_FixedEnvelopeClient(envelope))}
     section = assemble([domain], summary, roster)["sections"][0]
     specialist = section.get("specialist")
