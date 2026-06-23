@@ -240,10 +240,13 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         except Exception:
             # Thread survival (AC-6): a malformed body / a dispatch exception must NOT kill
             # the request thread. Answer with a degraded response, never a dropped
-            # connection — and never a fabricated reply/fact or a store write.
+            # connection — and never a fabricated reply/fact or a store write. The shape
+            # mirrors `chat._degraded_turn` (carries `reason`) so the two degraded surfaces
+            # cannot silently diverge.
             self._write_json(400, {
                 "reply": None, "receipt": {"store": [], "scaffold": [], "dropped": []},
                 "progress": None, "degraded": True, "degrade_to": "form",
+                "reason": "bad request",
             })
             return
         self._write_json(200, receipt)

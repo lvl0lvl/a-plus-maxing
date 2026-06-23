@@ -215,6 +215,24 @@ def plan_next_turn(summary, covered_domains, declined_domains):
     )
 
 
+def _deidentified_view(intent):
+    """The canonical 5-key de-identified projection of a `TurnIntent` (0 raw operator string).
+
+    The single source for the de-identified view both the turn-receipt progress and the
+    model-payload context carry: token NAMES (`missing_fields`), domain NAMES
+    (`target_domain`/`record_only`), and booleans (`domain_done`/`intake_complete`) — NEVER
+    a raw store VALUE. Both consumers route through here so the projection cannot drift (a
+    future `TurnIntent` field is added to one view but not the other).
+    """
+    return {
+        "target_domain": intent.target_domain,
+        "missing_fields": list(intent.missing_fields),
+        "record_only": list(intent.record_only),
+        "domain_done": intent.domain_done,
+        "intake_complete": intent.intake_complete,
+    }
+
+
 def _progress(intent):
     """The intake-progress state for the turn receipt — token/domain names + booleans only.
 
@@ -222,13 +240,7 @@ def _progress(intent):
     (`ADR-0017-T2`) reads `target_domain`/`missing_fields` to drive the next question and
     `intake_complete`/`domain_done` to end the loop.
     """
-    return {
-        "target_domain": intent.target_domain,
-        "missing_fields": list(intent.missing_fields),
-        "domain_done": intent.domain_done,
-        "intake_complete": intent.intake_complete,
-        "record_only": list(intent.record_only),
-    }
+    return _deidentified_view(intent)
 
 
 def _model_messages(conversation, turn_text, intent):
@@ -253,14 +265,19 @@ def _model_messages(conversation, turn_text, intent):
     Returns:
         (list) The `converse` messages: the de-identified context turn, the prior
         conversation, then the current operator turn.
+
+    Raises:
+        MalformedControlError: When `conversation` is not a list of `{role, content}`
+            dicts — fail-loud (mirroring `plan_next_turn`'s control-input posture), so an
+            untrusted `/chat`-body shape never char-splats into the model payload.
     """
-    context = {
-        "target_domain": intent.target_domain,
-        "missing_fields": list(intent.missing_fields),
-        "record_only": list(intent.record_only),
-        "domain_done": intent.domain_done,
-        "intake_complete": intent.intake_complete,
-    }
+    if not isinstance(conversation, list) or not all(
+        isinstance(t, dict) and "role" in t and "content" in t for t in conversation
+    ):
+        raise MalformedControlError(
+            "_model_messages: conversation must be a list of {role, content} dicts"
+        )
+    context = _deidentified_view(intent)
     messages = [{"role": "system", "content": context}]
     messages.extend(conversation)
     messages.append({"role": "user", "content": turn_text})
@@ -323,7 +340,9 @@ def dispatch_turn(turn_text, conversation, covered_domains, declined_domains, *,
 
     Raises:
         MalformedControlError: A control input outside the chat-covered contract
-            (`plan_next_turn`'s fail-loud) — the caller catches it for thread survival.
+            (`plan_next_turn`'s fail-loud, or a non-list/non-`{role,content}`
+            `conversation` from `_model_messages`) — the caller catches it for thread
+            survival.
     """
     store_read = (
         functools.partial(store.read, root=store_root) if store_root is not None

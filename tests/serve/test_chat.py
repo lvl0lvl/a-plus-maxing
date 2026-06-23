@@ -326,6 +326,70 @@ def test_model_client_exception_does_not_drop_the_thread(tmp_path):
         srv.server_close()
 
 
+def test_well_formed_body_with_malformed_control_degrades_and_thread_survives(tmp_path):
+    """AC-6: a WELL-FORMED JSON body carrying a malformed control shape degrades cleanly.
+
+    Distinct from `test_malformed_body_does_not_drop_the_thread` (a non-JSON body): each
+    body here is valid JSON, but carries a control shape `dispatch_turn`'s
+    `plan_next_turn`/`_model_messages` validation rejects fail-loud —
+    (i) a `covered_domains` member outside CHAT_DOMAINS, (ii) `declined_domains` not a
+    subset of `covered_domains`, (iii) a non-list `conversation` (a string) that, without
+    the `_model_messages` validation (FIX D1), would char-splat into the model payload.
+    Each must return a degraded response (caught by the server's `/chat` except), and a
+    subsequent well-formed request must still answer 200 (thread survival).
+    """
+    backend = _ReplyBackend(reply="ok")
+    srv, port = _server_with_chat(tmp_path, backend)
+    _serve_in_thread(srv)
+    try:
+        malformed_controls = (
+            {"turn": "hi", "conversation": [], "covered_domains": ["not-a-chat-domain"]},
+            {"turn": "hi", "conversation": [], "covered_domains": ["training"],
+             "declined_domains": ["goals"]},
+            {"turn": "hi", "conversation": "i am not a list", "covered_domains": ["training"]},
+        )
+        for payload in malformed_controls:
+            status, resp = _post_chat(port, payload)
+            assert status in (200, 400), f"a malformed control dropped the connection: {payload}"
+            assert isinstance(resp, dict), f"non-dict degraded response: {payload}"
+            assert resp.get("degraded") is True, f"not marked degraded: {payload}"
+        # The server survived every malformed control — a well-formed request still answers.
+        ok_status, ok_resp = _post_chat(
+            port, {"turn": "hi", "conversation": [], "covered_domains": []}
+        )
+        assert ok_status == 200 and ok_resp["reply"] == "ok"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_server_catch_path_degraded_shape_matches_degraded_turn(tmp_path):
+    """FIX E (F-TEST-3): the server `/chat` catch-path degraded response carries `reason`.
+
+    The server's `except`-path degraded response must be shape-parity with
+    `chat._degraded_turn` (which includes `reason`), so the two degraded surfaces cannot
+    silently diverge. A non-JSON body drives the server catch path; assert the response is
+    a well-formed dict carrying `degraded` True, `degrade_to == "form"`, the receipt shape,
+    `reply` None, `progress` None, and `reason` present.
+    """
+    backend = _ReplyBackend(reply="ok")
+    srv, port = _server_with_chat(tmp_path, backend)
+    _serve_in_thread(srv)
+    try:
+        status, resp = _post_chat(port, b"not json at all{{{")
+        assert status in (200, 400)
+        assert isinstance(resp, dict)
+        assert resp["degraded"] is True
+        assert resp["degrade_to"] == "form"
+        assert resp["reply"] is None
+        assert resp["progress"] is None
+        assert resp["receipt"] == {"store": [], "scaffold": [], "dropped": []}
+        assert "reason" in resp and resp["reason"], "the catch-path response omitted `reason`"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
 # --------------------------------------------------------------------------- #
 # H-2 — the /chat dispatch threads identity_config behaviorally (QA F1)
 # --------------------------------------------------------------------------- #
