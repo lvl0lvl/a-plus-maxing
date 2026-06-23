@@ -98,11 +98,18 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         scaffold_root: The gitignored operator-record root the POST handler's
             form-field capture writes record-only values into (None -> the production
             `vault/scaffold/filled/` default).
+        identity_config: The instance operator-identity token config the POST handler's
+            form-field capture threads into `persist_capture` so operator-identity PII
+            detection is non-empty (None -> `pii_scan`'s `vault/meta/operator-identity.txt`
+            default). The H-2 wiring (ADR-0017-T1): every capture call site threads this
+            through the same class-attr seam as `store_root`/`scaffold_root`, so dropping
+            it never silently disables identity detection.
     """
 
     store_root = None
     dna_root = None
     scaffold_root = None
+    identity_config = None
 
     def do_GET(self):
         if self.path != "/":
@@ -135,6 +142,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         store_root = self.store_root
         dna_root = self.dna_root
         scaffold_root = self.scaffold_root
+        identity_config = self.identity_config
         step = None
         try:
             # A length-bounded reader streams the body to the multipart parser, so
@@ -155,8 +163,12 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                 fields = dict(staged["fields"])
                 step = fields.pop("step", None)
                 if fields:
+                    # Thread the instance identity_config (H-2, ADR-0017-T1): without it
+                    # the free-text PII scan's operator-identity detection is empty —
+                    # the factory-to-component wiring gap this closes.
                     capture.persist_capture(
-                        fields, root=store_root, scaffold_root=scaffold_root
+                        fields, root=store_root, scaffold_root=scaffold_root,
+                        identity_config=identity_config,
                     )
         except (SystemExit, ValueError, zipfile.BadZipFile, ET.ParseError):
             # A real operator input must NOT kill the request thread. SystemExit: an
@@ -194,16 +206,17 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         """Silence the default per-request stderr access log."""
 
 
-def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None):
+def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
+                 identity_config=None):
     """Construct the loopback-bound intake server on `port`.
 
     The POST `/upload` handler ingests file uploads into `store_root`/`dna_root`,
     captures form fields by data class (wired tokens -> `store_root`, record-only
-    values -> `scaffold_root`), and re-renders the wizard from the store. All three
+    values -> `scaffold_root`), and re-renders the wizard from the store. All four
     default to None, which falls through to the production `vault/store/` /
-    `vault/dna/raw/` / `vault/scaffold/filled/` defaults (so the operator entry
-    `python -m scripts.serve` serves the real instance). Tests bind tmp roots so the
-    E2E never touches the real store/dropzone/scaffold.
+    `vault/dna/raw/` / `vault/scaffold/filled/` / `vault/meta/operator-identity.txt`
+    defaults (so the operator entry `python -m scripts.serve` serves the real instance).
+    Tests bind tmp roots so the E2E never touches the real store/dropzone/scaffold.
 
     Args:
         port (int): The TCP port to bind on loopback; 0 picks an ephemeral port.
@@ -211,6 +224,9 @@ def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None):
         dna_root (str | Path, optional): The DNA dropzone the POST handler lands into.
         scaffold_root (str | Path, optional): The gitignored operator-record root the
             form-field capture writes record-only values into.
+        identity_config (str | Path, optional): The instance operator-identity token
+            config the form-field capture threads into `persist_capture` (the H-2 seam,
+            ADR-0017-T1); None falls through to `pii_scan`'s default.
 
     Returns:
         (ThreadingHTTPServer) A server bound to ("127.0.0.1", port). Stop it with
@@ -218,5 +234,5 @@ def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None):
     """
     handler = type("BoundIntakeRequestHandler", (IntakeRequestHandler,),
                    {"store_root": store_root, "dna_root": dna_root,
-                    "scaffold_root": scaffold_root})
+                    "scaffold_root": scaffold_root, "identity_config": identity_config})
     return ThreadingHTTPServer((_LOOPBACK, port), handler)
