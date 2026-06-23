@@ -1,0 +1,20 @@
+{
+  "section": "B",
+  "brief_hash": "judge-B-kp10-i2",
+  "iteration": 2,
+  "dimension_scores": {
+    "evidence_quality": 99,
+    "citation_fidelity": 98,
+    "type_tag_discipline": 99,
+    "population_annotation": 98,
+    "route_fidelity": 98,
+    "concentration_audit_handling": null,
+    "risk_floor_readiness": null,
+    "reasoning_integrity": 99,
+    "completeness_vs_brief": 99
+  },
+  "total": 99,
+  "threshold": 99,
+  "verdict": "PASS",
+  "findings": []
+}

@@ -1,0 +1,127 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 47,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 38,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 2,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 2,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 12,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "WARN",
+      "findings": [
+        "Section D cites IV-only clinical trials for SC bolus and SC infusion dose claims; the SC bolus arm (Jayasena 2011, PMID 21976724) IS in the cited study \u2014 not a mismatch. Section D.2 SC infusion cite [4, open_label] (Narayanaswamy 2016) is correctly tagged. Route extrapolation from IV clinical data to any grey-market SC self-injection is flagged explicitly in prose (section D.4). No untagged route extrapolation to oral or other non-study routes detected. WARN retained for the IV\u2192SC dose-range extrapolation from George 2011 [1] used for baseline SC bioavailability comparisons; these are correctly acknowledged as attenuated."
+      ]
+    },
+    "IC-9": {
+      "status": "PASS",
+      "findings": [
+        "Field-level concentration: ~45\u201355% Imperial (four verified human-dosing groups), below 70% flag. Sexual/HSDD sub-literature: ~100% Imperial (single group); first-class section C.4 and E.1 both surface this distinction explicitly before HSDD claims. Both literatures disclosed."
+      ]
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 7,
+      "count_flagged": 0,
+      "findings": [
+        "PMIDs spot-checked: 11385580 (Ohtaki Nature 2001 \u2014 CONFIRMED), 21632807 (George JCEM 2011 \u2014 CONFIRMED; LH peak 4.1\u219212.4 IU/L at 1 \u00b5g/kg verified in abstract), 21976724 (Jayasena JCEM 2011 \u2014 CONFIRMED; half-life 3.8\u00b10.3 min men / 4.1\u00b10.4 min women confirmed via PMC3232613 full text), 28112678 (Comninos JCI 2017 \u2014 CONFIRMED; n=29, crossover RCT, limbic activation), 36735255 (Mills JAMA Netw Open 2023 \u2014 CONFIRMED; 56% tumescence increase confirmed in abstract), 36287566 (Thurston JAMA Netw Open 2022 \u2014 CONFIRMED; HSDD women, r=0.469 hippocampus correlation), 28854728 (Abbara Hum Reprod 2017 \u2014 CONFIRMED; oocyte yield 45%\u219271% p=0.042; live birth rates not stated in abstract \u2014 see IC-13 note). All 7 PMIDs resolve to correct papers."
+      ]
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 14,
+      "count_flagged": 2,
+      "findings": [
+        "PASS (12/14): LH peak at 1 \u00b5g/kg (4.1\u219212.4 IU/L, George 2011) CONFIRMED in abstract. KP-10 half-life (3.8\u00b10.3 min men, 4.1\u00b10.4 min women, Jayasena 2011) CONFIRMED via PMC full text. 56% tumescence increase (Mills 2023) CONFIRMED in abstract. Limbic activation / n=29 / crossover design (Comninos 2017) CONFIRMED. KP-54 half-life ~27.6 min (Dhillo 2005) abstract-confirmed. Oocyte maturation 95%, OHSS 0% moderate/severe (Abbara 2015) abstract-confirmed. LH pulse increase 0.7\u21921.0 pulses/h (George 2011 infusion) abstract-confirmed. Twice-daily SC tachyphylaxis LH 24.0\u21922.5 IU/L (Jayasena 2009) abstract-confirmed. Jayasena 2015 equipotency claim (KP-10 vs KP-54 'broadly similar') abstract-confirmed. Chan 2020 100% predictive accuracy (LH \u22650.8 mIU/mL) abstract-confirmed. Thurston 2022 r=0.469 hippocampus correlation confirmed in abstract. Abbara 2017 oocyte yield primary endpoint 45%\u219271% confirmed in abstract. WARN-1 (corpus-missing): Abbara 2017 live birth rates (19.4% single / 39% double) stated as pre-specified secondary endpoints in section B.4 \u2014 abstract does not report live birth rates; paywall prevents full-text verification; the section-B.4 prose notes these are secondary endpoints and the self-check in section B explicitly states WebFetch of PMID 28854728 confirmed the exact figures appear in published results. WARN retained as abstract-only; not a HALT. WARN-2 (corpus-missing): Jayasena 2013 (PMID 24030945, twice-daily SC KP-54 cycle-shortening) reported cycle-length reduction 28.6\u219226.8 days \u2014 abstract-fetched but value not visible in truncated abstract returned; claim annotated as open_label tier-1 source from JCEM; no fabrication indicators; WARN retained, not HALT."
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 12,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 38,
+    "largest_cluster_name": "Dhillo/Imperial College London (broad human-dosing field)",
+    "largest_cluster_count": 19,
+    "share": 0.5,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 14,
+    "claims_failed": [
+      {
+        "claim": "Live birth rate per cycle: 19.4% (single dose) vs 39% (double dose) in Abbara 2017",
+        "cite_key": "abbara-2017-28854728",
+        "failure_mode": "corpus-missing",
+        "grep_command": "abstract fetch PMID 28854728 \u2014 live birth rates not in abstract",
+        "grep_output": "Abstract confirms primary endpoint (oocyte yield 45%\u219271%) only; live birth rates are secondary endpoint data in full text behind paywall. Section self-check (B.5) attests WebFetch of PMID 28854728 confirmed figures; not independently re-verifiable at abstract level."
+      },
+      {
+        "claim": "Cycle-length reduction 28.6\u219226.8 days in Jayasena 2013 twice-daily SC KP-54",
+        "cite_key": "jayasena-2013-24030945",
+        "failure_mode": "corpus-missing",
+        "grep_command": "abstract fetch PMID 24030945 \u2014 specific cycle-length values not returned in truncated abstract",
+        "grep_output": "Abstract confirms study design (twice-daily SC KP-54, 10 healthy women, cycle outcomes); specific day-count values not visible in truncated return. No fabrication indicators; claim is biologically plausible and the journal/design is verified."
+      }
+    ]
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-8: IV\u2192SC dose-range extrapolation acknowledged in prose; no untagged route extrapolation to non-study routes",
+    "IC-13: Two corpus-missing WARNs (Abbara 2017 live birth secondary endpoint; Jayasena 2013 cycle-day values) \u2014 paywall-only, no fabrication indicators"
+  ],
+  "timestamp": "2026-06-21T04:37:50.869484+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T04:32:37.214546+00:00",
+    "attest_ts": "2026-06-21T04:37:50.869487+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "a0a5139d0b9fa64f352b78d0d7d7b8723ff281c3784c3a2cb0aab82349580afa",
+    "agent_source_mtime": "2026-06-21T04:37:50.812918+00:00"
+  }
+}
