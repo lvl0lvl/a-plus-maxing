@@ -1,0 +1,129 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 47,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 47,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 4,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 8,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-9": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0,
+      "findings": [
+        "Palatin/AMAG sponsor-concentration for Phase 3 pivotal evidence = 1.0 (100%); disclosed prominently in Section E.2 with a first-class COI section before any efficacy subsection; structurally normal for single-company FDA-approved drug but disclosed as material \u2014 threshold_triggered=true, not a HALT"
+      ]
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 10,
+      "count_flagged": 0,
+      "findings": [
+        "PMID 31599840 confirmed \u2014 Kingsberg 2019, Obstet Gynecol, FSFI-D +0.35 integrated",
+        "PMID 31599847 confirmed \u2014 Simon 2019 open-label extension, nausea 40.4%, OL discontinuation 23.4%/18.7%",
+        "PMID 35076581 confirmed \u2014 Edinoff 2022, Neurol Int, mechanism review",
+        "PMID 18206919 confirmed \u2014 Safarinejad 2008, J Urol, EoC notation present on PubMed page",
+        "PMID 36626345 confirmed \u2014 J Urol 2023 EoC on Safarinejad",
+        "DailyMed SetID 8c9607a2-5b57-4a59-b159-cf196deebdd9 confirmed \u2014 nausea 40%, flushing 20.3%, BP +6/+3 mmHg",
+        "PMID 17584130 confirmed \u2014 King 2007, Curr Top Med Chem, 'PT-141 is the carboxylate derivative of MT-II' verbatim in abstract",
+        "PMID 27977473 confirmed \u2014 White 2017 (not Portman as stated in Section B [5]); see IC-10 finding below",
+        "PMID 35147466 confirmed \u2014 Clayton 2022 J Womens Health, 43 studies ~3500 subjects",
+        "PMID 19224885 confirmed \u2014 Evans-Brown 2009, BMJ"
+      ]
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 47,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 12,
+      "count_flagged": 2,
+      "findings": [
+        "CLAIM: 'Cohen's d effect sizes for the integrated RECONNECT data were approximately 0.39 for the desire domain and 0.27 for the distress item' [Section B, attributed to [2, rct] Clayton J Sex Med 2019 Suppl abstract DOI 10.1016/j.jsxm.2019.09.100] \u2014 corpus-missing: DOI returns HTTP 404 (conference supplement abstract; unstable DOI). PMID 31599840 abstract (fetched) does not state Cohen's d. Claim is consistent with published integrated RECONNECT data and FSFI-D scale properties but cannot be verified against the cited corpus. verdict: corpus-missing WARN, not HALT. Recommend orchestrator verify via J Sex Med 2019 Suppl 4 print or Semantic Scholar.",
+        "CLAIM: Section B [5] describes the cardiovascular BP study as 'Portman DJ, Brown L, Yuan J, Kissling R, Kingsberg SA' (PMID 27977473) but the fetched PubMed record names first author as William B White, not Portman DJ. Author list in Section B bibliography entry [5] is incorrect. Numerical BP data (+3.1/+3.2 mmHg for 1.75 mg SC, <15 min peak) confirmed in the abstract. This is a bibliography-entry author-list error, not a fabricated citation \u2014 the PMID is correct and the data are in the paper. verdict: WARN (not HALT \u2014 the claim is verified; the bib author list needs correction)."
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 12,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 8,
+    "largest_cluster_name": "Palatin Technologies / AMAG Pharmaceuticals RECONNECT registration program",
+    "largest_cluster_count": 8,
+    "share": 1.0,
+    "threshold_triggered": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 12,
+    "claims_failed": [
+      {
+        "claim": "Cohen's d effect sizes for the integrated RECONNECT data were approximately 0.39 for the desire domain and 0.27 for the distress item [Section B, cite [2]]",
+        "cite_key": "clayton-2019-jsexmed-abstract",
+        "failure_mode": "corpus-missing"
+      }
+    ]
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: Cohen's d claim [Section B, cite B[2]] corpus-missing (DOI 404 \u2014 conference supplement abstract). Claim consistent with published data; recommend verification against J Sex Med 2019 Suppl 4 print.",
+    "IC-13: Section B bibliography [5] lists Portman DJ as first author of PMID 27977473; actual first author is White WB. PMID correct; numerical claims verified. Bib entry needs correction before wiki ingest."
+  ],
+  "timestamp": "2026-06-21T13:08:42.580525+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T13:00:35.326478+00:00",
+    "attest_ts": "2026-06-21T13:08:42.580528+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "9e6cd74668bfa319d7a218d14dadef5aa0f17e2eae00206087828cd7c191cf99",
+    "agent_source_mtime": "2026-06-21T13:08:42.524590+00:00"
+  }
+}
