@@ -1,0 +1,35 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/kisspeptin-10/practitioner-layer.md",
+    "present": true,
+    "compounding_sheets_count": 0,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/kisspeptin-10/non-english-layer.md",
+    "present": true,
+    "languages_surveyed": [
+      "Japanese",
+      "Chinese",
+      "Russian"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-21T05:06:58.297459+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T05:04:35.491323+00:00",
+    "attest_ts": "2026-06-21T05:06:58.297462+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "9256282a6dd0bbed4311a8274ebc41a86f8d3d8976decdc639e16417745320f2",
+    "agent_source_mtime": "2026-06-21T05:06:34.147134+00:00"
+  }
+}
