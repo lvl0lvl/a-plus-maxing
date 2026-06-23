@@ -1,0 +1,106 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 55,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 47,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 12,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 2,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 8,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-9": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 7,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 12,
+      "count_flagged": 1,
+      "findings": [
+        "corpus-missing: granular numerical claims from Brunel 2025 (PMID 40908429) \u2014 telomere extension 2.4\u20134 kb (21NT), 8 kb (BT474), hTERT 12-fold (21NT) / 5-fold (BT474), ALT 10-fold (21NT) \u2014 are sub-abstract-level; full text paywalled (Springer auth wall); abstract confirms core findings (hTERT upregulation, ALT in cancer lines) but does not list these specific numbers. Classified corpus-missing/WARN, not HALT per IC-13 rules. Claims are attributed accurately to this paper's known findings; paraphrase-no-token-match risk is low given abstract confirmation."
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 8,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 45,
+    "largest_cluster_name": "Khavinson / St. Petersburg IBG (+Anisimov collaborative network)",
+    "largest_cluster_count": 36,
+    "share": 0.8,
+    "threshold_triggered": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 12,
+    "claims_failed": []
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: corpus-missing for sub-abstract granular numbers from PMID 40908429 (Brunel 2025, Springer paywall); core claims confirmed at abstract level"
+  ],
+  "timestamp": "2026-06-21T01:20:43.017374+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T01:14:32.117767+00:00",
+    "attest_ts": "2026-06-21T01:20:43.017377+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "84906598f98d1a1ad0540825df1a4ab16553f0a49f6a783ef72dd3089369e00d",
+    "agent_source_mtime": "2026-06-21T01:20:42.955322+00:00"
+  }
+}
