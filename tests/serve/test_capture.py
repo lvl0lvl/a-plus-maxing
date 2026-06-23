@@ -535,15 +535,19 @@ def test_free_text_pii_straddling_the_old_window_boundary_routes_record_only(tmp
 def test_record_only_field_lands_in_scaffold_not_in_any_field_set_item(tmp_path):
     """AC-2 / Risk Negative-2: a record-only value lands ONLY under the scaffold root.
 
-    A Step-4 dietary-pattern and a raw Step-5 supplement name are record-only — they
-    land under the gitignored scaffold root and NOT under any SUMMARY_FIELD_SET store
-    item (the project assert-placement mandate: assert NOT in the wrong place).
+    A field with no de-identified field-set consumer (an arbitrary record-only field) and
+    the FIX-A record-only `rx-interaction-classes` form field are record-only — they land
+    under the gitignored scaffold root and NOT under any SUMMARY_FIELD_SET store item (the
+    project assert-placement mandate: assert NOT in the wrong place). (NOTE ADR-0019-T1:
+    the former `supplement-stack` example here is now a WIRED raw source — it writes the
+    `raw-supplement-free-text` named-excluded store item, no longer record-only — so this
+    test uses genuinely-record-only fields to keep proving the scaffold-routing path.)
     """
     store_root = tmp_path / "store"
     scaffold_root = tmp_path / "scaffold"
     record_only = {
-        "dietary-pattern": "mediterranean-ish, high protein",
-        "supplement-stack": "creatine monohydrate 5g",
+        "favorite-color": "mediterranean-ish, high protein",
+        "rx-interaction-classes": "creatine monohydrate 5g",
     }
     capture.persist_capture(
         record_only, root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
@@ -551,8 +555,8 @@ def test_record_only_field_lands_in_scaffold_not_in_any_field_set_item(tmp_path)
 
     # Positive: the record-only values are present somewhere under the scaffold root.
     scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
-    assert "mediterranean" in scaffold_text, "the dietary-pattern record-only value did not land in the scaffold"
-    assert "creatine" in scaffold_text, "the supplement-stack record-only value did not land in the scaffold"
+    assert "mediterranean" in scaffold_text, "the favorite-color record-only value did not land in the scaffold"
+    assert "creatine" in scaffold_text, "the rx record-only value did not land in the scaffold"
 
     # Negative (the load-bearing assertion): NO SUMMARY_FIELD_SET store item carries a
     # record-only value. Iterate EVERY field-set token.
@@ -801,3 +805,75 @@ def test_identity_config_seam_threads_to_every_capture_call_site():
         "the handler does not thread self.identity_config into a capture call — the "
         "instance config is not wired through the seam"
     )
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0019-T1 — the chat-sourced rich-domain raw-source capture round-trip.
+# Each new chat field writes its NAMED-EXCLUDED raw source store item (NOT the band
+# token), which `summarize` then DERIVES into the coarse band/class — mirroring the
+# `train-around -> raw-symptom-free-text -> active-issue-class` special-case.
+# --------------------------------------------------------------------------- #
+
+# (chat form field, named-excluded raw source, derived band token, a realistic raw value,
+#  a distinctive raw fragment, the expected coarse band).
+_CHAT_CAPTURE_CASES = [
+    ("nutrition-detail", "raw-nutrition-free-text", "dietary-pattern-class",
+     "vegan, allergic to SHELLFISH-XYZ, 5 small meals", "SHELLFISH-XYZ", "plant-based"),
+    ("supplement-stack", "raw-supplement-free-text", "supplement-stack-class",
+     "creatine 5g, whey BRAND-XYZ, omega-3", "BRAND-XYZ", "multi-supplement"),
+    ("peptide-stack", "raw-peptide-free-text", "peptide-use-class",
+     "BPC-157 250mcg COMPOUND-XYZ subcutaneous", "COMPOUND-XYZ", "peptide-in-use"),
+    ("training-detail", "raw-training-detail-free-text", "training-volume-band",
+     "PPL 6x/week, 22 SETS-XYZ per session", "SETS-XYZ", "high"),
+]
+
+
+import pytest
+
+
+@pytest.mark.parametrize("field, raw_source, token, value, fragment, band", _CHAT_CAPTURE_CASES)
+def test_chat_field_writes_raw_source_summarize_derives_band(
+    field, raw_source, token, value, fragment, band, tmp_path,
+):
+    """ADR-0019-T1: a chat rich-domain capture -> its named-excluded raw source -> the
+    derived coarse band, never the band token directly.
+
+    Each new chat field (`nutrition-detail` / `supplement-stack` / `peptide-stack` /
+    `training-detail`) writes its NAMED-EXCLUDED raw source store item (mirroring
+    `train-around -> raw-symptom-free-text`), NOT the band token. `summarize` then
+    DERIVES the coarse band/class from that raw source — closing the capture -> store ->
+    summarize loop. The raw free-text never appears under the field-set token (AC-2).
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {field: value},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    # The raw item is written under the named-excluded raw source, NOT the band token.
+    assert store.read(raw_source, root=store_root), (
+        f"{field!r} did not write the {raw_source!r} raw source item"
+    )
+    assert store.read(token, root=store_root) == [], (
+        f"{field!r} wrongly wrote the {token!r} band token directly (must be derived)"
+    )
+    summary = _summary(store_root)
+    assert summary.get(token) == band, (
+        f"summarize did not derive the {token!r} band from the {raw_source!r} raw source"
+    )
+    # The raw free-text fragment never appears under the field-set token.
+    assert fragment not in str(summary.get(token, "")), (
+        f"raw fragment {fragment!r} leaked into the {token!r} token"
+    )
+
+
+def test_chat_fields_are_not_wired_tokens(tmp_path):
+    """ADR-0019-T1: the band tokens are NOT WIRED_TOKENS (they are derived, not pass-through).
+
+    The new BAND tokens are read by `summarize` from their raw source — they are NOT
+    written own-name like a pass-through wired token. The `WIRED_TOKENS <= SUMMARY_FIELD_SET`
+    tripwire stays green because WIRED_TOKENS is unchanged. Asserts the four band tokens are
+    absent from WIRED_TOKENS and the four raw sources are not field-set tokens.
+    """
+    for _field, raw_source, token, _v, _f, _b in _CHAT_CAPTURE_CASES:
+        assert token not in capture.WIRED_TOKENS, token
+        assert raw_source not in SUMMARY_FIELD_SET, raw_source

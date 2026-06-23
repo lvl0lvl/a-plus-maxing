@@ -33,6 +33,15 @@ SUMMARY_FIELD_SET = (
     # BPMH (de-identified) — the operator's present Rx-interaction CLASSES only,
     # never the raw medication names (rxbp; the supplement<->Rx BPMH axis).
     "rx-interaction-classes",
+    # chat-sourced rich-domain (de-identified, ADR-0019-T1) — coarse band/class tokens
+    # derived from the chat-extracted free-text, never the raw food/stack/split text.
+    # Each is kind-2 raw-backed-derived (a named-excluded raw source + a derivation);
+    # `training-volume-band` (chat-sourced weekly volume) is DISTINCT from the
+    # demographic `training-age-band` (date-of-birth born-decade band).
+    "dietary-pattern-class",
+    "supplement-stack-class",
+    "peptide-use-class",
+    "training-volume-band",
 )
 
 # Named-excluded raw-PII fields (ADR-0006-T0). Enumerates the raw-PII the
@@ -63,6 +72,16 @@ EXCLUDED_RAW_PII = (
     # rejects it should it ever reach a payload, and so the disjointness tripwire
     # below pins it out of the Summary Field-Set.
     "medication-list",
+    # chat-sourced rich-domain raw free-text (ADR-0019-T1). The operator's raw nutrition
+    # / supplement / peptide / training-detail prose — named-excluded raw-PII classes that
+    # `summarize` DERIVES into the coarse `dietary-pattern-class` / `supplement-stack-class`
+    # / `peptide-use-class` / `training-volume-band` tokens (the raw text never crosses the
+    # boundary). Named here so the disjointness tripwire pins them out of the field-set and
+    # the dispatch whitelist rejects any raw source that reached a payload.
+    "raw-nutrition-free-text",
+    "raw-supplement-free-text",
+    "raw-peptide-free-text",
+    "raw-training-detail-free-text",
 )
 
 # Lane attributes (Constraint D1→ADR-0006: plan summaries route no-train).
@@ -87,6 +106,11 @@ _RAW_TO_FIELD = {
     "date-of-birth": "training-age-band",
     "raw-symptom-free-text": "active-issue-class",
     "clinical-notes": "active-issue-class",
+    # chat-sourced rich-domain raw free-text -> coarse band/class (ADR-0019-T1).
+    "raw-nutrition-free-text": "dietary-pattern-class",
+    "raw-supplement-free-text": "supplement-stack-class",
+    "raw-peptide-free-text": "peptide-use-class",
+    "raw-training-detail-free-text": "training-volume-band",
 }
 
 
@@ -295,6 +319,94 @@ def _issue_class(readings):
     return "general-issue"
 
 
+def _dietary_pattern_class(readings):
+    """Map raw nutrition free-text to a coarse dietary-pattern class (ADR-0019-T1).
+
+    Emits a coarse diet class only — the raw food/allergen text never appears in the
+    token (the per-token output scan, AC-2, proves this). Mirrors `_issue_class`'s
+    keyword-bucketing coarseness: the class is a pattern bucket, not the raw meal log.
+    An empty readings series (no chat-extracted nutrition yet) -> the no-signal
+    `general-diet` default (the always-set contract — never a false specific class).
+    """
+    if not readings:
+        return "general-diet"
+    text = str(readings[-1]["value"]).lower()
+    if any(w in text for w in ("vegan", "plant-based", "plant based", "wholly plant")):
+        return "plant-based"
+    if any(w in text for w in ("vegetarian", "plant-forward", "plant forward", "pescatarian")):
+        return "plant-forward"
+    if any(w in text for w in ("keto", "carnivore", "elimination", "allergic", "allergy",
+                               "intolerant", "restricted", "gluten-free")):
+        return "restricted"
+    if any(w in text for w in ("meat", "chicken", "beef", "fish", "omnivore", "everything")):
+        return "omnivore"
+    return "general-diet"
+
+
+def _supplement_stack_class(readings):
+    """Map raw supplement free-text to a coarse stack-presence class (ADR-0019-T1).
+
+    Emits a coarse presence/category class only — raw product names and doses never
+    appear in the token (AC-2). The cut is presence + rough breadth (one vs several),
+    never the itemized stack. An empty series -> the no-signal `none` (always-set).
+    """
+    if not readings:
+        return "none"
+    text = str(readings[-1]["value"]).strip().lower()
+    if not text or text in ("none", "no", "n/a", "na"):
+        return "none"
+    # Count distinct comma/semicolon/newline-separated items as a rough breadth signal.
+    parts = [p.strip() for p in text.replace(";", ",").replace("\n", ",").split(",") if p.strip()]
+    return "multi-supplement" if len(parts) > 1 else "single-supplement"
+
+
+def _peptide_use_class(readings):
+    """Map raw peptide free-text to a coarse use/presence class (ADR-0019-T1).
+
+    Emits a coarse use/presence class only — raw compound names and doses never appear
+    in the token (AC-2). The cut is binary presence (the peptide axis is high-sensitivity:
+    presence, not the itemized compounds). An empty series -> the no-signal `none`.
+    """
+    if not readings:
+        return "none"
+    text = str(readings[-1]["value"]).strip().lower()
+    if not text or text in ("none", "no", "n/a", "na"):
+        return "none"
+    return "peptide-in-use"
+
+
+def _training_volume_band(readings):
+    """Map raw training-detail free-text to a coarse weekly-volume band (ADR-0019-T1).
+
+    Emits a coarse weekly-volume band only — raw set counts / the itemized split never
+    appear in the token (AC-2). DISTINCT from `_age_band`'s `training-age-band` (a
+    demographic born-decade band): this is a chat-sourced training-VOLUME band. Bands by
+    weekly session frequency parsed loosely from the free-text (`low`/`moderate`/`high`),
+    defaulting to `moderate` when no count is determinable (the no-signal middle). An
+    empty series (no chat-extracted training detail yet) -> the `moderate` no-signal
+    default (the always-set contract).
+    """
+    import re
+
+    if not readings:
+        return "moderate"
+    text = str(readings[-1]["value"]).lower()
+    days = [int(n) for n in re.findall(r"\b([1-9])\s*x", text)]
+    days += [int(n) for n in re.findall(r"\b([1-9])\s*(?:days?|sessions?|/week|per week)", text)]
+    sessions = max(days) if days else None
+    if sessions is None:
+        if any(w in text for w in ("twice", "2x", "minimal", "light")):
+            return "low"
+        if any(w in text for w in ("daily", "every day", "two-a-day", "high volume")):
+            return "high"
+        return "moderate"
+    if sessions <= 2:
+        return "low"
+    if sessions >= 5:
+        return "high"
+    return "moderate"
+
+
 # Per-field-set-field de-identifying derivations for fields backed by a raw-PII
 # source item. Each takes the readings SERIES and MUST emit a derived band/class
 # token only — the raw value never appears in the emitted token (Finding 4-1).
@@ -303,7 +415,27 @@ def _issue_class(readings):
 _FIELD_DERIVATION = {
     "training-age-band": _age_band,
     "active-issue-class": _issue_class,
+    # chat-sourced rich-domain coarse band/class derivers (ADR-0019-T1).
+    "dietary-pattern-class": _dietary_pattern_class,
+    "supplement-stack-class": _supplement_stack_class,
+    "peptide-use-class": _peptide_use_class,
+    "training-volume-band": _training_volume_band,
 }
+
+# Derived tokens that are ALWAYS set (ADR-0019-T1): a fresh operator with no chat-extracted
+# source yet gets the deriver's no-signal default, so these never trip dispatch's
+# partial-summary raise — mirroring `recent-trend-direction` (the no-signal `flat`) and
+# `rx-interaction-classes` (the empty `""`). The OTHER raw-PII-backed derived fields
+# (`training-age-band`, `active-issue-class`) stay conditionally set — they are omitted when
+# their source is absent (the demographic intake always seeds `date-of-birth`; a
+# never-injured operator legitimately has no `active-issue-class`). Their derivers index
+# `readings[-1]` and are only reached when `if readings` holds.
+_ALWAYS_SET_DERIVED = (
+    "dietary-pattern-class",
+    "supplement-stack-class",
+    "peptide-use-class",
+    "training-volume-band",
+)
 
 # §5b change-control tripwire (Finding 4-2): every raw source item must be a
 # named-excluded raw-PII field, and the field-set must stay disjoint from the
@@ -402,6 +534,16 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
             # operator never trips dispatch's partial-summary raise. The 8j6 PII
             # backstop scans the curated value inside the deriver.
             summary[field] = _rx_interaction_classes_token(store_read, identity_config)
+            continue
+        if field in _ALWAYS_SET_DERIVED:
+            # chat-sourced rich-domain bands (ADR-0019-T1): ALWAYS set — a fresh operator
+            # with no chat-extracted source yet gets the deriver's no-signal default (the
+            # coarse `none`/`general-diet`/`moderate`), so the new tokens never trip
+            # dispatch's partial-summary raise (mirroring recent-trend-direction / rxbp).
+            readings = []
+            for raw in (r for r, f in _RAW_TO_FIELD.items() if f == field):
+                readings.extend(store_read(raw))
+            summary[field] = _FIELD_DERIVATION[field](readings)
             continue
         # A raw-PII source item backs this field via the band/class map...
         source_items = [raw for raw, f in _RAW_TO_FIELD.items() if f == field]

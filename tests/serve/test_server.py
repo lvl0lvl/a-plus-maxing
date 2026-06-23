@@ -787,10 +787,13 @@ def test_post_capture_fields_land_wired_tokens_and_rerenders(tmp_path):
 def test_post_capture_record_only_lands_in_scaffold_not_store(tmp_path):
     """AC-2 / Risk Negative-2 (E2E two-surface negative placement): record-only -> scaffold ONLY.
 
-    POSTs a record-only capture (a Step-4 dietary-pattern, a raw Step-5 supplement
-    name). Both land under the tmp `scaffold_root` AND `store.read(<any
-    SUMMARY_FIELD_SET token>)` does NOT carry that record-only value (the negative
-    assertion — the project assert-placement mandate). Iterates every field-set token.
+    POSTs a record-only capture (an arbitrary record-only field + the FIX-A record-only
+    `rx-interaction-classes` form field). Both land under the tmp `scaffold_root` AND
+    `store.read(<any SUMMARY_FIELD_SET token>)` does NOT carry that record-only value (the
+    negative assertion — the project assert-placement mandate). Iterates every field-set
+    token. (NOTE ADR-0019-T1: the former `supplement-stack` example here is now a WIRED raw
+    source — it writes the `raw-supplement-free-text` named-excluded store item, no longer
+    record-only — so this test uses genuinely-record-only fields to keep proving the path.)
     """
     from scripts.plan.router import SUMMARY_FIELD_SET
 
@@ -798,16 +801,16 @@ def test_post_capture_record_only_lands_in_scaffold_not_store(tmp_path):
     _serve_in_thread(srv)
     try:
         status, body = _post_fields(port, {
-            "dietary-pattern": "mediterranean high protein",
-            "supplement-stack": "creatine monohydrate 5g",
+            "favorite-color": "mediterranean high protein",
+            "rx-interaction-classes": "creatine monohydrate 5g",
         })
         assert status == 200, f"record-only capture POST returned {status}, expected 200"
 
         # Positive: the values landed under the scaffold root.
         scaffold_root = tmp_path / "scaffold"
         scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
-        assert "mediterranean" in scaffold_text, "the dietary-pattern record-only value did not land in the scaffold"
-        assert "creatine" in scaffold_text, "the supplement-stack record-only value did not land in the scaffold"
+        assert "mediterranean" in scaffold_text, "the favorite-color record-only value did not land in the scaffold"
+        assert "creatine" in scaffold_text, "the rx record-only value did not land in the scaffold"
 
         # Negative (load-bearing): NO field-set store item carries a record-only value.
         for token in SUMMARY_FIELD_SET:

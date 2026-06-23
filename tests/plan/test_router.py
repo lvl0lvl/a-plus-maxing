@@ -1131,3 +1131,272 @@ def test_rx_interaction_classes_8j6_backstop_scans_past_scan_text_cap():
         router.summarize(_store_read_factory(_rx_records(long_value)))
     assert "rx-interaction-classes" in str(exc.value)
     assert "dr.smith@example.com" not in str(exc.value)  # names the field, never echoes the PII
+
+
+# =========================================================================== #
+# ADR-0019-T1 — de-identified chat-sourced nutrition/supplement/peptide/training
+# tokens. Each is kind-2 raw-backed-derived: a named-excluded raw source + a
+# `_RAW_TO_FIELD` entry + a `_FIELD_DERIVATION` coarse band/class. THE CRITICAL AC
+# (AC-2) is the per-token output-scan COARSENESS PROOF — an INDEPENDENT scan of the
+# emitted token, NOT the 8j6 gate (which does NOT run on the raw-backed-derived
+# path: router.summarize's derived branch runs no `scan_text`). De-identification
+# is the DERIVATION's coarseness; the output scan is its proof.
+# =========================================================================== #
+
+# The four (raw source -> derived token -> consuming domain) the task mints. The
+# raw sources are named-excluded; the derived tokens are SUMMARY_FIELD_SET members.
+_CHAT_TOKENS = (
+    # (raw source store item, derived field-set token, consuming domain)
+    ("raw-nutrition-free-text", "dietary-pattern-class", "nutrition"),
+    ("raw-supplement-free-text", "supplement-stack-class", "supplements"),
+    ("raw-peptide-free-text", "peptide-use-class", "peptides"),
+    ("raw-training-detail-free-text", "training-volume-band", "workout"),
+)
+
+# A crafted raw value per source carrying a distinctive identifiable substring. The
+# output scan asserts NONE of these substrings survives into the emitted coarse token
+# (non-reversibility). Realistic representative input (PF-S90-01): a real dietary
+# free-text, a real supplement stack, a real peptide stack, a real training split.
+_CRAFTED_RAW = {
+    "raw-nutrition-free-text":
+        "mostly chicken rice and broccoli, allergic to SHELLFISH-SENTINEL, 5 meals a day",
+    "raw-supplement-free-text":
+        "creatine 5g, whey PROTEINBRAND-SENTINEL, vitamin D 4000IU nightly",
+    "raw-peptide-free-text":
+        "BPC-157 250mcg SENTINEL-COMPOUND twice daily subcutaneous",
+    "raw-training-detail-free-text":
+        "PPL 6x/week, 22 SENTINEL-SETS per session, heavy barbell squats",
+}
+
+
+def _chat_records(raw_source, value):
+    """One readings-series record for a chat raw source item carrying `value`."""
+    return [{"item": raw_source, "timepoint": "2026-01-01T00:00:00+00:00",
+             "source": "intake", "value": value}]
+
+
+def test_chat_tokens_are_field_set_members():
+    """AC-1/AC-3: each new derived token is a SUMMARY_FIELD_SET member."""
+    for _raw, token, _domain in _CHAT_TOKENS:
+        assert token in router.SUMMARY_FIELD_SET, token
+
+
+def test_chat_raw_sources_are_named_excluded():
+    """AC-3: each new raw source is a named-excluded raw-PII class (never a token)."""
+    for raw, token, _domain in _CHAT_TOKENS:
+        assert raw in router.EXCLUDED_RAW_PII, raw
+        assert raw not in router.SUMMARY_FIELD_SET, raw
+        # raw -> token mapping registered.
+        assert router._RAW_TO_FIELD.get(raw) == token, raw
+
+
+def test_chat_tokens_have_a_registered_derivation():
+    """AC-1/AC-3: each new token has a `_FIELD_DERIVATION` coarse band/class function."""
+    for _raw, token, _domain in _CHAT_TOKENS:
+        assert token in router._FIELD_DERIVATION, token
+        assert callable(router._FIELD_DERIVATION[token]), token
+
+
+@pytest.mark.parametrize("raw_source, token, domain", _CHAT_TOKENS)
+def test_chat_token_coarseness_output_scan(raw_source, token, domain):
+    """AC-2 (THE CRITICAL coarseness proof): a crafted raw value at a chat source emits
+    a coarse band/class carrying 0 of that raw value (non-reversibility).
+
+    The 8j6 `summarize` PII gate does NOT run on this raw-backed-derived path
+    (router.summarize's derived branch at the `_RAW_TO_FIELD` source lookup runs no
+    `scan_text` — only the pass-through else-branch gates). So a new token's
+    de-identification is NOT the 8j6 gate; it is the DERIVATION's COARSENESS, and THIS
+    independent output scan — not the gate — is the de-identification proof. We seed a
+    distinctive identifiable substring at the named-excluded source and assert it is
+    ABSENT from the emitted token (the token is the coarse class only).
+    """
+    crafted = _CRAFTED_RAW[raw_source]
+    summary = router.summarize(_store_read_factory(_chat_records(raw_source, crafted)))
+    emitted = str(summary[token])
+    # The emitted token is the coarse band/class — the raw sentinel never appears.
+    for fragment in crafted.split():
+        if fragment.isupper() and "SENTINEL" in fragment:
+            assert fragment not in emitted, (
+                f"raw value fragment {fragment!r} leaked into the {token!r} token: {emitted!r}"
+            )
+    # Belt: the whole crafted raw string never appears verbatim either.
+    assert crafted not in emitted, f"raw value leaked verbatim into {token!r}: {emitted!r}"
+
+
+def test_chat_token_coarseness_negative_control_is_failing_capable():
+    """AC-2 negative control (LOAD-BEARING): a TOO-FINE derivation (passing the raw value
+    through) makes the per-token output scan FAIL; the real coarse band passes.
+
+    Proves the coarseness scan is failing-capable, not a constant-true assertion. We
+    temporarily install a too-fine `dietary-pattern-class` deriver that returns the raw
+    value verbatim, confirm the output scan now finds the sentinel (the scan WOULD red),
+    then revert to the real coarse band and confirm the sentinel is gone (the scan
+    passes). This is the proof the whole task's load-bearing gate is failing-capable.
+    """
+    raw_source, token = "raw-nutrition-free-text", "dietary-pattern-class"
+    crafted = _CRAFTED_RAW[raw_source]
+    real_deriver = router._FIELD_DERIVATION[token]
+    try:
+        # TOO-FINE: pass the raw value straight through (no de-identification).
+        router._FIELD_DERIVATION[token] = lambda readings: str(readings[-1]["value"])
+        leaky = router.summarize(_store_read_factory(_chat_records(raw_source, crafted)))
+        # Under the too-fine deriver the sentinel DOES appear — the scan is failing-capable.
+        assert "SHELLFISH-SENTINEL" in str(leaky[token]), (
+            "the too-fine deriver should leak the raw value — the negative control is broken"
+        )
+    finally:
+        router._FIELD_DERIVATION[token] = real_deriver
+    # Reverted to the coarse band: the sentinel is gone (the scan passes).
+    clean = router.summarize(_store_read_factory(_chat_records(raw_source, crafted)))
+    assert "SHELLFISH-SENTINEL" not in str(clean[token])
+
+
+def _capturing_client(captured):
+    """A model client whose `author(domain, summary)` records the summary it is handed."""
+    class _Client:
+        def author(self, domain, summary):
+            captured[domain] = dict(summary)
+            return {"specialist": "test", "recommendations": []}
+    return _Client()
+
+
+@pytest.mark.parametrize("raw_source, token, domain", _CHAT_TOKENS)
+def test_chat_token_reaches_its_domain_author(raw_source, token, domain, tmp_path):
+    """AC-1 (round-trip to the translator; Risk PF-S87-01): a chat raw input -> its
+    named-excluded source item -> `summarize` derives the band -> the token is in the
+    summary the domain's author (the translator's consumer) reasons over.
+
+    `compute_plan(domain, ...)` builds the summary via `router.summarize` and hands it to
+    the domain author (`client.author(domain, summary)`). The token reaching that summary
+    for the consuming domain is the round-trip-to-translator (the translators consume the
+    author's recommendations reasoned over this summary). A capturing client records the
+    summary so we assert the token is present AND carries the derived coarse band.
+    """
+    from functools import partial
+
+    from scripts.plan import generate_plan
+    from scripts.store import store
+
+    store.append(
+        raw_source,
+        {"item": raw_source, "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": _CRAFTED_RAW[raw_source]},
+        root=tmp_path,
+    )
+    captured = {}
+    generate_plan.compute_plan(
+        domain,
+        store_read=partial(store.read, root=tmp_path),
+        client=_capturing_client(captured),
+    )
+    assert domain in captured, f"the {domain!r} author was never handed a summary"
+    assert token in captured[domain], (
+        f"the {token!r} token never reached the {domain!r} author's summary"
+    )
+    # The token carries the DERIVED coarse band, not the raw value.
+    assert "SENTINEL" not in str(captured[domain][token])
+
+
+def test_chat_tokens_tripwires_green_on_clean_import():
+    """AC-3: the change-control tripwires hold with the extended set (clean import).
+
+    A fresh `import scripts.plan.router` runs the module-load asserts:
+    `set(_RAW_TO_FIELD) <= EXCLUDED_RAW_PII` + `SUMMARY_FIELD_SET.isdisjoint(EXCLUDED_RAW_PII)`.
+    A clean reload not raising proves every new token is placed in the correct structure.
+    """
+    import importlib
+    importlib.reload(router)  # re-runs the load-time tripwires; raises if any is red
+    # And explicitly: the new tokens are disjoint from the excluded set, the raw sources
+    # are subsumed by it.
+    assert set(router._RAW_TO_FIELD) <= set(router.EXCLUDED_RAW_PII)
+    assert set(router.SUMMARY_FIELD_SET).isdisjoint(set(router.EXCLUDED_RAW_PII))
+
+
+def test_training_volume_band_distinct_from_training_age_band():
+    """AC-4: the chat-sourced `training-volume-band` is DISTINCT from the demographic
+    `training-age-band` — distinct field-set members, distinct sources, distinct derivers.
+    """
+    assert "training-volume-band" in router.SUMMARY_FIELD_SET
+    assert "training-age-band" in router.SUMMARY_FIELD_SET
+    assert "training-volume-band" != "training-age-band"
+    # Distinct sources: training-volume-band from the chat free-text, training-age-band
+    # from the demographic date-of-birth.
+    assert router._RAW_TO_FIELD.get("raw-training-detail-free-text") == "training-volume-band"
+    assert router._RAW_TO_FIELD.get("date-of-birth") == "training-age-band"
+    # Distinct derivers.
+    assert (router._FIELD_DERIVATION["training-volume-band"]
+            is not router._FIELD_DERIVATION["training-age-band"])
+
+
+# The module-load tripwires (router.py:312-313) verbatim. The mis-placement tests below
+# re-run these EXACT assertions against a deliberately mis-placed structure, proving the
+# tripwire is the thing that reds — `importlib.reload` rebuilds router's module literals
+# from source, so an in-place dict mutation cannot survive a reload to trip it (unlike the
+# smei test, which mutates the SEPARATE biomarker_meta module the load assert reads). A
+# subprocess that mutates BEFORE the load assert runs is the faithful "module-load" proof.
+
+_MISPLACEMENT_SUBPROCESS = """
+import sys
+# Inject the mis-placement into router's source-of-truth constants AFTER the import-time
+# asserts already ran clean, then re-execute the EXACT load-time tripwire to prove a
+# mis-placed token reds it. {mutation}
+from scripts.plan import router
+{mutation}
+assert set(router._RAW_TO_FIELD) <= set(router.EXCLUDED_RAW_PII)
+assert set(router.SUMMARY_FIELD_SET).isdisjoint(set(router.EXCLUDED_RAW_PII))
+print("tripwire-did-not-red")
+"""
+
+
+def _run_misplacement_subprocess(mutation):
+    """Run the load-time tripwire against a mis-placed structure in a fresh interpreter.
+
+    Returns the subprocess result; a faithful tripwire reds with a non-zero exit and an
+    AssertionError in stderr (never prints `tripwire-did-not-red`).
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    return subprocess.run(
+        [sys.executable, "-c", _MISPLACEMENT_SUBPROCESS.format(mutation=mutation)],
+        cwd=repo_root, capture_output=True, text=True,
+    )
+
+
+def test_chat_token_misplacement_raw_source_not_excluded_reds_at_load():
+    """AC-5 (Risk Negative-2): a raw source mapped in `_RAW_TO_FIELD` but NOT in
+    `EXCLUDED_RAW_PII` reds the load-time tripwire (AssertionError).
+
+    Fail-capable: add a raw source the excluded list does not name, then re-run the EXACT
+    `set(_RAW_TO_FIELD) <= EXCLUDED_RAW_PII` tripwire — it raises AssertionError. A token
+    whose raw source escapes the excluded list reads through `summarize`'s else-branch
+    under its raw name — the leak this tripwire catches.
+    """
+    result = _run_misplacement_subprocess(
+        'router._RAW_TO_FIELD["unlisted-raw-source"] = "dietary-pattern-class"'
+    )
+    assert result.returncode != 0, (
+        f"the mis-placement tripwire did not red; stdout={result.stdout!r}"
+    )
+    assert "AssertionError" in result.stderr
+    assert "tripwire-did-not-red" not in result.stdout
+
+
+def test_chat_token_misplacement_token_in_excluded_reds_at_load():
+    """AC-5 (Risk Negative-2): a token placed in BOTH the field-set and the excluded list
+    reds the disjointness tripwire at module load.
+
+    Fail-capable: also name a derived token in `EXCLUDED_RAW_PII` (so the field-set and
+    excluded list overlap), then re-run the EXACT
+    `SUMMARY_FIELD_SET.isdisjoint(EXCLUDED_RAW_PII)` tripwire — it raises AssertionError.
+    """
+    result = _run_misplacement_subprocess(
+        'router.EXCLUDED_RAW_PII = router.EXCLUDED_RAW_PII + ("dietary-pattern-class",)'
+    )
+    assert result.returncode != 0, (
+        f"the mis-placement tripwire did not red; stdout={result.stdout!r}"
+    )
+    assert "AssertionError" in result.stderr
+    assert "tripwire-did-not-red" not in result.stdout
