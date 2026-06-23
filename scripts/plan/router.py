@@ -77,9 +77,14 @@ TRAIN_ELIGIBLE_LANE = "train-eligible"
 # polarity feed, not from any raw-PII item — see `_recent_trend_direction`.
 # `raw-lab-values` stays a named-excluded raw-PII class (the boundary promise) but
 # is no longer derivation plumbing.
+# `equipment-access-class` is NOT here (ADR-0018-T1 reconciliation): the demographic
+# equipment selection (a Step-1 bounded select) is its ONE authoritative source — a
+# pass-through `WIRED_TOKENS` token read under its own name. The former
+# `postal-address -> equipment-access-class` inference (a coarse region-presence proxy)
+# is removed; `postal-address` stays a named-excluded raw-PII class in EXCLUDED_RAW_PII,
+# just no longer a derivation source.
 _RAW_TO_FIELD = {
     "date-of-birth": "training-age-band",
-    "postal-address": "equipment-access-class",
     "raw-symptom-free-text": "active-issue-class",
     "clinical-notes": "active-issue-class",
 }
@@ -290,18 +295,14 @@ def _issue_class(readings):
     return "general-issue"
 
 
-def _region_class(readings):
-    """Map a raw postal-address to a coarse presence/region class (no raw value)."""
-    return "region-present" if str(readings[-1]["value"]).strip() else "region-absent"
-
-
 # Per-field-set-field de-identifying derivations for fields backed by a raw-PII
 # source item. Each takes the readings SERIES and MUST emit a derived band/class
 # token only — the raw value never appears in the emitted token (Finding 4-1).
+# `equipment-access-class` is no longer here (ADR-0018-T1): it is now a pass-through
+# token sourced from the demographic equipment selection, not a postal-address derivation.
 _FIELD_DERIVATION = {
     "training-age-band": _age_band,
     "active-issue-class": _issue_class,
-    "equipment-access-class": _region_class,
 }
 
 # §5b change-control tripwire (Finding 4-2): every raw source item must be a

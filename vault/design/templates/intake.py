@@ -21,7 +21,11 @@ interactive-ingest build.
 from html import escape as _esc
 
 from scripts.ingest import status as ingest_status
-from scripts.serve.capture import GOAL_DOMAINS, RECOVERY_STATUS_BANDS
+from scripts.serve.capture import (
+    BODYWEIGHT_BANDS,
+    EQUIPMENT_ACCESS_CLASSES,
+    SEX_OPTIONS,
+)
 
 # The intake mocks (2vFFC / khCNX / BRAUE) use a neutral gray palette + a blue accent
 # (distinct from the dashboard's clin-* tokens). Held here so the render matches the mock.
@@ -147,11 +151,6 @@ def _rail():
     return f"<nav class='rail'>{''.join(items)}</nav>"
 
 
-def _field(label, value, placeholder=False):
-    cls = "box ph" if placeholder else "box"
-    return f"<div class='field'><label>{label}</label><div class='{cls}'>{value}</div></div>"
-
-
 def _doc(key, title, subtitle, state_text, ok):
     icon = f"<svg class='dicon' viewBox='0 0 24 24'>{_ICONS[key]}</svg>"
     state_cls = "ok" if ok else "no"
@@ -209,26 +208,11 @@ def _panel(num, title, subtitle, body, *, note=False, submit=False):
             f"{body}{note_html}{foot}</section>")
 
 
-def _chips(items, on=()):
-    out = []
-    for it in items:
-        cls = "chip ok" if it in on else "chip"
-        out.append(f"<span class='{cls}'>{it}</span>")
-    return f"<div class='chips'>{''.join(out)}</div>"
-
-
 def _text_field(label, name, placeholder=""):
     """A labeled single-line text input bound to the capture field `name`."""
     return (f"<div class='field'><label for='{name}'>{label}</label>"
             f"<input class='inp' type='text' id='{name}' name='{name}' "
             f"placeholder='{_esc(placeholder)}'></div>")
-
-
-def _textarea_field(label, name, placeholder=""):
-    """A labeled multi-line text input bound to the capture field `name`."""
-    return (f"<div class='field'><label for='{name}'>{label}</label>"
-            f"<textarea class='inp' id='{name}' name='{name}' "
-            f"placeholder='{_esc(placeholder)}'></textarea></div>")
 
 
 def _select_field(label, name, options):
@@ -238,27 +222,32 @@ def _select_field(label, name, options):
             f"<select class='inp' id='{name}' name='{name}'>{opts}</select></div>")
 
 
-def _check_chips(name, options, legend=None):
-    """Checkbox chips that all submit under one repeated capture field `name`.
-
-    When `legend` is given, the group is wrapped in a `<fieldset>`/`<legend>` so the
-    group purpose is programmatically associated (WCAG group semantics, Wave-B FIX-F).
-    """
-    out = []
-    for value in options:
-        out.append(f"<label class='chk'><input type='checkbox' name='{name}' "
-                   f"value='{_esc(value)}'>{_esc(value)}</label>")
-    chips = f"<div class='chips'>{''.join(out)}</div>"
-    if legend is None:
-        return chips
-    return (f"<fieldset class='grp'><legend class='seclab'>{_esc(legend)}</legend>"
-            f"{chips}</fieldset>")
+# Step-1 demographic select option labels (display text only; the option VALUES are the
+# capture gate constants — `SEX_OPTIONS`/`BODYWEIGHT_BANDS`/`EQUIPMENT_ACCESS_CLASSES` — so
+# the markup and the server-side `_BOUNDED_ENUMS` gate cannot drift, AC-6). Mirrors the
+# Wave-A RECOVERY_STATUS_BANDS option-label pattern.
+_SEX_LABELS = {"male": "Male", "female": "Female"}
+_EQUIPMENT_LABELS = {
+    "full-home-gym": "Full home gym", "commercial-gym": "Commercial gym",
+    "minimal-equipment": "Minimal equipment", "bodyweight-only": "Bodyweight only",
+}
 
 
 def _step1(status):
+    # The four demographic placeholders are now REAL POSTing inputs (ADR-0018-T1). Birth
+    # year writes the `date-of-birth` raw source the capture seam de-identifies into
+    # `training-age-band` (never the raw year in the token). Sex / bodyweight band /
+    # equipment access are bounded `<select>`s whose option VALUES are the capture gate
+    # constants (AC-6 no-drift) — the bodyweight band is a coarse range, never raw kg.
     about = ("<div class='seclab'>About you</div><div class='grid2'>"
-             + _field("Birth year", "—", True) + _field("Sex (for dosing)", "—", True)
-             + _field("Bodyweight", "—", True) + _field("Equipment access", "—", True) + "</div>")
+             + _text_field("Birth year", "date-of-birth", "e.g. 1986")
+             + _select_field("Sex (for dosing)", "sex-for-dosing",
+                             [("", "Select…")] + [(v, _SEX_LABELS[v]) for v in SEX_OPTIONS])
+             + _select_field("Bodyweight band", "bodyweight-band",
+                             [("", "Select a range…")] + [(b, b) for b in BODYWEIGHT_BANDS])
+             + _select_field("Equipment access", "equipment-access-class",
+                             [("", "Select…")] + [(v, _EQUIPMENT_LABELS[v]) for v in EQUIPMENT_ACCESS_CLASSES])
+             + "</div>")
     docs = "<div class='seclab'>Link your documents</div>" + _doc_cards(status)
     return _panel(1, "Your info &amp; documents",
                   "Start with the basics, then link any documents you have — labs, history, "
@@ -266,94 +255,45 @@ def _step1(status):
                   about + docs, note=True)
 
 
+def _chat_panel(num, title, subtitle, blurb):
+    """A rich-section panel whose detail is gathered in conversation, not a form field.
+
+    ADR-0018-T1 makes the form OBJECTIVE-ONLY: the rich sections (goals, training,
+    nutrition, supplements & peptides) are CHAT-only — gathered by the Wave-A
+    conversational intake at the POST `/chat` route, not as form fields. Each rich-section
+    panel keeps its stepper place but carries 0 capture `name=` inputs; its body is a thin
+    affordance pointing the operator to the chat. Reuses the locked Clinical Light theme
+    (`.handoff` panel) — no new design.
+    """
+    body = ("<div class='handoff'><h4>" + title + "</h4>"
+            "<p>" + blurb + " This is gathered in conversation — open the chat to talk it "
+            "through. Nothing here is a form field; the rich detail is captured by the "
+            "intake conversation at <code>/chat</code>.</p></div>")
+    return _panel(num, title, subtitle, body)
+
+
 def _step2():
-    # Goal areas -> the de-identified `goal-domains` token (repeated checkbox field).
-    # Targets -> `goal-targets`; priority -> `goal-priority-order`; the highest-priority
-    # add, `hard-limits` (the fail-closed HALT-filter input), is a real free-text field.
-    # The two free-text fields carry brief guidance to keep names/medical details out of
-    # the de-identified goal text (Wave-B FIX-C; the model path is no-train, and a typed
-    # diagnosis is an accepted V1 residual — see the field hints).
-    _goal_hint = "<div class='note'>Describe your goal — no names or medical details.</div>"
-    _limit_hint = "<div class='note'>List limits — no names or medical details.</div>"
-    body = (_check_chips("goal-domains", list(GOAL_DOMAINS), legend="Goal areas")
-            + "<div class='seclab'>Targets</div>"
-            + _textarea_field("What should the plan optimize for?", "goal-targets",
-                              "e.g. add 10 lb to squat by September; bring resting heart rate under 50")
-            + _goal_hint
-            + "<div class='seclab'>Priority order</div>"
-            + _text_field("Order your goals", "goal-priority-order",
-                          "e.g. 1 workout, 2 nutrition, 3 supplements")
-            + "<div class='seclab'>Hard limits</div>"
-            + _textarea_field("Anything the plan must never do", "hard-limits",
-                              "e.g. no overhead pressing; at least one full rest day")
-            + _limit_hint)
-    return _panel(2, "Goals &amp; priorities",
-                  "What should the plan optimize for, and in what order?", body)
+    return _chat_panel(2, "Goals &amp; priorities",
+                       "What should the plan optimize for, and in what order?",
+                       "Your goals, targets, priority order, and hard limits.")
 
 
 def _step3():
-    # `recovery-status-band` (the wired plan input, ADD) is a select; "Train around"
-    # -> the `train-around` raw-symptom field summarize de-identifies into
-    # active-issue-class. The training detail has no de-identified consumer today — it
-    # is captured to the gitignored record, honestly labeled.
-    # The option VALUES are RECOVERY_STATUS_BANDS (the server-side FIX-B enum), so the
-    # markup and capture's bounded-value gate cannot drift; the display text is local.
-    _band_labels = {"low": "Low — run down / under-recovered",
-                    "moderate": "Moderate — about normal",
-                    "high": "High — fresh and recovering well"}
-    body = (_select_field("Recovery status", "recovery-status-band",
-                          [("", "How recovered do you feel lately?")]
-                          + [(b, _band_labels[b]) for b in RECOVERY_STATUS_BANDS])
-            + "<div class='seclab'>Train around</div>"
-            + _text_field("Anything to train around (injury / caution)", "train-around",
-                          "e.g. lower-back caution, left shoulder")
-            + "<div class='recnote'>The fields below are saved to your record — not yet used by the plan.</div>"
-            + "<div class='grid2'>" + _text_field("Training experience", "training-experience", "e.g. 20 years")
-            + _text_field("Sessions per week", "sessions-per-week", "e.g. 4")
-            + _text_field("Session length", "session-length", "e.g. 60 min")
-            + _text_field("Preferred style / split", "training-split", "e.g. upper/lower") + "</div>"
-            + "<div class='seclab'>Current main lifts (optional)</div><div class='grid2'>"
-            + _text_field("Squat", "lift-squat", "e.g. 315 lb")
-            + _text_field("Bench", "lift-bench", "e.g. 225 lb")
-            + _text_field("Deadlift", "lift-deadlift", "e.g. 405 lb")
-            + _text_field("Overhead press", "lift-ohp", "e.g. 135 lb") + "</div>")
-    return _panel(3, "Training",
-                  "How you train now, so the workout plan meets you where you are.", body)
+    return _chat_panel(3, "Training",
+                       "How you train now, so the workout plan meets you where you are.",
+                       "Your training experience, schedule, style, and anything to train around.")
 
 
 def _step4():
-    # All nutrition has no de-identified plan consumer today (ADR-0014 Negative-2) — it
-    # is captured to the gitignored record, honestly labeled, never pretended into the plan.
-    body = ("<div class='recnote'>Nutrition is saved to your record — not yet used by the plan.</div>"
-            + "<div class='grid2'>" + _text_field("Dietary pattern", "dietary-pattern", "e.g. high protein")
-            + _text_field("Meals per day", "meals-per-day", "e.g. 3") + "</div>"
-            + "<div class='seclab'>Allergies &amp; intolerances</div>"
-            + _text_field("Allergies / intolerances", "allergies", "e.g. dairy, shellfish")
-            + "<div class='seclab'>Foods to avoid / preferences</div>"
-            + _textarea_field("Preferences", "food-preferences", "e.g. no pork, high protein"))
-    return _panel(4, "Nutrition",
-                  "Dietary pattern and constraints, so nutrition fits how you actually eat.", body)
+    return _chat_panel(4, "Nutrition",
+                       "Dietary pattern and constraints, so nutrition fits how you actually eat.",
+                       "Your dietary pattern, meal structure, allergies, and food preferences.")
 
 
 def _step5():
-    # The raw supplement/peptide stack (raw names/doses) is named-excluded PII -> the
-    # gitignored record, honestly labeled. The medication-interaction text is ALSO saved
-    # to the record only (Wave-B FIX-A): the model-bound `rx-interaction-classes` token
-    # carries only liaison-CURATED de-identified class tokens, so this untrusted form
-    # field does NOT cross the model boundary — it is honestly labeled as record-only,
-    # not promised as de-identified-by-the-form. The redundant "what are you hoping to
-    # address" is dropped (covered by Step-2 goals).
-    body = ("<div class='recnote'>Your raw stack is saved to your record — not yet used by the plan.</div>"
-            + "<div class='seclab'>Current supplement stack</div>"
-            + _textarea_field("Supplements (name &amp; dose)", "supplement-stack",
-                              "e.g. creatine monohydrate · 5 g")
-            + "<div class='seclab'>Peptides (current or considered)</div>"
-            + _textarea_field("Peptides (name &amp; dose)", "peptide-stack", "name & dose")
-            + "<div class='seclab'>Medications &amp; interactions</div>"
-            + _text_field("Medications to screen against (saved to your record)", "rx-interaction-classes",
-                          "e.g. blood thinner; thyroid medication"))
-    return _panel(5, "Supplements &amp; peptides",
-                  "Your current stack — saved to your record; interaction screening runs later, in plan generation.", body)
+    return _chat_panel(5, "Supplements &amp; peptides",
+                       "Your current stack; interaction screening runs later, in plan generation.",
+                       "Your current supplement and peptide stack, and medications to screen against.")
 
 
 def _step6():
@@ -401,16 +341,18 @@ def render(store_read, *, status=None, _today=None):
     status = status if status is not None else _default_status(store_read)
     head = ("<div class='head'><div class='brand'>A+ Maxing<div class='sub'>Build your plan</div></div>"
             "<div class='stepno'>6 steps</div></div>")
-    # Step 1 keeps its own document-upload affordance (the Wave-A file path). Steps 2-6
-    # are one capture form POSTing their fields to `/upload` (multipart, so the handler's
-    # `stage_uploads` parses them into `staged["fields"]`); the Step-6 submit carries
+    # The form is OBJECTIVE-ONLY (ADR-0018-T1): Step-1's activated demographic inputs +
+    # the content-upload affordances are the ONLY capture fields it POSTs to `/upload`
+    # (multipart, so `stage_uploads` parses them into `staged["fields"]`). Step-1 is now
+    # INSIDE the form so its demographic inputs submit. The rich sections (Steps 2-5) are
+    # CHAT-only `/chat` affordance panels (0 form fields). The Step-6 submit carries
     # `step=6` and routes the `/generate-plan` handoff re-render.
     capture_form = (
         "<form method='post' action='/upload' enctype='multipart/form-data'>"
-        + _step2() + _step3() + _step4() + _step5() + _step6()
+        + _step1(status) + _step2() + _step3() + _step4() + _step5() + _step6()
         + "</form>"
     )
-    body = _step1(status) + capture_form
+    body = capture_form
     return (f"<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
             f"<meta name='viewport' content='width=device-width, initial-scale=1'>"
             f"<title>A+ Maxing — Build your plan</title>{_style()}</head>"

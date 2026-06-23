@@ -33,8 +33,12 @@ def _clean_records():
     return [
         {"item": "date-of-birth", "timepoint": "2026-01-01T00:00:00+00:00",
          "source": "intake", "value": "1986-04-12"},
-        {"item": "postal-address", "timepoint": "2026-01-01T00:00:00+00:00",
-         "source": "intake", "value": "123 Main St"},
+        # equipment-access-class is now a pass-through token sourced from the demographic
+        # equipment selection (ADR-0018-T1 reconciliation) — an OWN-NAME store item, not
+        # the removed postal-address derivation. The value is a member of the bounded
+        # equipment-access enum the Step-1 select is built from (AC-6 markup<->gate no-drift).
+        {"item": "equipment-access-class", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "full-home-gym"},
         {"item": "raw-lab-values", "timepoint": "2026-01-01T00:00:00+00:00",
          "source": "lab", "value": "ALT 30; AST 28"},
         {"item": "raw-symptom-free-text", "timepoint": "2026-01-01T00:00:00+00:00",
@@ -163,14 +167,40 @@ def test_issue_class_token_value(value, expected):
     assert router._issue_class(_reading(value)) == expected
 
 
-@pytest.mark.parametrize("value, expected", [
-    ("123 Main St", "region-present"),
-    ("   ", "region-absent"),
-    ("", "region-absent"),
-])
-def test_region_class_token_value(value, expected):
-    """F17: _region_class maps an address to presence/region class."""
-    assert router._region_class(_reading(value)) == expected
+# NOTE (ADR-0018-T1): the former `test_region_class_token_value` parametrized test is
+# removed. It exercised `router._region_class`, the postal-address -> equipment-access-class
+# deriver, which the reconciliation removed (the demographic equipment selection is now the
+# token's one source). The function no longer exists; the test that called it is gone, not
+# weakened. `equipment-access-class`'s new pass-through sourcing is covered by
+# `tests/serve/test_intake_demographics.py` (the demographic round-trip) and the
+# `_clean_records()` own-name fixture above (field-set completeness for the dispatch tests).
+
+
+def test_postal_address_no_longer_derives_equipment_access_class():
+    """ADR-0018-T1: postal-address is removed as the equipment-access-class source.
+
+    The reconciliation pins ONE source for `equipment-access-class` — the demographic
+    equipment selection (a pass-through token). The former `postal-address` derivation is
+    gone: `postal-address` is no longer in `_RAW_TO_FIELD`, `equipment-access-class` is no
+    longer in `_FIELD_DERIVATION`, and `_region_class` is removed. `postal-address` STAYS a
+    named-excluded raw-PII class (the boundary promise is unchanged).
+
+    Failing-capable: re-adding `postal-address -> equipment-access-class` to `_RAW_TO_FIELD`
+    (the double-source the AC reconciles) reds this.
+    """
+    assert "postal-address" not in router._RAW_TO_FIELD, (
+        "postal-address still maps in _RAW_TO_FIELD — the equipment double-source is back"
+    )
+    assert "equipment-access-class" not in router._FIELD_DERIVATION, (
+        "equipment-access-class is still a derived field — it must be a pass-through token"
+    )
+    assert not hasattr(router, "_region_class"), (
+        "_region_class still exists — the postal-address deriver was not removed"
+    )
+    # The boundary promise is unchanged: postal-address stays named-excluded raw PII.
+    assert "postal-address" in router.EXCLUDED_RAW_PII, (
+        "postal-address was wrongly dropped from EXCLUDED_RAW_PII"
+    )
 
 
 def test_trend_token_flat_on_no_change():

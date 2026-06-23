@@ -53,6 +53,14 @@ WIRED_TOKENS = (
     "goal-priority-order",
     "hard-limits",
     "recovery-status-band",
+    # Step-1 demographics (ADR-0018-T1): bounded pass-through tokens written under their
+    # own name. `sex-for-dosing`/`equipment-access-class` are direct class selections;
+    # `bodyweight-band` is a coarse de-identified BAND (never raw kg). `training-age-band`
+    # is DELIBERATELY ABSENT — it is DERIVED from the named-excluded `date-of-birth` source
+    # the birth-year field writes (see `_DOB_FIELD`), never written directly.
+    "sex-for-dosing",
+    "bodyweight-band",
+    "equipment-access-class",
 )
 # `rx-interaction-classes` is DELIBERATELY ABSENT from the wired set (Wave-B FIX-A).
 # Its store item IS a SUMMARY_FIELD_SET member, but the model-bound token may carry
@@ -69,6 +77,12 @@ WIRED_TOKENS = (
 _TRAIN_AROUND_FIELD = "train-around"
 _RAW_SYMPTOM_ITEM = "raw-symptom-free-text"
 
+# The Step-1 birth-year form field -> the RAW `date-of-birth` store item `summarize`
+# de-identifies into `training-age-band` via `_age_band` (born-decade band, raw year never
+# in the token). Mirrors the `_TRAIN_AROUND_FIELD -> _RAW_SYMPTOM_ITEM` special-case: the
+# field writes the named-excluded raw source, NEVER the `training-age-band` token directly.
+_DOB_FIELD = "date-of-birth"
+
 # Server-side enumerated value sets for the bounded wired fields (Wave-B FIX-B). The
 # markup enforces these client-side (a `<select>` / a fixed chip set), but a crafted
 # POST can write any string into the token — so the server re-validates here BEFORE
@@ -79,9 +93,21 @@ _RAW_SYMPTOM_ITEM = "raw-symptom-free-text"
 # so EVERY token must be in the enum for the whole value to be accepted.
 RECOVERY_STATUS_BANDS = ("low", "moderate", "high")
 GOAL_DOMAINS = ("Workout", "Nutrition", "Supplements", "Peptides")
+# Step-1 demographic bounded vocabularies (ADR-0018-T1). `intake.py` builds its Step-1
+# `<select>` options FROM these constants (AC-6 markup<->gate no-drift). All three are
+# de-identified classes: `sex-for-dosing` is the clinically-relevant dosing dimension;
+# `BODYWEIGHT_BANDS` are coarse ranges so no raw kg is ever stored; `EQUIPMENT_ACCESS_CLASSES`
+# is the operator's training-environment class (the authoritative source for the token,
+# replacing the removed postal-address inference).
+SEX_OPTIONS = ("male", "female")
+BODYWEIGHT_BANDS = ("under-60kg", "60-70kg", "70-80kg", "80-90kg", "90-100kg", "over-100kg")
+EQUIPMENT_ACCESS_CLASSES = ("full-home-gym", "commercial-gym", "minimal-equipment", "bodyweight-only")
 _BOUNDED_ENUMS = {
     "recovery-status-band": ({b.lower() for b in RECOVERY_STATUS_BANDS}, False),
     "goal-domains": ({d.lower() for d in GOAL_DOMAINS}, True),
+    "sex-for-dosing": ({s.lower() for s in SEX_OPTIONS}, False),
+    "bodyweight-band": ({b.lower() for b in BODYWEIGHT_BANDS}, False),
+    "equipment-access-class": ({e.lower() for e in EQUIPMENT_ACCESS_CLASSES}, False),
 }
 
 
@@ -232,6 +258,12 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
             # into active-issue-class. NEVER active-issue-class directly.
             store.append(_RAW_SYMPTOM_ITEM, _reading(_RAW_SYMPTOM_ITEM, value), root=store_root)
             written_tokens.append(_RAW_SYMPTOM_ITEM)
+        elif name == _DOB_FIELD:
+            # The Step-1 birth year -> the RAW `date-of-birth` item summarize de-identifies
+            # into training-age-band (via `_age_band`, a born-decade band). NEVER
+            # training-age-band directly — the raw year is named-excluded raw PII.
+            store.append(_DOB_FIELD, _reading(_DOB_FIELD, value), root=store_root)
+            written_tokens.append(_DOB_FIELD)
         else:
             # Everything else is record-only: it has no de-identified field-set consumer
             # today (Step-3 training detail, all Step-4 nutrition, the raw Step-5 stack).
