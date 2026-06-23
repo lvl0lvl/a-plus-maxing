@@ -1,0 +1,30 @@
+{
+  "phase": "7.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "compound_risk_tier": "experimental",
+  "compound_entry_path": "vault/compounds/foxo4-dri.md",
+  "required_fields": {
+    "adverse_effects_literature": "populated",
+    "contraindications": "populated",
+    "monitoring": "populated",
+    "stopping_criteria": "populated"
+  },
+  "third_party_monitoring_marker_present": true,
+  "third_party_markers": [
+    "troponin I/T (cardiac \u2014 cardiotoxicity concern flagged by Zhang 2020 Leydig study)",
+    "CK-MB (cardiac \u2014 same cardiotoxicity gap)",
+    "eGFR / BUN / creatinine (renal \u2014 Baar 2017 measured BUN/creatinine; eGFR has a wiki biomarker page)",
+    "CBC with differential (platelets, lymphocytes \u2014 apoptotic stress markers)"
+  ],
+  "halt_reasons": [],
+  "timestamp": "2026-06-20T23:48:25.027666+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T23:46:06.215203+00:00",
+    "attest_ts": "2026-06-20T23:48:25.027669+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-7.5.md",
+    "agent_source_sha256": "476ddbb4e1e7ed99f790903f23be41ab26e4acba51db463bb206075f0ab45c2e",
+    "agent_source_mtime": "2026-06-20T23:47:46.593538+00:00"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "phase": "8.5",
+  "verdict": "PASS",
+  "iterations": 1,
+  "mode": "deep",
+  "practitioner_layer": {
+    "path": "vault/library/peptides/foxo4-dri/practitioner-layer.md",
+    "present": true,
+    "compounding_sheets_count": 0,
+    "named_physicians_count": 0,
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "non_english_layer": {
+    "path": "vault/library/peptides/foxo4-dri/non-english-layer.md",
+    "present": true,
+    "languages_surveyed": [
+      "Chinese",
+      "Russian",
+      "Japanese"
+    ],
+    "has_bibliography": true,
+    "has_self_check": true
+  },
+  "halt_reasons": [],
+  "timestamp": "2026-06-21T00:08:55.397790+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-21T00:07:18.979788+00:00",
+    "attest_ts": "2026-06-21T00:08:55.397795+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-8.5.md",
+    "agent_source_sha256": "b64e2154e24b7c22357a48f12cd38c04248ab2ae080268a154903b53960c75ac",
+    "agent_source_mtime": "2026-06-21T00:08:27.390423+00:00"
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "PASS",
+      "count_checked": 72,
+      "count_flagged": 0
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 42,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-4": {
+      "status": "PASS",
+      "count_checked": 1,
+      "count_flagged": 0
+    },
+    "IC-5": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-6": {
+      "status": "PASS",
+      "count_checked": 0,
+      "count_flagged": 0
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 28,
+      "count_flagged": 0
+    },
+    "IC-8": {
+      "status": "PASS",
+      "count_checked": 6,
+      "count_flagged": 0
+    },
+    "IC-9": {
+      "status": "PASS",
+      "count_checked": 8,
+      "count_flagged": 0
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-11": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-12": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 6,
+      "count_flagged": 3,
+      "findings": [
+        "Claim: '11.73-fold greater reduction in viability of senescent versus proliferating IMR90 cells' [B:section-B.md line 7, cite 1, in_vitro] \u2014 figure-level numerical claim; abstract of PMID 28340339 confirmed (title/author/year/journal match, selectivity described qualitatively) but exact figure not in abstract; PMC full text blocked by reCAPTCHA \u2014 corpus-missing WARN, not HALT",
+        "Claim: 'approximately 5-fold higher binding affinity (Kd ~400 \u00b1 280 nM for FOXO4-DRI vs. ~2.5 \u00b5M for FOXO4-FH)' [section-A.md, cite 2, in_vitro] \u2014 Kd values not present in PMID 40593617 abstract (p53 TAD2 binding target and phosphorylation-enhanced affinity confirmed; full-text paywall); corpus-missing WARN for specific Kd numbers",
+        "Claim: 'n=7\u20138 mice per treatment group for the XpdTTD cohorts (Fig. 6K)' [section-B.md, cite 1, animal] \u2014 figure-caption-level claim; abstract of PMID 28340339 does not state n values; PMC full text blocked \u2014 corpus-missing WARN for n values"
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 28,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 8,
+    "largest_cluster_name": "de Keizer (Erasmus MC/UMC Utrecht)",
+    "largest_cluster_count": 1,
+    "share": 0.125,
+    "threshold_triggered": false
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 6,
+    "claims_failed": [
+      {
+        "claim": "11.73-fold greater reduction in viability of senescent versus proliferating IMR90 cells",
+        "cite_key": "baar-2017-28340339",
+        "failure_mode": "corpus-missing",
+        "note": "PMC full text blocked by reCAPTCHA; abstract confirmed; claim consistent with abstract qualitative selectivity statement; WARN not HALT"
+      },
+      {
+        "claim": "Kd ~400 \u00b1 280 nM for FOXO4-DRI vs. ~2.5 \u00b5M for FOXO4-FH; approximately 5-fold higher binding affinity",
+        "cite_key": "bourgeois-2025-40593617",
+        "failure_mode": "corpus-missing",
+        "note": "Abstract confirms p53 TAD2 as binding target and phosphorylation-enhanced affinity; Kd numbers not in abstract; full-text paywall (Nature Communications); WARN not HALT"
+      },
+      {
+        "claim": "n=7\u20138 mice per treatment group for the XpdTTD cohorts (Fig. 6K)",
+        "cite_key": "baar-2017-28340339",
+        "failure_mode": "corpus-missing",
+        "note": "Figure-caption detail; abstract confirmed; full text blocked; WARN not HALT"
+      }
+    ]
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-13: 3 corpus-missing WARNs (paywall/reCAPTCHA barrier) \u2014 no quote-not-found or number-not-found failures; all 5 spot-checked PMIDs confirmed by PubMed direct fetch"
+  ],
+  "timestamp": "2026-06-20T23:31:22.456764+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T23:26:05.925989+00:00",
+    "attest_ts": "2026-06-20T23:31:22.456767+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "5f9c3e1173c2eb9e4c46a63e9d1cfcfb19c9e055aa5a0d1e0c57ae34d36ef5df",
+    "agent_source_mtime": "2026-06-20T23:31:22.399643+00:00"
+  }
+}
