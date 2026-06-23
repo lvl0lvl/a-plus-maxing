@@ -22,7 +22,7 @@ import functools
 from scripts.model.client import ModelCallError
 from scripts.plan import router
 from scripts.plan.router import SUMMARY_FIELD_SET
-from scripts.serve import capture, extract
+from scripts.serve import extract
 from scripts.serve.capture import WIRED_TOKENS
 from scripts.store import store
 
@@ -292,10 +292,11 @@ def dispatch_turn(turn_text, conversation, covered_domains, declined_domains, *,
     context over the instance-bound store read, plan the gap-set (`plan_next_turn`), make
     the ONE outbound model call (`client.converse`, the only egress — carrying the live
     conversation raw + the de-identified context, 0 store content), validate the model's
-    extraction proposal (`extract_facts`) and route the well-formed facts through the
-    UNCHANGED gate (`capture.persist_capture(..., identity_config=...)` — the `/chat` half
-    of the H-2 dual-call-site wiring), and return the per-turn receipt (assistant reply +
-    the `persist_capture` receipt + the de-identified progress). The extractor runs EACH
+    extraction proposal and route the well-formed facts through the UNCHANGED gate via the
+    shared `extract.persist_extraction` helper (`..., identity_config=...` — the `/chat`
+    half of the H-2 dual-call-site wiring), and return the per-turn receipt (assistant
+    reply + the `persist_extraction` `{store,scaffold,dropped}` receipt + the de-identified
+    progress). The extractor runs EACH
     turn, so the next-turn gap-set is computed against what LANDED in the store, not the
     model's claim (CONCERN-2). A failed/empty model call (the client's `ModelCallError`)
     returns the fail-closed degraded turn: no reply, no fact, 0 store write (NFR-2).
@@ -342,20 +343,18 @@ def dispatch_turn(turn_text, conversation, covered_domains, declined_domains, *,
         return _degraded_turn(str(exc))
 
     # The extractor runs THIS turn over the model's proposal; the well-formed facts route
-    # UNCHANGED through the capture gate (which de-identifies by data class). The `/chat`
-    # capture call threads identity_config — the H-2 dual-call-site wiring.
-    extraction = extract.extract_facts(result["extraction"], turn_text)
-    receipt = capture.persist_capture(
-        extraction.candidate_facts, root=store_root, scaffold_root=scaffold_root,
+    # UNCHANGED through the capture gate (which de-identifies by data class). Calling the
+    # shared `extract.persist_extraction` helper (validate -> route -> {store,scaffold,
+    # dropped} receipt) instead of re-implementing the chain keeps the `/chat` path from
+    # drifting if the helper's routing changes; it threads identity_config — the H-2
+    # dual-call-site wiring (NOTE-ARCH-1).
+    receipt = extract.persist_extraction(
+        result["extraction"], turn_text, root=store_root, scaffold_root=scaffold_root,
         identity_config=identity_config,
     )
     return {
         "reply": result["reply"],
-        "receipt": {
-            "store": receipt["store"],
-            "scaffold": receipt["scaffold"],
-            "dropped": extraction.dropped,
-        },
+        "receipt": receipt,
         "progress": _progress(intent),
         "degraded": False,
     }

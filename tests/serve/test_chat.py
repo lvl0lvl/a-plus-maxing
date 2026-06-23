@@ -324,3 +324,61 @@ def test_model_client_exception_does_not_drop_the_thread(tmp_path):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# --------------------------------------------------------------------------- #
+# H-2 — the /chat dispatch threads identity_config behaviorally (QA F1)
+# --------------------------------------------------------------------------- #
+
+
+_ABSENT_IDENTITY = "vault/meta/__no_such_identity_config__.txt"
+
+
+def test_dispatch_identity_config_round_trip_changes_detection(tmp_path):
+    """H-2/QA F1: the `/chat` dispatch threads `identity_config` so an operator-identity
+    value routes record-only WITH the config and lands WITHOUT it.
+
+    The structural seam test alone passes even if `dispatch_turn` drops `identity_config=`
+    from the persist call (QA F1: 0 failures). This BEHAVIORAL round-trip mirrors the
+    `/upload` `test_identity_config_round_trip_changes_detection`: a model-emitted
+    operator-identity value under a free-text wired token routes record-only WHEN an
+    instance `identity_config` listing that name is threaded, and LANDS in the model-bound
+    token WHEN it is the empty/absent baseline. Same value, same dispatch — only the
+    threaded config differs, so the test reds if the dispatch drops `identity_config`.
+    """
+    from scripts.model.client import ModelClient
+
+    identity_cfg = tmp_path / "operator-identity.txt"
+    identity_cfg.write_text("Walter McGivney\n")
+    value = "add 10 lb to squat; ask Walter McGivney before changing the program"
+    backend = _ReplyBackend(reply="noted", extraction={"goal-targets": value})
+    client = ModelClient(backend=backend)
+
+    # WITH the instance config threaded: the name is detected -> record-only to scaffold.
+    store_with = tmp_path / "store-with"
+    scaffold_with = tmp_path / "scaffold-with"
+    chat.dispatch_turn(
+        "let's set goals", [], ["goals"], [],
+        client=client, store_root=store_with, scaffold_root=scaffold_with,
+        identity_config=str(identity_cfg),
+    )
+    assert store.read("goal-targets", root=store_with) == [], (
+        "an operator-identity value reached the model-bound token WITH identity_config threaded"
+    )
+    scaffold_text = "".join(p.read_text() for p in scaffold_with.rglob("*") if p.is_file())
+    assert "McGivney" in scaffold_text, "the identity value did not route record-only WITH the config"
+
+    # WITHOUT it (the empty-detection baseline): identity detection is empty, so the value
+    # lands in the model-bound token — the no-op baseline the threading changes. If the
+    # dispatch drops identity_config, BOTH legs use empty detection and the WITH-config
+    # record-only assertion above reds.
+    store_without = tmp_path / "store-without"
+    chat.dispatch_turn(
+        "let's set goals", [], ["goals"], [],
+        client=client, store_root=store_without, scaffold_root=tmp_path / "scaffold-without",
+        identity_config=_ABSENT_IDENTITY,
+    )
+    landed = store.read("goal-targets", root=store_without)
+    assert landed and "McGivney" in landed[0]["value"], (
+        "the empty-detection baseline did not land the value — the round-trip proves nothing"
+    )
