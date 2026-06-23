@@ -57,26 +57,55 @@ per-author concerns — they run in the cross-domain layer (the step-4 reconcile
 `scripts/plan/orchestrate.py`) per the pipeline design.
 """
 
+from scripts.model.client import ModelCallError, ModelClient
 from scripts.plan import router
 from scripts.plan.assemble import assemble
 from scripts.store import plan_schema
 
+# The honest no-plan reason when the plan-author model call fails (ADR-0015 fail-closed,
+# NFR-2): the client raised `ModelCallError`, so the plan is the honest no-plan state —
+# never a fabricated or degraded regimen.
+AUTHOR_CALL_FAILED = "author-call-failed"
 
-def _author_callable(author_output):
-    """Wrap a captured author output as an `assemble` roster specialist callable.
 
-    Under runtime A the author already reasoned over the summary at dispatch time, so the
-    callable returns the captured output verbatim — the `(domain, summary)` args `assemble`
-    passes are ignored (the reasoning is not re-run in-process).
+class _FixedEnvelopeClient:
+    """A client adapter that authors a fixed, pre-captured envelope.
+
+    The backward-compatible path: a caller that already holds a captured author envelope
+    (every existing `compute_plan`/`generate_plan` caller) is adapted into the client seam
+    by returning the captured envelope from `author(domain, summary)`. New callers inject a
+    real `ModelClient` whose `author` makes the programmatic no-train call (ADR-0015 H-1).
+
+    Attributes:
+        author_output (dict): The captured author envelope this adapter returns.
+    """
+
+    def __init__(self, author_output):
+        self.author_output = author_output
+
+    def author(self, domain, summary):
+        return self.author_output
+
+
+def _author_callable(client):
+    """Wrap the model client as an `assemble` roster specialist callable.
+
+    The plan-author envelope is PRODUCED by a programmatic call through the one model client
+    (`scripts/model/client.py`'s `author(domain, summary)` — the ADR-0015 H-1 seam), over the
+    de-identified `summary` `assemble` hands it. The captured-verbatim feed is retired: the
+    envelope is now authored, not passed.
 
     Args:
-        author_output (dict): The captured author envelope.
+        client: A model client exposing `author(domain, summary) -> envelope` (a real
+            `ModelClient`, or the `_FixedEnvelopeClient` adapter for the captured-envelope
+            path).
 
     Returns:
-        (Callable) A `specialist(domain, summary) -> dict` returning the captured output.
+        (Callable) A `specialist(domain, summary) -> dict` that authors the envelope via
+        `client.author`.
     """
     def specialist(domain, summary):
-        return author_output
+        return client.author(domain, summary)
 
     return specialist
 
@@ -271,37 +300,49 @@ _DOMAIN_GATES = {
 }
 
 
-def compute_plan(domain, author_output, store_read, *, gates=None):
+def compute_plan(domain, author_output=None, store_read=None, *, gates=None, client=None):
     """Compute a domain's candidate plan WITHOUT recording it.
 
-    Everything `generate_plan` does except the `record_plan` write: derive the summary,
-    run `assemble`'s four filters for `domain`, apply the domain safety veto + the
-    coverage-gap check, and translate the surviving recommendations into the candidate
-    plan. The cross-domain orchestrator (`scripts/plan/orchestrate.py`) computes every
-    domain's candidate this way and reconciles them BEFORE recording (so a cross-domain
-    check — the energy bounce, the RED-S/LEA short-circuit — can hold a plan from being
-    written); the single-domain `generate_plan` records its candidate directly.
+    Everything `generate_plan` does except the `record_plan` write: author the envelope
+    through the one model client, derive the summary, run `assemble`'s four filters for
+    `domain`, apply the domain safety veto + the coverage-gap check, and translate the
+    surviving recommendations into the candidate plan. The cross-domain orchestrator
+    (`scripts/plan/orchestrate.py`) computes every domain's candidate this way and reconciles
+    them BEFORE recording (so a cross-domain check — the energy bounce, the RED-S/LEA
+    short-circuit — can hold a plan from being written); the single-domain `generate_plan`
+    records its candidate directly.
+
+    The plan-author envelope is authored by a programmatic call through `client.author(domain,
+    summary)` (the ADR-0015 H-1 seam — the one model boundary). A FAILED author call (the
+    client's `ModelCallError` raise) yields the honest no-plan state (`reason ==
+    AUTHOR_CALL_FAILED`), never a fabricated or degraded plan (NFR-2). When `client` is omitted,
+    a `_FixedEnvelopeClient` over `author_output` is used — the captured-envelope path that
+    every existing caller rides; a new caller injects a real `ModelClient`.
 
     Args:
         domain (str): A `plan_schema.PLAN_DOMAINS` member with a registered translator.
-        author_output (dict): The captured author envelope — `{"specialist": slug,
+        author_output (dict, optional): The captured author envelope — `{"specialist": slug,
             "recommendations": [...]}` (optionally a top-level `reconciliation` dict
-            carrying the cross-domain inputs) or the thin-library sentinel.
+            carrying the cross-domain inputs) or the thin-library sentinel. The captured-path
+            input; ignored when `client` is injected.
         store_read (Callable): The store read surface, instance-root pre-bound (the
             `router.summarize` caller contract — an unbound reader silently reads the
             wrong instance).
         gates (dict, optional): Per-domain safety inputs — `clearance_granted` (the workout
             load gate) and `red_s_lea_screen` (the nutrition RED-S/LEA critical-floor veto).
             Defaults to all-conservative.
+        client (optional): A model client exposing `author(domain, summary) -> envelope`
+            (a real `ModelClient`). When omitted, `author_output` is authored verbatim.
 
     Returns:
         (dict) `domain`, `specialist`, `plan` (dict | None — NOT yet recorded), `section`
         (the assembled section), `reason` (str | None — the coverage-gap kind, a domain
         safety-veto reason (the nutrition Phase-0.5 screen returns `RED_S_LEA_CLINICAL_ROUTING`
-        == `'red-s-lea-clinical-routing'`), or `no-actionable-recommendation`), and `meta`
-        (the author's `reconciliation` inputs the reconciler reads — the workout energy cost,
-        the nutrition energy-budget verdict, the compound additive-AE profile, author-declared
-        conflicts — `{}` if none declared).
+        == `'red-s-lea-clinical-routing'`), `no-actionable-recommendation`, or
+        `AUTHOR_CALL_FAILED` when the author model call failed), and `meta` (the author's
+        `reconciliation` inputs the reconciler reads — the workout energy cost, the nutrition
+        energy-budget verdict, the compound additive-AE profile, author-declared conflicts —
+        `{}` if none declared).
 
     Raises:
         KeyError: `domain` has no registered translator.
@@ -311,13 +352,26 @@ def compute_plan(domain, author_output, store_read, *, gates=None):
             f"no plan translator for domain {domain!r}; known: {tuple(_PLAN_TRANSLATORS)}"
         )
     gates = gates or {}
+    client = client if client is not None else _FixedEnvelopeClient(author_output)
     summary = router.summarize(store_read)
-    roster = {domain: _author_callable(author_output)}
+
+    # Author the envelope through the one model client (H-1). A failed call (the typed
+    # `ModelCallError`) is the honest no-plan state — never a fabricated/degraded plan
+    # (ADR-0015 fail-closed): we record NOTHING and skip `assemble` entirely.
+    try:
+        envelope = _author_callable(client)(domain, summary)
+    except ModelCallError:
+        return {
+            "domain": domain, "specialist": None, "plan": None,
+            "section": None, "reason": AUTHOR_CALL_FAILED, "meta": {},
+        }
+
+    roster = {domain: _author_callable(_FixedEnvelopeClient(envelope))}
     section = assemble([domain], summary, roster)["sections"][0]
     specialist = section.get("specialist")
     meta = {}
-    if isinstance(author_output, dict) and isinstance(author_output.get("reconciliation"), dict):
-        meta = dict(author_output["reconciliation"])
+    if isinstance(envelope, dict) and isinstance(envelope.get("reconciliation"), dict):
+        meta = dict(envelope["reconciliation"])
 
     def candidate(plan, reason):
         return {
@@ -344,20 +398,23 @@ def compute_plan(domain, author_output, store_read, *, gates=None):
     return candidate(plan, None)
 
 
-def generate_plan(domain, author_output, store_read, root, *, plan_date, gates=None):
+def generate_plan(domain, author_output=None, store_read=None, root=None, *,
+                  plan_date, gates=None, client=None):
     """Run one plan-author's output through the safety filters and record the plan.
 
     The single-domain production caller of `assemble` (PF-S63-02): computes the candidate
-    via `compute_plan` (summary -> `assemble`'s four filters -> domain veto / coverage-gap ->
-    translate), then records it via `record_plan`. A coverage-gap section, or a section whose
-    recommendations are all struck / payload-less, records NOTHING — the dashboard renders the
+    via `compute_plan` (author the envelope through the one model client -> summary ->
+    `assemble`'s four filters -> domain veto / coverage-gap -> translate), then records it via
+    `record_plan`. A coverage-gap section, a section whose recommendations are all struck /
+    payload-less, OR a FAILED author model call records NOTHING — the dashboard renders the
     honest no-plan state rather than a fabricated regimen. The cross-domain orchestrator uses
     `compute_plan` + `record_plan` directly so reconciliation runs between the two.
 
     Args:
         domain (str): A `plan_schema.PLAN_DOMAINS` member with a registered translator.
-        author_output (dict): The captured author envelope — `{"specialist": slug,
-            "recommendations": [...]}` or the thin-library sentinel.
+        author_output (dict, optional): The captured author envelope — `{"specialist": slug,
+            "recommendations": [...]}` or the thin-library sentinel. The captured-path input;
+            ignored when `client` is injected.
         store_read (Callable): The store read surface, instance-root pre-bound (the
             `router.summarize` caller contract — an unbound reader silently reads the
             wrong instance).
@@ -367,12 +424,14 @@ def generate_plan(domain, author_output, store_read, root, *, plan_date, gates=N
         gates (dict, optional): Per-domain safety inputs — `clearance_granted` (the workout
             load gate) and `red_s_lea_screen` (the nutrition RED-S/LEA critical-floor veto).
             Defaults to all-conservative.
+        client (optional): A model client exposing `author(domain, summary) -> envelope`
+            (a real `ModelClient`). When omitted, `author_output` is authored verbatim.
 
     Returns:
         (dict) A result record: `domain`, `specialist`, `recorded` (bool), `plan`
         (dict | None), `section` (the assembled section), `reason` (str | None — the
-        coverage-gap kind, the domain safety-veto reason, or `no-actionable-recommendation`
-        when nothing was recorded).
+        coverage-gap kind, the domain safety-veto reason, `no-actionable-recommendation`,
+        or `AUTHOR_CALL_FAILED` when the author model call failed) when nothing was recorded.
 
     Raises:
         KeyError: `domain` has no registered translator.
@@ -380,7 +439,7 @@ def generate_plan(domain, author_output, store_read, root, *, plan_date, gates=N
             schema-nonconformant plan, or the author omitted attribution) — surfaced
             loud, never silently dropped.
     """
-    result = compute_plan(domain, author_output, store_read, gates=gates)
+    result = compute_plan(domain, author_output, store_read, gates=gates, client=client)
     recorded = result["plan"] is not None
     if recorded:
         plan_schema.record_plan(domain, result["plan"], plan_date, result["specialist"], root)
@@ -394,10 +453,11 @@ def _self_test():
     """Run the wired path on a synthetic PII-free fixture and assert a plan renders.
 
     The mechanical core-capability gate's behavioral check (PF-S63-02): seeds a synthetic
-    operator-state store, feeds a fixture author output through `generate_plan`, then
-    renders the dashboard and asserts the workout card is populated from the recorded plan.
-    Deterministic (no agent dispatch) so it runs in CI. Returns 0 on a wired path, 1 on any
-    break.
+    operator-state store, authors a fixture envelope through the one model client (a
+    deterministic mock backend at the seam — no live agent dispatch, no live API), runs it
+    through `generate_plan`, then renders the dashboard and asserts the workout card is
+    populated from the recorded plan. Deterministic so it runs in CI. Returns 0 on a wired
+    path, 1 on any break.
 
     Scope: this proves the SHARED path shape (author -> assemble -> record_plan -> render)
     via the workout instance — the infrastructure every domain rides. Per-domain translation
@@ -446,9 +506,17 @@ def _self_test():
         def store_read(item):
             return store.read(item, root=tmp)
 
+        # The author output is produced THROUGH the one model client (ADR-0015 H-1) — a
+        # deterministic mock backend at the seam, never a live agent dispatch or live API,
+        # so the wired-path gate runs in CI.
+        class _FixtureBackend:
+            def author(self, domain, summary):
+                return author_output
+
         result = generate_plan(
-            "workout", author_output, store_read, tmp,
+            "workout", None, store_read, tmp,
             plan_date=plan_date, gates={"clearance_granted": False},
+            client=ModelClient(backend=_FixtureBackend()),
         )
         if not result["recorded"]:
             print(f"core-capability self-test FAIL: no plan recorded ({result['reason']})")
