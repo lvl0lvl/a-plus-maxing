@@ -85,18 +85,20 @@ def extract_facts(model_extraction_output, turn_text):
         # coerce it into a fabricated fact — the extractor only validates a dict proposal.
         return ExtractionResult(dropped=[type(model_extraction_output).__name__])
 
+    # `declined_domains` is a control key, not a captured fact — read it for the result
+    # field and strip it from the proposal BEFORE the candidate loop, so its (list) value
+    # never falls to the malformed-name branch and lands spuriously in `dropped`.
+    declined = model_extraction_output.get("declined_domains")
+    declined_domains = set(declined) if isinstance(declined, (list, set, tuple)) else set()
+    proposal = {k: v for k, v in model_extraction_output.items() if k != "declined_domains"}
+
     candidate_facts = {}
     dropped = []
-    for name, value in model_extraction_output.items():
+    for name, value in proposal.items():
         if isinstance(name, str) and isinstance(value, _SCALAR_TYPES):
             candidate_facts[name] = value
         else:
             dropped.append(str(name))
-
-    declined = model_extraction_output.get("declined_domains")
-    declined_domains = set(declined) if isinstance(declined, (list, set, tuple)) else set()
-    # `declined_domains` is a control key, not a captured fact — strip it from the facts.
-    candidate_facts.pop("declined_domains", None)
 
     return ExtractionResult(
         candidate_facts=candidate_facts,
