@@ -104,12 +104,17 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             default). The H-2 wiring (ADR-0017-T1): every capture call site threads this
             through the same class-attr seam as `store_root`/`scaffold_root`, so dropping
             it never silently disables identity detection.
+        client: The model client the POST `/chat` per-turn dispatch makes its ONE outbound
+            model call through (ADR-0016-T1; None -> a default `ModelClient` on the no-train
+            lane). The only model egress is via `scripts/model/`; the `/chat` route makes no
+            outbound call of its own (the single-egress-class boundary).
     """
 
     store_root = None
     dna_root = None
     scaffold_root = None
     identity_config = None
+    client = None
 
     def do_GET(self):
         if self.path != "/":
@@ -118,6 +123,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         self._write_html(200, _render_intake(store_root=self.store_root, dna_root=self.dna_root))
 
     def do_POST(self):
+        if self.path == "/chat":
+            self._do_chat()
+            return
         if self.path != "/upload":
             self.send_error(404)
             return
@@ -193,6 +201,64 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         """Write a 413 wizard re-render for an over-ceiling upload (no dropped connection)."""
         self._write_html(413, _render_intake(store_root=self.store_root, dna_root=self.dna_root))
 
+    def _do_chat(self):
+        """Run one POST `/chat` per-turn dispatch and write the JSON turn receipt.
+
+        Reads a JSON turn body (`{"turn", "conversation"?, "covered_domains"?,
+        "declined_domains"?}`), runs the `chat.dispatch_turn` chain over the instance roots
+        + the injected model client (the ONE outbound model call is the dispatch's
+        `client.converse` — the route makes no outbound call of its own), and writes the
+        per-turn receipt (assistant reply + capture receipt + progress) as JSON. A malformed
+        body or a dispatch/model-client exception is CAUGHT and answered with a degraded
+        response — the request thread is never dropped (mirroring `/upload`'s catch-and-
+        re-render thread-survival posture). The dispatch's own fail-closed degraded turn (a
+        failed model call) is returned verbatim — no fabricated reply/fact, no store write.
+        """
+        import json
+
+        from scripts.model.client import ModelClient
+        from scripts.serve import chat
+
+        # The injected instance client (tests inject a mock backend); None falls through to
+        # a default `ModelClient` on the no-train lane. The SDK import is lazy inside the
+        # backend, so resolving the client here adds no outbound client to the serve layer.
+        client = self.client if self.client is not None else ModelClient()
+
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length) if length else b""
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+            turn_text = body.get("turn", "")
+            conversation = body.get("conversation", [])
+            covered = body.get("covered_domains", [])
+            declined = body.get("declined_domains", [])
+            receipt = chat.dispatch_turn(
+                turn_text, conversation, covered, declined, client=client,
+                store_root=self.store_root, scaffold_root=self.scaffold_root,
+                identity_config=self.identity_config,
+            )
+        except Exception:
+            # Thread survival (AC-6): a malformed body / a dispatch exception must NOT kill
+            # the request thread. Answer with a degraded response, never a dropped
+            # connection — and never a fabricated reply/fact or a store write.
+            self._write_json(400, {
+                "reply": None, "receipt": {"store": [], "scaffold": [], "dropped": []},
+                "progress": None, "degraded": True, "degrade_to": "form",
+            })
+            return
+        self._write_json(200, receipt)
+
+    def _write_json(self, status, obj):
+        """Write a JSON response body (the `/chat` turn-receipt response-write site)."""
+        import json
+
+        body = json.dumps(obj).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _write_html(self, status, html):
         """Write an HTTP response with the HTML body (the single response-write site)."""
         body = html.encode("utf-8")
@@ -207,7 +273,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
 
 
 def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
-                 identity_config=None):
+                 identity_config=None, client=None):
     """Construct the loopback-bound intake server on `port`.
 
     The POST `/upload` handler ingests file uploads into `store_root`/`dna_root`,
@@ -227,6 +293,9 @@ def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
         identity_config (str | Path, optional): The instance operator-identity token
             config the form-field capture threads into `persist_capture` (the H-2 seam,
             ADR-0017-T1); None falls through to `pii_scan`'s default.
+        client (optional): The model client the POST `/chat` dispatch makes its one outbound
+            model call through (ADR-0016-T1); None -> a default `ModelClient`. Tests inject a
+            mock backend so the E2E never makes a live API call.
 
     Returns:
         (ThreadingHTTPServer) A server bound to ("127.0.0.1", port). Stop it with
@@ -234,5 +303,6 @@ def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
     """
     handler = type("BoundIntakeRequestHandler", (IntakeRequestHandler,),
                    {"store_root": store_root, "dna_root": dna_root,
-                    "scaffold_root": scaffold_root, "identity_config": identity_config})
+                    "scaffold_root": scaffold_root, "identity_config": identity_config,
+                    "client": client})
     return ThreadingHTTPServer((_LOOPBACK, port), handler)
