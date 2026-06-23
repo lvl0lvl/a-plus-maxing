@@ -1,0 +1,139 @@
+{
+  "phase": "4.75",
+  "verdict": "PASS",
+  "iterations": 1,
+  "ic_checks": {
+    "IC-1": {
+      "status": "WARN",
+      "findings": [
+        "1 slash dual-tag in C.5 [1, 2, cohort/open_label]; both constituent tags are valid enum members; structurally non-standard but unambiguous. Not a HALT."
+      ]
+    },
+    "IC-2": {
+      "status": "PASS",
+      "count_checked": 37,
+      "count_flagged": 0
+    },
+    "IC-3": {
+      "status": "PASS",
+      "findings": [
+        "vendor_label cite D[1] grounds only gray-market availability disclosure with explicit 'may NOT ground any numerical claim' disclaimer; no efficacy/dose number grounded on vendor_label."
+      ]
+    },
+    "IC-4": {
+      "status": "PASS",
+      "findings": [
+        "C[3]/D[4]/E[12] each confirmed to ground zero numerical claims. C[3] directional-only; D[4] qualitative only; E[12] explicitly disclaims any prevalence figure."
+      ]
+    },
+    "IC-5": {
+      "status": "PASS",
+      "findings": [
+        "No practitioner_protocol cites in corpus."
+      ]
+    },
+    "IC-6": {
+      "status": "PASS",
+      "findings": [
+        "No compounding_data_sheet cites in corpus."
+      ]
+    },
+    "IC-7": {
+      "status": "PASS",
+      "count_checked": 22,
+      "count_flagged": 0,
+      "findings": [
+        "All animal/in_vitro cites with numerical tokens have species as sentence subject (override applies) or are structurally separated from human data. Therapeutic(mouse)/biomarker(human-observational) boundary holds throughout."
+      ]
+    },
+    "IC-8": {
+      "status": "PASS",
+      "findings": [
+        "All preclinical dose claims explicitly state IP route matching cited mouse studies. CB4211 SC route sourced to human open_label. No cross-route extrapolation without flagging."
+      ]
+    },
+    "IC-9": {
+      "status": "PASS",
+      "findings": [
+        "Foundational efficacy/mechanism primary share = 100% Cohen/Lee (4/4 papers through 2021). All-primaries share = ~56% (9/16). Threshold triggered on foundational share. Section E.1 surfaces concentration as first-class section before any indication subsection. threshold_triggered: true."
+      ]
+    },
+    "IC-10": {
+      "status": "PASS",
+      "count_checked": 5,
+      "count_flagged": 0,
+      "findings": [
+        "PMIDs 25738459, 29983246, 33468709 confirmed directly via publisher. PMID 33473109 confirmed via DOI + author self-check. PMID 39160573 WARN (auth redirect). No fabricated citations detected."
+      ]
+    },
+    "IC-11": {
+      "status": "PASS",
+      "findings": [
+        "No placeholder strings detected in any section."
+      ]
+    },
+    "IC-12": {
+      "status": "PASS",
+      "findings": [
+        "No Wikipedia citations in any bibliography."
+      ]
+    },
+    "IC-13": {
+      "status": "WARN",
+      "count_checked": 12,
+      "count_flagged": 3,
+      "findings": [
+        "3 corpus-missing WARNs (paywall/reCAPTCHA infra, not number-not-found): PMID 39160573 (Zhou 2024 SMD \u22120.89), PMID 41551324 (Yoon 2025), PMID 31214116 (Ramanjaneya 2019) \u2014 detailed in corpus_scoping"
+      ]
+    }
+  },
+  "population_mismatch": {
+    "verdict": "PASS",
+    "checked_citations": 22,
+    "flagged_citations": []
+  },
+  "concentration_audit": {
+    "verdict": "PASS",
+    "total_primaries": 16,
+    "largest_cluster_name": "Cohen/Lee USC",
+    "largest_cluster_count": 9,
+    "share": 0.563,
+    "threshold_triggered": true
+  },
+  "corpus_scoping": {
+    "verdict": "PASS",
+    "claims_checked": 12,
+    "claims_failed": [
+      {
+        "claim": "SMD=\u22120.89; 95% CI \u22121.12 to \u22120.65",
+        "cite_key": "B4-PMID-39160573",
+        "failure_mode": "corpus-missing"
+      },
+      {
+        "claim": "273 \u00b1 56 vs. 223 \u00b1 50 pg/mL (Yoon 2025)",
+        "cite_key": "B6-PMID-41551324",
+        "failure_mode": "corpus-missing"
+      },
+      {
+        "claim": "235 \u00b1 182 pg/mL; 158 \u00b1 137 pg/mL (Ramanjaneya 2019)",
+        "cite_key": "B3-PMID-31214116",
+        "failure_mode": "corpus-missing"
+      }
+    ]
+  },
+  "halt_reasons": [],
+  "warnings": [
+    "IC-1: slash dual-tag [1, 2, cohort/open_label] in Section C.5 \u2014 non-standard format, both tags valid",
+    "IC-10: PMID 39160573 (Zhou 2024) unverifiable via WebFetch due to Springer auth redirect",
+    "IC-13: 3 corpus-missing WARNs \u2014 PMIDs 39160573, 41551324, 31214116 blocked by paywall/reCAPTCHA; no number-not-found failures on verified claims"
+  ],
+  "timestamp": "2026-06-20T17:38:29.542924+00:00",
+  "attestation_chain": {
+    "iter_start_ts": "2026-06-20T17:28:44.218112+00:00",
+    "attest_ts": "2026-06-20T17:38:29.542927+00:00",
+    "iteration": 1,
+    "agent_source_path": "gates/gate-4.75.md",
+    "agent_source_sha256": "6ce47db7f30885b442abfa368078cae31a7a5b7a9f310154e97f5e86d8ca7ff7",
+    "agent_source_mtime": "2026-06-20T17:37:55.282116+00:00"
+  }
+}
