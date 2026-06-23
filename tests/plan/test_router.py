@@ -148,9 +148,18 @@ def _reading(value):
     ("1972-08-09", "born-1970s"),
     ("2001-12-31", "born-2000s"),
     ("not-a-date", "age-band-unknown"),
+    # BUG-2 (Wave-B review): malformed birth years must NOT garble into a fake band.
+    ("86", "age-band-unknown"),        # 2-char — was 'born-860s'
+    ("3026", "age-band-unknown"),      # future year — was 'born-3020s'
+    ("198", "age-band-unknown"),       # 3-char — was 'born-1980s' (wrong)
+    ("  1986", "born-1980s"),          # leading-space valid year — was rejected
+    ("1986", "born-1980s"),            # bare valid year — unchanged
+    ("1900", "born-1900s"),            # lower range bound — accepted
+    ("1899", "age-band-unknown"),      # below the 1900 floor — rejected
 ])
 def test_age_band_token_value(value, expected):
-    """F17: _age_band emits the correct birth-decade band (exact token value)."""
+    """F17 + BUG-2: _age_band emits the correct birth-decade band, banding malformed/
+    out-of-range years `age-band-unknown` rather than fabricating a born-decade."""
     assert router._age_band(_reading(value)) == expected
 
 
@@ -1326,6 +1335,179 @@ def test_training_volume_band_distinct_from_training_age_band():
     # Distinct derivers.
     assert (router._FIELD_DERIVATION["training-volume-band"]
             is not router._FIELD_DERIVATION["training-age-band"])
+
+
+# =========================================================================== #
+# Wave-B /review-pr fixes — the 4 chat-deriver correctness bugs + the BUG-1
+# absent-source HONESTY sentinel. Each test asserts the POST-FIX behavior and is
+# failing-capable against the pre-fix code (the old no-signal-default-on-absent,
+# the single-digit frequency regex, the len<=1 separators-only false positive, the
+# plant-pattern-masks-allergy ordering, the garbled malformed-year band).
+# =========================================================================== #
+
+
+# (deriver, the no-signal default for a PRESENT-but-unspecific value). Only the dietary +
+# training derivers have an unspecific-present no-signal default; the supplement/peptide
+# derivers are binary presence (any present non-none text reads as presence), so a present
+# unspecific value reads as presence, not the no-signal default — covered separately.
+_UNSPECIFIC_PRESENT_DERIVERS = (
+    (router._dietary_pattern_class, "general-diet"),
+    (router._training_volume_band, "moderate"),
+)
+
+
+@pytest.mark.parametrize("raw_source, token, _domain", _CHAT_TOKENS)
+def test_chat_deriver_absent_source_emits_distinct_sentinel(raw_source, token, _domain):
+    """BUG-1 + TEST-1/TEST-4: an ABSENT source (empty store_read) emits the DISTINCT
+    `not-discussed` sentinel, NOT the no-signal default.
+
+    A fresh operator with no chat data must NOT emit a token token-indistinguishable from
+    a CONFIRMED answer (`none`/`general-diet`/`moderate`). The sentinel makes the data
+    honest: "not elicited" (`not-discussed`) is distinguishable from "confirmed none".
+    The sentinel is still a value, so the always-set contract holds (no partial-summary
+    raise). Failing-capable: the pre-fix absent branch returned the no-signal default,
+    which != `not-discussed`.
+    """
+    summary = router.summarize(_store_read_factory([]))  # nothing stored for any source
+    assert summary[token] == "not-discussed", (
+        f"{token!r} on an absent source emitted {summary[token]!r}, not the sentinel"
+    )
+    # The token is still PRESENT (always-set contract): the new tokens never drop out of
+    # the summary even when no chat source exists (so they do not contribute to a
+    # partial-summary raise — they are in `_ALWAYS_SET_DERIVED`).
+    assert token in summary
+    assert token in router._ALWAYS_SET_DERIVED
+
+
+def test_chat_absent_source_distinct_from_confirmed_none_for_presence_tokens():
+    """BUG-1: for the supplement/peptide presence tokens, ABSENT (-> sentinel) is
+    token-distinguishable from a CONFIRMED-none ('none' typed) -> `none`.
+
+    The whole point of the sentinel: `<deriver>([]) != <deriver>([{value:'none'}])`. A
+    fresh operator (absent) reads `not-discussed`; an operator who typed "none" reads the
+    confirmed `none`. Failing-capable: the pre-fix absent branch returned `none`, making
+    the two indistinguishable.
+    """
+    confirmed_none = [{"item": "x", "timepoint": "2026-01-01T00:00:00+00:00",
+                       "source": "intake", "value": "none"}]
+    for deriver in (router._supplement_stack_class, router._peptide_use_class):
+        assert deriver([]) == "not-discussed"
+        assert deriver(confirmed_none) == "none"
+        assert deriver([]) != deriver(confirmed_none), (
+            f"{deriver.__name__}: absent must be distinguishable from confirmed-none"
+        )
+
+
+@pytest.mark.parametrize("deriver, confirmed_default", _UNSPECIFIC_PRESENT_DERIVERS)
+def test_chat_deriver_no_signal_default_reserved_for_present_source(deriver, confirmed_default):
+    """BUG-1: the no-signal default (`general-diet`/`moderate`) is RESERVED for a PRESENT
+    source that resolves to no specific signal — never emitted on an absent source.
+
+    Absent -> the sentinel; a present value that matches no specific bucket -> the
+    no-signal default. Pins the two-state distinction so a future edit cannot collapse
+    absent back onto the default.
+    """
+    assert deriver([]) == "not-discussed"
+    # A present-but-unspecific value resolves to the confirmed no-signal default.
+    unspecific = [{"item": "x", "timepoint": "2026-01-01T00:00:00+00:00",
+                   "source": "intake", "value": "nothing in particular xyz"}]
+    assert deriver(unspecific) == confirmed_default
+
+
+def test_chat_tokens_sentinel_keeps_summary_complete_and_dispatchable():
+    """BUG-1 always-set: with a COMPLETE clean store but NO chat sources, the 4 chat
+    tokens are the `not-discussed` sentinel AND the full summary still dispatches.
+
+    Proves the sentinel keeps the always-set contract: a no-chat-data operator gets the
+    sentinel for each chat token, the summary is complete (every field-set field present),
+    and `dispatch` does NOT trip the partial-summary raise.
+    """
+    summary = router.summarize(_clean_store_read())  # clean pass-through state, no chat sources
+    for _raw, token, _domain in _CHAT_TOKENS:
+        assert summary[token] == "not-discussed", token
+    assert set(summary.keys()) == set(router.SUMMARY_FIELD_SET)  # complete, no field omitted
+    result = router.dispatch(summary)  # must NOT raise partial-summary
+    assert result.lane == router.NO_TRAIN_LANE
+    for _raw, token, _domain in _CHAT_TOKENS:
+        assert result.payload[token] == "not-discussed"
+
+
+# --- TEST-2: per-deriver bucket-branch unit tests (mirror _age_band/_issue_class) ----
+
+
+@pytest.mark.parametrize("value, expected", [
+    # BUG-5 precedence: allergy/restriction is checked FIRST (never masked by a plant pattern).
+    ("vegetarian but allergic to nuts", "restricted"),
+    ("pescatarian gluten-free", "restricted"),
+    ("eat everything but allergic to shellfish", "restricted"),
+    ("keto bulk", "restricted"),
+    ("carnivore", "restricted"),
+    ("vegan", "plant-based"),
+    ("wholly plant based diet", "plant-based"),
+    ("vegetarian, no meat", "plant-forward"),
+    ("plant-forward mostly", "plant-forward"),
+    ("eat everything, omnivore", "omnivore"),
+    ("chicken rice and beef", "omnivore"),
+    ("nothing in particular", "general-diet"),  # present, no bucket -> no-signal default
+])
+def test_dietary_pattern_class_token_value(value, expected):
+    """BUG-5 + TEST-2: _dietary_pattern_class maps free-text to the correct coarse class,
+    with the allergy/restriction signal taking precedence over plant patterns."""
+    assert router._dietary_pattern_class(_reading(value)) == expected
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("none", "none"),
+    ("no", "none"),
+    ("n/a", "none"),
+    (";;;", "none"),                         # BUG-4: separators-only -> none (not single)
+    (",,", "none"),                          # BUG-4
+    ("creatine 5g", "single-supplement"),
+    ("creatine; whey; vitamin d", "multi-supplement"),
+    ("creatine, omega-3, magnesium", "multi-supplement"),
+])
+def test_supplement_stack_class_token_value(value, expected):
+    """BUG-4 + TEST-2: _supplement_stack_class maps free-text to the correct presence/
+    breadth class; a separators-only value resolves to `none`, never a false single."""
+    assert router._supplement_stack_class(_reading(value)) == expected
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("none", "none"),
+    ("no", "none"),
+    (";;;", "none"),                         # BUG-4: separators-only -> none (not in-use)
+    (",,", "none"),                          # BUG-4
+    ("bpc-157 250mcg", "peptide-in-use"),
+    ("tb-500; ipamorelin", "peptide-in-use"),
+])
+def test_peptide_use_class_token_value(value, expected):
+    """BUG-4 + TEST-2: _peptide_use_class maps free-text to the correct binary presence
+    class; a separators-only value resolves to `none`, never a false peptide-in-use."""
+    assert router._peptide_use_class(_reading(value)) == expected
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("twice a week", "low"),
+    ("2x", "low"),
+    ("minimal", "low"),
+    ("3x/week", "moderate"),
+    ("4 sessions per week", "moderate"),
+    ("5 days", "high"),
+    ("6x/week", "high"),
+    ("daily", "high"),
+    # BUG-3: double-digit counts must NOT collapse to the moderate no-signal default.
+    ("10x", "high"),
+    ("12 sessions", "high"),
+    ("4-5x", "high"),                        # range -> the unit-adjacent digit (5) -> high
+    ("15 sets", "moderate"),                 # "sets" is not a frequency unit — not misread
+    ("5 days and 2x", "low"),                # contextual/last frequency (2x) wins over max()
+    ("nothing specific", "moderate"),        # present, no count -> no-signal middle
+])
+def test_training_volume_band_token_value(value, expected):
+    """BUG-3 + TEST-2: _training_volume_band maps free-text to the correct weekly-volume
+    band; double-digit counts band correctly and a stray set count is not misread as
+    frequency."""
+    assert router._training_volume_band(_reading(value)) == expected
 
 
 # The module-load tripwires (router.py:312-313) verbatim. The mis-placement tests below
