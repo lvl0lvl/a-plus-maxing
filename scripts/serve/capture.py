@@ -83,6 +83,21 @@ _RAW_SYMPTOM_ITEM = "raw-symptom-free-text"
 # field writes the named-excluded raw source, NEVER the `training-age-band` token directly.
 _DOB_FIELD = "date-of-birth"
 
+# The chat-sourced rich-domain free-text form fields (ADR-0019-T1) -> their NAMED-EXCLUDED
+# raw source store items, which `summarize` de-identifies into the coarse band/class tokens
+# (`dietary-pattern-class` / `supplement-stack-class` / `peptide-use-class` /
+# `training-volume-band`). Mirrors the `_TRAIN_AROUND_FIELD -> _RAW_SYMPTOM_ITEM` /
+# `_DOB_FIELD` special-cases: the field writes the named-excluded raw source via the
+# UNCHANGED `store.append`, NEVER the band token directly (the band is `summarize`'s coarse
+# derivation, its de-identification proven by the per-token output scan). Each raw source is
+# named in `router.EXCLUDED_RAW_PII` so the disjointness tripwire pins it out of the field set.
+_CHAT_RAW_SOURCE_FIELDS = {
+    "nutrition-detail": "raw-nutrition-free-text",
+    "supplement-stack": "raw-supplement-free-text",
+    "peptide-stack": "raw-peptide-free-text",
+    "training-detail": "raw-training-detail-free-text",
+}
+
 # Server-side enumerated value sets for the bounded wired fields (Wave-B FIX-B). The
 # markup enforces these client-side (a `<select>` / a fixed chip set), but a crafted
 # POST can write any string into the token — so the server re-validates here BEFORE
@@ -264,6 +279,15 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
             # training-age-band directly — the raw year is named-excluded raw PII.
             store.append(_DOB_FIELD, _reading(_DOB_FIELD, value), root=store_root)
             written_tokens.append(_DOB_FIELD)
+        elif name in _CHAT_RAW_SOURCE_FIELDS:
+            # A chat-sourced rich-domain free-text (nutrition/supplement/peptide/training
+            # detail) -> its NAMED-EXCLUDED raw source item, which summarize de-identifies
+            # into the coarse band/class token (dietary-pattern-class / supplement-stack-
+            # class / peptide-use-class / training-volume-band). NEVER the band token
+            # directly — the raw text is named-excluded raw PII (ADR-0019-T1).
+            raw_item = _CHAT_RAW_SOURCE_FIELDS[name]
+            store.append(raw_item, _reading(raw_item, value), root=store_root)
+            written_tokens.append(raw_item)
         else:
             # Everything else is record-only: it has no de-identified field-set consumer
             # today (Step-3 training detail, all Step-4 nutrition, the raw Step-5 stack).

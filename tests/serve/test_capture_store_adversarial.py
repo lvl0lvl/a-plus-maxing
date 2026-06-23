@@ -525,3 +525,188 @@ def test_demographic_widening_dedupe_to_include_value_breaks_collision(monkeypat
         "the dedupe-widening mutation did not change behavior — the demographic-path Cat-3 "
         "test is tautological (it would pass even with a broken dedupe key)"
     )
+
+
+# =========================================================================== #
+# ADR-0019-T1 — the SAME four categories on the chat-sourced rich-domain RAW-SOURCE
+# write paths. Each chat field (nutrition-detail / supplement-stack / peptide-stack /
+# training-detail) writes its NAMED-EXCLUDED raw source store item
+# (raw-nutrition-free-text / raw-supplement-free-text / raw-peptide-free-text /
+# raw-training-detail-free-text) via `persist_capture` -> `store.append` (0 forked
+# store-write logic), so the battery proves the new write paths inherit the store's
+# collision/dedupe guarantees. The `pka` MANDATE: all four categories on the NEW chat
+# write paths, category 4 observed RED. (`summarize` derives the coarse band from the
+# raw source — the de-identification is proven by the AC-2 output scan in test_router.py;
+# this battery is the store-surface guarantee, not the de-identification proof.)
+# =========================================================================== #
+
+# (chat form field, named-excluded raw source store item, a realistic raw value).
+_CHAT_CASES = (
+    ("nutrition-detail", "raw-nutrition-free-text", "mostly chicken rice broccoli, 5 meals"),
+    ("supplement-stack", "raw-supplement-free-text", "creatine 5g, whey, omega-3"),
+    ("peptide-stack", "raw-peptide-free-text", "BPC-157 250mcg twice daily"),
+    ("training-detail", "raw-training-detail-free-text", "PPL 6x/week, heavy squats"),
+)
+
+
+# --------------------------------------------------------------------------- #
+# Category 1 — cross-stream namespace collision (chat raw-source write paths)
+# --------------------------------------------------------------------------- #
+
+
+def test_chat_write_to_one_raw_source_never_cross_reads_as_another(tmp_path):
+    """Cat-1 (chat): a write to one chat raw source never reads back as another.
+
+    Capture all four DISTINCT chat fields with distinct values; each raw source's
+    `store.read` returns ONLY its own value — a read for raw source X never returns raw
+    source Y's value. Uses the REAL chat raw-source item names (not a synthetic
+    placeholder), so it proves the actual write paths. Also asserts each chat field
+    writes its RAW SOURCE, never the derived band token directly.
+    """
+    from scripts.plan import router
+
+    store_root = tmp_path / "store"
+    _persist(
+        {field: value for field, _raw, value in _CHAT_CASES},
+        store_root, tmp_path / "scaffold",
+    )
+    by_source = {raw: store.read(raw, root=store_root) for _f, raw, _v in _CHAT_CASES}
+    for _field, raw, value in _CHAT_CASES:
+        assert len(by_source[raw]) == 1 and by_source[raw][0]["value"] == value, raw
+    # Cross-read negatives: no raw source's value appears under another raw source's stream.
+    for _field, raw, value in _CHAT_CASES:
+        for other_field, other_raw, other_value in _CHAT_CASES:
+            if other_raw == raw:
+                continue
+            assert all(other_value not in str(r["value"]) for r in by_source[raw]), (
+                f"{other_raw!r} value leaked into the {raw!r} stream"
+            )
+    # The derived band tokens are NEVER written directly — only the raw sources.
+    for token in ("dietary-pattern-class", "supplement-stack-class", "peptide-use-class",
+                  "training-volume-band"):
+        assert store.read(token, root=store_root) == [], (
+            f"a chat field wrongly wrote the {token!r} band token directly (must be derived)"
+        )
+        assert token in router.SUMMARY_FIELD_SET  # the band IS a field-set token, just derived
+
+
+# --------------------------------------------------------------------------- #
+# Category 2 — same-timepoint dedupe / idempotency (chat raw-source write paths)
+# --------------------------------------------------------------------------- #
+
+
+def test_two_distinct_chat_raw_sources_same_timepoint_both_persist(tmp_path, monkeypatch):
+    """Cat-2 (chat): two distinct chat raw sources at the SAME timepoint both persist.
+
+    Drives the capture path with the timepoint pinned (`capture._now` fixed) so two distinct
+    chat raw sources share a timepoint. They have DIFFERENT `(item, timepoint, source)`
+    identities (different item), so both persist — keyed on the full identity, not timepoint.
+    """
+    monkeypatch.setattr(capture, "_now", lambda: _ts())
+    store_root = tmp_path / "store"
+    _persist({"nutrition-detail": "vegan, 5 meals", "peptide-stack": "BPC-157 250mcg"},
+             store_root, tmp_path / "scaffold")
+    assert store.read("raw-nutrition-free-text", root=store_root)[0]["value"] == "vegan, 5 meals"
+    assert store.read("raw-peptide-free-text", root=store_root)[0]["value"] == "BPC-157 250mcg"
+
+
+def test_identical_chat_recapture_same_timepoint_is_idempotent(tmp_path, monkeypatch):
+    """Cat-2 (chat): an identical chat re-capture at a pinned timepoint is a no-op.
+
+    Two `persist_capture` calls of the SAME chat field, with `capture._now` pinned so both
+    produce the same `(item, timepoint, source="intake")` identity. The second is a dedupe
+    no-op — the chat raw-source path inherits `store.append`'s idempotent dedupe (a
+    double-submit never duplicates the line).
+    """
+    monkeypatch.setattr(capture, "_now", lambda: _ts())
+    store_root = tmp_path / "store"
+    _persist({"supplement-stack": "creatine 5g"}, store_root, tmp_path / "scaffold")
+    _persist({"supplement-stack": "creatine 5g"}, store_root, tmp_path / "scaffold")  # identical
+    assert len(store.read("raw-supplement-free-text", root=store_root)) == 1, (
+        "an identical chat re-capture duplicated the line"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Category 3 — dedupe-key boundary (value EXCLUDED) (chat raw-source write paths)
+# --------------------------------------------------------------------------- #
+
+
+def test_chat_same_identity_different_value_collides_second_dropped(tmp_path, monkeypatch):
+    """Cat-3 (chat): same (item, timepoint, source) + a DIFFERENT value collides (second dropped).
+
+    Two `persist_capture` calls at the SAME pinned timepoint under the same chat field with
+    DIFFERENT values. `value` is EXCLUDED from the dedupe identity, so the second write is
+    DROPPED (a value correction is an explicit `store.correct`) and the first stands.
+    """
+    monkeypatch.setattr(capture, "_now", lambda: _ts())
+    store_root = tmp_path / "store"
+    _persist({"nutrition-detail": "vegan, 5 meals"}, store_root, tmp_path / "scaffold")
+    _persist({"nutrition-detail": "omnivore, 3 meals"}, store_root, tmp_path / "scaffold")
+    readings = store.read("raw-nutrition-free-text", root=store_root)
+    assert len(readings) == 1, "a same-identity different-value second write was not dropped"
+    assert readings[0]["value"] == "vegan, 5 meals", "the second write wrongly overrode the first value"
+
+
+def test_chat_any_single_differing_identity_field_does_not_collide(tmp_path, monkeypatch):
+    """Cat-3 (chat): a differing timepoint OR item does NOT collide (both persist).
+
+    The two identity fields the chat capture path can vary — `timepoint` (`capture._now`)
+    and `item` (the chat raw source) — each yield a distinct identity, so both readings
+    persist; none is silently ignored. (`source` is fixed `"intake"` for every capture
+    write, its contribution held by the direct-store Cat-3 battery above.)
+    """
+    store_root = tmp_path / "store"
+    # Differing timepoint -> distinct identity -> both persist (same field, two pinned stamps).
+    monkeypatch.setattr(capture, "_now", lambda: _ts())
+    _persist({"training-detail": "PPL 6x/week"}, store_root, tmp_path / "scaffold")
+    monkeypatch.setattr(capture, "_now", lambda: _ts(60))
+    _persist({"training-detail": "PPL 6x/week"}, store_root, tmp_path / "scaffold")
+    assert len(store.read("raw-training-detail-free-text", root=store_root)) == 2, (
+        "a differing timepoint wrongly collided"
+    )
+    # Differing item -> a different store file entirely (its own stream).
+    _persist({"peptide-stack": "BPC-157 250mcg"}, store_root, tmp_path / "scaffold")
+    assert len(store.read("raw-peptide-free-text", root=store_root)) == 1, (
+        "a differing chat item did not write its own stream"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Category 4 — mutation-style verification (chat write path; observed RED, reverted)
+# --------------------------------------------------------------------------- #
+
+
+def test_chat_widening_dedupe_to_include_value_breaks_collision(monkeypatch):
+    """Cat-4 (mutation, chat): widen the dedupe key to include `value` -> Cat-3 breaks.
+
+    With the capture timepoint pinned (`capture._now` fixed) so two chat writes share a
+    `(item, timepoint, source)`, deliberately MUTATE the store's dedupe identity to include
+    `value` and re-run the Cat-3 same-identity-collision scenario on the chat raw-source
+    path. Under the widened key the second (different-value) write is NO LONGER a dedupe
+    no-op — both lines persist. This proves the chat-path Cat-3 test is non-tautological:
+    it genuinely depends on `value` being EXCLUDED. monkeypatch reverts both mutations at
+    teardown.
+
+    Observed-RED record: under the widened key `len(readings)` becomes 2 (the second write
+    is no longer a dedupe no-op) — the exact assertion
+    `test_chat_same_identity_different_value_collides_second_dropped` makes (`len == 1`)
+    would RED.
+    """
+    def _widened_key(reading):
+        return tuple(reading[f] for f in ("item", "timepoint", "source", "value"))
+
+    monkeypatch.setattr(keying, "dedupe_key", _widened_key)
+    monkeypatch.setattr(capture, "_now", lambda: _ts())
+
+    import tempfile
+    from pathlib import Path
+    store_root = Path(tempfile.mkdtemp()) / "store"
+    scaffold_root = Path(tempfile.mkdtemp()) / "scaffold"
+    _persist({"nutrition-detail": "vegan, 5 meals"}, store_root, scaffold_root)
+    _persist({"nutrition-detail": "omnivore, 3 meals"}, store_root, scaffold_root)
+    readings = store.read("raw-nutrition-free-text", root=store_root)
+    assert len(readings) == 2, (
+        "the dedupe-widening mutation did not change behavior — the chat-path Cat-3 "
+        "test is tautological (it would pass even with a broken dedupe key)"
+    )
