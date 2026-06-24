@@ -53,24 +53,20 @@ from scripts.plan.dispatch_budget import (
 # (`plan_driver`, ADR-0026-T1) — `run_orchestrated` DRIVES it, never re-hosts it (the no-fork crown
 # jewel). Re-exported here so the established imports
 # (`from scripts.plan.plan_orchestrator import SAFETY_BLOCKED, ...`) keep their public surface.
+# `_ROLE_OF_DOMAIN` is imported (not re-defined): the SINGLE definition is in `plan_driver` (the
+# no-fork crown jewel — it hosts the membership guard that reads it). Imported here for
+# `_dispatch_domains`' role-slug VALUE lookup (`_ROLE_OF_DOMAIN[domain]` -> the profile read at
+# dispatch time, a missing one failing loud). The orchestrator already imports `plan_driver`, so this
+# adds no cycle. The plan-domain specialists live under `.claude/agents/<role>/agent.md` (verified
+# present); a nonexistent path would inline empty and make the role-inlining contract vacuous.
 from scripts.plan.plan_driver import (  # noqa: F401  (re-export of the driver's public surface)
     DEFAULT_REVISE_CAP,
     PROMOTE_FAILED,
     REVISE_EXHAUSTED,
     SAFETY_BLOCKED,
     _honest_no_plan,
+    _ROLE_OF_DOMAIN,
 )
-
-# domain -> the role whose full profile the dispatch prompt inlines (INV-ROLE-INLINING). The
-# plan-domain specialists live under `.claude/agents/<role>/agent.md` (verified present); a
-# nonexistent path would inline empty and make the role-inlining contract vacuous, so the live
-# profile is read at dispatch time and a missing one fails loud (FileNotFoundError).
-_ROLE_OF_DOMAIN = {
-    "workout": "personal-trainer",
-    "nutrition": "nutritionist",
-    "supplements": "supplement-specialist",
-    "peptides": "peptide-specialist",
-}
 
 # The default plan domains an unattended run generates (all four `PLAN_DOMAINS`); a caller
 # narrows via `domains=`.

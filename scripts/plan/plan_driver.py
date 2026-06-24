@@ -40,10 +40,13 @@ from scripts.plan import pipeline
 from scripts.plan.dispatch_budget import DispatchCapExceeded
 from scripts.store import store
 
-# domain -> the role whose full profile the dispatch prompt inlines (INV-ROLE-INLINING). The
-# out-of-run-set revise guard checks membership here (a `revise_domains` entry naming a domain not
-# in this map — or not in the run's `domains` — is a malformed disposition, routed to SAFETY_BLOCKED
-# rather than letting an unguarded `_ROLE_OF_DOMAIN[domain]` KeyError escape).
+# domain -> the role whose full profile the dispatch prompt inlines (INV-ROLE-INLINING). The SINGLE
+# definition (the no-fork crown jewel) for both uses: the driver's out-of-run-set revise guard reads
+# it for MEMBERSHIP (a `revise_domains` entry naming a domain not in this map — or not in the run's
+# `domains` — is a malformed disposition, routed to SAFETY_BLOCKED rather than letting an unguarded
+# `_ROLE_OF_DOMAIN[domain]` KeyError escape), and `plan_orchestrator._dispatch_domains` imports it for
+# the role-slug VALUE lookup (`_ROLE_OF_DOMAIN[domain]` -> the profile the dispatch prompt inlines).
+# The orchestrator already imports `plan_driver`, so it imports this map — no fork, no import cycle.
 _ROLE_OF_DOMAIN = {
     "workout": "personal-trainer",
     "nutrition": "nutritionist",

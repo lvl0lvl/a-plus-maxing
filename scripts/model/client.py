@@ -113,11 +113,14 @@ def _call(backend_method, *args):
         result = backend_method(*args)
     except ModelCallError:
         raise
-    except Exception as exc:  # the model boundary: any backend error fails closed, typed
+    except Exception:  # the model boundary: any backend error fails closed, typed
         # SEC-01: a CONSTANT message — never interpolate `{exc!r}`, which can carry raw
-        # input (the backend's exception text). The chained `from exc` keeps the original
-        # in the traceback frame for debugging; the `str(ModelCallError)` surface stays raw-free.
-        raise ModelCallError("backend call failed") from exc
+        # input (the backend's exception text). `from None` INTENTIONALLY SUPPRESSES the
+        # `__cause__`/`__context__` chain: the original SDK exception can carry raw operator
+        # PII (the request prompt) + the resolved key, which a caller's `logger.exception()` /
+        # `traceback.print_exc()` would render. At this PII/key boundary the chained cause's
+        # debuggability is not worth the latent raw/key leak (PUBLIC repo).
+        raise ModelCallError("backend call failed") from None
     if not result:
         raise ModelCallError("backend returned an empty result")
     return result
@@ -238,7 +241,10 @@ class _ClaudeNoTrainBackend:
             except Exception as exc:  # bounded: try again until the attempt ceiling
                 last_exc = exc
         # SEC-01: a CONSTANT message — never interpolate the SDK exception (it can carry the
-        # raw intake or the resolved key). The chained `from last_exc` keeps the original in
-        # the traceback frame for debugging; the `str(ModelCallError)` surface stays raw-free.
+        # raw intake or the resolved key). `from None` INTENTIONALLY SUPPRESSES the
+        # `__cause__`/`__context__` chain: `last_exc` is the raw SDK exception carrying the raw
+        # intake (the request prompt) + the resolved key, which a caller's `logger.exception()` /
+        # `traceback.print_exc()` would render. At this PII/key boundary the chained cause's
+        # debuggability is not worth the latent raw/key leak (PUBLIC repo).
         # Raised at the backend boundary so the raw SDK exception never escapes `deidentify`.
-        raise ModelCallError("deidentify call failed") from last_exc
+        raise ModelCallError("deidentify call failed") from None
