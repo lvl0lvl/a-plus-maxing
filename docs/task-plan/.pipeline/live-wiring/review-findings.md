@@ -36,4 +36,4 @@ The 5 recipes were authored grounded (no blocking spec defect) and reviewed by Q
 ### Cross-cutting (S94 forcing function)
 - **SEC-3 (LOW):** confirm an S94 landmark/bead carries the LIVE-subscription-dispatch 0-raw-PII-to-a-REAL-agent observation as a release gate (the one crown-jewel property the mock build correctly DEFERS to S94 — it must not evaporate). See bead created S93.
 
-## Status: ARCH-1 applied; 13 executability findings carried to S94 build-RED time (blocking per wave).
+## Status (updated S94): ALL findings APPLIED. ARCH-1 fixed S93; the 12 executability findings applied S94 per-task (PF-S93-01 lesson — one remediation agent per recipe, NOT batched) + grounded; recipes re-judged ACCEPT (all dims ≥9) + promoted to `docs/task-plan/<id>.md`. SEC-3 (live-dispatch 0-leak) remains an S94 operator-present release gate (bead `stsq`). The recipe stage is pipeline-complete.
