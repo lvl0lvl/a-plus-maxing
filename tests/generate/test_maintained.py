@@ -24,6 +24,7 @@ import pytest
 from scripts.generate import maintained
 from scripts.plan import reinsert_out, track
 from scripts.store import plan_schema, store
+from vault.design.templates import report
 
 SYNTH_NAME = "Janet Q Testperson"
 SYNTH_INITIALS = "JQT"
@@ -244,6 +245,42 @@ def test_high1_refuses_non_contained_absolute_path(tmp_path):
     assert not outside.exists(), "a non-contained absolute-path write was not refused"
 
 
+def test_test02_equal_path_containment_branch_is_allowed(tmp_path):
+    """TEST-02: the `real_target == real_root` branch of `_assert_contained` is ALLOWED (no raise).
+
+    The containment check refuses only a target whose realpath is NEITHER the root NOR strictly
+    under it. The degenerate equal-path case (`target` resolves to exactly `out_dir`) is the
+    documented ALLOW branch — it must NOT raise. Pinned directly on `_assert_contained` so the
+    branch has explicit coverage (it was previously exercised by no test).
+    """
+    repo, out = _gitignored_out(tmp_path)
+    # target == out_dir: realpaths are equal -> the allow branch (no raise)
+    maintained._assert_contained(out, out)
+
+
+def test_sec01_refuses_symlinked_out_dir_root(tmp_path):
+    """SEC-01: a SYMLINKED out_dir root is REFUSED independently of the target-containment check.
+
+    A symlinked out_dir would let the realpath-containment check adopt the symlink's TARGET as the
+    root and sanction a write outside the real gitignored tree (the `git check-ignore` /
+    gitignored-prefix contract is on the lexical name, not the symlink target). `_assert_contained`
+    must reject the symlinked root before resolving it. (A legitimate out-dir whose ANCESTOR is a
+    symlink — macOS `/var`->`/private/var` — is unaffected: only the out_dir's own final component
+    is checked, which `_gitignored_out`'s real dir is.)
+    """
+    repo, real_out = _gitignored_out(tmp_path)
+    store_root = tmp_path / "store"
+    # plant a symlink whose final component IS a symlink pointing at the real gitignored out-dir
+    linked_out = repo / "vault" / "artifacts" / "linked_generated"
+    linked_out.symlink_to(real_out)
+
+    with pytest.raises(ValueError, match="symlink"):
+        maintained.reemit_maintained(
+            root=store_root, _out_dir=linked_out, _today=TODAY,
+            _profile_paths=_synth_profile(tmp_path), _repo_root=repo,
+        )
+
+
 # ===============================================================================
 # Cycle 2: re-emit preserves prior content + folds tracking (AC-1, AC-3, AC-4)
 # ===============================================================================
@@ -351,6 +388,54 @@ def test_ac4_atomic_reemit_leaves_no_partial_state(tmp_path):
     # No stray temp sibling left behind.
     leftovers = [p.name for p in out.iterdir() if p.name.startswith("maintained.html.") and p.name.endswith(".tmp")]
     assert leftovers == [], f"a stray temp artifact was left after the failure: {leftovers}"
+
+
+# --- TEST-01: the profile-paths override leaks no global side-effect (the finally restore) ---
+
+
+def test_render_report_restores_profile_paths_no_global_leak(tmp_path):
+    """TEST-01: a `_profile_paths` re-emit leaves `report._PROFILE_PATHS` unchanged afterward.
+
+    `_render_report` overrides the module constant ONLY across its render and restores it in a
+    finally — so a process-shared `report._PROFILE_PATHS` does NOT leak the synthetic test profile
+    into other suites. Pins the finally restore: the constant is its pre-call value afterward.
+    """
+    repo, out = _gitignored_out(tmp_path)
+    store_root = tmp_path / "store"
+    before = report._PROFILE_PATHS
+
+    maintained.reemit_maintained(
+        root=store_root, _out_dir=out, _today=TODAY,
+        _profile_paths=_synth_profile(tmp_path), _repo_root=repo,
+    )
+
+    assert report._PROFILE_PATHS == before, "the profile-paths override leaked a global side-effect"
+
+
+def test_render_report_restores_profile_paths_even_when_render_raises(tmp_path, monkeypatch):
+    """TEST-01 (the finally pin): the constant is restored even when `report.render` RAISES.
+
+    Forces `report.render` to raise mid-render; the override must still be unwound by the finally.
+    REDs if `_render_report`'s finally body is replaced with `pass` (the constant would stay
+    pointed at the synthetic profile, leaking into every later suite sharing the process).
+    """
+    repo, out = _gitignored_out(tmp_path)
+    store_root = tmp_path / "store"
+    before = report._PROFILE_PATHS
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("injected render failure")
+
+    monkeypatch.setattr(maintained.report, "render", boom)
+
+    with pytest.raises(RuntimeError, match="injected render failure"):
+        maintained.reemit_maintained(
+            root=store_root, _out_dir=out, _today=TODAY,
+            _profile_paths=_synth_profile(tmp_path), _repo_root=repo,
+        )
+
+    assert report._PROFILE_PATHS == before, \
+        "the profile-paths override was NOT restored when render raised (the finally is broken)"
 
 
 # ===============================================================================
@@ -552,3 +637,31 @@ def test_ac2_external_reference_makes_emit_raise(tmp_path, monkeypatch):
         )
     # 0 file written when the budget is violated.
     assert not target.exists(), "a network-dependent artifact was written despite the external reference"
+    # BUG-03: the temp staging dir is auto-cleaned even when render.emit raises mid-render.
+    staging = [p.name for p in out.iterdir() if p.name.startswith(".staging")]
+    assert staging == [], f"a staging dir accreted after a render-budget raise: {staging}"
+
+
+# --- BUG-03: the temp staging dir does not accrete across re-emits ---------------
+
+
+def test_bug03_staging_dir_does_not_accrete_across_reemits(tmp_path):
+    """BUG-03: each re-emit's staging dir is auto-cleaned — the out-dir holds only the artifact.
+
+    The old fixed `out_dir/.staging` was created but never removed (only the staged FILE was
+    unlinked), so the directory accreted. The temp-staging-dir fix leaves 0 `.staging*` entries.
+    """
+    repo, out = _gitignored_out(tmp_path)
+    store_root = tmp_path / "store"
+    profile = _synth_profile(tmp_path)
+
+    for _ in range(3):
+        _seed_plan(store_root)
+        maintained.reemit_maintained(
+            root=store_root, _out_dir=out, _today=TODAY, _profile_paths=profile, _repo_root=repo,
+        )
+
+    entries = sorted(p.name for p in out.iterdir())
+    assert entries == ["maintained.html"], f"the out-dir accreted non-artifact entries: {entries}"
+    staging = [n for n in entries if n.startswith(".staging")]
+    assert staging == [], f"a staging dir accreted across re-emits: {staging}"

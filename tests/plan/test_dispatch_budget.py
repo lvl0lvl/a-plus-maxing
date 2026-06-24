@@ -235,3 +235,27 @@ def test_default_cap_omitted_runs_normally_and_records(tmp_path):
     recorded = [d for d, r in out["results"].items() if r.get("recorded") is True]
     assert len(recorded) >= 1
     assert out["dispatch_count"] == 2
+
+
+# --- API-01: `dispatch_count` is surfaced UNIFORMLY on every halt path -----------
+
+
+def test_deid_halt_surfaces_dispatch_count_zero(tmp_path):
+    # API-01: the de-id sentinel halt issues 0 dispatches, so it surfaces `dispatch_count: 0` —
+    # the SAME key the normal + cap-halt paths carry, so the T2 revise loop can read
+    # `result["dispatch_count"]` uniformly without a missing-key branch per halt class. A de-id
+    # halt missing the key turns this RED.
+    from scripts.model.client import ModelCallError
+
+    store_read = _seed_store(tmp_path)
+    failing_client = _FixedDeidClient(ModelCallError("backend de-id call failed"))
+    dispatch = _RecordingDispatch(_sustaining_authors())
+
+    out = run_orchestrated(
+        _raw_intake(), failing_client, dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"),
+    )
+
+    assert out["deidentified"] is False
+    assert out["dispatch_count"] == 0, "the de-id halt omitted dispatch_count (0 dispatches issued)"
+    assert dispatch.calls == []  # 0 dispatches actually issued (the count is accurate)

@@ -167,8 +167,9 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
         `reauthored`, `adjudication`, `conflict_adjudications`, `rx_bpmh_adjudications`,
         `dvq_entries`) plus `dispatch_count` (the aggregate dispatches this run issued). On the
         de-id sentinel halt, the honest no-plan state `{"deidentified": False, "reason":
-        DEID_HALTED, "results": {}, "dvq_entries": [], "deid": <the sentinel>}` — 0 dispatches
-        issued, `run_generation` never called. On the dispatch-cap halt, the honest no-plan state
+        DEID_HALTED, "results": {}, "dvq_entries": [], "deid": <the sentinel>, "dispatch_count":
+        0}` — 0 dispatches issued, `run_generation` never called (`dispatch_count` is surfaced
+        on every path so the revise loop reads it uniformly). On the dispatch-cap halt, the honest no-plan state
         `{"deidentified": True, "reason": DISPATCH_CAP_EXCEEDED, "results": {}, "dvq_entries": [],
         "dispatch_count": <count reached>}` — 0 plans recorded past the cap, the over-budget
         dispatch never issued.
@@ -201,6 +202,7 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
             "results": {},
             "dvq_entries": [],
             "deid": summary,
+            "dispatch_count": 0,  # 0 dispatches issued — surfaced uniformly with the other paths
         }
 
     try:
