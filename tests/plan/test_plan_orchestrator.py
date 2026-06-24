@@ -29,6 +29,7 @@ Every client/dispatch is a mock/fixture; no test hits a live API, and the test t
 0 real operator PII (synthetic tokens only).
 """
 
+import datetime
 import json
 from pathlib import Path
 
@@ -290,24 +291,66 @@ def test_gate_dispatch_keyword_accepted_seam_wired_not_yet_fired(tmp_path):
 
 
 def test_default_gate_dispatch_is_noop_zero_dispatches(tmp_path):
-    # (b) with the DEFAULT (no-op) gate_dispatch, a normal run issues 0 gate dispatches: a spy
-    # NOT injected dispatches nothing -- the default is inert (the ADR-0020-T2 gate-idle case).
+    # (b) the LEGACY Wave-2 non-loop path: a caller WITHOUT the revise loop (the genuine DEFAULT,
+    # `gate_dispatch` not supplied -> the no-op) runs the inner engine ONCE and surfaces the plan,
+    # the inner per-finding `adjudicate` gate the always-on floor (Security HIGH-2). The no-op
+    # default never fires a gate dispatch (the autonomous whole-plan tier is NOT composed on this
+    # path). Wave-4 re-grounding: the seam now FIRES when a REAL composed gate is INJECTED (that is
+    # `test_revise_loop.test_both_gates_run_each_pass` / `..._fires_live`); the genuine default
+    # stays inert and surfaces via the inner floor — the legacy non-loop contract.
     store_read = _seed_store(tmp_path)
     deid_client = _FixedDeidClient(_deid_summary())
 
-    # a gate spy passed via the seam to confirm 0 invocations on a default/clean run -- the spy
-    # only records; with the default no-op the orchestrator dispatches nothing through any gate.
+    dispatch = _RecordingDispatch(_sustaining_authors())
+    out = run_orchestrated(
+        _raw_intake(), deid_client, dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"),  # no gate_dispatch -> the default
+    )
+    # the legacy non-loop path surfaces a plan via the inner floor (no whole-plan gate composed)
+    recorded = [d for d, r in out["results"].items() if r.get("recorded") is True]
+    assert len(recorded) >= 1, "the legacy non-loop default did not surface a plan"
+    assert store.read("plan::workout", root=tmp_path) != []
+
+
+def test_gate_dispatch_seam_fires_live(tmp_path):
+    # The deferred Wave-2 re-assertion (ADR-0022-T2): the held `gate_dispatch=` seam NOW FIRES
+    # against the wired path. Inject a recording spy that composes a CLEAN disposition (both gates
+    # pass) and assert a POSITIVE dispatch count — the old keyword-accepted test only pinned the
+    # keyword was accepted, never that the seam fires. EXACT count (SF-4): the composed gate fires
+    # EXACTLY ONCE on a clean single pass (an off-by-one or a dropped-gate REDs); re-assert the
+    # 0023/0024 gate callables are invocable LIVE through the seam.
+    from scripts.plan.quality_judge import ACCEPT, quality_judge
+    from scripts.plan.safety_review import review_plan
+    from tests.plan.test_quality_judge import _FixedJudgeClient, _clean_scores
+    from tests.plan.test_safety_review import _no_findings_dispatch
+
+    store_read = _seed_store(tmp_path)
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch(_sustaining_authors())
+
+    judge_client = _FixedJudgeClient(_clean_scores())
+    lens_dispatch = _no_findings_dispatch()
     gate_calls = []
 
-    def gate_spy(*args, **kwargs):
-        gate_calls.append((args, kwargs))
+    def composed_gate(assembled_plan):
+        # the seam runs BOTH wired Wave-3 gate callables LIVE over the assembled result
+        q = quality_judge(assembled_plan, judge_client)
+        s = review_plan(assembled_plan, lens_dispatch)
+        gate_calls.append((q, s))
+        return {"accept": q["verdict"] == ACCEPT, "safety_passed": s["passed"]}
 
-    dispatch = _RecordingDispatch(_sustaining_authors())
-    run_orchestrated(
+    out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
-        plan_date=PLAN_DATE, domains=("workout", "nutrition"), gate_dispatch=gate_spy,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"), gate_dispatch=composed_gate,
     )
-    assert gate_calls == [], "the no-op default seam must issue 0 gate dispatches on a normal run"
+
+    # the seam FIRED (a positive dispatch count) — EXACTLY once on a clean single pass
+    assert len(gate_calls) == 1, f"the wired gate seam fired {len(gate_calls)} times, expected 1"
+    # the live gate callables produced their native verdicts (invocable through the seam)
+    assert gate_calls[0][0]["verdict"] == ACCEPT
+    assert gate_calls[0][1]["passed"] is True
+    # and a plan surfaced (the clean composed disposition surfaced it)
+    assert [d for d, r in out["results"].items() if r.get("recorded") is True]
 
 
 # === Cycle 2: inner-safety-gate-bypass falsification + the deid-sentinel halt ===
@@ -489,35 +532,56 @@ def test_outage_summarize_identity_check_has_teeth(tmp_path):
 
 
 def test_outage_leaves_existing_artifact_untouched(tmp_path):
-    # AC-3 (Risk R3, no partial/stale re-emit): seed a synthetic pre-existing maintained-HTML
-    # artifact under the orchestrator's `vault/artifacts/generated/` output target, inject the
-    # whole-run outage, run the orchestrator, and assert the artifact's bytes are IDENTICAL
-    # pre- and post-outage. An outage path that re-emitted / truncated / clobbered it -> RED.
-    # Wave-4 re-assertion note: nothing on any Wave-2 path writes to `vault/artifacts/generated/`
-    # (render is ADR-0025-T1 / bead a-plus-maxing-2xzt, the maintained-HTML output), so the
-    # byte-identical property is asserted STRUCTURALLY here (the placeholder pins that the outage
-    # halt does not introduce a write). It is NOT yet falsifiable: with no render wired, a success
-    # run also writes nothing, so the assertion passes with or without the outage halt. MUST be
-    # re-asserted when ADR-0025-T1 wires `render.emit` into the SUCCESS path — then a success run
-    # writes the artifact and the outage run must NOT, giving the byte-identical assertion teeth.
-    artifact_dir = tmp_path / "vault" / "artifacts" / "generated"
-    artifact_dir.mkdir(parents=True)
-    artifact = artifact_dir / "plan.html"
-    seeded = "<html><body>SYNTHETIC pre-existing maintained plan — untouched</body></html>"
-    artifact.write_text(seeded, encoding="utf-8")
-    before = artifact.read_bytes()
+    # AC-3 (Risk R3, no partial/stale re-emit) — Wave-4 DISCHARGE (now FALSIFIABLE). The render
+    # (`reemit_maintained`) is a DOWNSTREAM store-reading caller, NOT `run_orchestrated`'s body
+    # (the orchestrator's contract ends at recording the plan to the store). The byte-identical-
+    # on-outage property is therefore asserted over the SAME downstream caller invoked on BOTH
+    # paths: a CLEAN run records a plan -> the re-emitted maintained artifact carries it; the
+    # OUTAGE run records 0 plans -> a re-emit over that store carries NO plan content. The two
+    # artifacts DIFFER, so "the outage does not write/clobber a plan into the artifact" has teeth
+    # (a stale/partial re-emit that surfaced the no-longer-present plan, or an outage path that
+    # wrote a plan, turns this RED — the success artifact is the falsifying control).
+    from scripts.generate import maintained
 
-    store_read = _seed_store(tmp_path)
-    dispatch = _RecordingDispatch(_sustaining_authors())
+    # the maintained re-emit reads the store the orchestrator recorded into; render is downstream.
+    def _reemit(repo_root, store_root):
+        out_dir = repo_root / "vault" / "artifacts" / "generated"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (repo_root / ".gitignore").write_text("vault/artifacts/generated/\n", encoding="utf-8")
+        return maintained.reemit_maintained(
+            root=store_root, _out_dir=out_dir,
+            _today=datetime.date.fromisoformat(PLAN_DATE), _repo_root=repo_root,
+        )
 
+    # --- the CLEAN success path: a plan is recorded, the re-emit carries it ---
+    clean_repo = tmp_path / "clean"
+    clean_store = tmp_path / "clean-store"
+    clean_read = _seed_store(clean_store)
     run_orchestrated(
-        _raw_intake(), _outage_client(), dispatch, store_read, tmp_path,
-        plan_date=PLAN_DATE, domains=("workout", "nutrition"),
+        _raw_intake(), _FixedDeidClient(_deid_summary()), _RecordingDispatch(_sustaining_authors()),
+        clean_read, clean_store, plan_date=PLAN_DATE, domains=("workout", "nutrition"),
     )
+    clean_artifact = _reemit(clean_repo, clean_store).read_text(encoding="utf-8")
 
-    after = artifact.read_bytes()
-    assert after == before, "the outage path rewrote/clobbered the existing maintained artifact"
-    assert artifact.read_text(encoding="utf-8") == seeded
+    # --- the OUTAGE path: 0 plans recorded, the re-emit over that store carries no plan ---
+    outage_repo = tmp_path / "outage"
+    outage_store = tmp_path / "outage-store"
+    outage_read = _seed_store(outage_store)
+    out = run_orchestrated(
+        _raw_intake(), _outage_client(), _RecordingDispatch(_sustaining_authors()),
+        outage_read, outage_store, plan_date=PLAN_DATE, domains=("workout", "nutrition"),
+    )
+    assert out["results"] == {}, "the outage path recorded a plan (must halt to 0 plans)"
+    for domain in ("workout", "nutrition"):
+        assert store.read(f"plan::{domain}", root=outage_store) == []
+    outage_artifact = _reemit(outage_repo, outage_store).read_text(encoding="utf-8")
+
+    # the two artifacts DIFFER: the clean run's carries the recorded plan, the outage run's does
+    # not — the success artifact is the falsifying control giving the no-stale-re-emit teeth.
+    assert clean_artifact != outage_artifact, (
+        "the outage re-emit is byte-identical to the success re-emit (a stale plan leaked, or the "
+        "success path wrote nothing — the byte-identical property has no teeth)"
+    )
 
 
 # --- AC-4 (gate-idle, the negative assertion): 0 gate dispatches on outage --------
@@ -525,30 +589,39 @@ def test_outage_leaves_existing_artifact_untouched(tmp_path):
 
 def test_outage_gate_dispatch_seam_is_idle(tmp_path):
     # AC-4 (the missing negative assertion, ADR-0020 OQ-4): on the injected whole-run outage,
-    # the downstream gates issue 0 dispatches. Inject a RECORDING SPY into the orchestrator's
-    # real `gate_dispatch=` seam (the 0022-T1 hook both the judge AND safety-review wire
-    # through, so one spy counts all gate dispatches) and assert its dispatch count = 0. An
-    # orchestrator that reached the `gate_dispatch` seam despite the outage halt turns this RED.
-    # This asserts the seam is IDLE (not merely "a plan is absent") -- the E2E-placement
-    # negative assertion: data does NOT land where it should not.
-    # Wave-4 re-assertion note: re-assert at the Wave-4 checkpoint when ADR-0022-T2 wires the
-    # REAL gate dispatch into the seam, so the gate-idle-on-outage property holds against the
-    # WIRED path, not only the Wave-2 no-op seam.
+    # the downstream gates issue 0 dispatches. Wave-4 DISCHARGE: this now injects the WIRED
+    # composed gate (the REAL two-gate composition — quality_judge + review_plan), not the Wave-2
+    # no-op spy, and asserts the composed gate fires 0 times on the outage halt. The gate-idle
+    # property now has teeth against the WIRED path: an orchestrator that reached the gate despite
+    # the de-id outage halt turns this RED. The E2E-placement negative assertion: data does NOT
+    # land where it should not (the de-id boundary halts BEFORE the inner engine + the gate).
+    from scripts.plan.quality_judge import ACCEPT, quality_judge
+    from scripts.plan.safety_review import review_plan
+    from tests.plan.test_quality_judge import _FixedJudgeClient, _clean_scores
+    from tests.plan.test_safety_review import _no_findings_dispatch
+
     store_read = _seed_store(tmp_path)
     dispatch = _RecordingDispatch(_sustaining_authors())
 
+    judge_client = _FixedJudgeClient(_clean_scores())
+    lens_dispatch = _no_findings_dispatch()
     gate_calls = []
 
-    def gate_spy(*args, **kwargs):
-        gate_calls.append((args, kwargs))
+    def composed_gate(assembled_plan):
+        # the WIRED composed gate: runs BOTH real Wave-3 callables — counts every wired dispatch
+        q = quality_judge(assembled_plan, judge_client)
+        s = review_plan(assembled_plan, lens_dispatch)
+        gate_calls.append((q, s))
+        return {"accept": q["verdict"] == ACCEPT, "safety_passed": s["passed"]}
 
     out = run_orchestrated(
         _raw_intake(), _outage_client(), dispatch, store_read, tmp_path,
-        plan_date=PLAN_DATE, domains=("workout", "nutrition"), gate_dispatch=gate_spy,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"), gate_dispatch=composed_gate,
     )
 
-    # the orchestrator halted before reaching the gate_dispatch seam -> 0 gate dispatches
-    assert gate_calls == [], "the gate_dispatch seam fired on outage (must be idle on halt)"
+    # the WIRED composed gate fired 0 times — the de-id outage halt precedes it (the gate-idle
+    # property now has teeth against the real two-gate composition, not the Wave-2 no-op seam)
+    assert gate_calls == [], "the WIRED gate_dispatch seam fired on outage (must be idle on halt)"
     # and the halt surfaced (cross-check the seam-idle is the outage halt, not a silent skip)
     assert out["deidentified"] is False
     assert out["results"] == {}
