@@ -78,6 +78,12 @@ DEID_HALTED = "deid-halted"
 SAFETY_BLOCKED = "safety-blocked"
 REVISE_EXHAUSTED = "revise-exhausted"
 
+# The honest no-plan reason when promoting the surfaced pass's plan rows from the scratch store
+# into `root` fails mid-write (an OSError on a `store.append`). Same kebab-string family; the
+# promote is guarded so a write failure fails closed (honest no-plan, the real store NOT left
+# partial) rather than escaping uncaught with a half-promoted plan set.
+PROMOTE_FAILED = "promote-failed"
+
 # The bounded revise cap (dispositions #2: N=3 fixed at build-plan time). A named module constant
 # (NOT a hard-coded literal at the loop site), mirroring `dispatch_budget.DEFAULT_DISPATCH_CAP`;
 # `run_orchestrated`'s `revise_cap` keyword defaults to it so the bound is configurable + testable.
@@ -259,9 +265,14 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
                 if not (isinstance(disposition, dict) and disposition.get("safety_passed") is True):
                     return _honest_no_plan(SAFETY_BLOCKED, dispatch_count=budget.count)
                 # QUALITY: an ACCEPT with safety passing surfaces the plan — PROMOTE the survivors
-                # from the scratch store into `root` and return (AC-1, AC-4).
+                # from the scratch store into `root` and return (AC-1, AC-4). A write OSError
+                # mid-promote fails CLOSED to honest no-plan (the real store is not left surfacing
+                # a half-promoted plan set) rather than escaping uncaught (SEC-01).
                 if disposition.get("accept") is True:
-                    _promote_plans(scratch, root)
+                    try:
+                        _promote_plans(scratch, root)
+                    except OSError:
+                        return _honest_no_plan(PROMOTE_FAILED, dispatch_count=budget.count)
                     return {**result, "dispatch_count": budget.count}
                 # A quality REVISE with safety passing: bounded re-author. Halt at `revise_cap`
                 # without convergence (AC-3, R1 — the count of re-dispatch passes is capped exactly).
@@ -273,6 +284,13 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
                 # store-idempotent (identical result, no convergence), so the per-domain `authors` is
                 # REBUILT from a fresh specialist dispatch (the same `dispatch` seam — MF-1).
                 revise_domains = disposition.get("revise_domains") or []
+                # An unknown / out-of-run-set revise TARGET is a malformed disposition: route it to
+                # the same TERMINAL fail-closed halt the loop already takes for a non-dict / absent-key
+                # safety disposition, rather than letting an unguarded `_ROLE_OF_DOMAIN[domain]`
+                # KeyError escape uncaught (BUG-01/API-02). The composed gate must only ever name a
+                # domain this run is generating.
+                if any(d not in _ROLE_OF_DOMAIN or d not in domains for d in revise_domains):
+                    return _honest_no_plan(SAFETY_BLOCKED, dispatch_count=budget.count)
                 authors.update(_dispatch_domains(revise_domains, summary, gates, dispatch, budget))
                 revise_count += 1
                 scratch = Path(scratch_parent) / f"pass-{revise_count}"
@@ -414,12 +432,35 @@ def _promote_plans(scratch_root, root):
     `(item, timepoint, source)` dedupe — a re-promoted identical row is idempotent). The operator
     state already lives in `root`; only the inner engine's generated plan / queue streams promote.
 
+    EVERY read completes BEFORE any write: the `(item, reading)` pairs are collected from the
+    scratch store first, then appended into `root`. And the affected `root` item files are
+    snapshotted (their prior on-disk bytes, or absence) before the first append, so a write
+    OSError mid-append RESTORES each touched file to its pre-promote state before re-raising —
+    the real store is never left with a half-promoted plan set (the caller's guard then routes
+    the re-raise to a `PROMOTE_FAILED` honest no-plan halt). SEC-01.
+
     Args:
         scratch_root (str | Path): The surfaced pass's scratch store root.
         root (str | Path): The real store root the surfaced plans promote into.
     """
+    pairs = []
     for item in store.items(scratch_root):
         if not (item.startswith("plan::") or item.startswith("dvq::")):
             continue
         for reading in store.read(item, root=scratch_root):
+            pairs.append((item, reading))
+
+    # Snapshot the pre-promote on-disk state of every item file this promote will touch, so a
+    # mid-append OSError can roll the real store back to where it was (no half-promoted set).
+    affected = {store._item_path(item, root) for item, _ in pairs}
+    snapshot = {p: (p.read_bytes() if p.exists() else None) for p in affected}
+    try:
+        for item, reading in pairs:
             store.append(item, reading, root=root)
+    except OSError:
+        for path, prior in snapshot.items():
+            if prior is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(prior)
+        raise
