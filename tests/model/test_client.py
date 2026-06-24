@@ -20,6 +20,7 @@ hits a live API or reads a real key.
 """
 
 import subprocess
+import traceback
 
 import pytest
 
@@ -314,15 +315,16 @@ def test_no_train_backend_deidentify_makes_no_live_call_without_the_sdk():
 
 
 def test_call_error_message_carries_no_raw_input(tmp_path):
-    """FIX 4 (SEC-01): `_call`'s `ModelCallError` message does NOT interpolate the exception.
+    """SEC-01 / SEC-1: `_call`'s `ModelCallError` carries no raw input on str OR the cause chain.
 
-    A backend whose raised exception message embeds a synthetic raw token must not surface
-    that token on `str(ModelCallError)` — the message is a CONSTANT, so `_call` no longer
-    interpolates `{exc!r}` (which can carry raw input). The chained `from exc` still aids
-    debugging (the raw lives in the chained traceback frame, not the str surface). Scans the
-    raised error's str against an identity config matching the synthetic token: 0 hits, and a
-    direct substring check confirms the token is absent. A `_call` that interpolated the
-    exception would carry the token and turn this RED.
+    A backend whose raised exception message embeds a synthetic raw token must not surface that
+    token on `str(ModelCallError)` (the message is a CONSTANT — `_call` does not interpolate
+    `{exc!r}`) NOR through the `__cause__`/`__context__` chain a caller's `logger.exception()` /
+    `traceback.print_exc()` would render. `_call` raises `from None`, INTENTIONALLY SUPPRESSING the
+    chain at this PII/key boundary, so `__cause__` is `None` and the rendered traceback is raw-free.
+    Scans the str surface (0 hits) AND asserts the chain is severed AND the full rendered traceback
+    carries 0 occurrences of the token. A `_call` that interpolated the exception OR kept the
+    `from exc` chain would carry the token and turn this RED.
     """
     from scripts.guard import pii_scan
 
@@ -339,9 +341,12 @@ def test_call_error_message_carries_no_raw_input(tmp_path):
     with pytest.raises(ModelCallError) as excinfo:
         client.deidentify({"legal-name": raw_token})
 
-    assert raw_token in str(excinfo.value.__cause__)  # the chain still carries it (debuggable)
-    assert pii_scan.scan_text(str(excinfo.value), token_config=config) == 0  # str surface does NOT
-    assert raw_token not in str(excinfo.value)
+    e = excinfo.value
+    assert e.__cause__ is None  # the chain is suppressed (`from None`) — no raw via __cause__
+    assert pii_scan.scan_text(str(e), token_config=config) == 0  # str surface does NOT carry it
+    assert raw_token not in str(e)
+    tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+    assert raw_token not in tb  # the fully-rendered traceback carries 0 occurrences
 
 
 def test_failure_never_returns_a_fabricated_payload():
@@ -625,6 +630,36 @@ def test_deidentify_error_surface_carries_no_key_or_raw(monkeypatch, tmp_path):
     assert pii_scan.scan_text(str(excinfo.value), token_config=config) == 0
 
 
+def test_deidentify_error_traceback_carries_no_key_or_raw(monkeypatch, tmp_path):
+    """SEC-1: the RENDERED traceback (the `__cause__`/`__context__` chain) carries no key or raw token.
+
+    The constant-message `str()`/`.args` surface (the SEC-4 test above) is raw-free regardless of
+    the chain, BUT `raise ... from <sdk_exc>` would attach the raw SDK exception (carrying the raw
+    intake in the request prompt + the resolved key) as `__cause__` — which a caller's
+    `logger.exception()` / `traceback.print_exc()` / `exc_info=True` renders. Forces the failure
+    path with an SDK exception EMBEDDING both tokens and asserts the fully-rendered traceback carries
+    0 occurrences of either. RED-capable: reverting `from None` to `from last_exc` re-attaches the
+    raw `__cause__` and turns this RED (verified against the old form before adopting `from None`).
+    """
+    from scripts.model import key_source
+    from scripts.model.client import ModelCallError, _ClaudeNoTrainBackend
+
+    raw_token = "Jordan Faketestperson"
+    key_token = "synthetic-no-train-key-token-DO-NOT-LOG"
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: key_token)
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError(f"sdk error on {raw_token} with {key_token}"))
+    _patch_backend_client(monkeypatch, fake)
+
+    with pytest.raises(ModelCallError) as excinfo:
+        _ClaudeNoTrainBackend().deidentify({"legal-name": raw_token})
+
+    e = excinfo.value
+    tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+    assert raw_token not in tb
+    assert key_token not in tb
+
+
 # --- Cycle 3: raw-intake-in-memory-only (tmp-tree scan WITH MUTATION) ----------
 
 
@@ -660,10 +695,22 @@ def test_deidentify_raw_intake_never_written_to_disk(monkeypatch, tmp_path):
     from scripts.model import key_source
     from scripts.model.client import _ClaudeNoTrainBackend
 
+    import tempfile
+
     raw_token = "Jordan Faketestperson"
     key_token = "synthetic-no-train-key-token-DO-NOT-LOG"
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("HOME", str(tmp_path))
+    # Redirect tempfile + $TMPDIR/$TMP/$TEMP into the scanned tree too: a
+    # `tempfile.NamedTemporaryFile()` write (no dir= -> $TMPDIR -> /var/folders on macOS) would
+    # otherwise ESCAPE the rglob and read a false GREEN. The env vars alone do NOT redirect
+    # `tempfile` (it memoizes `tempfile.tempdir` on first `gettempdir()`), so set `tempfile.tempdir`
+    # directly (monkeypatch auto-restores it); the env vars cover subprocess / SDK-internal writes
+    # that read $TMPDIR themselves. Any tempfile-targeted write now lands under `tmp_path`.
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    monkeypatch.setenv("TMP", str(tmp_path))
+    monkeypatch.setenv("TEMP", str(tmp_path))
     monkeypatch.setattr(key_source, "resolve", lambda *a, **k: key_token)
 
     fake = _FakeAnthropic(response_summary=_good_deid_summary())
@@ -681,20 +728,34 @@ def test_deidentify_in_memory_scan_red_on_injected_write(monkeypatch, tmp_path):
     to a tmp file mid-call makes the rglob find ≥1 file — the scan DETECTS a real on-disk
     raw-PII write. This RED-capability is the lock; without it the clean GREEN is worthless.
     """
+    import tempfile
+
     from scripts.model import key_source
     from scripts.model.client import _ClaudeNoTrainBackend, _deid_prompt
 
     raw_token = "Jordan Faketestperson"
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("HOME", str(tmp_path))
+    # Redirect tempfile + $TMPDIR/$TMP/$TEMP into the scanned tree (matches the clean test's fixture)
+    # so the `tempfile.NamedTemporaryFile()` leak below (no dir= -> $TMPDIR) lands UNDER `tmp_path`.
+    # `tempfile` memoizes `tempfile.tempdir` on first `gettempdir()`, so the env vars alone do NOT
+    # redirect it — set `tempfile.tempdir` directly (monkeypatch auto-restores). This makes the
+    # mutation leg exercise the $TMPDIR escape the clean test now guards against.
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    monkeypatch.setenv("TMP", str(tmp_path))
+    monkeypatch.setenv("TEMP", str(tmp_path))
     monkeypatch.setattr(key_source, "resolve", lambda *a, **k: "synthetic-no-train-key-token-DO-NOT-LOG")
 
     fake = _FakeAnthropic(response_summary=_good_deid_summary())
 
     class _LeakingBackend(_ClaudeNoTrainBackend):
         def _client(self):
-            # inject the leak: write the raw intake to a tmp file mid-call, then behave normally.
-            (tmp_path / "leaked-intake.txt").write_text(_deid_prompt({"legal-name": raw_token}))
+            # inject the leak via a $TMPDIR-targeted tempfile write (NO dir= -> resolves to the
+            # redirected $TMPDIR == tmp_path), then behave normally. Proves the TMPDIR-redirected
+            # scan catches a tempfile-targeted raw-PII write that a tmp_path-only rglob would miss.
+            with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+                fh.write(_deid_prompt({"legal-name": raw_token}))
             return fake
 
     _LeakingBackend().deidentify({"legal-name": raw_token})
