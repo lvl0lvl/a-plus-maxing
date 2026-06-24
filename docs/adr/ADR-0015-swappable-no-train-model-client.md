@@ -119,3 +119,4 @@ This ADR `amends` ADR-0001 and ADR-0006 (documentation relationships, not DAG ed
 | 2026-06-23 | Added inverse edge(s) to ADR-0020 (enables) and ADR-0022 (relates) (plan-generation engine set, S92 backfill). | Walter McGivney |
 | 2026-06-22 | v1.1 — Phase-7 red-team (RT-01): added the fail-closed model-call-failure contract (Consequence + falsification criterion + OQ-3 spec-stage mechanics + a no-train-provider-failure-mode review trigger) | Walter McGivney |
 | 2026-06-22 | v1.2 — Phase-8 backfill: inverse enables->ADR-0018 edge (pairs with ADR-0018's depends-on). | Walter McGivney |
+| 2026-06-24 | The swappable `ModelClient` surface gains a `deidentify(raw) -> summary` method (the third method alongside `converse`/`author`), sanctioned by ADR-0020's model-backed-de-id decision; the swap-seam discipline (one boundary, mockable, no-train backend) is unchanged. | Walter McGivney |
