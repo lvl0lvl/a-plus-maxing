@@ -292,16 +292,24 @@ def test_deidentify_raises_typed_on_every_failure_mode(bad_result):
         client.deidentify({"legal-name": "Jordan Tester"})
 
 
-def test_no_train_backend_deidentify_is_not_invoked_in_tests():
-    """The default no-train backend's `deidentify` is `NotImplementedError`, never live.
+def test_no_train_backend_deidentify_makes_no_live_call_without_the_sdk():
+    """AC-9: an UNPATCHED de-id call never reaches a live API — the SDK is absent (0 spend).
 
-    Mirrors the `converse`/`author` stubs: the live de-id call is wired at the operator
-    checkpoint. Calling it raises `NotImplementedError` (lit at the checkpoint) — the proof
-    that no test path makes a live de-id call (0 live-API spend).
+    ADR-0027-T1 lit the live `deidentify`. Updated from the prior stub-pin: with the real
+    `anthropic` SDK absent from `.venv` (the patch-driven posture), an UNPATCHED call hits the
+    lazy `from anthropic import Anthropic` import and raises `ModuleNotFoundError` BEFORE any
+    network request — the proof that no test path makes a live de-id call (0 live-API spend).
+    The patched-SDK cases above inject a fake at the `_client` seam; this one leaves the seam
+    unpatched to prove the absence is what blocks a live call.
     """
+    import importlib.util
+
     from scripts.model.client import _ClaudeNoTrainBackend
 
-    with pytest.raises(NotImplementedError):
+    assert importlib.util.find_spec("anthropic") is None, (
+        "the anthropic SDK is installed — the 0-live-spend precondition (AC-9) no longer holds"
+    )
+    with pytest.raises(ModuleNotFoundError):
         _ClaudeNoTrainBackend().deidentify({"legal-name": "Jordan Tester"})
 
 
@@ -352,3 +360,401 @@ def test_failure_never_returns_a_fabricated_payload():
     except ModelCallError:
         returned = "RAISED"
     assert returned == "RAISED", "a failure mode returned a payload instead of raising"
+
+
+# --- ADR-0027-T1: the live no-train de-id backend (patched-SDK, 0 live spend) ------
+#
+# These cases exercise `_ClaudeNoTrainBackend.deidentify`'s LIVE call against a PATCHED
+# anthropic SDK injected at the `_ClaudeNoTrainBackend._client` import site. The real SDK
+# is absent from `.venv`, so the suite makes 0 live calls (AC-9). The fake records its
+# `messages.create` call args and returns a canned `SUMMARY_FIELD_SET`-shaped envelope.
+
+import json
+
+from scripts.plan.router import SUMMARY_FIELD_SET
+
+
+def _summary_envelope_text(summary):
+    """An anthropic `messages.create` response carrying `summary` as a JSON text block.
+
+    Mirrors the real envelope shape: `.content` is a list of content blocks, each with a
+    `.type`; the de-id summary is the JSON body of the first `text` block — the same shape
+    the live parse reads.
+    """
+
+    class _TextBlock:
+        type = "text"
+
+        def __init__(self, text):
+            self.text = text
+
+    class _Envelope:
+        def __init__(self, blocks):
+            self.content = blocks
+
+    return _Envelope([_TextBlock(json.dumps(summary))])
+
+
+class _FakeAnthropic:
+    """A fake `anthropic.Anthropic` recording `messages.create` args, no live call.
+
+    Constructed exactly as the real SDK is (`Anthropic(api_key=...)`); exposes a `messages`
+    namespace whose `create(**kwargs)` records the kwargs and returns a scripted envelope
+    (or raises a scripted exception). The whole point: the real package is never imported,
+    so the absence proves the test is patch-driven (0 live spend).
+
+    Attributes:
+        calls: The list of `messages.create` kwargs captured across invocations.
+    """
+
+    def __init__(self, response_summary=None, raise_exc=None, raise_seq=None, api_key=None):
+        self.api_key = api_key
+        self.calls = []
+        self._response_summary = response_summary
+        self._raise_exc = raise_exc
+        self._raise_seq = list(raise_seq) if raise_seq is not None else None
+
+        fake = self
+
+        class _Messages:
+            def create(self, **kwargs):
+                fake.calls.append(kwargs)
+                if fake._raise_seq is not None:
+                    exc = fake._raise_seq.pop(0)
+                    if exc is not None:
+                        raise exc
+                elif fake._raise_exc is not None:
+                    raise fake._raise_exc
+                return _summary_envelope_text(fake._response_summary)
+
+        self.messages = _Messages()
+
+    def with_options(self, **kwargs):
+        """Mirror the real SDK's per-request override (`timeout=`); returns a same-shape view.
+
+        The real `Anthropic.with_options(timeout=...)` returns a configured client whose
+        `.messages.create` behaves identically — the timeout knob does not alter the recorded
+        call. The fake returns itself so the recorded `messages.create` args are unchanged.
+        """
+        return self
+
+
+def _good_deid_summary():
+    """A well-formed de-identified summary the patched SDK returns (band/class tokens only)."""
+    return {
+        "training-age-band": "born-1980s",
+        "sex-for-dosing": "male",
+        "bodyweight-band": "80-90kg",
+        "goal-domains": "workout",
+        "recovery-status-band": "moderate",
+    }
+
+
+def _patch_backend_client(monkeypatch, fake):
+    """Patch `_ClaudeNoTrainBackend._client` to return `fake` — the SDK seam injection.
+
+    Moves the existing backend-seam fixture posture one level down: instead of injecting a
+    fixture BACKEND, the test injects a fake SDK at the lazy import site, so the live
+    `deidentify` body runs against the fake `messages.create`.
+    """
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    monkeypatch.setattr(_ClaudeNoTrainBackend, "_client", lambda self: fake)
+
+
+# --- Cycle 1: the live de-id call ---------------------------------------------
+
+
+def test_deidentify_live_returns_dict_and_prompt_carries_raw(monkeypatch):
+    """AC-1: live `deidentify` returns a dict; the prompt carries the raw intake.
+
+    With a patched SDK returning a `SUMMARY_FIELD_SET`-shaped envelope, the live call
+    returns a `dict`, AND the raw-intake token reaches the captured `messages.create`
+    prompt args (the model is given the raw intake to de-identify).
+    """
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    fake = _FakeAnthropic(response_summary=_good_deid_summary())
+    _patch_backend_client(monkeypatch, fake)
+
+    raw_intake = {"legal-name": "Jordan Faketestperson", "raw-lab-values": "ALT 88"}
+    result = _ClaudeNoTrainBackend().deidentify(raw_intake)
+
+    assert isinstance(result, dict)
+    assert len(fake.calls) == 1
+    prompt_blob = json.dumps(fake.calls[0])
+    assert "Jordan Faketestperson" in prompt_blob  # raw intake reached the model prompt
+
+
+def test_deidentify_model_id_read_from_MODEL_attribute(monkeypatch):
+    """AC-2: the call's `model=` is read off `MODEL` — swapping it needs 0 caller edits."""
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    fake = _FakeAnthropic(response_summary=_good_deid_summary())
+    _patch_backend_client(monkeypatch, fake)
+    monkeypatch.setattr(_ClaudeNoTrainBackend, "MODEL", "sentinel-model-xyz")
+
+    _ClaudeNoTrainBackend().deidentify({"legal-name": "Pat Sample"})
+
+    assert fake.calls[0]["model"] == "sentinel-model-xyz"
+
+
+def test_deidentify_summary_keys_subset_of_field_set(monkeypatch):
+    """AC-3: the parsed summary's keys are a subset of `SUMMARY_FIELD_SET`; `deid_in` passes."""
+    from scripts.model.client import ModelClient, _ClaudeNoTrainBackend
+    from scripts.plan.deid_in import DEID_CALL_FAILED, deid_in
+
+    fake = _FakeAnthropic(response_summary=_good_deid_summary())
+    _patch_backend_client(monkeypatch, fake)
+
+    summary = _ClaudeNoTrainBackend().deidentify({"legal-name": "Pat Sample"})
+
+    out_of_set = set(summary) - set(SUMMARY_FIELD_SET)
+    assert out_of_set == set(), f"out-of-set keys leaked: {out_of_set}"
+
+    surfaced = deid_in({"legal-name": "Pat Sample"}, ModelClient(backend=_ClaudeNoTrainBackend()))
+    assert surfaced.get("reason") != DEID_CALL_FAILED
+    assert set(surfaced) <= set(SUMMARY_FIELD_SET)
+
+
+# --- Cycle 2: fail-closed family ----------------------------------------------
+
+
+def test_deidentify_sdk_exception_fails_closed_to_sentinel(monkeypatch):
+    """AC-4: an injected SDK exception → `ModelCallError` → `deid_in`'s DEID_CALL_FAILED.
+
+    The fake's `messages.create` RAISES on every attempt; the live `deidentify` re-raises
+    after the bound, the `_call` wrapper types it `ModelCallError`, and `deid_in` returns the
+    honest no-plan sentinel — 0 fabricated/partial summaries past the boundary.
+    """
+    from scripts.model.client import ModelCallError, ModelClient, _ClaudeNoTrainBackend
+    from scripts.plan.deid_in import DEID_CALL_FAILED, deid_in
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError("sdk blew up"))
+    _patch_backend_client(monkeypatch, fake)
+
+    with pytest.raises(ModelCallError):
+        ModelClient(backend=_ClaudeNoTrainBackend()).deidentify({"legal-name": "Pat Sample"})
+
+    surfaced = deid_in({"legal-name": "Pat Sample"}, ModelClient(backend=_ClaudeNoTrainBackend()))
+    assert surfaced == {"deidentified": False, "reason": DEID_CALL_FAILED, "error_type": "ModelCallError"}
+
+
+def test_deidentify_out_of_set_field_fails_closed(monkeypatch):
+    """AC-5: a summary with a field OUTSIDE `SUMMARY_FIELD_SET` → `deid_in` DEID_CALL_FAILED.
+
+    The model emits a band/class summary that smuggles an out-of-set key (a non-faithful
+    de-id); `deid_in`'s whitelist rejects it — 0 out-of-set summaries surfaced.
+    """
+    from scripts.model.client import ModelClient, _ClaudeNoTrainBackend
+    from scripts.plan.deid_in import DEID_CALL_FAILED, deid_in
+
+    contaminated = dict(_good_deid_summary())
+    contaminated["legal-name"] = "Jordan Faketestperson"  # an out-of-set raw-PII field
+    fake = _FakeAnthropic(response_summary=contaminated)
+    _patch_backend_client(monkeypatch, fake)
+
+    surfaced = deid_in({"legal-name": "Jordan Faketestperson"},
+                       ModelClient(backend=_ClaudeNoTrainBackend()))
+    assert surfaced == {"deidentified": False, "reason": DEID_CALL_FAILED}
+
+
+def test_deidentify_bounded_retry_then_succeed(monkeypatch):
+    """AC-6 (succeed-within-bound): the Nth attempt succeeds → the call returns, invoked N times."""
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    # raise on the first N-1 attempts, succeed on the Nth (the success path through the loop).
+    raise_seq = [RuntimeError("transient")] * 2 + [None]
+    fake = _FakeAnthropic(response_summary=_good_deid_summary(), raise_seq=raise_seq)
+    _patch_backend_client(monkeypatch, fake)
+
+    result = _ClaudeNoTrainBackend().deidentify({"legal-name": "Pat Sample"})
+
+    assert isinstance(result, dict)
+    assert len(fake.calls) == 3  # invoked exactly the bound, succeeded on the last
+
+
+def test_deidentify_bounded_retry_then_fail(monkeypatch):
+    """AC-6 (exhaust-the-bound): all attempts raise → `ModelCallError` after EXACTLY the bound."""
+    from scripts.model.client import (
+        ModelCallError,
+        _ClaudeNoTrainBackend,
+        _DEID_MAX_ATTEMPTS,
+    )
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError("always fails"))
+    _patch_backend_client(monkeypatch, fake)
+
+    with pytest.raises(ModelCallError):
+        _ClaudeNoTrainBackend().deidentify({"legal-name": "Pat Sample"})
+
+    assert len(fake.calls) == _DEID_MAX_ATTEMPTS  # exactly the bound — never unbounded
+
+
+def test_deidentify_error_surface_carries_no_key_or_raw(monkeypatch, tmp_path):
+    """SEC-4: the raised `ModelCallError` str + .args carry no synthetic key or raw-PII token.
+
+    Seeds a synthetic key (patches `key_source.resolve`) + a synthetic raw-PII token, forces
+    the failure path with a `messages.create` whose exception message EMBEDS both tokens, and
+    asserts `str(exc)` and `exc.args` over the raised `ModelCallError` carry 0 occurrences of
+    either — the SEC-01 constant-message `_call` lock holds. RED-capable: a variant
+    interpolating `{exc!r}` into the message would leak the token and turn this RED.
+    """
+    from scripts.guard import pii_scan
+    from scripts.model import key_source
+    from scripts.model.client import ModelCallError, _ClaudeNoTrainBackend
+
+    raw_token = "Jordan Faketestperson"
+    # Built at runtime so the source carries NO key-shaped literal (the tree-wide
+    # `test_no_api_key_literal_in_tracked_tree` gate flags any `sk-ant-…` literal in the
+    # PUBLIC repo). Still an opaque secret substring that must be absent from the error surface.
+    key_token = "synthetic-no-train-key-token-DO-NOT-LOG"
+    config = tmp_path / "synthetic-identity.txt"
+    config.write_text(raw_token + "\n")
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: key_token)
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError(f"sdk error on {raw_token} with {key_token}"))
+    _patch_backend_client(monkeypatch, fake)
+
+    with pytest.raises(ModelCallError) as excinfo:
+        _ClaudeNoTrainBackend().deidentify({"legal-name": raw_token})
+
+    surface = str(excinfo.value) + repr(excinfo.value.args)
+    assert raw_token not in surface
+    assert key_token not in surface
+    assert pii_scan.scan_text(str(excinfo.value), token_config=config) == 0
+
+
+# --- Cycle 3: raw-intake-in-memory-only (tmp-tree scan WITH MUTATION) ----------
+
+
+def _tmp_tree_token_hits(tmp_path, *tokens):
+    """Count files under `tmp_path` whose bytes carry ANY of `tokens` (the on-disk rglob scan).
+
+    A filesystem rglob over the whole tmp tree — NOT a `builtins.open` write-spy (which
+    misses `os.write` / `pathlib.Path.write_text` / `tempfile` / SDK-internal write paths).
+    Returns the count of files carrying either token; 0 means nothing leaked to disk.
+    """
+    hits = 0
+    for path in tmp_path.rglob("*"):
+        if not path.is_file():
+            continue
+        try:
+            blob = path.read_text(errors="ignore")
+        except OSError:
+            continue
+        if any(tok in blob for tok in tokens):
+            hits += 1
+    return hits
+
+
+def test_deidentify_raw_intake_never_written_to_disk(monkeypatch, tmp_path):
+    """AC-7 (clean): no file under the tmp HOME/CWD carries the raw-PII OR the synthetic key.
+
+    Runs the live-wired backend over a synthetic raw-PII intake under an isolated tmp
+    HOME/CWD; patches `key_source.resolve` to a synthetic key so the call resolves it, then
+    rglobs the whole tmp tree for BOTH the raw token AND the key token → 0 files. The
+    KEY-token leg (SEC-2) closes the gitignored-key-residue gap the diff-only grep misses.
+    GREEN-on-oracle: the live method holds the raw intake in-memory only.
+    """
+    from scripts.model import key_source
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    raw_token = "Jordan Faketestperson"
+    key_token = "synthetic-no-train-key-token-DO-NOT-LOG"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: key_token)
+
+    fake = _FakeAnthropic(response_summary=_good_deid_summary())
+    _patch_backend_client(monkeypatch, fake)
+
+    _ClaudeNoTrainBackend().deidentify({"legal-name": raw_token, "raw-lab-values": "ALT 88"})
+
+    assert _tmp_tree_token_hits(tmp_path, raw_token, key_token) == 0
+
+
+def test_deidentify_in_memory_scan_red_on_injected_write(monkeypatch, tmp_path):
+    """AC-7 MUTATION: an injected mid-call `write_text(raw_intake)` makes the SAME scan find ≥1.
+
+    Proves the scan is non-vacuous: a backend variant that deliberately writes the raw intake
+    to a tmp file mid-call makes the rglob find ≥1 file — the scan DETECTS a real on-disk
+    raw-PII write. This RED-capability is the lock; without it the clean GREEN is worthless.
+    """
+    from scripts.model import key_source
+    from scripts.model.client import _ClaudeNoTrainBackend, _deid_prompt
+
+    raw_token = "Jordan Faketestperson"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: "synthetic-no-train-key-token-DO-NOT-LOG")
+
+    fake = _FakeAnthropic(response_summary=_good_deid_summary())
+
+    class _LeakingBackend(_ClaudeNoTrainBackend):
+        def _client(self):
+            # inject the leak: write the raw intake to a tmp file mid-call, then behave normally.
+            (tmp_path / "leaked-intake.txt").write_text(_deid_prompt({"legal-name": raw_token}))
+            return fake
+
+    _LeakingBackend().deidentify({"legal-name": raw_token})
+
+    # the SAME scan now finds the injected leak — the non-vacuous proof.
+    assert _tmp_tree_token_hits(tmp_path, raw_token) >= 1
+
+
+# --- Cycle 4: the crown-jewel raw-PII-leak probe ------------------------------
+
+
+def test_deidentify_no_raw_pii_token_past_boundary(monkeypatch):
+    """AC-8 (clean, crown-jewel): 0 raw tokens past the de-id boundary.
+
+    Seeds a synthetic legal name + a synthetic lab value into the raw intake; the patched
+    SDK returns a `SUMMARY_FIELD_SET`-shaped band/class summary (no raw tokens). Asserts the
+    summary the backend returns AND the summary `deid_in` surfaces carry 0 of those raw
+    tokens — count past the boundary = 0. GREEN-on-oracle: the live method returns only the
+    parsed patched summary; the seed reaching the assertion proves the probe is wired.
+    """
+    from scripts.model.client import ModelClient, _ClaudeNoTrainBackend
+    from scripts.plan.deid_in import deid_in
+
+    raw_name = "Jordan Faketestperson"
+    raw_lab = "ALT 88 AST 92"
+    fake = _FakeAnthropic(response_summary=_good_deid_summary())
+    _patch_backend_client(monkeypatch, fake)
+
+    returned = _ClaudeNoTrainBackend().deidentify({"legal-name": raw_name, "raw-lab-values": raw_lab})
+    surfaced = deid_in({"legal-name": raw_name, "raw-lab-values": raw_lab},
+                       ModelClient(backend=_ClaudeNoTrainBackend()))
+
+    returned_blob = json.dumps(returned)
+    surfaced_blob = json.dumps(surfaced)
+    for token in (raw_name, raw_lab, "Jordan", "88"):
+        assert token not in returned_blob, f"raw token {token!r} leaked into the returned summary"
+        assert token not in surfaced_blob, f"raw token {token!r} leaked into the deid_in summary"
+
+
+def test_deidentify_leak_variant_probe_goes_red(monkeypatch):
+    """AC-8 LEAK VARIANT: the clean probe's own assertion FAILS against a leaky SDK → RED-capable.
+
+    Proves the crown-jewel probe is not vacuous: a non-faithful SDK that echoes the raw legal
+    name into an IN-SET field value (so it survives `deid_in`'s key whitelist) pushes a raw
+    token past the boundary. Re-running the CLEAN probe's exact 0-raw-token assertion over the
+    leaky surfaced summary RAISES — the probe detects the leak. A probe that cannot go RED is
+    worthless; this is the demonstration.
+    """
+    from scripts.model.client import ModelClient, _ClaudeNoTrainBackend
+    from scripts.plan.deid_in import deid_in
+
+    raw_name = "Jordan Faketestperson"
+    leaky = {"sex-for-dosing": raw_name}  # the raw name echoed into an in-set field value
+    fake = _FakeAnthropic(response_summary=leaky)
+    _patch_backend_client(monkeypatch, fake)
+
+    surfaced = deid_in({"legal-name": raw_name}, ModelClient(backend=_ClaudeNoTrainBackend()))
+
+    # the in-set-key/raw-value summary passes the key whitelist, so the raw token IS surfaced —
+    # the clean probe's 0-raw-token assertion fails here, which is the RED-capability proof.
+    surfaced_blob = json.dumps(surfaced)
+    probe_passes = raw_name not in surfaced_blob
+    assert not probe_passes, "the leak variant did not surface the raw token — the probe is vacuous"

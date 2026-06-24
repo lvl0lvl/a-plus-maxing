@@ -123,6 +123,60 @@ def _call(backend_method, *args):
     return result
 
 
+def _deid_prompt(raw_intake):
+    """Build the de-id-IN prompt: inline the raw intake, instruct a field-set summary.
+
+    The model is given the raw intake (which carries PII) and told to emit ONLY a
+    de-identified band/class summary whose keys are drawn from `router.SUMMARY_FIELD_SET`
+    — no raw PII, no novel fields. A read of the existing whitelist for the field roster,
+    not a second copy. The subset check is NOT done here; it is `deid_in`'s downstream gate.
+    """
+    import json
+
+    from scripts.plan.router import SUMMARY_FIELD_SET
+
+    field_roster = ", ".join(SUMMARY_FIELD_SET)
+    return (
+        "De-identify the raw operator plan-intake below into a JSON summary object whose "
+        "keys are drawn ONLY from this field set: "
+        f"{field_roster}. "
+        "Emit de-identified band/class tokens only — never a raw legal name, raw lab value, "
+        "address, or any other raw PII, and never a key outside the field set. "
+        "Respond with the JSON object and nothing else.\n\n"
+        f"Raw intake:\n{json.dumps(raw_intake)}"
+    )
+
+
+def _parse_deid_summary(response):
+    """Parse the model response into the de-identified summary mapping.
+
+    Reads the first `text` content block off the SDK envelope and decodes it as the JSON
+    summary object — the model's `SUMMARY_FIELD_SET`-shaped band/class mapping. Returns the
+    parsed mapping verbatim (the raw intake never flows through here); a non-text / non-JSON
+    / non-mapping response raises, failing closed at the `_call` boundary to `ModelCallError`.
+    """
+    import json
+
+    text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), None)
+    if text is None:
+        raise ValueError("deidentify: model response carried no text block")
+    summary = json.loads(text)
+    if not isinstance(summary, dict):
+        raise ValueError("deidentify: model response was not a JSON object")
+    return summary
+
+
+# The de-id call's bounded retry ceiling — at most this many `messages.create` attempts
+# before the failure propagates to the `_call` fail-closed wrapper (never an unbounded
+# retry). An in-task design constant (recipe disposition #8), named here, not a call-site
+# literal, so the bound is one machine-diffable value.
+_DEID_MAX_ATTEMPTS = 3
+
+# The per-call timeout (seconds) the SDK request runs under — a bounded wait, never an
+# indefinite block. Passed through `with_options(timeout=...)` at call time.
+_DEID_TIMEOUT_SECONDS = 60.0
+
+
 class _ClaudeNoTrainBackend:
     """The default backend: the Claude no-train commercial API.
 
@@ -154,7 +208,37 @@ class _ClaudeNoTrainBackend:
         )
 
     def deidentify(self, raw_intake):
-        """De-identify a raw plan-intake against the no-train API."""
-        raise NotImplementedError(
-            "live deidentify is wired at the Wave-B operator checkpoint; tests inject a backend"
-        )
+        """De-identify a raw plan-intake against the no-train API (the live de-id-IN call).
+
+        Sends the raw intake to the `MODEL` no-train API under a bounded retry-with-timeout
+        loop and returns the model's parsed de-identified summary — a `SUMMARY_FIELD_SET`-
+        shaped band/class mapping, never the raw intake. The raw intake is held in memory
+        only (the local arg + the prompt string); it is written to no path. The returned
+        mapping is the parse of the model response, not a passthrough of the raw input; the
+        downstream `ModelClient.deidentify` `isinstance(dict)` check + `deid_in`'s
+        `⊆ SUMMARY_FIELD_SET` whitelist fail it closed if the model emits an out-of-set field.
+
+        Args:
+            raw_intake (dict): The raw operator plan-intake (carries raw-PII fields).
+
+        Returns:
+            (dict) The de-identified summary mapping (`SUMMARY_FIELD_SET`-keyed).
+        """
+        client = self._client()
+        prompt = _deid_prompt(raw_intake)
+        last_exc = None
+        for _ in range(_DEID_MAX_ATTEMPTS):
+            try:
+                response = client.with_options(timeout=_DEID_TIMEOUT_SECONDS).messages.create(
+                    model=self.MODEL,
+                    max_tokens=1024,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                return _parse_deid_summary(response)
+            except Exception as exc:  # bounded: try again until the attempt ceiling
+                last_exc = exc
+        # SEC-01: a CONSTANT message — never interpolate the SDK exception (it can carry the
+        # raw intake or the resolved key). The chained `from last_exc` keeps the original in
+        # the traceback frame for debugging; the `str(ModelCallError)` surface stays raw-free.
+        # Raised at the backend boundary so the raw SDK exception never escapes `deidentify`.
+        raise ModelCallError("deidentify call failed") from last_exc
