@@ -116,4 +116,9 @@ def reinsert_out(html, target_path, *, _profile_paths=DEFAULT_PROFILE_PATHS, _re
     initials = _initials_of(full_name)
     if not initials:
         return html
-    return html.replace(f"Patient {initials}", f"Patient {full_name}")
+    # Anchor the placeholder match on a trailing word boundary so a short initials token does
+    # not mis-substitute a longer one (the render header emits `Patient <initials> ·`; an
+    # unanchored `Patient Z` would clobber `Patient ZW`). `\b` matches the space/`·` boundary
+    # the render guarantees after the initials and refuses a within-token partial.
+    placeholder = re.compile(rf"Patient {re.escape(initials)}\b")
+    return placeholder.sub(f"Patient {full_name}", html)
