@@ -372,3 +372,169 @@ def test_deid_sentinel_halts_with_zero_dispatches_and_zero_plans(tmp_path):
     for domain in ("workout", "nutrition", "supplements", "peptides"):
         assert store.read(f"plan::{domain}", root=tmp_path) == []
 
+
+# === ADR-0020-T2: de-id-boundary WHOLE-RUN OUTAGE -> fail-closed halt ============
+#
+# A whole-run outage is the de-id boundary DOWN for the whole run: an injected
+# `deid_client` whose `deidentify` raises `ModelCallError`, so `deid_in` returns the
+# existing `{"deidentified": False, "reason": DEID_CALL_FAILED}` sentinel (a whole-run
+# outage is byte-identical to a per-call failure AT the `deid_in` boundary). On that
+# sentinel the orchestrator HALTS to honest no-plan: 0 plans recorded, no degrade to
+# `router.summarize` as a de-id-IN substitute, the maintained artifact untouched, and the
+# `gate_dispatch=` seam IDLE (0 dispatches). These are the five ADR-0020-T2 acceptance
+# criteria; the deviation table grounds them as ORCHESTRATOR (not `deid_in`) behaviors.
+
+
+def _outage_client():
+    """A de-id client whose `deidentify` raises `ModelCallError` for the WHOLE run.
+
+    The whole-run-outage injection: `deid_in` collapses the raise to the existing
+    `DEID_CALL_FAILED` sentinel (`except Exception`), which the orchestrator halts on.
+    """
+    return _FixedDeidClient(ModelCallError("de-id boundary unreachable for the whole run"))
+
+
+# --- AC-1: whole-run outage -> 0 plans recorded, honest no-plan surfaced ----------
+
+
+def test_whole_run_outage_records_zero_plans(tmp_path):
+    # AC-1: with the de-id boundary injected as unreachable for the WHOLE run, the
+    # orchestrator records 0 plans and surfaces the honest no-plan state. A degrade-to-
+    # `summarize` or a fabricated summary would have recorded a `plan::<domain>` -> RED.
+    store_read = _seed_store(tmp_path)
+    dispatch = _RecordingDispatch(_sustaining_authors())
+
+    out = run_orchestrated(
+        _raw_intake(), _outage_client(), dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"),
+    )
+
+    # the honest no-plan state is surfaced (no recorded plan in the results)
+    assert out["deidentified"] is False
+    assert out["results"] == {}
+    recorded = [d for d, r in out["results"].items() if r.get("recorded") is True]
+    assert recorded == [], "the outage path recorded a plan (must halt to 0 plans)"
+    # 0 plans landed in the store across EVERY domain (not only the requested two)
+    for domain in ("workout", "nutrition", "supplements", "peptides"):
+        assert store.read(f"plan::{domain}", root=tmp_path) == []
+
+
+# --- AC-2: the outage path does NOT route raw through `router.summarize` ----------
+
+
+def test_outage_does_not_route_raw_intake_through_summarize(tmp_path, monkeypatch):
+    # AC-2 (non-vacuous, fix M3/LOW-3): a bare call-count `summarize == 0` passes trivially
+    # on a halted orchestrator (it never reaches the persisted-side `summarize` anyway). The
+    # load-bearing assertion is an IDENTITY check: the RAW-INTAKE OBJECT is NEVER an argument
+    # to `router.summarize` on the outage path -- proving `summarize` is not used as a degraded
+    # de-id-IN substitute for the raw intake. A counterfactual control (below) gives it teeth.
+    summarize_args = []
+    real_summarize = router.summarize
+
+    def summarize_spy(*args, **kwargs):
+        summarize_args.append((args, kwargs))
+        return real_summarize(*args, **kwargs)
+
+    monkeypatch.setattr(router, "summarize", summarize_spy)
+
+    store_read = _seed_store(tmp_path)
+    raw = _raw_intake()
+    dispatch = _RecordingDispatch(_sustaining_authors())
+
+    run_orchestrated(
+        raw, _outage_client(), dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"),
+    )
+
+    # the raw-intake OBJECT was never passed to `summarize` (no degrade-to-summarize de-id-IN)
+    for args, kwargs in summarize_args:
+        for arg in args:
+            assert arg is not raw, "the outage path routed the RAW intake through router.summarize"
+        for value in kwargs.values():
+            assert value is not raw, "the outage path routed the RAW intake through router.summarize"
+
+
+def test_outage_summarize_identity_check_has_teeth(tmp_path):
+    # AC-2 COUNTERFACTUAL NEGATIVE CONTROL: a deliberately-degrading orchestrator stub that
+    # DOES route the raw intake through `router.summarize` to keep going makes the identity
+    # assertion turn RED -- confirming the assertion above tests something (not a tautology).
+    raw = _raw_intake()
+    summarize_args = []
+
+    def summarize_spy(arg, *rest, **kwargs):
+        summarize_args.append(arg)
+        return {}
+
+    def degrading_orchestrator(raw_intake):
+        # the crown-jewel fidelity relaxation the real orchestrator must NEVER do: on a
+        # de-id-boundary outage, degrade to `summarize(raw_intake)` as a coarse de-id-IN.
+        return summarize_spy(raw_intake)
+
+    degrading_orchestrator(raw)
+
+    # the degrading stub DID pass the raw-intake object to `summarize` -> the identity check fails
+    routed_raw = any(arg is raw for arg in summarize_args)
+    assert routed_raw, "the counterfactual control must route the raw object (proves teeth)"
+
+
+# --- AC-3: on outage, an existing maintained artifact is left untouched -----------
+
+
+def test_outage_leaves_existing_artifact_untouched(tmp_path):
+    # AC-3 (Risk R3, no partial/stale re-emit): seed a synthetic pre-existing maintained-HTML
+    # artifact under the orchestrator's `vault/artifacts/generated/` output target, inject the
+    # whole-run outage, run the orchestrator, and assert the artifact's bytes are IDENTICAL
+    # pre- and post-outage. An outage path that re-emitted / truncated / clobbered it -> RED.
+    artifact_dir = tmp_path / "vault" / "artifacts" / "generated"
+    artifact_dir.mkdir(parents=True)
+    artifact = artifact_dir / "plan.html"
+    seeded = "<html><body>SYNTHETIC pre-existing maintained plan — untouched</body></html>"
+    artifact.write_text(seeded, encoding="utf-8")
+    before = artifact.read_bytes()
+
+    store_read = _seed_store(tmp_path)
+    dispatch = _RecordingDispatch(_sustaining_authors())
+
+    run_orchestrated(
+        _raw_intake(), _outage_client(), dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"),
+    )
+
+    after = artifact.read_bytes()
+    assert after == before, "the outage path rewrote/clobbered the existing maintained artifact"
+    assert artifact.read_text(encoding="utf-8") == seeded
+
+
+# --- AC-4 (gate-idle, the negative assertion): 0 gate dispatches on outage --------
+
+
+def test_outage_gate_dispatch_seam_is_idle(tmp_path):
+    # AC-4 (the missing negative assertion, ADR-0020 OQ-4): on the injected whole-run outage,
+    # the downstream gates issue 0 dispatches. Inject a RECORDING SPY into the orchestrator's
+    # real `gate_dispatch=` seam (the 0022-T1 hook both the judge AND safety-review wire
+    # through, so one spy counts all gate dispatches) and assert its dispatch count = 0. An
+    # orchestrator that reached the `gate_dispatch` seam despite the outage halt turns this RED.
+    # This asserts the seam is IDLE (not merely "a plan is absent") -- the E2E-placement
+    # negative assertion: data does NOT land where it should not.
+    # Wave-4 re-assertion note: re-assert at the Wave-4 checkpoint when ADR-0022-T2 wires the
+    # REAL gate dispatch into the seam, so the gate-idle-on-outage property holds against the
+    # WIRED path, not only the Wave-2 no-op seam.
+    store_read = _seed_store(tmp_path)
+    dispatch = _RecordingDispatch(_sustaining_authors())
+
+    gate_calls = []
+
+    def gate_spy(*args, **kwargs):
+        gate_calls.append((args, kwargs))
+
+    out = run_orchestrated(
+        _raw_intake(), _outage_client(), dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"), gate_dispatch=gate_spy,
+    )
+
+    # the orchestrator halted before reaching the gate_dispatch seam -> 0 gate dispatches
+    assert gate_calls == [], "the gate_dispatch seam fired on outage (must be idle on halt)"
+    # and the halt surfaced (cross-check the seam-idle is the outage halt, not a silent skip)
+    assert out["deidentified"] is False
+    assert out["results"] == {}
+
