@@ -88,6 +88,8 @@ Produce the plan with deterministic local tooling and pre-written templates, app
 | [ADR-0014 (Web-Form Capture and Persistence of Operator Input)](ADR-0014-web-form-capture-operator-input-persistence.md) | constrains | ADR-0014's captured raw values stay off the model — they reach specialists only via `router.summarize`'s closed `SUMMARY_FIELD_SET` de-identification gate. |
 | [ADR-0015 (Swappable No-Train Model Client)](ADR-0015-swappable-no-train-model-client.md) | amended-by | ADR-0015 adds the programmatic-client MECHANISM this ADR never specified, plus a SECOND model-touching path (the intake conversation) alongside "Only plan reasoning touches the model"; the no-train-lane routing and summaries-not-raw discipline for the store read survive unchanged. |
 | [ADR-0016 (Intake-Conversation Egress Relaxation)](ADR-0016-intake-conversation-egress-relaxation.md) | amended-by | ADR-0016 scopes this ADR's zero-egress boundary so the live intake conversation may egress raw on the no-train lane while every persisted fact stays de-identified; it does not supersede wholesale — the store-side `summarize`/`dispatch` discipline is untouched. |
+| [ADR-0020 (Model-Backed API De-Id Boundary — De-Id IN)](ADR-0020-model-backed-api-deid-boundary-in.md) | tensions-with | ADR-0020 routes raw plan-intake PII to the API BEFORE de-identification — the surface this ADR's summaries-not-raw falsification forbade. The boundary is defined in ADR-0020's Consequences; this ADR's persisted-side-de-identified invariant is honored (the boundary RELOCATES de-id, it does not remove the de-identified store). Inverse of ADR-0020 → 0001 `tensions-with` (engine dag.md §7). |
+| [ADR-0021 (Deterministic PII Re-Insertion — De-Id OUT)](ADR-0021-pii-reinsertion-local-artifact-out.md) | relates | ADR-0021 is the OUT half of the crown-jewel relaxation, pairing with ADR-0020's IN half. This ADR's persisted-side-de-identified invariant is honored — re-insertion is render-time-only onto a gitignored artifact, off the persisted store. Inverse of ADR-0021 → 0001 `relates` (engine dag.md §7). |
 
 Note on [2026-05-16-system-architecture.md](../../vault/decisions/2026-05-16-system-architecture.md): this ADR reframes the conversational-only threat posture that decision assumed ("LLM-driven agent, not a tracker"), but it is not a formal superseder of any specific 2026-05-16 decision — the threat-model-B boundary is a new decision, not a reversal of one. The formal supersession of 2026-05-16 is carried by ADR-0002, ADR-0004, and ADR-0006 per the discovery Supersession map; it is therefore a prose reframing note here, not a Related Decisions edge.
 
@@ -124,6 +126,7 @@ Cross-reference authority: [.pipeline/dag.md §6](.pipeline/dag.md) is the canon
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-06-03 | Initial draft (v1.0) — accepted | Walter McGivney |
+| 2026-06-23 | Added inverse edge(s) to ADR-0020 (tensions-with) and ADR-0021 (relates) (plan-generation engine set, S92 backfill). | Walter McGivney |
 | 2026-06-04 | v1.1 — backfilled cross-references to the completed ADR set. | Walter McGivney |
 | 2026-06-04 | v1.2 — Phase-8 red-team fixes (RT-01). | Walter McGivney |
 | 2026-06-21 | v1.3 — Phase-5 verify: added inverse `constrains` edges to ADR-0013 (intake-server no-egress surface) and ADR-0014 (capture stays off the model). | Walter McGivney |
