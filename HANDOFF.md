@@ -12,6 +12,29 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 94 (2026-06-24)
+
+Goal: Complete the recipe stage (apply the laddered review-findings ledger + judge + promote), then **BUILD the plan-generation engine LIVE-WIRING** via `/execute-plan` (wave by wave, mock/fixture-tested, 0 live spend) — as many of the 3 waves as the session allows, each with its EXECUTED checkpoint Go/No-Go + Tier-3 `/review-pr` → `/merge` — so the ONLY remaining step is the operator-present LIVE test. (AUTONOMOUS; operator-directed: "open the session, write the scope contract and proceed.")
+
+Acceptance criteria:
+- [ ] AC1 (recipe stage — the PF-S93-01 carry-over): the 12 laddered executability findings applied to the recipes **per-task** (one agent per recipe — PF-S93-01 lesson, NOT a single batched dispatch); the recipe judge pass (Phase 6/7) ACCEPT ≥9/dim; recipes promoted `draft-ADR-002x-T*.md` → `docs/task-plan/<id>.md`. (ARCH-1 already fixed in the T2 draft.)
+- [ ] AC2 (Wave 1): ADR-0027-T1 (live de-id backend) + ADR-0026-T1 (keystone control-inversion driver) built TDD-per-recipe; Wave-1 checkpoint EXECUTED green (the behavior-preservation TRIAD: inner-engine numstat=0 + 0 forked loop copies + suite green; the de-id crown-jewel 0-leak: 0 raw-PII past the boundary + raw-intake-in-memory-only + fail-closed `ModelCallError`).
+- [ ] AC3 (Wave 2): ADR-0026-T2 composed `gate_dispatch` built; checkpoint green (exact 3-key disposition + fail-closed-on-malformed + both-gates-run + the composer-driver seam).
+- [ ] AC4 (Wave 3): ADR-0026-T3 `/generate-plan` skill front-door + ADR-0026-T4 core-capability-audit repoint built; checkpoint green (runtime-stage-order E2E on fixtures + audit on the A′ spine + the non-tautological `--self-test`); `core-capability-audit.sh` repointed off `generate_plan.py` onto the A′ spine (closes `71s4`/PF-S63-02).
+- [ ] AC5 (review→merge): every built wave through the full Tier-3 `/review-pr` 6-agent with independence intact (profile-less blind-triage + EXECUTED blind-verify); LEGITIMATE findings fixed + blind-verified → `/merge` to `main`.
+- [ ] AC6 (close): full automatic close on final post-merge `main` + cite the SHA (PF-S74-01).
+
+Files I WILL touch: `scripts/model/client.py` (`_ClaudeNoTrainBackend.deidentify`); `scripts/plan/plan_driver.py` (NEW), `scripts/plan/plan_orchestrator.py` (the wrapper re-point — behavior-preserving refactor), `scripts/plan/gate_dispatch.py` (NEW), `scripts/plan/_a_prime_self_test.py` (NEW); `scripts/core-capability-audit.sh` (repoint); `.claude/skills/generate-plan/SKILL.md` (the A′ front-door reconcile); `tests/*`; the recipes (apply ledger + promote to `docs/task-plan/`); the close docs (staged by EXPLICIT path).
+Files I will NOT touch: the INNER ENGINE (`scripts/plan/{orchestrate,pipeline,assemble,generate_plan,adjudicate,adjust,track,router}.py` — numstat=0); the built gate callables (`quality_judge`/`safety_review`)/`deid_in`/`reinsert_out`/`maintained.py` (WIRED not rewritten); `scripts/store/store.py`+`keying.py`; the dashboard (LOCKED); `vault/library/*`; `main` directly; the keychain.
+NOT doing: the operator-present LIVE end-to-end run (the operator injects the key; agent never touches the keychain; never commit the key — PUBLIC repo); ANY live API call (mock/fixture-tested, 0 spend); forcing ALL 3 waves if context runs low (checkpoint cleanly at a wave boundary with a clean HANDOFF if so — each wave is a natural session boundary per V1 Build Execution).
+Invariants at risk: ADR-0001/0005/0016 (the crown-jewel PII boundary — the live de-id is the API egress; fail-closed); INV-CORE-CAPABILITY (the audit repoint CLOSES PF-S63-02); INV-ROLE-INLINING (full profiles on EVERY dispatch); INV-BRANCH-NOT-MAIN; the close gates; PF-S74-01; PF-S92-01 (never stop mid-loop to ask a settled question); PF-S93-01 (per-task remediation, NOT batched).
+
+**Core-capability-first gate (PF-S63-02):** YES — this IS the core-capability build (the engine → a live front door + the live de-id backend → the audit repointed onto the A′ spine proving the real capability is wired). The direct path, not secondary work.
+
+**v1-build attestation (V1 Build Execution):** executes the approved 3-wave `docs/build-plan/build-plan-live-wiring.md`; the prior stage (recipes) is completed FIRST (its design checkpoint). Build via `/execute-plan` per V1 Build Execution — never hand-rolled (PF-S36-01); plan-integrity grounds + gates each wave transition.
+
+**S94 self-confirmation (autonomous):** contract committed at session-OPEN (the PF-S91 lesson) per the operator's explicit "write the scope contract and proceed" + the standing autonomous directive.
+
 ## Scope Contract — Session 93 (2026-06-24)
 
 Goal: Design + build the **live-wiring** that connects the built plan-generation engine to real clients — so the ONLY remaining step is the operator-present LIVE test — via the full autonomous build pipeline (`/create-adr` → spec → build-plan → task-plan → `/execute-plan`), mock/fixture-tested (0 live spend). **Runtime split (operator decision, S93): PII-related → no-train API (the de-id-IN boundary, the one model call that sees raw operator PII); everything else (the plan-domain specialists, the quality judge, the safety-review lenses, the orchestrator control flow) → subscription (Claude Code agent dispatch, like the autonomous build pipeline); de-id OUT stays deterministic (no model, already built).**
