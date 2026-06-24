@@ -24,8 +24,18 @@ from `run_generation`'s `gates=` per-domain safety-inputs dict (`clearance_grant
 `red_s_lea_screen` to `compute_plan`): `gate_dispatch=` is the post-generation gate-dispatch hook
 this task adds, `gates=` is the per-domain compute input this callable also forwards.
 
-The revise loop (ADR-0022-T2) and the dispatch-cap (ADR-0022-T3) are LATER tasks and are
-explicitly OUT of scope here — this module pre-builds neither.
+The revise loop (ADR-0022-T2) is a LATER task and is explicitly OUT of scope here.
+
+The aggregate-dispatch CAP (ADR-0022-T3) IS wired here: `run_orchestrated` instruments the
+per-plan aggregate dispatch count across the three dispatch classes (specialist, gate, revise) via
+a `DispatchBudget` charged BEFORE each dispatch, and fails closed when a `dispatch_cap` would be
+exceeded — halting to the honest no-plan state (the `DEID_HALTED` shape, extended with
+`dispatch_count`), recording 0 plans past the cap, dispatching nothing further. The cap is a
+configurable keyword parameter defaulting to the named `dispatch_budget.DEFAULT_DISPATCH_CAP` (an
+operator/billing fact confirmed downstream), never a hard-coded literal. On the normal path the
+final count is surfaced in the result (`dispatch_count`). The revise-class accrual (ADR-0022-T2,
+Wave 4) is charged at THIS forward by wrapping the `reauthor`/`adjudicator` hooks, leaving the
+inner engine byte-unchanged.
 """
 
 import json
@@ -33,6 +43,11 @@ from pathlib import Path
 
 from scripts.plan import pipeline
 from scripts.plan.deid_in import deid_in
+from scripts.plan.dispatch_budget import (
+    DEFAULT_DISPATCH_CAP,
+    DispatchBudget,
+    DispatchCapExceeded,
+)
 
 # domain -> the role whose full profile the dispatch prompt inlines (INV-ROLE-INLINING). The
 # plan-domain specialists live under `.claude/agents/<role>/agent.md` (verified present); a
@@ -100,7 +115,7 @@ def _dispatch_prompt(role, summary, gates):
 
 def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, plan_date,
                      domains=DEFAULT_DOMAINS, on_date=None, gates=None, gate_dispatch=None,
-                     reauthor=None, adjudicator=None):
+                     reauthor=None, adjudicator=None, dispatch_cap=DEFAULT_DISPATCH_CAP):
     """Drive the autonomous GENERATE pass: de-id IN -> dispatch specialists -> the inner engine.
 
     The programmatic runtime surface (runtime A): (1) calls `deid_in(raw_intake, deid_client)`
@@ -140,19 +155,40 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
             `run_generation` verbatim.
         adjudicator (Callable, optional): The held-finding medical-liaison dispatch hook,
             forwarded to `run_generation` verbatim (the inner safety gate — never bypassed).
+        dispatch_cap (int, optional): The fail-closed aggregate-dispatch cap (ADR-0022-T3) — the
+            max dispatches a single run may issue across all three dispatch classes (specialist +
+            gate + revise). Defaults to the named `dispatch_budget.DEFAULT_DISPATCH_CAP` (the
+            no-cap-pressure default; the operator/billing ceiling is confirmed downstream), never a
+            hard-coded literal. When a charge would exceed it, the run HALTS to honest no-plan
+            before the over-budget dispatch is issued.
 
     Returns:
         (dict) On a successful run, the `run_generation` result (`results`, `reconciliation`,
         `reauthored`, `adjudication`, `conflict_adjudications`, `rx_bpmh_adjudications`,
-        `dvq_entries`). On the de-id sentinel halt, the honest no-plan state
-        `{"deidentified": False, "reason": DEID_HALTED, "results": {}, "dvq_entries": [],
-        "deid": <the sentinel>}` — 0 dispatches issued, `run_generation` never called.
+        `dvq_entries`) plus `dispatch_count` (the aggregate dispatches this run issued). On the
+        de-id sentinel halt, the honest no-plan state `{"deidentified": False, "reason":
+        DEID_HALTED, "results": {}, "dvq_entries": [], "deid": <the sentinel>}` — 0 dispatches
+        issued, `run_generation` never called. On the dispatch-cap halt, the honest no-plan state
+        `{"deidentified": True, "reason": DISPATCH_CAP_EXCEEDED, "results": {}, "dvq_entries": [],
+        "dispatch_count": <count reached>}` — 0 plans recorded past the cap, the over-budget
+        dispatch never issued.
     """
     gates = gates or {}
+    # The per-plan dispatch budget (ADR-0022-T3): charged BEFORE each dispatch across all three
+    # dispatch classes (specialist + gate + revise). When a charge would exceed `dispatch_cap` it
+    # raises `DispatchCapExceeded` (fail-closed — the over-budget dispatch is never issued); the
+    # caught halt surfaces the honest no-plan state + the count reached.
+    budget = DispatchBudget(cap=dispatch_cap)
     # The seam is HELD here (the control-surface hook ADR-0023-T1 / ADR-0024-T1 wire real gates
     # into, ADR-0020-T2 spies). Its DEFAULT is a no-op that dispatches nothing — this task builds
-    # the seam only, never the gates, so a normal run issues 0 gate dispatches (AC-7).
+    # the seam only, never the gates, so a normal run issues 0 gate dispatches (AC-7). The gate +
+    # the revise hooks are wrapped to CHARGE the budget on every real invocation, so each gate /
+    # revise dispatch the inner engine fires accrues at this orchestrator forward (the inner engine
+    # stays byte-unchanged — the accrual is here, not in `pipeline`/`orchestrate`).
     gate_dispatch = gate_dispatch if gate_dispatch is not None else _noop_gate_dispatch
+    gate_dispatch = _charging(gate_dispatch, budget)
+    reauthor = _charging(reauthor, budget) if reauthor is not None else None
+    adjudicator = _charging(adjudicator, budget) if adjudicator is not None else None
 
     summary = deid_in(raw_intake, deid_client)
     # Honest no-plan halt: the de-id boundary returned the sentinel ({"deidentified": False}), so
@@ -167,22 +203,40 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
             "deid": summary,
         }
 
-    # Dispatch each domain's specialist (full profile inlined) over the de-identified summary
-    # through the injected seam, capturing each author envelope. The orchestrator originates no
-    # plan content — the envelope is the specialist's (runtime A).
-    authors = {}
-    for domain in domains:
-        role = _ROLE_OF_DOMAIN[domain]
-        prompt = _dispatch_prompt(role, summary, gates)
-        authors[domain] = dispatch(domain, prompt, summary)
+    try:
+        # Dispatch each domain's specialist (full profile inlined) over the de-identified summary
+        # through the injected seam, capturing each author envelope. Charge the budget BEFORE each
+        # dispatch — fail-closed before the over-budget specialist call is issued. The orchestrator
+        # originates no plan content — the envelope is the specialist's (runtime A).
+        authors = {}
+        for domain in domains:
+            budget.charge()
+            role = _ROLE_OF_DOMAIN[domain]
+            prompt = _dispatch_prompt(role, summary, gates)
+            authors[domain] = dispatch(domain, prompt, summary)
 
-    # Drive the inner engine verbatim. It records the survivors via `record_plan`; the
-    # orchestrator records nothing directly and opens no new store stream. The safety gate
-    # (the `adjudicator` hook) is forwarded, never bypassed.
-    return pipeline.run_generation(
-        authors, store_read, root, plan_date=plan_date, on_date=on_date, gates=gates,
-        reauthor=reauthor, adjudicator=adjudicator,
-    )
+        # Drive the inner engine verbatim. It records the survivors via `record_plan`; the
+        # orchestrator records nothing directly and opens no new store stream. The safety gate
+        # (the `adjudicator` hook) is forwarded, never bypassed. The gate / revise dispatch classes
+        # the inner engine fires charge the budget through the wrapped hooks above.
+        result = pipeline.run_generation(
+            authors, store_read, root, plan_date=plan_date, on_date=on_date, gates=gates,
+            reauthor=reauthor, adjudicator=adjudicator,
+        )
+    except DispatchCapExceeded as exceeded:
+        # Fail-closed halt: a charge would exceed the cap, so the over-budget dispatch was never
+        # issued. Return the honest no-plan state (the DEID_HALTED shape, extended with
+        # `dispatch_count`) — 0 plans recorded past the cap, dispatch nothing further.
+        return {
+            "deidentified": True,
+            "reason": exceeded.reason,
+            "results": {},
+            "dvq_entries": [],
+            "dispatch_count": exceeded.count,
+        }
+
+    # Normal path: surface the final aggregate dispatch count in the returned result.
+    return {**result, "dispatch_count": budget.count}
 
 
 def _noop_gate_dispatch(*args, **kwargs):
@@ -194,3 +248,29 @@ def _noop_gate_dispatch(*args, **kwargs):
     assertion. This task builds the seam + this inert default ONLY, never the gates.
     """
     return None
+
+
+def _charging(hook, budget):
+    """Wrap a dispatch hook so it CHARGES the budget before each real invocation.
+
+    The gate / revise (`reauthor` / `adjudicator`) dispatch classes fire INSIDE the inner engine
+    (`pipeline.run_generation` -> `orchestrate.generate_plans`), but their accrual must happen at
+    THIS orchestrator forward, not in the byte-unchanged inner engine. Wrapping the hook charges
+    the budget on every invocation BEFORE the wrapped dispatch runs — fail-closed before the
+    over-budget gate / revise call is issued (`DispatchCapExceeded` propagates up to the run's
+    halt handler). The no-op default gate charges nothing on a normal run (it is never invoked
+    past the seam in Wave 2/3), so the count stays the specialist tally on the default path.
+
+    Args:
+        hook (Callable): The dispatch hook to charge-wrap (`gate_dispatch` / `reauthor` /
+            `adjudicator`).
+        budget (DispatchBudget): The per-plan dispatch budget to charge.
+
+    Returns:
+        (Callable) The charge-wrapping hook, same call signature as `hook`.
+    """
+    def charged(*args, **kwargs):
+        budget.charge()
+        return hook(*args, **kwargs)
+
+    return charged
