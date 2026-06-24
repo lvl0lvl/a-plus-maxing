@@ -35,11 +35,13 @@ class _FixtureBackend:
     Attributes:
         converse_result: The fixture `converse` returns (or an Exception to raise).
         author_result: The fixture `author` returns (or an Exception to raise).
+        deidentify_result: The fixture `deidentify` returns (or an Exception to raise).
     """
 
-    def __init__(self, converse_result=None, author_result=None):
+    def __init__(self, converse_result=None, author_result=None, deidentify_result=None):
         self.converse_result = converse_result
         self.author_result = author_result
+        self.deidentify_result = deidentify_result
 
     def converse(self, messages):
         if isinstance(self.converse_result, Exception):
@@ -50,6 +52,11 @@ class _FixtureBackend:
         if isinstance(self.author_result, Exception):
             raise self.author_result
         return self.author_result
+
+    def deidentify(self, raw_intake):
+        if isinstance(self.deidentify_result, Exception):
+            raise self.deidentify_result
+        return self.deidentify_result
 
 
 def _good_converse_fixture():
@@ -76,6 +83,22 @@ def _good_author_fixture(slug="personal-trainer"):
                 "payload": {"exercise": "back squat", "sets": 3, "reps": 5},
             }
         ],
+    }
+
+
+def _good_deid_summary_fixture():
+    """A well-formed backend `deidentify` result: the de-identified summary mapping.
+
+    Shaped from `router.SUMMARY_FIELD_SET` — de-identified band/class tokens only, never raw
+    plan-intake PII (no legal name, no raw lab value). This is what the no-train de-id call
+    emits from a raw intake.
+    """
+    return {
+        "training-age-band": "10-15y",
+        "sex-for-dosing": "male",
+        "bodyweight-band": "80-90kg",
+        "goal-domains": ["workout"],
+        "recovery-status-band": "moderate",
     }
 
 
@@ -110,6 +133,22 @@ def test_author_passes_thin_library_sentinel_through():
     client = ModelClient(backend=_FixtureBackend(author_result=sentinel))
 
     assert client.author("peptides", {"goal": "token-B"}) == sentinel
+
+
+def test_deidentify_returns_summary_over_mock_backend():
+    """`deidentify` returns the de-identified summary mapping over a MOCK backend.
+
+    The de-id-IN seam (ADR-0020): raw plan-intake in, de-identified summary out — no live
+    API, no key (the backend is a fixture). The result is the `SUMMARY_FIELD_SET`-shaped
+    de-identified mapping the pipeline consumes.
+    """
+    summary = _good_deid_summary_fixture()
+    client = ModelClient(backend=_FixtureBackend(deidentify_result=summary))
+
+    result = client.deidentify({"legal-name": "Jordan Tester", "raw-lab-values": "ALT 88"})
+
+    assert result == summary
+    assert result["training-age-band"] == "10-15y"
 
 
 # --- AC-1: single model boundary (the one import-point) ------------------------
@@ -150,16 +189,21 @@ class _AltBackend:
     def author(self, domain, summary):
         return {"specialist": "alt-author", "recommendations": []}
 
+    def deidentify(self, raw_intake):
+        return {"goal-domains": ["workout"], "sex-for-dosing": "unspecified"}
+
 
 def test_swap_to_alternate_backend_exercises_both_methods():
-    """AC-3: an injected alternate backend serves both methods (swap = injection)."""
+    """AC-3: an injected alternate backend serves all three methods (swap = injection)."""
     client = ModelClient(backend=_AltBackend())
 
     converse_out = client.converse([{"role": "user", "content": "hi"}])
     author_out = client.author("workout", {"goal": "token-C"})
+    deid_out = client.deidentify({"legal-name": "Pat Sample"})
 
     assert converse_out["reply"] == "[alt-provider] noted."
     assert author_out["specialist"] == "alt-author"
+    assert deid_out["goal-domains"] == ["workout"]
 
 
 def test_swap_requires_no_caller_side_edit():
@@ -222,6 +266,43 @@ def test_author_raises_typed_on_every_failure_mode(bad_result):
 
     with pytest.raises(ModelCallError):
         client.author("workout", {"goal": "token-D"})
+
+
+@pytest.mark.parametrize(
+    "bad_result",
+    [
+        None,  # failed: backend returned nothing
+        {},  # empty: backend returned an empty payload
+        "not-a-mapping",  # malformed: a non-mapping de-id result
+        RuntimeError("backend errored"),  # errored: backend raised
+        subprocess.TimeoutExpired(cmd="model", timeout=30),  # timed-out
+    ],
+    ids=["failed", "empty", "malformed", "errored", "timed-out"],
+)
+def test_deidentify_raises_typed_on_every_failure_mode(bad_result):
+    """`deidentify` raises a TYPED failure on each failure mode (fail-closed de-id).
+
+    An empty/malformed/errored de-id call must RAISE — never return a fabricated or partial
+    summary that could be mistaken for a valid de-identified payload (the crown-jewel
+    fail-closed contract `deid_in` depends on).
+    """
+    client = ModelClient(backend=_FixtureBackend(deidentify_result=bad_result))
+
+    with pytest.raises(ModelCallError):
+        client.deidentify({"legal-name": "Jordan Tester"})
+
+
+def test_no_train_backend_deidentify_is_not_invoked_in_tests():
+    """The default no-train backend's `deidentify` is `NotImplementedError`, never live.
+
+    Mirrors the `converse`/`author` stubs: the live de-id call is wired at the operator
+    checkpoint. Calling it raises `NotImplementedError` (lit at the checkpoint) — the proof
+    that no test path makes a live de-id call (0 live-API spend).
+    """
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    with pytest.raises(NotImplementedError):
+        _ClaudeNoTrainBackend().deidentify({"legal-name": "Jordan Tester"})
 
 
 def test_failure_never_returns_a_fabricated_payload():
