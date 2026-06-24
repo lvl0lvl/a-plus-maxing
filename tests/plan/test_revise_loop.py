@@ -40,7 +40,9 @@ import os
 import subprocess
 from pathlib import Path
 
+from scripts.plan.dispatch_budget import DISPATCH_CAP_EXCEEDED
 from scripts.plan.plan_orchestrator import (
+    PROMOTE_FAILED,
     REVISE_EXHAUSTED,
     SAFETY_BLOCKED,
     run_orchestrated,
@@ -943,3 +945,150 @@ def test_e2e_blocked_plan_does_not_reach_the_rendered_store(tmp_path):
     rendered = Path(artifact).read_text(encoding="utf-8")
     # the workout exercise the sustaining author would have surfaced is NOT in the render
     assert "Goblet squat" not in rendered, "a SAFETY_BLOCKED plan leaked into the rendered store"
+
+
+# ===============================================================================
+# Cycle 7: the in-loop fail-closed boundary (SEC-01 promote OSError, BUG-01 unknown domain)
+# ===============================================================================
+
+
+def test_promote_oserror_fails_closed_no_partial_store(tmp_path, monkeypatch):
+    # SEC-01: a mid-promote write OSError (the 2nd `plan::` append of a clean ACCEPT+PASS
+    # multi-domain run) must FAIL CLOSED — `run_orchestrated` returns honest no-plan
+    # (`PROMOTE_FAILED`), NOT an escaping OSError, and the real store is NOT left with a
+    # partial plan set (0 plan rows). On the current code the OSError escapes the try (it
+    # catches only `DispatchCapExceeded`) and any first row already appended is a partial root.
+    store_read = _seed_store(tmp_path)
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch(_sustaining_authors())
+    gate = _clean_composing_gate()
+
+    real_append = store.append
+    appended = {"n": 0}
+
+    def failing_append(item, reading, root=store.DEFAULT_ROOT):
+        # only the promote into the REAL root is failure-injected (the scratch writes the
+        # inner engine does are untouched); fail on the 2nd promote-append.
+        if str(root) == str(tmp_path) and (item.startswith("plan::") or item.startswith("dvq::")):
+            appended["n"] += 1
+            if appended["n"] == 2:
+                raise OSError("disk full mid-promote")
+        return real_append(item, reading, root=root)
+
+    monkeypatch.setattr(store, "append", failing_append)
+
+    out = run_orchestrated(
+        _raw_intake(), deid_client, dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"), gate_dispatch=gate,
+    )
+
+    # the run FAILED CLOSED to honest no-plan, NOT an escaping OSError
+    assert out["reason"] == PROMOTE_FAILED, f"promote OSError did not fail closed: {out.get('reason')}"
+    assert out["results"] == {}, "a promote-failed run surfaced a plan"
+    # the real store is NOT left with a partial plan set (0 plan/dvq rows promoted)
+    for item in store.items(root=tmp_path):
+        assert not (item.startswith("plan::") or item.startswith("dvq::")), (
+            f"a partial plan set was left in the real store: {item}"
+        )
+
+
+def test_unknown_revise_domain_fails_closed(tmp_path):
+    # BUG-01/API-02: a gate disposition naming an UNKNOWN `revise_domains` target must FAIL
+    # CLOSED — `run_orchestrated` returns honest no-plan (`SAFETY_BLOCKED`, treating an unknown
+    # revise target as a malformed disposition), NOT an escaping KeyError out of
+    # `_ROLE_OF_DOMAIN[domain]`. On the current code the unguarded `_ROLE_OF_DOMAIN[domain]`
+    # raises a KeyError that escapes the try (it catches only `DispatchCapExceeded`).
+    store_read = _seed_store(tmp_path)
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch(_sustaining_authors())
+
+    # a gate that REVISEs (never accepts) naming a domain not in `_ROLE_OF_DOMAIN` / the run set
+    def unknown_revise_gate(assembled_plan):
+        return {"accept": False, "safety_passed": True, "revise_domains": ("not-a-domain",)}
+
+    out = run_orchestrated(
+        _raw_intake(), deid_client, dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout",), gate_dispatch=unknown_revise_gate,
+    )
+
+    assert out["reason"] == SAFETY_BLOCKED, f"unknown revise domain did not fail closed: {out.get('reason')}"
+    assert out["results"] == {}, "an unknown-revise-domain run surfaced a plan"
+    assert store.read("plan::workout", root=tmp_path) == []
+
+
+def test_cap_trips_mid_revise_loop(tmp_path):
+    # BUG-02: a NON-converging revise loop with a `dispatch_cap` sized to trip MID-revise (enough
+    # for the initial specialist + 1 gate but NOT a 2nd revise re-dispatch) halts
+    # DISPATCH_CAP_EXCEEDED, 0 plans. The cap×revise-loop interaction (production behavior is
+    # correct — this pins it). cap=2: initial workout dispatch (count=1), gate dispatch (count=2),
+    # then the revise re-dispatch's charge (count=3 > 2) trips before the over-budget dispatch.
+    store_read = _seed_store(tmp_path)
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _counting_dispatch(lambda domain, n: _empty_workout_envelope())
+    gate = _composing_gate(
+        _recording_quality(_clean_scores()),  # the empty section REVISEs every pass
+        _recording_safety(_no_findings_dispatch()),
+        revise_domains=("workout",),
+    )
+
+    out = run_orchestrated(
+        _raw_intake(), deid_client, dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout",), gate_dispatch=gate, dispatch_cap=2,
+    )
+
+    assert out["reason"] == DISPATCH_CAP_EXCEEDED, f"cap did not trip mid-revise: {out.get('reason')}"
+    assert out["dispatch_count"] == 3, f"dispatch_count != cap+1 (the over-budget charge): {out['dispatch_count']}"
+    assert out["results"] == {}, "a cap-tripped run surfaced a plan"
+    assert store.read("plan::workout", root=tmp_path) == []
+
+
+def test_converged_revise_surfaces_aggregate_dispatch_count(tmp_path):
+    # TEST-01 (re-scoped): `dispatch_count` is asserted on the LOOP converged-revise SUCCESS path
+    # (where the count aggregates specialist + gate + revise dispatches), not only the legacy
+    # non-loop path. One revise pass that converges: initial workout dispatch (1) + gate (1) +
+    # revise re-dispatch (1) + gate (1) = 4 aggregate dispatches.
+    store_read = _seed_store(tmp_path)
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch({"workout": _empty_workout_envelope()})
+
+    def reissuing_dispatch(domain, prompt, summary):
+        dispatch.calls.append({"domain": domain, "prompt": prompt, "summary": summary})
+        n = len([c for c in dispatch.calls if c["domain"] == domain])
+        return _filled_workout_envelope() if n >= 2 else _empty_workout_envelope()
+
+    gate = _composing_gate(
+        _recording_quality(_clean_scores()),
+        _recording_safety(_no_findings_dispatch()),
+        revise_domains=("workout",),
+    )
+
+    out = run_orchestrated(
+        _raw_intake(), deid_client, reissuing_dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout",), gate_dispatch=gate,
+    )
+
+    # converged + recorded, and dispatch_count is the loop aggregate (specialist + gate + revise)
+    assert out["results"]["workout"]["recorded"] is True
+    assert "dispatch_count" in out, "the converged-revise success path did not surface dispatch_count"
+    # initial specialist(1) + initial gate(1) + revise re-dispatch(1) + re-run gate(1) = 4
+    assert out["dispatch_count"] == 4, f"converged-revise aggregate dispatch_count != 4: {out['dispatch_count']}"
+
+
+def test_deid_halt_short_circuits_before_loop(tmp_path):
+    # TEST-02: a `{deidentified: False}` sentinel de-id client short-circuits BEFORE the loop —
+    # 0 dispatches (the specialist seam never fires) AND the gate never fires (gate.calls empty),
+    # even with a real composing gate injected. The de-id halt precedes any dispatch / gate.
+    store_read = _seed_store(tmp_path)
+    deid_client = _FixedDeidClient({"deidentified": False, "reason": "deid-call-failed"})
+    dispatch = _RecordingDispatch(_sustaining_authors())
+    gate = _clean_composing_gate()
+
+    out = run_orchestrated(
+        _raw_intake(), deid_client, dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"), gate_dispatch=gate,
+    )
+
+    assert out["deidentified"] is False
+    assert out["dispatch_count"] == 0
+    assert dispatch.calls == [], "a specialist dispatched past the de-id halt"
+    assert gate.calls == [], "the gate fired past the de-id halt"
