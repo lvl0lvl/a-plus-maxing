@@ -27,4 +27,8 @@ STORE_PREFIX="vault/store/"
 # 1+2; mirrored as the pre-push path-denial, PR#84 API-1).
 PER_SE_DENY_PREFIXES=("$SCAFFOLD_PREFIX" "$STORE_PREFIX")
 # Data-bearing dropzones (gitignored health-data paths) the identity scan covers.
-DATA_BEARING_PREFIXES=("$SCAFFOLD_PREFIX" "$STORE_PREFIX" "vault/dna/raw/" "vault/labs/raw/")
+# vault/artifacts/generated/ holds the maintained re-inserted-name plan render, so a
+# re-inserted REAL name must be name-scanned there (ADR-0021 N2 / ADR-0025 N3); it is
+# NOT a per-se-deny path — the same dropzone legitimately holds the clean initials-only
+# render, which must stay allowed.
+DATA_BEARING_PREFIXES=("$SCAFFOLD_PREFIX" "$STORE_PREFIX" "vault/dna/raw/" "vault/labs/raw/" "vault/artifacts/generated/")
