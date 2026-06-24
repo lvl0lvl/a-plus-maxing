@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-06-10, S49)
 **Owner:** Walter McGivney
-**Relates to:** ADR-0004 (single-file artifact generation), ADR-0008 (biomarker metadata + type-routed dashboard), `vault/design/dashboard-v1-design.md` (the frozen, Walter-approved target)
+**Relates to:** ADR-0004 (single-file artifact generation), ADR-0008 (biomarker metadata + type-routed dashboard), ADR-0021 (deterministic PII re-insertion — supersedes-posture toward D2's initials-only render rule, plan-generation engine set), `vault/design/dashboard-v1-design.md` (the frozen, Walter-approved target)
 
 ## Context
 
@@ -151,6 +151,16 @@ LM-02, calendar, goals, rollup) fills its zone in place.
   of the TL;DR banner (exception recorded in
   `vault/design/artifact-design-protocol.md`); report-class artifacts keep the
   banner.
+- [2026-06-23: Added inverse edge(s) to ADR-0021 (plan-generation engine set,
+  S92 backfill).] ADR-0021 (deterministic PII re-insertion — de-id OUT) records
+  a `supersedes-posture` toward D2's initials-only render rule for the gitignored
+  operator-facing artifact: re-insertion fills the name slot from a filled
+  gitignored source, where D2 yielded initials-only. D2's honest-absence/em-dash
+  discipline for unfilled slots is UNCHANGED — re-insertion never fabricates a
+  name, it fills a real one from a gitignored source; initials-only survives for
+  any TRACKED render. Recorded here in prose (this ADR carries no
+  Related-Decisions table) as the inverse of ADR-0021 → 0009
+  `supersedes-posture` (engine `.pipeline/engine/dag.md` §7).
 
 ## Review triggers
 

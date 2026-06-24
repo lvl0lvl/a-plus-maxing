@@ -2,6 +2,7 @@
 title: Plan-Generation Pipeline v1 — topology, tiers, and ordering (design spec for 71s4)
 type: design
 status: approved
+superseded_by: ADR-0022
 owner: walter
 created: 2026-06-16
 last_reviewed: 2026-06-20
@@ -16,6 +17,8 @@ permalink: a-plus-maxing/design/plan-generation-pipeline-v1
 **Provenance (how the order + tiers were derived, not guessed):** the `plan-pipeline-order` multi-agent workflow (S68, run `wf_eda67138-e95`). 16 specialists each elicited their own input/output dependencies + tier self-classification → the health-specialist-architect synthesized a dependency DAG → 6 adversarial reviewers (the 4 planners + medical-safety-reviewer + architect) tried to break it → a reconcile pass produced the final. The adversarial pass **rejected the first synthesis's fabricated edge-provenance** (it had claimed specialists "self-reported" ordering metadata that did not exist) and forced every edge to be re-derived from `vault/WIKI.md` Reads/Owns contracts: an edge X→Y holds iff Y *Reads* an entity-class X *Owns*. Final confidence: high.
 
 ## Runtime model (operator decision, S68)
+
+> **Superseded by [ADR-0022](../../docs/adr/ADR-0022-programmatic-subscription-orchestrator.md) (2026-06-23, S92 backfill):** the runtime-model decision below — "an interactive Claude-Code / agent-dispatch session, not a standalone API client" — is superseded by ADR-0022's programmatic subscription orchestrator. ONLY this runtime-model decision is superseded; the tier model, the ordered-pipeline DAG, and the inner reconciler survive unchanged.
 
 Plan generation runs as an **interactive Claude-Code / agent-dispatch session**, not a standalone API client. The orchestrator dispatches specialists against the wiki + the de-identified `router.summarize` summary, composes via `assemble`, writes the store via `record_plan`, and renders via `generate.run`. The no-train PII guarantee rides two things, not an API client: (a) the session runs under the no-train commercial-API profile (threat-model B), and (b) `summarize`'s 0-raw-PII de-identification + `dispatch`'s whitelist gate as in-code defense-in-depth. A standalone `scripts/` API client is a later North-Star option the seam must not foreclose.
 
