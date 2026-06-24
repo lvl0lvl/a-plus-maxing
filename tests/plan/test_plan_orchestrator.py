@@ -260,9 +260,17 @@ def test_no_live_backend_constructed(tmp_path, monkeypatch):
 # --- AC-7: the gate-dispatch seam (the Wave-3 / ADR-0020-T2 attachment point) ----
 
 
-def test_gate_dispatch_seam_is_spyable(tmp_path):
-    # (a) the seam EXISTS and is spyable: an injected recording gate_dispatch is held/invocable
-    # through the documented path. The orchestrator must hold the seam (not drop it).
+def test_gate_dispatch_keyword_accepted_seam_wired_not_yet_fired(tmp_path):
+    # The orchestrator ACCEPTS `gate_dispatch=` and runs to completion with it injected -- the
+    # seam is WIRED but NOT yet exercised: no real gate fires it in Wave 2 (this task builds the
+    # seam + its inert default ONLY, never the gates). This test pins ONLY that the keyword is
+    # accepted and the run completes with it injected; it deliberately does NOT claim the spy is
+    # reachable/fired (the old `_is_spyable` name overpromised -- a dropped seam stayed green here
+    # because Wave 2 never fires it). The default-vs-injected resolution IS pinned by
+    # `test_default_gate_dispatch_is_noop_zero_dispatches` (0 dispatches on the default).
+    # Wave-3 re-assertion note: Wave 3 (ADR-0023-T1 quality judge / ADR-0024-T1 safety review)
+    # wires the real gates into this seam; re-assert there that the injected spy ACTUALLY FIRES
+    # (a positive dispatch-count assertion), giving "spyable" real teeth against the wired path.
     store_read = _seed_store(tmp_path)
     deid_client = _FixedDeidClient(_deid_summary())
     dispatch = _RecordingDispatch(_sustaining_authors())
@@ -276,8 +284,8 @@ def test_gate_dispatch_seam_is_spyable(tmp_path):
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
         plan_date=PLAN_DATE, domains=("workout", "nutrition"), gate_dispatch=gate_spy,
     )
-    # the run completed normally with the seam injected (it is the held control-surface hook,
-    # wired but not yet exercised by any real gate in this task -- Wave 3 wires the gates)
+    # the run completed normally with the seam injected (the held control-surface hook, accepted
+    # but not yet exercised by any real gate in this task -- Wave 3 wires + fires the gates)
     assert "results" in out
 
 
@@ -485,6 +493,13 @@ def test_outage_leaves_existing_artifact_untouched(tmp_path):
     # artifact under the orchestrator's `vault/artifacts/generated/` output target, inject the
     # whole-run outage, run the orchestrator, and assert the artifact's bytes are IDENTICAL
     # pre- and post-outage. An outage path that re-emitted / truncated / clobbered it -> RED.
+    # Wave-4 re-assertion note: nothing on any Wave-2 path writes to `vault/artifacts/generated/`
+    # (render is ADR-0025-T1 / bead a-plus-maxing-2xzt, the maintained-HTML output), so the
+    # byte-identical property is asserted STRUCTURALLY here (the placeholder pins that the outage
+    # halt does not introduce a write). It is NOT yet falsifiable: with no render wired, a success
+    # run also writes nothing, so the assertion passes with or without the outage halt. MUST be
+    # re-asserted when ADR-0025-T1 wires `render.emit` into the SUCCESS path — then a success run
+    # writes the artifact and the outage run must NOT, giving the byte-identical assertion teeth.
     artifact_dir = tmp_path / "vault" / "artifacts" / "generated"
     artifact_dir.mkdir(parents=True)
     artifact = artifact_dir / "plan.html"

@@ -191,6 +191,35 @@ def test_store_and_tracked_stay_deidentified(tmp_path):
     assert hits == 0, "the persisted store and the tracked render must stay de-identified"
 
 
+# --- SEC-02: a short initials token must not mis-substitute a longer placeholder ---
+
+
+def test_single_word_name_does_not_mangle_longer_placeholder(tmp_path):
+    """SEC-02: a 1-char initials token (single-word name) leaves a longer `Patient XW` intact.
+
+    A single-word operator name (`Zephyr`) derives the 1-char initials `Z`. The produced HTML
+    carries a LONGER `Patient ZW ·` placeholder. An unanchored `Patient Z` -> `Patient Zephyr`
+    replace clobbers the `Patient ZW` token into `Patient ZephyrW` (RED on the old code); the
+    word-boundary anchor refuses the within-token partial, leaving `Patient ZW` intact (GREEN).
+    """
+    repo = _init_repo_with_gitignore(tmp_path)
+    profile = tmp_path / "operator-profile.md"
+    profile.write_text("# Operator Profile — Zephyr\n", encoding="utf-8")
+    target = repo / "vault" / "artifacts" / "generated" / "plan.html"
+
+    html = (
+        "<html><body><div class='hd-status'>"
+        "Patient ZW · age band 40s · issue status recovering"
+        "</div></body></html>"
+    )
+
+    out = reinsert_out(html, target, _profile_paths=(profile,), _repo_root=repo)
+
+    # the longer `Patient ZW` placeholder is NOT mangled by the 1-char `Z` substitution
+    assert "Patient ZW ·" in out, "the longer placeholder must survive the short-initials replace"
+    assert "ZephyrW" not in out, "the short initials must not partially clobber the longer token"
+
+
 # --- MEDIUM-1: symlinked / path-divergent target -------------------------------
 
 
