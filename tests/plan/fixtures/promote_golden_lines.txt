@@ -1,0 +1,2 @@
+plan::nutrition	{"item": "plan::nutrition", "source": "plan::nutritionist", "timepoint": "2026-06-18", "value": {"calorie_goal": 2400, "macros": {"carbs": 240, "fat": 70, "protein": 180}, "meals": [{"kcal": 600, "name": "Breakfast"}]}}
+plan::workout	{"item": "plan::workout", "source": "plan::personal-trainer", "timepoint": "2026-06-18", "value": {"exercises": [{"detail": "controlled tempo", "name": "Goblet squat", "reps": "8-12", "sets": 3}]}}
