@@ -22,7 +22,8 @@ symlink-escape `reinsert_out`'s best-effort `git check-ignore` cannot: a symlink
 gitignored dir whose realpath escapes to a tracked path exits `check-ignore` 0 on its lexical
 name, yet the realpath escapes — the name-bearing HTML would write THROUGH the symlink into a
 tracked file. `git check-ignore` alone is symlink-bypassable; the realpath containment is the
-primary guard.
+primary guard. A symlinked out_dir ROOT is rejected SEPARATELY (before the containment check
+resolves it), so a symlinked root cannot launder its target into the accepted realpath root.
 
 The artifact write is the maintained module's OWN atomic temp-then-rename (mirroring
 `store._write_atomic`: write the full file to a temp sibling, `fsync`, `os.replace`), so an
@@ -61,20 +62,40 @@ def _assert_contained(target, out_dir):
     """Refuse `target` unless its realpath resolves lexically under `out_dir`'s realpath.
 
     The SEC-01 caller-precondition (the crown jewel). A genuine independent containment
-    guard: `git check-ignore` (reinsert_out's best-effort confirm) exits 0 on a symlink's
-    lexical name under the gitignored prefix even when the symlink's realpath escapes to a
-    tracked path — so a name-bearing artifact could write THROUGH the symlink into a tracked
-    file. Resolving the realpath of both the target and the out-dir defeats the symlink, the
-    `..`-traversal, and the non-contained-path escapes identically. Fail-closed: any escape
-    raises before a byte is written.
+    guard, in two parts:
+
+      1. The realpath-containment check catches a symlinked TARGET under a real root:
+         `git check-ignore` (reinsert_out's best-effort confirm) exits 0 on a symlink's lexical
+         name under the gitignored prefix even when the symlink's realpath escapes to a tracked
+         path — so a name-bearing artifact could write THROUGH the symlink into a tracked file.
+         Resolving the realpath of both the target and the out-dir defeats the symlinked target,
+         the `..`-traversal, and the non-contained-path escapes identically.
+      2. The root-symlink case is rejected SEPARATELY: if `out_dir` itself is a symlink (its final
+         component redirects elsewhere), the realpath check would silently adopt the symlink's
+         TARGET as the root and accept a write the gitignored-prefix contract never sanctioned. So
+         a symlinked out_dir is refused independently, before the containment check resolves it.
+         (Ancestor symlinks like macOS `/var`->`/private/var` are NOT the out_dir's own final
+         component, so a legitimate out-dir under such a path is unaffected.)
+
+    Fail-closed: any escape raises before a byte is written.
 
     Args:
         target (str | Path): The destination the name-bearing artifact would be written to.
         out_dir (str | Path): The gitignored output root the target must resolve under.
 
     Raises:
-        ValueError: `target`'s realpath does not resolve lexically under `out_dir`'s realpath.
+        ValueError: `out_dir` itself traverses a symlink, OR `target`'s realpath does not resolve
+            lexically under `out_dir`'s realpath.
     """
+    # (2) the out_dir must not ITSELF be a symlink — a symlinked root would let the realpath check
+    # below adopt the symlink's target as the root and sanction a write outside the real gitignored
+    # tree. Rejected independently of the target containment below.
+    if os.path.islink(out_dir):
+        raise ValueError(
+            f"refusing to write the maintained artifact: the output root {os.fspath(out_dir)!r} "
+            f"is itself a symlink (it redirects to {os.path.realpath(out_dir)!r}) — fail-closed"
+        )
+
     real_target = os.path.realpath(target)
     real_root = os.path.realpath(out_dir)
     if real_target != real_root and not real_target.startswith(real_root + os.sep):
@@ -276,10 +297,14 @@ def reemit_maintained(
         return _assemble_maintained(sr, store_root, on_date, today, _profile_paths)
 
     _template.__name__ = "maintained"
-    staged_dir = out_dir / ".staging"
-    rendered_path = render.emit(_template, store_read, _out_dir=staged_dir)
-    html = rendered_path.read_text(encoding="utf-8")
-    os.unlink(rendered_path)  # the staged render is consumed; the real write is the atomic one below
+    # Render into an auto-cleaned temp staging dir UNDER the (gitignored) out-dir, so the staging
+    # directory never accretes (BUG-03 — the old fixed `out_dir/.staging` was never removed). The
+    # `TemporaryDirectory` unwinds the dir + its contents on exit, including when `render.emit`
+    # raises mid-render (the external-ref budget gate) — leaving 0 staged artifact behind.
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=out_dir, prefix=".staging.") as staged_dir:
+        rendered_path = render.emit(_template, store_read, _out_dir=Path(staged_dir))
+        html = rendered_path.read_text(encoding="utf-8")
 
     # --- preserve prior content across re-emits ---
     html = _preserve_prior_content(html, _read_prior(target))

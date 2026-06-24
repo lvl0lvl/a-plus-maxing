@@ -294,6 +294,147 @@ def test_zero_seeded_defective_plans_surface_accept():
         assert verdict["verdict"] != ACCEPT, "a seeded-defective plan surfaced with ACCEPT"
 
 
+# === BUG-01: the structural floor must FIRE on the REAL run_generation result shape ===
+#
+# The run_generation result (what `run_orchestrated` produces, what `gate_dispatch` receives,
+# what `safety_review` already consumes) is shaped `{"results": {domain: {...}}, "reconciliation":
+# ..., "adjudication": ...}` with NO top-level "sections" key — the per-domain section data lives
+# under `results[domain]["section"]`. A structural floor that greps `plan.get("sections")` no-ops
+# on this shape and returns 0 deductions, surfacing a SEEDED-DEFECTIVE plan as ACCEPT (the gate's
+# whole purpose, defeated). These pin the floor against the SAME shape `safety_review` scores.
+
+
+def _run_generation_result_with_empty_domain(tmp_path):
+    """A REAL `run_generation`-shaped result whose peptides domain is an empty coverage-gap.
+
+    Built through the actual `pipeline.run_generation` over fixture authors (the same shape
+    `safety_review` consumes), with the peptides author returning an envelope carrying 0
+    recommendations so its `results["peptides"]["section"]` is the real `assemble`
+    EMPTY_OUTPUT_GAP coverage-gap shape — an in-scope domain that surfaced 0 actionable
+    recommendations (a followability + completeness auto-fail). The other domains record cleanly.
+    """
+    from scripts.plan import pipeline
+    from tests.plan.test_generate_plan import (
+        _author,
+        _nutrition_meal_rec,
+        _nutrition_target_rec,
+        _supplement_rec,
+        _workout_rec,
+    )
+    from tests.plan.test_orchestrate import _nutrition, _recon
+
+    store_read = _seed_store(tmp_path)
+    authors = {
+        "workout": _recon(_author(_workout_rec("Goblet squat", 3)), energy_cost_kcal=500),
+        "nutrition": _nutrition(
+            _nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600),
+            energy_budget={"sustains": True, "sustainable_training_kcal": 700},
+        ),
+        "supplements": _author(
+            _supplement_rec("Creatine", "5 g"), specialist="supplement-specialist"
+        ),
+        # an envelope with 0 recommendations -> the real `assemble` EMPTY_OUTPUT_GAP section
+        # (an in-scope domain that surfaced nothing actionable — the completeness auto-fail).
+        "peptides": {"specialist": "peptide-specialist", "recommendations": []},
+    }
+    return pipeline.run_generation(authors, store_read, tmp_path, plan_date=PLAN_DATE)
+
+
+def _run_generation_result_with_contradictory_targets():
+    """A faithful `run_generation`-shaped result with mutually-contradictory cross-domain targets.
+
+    The per-domain `section` carries the `assemble`-shaped recommendations the structural floor
+    walks; two sections assert `caloric-balance: surplus` vs `caloric-balance: deficit` — the
+    internal-consistency auto-fail, expressed on the real `{"results": {...}}` shape.
+    """
+    return {
+        "results": {
+            "nutrition": {
+                "domain": "nutrition", "specialist": "nutritionist", "recorded": True, "plan": {},
+                "section": {
+                    "domain": "nutrition", "specialist": "nutritionist",
+                    "recommendations": [
+                        {"claim": "Eat in a caloric surplus", "target": "caloric-balance: surplus"},
+                    ],
+                },
+                "reason": None,
+            },
+            "workout": {
+                "domain": "workout", "specialist": "personal-trainer", "recorded": True, "plan": {},
+                "section": {
+                    "domain": "workout", "specialist": "personal-trainer",
+                    "recommendations": [
+                        {"claim": "Eat in a caloric deficit", "target": "caloric-balance: deficit"},
+                    ],
+                },
+                "reason": None,
+            },
+        },
+        "reconciliation": {},
+        "adjudication": None,
+    }
+
+
+def test_structural_floor_fires_on_run_generation_result_empty_domain(tmp_path):
+    # BUG-01 (i): a REAL run_generation result whose in-scope peptides domain surfaced 0
+    # recommendations (the real `assemble` coverage-gap shape under `results[domain]["section"]`)
+    # gets a quality-defect verdict (REVISE), NEVER ACCEPT — even with all-clean mock scores. On
+    # the current "sections"-only floor this REDs (the floor no-ops on the `{"results": {...}}`
+    # shape and surfaces ACCEPT).
+    result = _run_generation_result_with_empty_domain(tmp_path)
+    assert "results" in result and "sections" not in result, "fixture is not run_generation-shaped"
+    verdict = quality_judge(result, _FixedJudgeClient(_clean_scores()))
+    assert verdict["verdict"] == REVISE
+    assert verdict["verdict"] != ACCEPT, "a seeded-defective run_generation result surfaced ACCEPT"
+    failed_dims = {d["dimension"] for d in verdict["deductions"]}
+    assert failed_dims & {"completeness", "coherence"}, "empty-domain defect not rubric-anchored"
+
+
+def test_structural_floor_fires_on_run_generation_result_contradictory_targets():
+    # BUG-01 (ii): a run_generation-shaped result with mutually-contradictory cross-section targets
+    # gets a quality-defect verdict (REVISE), never ACCEPT — even with all-clean mock scores. REDs
+    # on the current "sections"-only floor (which never inspects `results[domain]["section"]`).
+    result = _run_generation_result_with_contradictory_targets()
+    verdict = quality_judge(result, _FixedJudgeClient(_clean_scores()))
+    assert verdict["verdict"] == REVISE
+    assert verdict["verdict"] != ACCEPT, "a seeded-defective run_generation result surfaced ACCEPT"
+    failed_dims = {d["dimension"] for d in verdict["deductions"]}
+    assert "internal consistency" in failed_dims
+
+
+class _NonMappingJudgeClient:
+    """A judge client whose `judge` returns a non-mapping (a malformed model-client output)."""
+
+    def __init__(self, value):
+        self.value = value
+
+    def judge(self, payload):
+        return self.value
+
+
+def test_non_mapping_judge_return_fails_loud_at_the_seam():
+    # API-03: the judge client must return a `{dimension: number}` mapping. A non-mapping return
+    # (a bare list / string / None — a malformed/degraded model response) RAISES at the seam with a
+    # clear message, never failing deep in the per-dimension `scores.get(...)` walk or coercing
+    # silently. The structural-floor-only deductions must not mask a broken judge client.
+    import pytest
+
+    for bad in (["followability"], "9", None, 9):
+        with pytest.raises(TypeError, match="mapping"):
+            quality_judge(_clean_plan(), _NonMappingJudgeClient(bad))
+
+
+def test_unrecognizable_plan_shape_fails_loud():
+    # BUG-01 (fail-loud guard): a plan carrying NEITHER a recognizable "results" NOR "sections"
+    # structure must RAISE, never silently return 0 deductions -> a vacuous ACCEPT. A structural
+    # floor that returns [] on an unrecognized shape would rubber-stamp anything.
+    import pytest
+
+    for bad in ({"unexpected": "shape"}, {"reconciliation": {}}):
+        with pytest.raises((ValueError, KeyError, TypeError)):
+            quality_judge(bad, _FixedJudgeClient(_clean_scores()))
+
+
 # --- the QUALITY-vs-SAFETY distinction (this judge scores quality only) ----------
 
 

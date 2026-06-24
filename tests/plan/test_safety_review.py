@@ -317,6 +317,21 @@ def test_seeded_emergent_unsafe_plan_is_caught(tmp_path):
     assert verdict["passed"] is False, "the verdict did not drive a revise/block on the unsafe plan"
 
 
+def test_too_few_lenses_raises_never_vacuous_pass(tmp_path):
+    # BUG-02 (AC-1 fail-loud): a SAFETY gate must never silently PASS on too-few lenses. With <2
+    # independent lenses (`()` or a single `("x",)`), `review_plan` RAISES rather than returning a
+    # vacuous `passed=True` over 0/1 dispatches. REDs on the un-guarded version (which returned
+    # `{"findings": [], "passed": True}` for an empty roster — a safety gate passing on 0 lenses).
+    import pytest
+
+    assembled = _assembled_safe_plan(tmp_path)
+    dispatch = _no_findings_dispatch()
+
+    for too_few in ((), ("medical-safety-reviewer",)):
+        with pytest.raises(ValueError, match="2 independent lenses"):
+            safety_review.review_plan(assembled, dispatch, lenses=too_few)
+
+
 def test_safe_plan_positive_control_passes(tmp_path):
     # AC-2 POSITIVE CONTROL (non-tautological): a SAFE assembled plan (no cumulative-load issue; the
     # lens mocks emit 0 findings) PASSES — the review does NOT over-block a clean plan. Without this

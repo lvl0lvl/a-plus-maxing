@@ -26,6 +26,11 @@ parallel to ADR-0023's quality gate). This module builds the callable + its beha
 of the gate into the orchestrator's loop control flow (calling it post-assembly, re-running it each
 revise pass, treating a safety finding as BLOCKING/terminal) is ADR-0022-T2's job (the revise-loop
 owner), NOT this module. It does NOT modify `plan_orchestrator.py`.
+
+Gate-callable disposition key (API-02, a DECISION not a defect): this gate's disposition is read
+off `passed` (bool); the quality gate's is read off `verdict` (ACCEPT/REVISE) — deliberately
+distinct per ADR-0023/0024 (distinct gate semantics). ADR-0022-T2 (Wave 4) owns adapting each
+verdict to the revise-loop's common disposition; this module emits its native verdict shape only.
 """
 
 from scripts.plan.plan_orchestrator import _role_profile
@@ -123,14 +128,28 @@ def review_plan(assembled_plan, dispatch, *, lenses=DEFAULT_LENSES):
         dispatch (Callable): The programmatic lens-dispatch seam,
             `dispatch(lens, prompt, assembled_plan) -> list of finding dicts`. A real agent dispatch
             in production; a fixture mock in tests (so the review runs with 0 live spend).
-        lenses (tuple, optional): The >=2 independent lens roster. Defaults to the verified
-            `.claude/agents/` set (`DEFAULT_LENSES`).
+        lenses (tuple, optional): The >=2 independent lens roster (ENFORCED — a roster of <2
+            lenses raises `ValueError`, never a vacuous single-/zero-lens PASS). Defaults to the
+            verified `.claude/agents/` set (`DEFAULT_LENSES`).
+
+    Raises:
+        ValueError: `lenses` carries fewer than 2 independent lenses (the AC-1 contract).
 
     Returns:
         (dict) The gate verdict: `findings` (the synthesized, blind-triaged finding set — the
         legitimate findings that drive a revise / a block; `[]` on a clean pass), `passed` (bool —
         True when the set is empty), and `lenses` (the dispatched lens roster).
     """
+    # AC-1 contract (fail-loud): a SAFETY gate must never silently PASS on too-few lenses. With
+    # <2 independent lenses the multi-lens whole-plan review is not what it claims (a single lens
+    # is not the independent cross-check the layer exists to provide), and an empty roster would
+    # return a vacuous `passed=True` over 0 dispatches — the exact silent-PASS the gate must avoid.
+    if len(lenses) < 2:
+        raise ValueError(
+            f"safety review requires >=2 independent lenses (AC-1); got {len(lenses)}: "
+            f"{tuple(lenses)!r} — refusing to run a vacuous single-/zero-lens safety review"
+        )
+
     excluded = _excluded_finding_ids(assembled_plan)
 
     synthesized = []
