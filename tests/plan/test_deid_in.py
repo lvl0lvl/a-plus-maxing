@@ -227,21 +227,26 @@ def test_emitted_summary_carries_no_raw_pii(tmp_path):
 
 
 def test_leak_probe_reds_on_a_passthrough_boundary(tmp_path):
-    """Negative control (failing-capable proof): the probe REDs when raw is passed through.
+    """Negative control (failing-capable proof): the raw echo WOULD leak; `deid_in` blocks it.
 
-    Constructs the exact passthrough failure the crown-jewel probe must catch: a client whose
-    `deidentify` echoes the RAW intake. Scanning that echoed output against the synthetic
+    Constructs the exact passthrough failure the crown-jewel probe must catch: a `deidentify`
+    that echoes the RAW intake. Scanning that echoed output DIRECTLY against the synthetic
     identity config registers >0 hits — proving `test_emitted_summary_carries_no_raw_pii` is
-    failing-capable (it tests something, not a tautology).
+    failing-capable (it tests something, not a tautology). Since FIX 1's whitelist, routing the
+    same echo THROUGH `deid_in` no longer leaks: the raw intake carries out-of-`SUMMARY_FIELD_SET`
+    fields (`legal-name`, `raw-lab-values`), so the boundary rejects it to the sentinel — proven
+    here by scanning the actual `deid_in` output and getting 0 (the boundary's positive value).
     """
     config = _identity_config(tmp_path)
     raw = _raw_intake()
     passthrough_client = _FixedDeidClient(raw)  # echoes raw — the leak the boundary must prevent
 
-    leaked = deid_in(raw, passthrough_client)
-    leaked_text = json.dumps(leaked)
-
-    assert pii_scan.scan_text(leaked_text, token_config=config) > 0
+    # the raw echo itself WOULD leak (the probe is failing-capable, not a tautology)
+    assert pii_scan.scan_text(json.dumps(raw), token_config=config) > 0
+    # but the real boundary rejects the out-of-field-set echo -> the sentinel, 0 leak (FIX 1)
+    blocked = deid_in(raw, passthrough_client)
+    assert pii_scan.scan_text(json.dumps(blocked), token_config=config) == 0
+    assert blocked["deidentified"] is False
 
 
 # --- AC-2: fail-closed on ModelCallError ---------------------------------------
@@ -258,8 +263,11 @@ def test_deid_in_fail_closed_returns_honest_no_plan_sentinel():
 
     result = deid_in(_raw_intake(), failing_client)
 
-    assert result == {"deidentified": False, "reason": DEID_CALL_FAILED}
+    # the raise-path sentinel: the discriminator + reason are load-bearing; the raise path
+    # also carries error_type (FIX 3, the exception class name — never its raw-bearing message).
     assert result["deidentified"] is False
+    assert result["reason"] == DEID_CALL_FAILED
+    assert result["error_type"] == "ModelCallError"
     assert DEID_CALL_FAILED == "deid-call-failed"
 
 
@@ -346,6 +354,152 @@ def test_default_no_train_backend_makes_no_live_call_and_fails_closed():
 
     result = deid_in(_raw_intake(), live_client)
 
-    assert result == {"deidentified": False, "reason": DEID_CALL_FAILED}, (
+    # the default backend's NotImplementedError -> ModelCallError -> the raise-path sentinel
+    # (with error_type, FIX 3); a real summary would carry no `deidentified` discriminator.
+    assert result["deidentified"] is False, (
         "a default no-train client must fail closed (no live de-id call), not return a summary"
     )
+    assert result["reason"] == DEID_CALL_FAILED
+
+
+# --- FIX 1 (WHITELIST): the de-id-IN boundary enforces the positive field-set whitelist ----
+
+
+def _contaminated_summary():
+    """A de-id result carrying band-tokens PLUS a raw-PII field (the contamination case).
+
+    A faithful de-id summary carries ONLY `router.SUMMARY_FIELD_SET` fields; this one smuggles
+    in an out-of-set raw-PII field (`legal-name` + `raw-lab-values`) alongside valid band
+    tokens. The de-id-IN boundary's whitelist must reject the whole dict (not return it).
+    """
+    return {
+        "sex-for-dosing": "male",
+        "legal-name": SYNTHETIC_NAME,
+        "raw-lab-values": SYNTHETIC_LAB,
+    }
+
+
+def test_deid_in_rejects_out_of_field_set_contaminated_summary(tmp_path):
+    """FIX 1 (WHITELIST): a de-id summary with an out-of-set raw-PII field → the sentinel.
+
+    The de-id-IN boundary enforces the SAME positive field-set whitelist the persisted path
+    (`router.dispatch`) enforces: `set(summary) <= set(router.SUMMARY_FIELD_SET)`. A summary
+    carrying an out-of-set field (raw PII smuggled past a non-faithful de-id call) is NOT
+    returned — `deid_in` fails closed to the honest no-plan sentinel, and the result scans 0
+    raw-PII. A `deid_in` that returned the contaminated dict turns this RED.
+    """
+    config = _identity_config(tmp_path)
+    client = _FixedDeidClient(_contaminated_summary())
+
+    result = deid_in(_raw_intake(), client)
+
+    assert result == {"deidentified": False, "reason": DEID_CALL_FAILED}
+    assert pii_scan.scan_text(json.dumps(result), token_config=config) == 0
+
+
+def test_deid_in_whitelist_passes_a_clean_in_set_summary():
+    """FIX 1: a faithful summary (only `SUMMARY_FIELD_SET` fields) passes the whitelist.
+
+    Proves the whitelist is a subset gate, not a fixed-shape gate — a clean de-identified
+    summary carrying only field-set fields is returned verbatim (the success leg).
+    """
+    summary = _deid_summary_fixture()
+    assert set(summary) <= set(router.SUMMARY_FIELD_SET)
+    client = _FixedDeidClient(summary)
+
+    assert deid_in(_raw_intake(), client) == summary
+
+
+# --- FIX 2 (TEST-01): a REAL ModelClient(backend=_FixtureBackend(...)) wired into deid_in ----
+
+
+def test_deid_in_with_real_client_malformed_backend_fails_closed(tmp_path):
+    """FIX 2 (TEST-01): a REAL `ModelClient` over a malformed-result backend → the sentinel.
+
+    Wires a real `ModelClient(backend=_FixtureBackend(deidentify_result="not-a-mapping"))`
+    into `deid_in` (not a pre-built `ModelCallError`): the real client's shape-check RAISES
+    `ModelCallError` on the non-mapping result, and `deid_in`'s except lands it on the honest
+    no-plan sentinel. Proves the real client's raise composes with `deid_in` (the seam, end
+    to end), scanning 0 raw-PII.
+    """
+    from tests.model.test_client import _FixtureBackend
+
+    config = _identity_config(tmp_path)
+    real_client = ModelClient(backend=_FixtureBackend(deidentify_result="not-a-mapping"))
+
+    result = deid_in(_raw_intake(), real_client)
+
+    # the real client's shape-check raised ModelCallError -> the raise-path sentinel
+    # (carrying error_type, FIX 3); the discriminator + reason are the load-bearing keys.
+    assert result["deidentified"] is False
+    assert result["reason"] == DEID_CALL_FAILED
+    assert result["error_type"] == "ModelCallError"
+    assert pii_scan.scan_text(json.dumps(result), token_config=config) == 0
+
+
+def test_deid_in_with_real_client_contaminated_backend_fails_closed(tmp_path):
+    """FIX 2 (TEST-01, composes with FIX 1): a REAL client over a contaminated backend result.
+
+    The backend returns a band-tokens-PLUS-raw-field mapping (truthy + a valid `dict`, so the
+    real client's shape-check passes it through); `deid_in`'s WHITELIST then catches the
+    out-of-set raw-PII field and fails closed to the sentinel. Proves FIX 1 and FIX 2 compose:
+    the real client lands the dict, the de-id-IN whitelist rejects it.
+    """
+    from tests.model.test_client import _FixtureBackend
+
+    config = _identity_config(tmp_path)
+    real_client = ModelClient(
+        backend=_FixtureBackend(deidentify_result=_contaminated_summary())
+    )
+
+    result = deid_in(_raw_intake(), real_client)
+
+    assert result == {"deidentified": False, "reason": DEID_CALL_FAILED}
+    assert pii_scan.scan_text(json.dumps(result), token_config=config) == 0
+
+
+# --- FIX 3 (SEC-02): ANY exception from the de-id call fails closed (not only ModelCallError) -
+
+
+def test_deid_in_fails_closed_on_non_model_call_error(tmp_path):
+    """FIX 3 (SEC-02): a `deidentify` raising a NON-`ModelCallError` exception → the sentinel.
+
+    A `ValueError` whose message embeds the RAW intake (`ValueError(f"bad {raw}")`) is the
+    leak-via-traceback case the broadened except must catch: `deid_in` returns the honest
+    no-plan sentinel, and the serialized sentinel scans 0 raw-PII — the raw in the exception
+    message does NOT escape. A `deid_in` that caught only `ModelCallError` would let this
+    propagate (raw in the traceback) and turn this RED.
+    """
+    config = _identity_config(tmp_path)
+    raw = _raw_intake()
+
+    class _RaisingValueErrorClient:
+        def deidentify(self, raw_intake):
+            raise ValueError(f"bad {raw_intake}")  # raw embedded in the message
+
+    result = deid_in(raw, _RaisingValueErrorClient())
+
+    assert result["deidentified"] is False
+    assert result["reason"] == DEID_CALL_FAILED
+    assert pii_scan.scan_text(json.dumps(result), token_config=config) == 0
+
+
+def test_deid_in_records_exception_type_not_message(tmp_path):
+    """FIX 3 (SEC-02): the sentinel records the exception TYPE name, never its message.
+
+    To keep a genuine bug diagnosable WITHOUT leaking raw, the broadened except records
+    `error_type` (the exception class name) — never the message/repr/args (which can carry
+    raw). Asserts `error_type == "ValueError"` AND the sentinel still scans 0 raw-PII even
+    though the raised message embedded the synthetic name/lab.
+    """
+    config = _identity_config(tmp_path)
+    raw = _raw_intake()
+
+    class _RaisingValueErrorClient:
+        def deidentify(self, raw_intake):
+            raise ValueError(f"bad {SYNTHETIC_NAME} {SYNTHETIC_LAB}")
+
+    result = deid_in(raw, _RaisingValueErrorClient())
+
+    assert result["error_type"] == "ValueError"
+    assert pii_scan.scan_text(json.dumps(result), token_config=config) == 0

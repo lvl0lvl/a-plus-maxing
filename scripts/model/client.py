@@ -114,7 +114,10 @@ def _call(backend_method, *args):
     except ModelCallError:
         raise
     except Exception as exc:  # the model boundary: any backend error fails closed, typed
-        raise ModelCallError(f"backend call failed: {exc!r}") from exc
+        # SEC-01: a CONSTANT message — never interpolate `{exc!r}`, which can carry raw
+        # input (the backend's exception text). The chained `from exc` keeps the original
+        # in the traceback frame for debugging; the `str(ModelCallError)` surface stays raw-free.
+        raise ModelCallError("backend call failed") from exc
     if not result:
         raise ModelCallError("backend returned an empty result")
     return result

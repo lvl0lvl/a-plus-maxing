@@ -305,6 +305,37 @@ def test_no_train_backend_deidentify_is_not_invoked_in_tests():
         _ClaudeNoTrainBackend().deidentify({"legal-name": "Jordan Tester"})
 
 
+def test_call_error_message_carries_no_raw_input(tmp_path):
+    """FIX 4 (SEC-01): `_call`'s `ModelCallError` message does NOT interpolate the exception.
+
+    A backend whose raised exception message embeds a synthetic raw token must not surface
+    that token on `str(ModelCallError)` — the message is a CONSTANT, so `_call` no longer
+    interpolates `{exc!r}` (which can carry raw input). The chained `from exc` still aids
+    debugging (the raw lives in the chained traceback frame, not the str surface). Scans the
+    raised error's str against an identity config matching the synthetic token: 0 hits, and a
+    direct substring check confirms the token is absent. A `_call` that interpolated the
+    exception would carry the token and turn this RED.
+    """
+    from scripts.guard import pii_scan
+
+    raw_token = "Jordan Faketestperson"
+    config = tmp_path / "synthetic-identity.txt"
+    config.write_text(raw_token + "\n")
+
+    class _RawLeakingBackend:
+        def deidentify(self, raw_intake):
+            raise RuntimeError(f"backend blew up on {raw_token}")
+
+    client = ModelClient(backend=_RawLeakingBackend())
+
+    with pytest.raises(ModelCallError) as excinfo:
+        client.deidentify({"legal-name": raw_token})
+
+    assert raw_token in str(excinfo.value.__cause__)  # the chain still carries it (debuggable)
+    assert pii_scan.scan_text(str(excinfo.value), token_config=config) == 0  # str surface does NOT
+    assert raw_token not in str(excinfo.value)
+
+
 def test_failure_never_returns_a_fabricated_payload():
     """AC-4: on a failure mode the method RAISES — it never returns a partial payload.
 
