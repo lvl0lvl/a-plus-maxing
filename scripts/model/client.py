@@ -1,12 +1,13 @@
 """The swappable no-train model client — the system's single model boundary.
 
-`ModelClient` is a NARROW two-method surface — `converse(...)` (one intake turn) and
-`author(domain, summary)` (the plan-author envelope) — over an INJECTABLE backend seam.
-The backend defaults to a Claude no-train commercial-API backend (`_ClaudeNoTrainBackend`,
-the only site a model-client SDK import appears); swapping the provider is a backend
-injection at construction — no caller-side edit (ADR-0015 Negative-2). Every backend call
-is fail-closed: a failed / empty / errored / timed-out call RAISES `ModelCallError` and
-NEVER returns a fabricated or silently-partial payload (NFR-2).
+`ModelClient` is a NARROW three-method surface — `converse(...)` (one intake turn),
+`author(domain, summary)` (the plan-author envelope), and `deidentify(raw_intake)` (the
+de-id-IN seam: raw plan-intake → de-identified summary, ADR-0020) — over an INJECTABLE
+backend seam. The backend defaults to a Claude no-train commercial-API backend
+(`_ClaudeNoTrainBackend`, the only site a model-client SDK import appears); swapping the
+provider is a backend injection at construction — no caller-side edit (ADR-0015 Negative-2).
+Every backend call is fail-closed: a failed / empty / errored / timed-out call RAISES
+`ModelCallError` and NEVER returns a fabricated or silently-partial payload (NFR-2).
 
 The published surface is frozen here (ADR-0015-T1): `ADR-0016-T1` imports `converse`,
 `ADR-0015-T3` imports `author`, `ADR-0017-T1` validates `converse`'s extraction proposal.
@@ -30,13 +31,14 @@ class ModelCallError(RuntimeError):
 
 
 class ModelClient:
-    """The two-method no-train model client over an injectable backend seam.
+    """The three-method no-train model client over an injectable backend seam.
 
     Attributes:
         backend: The provider backend (the swap seam). A backend exposes
-            `converse(messages) -> {"reply": str, "extraction": list}` and
-            `author(domain, summary) -> envelope`. Defaults to the Claude no-train
-            commercial-API backend.
+            `converse(messages) -> {"reply": str, "extraction": list}`,
+            `author(domain, summary) -> envelope`, and
+            `deidentify(raw_intake) -> de_identified_summary`. Defaults to the Claude
+            no-train commercial-API backend.
     """
 
     def __init__(self, backend=None):
@@ -71,6 +73,25 @@ class ModelClient:
         result = _call(self.backend.author, domain, summary)
         if not isinstance(result, dict) or not _is_author_envelope(result):
             raise ModelCallError("author: backend returned an empty or malformed envelope")
+        return result
+
+    def deidentify(self, raw_intake):
+        """De-identify a raw operator plan-intake into the de-identified summary (de-id IN).
+
+        The de-id-IN seam (ADR-0020): raw plan-intake PII in, the de-identified summary the
+        plan pipeline consumes out — the `router.summarize`-shaped band/class mapping, never
+        raw PII. Fail-closed: an empty / malformed (non-mapping) result raises `ModelCallError`,
+        never a fabricated or partial summary.
+
+        Args:
+            raw_intake (dict): The raw operator plan-intake (carries raw-PII fields).
+
+        Returns:
+            (dict) The de-identified summary mapping the orchestrator consumes.
+        """
+        result = _call(self.backend.deidentify, raw_intake)
+        if not isinstance(result, dict):
+            raise ModelCallError("deidentify: backend returned an empty or malformed summary")
         return result
 
 
@@ -127,4 +148,10 @@ class _ClaudeNoTrainBackend:
         """Author a domain's recommendations against the no-train API."""
         raise NotImplementedError(
             "live author is wired by ADR-0015-T3; tests inject a backend"
+        )
+
+    def deidentify(self, raw_intake):
+        """De-identify a raw plan-intake against the no-train API."""
+        raise NotImplementedError(
+            "live deidentify is wired at the Wave-B operator checkpoint; tests inject a backend"
         )
