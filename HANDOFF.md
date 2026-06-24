@@ -12,6 +12,26 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 93 (2026-06-24)
+
+Goal: Design + build the **live-wiring** that connects the built plan-generation engine to real clients — so the ONLY remaining step is the operator-present LIVE test — via the full autonomous build pipeline (`/create-adr` → spec → build-plan → task-plan → `/execute-plan`), mock/fixture-tested (0 live spend). **Runtime split (operator decision, S93): PII-related → no-train API (the de-id-IN boundary, the one model call that sees raw operator PII); everything else (the plan-domain specialists, the quality judge, the safety-review lenses, the orchestrator control flow) → subscription (Claude Code agent dispatch, like the autonomous build pipeline); de-id OUT stays deterministic (no model, already built).**
+
+Acceptance criteria:
+- [ ] AC1 (design): `/create-adr` authors the live-wiring runtime ADR(s) — capturing the PII-API / subscription-else split + RESOLVING how the programmatic orchestrator drives subscription specialist/gate dispatch (the skill-as-orchestrator-control-surface vs Python-driven question); judged ≥9/dim + red-teamed; landed.
+- [ ] AC2 (plan): spec → build-plan → per-wave recipes, each recipe-reviewed (QA+Security+Architect) + judged ACCEPT; landed.
+- [ ] AC3 (build): `/execute-plan` builds the wiring — the live `_ClaudeNoTrainBackend.deidentify` (real no-train API call, mock-tested via patched SDK, 0 spend); the production front door (reads real operator state → de-id via API → subscription specialist+gate dispatch → `run_orchestrated` → `reinsert_out` → maintained render); the composed `gate_dispatch` adapter; `core-capability-audit.sh` repointed from `generate_plan.py` to the engine path. EXTEND-NOT-REBUILD on the inner engine + the gate callables.
+- [ ] AC4 (review→merge): every code PR through the full Tier-3 `/review-pr` 6-agent with independence intact; LEGITIMATE findings fixed + blind-verified → `/merge`.
+- [ ] AC5 (close): full automatic close on final post-merge `main` + cite the SHA (PF-S74-01). The LIVE test itself is the operator-present NEXT step (S94) — NOT in scope here.
+
+Files I WILL touch: `docs/adr/*` (the live-wiring ADR + backfill), `docs/spec/*`, `docs/build-plan/*`, `docs/task-plan/*`; `scripts/model/client.py` (`_ClaudeNoTrainBackend.deidentify` real call); a new production front-door (a `.claude/skills/generate-plan/` rewrite and/or a thin `scripts/plan/` entry that composes the seams); `scripts/core-capability-audit.sh` (repoint); `tests/*`; the recipes' `status`; the close docs (staged by EXPLICIT path).
+Files I will NOT touch: the INNER ENGINE (`scripts/plan/{orchestrate,pipeline,assemble,generate_plan,adjudicate,adjust,track,router}.py` — EXTEND-NOT-REBUILD) + the built gate callables (`quality_judge`/`safety_review`)/`deid_in`/`reinsert_out`/`maintained.py`/`dispatch_budget` (WIRED not rewritten); `scripts/store/store.py`+`keying.py`; the dashboard (LOCKED); `vault/library/*`; `main` directly; the keychain.
+NOT doing: ANY live API call (mock-tested via a patched SDK; 0 spend); the LIVE end-to-end run (operator-present, S94 — the operator injects the key); ingesting real operator data (operator-side).
+Invariants at risk: ADR-0001/0005/0016 (the crown-jewel PII boundary — the API de-id is the relaxation; subscription pieces see only de-identified data); INV-CORE-CAPABILITY (repointing the audit to the engine path is the PF-S63-02 close); INV-ROLE-INLINING; INV-BRANCH-NOT-MAIN; the close gates; PF-S74-01; PF-S92-01 (do NOT stop mid-loop to ask a settled question).
+
+**Core-capability-first gate (PF-S63-02):** YES — this IS the core capability wiring (the engine → a live front door → `core-capability-audit` repointed to it). The direct path, not secondary work.
+
+**S93 self-confirmation (autonomous):** contract committed at session-OPEN (the PF-S91 lesson) per the operator's directive ("complete everything needed to get us to the live test … API for PII, subscription for everything else") + the standing autonomous directive.
+
 ## Scope Contract — Session 92 (2026-06-24)
 
 Goal: Run the **FULL autonomous build pipeline** to design + build the **plan-generation engine** — the operator-confirmed (S91) full-target multi-agent architecture — end to end (`/create-adr` → `/create-spec` → `/create-build-plan` → `/create-task-plan` → `/execute-plan`), with extra-engaged monitoring (the pipeline is the live reference model for how the health-plan pipeline gets organized) + beading new-skill/command rough edges. (AUTONOMOUS; operator-directed: "run the full autonomous build pipeline … build out everything.")
