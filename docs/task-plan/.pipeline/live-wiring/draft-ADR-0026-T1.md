@@ -1,0 +1,473 @@
+---
+task-id: ADR-0026-T1
+source-spec: docs/spec/live-wiring-spec.md
+source-build-plan: docs/build-plan/build-plan-live-wiring.md
+wave: 1
+assigned-agent: SE
+reviewers: [Architect, QA, Security]
+created: 2026-06-24
+status: draft
+depends-on: []
+---
+
+# Recipe: Shared Control-Inversion Driver Extraction + `run_orchestrated` Re-Point (KEYSTONE)
+
+The KEYSTONE. EXTRACT the inline revise-loop control flow that today lives in `run_orchestrated`'s
+`while True:` ([plan_orchestrator.py:260-300]) into ONE shared control-inversion driver
+(`scripts/plan/plan_driver.py`, Create), and RE-POINT `run_orchestrated` at it (the inline loop body
+DELETED, the shared driver driven by the existing programmatic/fixture `dispatch`). The driver is a
+generator/coroutine that yields dispatch-requests and receives envelopes via `.send()` (the
+recommended default per OQ-1; a step state-machine is permitted if cleaner) — the SINGLE definition
+both consumers (`run_orchestrated` API/test mode + the ADR-0026-T3 skill subscription mode) drive.
+
+This is a BEHAVIOR-PRESERVING refactor of the S92-authored WRAPPER under the protection of the
+1611-test suite. The byte-frozen INNER ENGINE (`scripts/plan/{orchestrate,pipeline,assemble,
+generate_plan,adjudicate,adjust,track,router}.py`) stays numstat=0; `plan_orchestrator.py` (the
+wrapper) MAY change. The no-fork crown-jewel obligation: the `while True:` gate→branch→re-dispatch
+sequencing, the `safety_passed is True` surface gate, the bounded-revise cap, and the scratch-and-
+promote logic exist in EXACTLY 1 definition (in `plan_driver.py`) — 0 duplicated copies. The store
+write on the A′ path (`_promote_plans`→`store.append`, [plan_orchestrator.py:459]) RELOCATES verbatim
+— no new store-adversarial battery (bead `pka`); the suite-green gate re-runs the S92 battery across
+the relocation, and a store-seam golden-line byte-diff proves the relocated keying is byte-identical.
+
+**Build dependency vs runtime order (load-bearing):** depends-on = None from the BUILD perspective.
+The extraction drives the existing `dispatch`/`gate_dispatch`/`deid_client` seams (a FIXTURE `dispatch`
+drives it in tests), so it does NOT depend on ADR-0027-T1's live backend — even though de-id IN is
+the FIRST RUNTIME stage. A future edit that gives the keystone a LIVE raw-intake path before
+ADR-0027-T1 lands would INVERT the 0-leak property (SEC-1 verifier watch-item) — the driver is fed
+ONLY a fixture `dispatch` here.
+
+## Entry State
+
+**Prerequisites:**
+- [ ] Working tree clean: `git status` shows no changes (the daemon vault-frontmatter churn under
+      `vault/**` is daemon noise — leave it uncommitted, do not stage it; see CLAUDE.md § Vault
+      hygiene).
+- [ ] Full test suite passes at the EXTEND-NOT-REBUILD behavior-preservation baseline:
+      `.venv/bin/python -m pytest -q` → `1611 passed, 2 skipped` (the spec's `main @ e3d5789` baseline;
+      re-baseline with a recorded count delta if the live count differs — the gate is the suite
+      staying green across the extraction, not the absolute integer).
+- [ ] Infrastructure prerequisite verified — the byte-frozen inner engine present:
+      `for f in orchestrate pipeline assemble generate_plan adjudicate adjust track router; do test -f
+      scripts/plan/$f.py || { echo "MISSING $f"; exit 1; }; done && echo OK`.
+- [ ] Infrastructure prerequisite verified — the inline loop + the seams + the store-write site
+      present in `run_orchestrated`: `grep -q "while True:" scripts/plan/plan_orchestrator.py &&
+      grep -q "gate_dispatch" scripts/plan/plan_orchestrator.py && grep -q "def _promote_plans"
+      scripts/plan/plan_orchestrator.py && grep -q "store.append" scripts/plan/plan_orchestrator.py
+      && echo OK`.
+- [ ] On feature branch: `feature/shared-plan-driver` cut off `feature/engine-live-wiring-build`.
+
+This entry state doubles as the rollback target — the entry-state commit is the
+`feature/engine-live-wiring-build` HEAD this branch was cut from.
+
+## Context Load List
+
+**Files to read:**
+- `scripts/plan/plan_orchestrator.py` — the wrapper being refactored: the inline `while True:` loop
+  body ([:260-300]) — the `_safe_gate` invocation ([:261]), the `safety_passed is True` surface gate
+  ([:265]), the accept→`_promote_plans` branch ([:271-276]), the `revise_cap` halt ([:279-280]), the
+  `revise_domains` re-dispatch + out-of-run-set guard ([:286-294]), the de-id sentinel halt
+  ([:229-231]), the dispatch_cap halt ([:301-305]); the helpers that move-with-it or stay-importable
+  (`_dispatch_domains` [:345], `_safe_gate` [:373], `_promote_plans` [:424], `_honest_no_plan` [:398],
+  `_charging` [:319], `_noop_gate_dispatch` [:308]); the reason constants
+  (`DEID_HALTED`/`SAFETY_BLOCKED`/`REVISE_EXHAUSTED`/`PROMOTE_FAILED`/`DEFAULT_REVISE_CAP`).
+- `scripts/plan/pipeline.py` — `run_generation(authors, store_read, root, *, plan_date, on_date,
+  gates, reauthor, adjudicator)` — the inner-engine seam the driver re-runs each pass (BYTE-UNCHANGED;
+  read its signature + return-shape only).
+- `tests/plan/test_plan_orchestrator.py` — the existing orchestrator tests + their fixtures
+  (`_RecordingDispatch`, `_FixedDeidClient`, `_deid_summary`, `_sustaining_authors`, the de-id /
+  cap / gate-seam cases) — the behavior-preservation oracle that must stay green, and the fixture
+  source the new `test_plan_driver.py` re-imports.
+- `tests/plan/test_revise_loop.py` — the existing revise-loop suite (the AC-1..AC-5 falsification
+  probes + the E2E) — these EXERCISE the loop behavior that must be preserved by the extraction;
+  read to confirm the driver still satisfies them (they stay green).
+
+**Do NOT load:** the ADRs (`docs/adr/ADR-0026*.md`) — the spec distilled them; the inner-engine
+modules other than `pipeline.py`'s signature (`orchestrate`/`assemble`/`generate_plan`/`adjudicate`/
+`adjust`/`track`/`router`) — byte-frozen, not read-to-modify; the de-id backend
+(`scripts/model/client.py`) — ADR-0027-T1's scope; the gate callables (`quality_judge.py` /
+`safety_review.py`) — composed by ADR-0026-T2, not this task; `.claude/skills/generate-plan/SKILL.md`
+— ADR-0026-T3 re-points it (but the NO-FORK grep DOES scan it, see Cycle 1); any `vault/**` file —
+daemon-churned.
+
+## Risk Pre-Check
+
+This task carries the spec's ADR-0026-T1 Risk Mitigations field (the keystone behavior-preserving
+refactor + the no-fork crown jewel). Before proceeding to RED, verify a test exists (or the RED phase
+adds one) for EACH; a placeholder test (`assert True`) fails this gate.
+
+- **Risk N2 — the refactor + the new shared-driver seam silently drift `run_orchestrated`'s public
+  contract (ADR-0026 Consequence-Negative-2).** Gate: the full existing suite stays green across the
+  extraction — `.venv/bin/python -m pytest -q` → `1611 passed, 2 skipped`, 0 tests that passed
+  pre-extract now failing (AC-3, the behavior-preservation probe).
+- **Risk — forked safety loop (ADR-0026 Falsification forked-loop probe).** Gate: a grep over
+  `plan_orchestrator.py` + `.claude/skills/generate-plan/SKILL.md` for a SECOND copy of the loop
+  sequencing / `safety_passed is True` gate / bounded-revise cap / scratch-and-promote finds EXACTLY
+  1 definition (in `plan_driver.py`) and 0 duplicated copies (AC-2, the no-fork probe).
+- **Risk — injected-safety-not-True surfaces a plan (ADR-0026 Falsification injected-safety-not-True
+  probe / INV-CRITICAL-NON-OVERRIDABLE).** Gate: driving the shared driver with a disposition whose
+  `safety_passed` is not boolean-True (`False`/`None`/absent/non-dict/raised) surfaces 0 plans —
+  terminal `SAFETY_BLOCKED` (AC-4).
+- **Risk — frozen inner engine re-authored (ADR-0026 Falsification frozen-engine).** Gate:
+  `git diff --numstat <wave-base>..HEAD` on the 8 inner-engine files → 0 changed lines (AC-1).
+- **Risk — store-keying drift at the relocated promote seam (QA-2 store-seam golden-line).** Gate: an
+  identical accept-fixture run through `run_orchestrated` pre-extraction and post-extraction produces
+  byte-identical promoted store lines — a `diff` of the two captures → 0 differing lines (carried into
+  AC-3's behavior-preservation leg).
+
+The gate conditions reference live tests, not subjective assessments.
+
+## TDD Steps
+
+Five TDD cycles. Cycle 1 extracts the driver + re-points `run_orchestrated` + the no-fork + frozen-
+engine probes. Cycle 2 the injected-safety-not-True + promotion-on-accept. Cycle 3 the bounded-revise
++ dispatch-cap + de-id-sentinel + out-of-run-set halts (the preserved halts). Cycle 4 the
+driver-independently-drivable proof. Cycle 5 the store-seam golden-line byte-diff. All fixture-
+`dispatch`, 0 live spend.
+
+**Fixture import block for the new `test_plan_driver.py` (read before RED):** the driver suite needs
+the same fixtures `test_plan_orchestrator.py` + `test_revise_loop.py` already use — re-import them the
+same way those files do (their import blocks): `_FixedDeidClient` / `_deid_summary` /
+`_sustaining_authors` / the `_RecordingDispatch` spy from `tests.plan.test_plan_orchestrator`; the
+fixture judge/review dispositions from the revise-loop suite. A fixture `gate_dispatch` (returning a
+canned `{accept, safety_passed, revise_domains}` disposition) drives the driver directly — no real
+composer (that is ADR-0026-T2).
+
+### Cycle 1: Steps 1-4 — extract the driver + re-point `run_orchestrated` + no-fork + frozen-engine
+
+#### Step 1: RED — Write Failing Tests
+Call `/write-tests` for `scripts/plan/plan_driver.py` (new suite `tests/plan/test_plan_driver.py`)
+targeting:
+- AC-10 (driver independently drivable, the extract proof): `plan_driver`'s driver runs end-to-end
+  under a fixture `dispatch` + a fixture `gate_dispatch` with NO live client and NO skill present —
+  a fixture accept disposition drives it to promote ≥1 `plan::<domain>` row into `root` and the
+  result carries `dispatch_count`. (This test references `plan_driver`, which does not yet exist → RED.)
+- AC-2 (no-fork probe, 0 duplicated loop copies): a grep over `scripts/plan/plan_orchestrator.py` +
+  `.claude/skills/generate-plan/SKILL.md` for a SECOND copy of the `while True:` gate→branch→
+  re-dispatch sequencing, the `safety_passed is True` surface gate, the bounded-revise cap check, or
+  the scratch-and-promote logic finds EXACTLY 1 definition (in `plan_driver.py`) and 0 duplicated
+  copies (a test that shells the grep and asserts the count). RED today: the loop is still inline in
+  `plan_orchestrator.py` (1 copy there, 0 in `plan_driver.py` which does not exist) → the assertion
+  "exactly 1, in `plan_driver.py`" fails.
+- AC-1 (frozen-engine probe): a test asserting `git diff --numstat <wave-base>..HEAD` shows 0 changed
+  lines on each of `scripts/plan/{orchestrate,pipeline,assemble,generate_plan,adjudicate,adjust,
+  track,router}.py`. (RED-capable: a variant that touched an inner-engine module would go RED.)
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py tests/plan/test_plan_orchestrator.py
+tests/plan/test_revise_loop.py -q`
+Expected: FAIL (`plan_driver` does not exist; the no-fork grep finds the loop in `plan_orchestrator.py`
+not `plan_driver.py`).
+
+#### Step 2: GREEN — Implement
+Changes to make:
+- `scripts/plan/plan_driver.py` (Create): define the ONE shared control-inversion driver. EXTRACT the
+  `while True:` body from `run_orchestrated` ([plan_orchestrator.py:260-300]) into a generator/
+  coroutine that YIELDS dispatch-requests (a `(domains, summary, gates)`-shaped request) and RECEIVES
+  the captured author envelopes via `.send()`, threading the same control flow: run the composed gate
+  over the assembled result (`_safe_gate`), apply the `safety_passed is True` surface gate
+  (non-True → terminal `SAFETY_BLOCKED`), on accept promote the scratch survivors into `root` and
+  finish, on a quality REVISE with safety passing re-yield a dispatch-request for the REVISE-targeted
+  domains (guarding out-of-run-set targets → `SAFETY_BLOCKED`), bound the revise count at `revise_cap`
+  (→ `REVISE_EXHAUSTED`), and honor the de-id sentinel + dispatch_cap halts. The driver receives the
+  inner-engine seam (`pipeline.run_generation`) + the scratch-store strategy + the budget as
+  inputs/closures so it is byte-frozen-inner-engine-agnostic. Move the helpers it owns
+  (`_dispatch_domains` / `_safe_gate` / `_promote_plans` / `_honest_no_plan` / `_charging` /
+  `_noop_gate_dispatch`) into `plan_driver.py` OR keep them importable from `plan_orchestrator.py` —
+  pick one home and the no-fork grep proves a single definition. The reason constants
+  (`SAFETY_BLOCKED` / `REVISE_EXHAUSTED` / `PROMOTE_FAILED` / `DEFAULT_REVISE_CAP`) live with the
+  driver or stay importable. The driver is independently drivable by a fixture `dispatch` (the
+  test/API mode). (satisfies AC-10, the driver definition)
+- `scripts/plan/plan_orchestrator.py` (Modify): re-point `run_orchestrated` at `plan_driver` — DELETE
+  the inline `while True:` body and the now-relocated helper definitions, drive the shared driver with
+  the existing programmatic/fixture `dispatch` (feed each captured envelope back per yielded
+  dispatch-request via `.send()`). `run_orchestrated`'s public signature + return shapes are preserved
+  VERBATIM (the inner-engine `pipeline.run_generation` call shape is unchanged; the LEGACY Wave-2
+  non-loop path — `if not loop_enabled:` [:237-243] — stays as-is, only the autonomous loop body
+  relocates). 0 duplicated copies of the loop control flow remain in `plan_orchestrator.py`.
+  (satisfies AC-2, AC-1 — no inner-engine module is touched)
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py tests/plan/test_plan_orchestrator.py
+tests/plan/test_revise_loop.py -q`
+Expected: PASS
+
+#### Step 3: REFACTOR
+Review for:
+- Duplication between the relocated helpers and any residual shape-builders left in
+  `plan_orchestrator.py` — the honest-no-plan shape, the charging wrapper, and the dispatch helper
+  should have ONE home each (the no-fork grep is the oracle).
+- Naming consistency: the driver's public entry (generator factory / driver function) follows the
+  module's `run_*` / `_*` idiom; the yielded-request + sent-envelope shapes are named, not anonymous
+  tuples passed by position with no doc.
+- No behavior change.
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py tests/plan/test_plan_orchestrator.py
+tests/plan/test_revise_loop.py -q`
+Expected: PASS (no behavior change)
+
+#### Step 4: REGRESSION
+Run: `.venv/bin/python -m pytest -q`
+Expected: PASS — `1611 passed, 2 skipped` (AC-3, the behavior-preservation probe: 0 tests that passed
+pre-extract now failing). Run the EXTEND-NOT-REBUILD gate (AC-1): `git diff --numstat <wave-base>..HEAD
+-- scripts/plan/orchestrate.py scripts/plan/pipeline.py scripts/plan/assemble.py
+scripts/plan/generate_plan.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/track.py
+scripts/plan/router.py` → 0 changed lines.
+
+### Cycle 2: Steps 5-8 — injected-safety-not-True (0 plans) + promotion-on-accept
+
+#### Step 5: RED — Write Failing Tests
+Call `/write-tests` for `scripts/plan/plan_driver.py` (`tests/plan/test_plan_driver.py`) targeting:
+- AC-4 (injected-safety-not-True probe): drive the shared driver via a fixture `dispatch` + a fixture
+  `gate_dispatch` returning a disposition whose `safety_passed` is not boolean-True — assert across
+  ALL five shapes (`False` / `None` / absent key / non-dict result / a raised gate) that the count of
+  plans promoted into `root` == 0 (terminal `SAFETY_BLOCKED`).
+- AC-5 (promotion-on-accept): drive the shared driver with a fixture disposition
+  `{accept: True, safety_passed: True}`; assert ≥1 `plan::<domain>` row is promoted into `root` and
+  the result carries `dispatch_count`.
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py -q`
+Expected: FAIL or PASS-on-the-oracle (the Cycle-1 driver already threads the `safety_passed is True`
+gate; this cycle PINS the five non-True shapes + the accept promotion explicitly — if Cycle 1 missed
+the non-dict / raised case, RED).
+
+#### Step 6: GREEN — Implement
+Changes to make:
+- `scripts/plan/plan_driver.py`: confirm the driver's safety gate routes EVERY non-boolean-True
+  disposition (`False` / `None` / absent / non-dict / raised) to the terminal `SAFETY_BLOCKED` halt
+  (via `_safe_gate` returning `None` on a raised gate + the `isinstance(disposition, dict) and
+  disposition.get("safety_passed") is True` surface check), and the accept branch promotes the
+  scratch survivors into `root`. No new control flow if Cycle 1 threaded it; close any gap the RED
+  surfaced (e.g. a non-dict disposition not caught).
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py -q`
+Expected: PASS
+
+#### Step 7: REFACTOR
+Review the safety-gate + promote branch for duplication with the de-id-sentinel / cap halt shape
+builders (all return the `_honest_no_plan` shape — one helper). Run targets:
+`tests/plan/test_plan_driver.py`. Expected: PASS, no behavior change.
+
+#### Step 8: REGRESSION
+Run: `.venv/bin/python -m pytest -q`
+Expected: PASS
+
+### Cycle 3: Steps 9-10 — the preserved halts (bounded-revise + de-id-sentinel + out-of-run-set + dispatch-cap)
+
+#### Step 9: RED — Write Failing Tests
+Call `/write-tests` for `scripts/plan/plan_driver.py` (`tests/plan/test_plan_driver.py`) targeting:
+- AC-6 (bounded-revise probe): a fixture disposition returning `accept: False, safety_passed: True,
+  revise_domains: [<known domain>]` every pass (non-converging) → the driver halts at `revise_cap`
+  and returns `REVISE_EXHAUSTED`; count of plans that loop past `revise_cap` == 0 (assert the per-
+  domain re-dispatch fired EXACTLY `revise_cap` times, not `revise_cap + 1`).
+- AC-7 (de-id sentinel halt preserved): a `deid_in` sentinel (`{"deidentified": False}`) → the
+  driver/orchestrator halts to honest no-plan with 0 dispatches + 0 plans (`DEID_HALTED`).
+- AC-8 (out-of-run-set revise guard preserved): a fixture disposition naming a `revise_domains` entry
+  NOT in the run's `domains` → terminal `SAFETY_BLOCKED`, 0 plans (no unguarded `KeyError` on
+  `_ROLE_OF_DOMAIN[domain]`).
+- AC-9 (dispatch-cap halt preserved): with `dispatch_cap` below the run's tally, the driver halts to
+  honest no-plan (`DISPATCH_CAP_EXCEEDED`) before the over-budget dispatch — 0 plans past the cap.
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py -q`
+Expected: FAIL or PASS-on-the-oracle (the halts are the Cycle-1 driver's preserved branches; this
+cycle pins each; a missing out-of-run-set guard would let a `KeyError` escape → RED).
+
+#### Step 10: GREEN — Implement
+Changes to make:
+- `scripts/plan/plan_driver.py`: confirm the driver preserves each halt verbatim from the extracted
+  loop — the `revise_cap` boundary (no off-by-one allowing a 4th re-dispatch), the de-id sentinel
+  halt (0 dispatches before the inner engine), the out-of-run-set `revise_domains` guard (→
+  `SAFETY_BLOCKED`, no `KeyError`), and the `DispatchCapExceeded`-caught halt. No new control flow if
+  Cycle 1 relocated them; fix any boundary the RED surfaced.
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py -q`
+Expected: PASS
+
+#### (REFACTOR folded — the halts are the extracted loop's branches. REGRESSION:)
+Run: `.venv/bin/python -m pytest -q`
+Expected: PASS
+
+### Cycle 4: Steps 11-12 — driver-independently-drivable (no live client, no skill)
+
+#### Step 11: RED — Write Failing Tests
+Call `/write-tests` for `scripts/plan/plan_driver.py` (`tests/plan/test_plan_driver.py`) targeting:
+- AC-10 (independently drivable, the test/API-mode proof): `plan_driver` runs end-to-end under a
+  fixture `dispatch` + a fixture `gate_dispatch` with NO `ModelClient` constructed and NO
+  `.claude/skills/generate-plan/SKILL.md` referenced — assert the driver completes a synthetic run
+  (de-id-fixture → loop → promote) from `tests/plan/test_plan_driver.py` alone. (Pins that the driver
+  has no hidden dependency on the orchestrator's live wiring or the skill.)
+- AC-11 (suite gate): `.venv/bin/python -m pytest tests/plan/test_plan_driver.py
+  tests/plan/test_plan_orchestrator.py tests/plan/test_revise_loop.py` passes (0 live calls).
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py -q`
+Expected: FAIL or PASS-on-the-oracle (if the driver imports the orchestrator's live client or the
+skill at module scope, the no-client run RED).
+
+#### Step 12: GREEN — Implement
+Changes to make:
+- `scripts/plan/plan_driver.py`: confirm the driver takes the inner-engine seam + the `dispatch` +
+  the `gate_dispatch` + the budget as INPUTS (not module-scope imports of a live client or the skill)
+  — so a fixture `dispatch` drives it with no live wiring. Remove any incidental module-scope import
+  of `ModelClient` / the skill if Cycle 1 introduced one (the driver is seam-driven by construction).
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py tests/plan/test_plan_orchestrator.py
+tests/plan/test_revise_loop.py -q`
+Expected: PASS
+
+#### (REFACTOR folded. REGRESSION:)
+Run: `.venv/bin/python -m pytest -q`
+Expected: PASS
+
+### Cycle 5: Steps 13-14 — store-seam golden-line (QA-2: byte-identical promoted store lines)
+
+#### Step 13: RED — Write Failing Tests
+Call `/write-tests` for `scripts/plan/plan_driver.py` (`tests/plan/test_plan_driver.py`) targeting:
+- QA-2 (store-seam golden-line, extends AC-3's behavior-preservation leg): run an identical
+  accept-fixture through `run_orchestrated` and capture the promoted store lines (the raw
+  `plan::`/`dvq::`-keyed bytes `store.append` receives at the relocated `_promote_plans` seam). The
+  test asserts these promoted lines are byte-identical to a recorded GOLDEN capture taken from the
+  pre-extraction `run_orchestrated` (committed as a fixture, or captured from `<wave-base>` HEAD in a
+  conftest helper) — `diff` of the two captures → 0 differing lines. The existing suite asserts on
+  `results`/`reason`, not the stored line bytes; this golden-line byte-diff makes a SILENT keying
+  drift at the relocated `_promote_plans`→`store.append` seam go RED (same-surface-different-bytes).
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py -q`
+Expected: FAIL if the relocation drifted the stored keying; PASS if the promote relocated verbatim
+(then the RED proves the golden capture is wired). Demonstrate the probe goes RED against a variant
+that changes the `(item, timepoint, source)` keying at the relocated seam — a golden-line that cannot
+catch a keying drift is worthless.
+
+#### Step 14: GREEN — Implement
+Changes to make:
+- `scripts/plan/plan_driver.py`: confirm `_promote_plans` relocated VERBATIM — the same
+  `store.items(scratch_root)` → `store.read(item, root=scratch_root)` → `store.append(item, reading,
+  root=root)` sequence, the same `plan::`/`dvq::` prefix filter, the same snapshot-and-rollback
+  guard. The stored keying is `store.append`'s (`(item, timepoint, source)` dedupe), untouched by the
+  relocation. No new control flow — the GREEN here is "the promote moved, not changed"; if Cycle 1
+  altered the keying or the prefix filter, restore the verbatim shape.
+
+Run: `.venv/bin/python -m pytest tests/plan/test_plan_driver.py -q`
+Expected: PASS
+
+#### Step 15: REGRESSION
+Run: `.venv/bin/python -m pytest -q`
+Expected: PASS — `1611 passed, 2 skipped` (the full integrated suite green; the S92 store-adversarial
+battery in `tests/plan/test_revise_loop.py` + `tests/plan/test_pipeline.py` re-runs across the
+relocation, re-proving the cross-stream / same-timepoint-dedupe / dedupe-key-boundary / mutation-RED
+guarantees over the moved promote — bead `pka` satisfied by the suite-green gate, NO new battery).
+
+**TDD step count: 15 (5 cycles, REFACTOR/REGRESSION folded on cycles 3-5).** At the upper bound of
+the ≤10-cycles guidance (5 cycles); the keystone's 11 ACs span the no-fork / frozen-engine /
+behavior-preservation triad + the four preserved halts + the golden-line, none splittable across
+waves (ADR-0026-T1 is the single keystone). One created driver + one modified wrapper + one new test
+file.
+
+## Interface Contracts
+
+This task CREATES a shared interface consumed by ADR-0026-T2, ADR-0026-T3, and ADR-0026-T4: the
+`plan_driver` drive-protocol. It also PRESERVES `run_orchestrated`'s public signature + return shapes
+verbatim (the contract ADR-0022-T1/T3 fixed) — only the internal control flow relocates.
+
+- **`plan_driver` drive-protocol (the shared control-inversion contract — NEW, consumed downstream).**
+  The driver is a generator/coroutine (the OQ-1 recommended shape; a step state-machine is permitted
+  if it exposes the same protocol). Its drive-protocol:
+  - The CONSUMER (`run_orchestrated` API/test mode, or the ADR-0026-T3 skill subscription mode)
+    advances the driver; the driver YIELDS a dispatch-request (a `(domains, summary, gates)`-shaped
+    request naming the domains to author and the de-identified summary to author over).
+  - The CONSUMER captures each domain's author envelope (via its `dispatch` seam — a fixture in
+    tests, a real subscription agent in the skill) and SENDS the captured envelopes back to the driver
+    (`.send(envelopes)`).
+  - The driver runs the inner engine (`pipeline.run_generation`) over the captured authors against an
+    ISOLATED scratch store, gates the assembled result through the injected composed `gate_dispatch`,
+    and either (a) promotes the survivors into `root` and STOPS (accept + `safety_passed is True`),
+    (b) re-yields a dispatch-request for the REVISE-targeted domains (quality REVISE + safety passing,
+    below `revise_cap`), or (c) STOPS at a terminal honest-no-plan halt (`SAFETY_BLOCKED` /
+    `REVISE_EXHAUSTED` / `DEID_HALTED` / `DISPATCH_CAP_EXCEEDED`).
+  - **The disposition the driver READS is the FIXED 3-key shape** `{accept: bool, safety_passed: bool,
+    revise_domains: list}` — `safety_passed is True` is the ONLY surface path; `revise_domains` names
+    only run-set domains. ADR-0026-T2's composer EMITS exactly this shape into the driver's
+    `gate_dispatch` seam; a richer disposition shape would break the driver's single-disposition read.
+  - The driver is INDEPENDENTLY DRIVABLE by a fixture `dispatch` + a fixture `gate_dispatch` with no
+    live client and no skill (the test/API mode — AC-10).
+  - **Change control:** Dependent tasks (ADR-0026-T2 emits the disposition; ADR-0026-T3/T4 drive the
+    protocol) MUST NOT change this drive-protocol (the yielded-request shape, the sent-envelope shape,
+    the 3-key disposition read, the loop topology, the fail-closed safety gate) without Architect
+    review (Core Rule 10).
+- **`run_orchestrated(...)` — signature + return shapes UNCHANGED.** The signature
+  (`raw_intake, deid_client, dispatch, store_read, root, *, plan_date, domains, on_date, gates,
+  gate_dispatch, reauthor, adjudicator, dispatch_cap, revise_cap`) and the return shapes (the
+  `run_generation` result + `dispatch_count` on success; the `_honest_no_plan` shape on each halt) are
+  preserved verbatim. The behavior-preservation suite-green gate (AC-3) is the oracle that this
+  contract did not drift.
+
+## Verification Checklist
+
+- [ ] AC-1 (frozen-engine, inner-engine numstat=0) — verified by the EXTEND-NOT-REBUILD gate
+      `git diff --numstat <wave-base>..HEAD` on the 8 inner-engine files → 0 changed lines +
+      `test_inner_engine_byte_frozen` (shells the numstat).
+- [ ] AC-2 (no-fork, 0 duplicated loop copies) — verified by `test_no_forked_revise_loop` (greps
+      `plan_orchestrator.py` + `SKILL.md` → EXACTLY 1 loop definition, in `plan_driver.py`, 0 dups).
+- [ ] AC-3 (behavior-preservation) — verified by the full suite `.venv/bin/python -m pytest -q` →
+      `1611 passed, 2 skipped`, 0 tests that passed pre-extract now failing.
+- [ ] AC-4 (injected-safety-not-True → 0 plans) — verified by `test_injected_safety_not_true_zero_plans`
+      (across `False`/`None`/absent/non-dict/raised → terminal `SAFETY_BLOCKED`, 0 plans promoted).
+- [ ] AC-5 (promotion-on-accept) — verified by `test_promotion_on_accept` (≥1 `plan::<domain>` into
+      `root`, `dispatch_count` present).
+- [ ] AC-6 (bounded-revise → `REVISE_EXHAUSTED`) — verified by `test_bounded_revise_halts_at_cap`
+      (non-converging → halt at `revise_cap`, EXACTLY `revise_cap` re-dispatches, 0 plans past).
+- [ ] AC-7 (de-id sentinel halt preserved) — verified by `test_deid_sentinel_halt` (`DEID_HALTED`, 0
+      dispatches, 0 plans).
+- [ ] AC-8 (out-of-run-set revise guard preserved) — verified by `test_out_of_run_set_revise_blocked`
+      (`SAFETY_BLOCKED`, 0 plans, no `KeyError`).
+- [ ] AC-9 (dispatch-cap halt preserved) — verified by `test_dispatch_cap_halt`
+      (`DISPATCH_CAP_EXCEEDED`, 0 plans past the cap).
+- [ ] AC-10 (driver independently drivable) — verified by `test_driver_drivable_no_client_no_skill`
+      (fixture `dispatch` + fixture `gate_dispatch`, no live client, no skill).
+- [ ] AC-11 (suite gate) — verified by `.venv/bin/python -m pytest tests/plan/test_plan_driver.py
+      tests/plan/test_plan_orchestrator.py tests/plan/test_revise_loop.py` (0 live calls).
+- [ ] Wave-1 keystone behavior-preservation TRIAD carried: frozen-engine [AC-1] + no-fork [AC-2] +
+      behavior-preservation [AC-3].
+- [ ] Wave-1 store-seam golden-line (QA-2) carried — verified by `test_store_seam_golden_line`
+      (byte-identical promoted store lines pre/post extraction; demonstrated RED against a keying-drift
+      variant).
+- [ ] Store-adversarial battery satisfaction (bead `pka`): NO new battery; the suite-green gate (AC-3)
+      re-runs the S92 battery (`tests/plan/test_revise_loop.py` + `tests/plan/test_pipeline.py`) across
+      the relocated `_promote_plans`; `grep -c "store.append" scripts/plan/plan_driver.py
+      scripts/plan/plan_orchestrator.py` shows the write MOVED, not duplicated.
+- [ ] No regression in full test suite (`.venv/bin/python -m pytest -q`).
+- [ ] Files modified match file manifest (`scripts/plan/plan_driver.py` +
+      `scripts/plan/plan_orchestrator.py` + `tests/plan/test_plan_driver.py`) — no scope creep.
+- [ ] Interface contracts documented (the `plan_driver` drive-protocol + the fixed 3-key disposition
+      read + the preserved `run_orchestrated` signature).
+
+## Commit
+
+```
+refactor(plan): extract shared control-inversion driver
+```
+Stage only:
+- `scripts/plan/plan_driver.py`
+- `scripts/plan/plan_orchestrator.py`
+- `tests/plan/test_plan_driver.py`
+
+Stage by explicit path (`git add <path>` as its own command, then `git commit` separately — the
+PreToolUse hook denies single-call stage+commit, `git commit -a/--all`, and pathspec
+`git commit <path>`). Do NOT `git add vault/` or the daemon frontmatter churn (CLAUDE.md § Vault
+hygiene). Do NOT stage `.beads/issues.jsonl` / `harvest.jsonl` / `memory/process-failures.md` — those
+are close-protocol artifacts.
+
+## Rollback
+
+If verification fails after 3 fix cycles:
+1. `git stash -m "failed-ADR-0026-T1-attempt-{N}"` — preserve work for diagnosis.
+2. `git checkout {commit-before-task}` — revert to the entry-state commit (the
+   `feature/engine-live-wiring-build` HEAD this branch was cut from).
+3. Update the bead tracker: flag ADR-0026-T1 as BLOCKED with the failure log.
+4. Escalate: "Task ADR-0026-T1 failed verification after 3 attempts. Stash ref: {ref}. Failure log:
+   {summary}."
+5. After abandonment or re-planning, drop all `failed-ADR-0026-T1` entries from `git stash list`.
+
+Do NOT: silently skip failing acceptance criteria, weaken tests to make them pass (especially the
+no-fork / injected-safety-not-True / behavior-preservation probes — a falsification that cannot go
+RED is worthless), or proceed to the wave checkpoint with a broken state. A no-fork violation (a
+second copy of the revise loop) is the latent forked-safety-loop failure vector ADR-0026 rejects —
+HALT, route back to drive the ONE shared driver. An EXTEND-NOT-REBUILD violation (non-zero numstat on
+an inner-engine file) — HALT, re-implement against the seam.
