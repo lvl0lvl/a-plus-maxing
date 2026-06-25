@@ -116,6 +116,26 @@ def _run_through_step(drive_kwargs, *, authors_map, reauthor=None, adjudicator=N
     return plan_step.result_of(state)
 
 
+def _run_through_step_capped(drive_kwargs, *, authors_map, reauthor=None, adjudicator=None, cap):
+    """Drive through repeated `step` calls BOUNDED by a step cap; return (pending, result, steps).
+
+    A `None` re-author / `None` adjudicator that an un-cached fulfilment-guard fails to memoize makes
+    the re-drive re-fire the SAME hook forever (the BUG-1 infinite loop) — so this helper is BOUNDED:
+    it stops at `cap` steps. The test asserts the run TERMINATED (`pending is None`) WITHIN the cap.
+    Against the unfixed `fulfilled_envelope is not None` guard the cap is exhausted (RED); with the
+    sentinel fix the run terminates well inside it (GREEN).
+    """
+    budget = drive_kwargs.get("budget")
+    pending, state = plan_step.step(None, **drive_kwargs)
+    steps = 1
+    while pending is not None and steps < cap:
+        envelope = _fulfil(pending, authors_map=authors_map, reauthor=reauthor,
+                           adjudicator=adjudicator, budget=budget)
+        pending, state = plan_step.step(state, fulfilled_envelope=envelope, **drive_kwargs)
+        steps += 1
+    return pending, plan_step.result_of(state), steps
+
+
 # ===============================================================================
 # Cycle 1: AC-1 (one-yield-advance) + AC-2 (serialization FORMAT) + AC-5 (no-fork)
 # ===============================================================================
@@ -414,3 +434,109 @@ def test_harness_defines_no_store_write():
     # existing `plan_driver._promote_plans` -> `store.append` promote unchanged.
     src = Path("scripts/plan/plan_step.py").read_text(encoding="utf-8")
     assert src.count("store.append") == 0, "the harness defines a store write (it must drive the existing promote)"
+
+
+# ===============================================================================
+# Cycle 5: BUG-1 — a None hook fulfilment terminates HELD (no infinite re-fire)
+# ===============================================================================
+
+
+def test_none_reauthor_terminates_no_plan_equal_to_reference(tmp_path):
+    # BUG-1 (the safety-critical hang): a REAUTHOR returning `None` is a LEGITIMATE outcome — the
+    # trainer cannot fuel a sustainable session, so the workout is HELD (no fuelable plan). The OLD
+    # `fulfilled_envelope is not None` guard never CACHED that `None`, so the re-drive re-fired the SAME
+    # REAUTHOR -> cache MISS -> `_ReplayNeeded` forever (the harness hangs on the safe default). With
+    # the sentinel guard the `None` is cached exactly as the synchronous `_run_with_replay` caches it ->
+    # the re-drive HITs -> the engine proceeds to the SAME terminal honest-no-plan state the synchronous
+    # `run_orchestrated` reaches over the same fixture (here the held workout's coverage gap drives the
+    # quality-revise loop to its cap -> `REVISE_EXHAUSTED`, 0 plans). The no-fork property: harness ==
+    # reference.
+    from scripts.plan.plan_orchestrator import run_orchestrated
+    from tests.plan.test_deid_in import _raw_intake
+    from tests.plan.test_plan_orchestrator import _RecordingDispatch
+
+    def declining_reauthor(domain, constraint):
+        return None  # the trainer cannot fuel a sustainable session (the safe default)
+
+    domains = ("workout", "nutrition")
+
+    # --- the synchronous reference (the no-fork equivalence target) ---
+    ref_root = tmp_path / "reference"
+    ref_out = run_orchestrated(
+        _raw_intake(), _FixedDeidClient(_deid_summary()),
+        _RecordingDispatch(_bounce_authors(workout_cost=900, ceiling=450)),
+        _seed_store(ref_root), ref_root, plan_date=PLAN_DATE, domains=domains,
+        gate_dispatch=_clean_composing_gate(), reauthor=declining_reauthor,
+    )
+    ref_recorded = {d for d, r in ref_out["results"].items() if r.get("recorded") is True}
+
+    # --- the harness drive: the SAME fixture through repeated step calls, bounded by a step cap ---
+    harness_root = tmp_path / "harness"
+    drive_kwargs = dict(
+        summary=_deid_summary(), domains=domains, store_read=_seed_store(harness_root),
+        root=harness_root, plan_date=PLAN_DATE, gates={}, gate_producer=_clean_composing_gate(),
+        reauthor=declining_reauthor,
+    )
+    pending, result, _steps = _run_through_step_capped(
+        drive_kwargs, authors_map=_bounce_authors(workout_cost=900, ceiling=450),
+        reauthor=declining_reauthor, cap=40,
+    )
+
+    # the harness TERMINATED within the cap (the None re-author no longer hangs)
+    assert pending is None, "the harness did not terminate (None reauthor re-fired forever — BUG-1)"
+    # SAME terminal halt reason + SAME (empty) recorded set as the synchronous reference, 0 plan:: rows
+    assert result["reason"] == ref_out["reason"], f"{result['reason']!r} != {ref_out['reason']!r}"
+    harness_recorded = {d for d, r in result["results"].items() if r.get("recorded") is True}
+    assert harness_recorded == ref_recorded, f"{harness_recorded} != {ref_recorded}"
+    assert "workout" not in harness_recorded, "the un-fuelable workout was recorded"
+    assert store.read("plan::workout", root=harness_root) == [], "a held workout promoted a plan:: row"
+
+
+def test_none_adjudicator_terminates_affected_held_equal_to_reference(tmp_path):
+    # BUG-1 (the safety-critical hang, the ADJUDICATOR axis): an ADJUDICATOR returning `None` is the
+    # SAFE default — the medical liaison DECLINES to clear a held finding, so the hold STANDS. The OLD
+    # guard never cached that `None`, so the re-drive re-fired the SAME ADJUDICATOR forever. With the
+    # sentinel guard the `None` is cached -> the re-drive HITs -> every held finding's block stands ->
+    # the affected domains are HELD, EQUAL to the synchronous `run_orchestrated` reference.
+    from scripts.plan.plan_orchestrator import run_orchestrated
+    from tests.plan.test_deid_in import _raw_intake
+    from tests.plan.test_plan_orchestrator import _RecordingDispatch
+
+    def declining_adjudicator(safety_finding):
+        return None  # the liaison declines to clear -> the block stands (the safe default)
+
+    domains = ("supplements", "peptides")
+
+    # --- the synchronous reference: both held domains stay HELD (no clearance) ---
+    ref_root = tmp_path / "reference"
+    ref_out = run_orchestrated(
+        _raw_intake(), _FixedDeidClient(_deid_summary()),
+        _RecordingDispatch(_multi_held_authors()), _bpmh_store(ref_root, "bleeding-risk"),
+        ref_root, plan_date=PLAN_DATE, domains=domains,
+        gate_dispatch=_clean_composing_gate(), adjudicator=declining_adjudicator,
+    )
+    assert ref_out["results"]["supplements"]["recorded"] is False
+    assert ref_out["results"]["peptides"]["recorded"] is False
+
+    # --- the harness drive: the SAME fixture through repeated step calls, bounded by a step cap ---
+    harness_root = tmp_path / "harness"
+    drive_kwargs = dict(
+        summary=_deid_summary(), domains=domains,
+        store_read=_bpmh_store(harness_root, "bleeding-risk"), root=harness_root,
+        plan_date=PLAN_DATE, gates={}, gate_producer=_clean_composing_gate(),
+        adjudicator=declining_adjudicator,
+    )
+    pending, result, _steps = _run_through_step_capped(
+        drive_kwargs, authors_map=_multi_held_authors(),
+        adjudicator=declining_adjudicator, cap=40,
+    )
+
+    # the harness TERMINATED within the cap (the None adjudication no longer hangs)
+    assert pending is None, "the harness did not terminate (None adjudicator re-fired forever — BUG-1)"
+    # both affected domains stay HELD, 0 plan:: rows — EQUAL to the synchronous reference
+    assert result["results"]["supplements"]["recorded"] is False
+    assert result["results"]["peptides"]["recorded"] is False
+    assert store.read("plan::supplements", root=harness_root) == []
+    assert store.read("plan::peptides", root=harness_root) == []
+    assert (result["results"]["supplements"]["recorded"]
+            == ref_out["results"]["supplements"]["recorded"])
