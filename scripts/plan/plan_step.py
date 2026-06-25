@@ -64,8 +64,17 @@ _RESULT = "result"
 # value-PII fail-closed return shape; name no value (no PII echo in the reason).
 YIELD_PAYLOAD_PII = "yield-payload-pii"
 
+# The private "no fulfilment supplied" sentinel for `step`'s `fulfilled_envelope` default. It is NOT
+# `None`, because `None` is a LEGITIMATE, safety-critical fulfilment: a REAUTHOR returning `None` (the
+# trainer cannot fuel a sustainable session — the workout is HELD) and an ADJUDICATOR returning `None`
+# (the medical liaison DECLINES to clear a held finding — the safe default, the hold stands) must be
+# CACHED so the re-drive HITs (exactly as the synchronous `_run_with_replay` caches every envelope
+# unconditionally). Defaulting to this sentinel lets `step` route a SUPPLIED `None` into the cache
+# while still skipping a re-call that supplies no fulfilment (the first call).
+_UNFULFILLED = object()
 
-def step(serialized_state, *, fulfilled_envelope=None, summary=None, domains=None, store_read=None,
+
+def step(serialized_state, *, fulfilled_envelope=_UNFULFILLED, summary=None, domains=None, store_read=None,
          root=None, plan_date=None, gates=None, gate_producer=None, compose=None, on_date=None,
          reauthor=None, adjudicator=None, budget=None, revise_cap=plan_driver.DEFAULT_REVISE_CAP,
          identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
@@ -88,9 +97,14 @@ def step(serialized_state, *, fulfilled_envelope=None, summary=None, domains=Non
     Args:
         serialized_state (dict | None): The prior round's serialized state. `None` on the FIRST call
             (a fresh run — the memo + rounds log start empty).
-        fulfilled_envelope: The envelope the consumer dispatched for the prior pending request. `None`
-            on the first call. Routed into the memo (REAUTHOR / ADJUDICATOR) or the rounds log
-            (AUTHOR / GATE) by the prior pending request's recorded `kind`.
+        fulfilled_envelope: The envelope the consumer dispatched for the prior pending request.
+            Defaults to the `_UNFULFILLED` sentinel (no fulfilment supplied — the first call). A
+            SUPPLIED fulfilment — INCLUDING a legitimate `None` (a REAUTHOR that declines to fuel a
+            sustainable session, an ADJUDICATOR that declines to clear a held finding — the safe
+            defaults) — is routed into the memo (REAUTHOR / ADJUDICATOR) or the rounds log (AUTHOR /
+            GATE) by the prior pending request's recorded `kind`. A supplied `None` is cached exactly
+            as the synchronous `_run_with_replay` caches it, so the re-drive HITs (no re-yield) and
+            the engine proceeds to the held / declined terminal state rather than re-firing forever.
         summary (dict): The de-identified operator summary (forwarded to `drive`).
         domains (tuple): The plan domains to generate (forwarded to `drive`).
         store_read (Callable): The store read surface, instance-root pre-bound.
@@ -124,7 +138,7 @@ def step(serialized_state, *, fulfilled_envelope=None, summary=None, domains=Non
     # `lenses` tuple — which json renders as a list; normalizing here makes the state's bytes the
     # canonical json form, and the re-drive runs over that form identically).
     pending = state.get(_PENDING)
-    if pending is not None and fulfilled_envelope is not None:
+    if pending is not None and fulfilled_envelope is not _UNFULFILLED:
         normalized = _json_native(fulfilled_envelope)
         if pending["kind"] in (plan_driver.REAUTHOR, plan_driver.ADJUDICATOR):
             state[_MEMO][pending["key"]] = normalized
