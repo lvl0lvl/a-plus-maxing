@@ -41,6 +41,7 @@ import subprocess
 from pathlib import Path
 
 from scripts.plan.dispatch_budget import DISPATCH_CAP_EXCEEDED
+from scripts.plan.orchestrate import ENERGY_BOUNCE_UNRESOLVED
 from scripts.plan.plan_orchestrator import (
     PROMOTE_FAILED,
     REVISE_EXHAUSTED,
@@ -70,12 +71,15 @@ from tests.plan.test_generate_plan import (
 )
 from tests.plan.test_orchestrate import (
     _SUPP_CONFLICT,
+    _bpmh_store,
+    _compound_authors,
     _conflict_authors,
     _liaison,
     _nutrition,
     _recon,
+    _selective_liaison,
 )
-from tests.plan.test_adjudicate import _override_record
+from tests.plan.test_adjudicate import _envelope, _override_record
 from tests.plan.test_plan_orchestrator import (
     _RecordingDispatch,
     _deid_summary,
@@ -1114,3 +1118,496 @@ def test_deid_halt_short_circuits_before_loop(tmp_path):
     assert out["dispatch_count"] == 0
     assert dispatch.calls == [], "a specialist dispatched past the de-id halt"
     assert gate.calls == [], "the gate fired past the de-id halt"
+
+
+# ===============================================================================
+# ADR-0028-T2: the REAUTHOR / ADJUDICATOR throw / replay-memo mechanism
+# ===============================================================================
+#
+# REAUTHOR (the energy-bounce re-author) and ADJUDICATOR (the held-finding medical-liaison) fire
+# DEEP INSIDE the byte-frozen `orchestrate.generate_plans`, NOT in `drive`'s frame, so they cannot
+# become direct yields. They invert by THROW / REPLAY-MEMOIZATION: the memo-cache callable the
+# driver forwards into `run_generation` raises a `BaseException`-subclass sentinel on a cache MISS;
+# the sentinel unwinds THROUGH the frozen engine (its only catch is the narrow `except ModelCallError`)
+# up to `drive`, which catches it, yields the typed `REAUTHOR` / `ADJUDICATOR` request, caches the
+# `.send()`'d envelope, and RE-DRIVES the pass over a FRESH scratch store. The replay round hits the
+# cache and the engine proceeds unchanged. Charge-on-cache-miss-only (the existing `_charging` wrap).
+#
+# All fixture-driven, 0 live spend.
+
+
+# --- Cycle 1: the BaseException sentinel + non-swallowable proof + no-fork release-grep ---
+
+
+def test_replay_sentinel_is_baseexception_not_exception():
+    # AC-8 (sentinel non-swallowable, the type contract): the replay sentinel is a `BaseException`
+    # subclass and NOT an `Exception` subclass — so neither the engine's `except ModelCallError`
+    # nor `drive`'s GATE-yield `except Exception: disposition = None` (the `_safe_gate` analogue)
+    # can absorb it. A sentinel re-typed to `Exception` would be swallowed -> this test goes RED.
+    from scripts.plan.plan_driver import _ReplayNeeded
+
+    assert issubclass(_ReplayNeeded, BaseException)
+    assert not issubclass(_ReplayNeeded, Exception)
+
+
+def test_replay_sentinel_unwinds_through_except_exception():
+    # AC-8 (the live proof site): a `try/except Exception` around a sentinel-raising call (the exact
+    # shape of `drive`'s GATE-yield fail-closed wrap, `except DispatchCapExceeded: raise` then
+    # `except Exception: disposition = None`) does NOT catch the sentinel — it unwinds to a
+    # `BaseException` handler. A loop reading only `except Exception` would turn the sentinel into a
+    # SAFETY_BLOCKED swallow; the sentinel must propagate to `drive`'s replay handler.
+    from scripts.plan.plan_driver import _ReplayNeeded, REAUTHOR
+
+    def raises_sentinel():
+        raise _ReplayNeeded(REAUTHOR, ("reauthor", "workout", 450), ("workout", {"x": 1}))
+
+    swallowed = False
+    propagated = False
+    try:
+        try:
+            raises_sentinel()
+        except Exception:  # noqa: BLE001 — the deliberate `_safe_gate` analogue
+            swallowed = True
+    except _ReplayNeeded:
+        propagated = True
+
+    assert swallowed is False, "the `except Exception` swallowed the replay sentinel (swallowable)"
+    assert propagated is True, "the replay sentinel did not unwind to a BaseException handler"
+
+
+def test_replay_sentinel_carries_kind_and_key():
+    # the sentinel carries the dispatch CLASS (REAUTHOR / ADJUDICATOR) so `drive`'s catch knows which
+    # typed request to yield, the memo KEY it was raised for so `drive` knows which cache slot the
+    # `.send()`'d envelope fills, and the de-identified PAYLOAD the typed request carries. Named
+    # attributes, not positional tuples passed with no doc.
+    from scripts.plan.plan_driver import _ReplayNeeded, ADJUDICATOR
+
+    key = ("adjudicator", "supplements", "additive-ae", "additive-ae:class:bleeding-risk")
+    payload = {"finding_id": "additive-ae:class:bleeding-risk", "held_domain": "supplements"}
+    sentinel = _ReplayNeeded(ADJUDICATOR, key, payload)
+
+    assert sentinel.kind == ADJUDICATOR
+    assert sentinel.key == key
+    assert sentinel.payload == payload
+
+
+def test_no_fork_adjudication_release_not_rederived_in_consumer_or_driver():
+    # NO-FORK release-grep (the crown-jewel consumer axis): the adjudication RELEASE — the
+    # `outcome == "cleared"` expression AND the CRITICAL / H1-H2 non-overridable check — stays in
+    # `orchestrate.adjudicate`; the consumer (`plan_orchestrator.py`) and the driver
+    # (`plan_driver.py`) re-derive NEITHER. The adjudicator memo-callable returns ONLY the raw
+    # liaison envelope. A re-derivation in either file is the forked-safety-loop failure vector
+    # ADR-0028 rejects -> RED. Targets EXECUTABLE control flow: comments + docstrings are stripped
+    # before counting (a token surviving in prose is not a fork).
+    import ast
+
+    for path in ("scripts/plan/plan_orchestrator.py", "scripts/plan/plan_driver.py"):
+        source = Path(path).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        # collect every string-literal (docstrings live as Constant nodes) line span, then read the
+        # source lines OUTSIDE those spans + with `#`-comments stripped — the executable surface.
+        docstring_lines = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if hasattr(node, "end_lineno"):
+                    docstring_lines.update(range(node.lineno, node.end_lineno + 1))
+        executable = []
+        for i, line in enumerate(source.splitlines(), start=1):
+            if i in docstring_lines:
+                continue
+            code = line.split("#", 1)[0]
+            executable.append(code)
+        executable_src = "\n".join(executable)
+        assert 'outcome == "cleared"' not in executable_src, (
+            f"{path} re-derives the adjudication release (`outcome == \"cleared\"`) — a forked "
+            f"safety loop; the release stays in orchestrate.adjudicate"
+        )
+        assert "outcome == 'cleared'" not in executable_src, (
+            f"{path} re-derives the adjudication release — a forked safety loop"
+        )
+        # the CRITICAL / non-overridable re-derivation guard (the H1-H2 non-overridable check)
+        assert "non_overridable" not in executable_src, (
+            f"{path} re-derives the CRITICAL / H1-H2 non-overridable check — a forked safety loop; "
+            f"it stays in orchestrate.adjudicate"
+        )
+
+
+# --- Cycle 2: REAUTHOR throw -> yield -> cache -> replay + REAUTHOR fail-closed hold ---
+
+
+def _bounce_authors(workout_cost, *, ceiling=450):
+    """A workout over the sustainable ceiling + a nutrition budget that does NOT sustain.
+
+    `energy_budget.sustains is False` with a workout `energy_cost_kcal > ceiling` forces a REAL
+    energy bounce ([orchestrate.py:546-565]) — the engine calls `reauthor("workout", {ceiling})`.
+    """
+    return {
+        "workout": _recon(_author(_workout_rec("Heavy back squat", 5)), energy_cost_kcal=workout_cost),
+        "nutrition": _nutrition(
+            _nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600),
+            energy_budget={"sustains": False, "sustainable_training_kcal": ceiling},
+        ),
+    }
+
+
+def _kind_recording_gate(quality_wrapper, safety_wrapper, *, kinds_seen):
+    """A clean composing gate that also records the request-kind SEQUENCE the driver yielded.
+
+    The driver yields AUTHOR / REAUTHOR / ADJUDICATOR / GATE typed requests; only the GATE reaches
+    a producer, but a REAUTHOR/ADJUDICATOR fired BETWEEN the AUTHOR and the GATE means by the time
+    the producer is called the inner engine has already run (and replayed), so recording the
+    producer-call moment alongside the cache state is the in-band check. AC-1 asserts the yielded
+    `kind` sequence contains a REAUTHOR between the AUTHOR and the GATE — captured by the
+    consumer-side kind spy (`_kind_spy_run`), not here. This gate is just the clean PASS.
+    """
+    def producer(assembled_plan):
+        kinds_seen.append("GATE")
+        return {"judge": quality_wrapper(assembled_plan), "review": safety_wrapper(assembled_plan)}
+
+    producer.calls = kinds_seen
+    return producer
+
+
+def _kind_spy_run(monkeypatch, **run_kwargs):
+    """Run `run_orchestrated`, recording the SEQUENCE of `Request.kind` values the driver yielded.
+
+    Wraps `plan_driver.drive` so each yielded `Request.kind` is appended to a list — the in-band
+    proof that a REAUTHOR was yielded BETWEEN the AUTHOR and the GATE (the throw/replay fired). 0
+    live spend (the run is fully fixture-driven).
+    """
+    from scripts.plan import plan_driver
+
+    kinds = []
+    real_drive = plan_driver.drive
+
+    def spying_drive(*args, **kwargs):
+        gen = real_drive(*args, **kwargs)
+        sent = None
+        try:
+            while True:
+                request = gen.send(sent)
+                kinds.append(request.kind)
+                sent = yield request
+        except StopIteration as done:
+            return done.value
+
+    monkeypatch.setattr(plan_driver, "drive", spying_drive)
+    out = run_orchestrated(**run_kwargs)
+    return out, kinds
+
+
+def test_reauthor_throws_yields_caches_replays(tmp_path, monkeypatch):
+    # AC-1 (REAUTHOR throw -> yield -> cache -> replay): a real energy bounce
+    # (`energy_budget.sustains is False` + over-ceiling workout) -> the memo `reauthor` callable
+    # raises the sentinel on the cache-miss pass -> `drive` yields a REAUTHOR request -> the consumer
+    # `.send()`s a re-author envelope -> `drive` caches it (keyed `reauthor:(domain, constraint)`)
+    # and re-drives over a FRESH scratch store -> the replay hits the cache and the pass completes.
+    # Assert the yielded `kind` sequence contains a REAUTHOR BETWEEN the AUTHOR and the GATE.
+    from scripts.plan import plan_driver
+
+    store_read = _seed_store(tmp_path)
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch(_bounce_authors(workout_cost=900, ceiling=450))
+    gate = _clean_composing_gate()
+
+    reauthor_calls = []
+
+    def reauthor(domain, constraint):
+        reauthor_calls.append((domain, constraint))
+        # the re-dispatched personal-trainer returns a reduced session UNDER the ceiling (fuelable)
+        return _recon(_author(_workout_rec("Light goblet squat", 2)), energy_cost_kcal=400)
+
+    out, kinds = _kind_spy_run(
+        monkeypatch,
+        raw_intake=_raw_intake(), deid_client=deid_client, dispatch=dispatch,
+        store_read=store_read, root=tmp_path, plan_date=PLAN_DATE,
+        domains=("workout", "nutrition"), gate_dispatch=gate, reauthor=reauthor,
+    )
+
+    # the energy bounce fired and the re-author hook was dispatched EXACTLY ONCE (the cache miss)
+    assert reauthor_calls == [("workout", {"sustainable_training_kcal": 450})], reauthor_calls
+    # the yielded kind sequence carries a REAUTHOR BETWEEN the first AUTHOR and the first GATE
+    assert plan_driver.REAUTHOR in kinds, f"no REAUTHOR was yielded: {kinds}"
+    first_author = kinds.index(plan_driver.AUTHOR)
+    first_gate = kinds.index(plan_driver.GATE)
+    first_reauthor = kinds.index(plan_driver.REAUTHOR)
+    assert first_author < first_reauthor < first_gate, f"REAUTHOR not between AUTHOR and GATE: {kinds}"
+    # the replay completed and the FUELABLE re-authored workout surfaced (the cache hit on replay)
+    assert out["results"]["workout"]["recorded"] is True
+    recorded = store.read("plan::workout", root=tmp_path)
+    assert recorded != [], "the replay did not surface the re-authored workout"
+    assert recorded[-1]["value"]["exercises"][0]["name"] == "Light goblet squat"
+
+
+def test_reauthor_fail_closed_holds_workout_others_may_surface(tmp_path):
+    # AC-5 (REAUTHOR fail-closed shape, per-domain hold — NOT terminal): a malformed re-author
+    # envelope (over-ceiling cost) -> the WORKOUT domain stays HELD (`ENERGY_BOUNCE_UNRESOLVED`,
+    # records nothing) while OTHER domains MAY surface. Threshold is "workout not recorded", NOT
+    # "0 plans". The engine's existing hold branch decides the workout is un-fuelable; the driver
+    # only replays with the (malformed) envelope cached.
+    store_read = _seed_store(tmp_path)
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch(_bounce_authors(workout_cost=900, ceiling=450))
+    gate = _clean_composing_gate()
+
+    def reauthor(domain, constraint):
+        # STILL over the ceiling -> the engine holds workout `ENERGY_BOUNCE_UNRESOLVED`
+        return _recon(_author(_workout_rec("Still heavy squat", 5)), energy_cost_kcal=800)
+
+    out = run_orchestrated(
+        _raw_intake(), deid_client, dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition"), gate_dispatch=gate, reauthor=reauthor,
+    )
+
+    # the workout is HELD (per-domain), not recorded — but the run is NOT terminal (not 0 plans)
+    assert out["results"]["workout"]["recorded"] is False
+    assert out["results"]["workout"]["reason"] == ENERGY_BOUNCE_UNRESOLVED
+    assert store.read("plan::workout", root=tmp_path) == []
+    # the OTHER domain (nutrition) surfaced — the hold is per-domain, not a terminal halt
+    assert out["results"]["nutrition"]["recorded"] is True
+    assert store.read("plan::nutrition", root=tmp_path) != []
+
+
+# --- Cycle 3: ADJUDICATOR once-per-held-domain + ADJUDICATOR fail-closed hold ---
+
+
+def _multi_held_authors():
+    """A supp + pep pair that holds additive-AE (supp) + conflict (pep) + rx-bpmh (supp AND pep).
+
+    With the operator on a `bleeding-risk` Rx class (`_bpmh_store(..., "bleeding-risk")`), this forces
+    FOUR distinct held findings, each a distinct `(held_domain, source, finding_id)` -> a distinct
+    memo key -> one ADJUDICATOR yield per held finding:
+      - additive-ae   / supplements / additive-ae:class:bleeding-risk
+      - cross-domain-conflict / peptides / conflict:peptides:supplements/fish oil
+      - rx-bpmh       / peptides     / rx-bpmh:peptides:bleeding-risk
+      - rx-bpmh       / supplements  / rx-bpmh:supplements:bleeding-risk
+    """
+    return _compound_authors(
+        supp_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]}},
+        pep_recon={"ae_profile": {"additive_classes": ["bleeding-risk"]},
+                   "conflicts": [{"with_domain": "supplements", "with": "fish oil", "reason": "additive bleeding"}]},
+    )
+
+
+def test_adjudicator_yielded_once_per_held_domain(tmp_path, monkeypatch):
+    # AC-2 (ADJUDICATOR yielded once per held domain per pass): a fixture holding additive-AE +
+    # cross-domain-conflict + Rx-BPMH (4 distinct held findings) yields exactly ONE ADJUDICATOR
+    # request per held finding, each independently memo-keyed by `(held-domain, hold-class,
+    # finding_id)`. Assert the count of ADJUDICATOR yields == the number of held findings (4 >= 3).
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch(_multi_held_authors())
+    gate = _clean_composing_gate()
+
+    liaison_findings = []
+
+    def liaison(safety_finding):
+        liaison_findings.append((safety_finding["source"], safety_finding["held_domain"]))
+        # a content-valid HIGH override that echoes the finding's caution verbatim (the release
+        # condition) — so the holds clear and the pass surfaces a plan.
+        env = _envelope(band="HIGH", finding_id=safety_finding["finding_id"])
+        env["override_record"]["caution_verbatim"] = safety_finding["caution"]
+        return env
+
+    out, kinds = _kind_spy_run(
+        monkeypatch,
+        raw_intake=_raw_intake(), deid_client=deid_client, dispatch=dispatch,
+        store_read=store_read, root=tmp_path, plan_date=PLAN_DATE,
+        domains=("supplements", "peptides"), gate_dispatch=gate, adjudicator=liaison,
+    )
+
+    # exactly one ADJUDICATOR yield per held finding (4 here, >= 3 required by AC-2)
+    from scripts.plan import plan_driver
+    adjudicator_yields = [k for k in kinds if k == plan_driver.ADJUDICATOR]
+    assert len(adjudicator_yields) == 4, f"ADJUDICATOR yields != held findings: {kinds}"
+    # each held finding was independently dispatched (distinct (source, held_domain) pairs)
+    assert len(set(liaison_findings)) == 4, f"held findings not independently keyed: {liaison_findings}"
+    assert ("additive-ae", "supplements") in liaison_findings
+    assert ("cross-domain-conflict", "peptides") in liaison_findings
+    assert ("rx-bpmh", "supplements") in liaison_findings
+    assert ("rx-bpmh", "peptides") in liaison_findings
+
+
+def test_adjudicator_fail_closed_holds_affected_domain(tmp_path):
+    # AC-6 (ADJUDICATOR fail-closed shape, per-domain hold — NOT terminal): a malformed/absent
+    # liaison envelope for a held domain -> that AFFECTED held domain stays HELD (the `outcome ==
+    # "cleared"` release does NOT fire, records nothing) while OTHER domains MAY surface. Threshold
+    # is "affected domain not recorded", NOT "0 plans". A SELECTIVE liaison clears the conflict +
+    # rx-bpmh on peptides but returns NO envelope for the additive-AE supplements finding -> the
+    # supplements domain stays held; peptides (all concerns cleared) surfaces.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch(_multi_held_authors())
+    gate = _clean_composing_gate()
+
+    # block-stands (no envelope -> the block stands) for the additive-AE finding; clear the conflict
+    # + rx-bpmh findings with a content-valid HIGH override (caution echoed). supplements stays held
+    # by additive-AE (+ its rx-bpmh, which DOES clear, but additive-AE keeps it held); peptides
+    # clears its conflict + rx-bpmh and surfaces. `_selective_liaison` echoes the caution verbatim.
+    selective_liaison = _selective_liaison(
+        {"cross-domain-conflict": "HIGH", "rx-bpmh": "HIGH"}  # additive-ae unmapped -> None -> held
+    )
+
+    out = run_orchestrated(
+        _raw_intake(), deid_client, dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("supplements", "peptides"),
+        gate_dispatch=gate, adjudicator=selective_liaison,
+    )
+
+    # the AFFECTED held domain (supplements, additive-AE block-stands) records nothing — per-domain
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
+    # the OTHER domain (peptides, all concerns cleared) surfaced — NOT a terminal "0 plans" halt
+    assert out["results"]["peptides"]["recorded"] is True
+    assert store.read("plan::peptides", root=tmp_path) != []
+
+
+# --- Cycle 4: cache-HIT-proceeds-unchanged + charge-on-miss-only + REPLAY SAFETY ---
+
+
+def _replay_safety_authors():
+    """A 4-domain fixture forcing 1 REAUTHOR + 4 ADJUDICATOR dispatches in one pass.
+
+    workout over the ceiling + nutrition not-sustaining -> a REAUTHOR; supp + pep both bleeding-risk
+    + a pep conflict + the operator on a bleeding-risk Rx class -> 4 ADJUDICATOR findings (additive-AE
+    supp, conflict pep, rx-bpmh supp, rx-bpmh pep). All clear -> all four domains surface ONE row each.
+    """
+    from tests.plan.test_generate_plan import _peptide_rec, _supplement_rec
+
+    return {
+        "workout": _recon(_author(_workout_rec("Heavy squat", 5)), energy_cost_kcal=900),
+        "nutrition": _nutrition(
+            _nutrition_target_rec(), _nutrition_meal_rec("Breakfast", kcal=600),
+            energy_budget={"sustains": False, "sustainable_training_kcal": 450},
+        ),
+        "supplements": _recon(
+            _author(_supplement_rec("Fish oil", "2 g"), specialist="supplement-specialist"),
+            ae_profile={"additive_classes": ["bleeding-risk"]},
+        ),
+        "peptides": _recon(
+            _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist"),
+            ae_profile={"additive_classes": ["bleeding-risk"]},
+            conflicts=[{"with_domain": "supplements", "with": "fish oil", "reason": "additive bleeding"}],
+        ),
+    }
+
+
+def _clearing_reauthor():
+    """A spied energy-bounce re-author returning a fuelable session (records every call)."""
+    calls = []
+
+    def reauthor(domain, constraint):
+        calls.append((domain, constraint))
+        return _recon(_author(_workout_rec("Light goblet squat", 2)), energy_cost_kcal=400)
+
+    reauthor.calls = calls
+    return reauthor
+
+
+def _clearing_liaison():
+    """A spied liaison clearing every held finding with a content-valid HIGH override (caution echoed)."""
+    calls = []
+
+    def liaison(safety_finding):
+        calls.append((safety_finding["source"], safety_finding["held_domain"]))
+        env = _envelope(band="HIGH", finding_id=safety_finding["finding_id"])
+        env["override_record"]["caution_verbatim"] = safety_finding["caution"]
+        return env
+
+    liaison.calls = calls
+    return liaison
+
+
+def test_cache_hit_raises_no_sentinel_on_replay(tmp_path):
+    # AC-3 (cache-HIT proceeds unchanged): on the replay rounds, each hook's key is already cached, so
+    # the memo callable returns the cached envelope and raises NO sentinel. Spy the raw hooks and
+    # assert each is dispatched EXACTLY ONCE (the cache miss) — 0 extra dispatches on the cached
+    # replays. A replay that re-raised (re-dispatched) a cached hook would inflate the spy counts.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch(_replay_safety_authors())
+    gate = _clean_composing_gate()
+    reauthor = _clearing_reauthor()
+    liaison = _clearing_liaison()
+
+    out = run_orchestrated(
+        _raw_intake(), deid_client, dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition", "supplements", "peptides"),
+        gate_dispatch=gate, reauthor=reauthor, adjudicator=liaison,
+    )
+
+    # each raw hook dispatched EXACTLY ONCE — the cached replays raised NO further sentinel (the HIT
+    # returned from the memo cache). A double-raise on a cached key would re-dispatch and inflate this.
+    assert len(reauthor.calls) == 1, f"reauthor re-dispatched on a cached replay: {reauthor.calls}"
+    assert len(liaison.calls) == 4, f"liaison re-dispatched on a cached replay: {liaison.calls}"
+    # each finding is a DISTINCT key (one dispatch per held finding, never a cached re-fire)
+    assert len(set(liaison.calls)) == 4, f"a held finding fired more than once: {liaison.calls}"
+    # the pass surfaced (all four domains recorded)
+    for domain in ("workout", "nutrition", "supplements", "peptides"):
+        assert out["results"][domain]["recorded"] is True
+
+
+def test_replay_safety_no_double_charge_no_double_write(tmp_path):
+    # AC-7 (REPLAY SAFETY — no-double-charge / no-double-write): a fixture triggering 1 REAUTHOR + 4
+    # ADJUDICATOR dispatches (multiple replay rounds) -> `budget.count` AND the promoted `plan::`
+    # row-count EQUAL a single synchronous in-process reference of the SAME fixtures (exact equality).
+    #
+    # REFERENCE (independent, no replay): drive the inner engine ONCE via `pipeline.run_generation`
+    # with the hooks returning their envelopes DIRECTLY (no sentinel, one pass) — its promoted-row
+    # count per domain is the canonical single-pass write count, and each hook fires exactly once.
+    # Then drive the COLD (empty-cache) throw/replay `run_orchestrated` path and assert: each surfacing
+    # domain promoted EXACTLY the reference row-count (no replay double-promote), and each hook
+    # dispatched EXACTLY once (no charge on a replayed HIT). `budget.count` exceeding the single-pass
+    # tally (a HIT was charged) OR the row-count exceeding the reference (a replay double-promoted) -> FAIL.
+    from scripts.plan import pipeline
+
+    # --- the independent single-pass reference (no replay; hooks return directly) ---
+    ref_root = tmp_path / "reference"
+    ref_store_read = _bpmh_store(ref_root, "bleeding-risk")
+    ref_reauthor = _clearing_reauthor()
+    ref_liaison = _clearing_liaison()
+    # the authors the de-id'd run would dispatch (the same fixture envelopes)
+    ref_authors = _replay_safety_authors()
+    ref_result = pipeline.run_generation(
+        ref_authors, ref_store_read, ref_root, plan_date=PLAN_DATE,
+        reauthor=ref_reauthor, adjudicator=ref_liaison,
+    )
+    reference_rows = {d: len(store.read(f"plan::{d}", root=ref_root))
+                      for d in ("workout", "nutrition", "supplements", "peptides")}
+    reference_hook_dispatches = len(ref_reauthor.calls) + len(ref_liaison.calls)
+    assert reference_hook_dispatches == 5, f"reference hook count != 5 (1 reauthor + 4 liaison): {reference_hook_dispatches}"
+    assert all(reference_rows[d] == 1 for d in reference_rows), f"reference rows: {reference_rows}"
+
+    # --- the cold throw/replay path (empty cache; the engine raises + replays) ---
+    cold_root = tmp_path / "cold"
+    cold_store_read = _bpmh_store(cold_root, "bleeding-risk")
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch(_replay_safety_authors())
+    gate = _clean_composing_gate()
+    cold_reauthor = _clearing_reauthor()
+    cold_liaison = _clearing_liaison()
+
+    out = run_orchestrated(
+        _raw_intake(), deid_client, dispatch, cold_store_read, cold_root,
+        plan_date=PLAN_DATE, domains=("workout", "nutrition", "supplements", "peptides"),
+        gate_dispatch=gate, reauthor=cold_reauthor, adjudicator=cold_liaison,
+    )
+
+    # NO-DOUBLE-WRITE: each surfacing domain promoted EXACTLY the reference row-count (1 each) — the
+    # fresh-scratch re-drives discarded their intermediate scratch and promoted only the final pass.
+    for domain in ("workout", "nutrition", "supplements", "peptides"):
+        cold_rows = len(store.read(f"plan::{domain}", root=cold_root))
+        assert cold_rows == reference_rows[domain], (
+            f"{domain}: throw/replay promoted {cold_rows} rows != reference {reference_rows[domain]} "
+            f"(a replay double-promoted)"
+        )
+    # NO-DOUBLE-CHARGE: each hook dispatched EXACTLY once (== the reference), so the cap accrued once
+    # per cache MISS, never on a replayed HIT.
+    cold_hook_dispatches = len(cold_reauthor.calls) + len(cold_liaison.calls)
+    assert cold_hook_dispatches == reference_hook_dispatches, (
+        f"throw/replay hook dispatches {cold_hook_dispatches} != reference {reference_hook_dispatches} "
+        f"(a replayed HIT was charged)"
+    )
+    # the aggregate dispatch_count equals the single-pass tally: 4 specialists + 1 gate + 1 reauthor +
+    # 4 adjudicators = 10 — no HIT inflated the budget.
+    assert out["dispatch_count"] == 10, f"throw/replay dispatch_count != single-pass tally 10: {out['dispatch_count']}"

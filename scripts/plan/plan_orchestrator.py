@@ -283,6 +283,23 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
                     raise
                 except Exception as gate_error:
                     thrown = gate_error
+            elif request.kind == plan_driver.REAUTHOR:
+                # The REAUTHOR request (ADR-0028-T2 throw/replay): the energy-bounce re-author fired
+                # deep in the byte-frozen engine and raised the memo sentinel on a cache MISS. The
+                # consumer fulfils it by dispatching the charge-wrapped `reauthor` hook over the
+                # de-identified `(domain, constraint)` payload and `.send()`s the envelope back; the
+                # driver caches it and re-drives. The charge accrues HERE (once per cache MISS), never
+                # on a replayed HIT (the HIT returns from the memo cache without re-yielding).
+                fulfilment = reauthor(*request.payload)
+            elif request.kind == plan_driver.ADJUDICATOR:
+                # The ADJUDICATOR request (ADR-0028-T2 throw/replay): a held-finding adjudication
+                # fired deep in the engine and raised the memo sentinel on a cache MISS. The consumer
+                # dispatches the charge-wrapped `adjudicator` hook over the de-identified
+                # `(safety_finding,)` payload and `.send()`s ONLY the raw liaison envelope — it never
+                # inspects `outcome` / re-derives the `outcome == "cleared"` release (the no-fork
+                # crown jewel: the release stays in `orchestrate.adjudicate`). The charge accrues HERE
+                # (once per cache MISS) via the charge-wrapped hook, never on a replayed HIT.
+                fulfilment = adjudicator(*request.payload)
             else:
                 # Negative-1 fail-closed: an unrecognized request kind surfaces 0 plans (honest
                 # no-plan), never a default-allow that would let an un-handled kind pass silently.
