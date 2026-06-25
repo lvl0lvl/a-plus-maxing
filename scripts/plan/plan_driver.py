@@ -75,6 +75,38 @@ Request.__doc__ = (
     "and applies the fail-closed `safety_passed is True` surface gate."
 )
 
+class _ReplayNeeded(BaseException):
+    """The throw/replay-memo sentinel: a memo-cache MISS on a REAUTHOR / ADJUDICATOR hook (ADR-0028-T2).
+
+    REAUTHOR (the energy-bounce re-author) and ADJUDICATOR (the held-finding medical-liaison) fire
+    DEEP INSIDE the byte-frozen `orchestrate.generate_plans`, NOT in `drive`'s frame, so they cannot
+    become direct yields like AUTHOR / GATE. The memo-cache callable `drive` forwards into
+    `run_generation` raises THIS sentinel on a cache MISS; it unwinds THROUGH the frozen engine (whose
+    only catch is the narrow `except ModelCallError` — no broad `except Exception`/`except BaseException`)
+    up to `drive`'s replay handler, which yields the typed request, caches the dispatched envelope, and
+    re-drives the pass over a FRESH scratch store.
+
+    It subclasses `BaseException` DIRECTLY, NOT `Exception` — so neither the engine's
+    `except ModelCallError` nor `drive`'s GATE-yield `except Exception: disposition = None` (the
+    `_safe_gate` analogue) can swallow it into a SAFETY_BLOCKED. The non-swallowable contract rests on
+    this base; re-typing it to `Exception` is an ADR-0028 HALT condition (Architect review required).
+
+    Attributes:
+        kind (str): The dispatch CLASS — `REAUTHOR` or `ADJUDICATOR` — so `drive`'s catch knows which
+            typed `Request` to yield.
+        key (tuple): The memo cache key the miss was raised for, so `drive` knows which cache slot the
+            `.send()`'d envelope fills (`("reauthor", domain, ceiling)` /
+            `("adjudicator", held_domain, hold_class, finding_id)`).
+        payload: The de-identified fulfilment payload the typed request carries to the consumer.
+    """
+
+    def __init__(self, kind, key, payload):
+        self.kind = kind
+        self.key = key
+        self.payload = payload
+        super().__init__(f"replay needed: {kind} {key}")
+
+
 # domain -> the role whose full profile the dispatch prompt inlines (INV-ROLE-INLINING). The SINGLE
 # definition (the no-fork crown jewel) for both uses: the driver's out-of-run-set revise guard reads
 # it for MEMBERSHIP (a `revise_domains` entry naming a domain not in this map — or not in the run's
@@ -143,9 +175,17 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_producer
             test-injection point, never a second composition site.
         on_date (str, optional): The doctor-visit-queue collation date. Forwarded to
             `run_generation`.
-        reauthor (Callable, optional): The energy-bounce re-dispatch hook, forwarded verbatim.
-        adjudicator (Callable, optional): The held-finding medical-liaison dispatch hook, forwarded
-            verbatim (the inner safety gate — never bypassed).
+        reauthor (Callable, optional): The energy-bounce re-dispatch hook. When provided, `drive`
+            inverts it via THROW/REPLAY-MEMO (ADR-0028-T2): a memo-cache wrapper is forwarded into
+            `run_generation` that raises the `_ReplayNeeded` sentinel on a cache MISS — `drive`
+            catches it, yields a `REAUTHOR` request, caches the `.send()`'d envelope, and re-drives
+            over a fresh scratch store. `None` -> no hook (the engine's no-reauthor branch).
+        adjudicator (Callable, optional): The held-finding medical-liaison dispatch hook (the inner
+            safety gate — never bypassed). Inverted via the SAME throw/replay-memo mechanism: a memo
+            wrapper raises `_ReplayNeeded` on a cache MISS per held domain; `drive` yields one
+            `ADJUDICATOR` request per held domain, caches each `.send()`'d liaison envelope, and
+            re-drives. The consumer returns ONLY the raw envelope — the `outcome == "cleared"`
+            release stays in `orchestrate.adjudicate` (the no-fork crown jewel). `None` -> no hook.
         budget (DispatchBudget, optional): The per-plan dispatch budget for `dispatch_count` surfacing
             (charged by the consumer on each specialist dispatch + by the charge-wrapped
             `gate_dispatch`). When `None`, `dispatch_count` is reported as `0`.
@@ -171,13 +211,24 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_producer
         from scripts.plan.gate_dispatch import compose_disposition
         compose = compose_disposition
     count = (lambda: budget.count) if budget is not None else (lambda: 0)
+    # The throw/replay-memo cache (ADR-0028-T2): keyed by the dispatch class + the engine's hook
+    # arguments. A hook fires DEEP inside the byte-frozen engine (`reauthor("workout", {...})` /
+    # `_adjudicate_with_band(safety_finding, adjudicator)`), so it cannot yield directly; the memo
+    # wrapper forwarded into `run_generation` raises `_ReplayNeeded` on a cache MISS, `drive` yields
+    # the typed request, caches the dispatched envelope here, and re-drives. On the replay the key is
+    # cached, so the wrapper returns the envelope and the engine proceeds unchanged. The cache lives
+    # for the whole `drive` invocation (one slot per distinct hook key across all passes / re-drives).
+    memo = {} if (reauthor is not None or adjudicator is not None) else None
+    engine_reauthor = _memo_hook(REAUTHOR, _reauthor_key, memo) if reauthor is not None else None
+    engine_adjudicator = (
+        _memo_hook(ADJUDICATOR, _adjudicator_key, memo) if adjudicator is not None else None
+    )
     with tempfile.TemporaryDirectory(prefix="aplus-revise-") as scratch_parent:
         revise_count = 0
         authors = yield Request(AUTHOR, (tuple(domains), summary, gates))
-        scratch = Path(scratch_parent) / "pass-0"
-        result = pipeline.run_generation(
-            authors, store_read, scratch, plan_date=plan_date, on_date=on_date, gates=gates,
-            reauthor=reauthor, adjudicator=adjudicator,
+        result, scratch = yield from _run_with_replay(
+            authors, store_read, scratch_parent, "pass-0", plan_date=plan_date, on_date=on_date,
+            gates=gates, reauthor=engine_reauthor, adjudicator=engine_adjudicator, memo=memo,
         )
         while True:
             # GATE direct-yield inversion (ADR-0028-T1, OQ-2): yield a GATE request carrying the
@@ -233,11 +284,127 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_producer
                 return _honest_no_plan(SAFETY_BLOCKED, dispatch_count=count())
             authors.update((yield Request(AUTHOR, (tuple(revise_domains), summary, gates))))
             revise_count += 1
-            scratch = Path(scratch_parent) / f"pass-{revise_count}"
+            result, scratch = yield from _run_with_replay(
+                authors, store_read, scratch_parent, f"pass-{revise_count}", plan_date=plan_date,
+                on_date=on_date, gates=gates, reauthor=engine_reauthor,
+                adjudicator=engine_adjudicator, memo=memo,
+            )
+
+
+def _reauthor_key(domain, constraint):
+    """The memo key for an energy-bounce re-author hook call (`reauthor(domain, constraint)`).
+
+    The engine calls `reauthor("workout", {"sustainable_training_kcal": ceiling})`
+    ([orchestrate.py:550]); the key distills the dispatch class + the de-identified constraint into a
+    hashable slot. `constraint` is the bounce directive's de-identified ceiling dict — no raw PII.
+
+    Args:
+        domain (str): The bounced domain (always `"workout"` in V1).
+        constraint (dict): The sustainable-energy ceiling (`{"sustainable_training_kcal": int}`).
+
+    Returns:
+        (tuple) The cache key `("reauthor", domain, ceiling)`.
+    """
+    return ("reauthor", domain, constraint.get("sustainable_training_kcal"))
+
+
+def _adjudicator_key(safety_finding):
+    """The memo key for a held-finding adjudicator hook call (`adjudicator(safety_finding)`).
+
+    The engine calls `_adjudicate_with_band(safety_finding, adjudicator)` once per held domain
+    ([orchestrate.py:578,595,613]); each held finding carries a distinct `finding_id` (distilled at
+    [orchestrate.py:222,255,301]), so `(held_domain, source, finding_id)` is a distinct slot per held
+    domain — one replay round, one `ADJUDICATOR` yield, per held domain.
+
+    Args:
+        safety_finding (dict): The held finding routed to the liaison (`finding_id`, `source`,
+            `held_domain`).
+
+    Returns:
+        (tuple) The cache key `("adjudicator", held_domain, source, finding_id)`.
+    """
+    return (
+        "adjudicator", safety_finding.get("held_domain"), safety_finding.get("source"),
+        safety_finding.get("finding_id"),
+    )
+
+
+def _memo_hook(kind, key_of, memo):
+    """Build the memo-cache wrapper the engine calls in place of the raw REAUTHOR / ADJUDICATOR hook.
+
+    The wrapper forwarded into `run_generation` (so the byte-frozen engine stays unchanged — it still
+    calls a plain callable). On a cache HIT it returns the cached envelope (the engine proceeds
+    unchanged); on a cache MISS it raises the `_ReplayNeeded` sentinel carrying the dispatch class +
+    the key — the sentinel unwinds THROUGH the engine to `drive`'s replay handler. The wrapper itself
+    NEVER dispatches and NEVER charges — the consumer dispatches the real hook (charge-wrapped) when
+    `drive` yields the typed request, so the charge accrues once per cache MISS only (ADR-0028-T2).
+
+    Args:
+        kind (str): The dispatch class (`REAUTHOR` / `ADJUDICATOR`).
+        key_of (Callable): The hook-args -> memo-key distiller (`_reauthor_key` / `_adjudicator_key`).
+        memo (dict): The shared throw/replay-memo cache.
+
+    Returns:
+        (Callable) The engine-facing memo wrapper, same call signature as the raw hook.
+    """
+    def wrapper(*args):
+        key = key_of(*args)
+        if key in memo:
+            return memo[key]
+        raise _ReplayNeeded(kind, key, args)
+
+    return wrapper
+
+
+def _run_with_replay(authors, store_read, scratch_parent, pass_label, *, plan_date, on_date, gates,
+                     reauthor, adjudicator, memo):
+    """Run one pass through the inner engine, inverting any REAUTHOR / ADJUDICATOR hook via replay.
+
+    The throw/replay-memo driver for a single pass (ADR-0028-T2). Runs `pipeline.run_generation`
+    against a FRESH scratch store; if a memo-cache MISS raises `_ReplayNeeded` deep inside the
+    byte-frozen engine, catch it, YIELD the typed `Request(kind, payload)`, cache the consumer's
+    `.send()`'d envelope under the sentinel's key, and RE-DRIVE the pass over a NEW scratch dir (the
+    engine re-runs against clean scratch — never double-writing the discarded one). The re-drive
+    loops until `run_generation` completes without a sentinel (every fired hook now cached); the LAST,
+    completed scratch holds the promotable rows and is returned for `_promote_plans`. With no hooks
+    (`memo is None`) it is the plain single `run_generation` call (the legacy path, unchanged).
+
+    Args:
+        authors (dict): The captured author envelopes for this pass.
+        store_read (Callable): The store read surface (the real root, pre-bound).
+        scratch_parent (str | Path): The per-`drive` scratch parent dir.
+        pass_label (str): The pass's scratch-dir stem (`pass-0` / `pass-{n}`).
+        plan_date (str): The plans' date.
+        on_date (str | None): The doctor-visit-queue collation date.
+        gates (dict): Per-domain safety inputs.
+        reauthor (Callable | None): The engine-facing memo `reauthor` wrapper (or `None`).
+        adjudicator (Callable | None): The engine-facing memo `adjudicator` wrapper (or `None`).
+        memo (dict | None): The shared throw/replay-memo cache (`None` when no hook is wired).
+
+    Yields:
+        (Request) A `REAUTHOR` / `ADJUDICATOR` typed request per cache MISS, fulfilled by the
+        consumer's `.send()` of the dispatched envelope.
+
+    Returns:
+        (dict) The completed `run_generation` result.
+        (Path) The scratch dir the completed result wrote into (the promote source).
+    """
+    attempt = 0
+    while True:
+        scratch = Path(scratch_parent) / (pass_label if attempt == 0 else f"{pass_label}-replay-{attempt}")
+        try:
             result = pipeline.run_generation(
                 authors, store_read, scratch, plan_date=plan_date, on_date=on_date, gates=gates,
                 reauthor=reauthor, adjudicator=adjudicator,
             )
+        except _ReplayNeeded as need:
+            # A memo MISS fired deep in the engine: yield the typed request, cache the consumer's
+            # dispatched envelope under the sentinel's key, and re-drive over a fresh scratch dir.
+            envelope = yield Request(need.kind, need.payload)
+            memo[need.key] = envelope
+            attempt += 1
+            continue
+        return result, scratch
 
 
 def _honest_no_plan(reason, *, dispatch_count, deidentified=True, **extra):
