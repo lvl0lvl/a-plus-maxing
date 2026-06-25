@@ -2,12 +2,18 @@
 # test_core_capability_audit.sh — negative test for core-capability-audit.sh (F-007).
 #
 # Per Rigor Framework Discipline 5 (F-007): a mechanical gate only counts as enforcing
-# once it has PROVEN it goes RED on bad input. This proves core-capability-audit.sh:
-#   - FAILs (exit 1) when assemble has no production caller (the PF-S63-02 regression):
-#       (A) the caller does not call assemble, (B) the caller file is missing;
-#   - PASSes (exit 0) on a structurally-wired caller; and
-#   - PASSes (exit 0) on the REAL tree incl. the behavioral wired-path self-test.
-# A gate that stayed green under (A)/(B) would be tautological.
+# once it has PROVEN it goes RED on bad input. This proves core-capability-audit.sh goes
+# RED on a deliberately-UNWIRED A′ spine (ADR-0026-T4 repoint). The A′ spine spans TWO
+# modules (QA-5), so each RED case OMITS a SPECIFIC A′-spine token in its host module:
+#   - (A) the DRIVER ($CALLER) omits the disposition gate -> structural check 3 FAILs;
+#   - (B) the DRIVER file is missing -> structural check 1 FAILs;
+#   - (B2) the RUN_GEN_HOST omits `pipeline.run_generation(` -> structural check 2 FAILs;
+#   - (C) a structurally-wired A′ spine (driver carries the disposition gate + accept /
+#         revise_domains reads, RUN_GEN_HOST carries `pipeline.run_generation(`) PASSes;
+#   - (D) the REAL tree (incl. the A′-inversion behavioral self-test) PASSes.
+# Each RED case REDs on its specific A′-spine token — NEVER on the retired `assemble(` /
+# `record_plan(` checks the repoint DROPPED. A gate that stayed green under (A)/(B)/(B2)
+# would be tautological.
 
 set -uo pipefail
 
@@ -26,36 +32,62 @@ check() {  # check <label> <expected-exit> <actual-exit>
   fi
 }
 
-# (A) RED — a caller that does not call assemble (structural, behavioral skipped).
-cat > "$TMP/no-assemble.py" <<'PY'
-# a caller stub that forgot to call assemble — record_plan(x) only
+# A valid A′ DRIVER stub ($CALLER): carries the EXECUTABLE disposition gate + the accept /
+# revise_domains reads (the structural check-3 surface). Reused by the GREEN case + as the valid
+# half of the per-check-independence RED cases.
+cat > "$TMP/driver-wired.py" <<'PY'
+# an A′ shared-driver stub carrying the executable disposition gate + accept / revise reads
+def drive(...):
+    if not (isinstance(disposition, dict) and disposition.get("safety_passed") is True):
+        return _honest_no_plan(SAFETY_BLOCKED)
+    if disposition.get("accept") is True:
+        _promote_plans(scratch, root)
+    revise_domains = disposition.get("revise_domains") or []
 PY
-rc=0; CORE_CAP_CALLER="$TMP/no-assemble.py" CORE_CAP_SKIP_BEHAVIORAL=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
-check "caller-without-assemble FAILs" 1 "$rc"
 
-# (B) RED — the caller file is missing entirely.
-rc=0; CORE_CAP_CALLER="$TMP/does-not-exist.py" CORE_CAP_SKIP_BEHAVIORAL=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
-check "missing-caller FAILs" 1 "$rc"
-
-# (B2) RED — a caller that calls assemble( but NOT record_plan( (proves the
-# record_plan structural check fires INDEPENDENTLY of the assemble check; F-007).
-cat > "$TMP/assemble-only.py" <<'PY'
-# section = assemble([domain], summary, roster)  -- but the plan is never recorded
+# A valid RUN_GEN_HOST stub: carries the EXECUTABLE `pipeline.run_generation(` call (check-2 surface).
+cat > "$TMP/host-wired.py" <<'PY'
+# an A′ run_generation host stub driving the inner engine
+result = pipeline.run_generation(authors, store_read, scratch, plan_date=plan_date)
 PY
-rc=0; CORE_CAP_CALLER="$TMP/assemble-only.py" CORE_CAP_SKIP_BEHAVIORAL=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
-check "assemble-without-record_plan FAILs" 1 "$rc"
 
-# (C) GREEN — a structurally-wired caller (calls both assemble and record_plan).
-cat > "$TMP/wired.py" <<'PY'
-# stub: section = assemble([domain], summary, roster)
-# record_plan(domain, plan, plan_date, specialist, root)
+# (A) RED — the DRIVER omits the disposition gate (check 3 FAILs on its specific A′ token).
+# A valid RUN_GEN_HOST (so check 2 passes) isolates the failure to the disposition-gate check.
+cat > "$TMP/driver-no-gate.py" <<'PY'
+# an A′ driver stub MISSING the disposition gate — drives nothing, gates on nothing
+def drive(...):
+    authors = yield (domains, summary, gates)
+    return {"results": {}}
 PY
-rc=0; CORE_CAP_CALLER="$TMP/wired.py" CORE_CAP_SKIP_BEHAVIORAL=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
-check "structurally-wired caller PASSes" 0 "$rc"
+rc=0; CORE_CAP_CALLER="$TMP/driver-no-gate.py" CORE_CAP_RUN_GEN_HOST="$TMP/host-wired.py" \
+  CORE_CAP_SKIP_BEHAVIORAL=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
+check "driver-without-disposition-gate FAILs" 1 "$rc"
 
-# (D) GREEN — the REAL tree, including the behavioral wired-path self-test.
+# (B) RED — the DRIVER ($CALLER) file is missing entirely (check 1 FAILs).
+rc=0; CORE_CAP_CALLER="$TMP/does-not-exist.py" CORE_CAP_RUN_GEN_HOST="$TMP/host-wired.py" \
+  CORE_CAP_SKIP_BEHAVIORAL=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
+check "missing-driver FAILs" 1 "$rc"
+
+# (B2) RED — the RUN_GEN_HOST omits `pipeline.run_generation(` (check 2 FAILs INDEPENDENTLY of
+# check 3 — a valid driver with the disposition gate, so the failure isolates to the host's
+# run_generation check; the original B2 per-check-independence intent).
+cat > "$TMP/host-no-run-gen.py" <<'PY'
+# a RUN_GEN_HOST stub that does NOT drive pipeline.run_generation(
+result = None  # the inner engine is never driven
+PY
+rc=0; CORE_CAP_CALLER="$TMP/driver-wired.py" CORE_CAP_RUN_GEN_HOST="$TMP/host-no-run-gen.py" \
+  CORE_CAP_SKIP_BEHAVIORAL=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
+check "host-without-run_generation FAILs" 1 "$rc"
+
+# (C) GREEN — a structurally-wired A′ spine (driver carries the disposition gate + accept /
+# revise reads; RUN_GEN_HOST carries pipeline.run_generation(). Both wired via the two hooks.
+rc=0; CORE_CAP_CALLER="$TMP/driver-wired.py" CORE_CAP_RUN_GEN_HOST="$TMP/host-wired.py" \
+  CORE_CAP_SKIP_BEHAVIORAL=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
+check "structurally-wired A′ spine PASSes" 0 "$rc"
+
+# (D) GREEN — the REAL tree, including the A′-inversion behavioral self-test.
 rc=0; bash "$GATE" >/dev/null 2>&1 || rc=$?
-check "real wired path (incl. self-test) PASSes" 0 "$rc"
+check "real wired A′ path (incl. self-test) PASSes" 0 "$rc"
 
 if [ "$fail" -ne 0 ]; then
   echo "test_core_capability_audit: FAILED"
