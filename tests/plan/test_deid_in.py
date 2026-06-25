@@ -32,7 +32,7 @@ import pytest
 from scripts.guard import pii_scan
 from scripts.model.client import ModelCallError, ModelClient
 from scripts.plan import router
-from scripts.plan.deid_in import DEID_CALL_FAILED, deid_in
+from scripts.plan.deid_in import DEID_CALL_FAILED, DEID_VALUE_PII, deid_in
 
 
 # --- synthetic fixtures (0 real operator PII) ----------------------------------
@@ -408,6 +408,88 @@ def test_deid_in_whitelist_passes_a_clean_in_set_summary():
     client = _FixedDeidClient(summary)
 
     assert deid_in(_raw_intake(), client) == summary
+
+
+# --- SEC-1 (VALUE-SCAN): the key whitelist checks NAMES; this checks in-set VALUES for raw PII --
+
+
+def _value_pii_summary(pii_value):
+    """A summary whose KEYS are all in `SUMMARY_FIELD_SET` but ONE value carries raw PII.
+
+    The key-name whitelist passes (`active-issue-class` is a field-set field); the
+    contamination is in the VALUE — the exact gap the key-name-only whitelist misses (a
+    faithless de-id echoing raw PII into an allowed field's value).
+    """
+    summary = _deid_summary_fixture()
+    summary["active-issue-class"] = pii_value
+    return summary
+
+
+def test_deid_in_rejects_in_set_value_carrying_identity_pii(tmp_path):
+    """SEC-1: an in-set key whose VALUE carries the operator's name → the value-PII sentinel.
+
+    The key whitelist passes (`active-issue-class` is a `SUMMARY_FIELD_SET` field), but the
+    value is the synthetic operator NAME. The value-level scan (identity-token config) catches
+    it and `deid_in` fails closed to `{deidentified: False, reason: DEID_VALUE_PII}`; the result
+    scans 0 raw-PII. A `deid_in` WITHOUT the value scan returns the contaminated summary — RED
+    (the returned dict carries the name; the discriminator + scan assertions both fail).
+    """
+    config = _identity_config(tmp_path)
+    client = _FixedDeidClient(_value_pii_summary(SYNTHETIC_NAME))
+
+    result = deid_in(_raw_intake(), client, identity_config=config)
+
+    assert result == {"deidentified": False, "reason": DEID_VALUE_PII}
+    assert pii_scan.scan_text_full(json.dumps(result), token_config=config) == 0
+
+
+def test_deid_in_rejects_in_set_value_carrying_contact_pii(tmp_path):
+    """SEC-1: an in-set value carrying value-CLASS PII (email) → the sentinel, no config needed.
+
+    The value-class patterns (email / phone / postal) run WITHOUT an identity-token config, so a
+    contact-PII leak into an allowed field's value is caught even when the operator-identity file
+    is absent — proving the value scan is not solely identity-token-dependent.
+    """
+    client = _FixedDeidClient(
+        _value_pii_summary("reach me at jordan.fake@test-clinic.example.org")
+    )
+
+    result = deid_in(_raw_intake(), client, identity_config=tmp_path / "absent.txt")
+
+    assert result["deidentified"] is False
+    assert result["reason"] == DEID_VALUE_PII
+
+
+def test_deid_in_value_scan_catches_pii_past_the_scan_text_cap(tmp_path):
+    """SEC-1 (sc97): the value scan is NON-TRUNCATING — PII past `_MAX_SCAN_TEXT_LEN` is caught.
+
+    The capped `scan_text` leaves a straddle hole at a value boundary; `deid_in` uses
+    `scan_text_full`. A value whose raw-PII (the operator name) sits AFTER a long benign prefix
+    (longer than the `scan_text` cap) must still fail closed — a `deid_in` that used the capped
+    `scan_text` would return the contaminated summary (RED).
+    """
+    config = _identity_config(tmp_path)
+    cap = pii_scan._MAX_SCAN_TEXT_LEN
+    long_value = ("recovery " * ((cap // 9) + 200)) + SYNTHETIC_NAME
+    assert len(long_value) > cap
+    client = _FixedDeidClient(_value_pii_summary(long_value))
+
+    result = deid_in(_raw_intake(), client, identity_config=config)
+
+    assert result == {"deidentified": False, "reason": DEID_VALUE_PII}
+
+
+def test_deid_in_value_scan_passes_a_clean_summary(tmp_path):
+    """SEC-1: a clean band/class summary passes the value scan (the success leg is preserved).
+
+    Proves the value scan does not false-positive on the legitimate band/class tokens — a clean
+    de-identified summary is still returned verbatim with the scan in place.
+    """
+    config = _identity_config(tmp_path)
+    summary = _deid_summary_fixture()
+    client = _FixedDeidClient(summary)
+
+    assert deid_in(_raw_intake(), client, identity_config=config) == summary
 
 
 # --- FIX 2 (TEST-01): a REAL ModelClient(backend=_FixtureBackend(...)) wired into deid_in ----

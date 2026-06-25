@@ -14,6 +14,7 @@ never a fabricated/partial summary and never a passthrough of the raw intake (NF
 crown-jewel containment contract).
 """
 
+from scripts.guard import pii_scan
 from scripts.model.client import ModelCallError
 from scripts.plan.router import SUMMARY_FIELD_SET
 
@@ -26,8 +27,16 @@ from scripts.plan.router import SUMMARY_FIELD_SET
 # sentinel shape for the whole-run-outage halt (a distinct `reason`).
 DEID_CALL_FAILED = "deid-call-failed"
 
+# The honest no-plan reason when an IN-field-set summary VALUE carries raw operator PII (SEC-1):
+# the key whitelist below checks field NAMES, but a faithless de-id call can pass the whitelist
+# yet echo raw PII into an allowed field's VALUE. The boundary value-scans every value and fails
+# closed to this sentinel on any hit — distinct from `DEID_CALL_FAILED` so a faithless-model PII
+# injection is diagnosable apart from a benign outage. The orchestrator treats it identically
+# (the `deidentified` discriminator is the load-bearing key).
+DEID_VALUE_PII = "deid-value-pii"
 
-def deid_in(raw_intake, client):
+
+def deid_in(raw_intake, client, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
     """De-identify the raw operator plan-intake through the injected no-train client.
 
     Routes the de-id call through `client.deidentify(raw_intake)` and returns the
@@ -46,17 +55,27 @@ def deid_in(raw_intake, client):
     (success) vs PRESENCE (no-plan). The boundary enforces the SAME positive field-set
     whitelist the persisted path (`router.dispatch`) enforces: a summary carrying any
     out-of-set field (raw PII smuggled past a non-faithful de-id call) is rejected — the
-    boundary fails closed to the sentinel rather than return the contaminated dict.
+    boundary fails closed to the sentinel rather than return the contaminated dict. It
+    additionally VALUE-SCANS every in-set field (SEC-1): an allowed field whose VALUE carries
+    raw operator PII (identity or contact) — past the key-name whitelist — fails closed to the
+    `DEID_VALUE_PII` sentinel, via the NON-TRUNCATING `pii_scan.scan_text_full` (no
+    `_MAX_SCAN_TEXT_LEN` straddle hole; the capped `scan_text` gap is sc97).
 
     Args:
         raw_intake (dict): The raw operator plan-intake (carries raw-PII fields).
         client: An injected model client exposing `deidentify(raw_intake) -> summary` (a real
             `scripts.model.client.ModelClient`, or a `_FixedEnvelopeClient`-style mock in tests).
+        identity_config (str | Path, optional): The gitignored operator-identity token file the
+            value-scan loads (mirrors `router.summarize`); defaults to
+            `pii_scan.DEFAULT_IDENTITY_CONFIG`. Absent → identity detection is empty but the
+            value-class patterns (email / phone / postal) still run.
 
     Returns:
         (dict) The de-identified summary the orchestrator consumes (success), OR the honest
         no-plan sentinel `{"deidentified": False, "reason": DEID_CALL_FAILED, "error_type": ...}`
-        on any de-id failure (a raise) or an out-of-field-set (contaminated) summary.
+        on any de-id failure (a raise) or an out-of-field-set (contaminated) summary, OR
+        `{"deidentified": False, "reason": DEID_VALUE_PII}` when an in-set field's value carries
+        raw PII.
     """
     try:
         summary = client.deidentify(raw_intake)
@@ -70,4 +89,16 @@ def deid_in(raw_intake, client):
     # carrying an out-of-set field (raw PII past a non-faithful de-id) is NOT returned.
     if not isinstance(summary, dict) or not set(summary) <= set(SUMMARY_FIELD_SET):
         return {"deidentified": False, "reason": DEID_CALL_FAILED}
+    # SEC-1 (VALUE-SCAN): the whitelist above checks field NAMES; this checks the VALUES. A
+    # faithless de-id can pass the key whitelist yet echo raw operator PII into an allowed
+    # field's value. Mirror the persisted-side value gate (`router.summarize`'s 8j6 scan) but
+    # with the NON-TRUNCATING `scan_text_full` — no `_MAX_SCAN_TEXT_LEN` straddle hole (the
+    # crown-jewel boundary; the capped `scan_text` gap is sc97). `str(value)` flattens a
+    # non-scalar so STRING PII inside a container is caught too. Name no value (no PII echo).
+    # The scan INHERITS `pii_scan`'s value-pattern recall — numeric-typed identifiers (a phone
+    # /MRN/lab as a bare JSON number or a 7+-digit run) and two-line `\n`-split postal addresses
+    # are residual recall gaps at this boundary, tracked for the real-PII run (beads, SEC-1).
+    for value in summary.values():
+        if pii_scan.scan_text_full(str(value), token_config=identity_config):
+            return {"deidentified": False, "reason": DEID_VALUE_PII}
     return summary
