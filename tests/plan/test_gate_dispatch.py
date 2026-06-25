@@ -230,16 +230,6 @@ class _RaisingReviewDispatch:
         raise RuntimeError("safety lens dispatch failed mid-review")
 
 
-class _MissingKeyReviewDispatch:
-    """A review dispatch that drives `review_plan` to a result with no `passed` key.
-
-    `review_plan` itself always returns a `passed` key, so the missing-key malformed shape is
-    injected at the composer's own review seam: a stand-in `review` callable returning a dict with
-    no `passed`. Modeled via a composer override of the review step is not available, so this proxy
-    is exercised through `_malformed_review_result` below instead.
-    """
-
-
 def _safety_passed_true_count(dispositions):
     """Count dispositions whose `safety_passed` is boolean-True (the AC-4 floor: must be 0)."""
     return sum(
@@ -249,11 +239,13 @@ def _safety_passed_true_count(dispositions):
 
 
 def test_malformed_composite_never_safety_passed_true(tmp_path):
-    # AC-4 (the load-bearing fail-closed probe): across the malformed-composite family — a judge that
-    # RAISES, a review dispatch that RAISES, a non-dict judge return — the composer emits a
-    # disposition whose `safety_passed` is NOT boolean-True (or raises in a way `plan_driver._safe_gate`
-    # catches to None). Count of `safety_passed is True` over the malformed family == 0. A composer
-    # that defaulted safety_passed True on a malformed composite goes RED here.
+    # AC-4 (fail-LOUD arm): across the malformed-composite family — a judge that RAISES, a review
+    # dispatch that RAISES, a non-dict judge return — each gate RAISES (quality_judge / the dispatch
+    # raises BEFORE the composer's `safety_passed` assignment), so this test pins the RAISE → caught →
+    # 0-safety_passed-True propagation (in production `plan_driver._safe_gate` catches the raise to
+    # None → SAFETY_BLOCKED). Count of `safety_passed is True` over the malformed family == 0. The
+    # `safety_passed` ASSIGNMENT line itself (a non-raising malformed review) is guarded by
+    # `test_malformed_missing_passed_key_never_safety_passed_true` below, not by this fail-loud arm.
     assembled = _assembled_clean_plan(tmp_path)
 
     malformed_gates = (
