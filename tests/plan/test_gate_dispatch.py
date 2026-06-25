@@ -1,11 +1,14 @@
-"""Tests for the composed `gate_dispatch` adapter (ADR-0026-T2).
+"""Tests for the gate-dispatch adapter (ADR-0026-T2 / ADR-0028-T1).
 
 `scripts.plan.gate_dispatch.compose_gate_dispatch(judge_client, review_dispatch, *, lenses)`
-returns the single-arg `gate_dispatch(assembled_plan) -> disposition` callable the ADR-0026-T1
-shared driver (`plan_driver.drive`) consumes via its `gate_dispatch=` seam. Over the assembled
-`run_generation` result it runs BOTH built gate callables — `quality_judge` (the QUALITY gate) AND
-`review_plan` (the SAFETY gate) — and maps their native shapes into EXACTLY the 3-key disposition
-`{accept, safety_passed, revise_domains}` the driver's single-disposition read consumes. These pin:
+returns the single-arg RAW-VERDICT producer `gate_producer(assembled_plan) -> {judge, review}` the
+ADR-0028-T1 GATE yield carries; `compose_disposition(verdicts, assembled_plan)` is the ONE
+composition site that maps those raw verdicts into the 3-key disposition the driver reads. Over the
+assembled `run_generation` result the producer runs BOTH built gate callables — `quality_judge` (the
+QUALITY gate) AND `review_plan` (the SAFETY gate) — returning their RAW native verdicts, and
+`compose_disposition` maps them into EXACTLY the 3-key disposition
+`{accept, safety_passed, revise_domains}` the driver's single-disposition read + fail-closed surface
+gate consume. These pin (each test composes the producer's raw verdicts via `compose_disposition`):
 
   - AC-1: a clean accept-band judge + a 0-finding review emits the EXACT 3 keys
     `{accept: True, safety_passed: True, revise_domains: []}` — no more, no fewer;
@@ -28,7 +31,7 @@ carries 0 real operator PII (synthetic band/class tokens only).
 import tempfile
 
 from scripts.plan import assemble
-from scripts.plan.gate_dispatch import compose_gate_dispatch
+from scripts.plan.gate_dispatch import compose_disposition, compose_gate_dispatch
 from scripts.plan.plan_orchestrator import SAFETY_BLOCKED, run_orchestrated
 from scripts.plan.safety_review import DEFAULT_LENSES
 from scripts.store import store
@@ -123,7 +126,7 @@ def test_accept_passing_emits_exact_3_keys(tmp_path):
     assembled = _assembled_clean_plan(tmp_path)
     gate = compose_gate_dispatch(_FixedJudgeClient(_clean_scores()), _no_findings_dispatch())
 
-    disposition = gate(assembled)
+    disposition = compose_disposition(gate(assembled), assembled)
 
     assert set(disposition.keys()) == _EXACT_3_KEYS, f"not the exact 3 keys: {set(disposition)}"
     assert disposition["accept"] is True
@@ -138,7 +141,7 @@ def test_revise_structural_deduction_localizes_to_specific_domain(tmp_path):
     assembled = _assembled_empty_domain_plan(tmp_path)
     gate = compose_gate_dispatch(_FixedJudgeClient(_clean_scores()), _no_findings_dispatch())
 
-    disposition = gate(assembled)
+    disposition = compose_disposition(gate(assembled), assembled)
 
     assert set(disposition.keys()) == _EXACT_3_KEYS
     assert disposition["accept"] is False, "the empty in-scope domain did not force a REVISE"
@@ -158,7 +161,7 @@ def test_revise_dimension_deduction_targets_all_run_set_domains(tmp_path):
         _FixedJudgeClient(_below_band_scores("followability")), _no_findings_dispatch()
     )
 
-    disposition = gate(assembled)
+    disposition = compose_disposition(gate(assembled), assembled)
 
     assert disposition["accept"] is False, "the below-band followability score did not force a REVISE"
     assert disposition["safety_passed"] is True
@@ -176,7 +179,7 @@ def test_revise_passing_populates_revise_domains(tmp_path):
     run_domains = set(assembled["results"].keys())
     gate = compose_gate_dispatch(_FixedJudgeClient(_clean_scores()), _no_findings_dispatch())
 
-    disposition = gate(assembled)
+    disposition = compose_disposition(gate(assembled), assembled)
 
     assert disposition["accept"] is False
     assert disposition["safety_passed"] is True
@@ -199,7 +202,7 @@ def test_not_passed_review_forces_safety_false(tmp_path):
     })
     gate = compose_gate_dispatch(_FixedJudgeClient(_clean_scores()), finding_dispatch)
 
-    disposition = gate(assembled)
+    disposition = compose_disposition(gate(assembled), assembled)
 
     assert set(disposition.keys()) == _EXACT_3_KEYS
     assert disposition["accept"] is True, "the clean judge should still ACCEPT on quality"
@@ -281,7 +284,7 @@ def test_malformed_missing_passed_key_never_safety_passed_true(tmp_path):
         _review=lambda plan, dispatch, *, lenses: {"findings": [], "lenses": tuple(lenses)},
     )
 
-    disposition = gate(assembled)
+    disposition = compose_disposition(gate(assembled), assembled)
 
     assert not (isinstance(disposition, dict) and disposition.get("safety_passed") is True), (
         "a review result missing the `passed` key surfaced safety_passed True"
@@ -330,7 +333,7 @@ def test_revise_domains_subset_of_run_set(tmp_path):
     run_domains = set(assembled["results"].keys())
     gate = compose_gate_dispatch(_FixedJudgeClient(_clean_scores()), _no_findings_dispatch())
 
-    disposition = gate(assembled)
+    disposition = compose_disposition(gate(assembled), assembled)
 
     assert set(disposition["revise_domains"]) <= run_domains, (
         f"revise_domains escaped the run-set: {disposition['revise_domains']} not subset of {run_domains}"
@@ -339,7 +342,7 @@ def test_revise_domains_subset_of_run_set(tmp_path):
     fallback_gate = compose_gate_dispatch(
         _FixedJudgeClient(_below_band_scores("coherence")), _no_findings_dispatch()
     )
-    fallback = fallback_gate(assembled)
+    fallback = compose_disposition(fallback_gate(assembled), assembled)
     assert set(fallback["revise_domains"]) <= run_domains
 
 

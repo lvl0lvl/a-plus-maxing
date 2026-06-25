@@ -333,11 +333,12 @@ def test_gate_dispatch_seam_fires_live(tmp_path):
     gate_calls = []
 
     def composed_gate(assembled_plan):
-        # the seam runs BOTH wired Wave-3 gate callables LIVE over the assembled result
+        # the seam runs BOTH wired Wave-3 gate callables LIVE over the assembled result and returns
+        # their RAW verdicts (ADR-0028-T1 producer; the driver composes via `compose_disposition`).
         q = quality_judge(assembled_plan, judge_client)
         s = review_plan(assembled_plan, lens_dispatch)
         gate_calls.append((q, s))
-        return {"accept": q["verdict"] == ACCEPT, "safety_passed": s["passed"]}
+        return {"judge": q, "review": s}
 
     out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
@@ -608,11 +609,12 @@ def test_outage_gate_dispatch_seam_is_idle(tmp_path):
     gate_calls = []
 
     def composed_gate(assembled_plan):
-        # the WIRED composed gate: runs BOTH real Wave-3 callables — counts every wired dispatch
+        # the WIRED producer: runs BOTH real Wave-3 callables, returns RAW verdicts (ADR-0028-T1) —
+        # counts every wired dispatch. Never reached here (the outage halt precedes the gate).
         q = quality_judge(assembled_plan, judge_client)
         s = review_plan(assembled_plan, lens_dispatch)
         gate_calls.append((q, s))
-        return {"accept": q["verdict"] == ACCEPT, "safety_passed": s["passed"]}
+        return {"judge": q, "review": s}
 
     out = run_orchestrated(
         _raw_intake(), _outage_client(), dispatch, store_read, tmp_path,

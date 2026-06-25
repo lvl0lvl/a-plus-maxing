@@ -127,7 +127,7 @@ def _dispatch_prompt(role, summary, gates):
 def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, plan_date,
                      domains=DEFAULT_DOMAINS, on_date=None, gates=None, gate_dispatch=None,
                      reauthor=None, adjudicator=None, dispatch_cap=DEFAULT_DISPATCH_CAP,
-                     revise_cap=DEFAULT_REVISE_CAP):
+                     revise_cap=DEFAULT_REVISE_CAP, compose=None):
     """Drive the autonomous GENERATE pass: de-id IN -> dispatch specialists -> the inner engine.
 
     The programmatic runtime surface (runtime A): (1) calls `deid_in(raw_intake, deid_client)`
@@ -157,10 +157,12 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
         gates (dict, optional): Per-domain safety inputs (`clearance_granted`, `red_s_lea_screen`)
             forwarded to `run_generation` (the per-domain `compute_plan` input). DISTINCT from
             `gate_dispatch`. Defaults to all-conservative.
-        gate_dispatch (Callable, optional): The injectable GATE-DISPATCH SEAM — the Wave-3 /
-            ADR-0020-T2 attachment point. Default `None` -> a no-op that dispatches nothing; this
-            task builds ONLY the seam + its inert default, never the gates (those are Wave-3).
-            ADR-0023-T1 / ADR-0024-T1 wire real post-generation gates here; ADR-0020-T2 injects a
+        gate_dispatch (Callable, optional): The injectable GATE-DISPATCH SEAM — the post-generation
+            RAW-VERDICT producer `gate_producer(assembled_plan) -> {judge, review}` (ADR-0028-T1,
+            OQ-2: a producer of raw verdicts, NOT a composed disposition — the driver composes via
+            `compose_disposition`). Default `None` -> a no-op (the legacy Wave-2 non-loop path; the
+            driver is never entered). `compose_gate_dispatch` builds the real producer that runs the
+            ADR-0023-T1 quality judge + the ADR-0024-T1 safety review; ADR-0020-T2 injects a
             recording spy here for the outage gate-idle (0-dispatch) assertion. DISTINCT from
             `gates=`.
         reauthor (Callable, optional): The energy-bounce re-dispatch hook, forwarded to
@@ -178,6 +180,11 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
             (`REVISE_EXHAUSTED`). Defaults to the named `DEFAULT_REVISE_CAP` (3, fixed at
             build-plan time); configurable so the bound is testable. ONLY consulted on the
             autonomous loop path (when a real `gate_dispatch` is injected).
+        compose (Callable, optional): The raw-verdicts -> disposition mapping forwarded to
+            `plan_driver.drive`. Default `None` -> `drive` uses `gate_dispatch.compose_disposition`
+            (the ONE composition site). A test-injection point (a mutant `compose` to exercise the
+            driver's out-of-run-set / surface-gate guards over a synthetic disposition), never a
+            production override — the no-fork single composition definition is unchanged.
 
     Returns:
         (dict) On a successful run, the `run_generation` result (`results`, `reconciliation`,
@@ -245,30 +252,33 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
         # `_dispatch_domains`' charge or the charge-wrapped gate) propagates out to the halt below.
         driver = plan_driver.drive(
             summary, domains, store_read, root, plan_date=plan_date, gates=gates,
-            gate_dispatch=gate_dispatch, on_date=on_date, reauthor=reauthor,
+            gate_producer=gate_dispatch, compose=compose, on_date=on_date, reauthor=reauthor,
             adjudicator=adjudicator, budget=budget, revise_cap=revise_cap,
         )
         request = next(driver)
         while True:
             # The per-`kind` fulfilment switch over the typed drive-request (ADR-0028-T1). The
             # driver yields a `Request(kind, payload)`; the consumer fulfils each kind and `.send()`s
-            # the RAW fulfilment back — it builds NO disposition (composition stays in `drive`'s ONE
-            # `compose_gate_dispatch` call; the surface gate stays in `drive`). An unrecognized kind
-            # FAILS CLOSED to honest no-plan (Negative-1: never default-allow an un-handled kind).
+            # the RAW fulfilment back — it builds NO disposition and re-derives nothing (composition
+            # stays in `drive`'s ONE `compose_disposition` call; the surface gate stays in `drive`).
+            # An unrecognized kind FAILS CLOSED to honest no-plan (Negative-1: never default-allow an
+            # un-handled kind).
             thrown = None
             if request.kind == plan_driver.AUTHOR:
                 req_domains, req_summary, req_gates = request.payload
                 fulfilment = _dispatch_domains(req_domains, req_summary, req_gates, dispatch, budget)
             elif request.kind == plan_driver.GATE:
-                # The GATE request carries `(assembled_plan, gate)` — the consumer invokes the
-                # charge-wrapped composed gate over the assembled plan and sends back the RAW
-                # disposition. A gate that RAISES is THROWN INTO the driver, whose GATE-yield
-                # fail-closed wrap reads it as ambiguous -> SAFETY_BLOCKED (the surface gate stays in
-                # `drive`). `DispatchCapExceeded` is the budget halt, not a gate ambiguity — it
-                # propagates to this consumer's cap-halt handler, never thrown into the driver.
-                assembled_plan, gate = request.payload
+                # The GATE request carries `(assembled_plan, gate_producer)` (ADR-0028-T1, OQ-2) —
+                # the consumer dispatches the judge + each lens via the charge-wrapped RAW-VERDICT
+                # producer and sends back the RAW `{judge, review}` verdicts; it composes NOTHING
+                # (`drive` calls `compose_disposition`, the ONE site). A producer that RAISES is
+                # THROWN INTO the driver, whose GATE-yield fail-closed wrap reads it as ambiguous ->
+                # SAFETY_BLOCKED (the surface gate stays in `drive`). `DispatchCapExceeded` is the
+                # budget halt, not a gate ambiguity — it propagates to this consumer's cap-halt
+                # handler, never thrown into the driver.
+                assembled_plan, producer = request.payload
                 try:
-                    fulfilment = gate(assembled_plan)
+                    fulfilment = producer(assembled_plan)
                 except DispatchCapExceeded:
                     raise
                 except Exception as gate_error:

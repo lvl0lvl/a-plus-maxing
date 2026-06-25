@@ -1,29 +1,42 @@
-"""The composed `gate_dispatch` adapter (ADR-0026-T2) — quality + safety -> the 3-key disposition.
+"""The gate-dispatch adapter (ADR-0026-T2 / ADR-0028-T1) — raw verdicts -> the 3-key disposition.
 
-`compose_gate_dispatch(judge_client, review_dispatch, *, lenses)` returns the single-arg
-`gate_dispatch(assembled_plan) -> disposition` callable the ADR-0026-T1 shared driver
-(`plan_driver.drive`) consumes via its `gate_dispatch=` seam. Over the assembled `run_generation`
-result it runs BOTH built gate callables — `quality_judge` (the QUALITY gate, ADR-0023-T1) AND
-`review_plan` (the SAFETY gate, ADR-0024-T1) — and maps their native shapes into EXACTLY the 3-key
-disposition the driver's single-disposition read consumes:
+This module splits the GATE adapter into the two halves ADR-0028 OQ-2 requires:
 
-    {accept: bool, safety_passed: bool, revise_domains: list}
+  - `compose_gate_dispatch(judge_client, review_dispatch, *, lenses)` returns the single-arg
+    PRODUCER `gate_producer(assembled_plan) -> {judge, review}`. Over the assembled `run_generation`
+    result it runs BOTH built gate callables — `quality_judge` (the QUALITY gate, ADR-0023-T1) AND
+    `review_plan` (the SAFETY gate, ADR-0024-T1) — and returns their RAW, UNCOMPOSED native
+    verdicts. It builds NO disposition. The ADR-0028-T1 shared driver (`plan_driver.drive`) yields a
+    GATE request carrying the assembled plan + this producer; the consumer dispatches the judge and
+    each lens (via the producer) and `.send()`s these RAW verdicts back — never a composed callable
+    (the OQ-2-rejected shape) and never a finished disposition.
 
-  - `accept` = (`quality_judge`'s `verdict == ACCEPT`).
-  - `safety_passed` = (`review_plan`'s `passed`, a bool) — boolean-`True` ONLY when `review_plan`
-    returned a dict with `passed is True`. Every malformed composite (a raised / non-dict judge or
-    review, a missing `verdict` / `passed` key) yields a `safety_passed` that is NOT boolean-True
-    (FAIL-CLOSED), so the driver routes it to `SAFETY_BLOCKED`. The fail-closed default IS the
-    contract — the composer NEVER emits `safety_passed: True` on anything but a positive review.
-  - `revise_domains` = the run-set domains to re-author on a quality REVISE, per the derivation rule
-    in `_revise_domains`. The keys are the EXACT three above — no more, no fewer (a richer shape
-    breaks the driver's single-disposition read, OQ-2).
+  - `compose_disposition(verdicts, assembled_plan)` is the ONE composition site (extracted from the
+    former `gate_dispatch` body): it maps the raw `{judge, review}` verdicts into EXACTLY the 3-key
+    disposition the driver's single-disposition read consumes:
+
+        {accept: bool, safety_passed: bool, revise_domains: list}
+
+    `drive` calls it over the consumer's RAW `.send()`-back, then applies the fail-closed
+    `safety_passed is True` surface gate. Composition lives HERE only — the consumer/orchestrator
+    re-derive nothing.
+
+      - `accept` = (`quality_judge`'s `verdict == ACCEPT`).
+      - `safety_passed` = (`review_plan`'s `passed`, a bool) — boolean-`True` ONLY when `review_plan`
+        returned a dict with `passed is True`. Every malformed verdict (a non-dict judge or review,
+        a missing `verdict` / `passed` key) yields a `safety_passed` that is NOT boolean-True
+        (FAIL-CLOSED), so the driver routes it to `SAFETY_BLOCKED`. The fail-closed default IS the
+        contract — composition NEVER emits `safety_passed: True` on anything but a positive review.
+      - `revise_domains` = the run-set domains to re-author on a quality REVISE, per the derivation
+        rule in `_revise_domains`. The keys are the EXACT three above — no more, no fewer (a richer
+        shape breaks the driver's single-disposition read, OQ-2).
 
 This is a Create-only ADAPTER over the built gate callables — it CONSUMES them and re-authors
 nothing. The inner engine, `quality_judge`, `safety_review`, `plan_driver`, and `plan_orchestrator`
-stay byte-unchanged; the composer wraps their outputs. The bound `judge_client` + `review_dispatch`
-are the gates' collaborators (a fixture mock in tests, a real model/agent dispatch in production);
-the returned callable closes over them so the driver's `gate_dispatch=` seam stays single-arg.
+stay byte-unchanged; the producer wraps their outputs into raw verdicts and `compose_disposition`
+maps those. The bound `judge_client` + `review_dispatch` are the gates' collaborators (a fixture
+mock in tests, a real model/agent dispatch in production); the producer closes over them so the
+GATE yield carries them as one single-arg dispatch unit (OQ-2 raw inputs), not a composed callable.
 """
 
 from scripts.plan import quality_judge as quality_judge_mod
@@ -102,17 +115,66 @@ def _revise_domains(verdict, assembled_plan):
     return [domain for domain in run_set if domain in targets]
 
 
+def compose_disposition(verdicts, assembled_plan):
+    """Map the raw `{judge, review}` verdicts to the 3-key disposition (the ONE composition site).
+
+    The extracted disposition-composition (formerly the body of the gate callable). `drive` calls
+    it over the RAW verdicts the consumer dispatched and `.send()`-back, producing the EXACT 3-key
+    `{accept, safety_passed, revise_domains}` disposition the driver's single-disposition read +
+    fail-closed `safety_passed is True` surface gate consume. Composition lives HERE only — the
+    consumer/orchestrator/skill re-derive nothing (ADR-0028 no-fork).
+
+    FAIL-CLOSED on any malformed verdict: a non-dict / `None` / missing-key judge or review yields a
+    `safety_passed` that is NOT boolean-True (the driver routes it to `SAFETY_BLOCKED`), and a
+    malformed quality verdict yields `accept=False` with an EMPTY `revise_domains` (the malformed
+    verdict cannot localize a revise target, so no domain is named — fail-closed). The composer
+    NEVER emits `safety_passed: True` on anything but a positive review.
+
+    Args:
+        verdicts (dict): The raw gate verdicts `{"judge": <quality_judge verdict>, "review":
+            <review_plan result>}` the consumer dispatched. A non-dict `verdicts` is malformed —
+            treated as absent judge + absent review (fail-closed).
+        assembled_plan (dict): The assembled `run_generation` result the verdicts scored.
+
+    Returns:
+        (dict) The 3-key disposition `{accept, safety_passed, revise_domains}`.
+    """
+    verdict = verdicts.get("judge") if isinstance(verdicts, dict) else None
+    review = verdicts.get("review") if isinstance(verdicts, dict) else None
+
+    accept = isinstance(verdict, dict) and verdict.get("verdict") == quality_judge_mod.ACCEPT
+    # FAIL-CLOSED: safety_passed is boolean-True ONLY when review_plan returned a dict whose
+    # `passed` is boolean-True. A non-dict review or a missing `passed` key yields False.
+    safety_passed = isinstance(review, dict) and review.get("passed") is True
+
+    # A REVISE derives targets ONLY from a well-formed verdict — a malformed (non-dict / missing
+    # `deductions`) verdict cannot localize a target, so `revise_domains` is empty (fail-closed: an
+    # un-acceptable plan with no nameable revise target falls to the driver's terminal halt, never a
+    # `KeyError` deep in `_revise_domains`).
+    if accept or not (isinstance(verdict, dict) and isinstance(verdict.get("deductions"), list)):
+        revise_domains = []
+    else:
+        revise_domains = _revise_domains(verdict, assembled_plan)
+    return {
+        "accept": accept,
+        "safety_passed": safety_passed,
+        "revise_domains": revise_domains,
+    }
+
+
 def compose_gate_dispatch(judge_client, review_dispatch, *,
                           lenses=safety_review_mod.DEFAULT_LENSES,
                           _quality_judge=quality_judge_mod.quality_judge,
                           _review=safety_review_mod.review_plan):
-    """Compose the quality + safety gates into the driver's single-arg `gate_dispatch` callable.
+    """Bind the quality + safety gates into the driver's single-arg RAW-VERDICT producer.
 
     Binds the gates' collaborators (the `judge_client` and the review `dispatch` + `lenses`) and
-    returns `gate_dispatch(assembled_plan) -> {accept, safety_passed, revise_domains}` — the EXACT
-    3-key disposition the ADR-0026-T1 driver consumes. The returned callable runs BOTH gates over
-    the assembled `run_generation` result and maps their native shapes, FAIL-CLOSED on any malformed
-    composite (a raised / non-dict judge or review, a missing key never yields `safety_passed: True`).
+    returns `gate_producer(assembled_plan) -> {judge, review}` — the single-arg producer the
+    ADR-0028-T1 GATE yield carries. The producer runs BOTH gates over the assembled `run_generation`
+    result and returns their RAW native verdicts; it builds NO disposition (that is
+    `compose_disposition`'s sole job, called by `drive` — the no-fork single composition site). A
+    judge / lens dispatch that RAISES propagates out of the producer; the consumer throws it into
+    the driver, whose GATE-yield fail-closed wrap routes it to `SAFETY_BLOCKED`.
 
     Args:
         judge_client: The injected QUALITY judge client — `judge(payload) -> {dimension: score}`. A
@@ -128,22 +190,12 @@ def compose_gate_dispatch(judge_client, review_dispatch, *,
             `safety_review.review_plan`); a test-injection point, not a production override.
 
     Returns:
-        (Callable) The single-arg `gate_dispatch(assembled_plan) -> disposition` the driver consumes.
+        (Callable) The single-arg `gate_producer(assembled_plan) -> {judge, review}` raw-verdict
+        producer the driver's GATE yield carries.
     """
-    def gate_dispatch(assembled_plan):
+    def gate_producer(assembled_plan):
         verdict = _quality_judge(assembled_plan, judge_client)
         review = _review(assembled_plan, review_dispatch, lenses=lenses)
+        return {"judge": verdict, "review": review}
 
-        accept = isinstance(verdict, dict) and verdict.get("verdict") == quality_judge_mod.ACCEPT
-        # FAIL-CLOSED: safety_passed is boolean-True ONLY when review_plan returned a dict whose
-        # `passed` is boolean-True. A non-dict review or a missing `passed` key yields False.
-        safety_passed = isinstance(review, dict) and review.get("passed") is True
-
-        revise_domains = [] if accept else _revise_domains(verdict, assembled_plan)
-        return {
-            "accept": accept,
-            "safety_passed": safety_passed,
-            "revise_domains": revise_domains,
-        }
-
-    return gate_dispatch
+    return gate_producer

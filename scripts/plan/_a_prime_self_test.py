@@ -36,6 +36,7 @@ import os
 import tempfile
 from pathlib import Path
 
+from scripts.plan import quality_judge as quality_judge_mod
 from scripts.plan.gate_dispatch import compose_gate_dispatch
 from scripts.plan.plan_orchestrator import SAFETY_BLOCKED, run_orchestrated  # noqa: F401  (SAFETY_BLOCKED re-exported for the suite)
 from scripts.store import keying, store
@@ -235,18 +236,23 @@ def _real_composer(judge_client, review_dispatch):
 
 
 def _broken_composer(judge_client, review_dispatch):
-    """A KNOWN-BROKEN promote-everything composer — the fail-closed gate INVERTED (QA-3 probe).
+    """A KNOWN-BROKEN promote-everything producer — the fail-closed gate INVERTED (QA-3 probe).
 
-    Returns a `gate_dispatch` that surfaces an accept + `safety_passed: True` disposition for EVERY
-    plan regardless of the review's findings — so a plan surfaces PAST a non-True safety disposition,
-    inverting the fail-closed gate. The self-test's safety-not-True leg must then surface ≥1 plan,
-    breaking the inversion assertion → `_self_test()` returns non-zero (the audit→self-test
-    exit-code chain goes RED). This is the deliberately-broken spine, never a production path.
+    Returns a RAW-VERDICT producer (ADR-0028-T1) that emits a clean ACCEPT judge + a passing review
+    for EVERY plan REGARDLESS of the real review's findings — so when `compose_disposition` maps it,
+    a plan surfaces PAST a non-True safety disposition, inverting the fail-closed gate. The
+    self-test's safety-not-True leg must then surface ≥1 plan, breaking the inversion assertion →
+    `_self_test()` returns non-zero (the audit→self-test exit-code chain goes RED). The broken spine
+    lives in the PRODUCER (it ignores the findings the real producer would surface), never in
+    `compose_disposition` (the one composition site stays correct) and never a production path.
     """
-    def gate_dispatch(assembled_plan):
-        return {"accept": True, "safety_passed": True, "revise_domains": []}
+    def gate_producer(assembled_plan):
+        return {
+            "judge": {"verdict": quality_judge_mod.ACCEPT, "dimensions": {}, "deductions": []},
+            "review": {"passed": True, "findings": [], "lenses": ()},
+        }
 
-    return gate_dispatch
+    return gate_producer
 
 
 # --- the two inversion legs ----------------------------------------------------
