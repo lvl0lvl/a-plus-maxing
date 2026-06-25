@@ -28,10 +28,17 @@ CRITICAL / H1-H2 check stay in `orchestrate.adjudicate`). The no-fork crown jewe
 harness. It is INDEPENDENTLY DRIVABLE by a fixture consumer — it takes the inner-engine seam, the
 gates, the budget, and the memo-cache callables as INPUTS (never a module-scope live import), so a
 fixture consumer drives it with 0 live wiring.
+
+The harness is ALSO the PII boundary for the DERIVED yields (ADR-0028-T4): before a GATE / REAUTHOR /
+ADJUDICATOR payload leaves the process to a subscription agent, `_scan_yield_payload` value-scans it
+(reusing `pii_scan.scan_text_full`, the `deid_in` precedent) and fails CLOSED to the
+`YIELD_PAYLOAD_PII` sentinel on a hit. The GATE scan is scoped to `payload[0]` (the assembled plan);
+the AUTHOR seam is not scanned (the orchestrator holds only the de-identified summary).
 """
 
 import json
 
+from scripts.guard import pii_scan
 from scripts.plan import plan_driver
 
 # The two documented memo-cache key classes (the leading token of `_reauthor_key` /
@@ -49,10 +56,19 @@ _PENDING = "pending"
 _DONE = "done"
 _RESULT = "result"
 
+# The honest no-plan reason when a DERIVED yield payload — the GATE assembled plan / the ADJUDICATOR
+# safety finding / the REAUTHOR constraint — carries raw operator PII (ADR-0028-T4). The value-scan
+# at the harness boundary fails CLOSED to this sentinel BEFORE the payload leaves the process to a
+# subscription agent: the first-ever scan over these engine-derived artifacts (the AUTHOR seam is
+# structurally clean — the orchestrator holds only the de-identified summary). Mirrors the `deid_in`
+# value-PII fail-closed return shape; name no value (no PII echo in the reason).
+YIELD_PAYLOAD_PII = "yield-payload-pii"
+
 
 def step(serialized_state, *, fulfilled_envelope=None, summary=None, domains=None, store_read=None,
          root=None, plan_date=None, gates=None, gate_producer=None, compose=None, on_date=None,
-         reauthor=None, adjudicator=None, budget=None, revise_cap=plan_driver.DEFAULT_REVISE_CAP):
+         reauthor=None, adjudicator=None, budget=None, revise_cap=plan_driver.DEFAULT_REVISE_CAP,
+         identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
     """Advance the shared driver EXACTLY one yield from the serialized state; return the next request.
 
     The per-round drive entry (the skill's pause boundary). Re-constructs a FRESH `plan_driver.drive`
@@ -88,10 +104,14 @@ def step(serialized_state, *, fulfilled_envelope=None, summary=None, domains=Non
         adjudicator (Callable, optional): The held-finding liaison hook (forwarded to `drive`).
         budget (DispatchBudget, optional): The per-plan dispatch budget.
         revise_cap (int, optional): The bounded revise-loop cap.
+        identity_config (str | Path, optional): The gitignored operator-identity token file the
+            boundary value-scan loads (the same `deid_in` precedent default). Passed as an INPUT
+            (never a module-scope live read) so the scan stays fixture-drivable.
 
     Returns:
         (Request | None) The next pending typed `Request(kind, payload)` the consumer must fulfil, or
-        `None` when the run completed.
+        `None` when the run completed (or the boundary value-scan failed closed on a derived payload
+        carrying raw PII — the run's result is then the `YIELD_PAYLOAD_PII` sentinel).
         (dict) The re-serialized state (the continuation) — pass it to the next `step` call.
     """
     state = _fresh_state() if serialized_state is None else serialized_state
@@ -127,8 +147,55 @@ def step(serialized_state, *, fulfilled_envelope=None, summary=None, domains=Non
         state[_RESULT] = _json_native(result)
         return None, state
 
+    # CROWN-JEWEL value-scan (ADR-0028-T4): before the DERIVED yield payload leaves the process to a
+    # subscription agent, scan it for raw operator PII. The GATE assembled plan / the ADJUDICATOR
+    # safety finding / the REAUTHOR constraint are DERIVED from the engine — their PII-freeness is
+    # transitive-but-unverified (the AUTHOR seam is structurally clean). On a hit the payload FAILS
+    # CLOSED — it does NOT leave the process: the harness halts to the fail-closed sentinel rather
+    # than returning the pending request onward (mirrors the `deid_in` fail-closed return; no PII echo).
+    if _scan_yield_payload(request, identity_config):
+        state[_PENDING] = None
+        state[_DONE] = True
+        state[_RESULT] = {"deidentified": False, "reason": YIELD_PAYLOAD_PII}
+        return None, state
+
     state[_PENDING] = {"kind": request.kind, "key": _serialize_key(request_key(request))}
     return request, state
+
+
+def _scan_yield_payload(request, identity_config):
+    """Value-scan a DERIVED yield payload before it leaves the process; return the raw-PII hit count.
+
+    The crown-jewel value-scan (ADR-0028-T4) over the DERIVED GATE / ADJUDICATOR / REAUTHOR yield
+    payloads — the first-ever scan over these engine-derived artifacts. It REUSES
+    `pii_scan.scan_text_full` (the same value-scan utility the `deid_in` boundary uses, the precedent
+    shape) over the `str(payload)`-flattened payload, so STRING PII inside a non-scalar container is
+    caught too. The AUTHOR seam is NOT scanned: its payload is the de-identified summary the
+    orchestrator already holds (structurally clean), so an AUTHOR request returns 0.
+
+    GATE scope: the GATE payload is `(assembled_plan, gate_producer)` — the scan is scoped to
+    `payload[0]` (the assembled plan, the actual derived-PII surface). `payload[1]` is the
+    `gate_producer` CALLABLE (it `str()`s to an inert `<function ...>` repr); it is scoped out
+    EXPLICITLY so a future producer that closes over operator-derived data is not silently scanned
+    around, and so the scan targets the assembled plan rather than a callable repr. REAUTHOR /
+    ADJUDICATOR: the payload IS the derived artifact (the constraint / the safety finding) — scan it
+    whole.
+
+    Args:
+        request (Request): The pending typed `Request(kind, payload)` about to leave the process.
+        identity_config (str | Path): The gitignored operator-identity token file the scan loads.
+
+    Returns:
+        (int) The count of raw-PII matches in the derived payload (0 on a clean payload, and 0 for an
+        AUTHOR request — the structurally-clean seam).
+    """
+    if request.kind == plan_driver.GATE:
+        scanned = request.payload[0]
+    elif request.kind in (plan_driver.REAUTHOR, plan_driver.ADJUDICATOR):
+        scanned = request.payload
+    else:
+        return 0
+    return pii_scan.scan_text_full(str(scanned), token_config=identity_config)
 
 
 def _drive_to_next(*, memo, rounds, summary, domains, store_read, root, plan_date, gates,

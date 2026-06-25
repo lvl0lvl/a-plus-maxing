@@ -41,11 +41,14 @@ S94 checkpoint owner (SEC-6). Every client/dispatch here is a mock/fixture; no t
 API, and the test tree carries 0 real operator PII (synthetic tokens only).
 """
 
+import inspect
 import json
 import subprocess
 from pathlib import Path
 
+from scripts.guard import pii_scan
 from scripts.model.client import ModelClient
+from scripts.plan import plan_driver, plan_step
 from scripts.plan.deid_in import deid_in
 from scripts.plan.gate_dispatch import compose_gate_dispatch
 from scripts.plan.plan_orchestrator import run_orchestrated
@@ -55,16 +58,35 @@ from tests.plan.test_deid_in import (
     SYNTHETIC_LAB,
     SYNTHETIC_NAME,
     _FixedDeidClient,
+    _identity_config,
     _raw_intake,
 )
-from tests.plan.test_generate_plan import PLAN_DATE, _seed_store
+from tests.plan.test_generate_plan import (
+    PLAN_DATE,
+    _author,
+    _seed_store,
+    _workout_rec,
+)
+from tests.plan.test_orchestrate import _recon
 from tests.plan.test_plan_orchestrator import (
     _RecordingDispatch,
     _deid_summary,
     _sustaining_authors,
 )
+from tests.plan.test_plan_step import _fulfil, _run_through_step
 from tests.plan.test_quality_judge import _FixedJudgeClient, _clean_scores
+from tests.plan.test_revise_loop import (
+    _bpmh_store,
+    _clean_composing_gate,
+    _clearing_liaison,
+    _clearing_reauthor,
+    _replay_safety_authors,
+)
 from tests.plan.test_safety_review import _no_findings_dispatch
+
+# A synthetic contact token that trips the value-CLASS scan (email) WITHOUT any identity config —
+# the planted-leak token. Mirrors the `deid_in` contact-PII precedent (test_deid_in.py).
+_LEAK_EMAIL = "jordan.fake@test-clinic.example.org"
 
 
 # The reconciled A′ skill front door under test — the file the prose-grep ACs read.
@@ -433,3 +455,293 @@ def test_skill_prose_grep_distinguishes_deid_in_from_persisted_summarize():
     assert not _names_summarize_as_deid_in(disambiguation), (
         "the grep must not flag the required disambiguation sentence (it NEGATES the role)"
     )
+
+
+# ===============================================================================
+# ADR-0028-T4 Cycle 1: the NEW value-scan over the DERIVED GATE / ADJUDICATOR /
+# REAUTHOR yield payloads at the harness boundary (the crown jewel)
+# ===============================================================================
+#
+# The FIRST-EVER scan over the engine-DERIVED yield payloads (the assembled plan /
+# the safety finding / the re-author constraint). The AUTHOR seam is structurally
+# clean (the orchestrator holds only the de-identified summary), so AUTHOR is not
+# scanned; the derived payloads' PII-freeness is transitive-but-unverified, so the
+# harness value-scans each one with `pii_scan.scan_text_full` (the same utility the
+# `deid_in` boundary uses) BEFORE it leaves the process, failing CLOSED on a hit.
+
+
+def _drive_collecting_requests(drive_kwargs, *, authors_map, reauthor=None, adjudicator=None):
+    """Drive a run to completion through repeated `plan_step.step`, collecting each yielded request.
+
+    Mirrors `test_plan_step._run_through_step` but RETAINS each surfaced pending request so a test
+    can scan the DERIVED yield payloads. The ONLY state across iterations is the serialized state +
+    the just-fulfilled envelope — no held generator.
+
+    Returns:
+        (list) The yielded `Request`s surfaced to the consumer (in order).
+        (dict) The terminal serialized state (read its result via `plan_step.result_of`).
+    """
+    requests = []
+    pending, state = plan_step.step(None, **drive_kwargs)
+    envelope = None
+    while pending is not None:
+        requests.append(pending)
+        envelope = _fulfil(pending, authors_map=authors_map, reauthor=reauthor, adjudicator=adjudicator)
+        pending, state = plan_step.step(state, fulfilled_envelope=envelope, **drive_kwargs)
+    return requests, state
+
+
+def test_no_raw_pii_in_any_derived_yield_payload(tmp_path):
+    # AC-2 (the crown jewel, 0 raw-PII over the DERIVED payloads): drive a bounce + held-finding
+    # fixture run through the harness; the GATE assembled-plan (payload[0]) + the ADJUDICATOR safety
+    # finding (payload) + the REAUTHOR constraint (payload) yield payloads each scan 0 raw-PII against
+    # an identity config matching the synthetic name/lab tokens — the first-ever scan over those
+    # DERIVED artifacts. And the run completes through the harness (the harness's INTERNAL value-scan
+    # passed — it did NOT fail closed on a clean run).
+    config = _identity_config(tmp_path)
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    drive_kwargs = dict(
+        summary=_deid_summary(),
+        domains=("workout", "nutrition", "supplements", "peptides"),
+        store_read=store_read, root=tmp_path, plan_date=PLAN_DATE, gates={},
+        gate_producer=_clean_composing_gate(),
+        reauthor=_clearing_reauthor(), adjudicator=_clearing_liaison(),
+        identity_config=config,
+    )
+
+    requests, state = _drive_collecting_requests(
+        drive_kwargs, authors_map=_replay_safety_authors(),
+        reauthor=_clearing_reauthor(), adjudicator=_clearing_liaison(),
+    )
+
+    # all three DERIVED yield kinds actually surfaced (else the scan is vacuous)
+    kinds = {r.kind for r in requests}
+    assert plan_driver.GATE in kinds, "no GATE yield surfaced (the scan would be vacuous)"
+    assert plan_driver.REAUTHOR in kinds, "no REAUTHOR yield surfaced (the bounce did not fire)"
+    assert plan_driver.ADJUDICATOR in kinds, "no ADJUDICATOR yield surfaced (no held finding fired)"
+
+    # each DERIVED payload scans 0 raw-PII — GATE scoped to payload[0] (the assembled plan); the
+    # REAUTHOR constraint + the ADJUDICATOR finding scanned whole (the carried Architect doc action).
+    for r in requests:
+        if r.kind == plan_driver.GATE:
+            assert pii_scan.scan_text_full(str(r.payload[0]), token_config=config) == 0, (
+                "the GATE assembled-plan yield payload carried raw-PII"
+            )
+        elif r.kind in (plan_driver.REAUTHOR, plan_driver.ADJUDICATOR):
+            assert pii_scan.scan_text_full(str(r.payload), token_config=config) == 0, (
+                f"a {r.kind} yield payload carried raw-PII"
+            )
+
+    # the run completed through the harness (the harness's own value-scan did NOT fail closed)
+    result = plan_step.result_of(state)
+    assert result is not None, "the harness run did not complete"
+    assert result.get("reason") != plan_step.YIELD_PAYLOAD_PII, "a clean run wrongly failed closed"
+
+
+def test_value_scan_helper_reds_on_a_planted_leak():
+    # AC-3 (RED-capability, DEMONSTRATED not assumed): the harness value-scan returns >=1 on a
+    # planted-leak DERIVED payload and 0 on a clean one. GATE is scoped to payload[0] (the assembled
+    # plan); payload[1] (the `gate_producer` callable) is EXCLUDED — it str()s to an inert
+    # `<function ...>` repr, scoped out explicitly so a future producer closing over operator-derived
+    # data is not silently included AND so the scan targets the actual derived-PII surface (the
+    # carried Architect doc action). REAUTHOR / ADJUDICATOR payloads are scanned whole.
+    producer = lambda assembled_plan: {}  # an inert raw-verdict producer
+
+    clean_gate = plan_driver.Request(plan_driver.GATE, ({"plan": "Goblet squat 3x8"}, producer))
+    leak_gate = plan_driver.Request(plan_driver.GATE, ({"plan": f"note {_LEAK_EMAIL}"}, producer))
+    assert plan_step._scan_yield_payload(clean_gate, pii_scan.DEFAULT_IDENTITY_CONFIG) == 0
+    assert plan_step._scan_yield_payload(leak_gate, pii_scan.DEFAULT_IDENTITY_CONFIG) >= 1, (
+        "the value-scan did not catch a planted leak in the GATE assembled-plan payload"
+    )
+
+    # the gate_producer CALLABLE (payload[1]) is NOT scanned even when its repr would carry a token
+    producer_closing_over_leak = lambda assembled_plan: _LEAK_EMAIL
+    producer_gate = plan_driver.Request(
+        plan_driver.GATE, ({"plan": "clean"}, producer_closing_over_leak)
+    )
+    assert plan_step._scan_yield_payload(producer_gate, pii_scan.DEFAULT_IDENTITY_CONFIG) == 0, (
+        "the scan must be scoped to payload[0]; the gate_producer callable is not scanned"
+    )
+
+    # REAUTHOR / ADJUDICATOR payloads are scanned WHOLE (they ARE the derived artifact)
+    leak_reauthor = plan_driver.Request(
+        plan_driver.REAUTHOR, ("workout", {"note": _LEAK_EMAIL})
+    )
+    leak_adjudicator = plan_driver.Request(
+        plan_driver.ADJUDICATOR, ({"finding_id": _LEAK_EMAIL, "held_domain": "supplements"},)
+    )
+    assert plan_step._scan_yield_payload(leak_reauthor, pii_scan.DEFAULT_IDENTITY_CONFIG) >= 1
+    assert plan_step._scan_yield_payload(leak_adjudicator, pii_scan.DEFAULT_IDENTITY_CONFIG) >= 1
+
+    # the AUTHOR seam is structurally clean — it is NOT scanned (the de-identified summary only)
+    author_with_token = plan_driver.Request(
+        plan_driver.AUTHOR, (("workout",), {"x": _LEAK_EMAIL}, {})
+    )
+    assert plan_step._scan_yield_payload(author_with_token, pii_scan.DEFAULT_IDENTITY_CONFIG) == 0
+
+
+def test_value_scan_fails_closed_on_planted_leak(tmp_path):
+    # AC-3 (the INTEGRATED fail-closed through the harness): a planted raw-PII token (a contact token)
+    # in a workout author surfaces in the assembled plan (the GATE payload[0]); the harness value-scan
+    # catches it and FAILS CLOSED — the GATE request is NEVER surfaced to the consumer (the payload
+    # does not leave the process), the harness halts to the fail-closed sentinel, and 0 plan rows
+    # promote into the real root.
+    store_read = _seed_store(tmp_path)
+    contaminated = {
+        # the contact token rides in the exercise name -> it surfaces verbatim in the assembled plan
+        "workout": _recon(_author(_workout_rec(f"Goblet squat {_LEAK_EMAIL}", 3)), energy_cost_kcal=500),
+        "nutrition": _sustaining_authors()["nutrition"],
+    }
+    drive_kwargs = dict(
+        summary=_deid_summary(), domains=("workout", "nutrition"), store_read=store_read,
+        root=tmp_path, plan_date=PLAN_DATE, gates={}, gate_producer=_clean_composing_gate(),
+    )
+
+    requests, state = _drive_collecting_requests(drive_kwargs, authors_map=contaminated)
+
+    # the harness FAILED CLOSED on the planted leak (the derived GATE payload did not leave the process)
+    result = plan_step.result_of(state)
+    assert result == {"deidentified": False, "reason": plan_step.YIELD_PAYLOAD_PII}, (
+        f"the harness did not fail closed on the planted leak: {result}"
+    )
+    # NO GATE request carrying the leaked payload was ever surfaced to the consumer
+    assert all(r.kind != plan_driver.GATE for r in requests), (
+        "a contaminated GATE payload leaked past the harness scan to the consumer"
+    )
+    # and 0 plan rows promoted into the real root (the fail-closed surface)
+    assert store.read("plan::workout", root=tmp_path) == [], "a plan promoted past the failed-closed scan"
+
+
+# ===============================================================================
+# ADR-0028-T4 Cycle 2: the skill-drives-via-`plan_step.py` glue — 0 synchronous
+# agent calls inside `drive` (every dispatch is a yielded-request fulfilment)
+# ===============================================================================
+
+
+def _stack_checked(fn):
+    """Wrap a dispatch hook so it records whether it was invoked synchronously from inside `drive`.
+
+    When the CONSUMER fulfils a yielded request, the `drive` generator is SUSPENDED (paused at a
+    yield), so its frame is NOT on the active call stack — a dispatch that fires with `drive` /
+    `_run_with_replay` / `_drive_to_next` on the stack would be a SYNCHRONOUS agent call inside the
+    driver's frame (the control-inversion the harness exists to prevent). The wrapper records the
+    total call count + how many fired with a driver frame on the stack.
+    """
+    drive_frames = {"drive", "_run_with_replay", "_drive_to_next", "_send_round"}
+    record = {"calls": 0, "inside_drive": 0}
+
+    def wrapper(*args, **kwargs):
+        stack_fns = {fr.function for fr in inspect.stack()}
+        if stack_fns & drive_frames:
+            record["inside_drive"] += 1
+        record["calls"] += 1
+        return fn(*args, **kwargs)
+
+    wrapper.record = record
+    return wrapper
+
+
+def test_zero_synchronous_agent_calls_inside_drive(tmp_path):
+    # AC-5: drive de-id -> AUTHOR -> GATE -> (REAUTHOR/ADJUDICATOR replay) -> (revise) -> promote
+    # through the harness over a bounce + held-finding fixture; the count of SYNCHRONOUS
+    # judge/lens/reauthor/adjudicator agent calls INSIDE `drive`'s frame is 0 — every dispatch is the
+    # CONSUMER's fulfilment of a yielded request (the driver is SUSPENDED at the yield when the
+    # dispatch fires). A spy records every dispatch's call-stack origin; a dispatch with a driver
+    # frame on the stack -> RED. The harness inverts every agent-touching dispatch into a yield.
+    store_read = _bpmh_store(tmp_path, "bleeding-risk")
+    gate_spy = _stack_checked(_clean_composing_gate())
+    reauthor_spy = _stack_checked(_clearing_reauthor())
+    adjudicator_spy = _stack_checked(_clearing_liaison())
+    drive_kwargs = dict(
+        summary=_deid_summary(),
+        domains=("workout", "nutrition", "supplements", "peptides"),
+        store_read=store_read, root=tmp_path, plan_date=PLAN_DATE, gates={},
+        gate_producer=gate_spy,
+        # the drive-side reauthor/adjudicator are truthiness-only (they WIRE the engine memo hooks);
+        # the real dispatch is the CONSUMER's spy below — the harness never calls these directly.
+        reauthor=_clearing_reauthor(), adjudicator=_clearing_liaison(),
+    )
+
+    result = _run_through_step(
+        drive_kwargs, authors_map=_replay_safety_authors(),
+        reauthor=reauthor_spy, adjudicator=adjudicator_spy,
+    )
+
+    # the run promoted >=1 plan (the bounce + held finding cleared) — else the assertions are vacuous
+    recorded = [d for d, r in result["results"].items() if r.get("recorded") is True]
+    assert recorded, "the harness did not drive the fixtures to a promoted plan"
+    # every dispatch fired (the spies are non-vacuous)
+    assert gate_spy.record["calls"] >= 1, "the GATE producer never fired"
+    assert reauthor_spy.record["calls"] >= 1, "the bounce reauthor never fired (the spy is vacuous)"
+    assert adjudicator_spy.record["calls"] >= 1, "the adjudicator never fired (the spy is vacuous)"
+    # and NONE fired synchronously inside `drive`'s frame (0 synchronous agent calls inside drive)
+    assert gate_spy.record["inside_drive"] == 0, "a GATE dispatch fired synchronously inside drive"
+    assert reauthor_spy.record["inside_drive"] == 0, "a REAUTHOR dispatch fired synchronously inside drive"
+    assert adjudicator_spy.record["inside_drive"] == 0, "an ADJUDICATOR dispatch fired synchronously inside drive"
+
+
+# ===============================================================================
+# ADR-0028-T4 Cycle 3: the SKILL.md prose reconcile — drives via `plan_step.py`,
+# no-fork-at-skill (loop OR release), the S94 live-subscription-dispatch deferral
+# ===============================================================================
+
+
+def test_skill_prose_drives_via_plan_step():
+    # AC-1: SKILL.md Phase 2 drives the shared driver THROUGH the `plan_step.py` step-harness (not a
+    # direct in-session `plan_driver.drive` generator), and documents the per-class subscription-
+    # dispatch fulfilment: the skill fulfils each yielded typed request (AUTHOR / GATE / REAUTHOR /
+    # ADJUDICATOR) via a SUBSCRIPTION agent dispatch and re-calls the harness with the appended
+    # envelope. A SKILL.md that still drives `plan_driver.drive` directly (no `plan_step` reference,
+    # no per-round harness loop) -> RED.
+    text = SKILL_MD.read_text(encoding="utf-8")
+
+    # the harness is named as the drive mechanism (the per-round `step`)
+    assert "plan_step" in text, "SKILL.md does not name plan_step as the drive mechanism"
+    assert "plan_step.step" in text, "SKILL.md does not name plan_step.step (the per-round drive entry)"
+    # the four yielded typed-request kinds' fulfilment is documented
+    for kind in ("AUTHOR", "GATE", "REAUTHOR", "ADJUDICATOR"):
+        assert kind in text, f"SKILL.md does not document fulfilling the {kind} yielded request"
+    # the per-round re-call is documented (fulfil a yield via a subscription dispatch, re-call the harness)
+    lowered = text.lower()
+    assert "subscription" in lowered, "SKILL.md does not document the subscription-dispatch fulfilment"
+    assert "envelope" in lowered, "SKILL.md does not document re-calling the harness with the fulfilled envelope"
+
+
+def test_skill_md_no_forked_loop_or_release():
+    # AC-6 (no-fork at the skill — loop OR release): a comment-stripped grep over SKILL.md finds 0
+    # copies of the EXECUTABLE safety-loop control flow (a `while True:` header, the
+    # `disposition.get("safety_passed") is True` gate EXPRESSION at a non-comment line) AND 0
+    # re-derivations of the adjudication release (`outcome == "cleared"`). The skill DRIVES the ONE
+    # driver via the harness; the loop + the composition + the release stay in the inner engine. The
+    # probe targets executable control flow (not a bare token a descriptive prose mention carries),
+    # stripping comments/prose before counting (ADR-0026-T1 QA-2 / ADR-0028-T3 AC-5 discipline).
+    lines = list(_comment_stripped_lines(SKILL_MD))
+
+    forked_loop_headers = [ln for ln in lines if "while True:" in ln]
+    assert forked_loop_headers == [], f"SKILL.md re-hosts a `while True:` safety loop: {forked_loop_headers}"
+
+    forked_gate_exprs = [ln for ln in lines if 'disposition.get("safety_passed") is True' in ln]
+    assert forked_gate_exprs == [], f"SKILL.md re-hosts the safety-gate EXPRESSION: {forked_gate_exprs}"
+
+    rederived_release = [
+        ln for ln in lines if 'outcome == "cleared"' in ln or "outcome == 'cleared'" in ln
+    ]
+    assert rederived_release == [], (
+        f"SKILL.md re-derives the adjudication release (`outcome == cleared`): {rederived_release}"
+    )
+
+
+def test_skill_prose_documents_s94_live_deferral():
+    # AC-7 (MOCK/FIXTURE-tested + S94 noted): SKILL.md documents that the LIVE subscription dispatch
+    # (the skill dispatching REAL agents per round, real key, real spend) is the operator-present S94
+    # attestation, NOT a mock-test target — so what IS vs ISN'T mock-testable is explicit. The glue
+    # test's fixture construction (the glue drives a fixture dispatch, never a real agent) is the
+    # mock-tested half.
+    text = SKILL_MD.read_text(encoding="utf-8")
+    assert "S94" in text, "SKILL.md does not document the S94 deferral of the live dispatch"
+    lowered = text.lower()
+    assert "live" in lowered and ("attestation" in lowered or "operator-present" in lowered), (
+        "SKILL.md does not document the live subscription dispatch as the S94 operator-present "
+        "attestation (what IS vs ISN'T mock-testable must be explicit)"
+    )
+    assert "subscription" in lowered, "SKILL.md does not name the live subscription dispatch"
