@@ -139,11 +139,20 @@ def step(serialized_state, *, fulfilled_envelope=_UNFULFILLED, summary=None, dom
     # canonical json form, and the re-drive runs over that form identically).
     pending = state.get(_PENDING)
     if pending is not None and fulfilled_envelope is not _UNFULFILLED:
-        normalized = _json_native(fulfilled_envelope)
-        if pending["kind"] in (plan_driver.REAUTHOR, plan_driver.ADJUDICATOR):
-            state[_MEMO][pending["key"]] = normalized
+        if pending["kind"] == plan_driver.GATE and isinstance(fulfilled_envelope, BaseException):
+            # The GATE producer RAISED (a safety-lens dispatch failed mid-review). A BaseException is
+            # not json-serializable, so it cannot enter the lossless rounds log; record the json-safe
+            # raised-GATE MARKER instead — `_send_round` reconstructs it into a fail-closed `gen.throw`
+            # on the re-drive, so the round-based path reproduces the synchronous SAFETY_BLOCKED-on-
+            # gate-raise (`drive`'s GATE-yield `except Exception: disposition = None`), exactly as the
+            # synchronous consumer's `driver.throw(gate_error)` does.
+            state[_ROUNDS] = state[_ROUNDS] + [dict(_GATE_RAISED)]
         else:
-            state[_ROUNDS] = state[_ROUNDS] + [normalized]
+            normalized = _json_native(fulfilled_envelope)
+            if pending["kind"] in (plan_driver.REAUTHOR, plan_driver.ADJUDICATOR):
+                state[_MEMO][pending["key"]] = normalized
+            else:
+                state[_ROUNDS] = state[_ROUNDS] + [normalized]
 
     # Re-construct a FRESH driver seeded with the accumulated memo (the cached REAUTHOR / ADJUDICATOR
     # responses HIT instead of re-yielding), replay the AUTHOR / GATE rounds log, and advance to the
@@ -218,10 +227,11 @@ def _drive_to_next(*, memo, rounds, summary, domains, store_read, root, plan_dat
 
     The OQ-5 round-based replay: a FRESH `plan_driver.drive` is seeded with the accumulated memo, then
     walked one yield at a time. Each direct AUTHOR / GATE yield is fulfilled from the ordered `rounds`
-    log (a producer that RAISES is THROWN into the driver, mirroring the production consumer's
-    fail-closed wrap). When the rounds log is exhausted (a NEW AUTHOR / GATE yield) or a NOT-yet-cached
-    REAUTHOR / ADJUDICATOR yield appears (a cache-miss the seeded memo did not answer), that yield is
-    the next pending request. If the driver completes during the replay, its result is returned.
+    log (a GATE round recorded as the raised-GATE marker is reconstructed into a fail-closed
+    `gen.throw` — see `_send_round`). When the rounds log is exhausted (a NEW AUTHOR / GATE yield) or a
+    NOT-yet-cached REAUTHOR / ADJUDICATOR yield appears (a cache-miss the seeded memo did not answer),
+    that yield is the next pending request. If the driver completes during the replay, its result is
+    returned.
 
     Returns:
         (Request | None) The next un-answered pending request, or `None` on completion.
@@ -252,18 +262,39 @@ def _drive_to_next(*, memo, rounds, summary, domains, store_read, root, plan_dat
 # A unique sentinel distinguishing an exhausted rounds log from a legitimately-`None` fulfilment.
 _UNANSWERED = object()
 
+# The json-safe MARKER recorded in the rounds log for a GATE round whose producer RAISED (a safety
+# lens failed mid-review). A raised producer is a BaseException — NOT json-serializable, so it cannot
+# enter the lossless rounds log directly; the marker stands in for it, and `_send_round` reconstructs
+# it into a `gen.throw` of `_GateProducerRaised` on the re-drive, reproducing the synchronous
+# SAFETY_BLOCKED-on-gate-raise (`drive`'s GATE-yield `except Exception: disposition = None`). A clean
+# raw verdict is `{judge, review}` — never this shape, so the marker is unambiguous.
+_GATE_RAISED = {"__gate_raised__": True}
+
+
+class _GateProducerRaised(Exception):
+    """The fail-closed sentinel `_send_round` throws into the driver for a recorded GATE-producer raise.
+
+    A plain `Exception` (NOT a `BaseException`): the driver's GATE-yield fail-closed wrap
+    (`except Exception: disposition = None`) MUST catch it -> SAFETY_BLOCKED, mirroring the synchronous
+    consumer's `driver.throw(gate_error)`. (`_ReplayNeeded` is the BaseException that must NOT be
+    caught; this one is its opposite — it must be, so the raised GATE fails closed to no plan.)
+    """
+
 
 def _send_round(gen, request, envelope):
     """Send a replayed AUTHOR / GATE round envelope back into the driver and return the next yield.
 
     A GATE envelope is the raw verdicts (or a producer-call result); the harness does NOT compose it
     — it `.send()`s it back verbatim (`drive` composes via `compose_disposition`, the ONE site). A
-    GATE round whose recorded envelope is an EXCEPTION (a producer raised mid-review) is THROWN into
-    the driver, mirroring the production consumer's fail-closed wrap (the surface gate stays in
-    `drive`). AUTHOR rounds are always `.send()`'d.
+    GATE round recorded as the raised-GATE MARKER (`_GATE_RAISED` — the producer raised mid-review, a
+    safety lens failed) is reconstructed into a `gen.throw` of the `_GateProducerRaised` fail-closed
+    sentinel: the driver's GATE-yield `except Exception: disposition = None` catches it ->
+    SAFETY_BLOCKED, reproducing the synchronous consumer's `driver.throw(gate_error)` fail-closed wrap
+    (the surface gate stays in `drive`). AUTHOR rounds — and clean GATE verdicts — are always `.send()`'d.
     """
-    if request.kind == plan_driver.GATE and isinstance(envelope, BaseException):
-        return gen.throw(envelope)
+    if (request.kind == plan_driver.GATE and isinstance(envelope, dict)
+            and envelope.get("__gate_raised__") is True):
+        return gen.throw(_GateProducerRaised("a GATE producer raised mid-review — fail closed"))
     return gen.send(envelope)
 
 
