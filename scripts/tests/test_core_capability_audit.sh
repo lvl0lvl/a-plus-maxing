@@ -10,10 +10,12 @@
 #   - (B2) the RUN_GEN_HOST omits `pipeline.run_generation(` -> structural check 2 FAILs;
 #   - (C) a structurally-wired A′ spine (driver carries the disposition gate + accept /
 #         revise_domains reads, RUN_GEN_HOST carries `pipeline.run_generation(`) PASSes;
-#   - (D) the REAL tree (incl. the A′-inversion behavioral self-test) PASSes.
-# Each RED case REDs on its specific A′-spine token — NEVER on the retired `assemble(` /
-# `record_plan(` checks the repoint DROPPED. A gate that stayed green under (A)/(B)/(B2)
-# would be tautological.
+#   - (D) the REAL tree (incl. the A′-inversion behavioral self-test) PASSes;
+#   - (E) the REAL wired spine whose BEHAVIORAL self-test is forced to FAIL (the BROKEN_SPINE env
+#         hook) -> the audit PROPAGATES the non-zero exit (the behavioral leg RED, not only structural).
+# Each STRUCTURAL RED case (A/B/B2) REDs on its specific A′-spine token — NEVER on the retired
+# `assemble(` / `record_plan(` checks the repoint DROPPED; case E REDs on the behavioral leg. A gate
+# that stayed green under (A)/(B)/(B2)/(E) would be tautological.
 
 set -uo pipefail
 
@@ -88,6 +90,14 @@ check "structurally-wired A′ spine PASSes" 0 "$rc"
 # (D) GREEN — the REAL tree, including the A′-inversion behavioral self-test.
 rc=0; bash "$GATE" >/dev/null 2>&1 || rc=$?
 check "real wired A′ path (incl. self-test) PASSes" 0 "$rc"
+
+# (E) RED — a structurally-wired REAL spine whose BEHAVIORAL self-test is forced to FAIL via the
+# A′-inversion BROKEN_SPINE env hook: the audit must PROPAGATE the self-test's non-zero exit (the
+# PF-S63-02 non-tautology). Co-locates the behavioral-leg RED proof with the structural RED cases so
+# the F-007 shell suite asserts BOTH legs of the audit, not the structural leg alone (the behavioral
+# propagation was otherwise asserted only by the Python chain test). Requires .venv, like case D.
+rc=0; A_PRIME_SELF_TEST_BROKEN_SPINE=1 bash "$GATE" >/dev/null 2>&1 || rc=$?
+check "wired spine + FAILING behavioral self-test FAILs" 1 "$rc"
 
 if [ "$fail" -ne 0 ]; then
   echo "test_core_capability_audit: FAILED"
