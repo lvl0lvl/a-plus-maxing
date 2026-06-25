@@ -14,10 +14,13 @@ for T2). The CONSUMER switches on `kind`, fulfils the request, and `.send()`s th
   - AUTHOR request (`payload = (domains, summary, gates)`): the CONSUMER captures each domain's
     author envelope (via its `dispatch` seam — a fixture in tests, a real subscription agent in the
     skill) and SENDS the captured `{domain: envelope}` fragment back (`gen.send(envelopes)`).
-  - GATE request (`payload = (assembled_plan, gate)`): the CONSUMER invokes the composed gate over
-    the assembled plan and SENDS the RAW disposition back. `drive` then applies the fail-closed
-    `safety_passed is True` surface gate over that disposition (the surface gate stays in ONE place —
-    the consumer builds NO disposition).
+  - GATE request (`payload = (assembled_plan, gate_producer)`): the CONSUMER dispatches the judge
+    and each safety lens (via the RAW-VERDICT producer the payload carries) and SENDS the RAW
+    `{judge, review}` verdicts back — NEVER a composed callable (ADR-0028 OQ-2 rejects shipping the
+    skill a Python callable whose body must synchronously call agents) and NEVER a finished
+    disposition. `drive` then calls `compose_disposition` over the raw verdicts (the ONE composition
+    site) and applies the fail-closed `safety_passed is True` surface gate over the result — both
+    stay in ONE place; the consumer builds NO disposition and re-derives nothing.
   - The driver runs the inner engine (`pipeline.run_generation`) over the captured authors against
     an ISOLATED scratch store, gates the assembled result via the yielded GATE request, and either
     (a) promotes the survivors into `root` and STOPS (accept + `safety_passed is True`), (b) re-yields
@@ -28,7 +31,7 @@ for T2). The CONSUMER switches on `kind`, fulfils the request, and `.send()`s th
     revise_domains: list}` — `safety_passed is True` is the ONLY surface path; `revise_domains`
     names only run-set domains.
 
-The driver is INDEPENDENTLY DRIVABLE by a fixture-supplied `gate_dispatch` + a consumer feeding
+The driver is INDEPENDENTLY DRIVABLE by a fixture-supplied `gate_producer` + a consumer feeding
 fixture envelopes, with no live client and no skill — it takes the inner-engine seam, the budget,
 and the gates as inputs (never a module-scope live import). The de-id-sentinel halt + the budget
 construction live in the consumer (`run_orchestrated`), BEFORE the driver is entered.
@@ -66,8 +69,10 @@ Request.__doc__ = (
     "A typed discriminated-union drive request the driver yields. `kind` is one of `REQUEST_KINDS`; "
     "`payload` is the kind-specific fulfilment input the consumer reads. AUTHOR: `(domains, summary, "
     "gates)` — the consumer dispatches each domain's specialist and sends back `{domain: envelope}`. "
-    "GATE: `(assembled_plan, gate)` — the consumer invokes the gate over the assembled plan and sends "
-    "back the RAW disposition; `drive` applies the fail-closed `safety_passed is True` surface gate."
+    "GATE: `(assembled_plan, gate_producer)` — the consumer dispatches the judge + each lens via the "
+    "RAW-VERDICT producer and sends back the raw `{judge, review}` verdicts (NOT a composed callable, "
+    "NOT a disposition); `drive` composes them via `compose_disposition` (the ONE composition site) "
+    "and applies the fail-closed `safety_passed is True` surface gate."
 )
 
 # domain -> the role whose full profile the dispatch prompt inlines (INV-ROLE-INLINING). The SINGLE
@@ -104,18 +109,20 @@ PROMOTE_FAILED = "promote-failed"
 DEFAULT_REVISE_CAP = 3
 
 
-def drive(summary, domains, store_read, root, *, plan_date, gates, gate_dispatch, on_date=None,
-          reauthor=None, adjudicator=None, budget=None, revise_cap=DEFAULT_REVISE_CAP):
+def drive(summary, domains, store_read, root, *, plan_date, gates, gate_producer, compose=None,
+          on_date=None, reauthor=None, adjudicator=None, budget=None, revise_cap=DEFAULT_REVISE_CAP):
     """Drive the autonomous bounded revise loop as a control-inversion generator-coroutine.
 
     The ONE shared revise-loop control flow (the no-fork crown jewel). Yields a dispatch-request
     `(domains, summary, gates)` for each pass the consumer must author, receives the captured author
-    envelopes via `.send()`, runs the inner engine against an isolated scratch store, gates the
-    assembled result, and either promotes the survivors into `root` (accept + `safety_passed is
-    True`), re-yields a revise-request, or halts to honest no-plan. The inner engine writes plan::/
-    dvq:: as it generates, BEFORE the whole-plan gate runs — so each pass writes to an ISOLATED
-    scratch store, and the surviving plans are PROMOTED into `root` ONLY when the gates surface them
-    (a SAFETY_BLOCKED / REVISE_EXHAUSTED halt promotes nothing — the fail-closed surface).
+    envelopes via `.send()`, runs the inner engine against an isolated scratch store, yields a GATE
+    request carrying the assembled result + the raw-verdict producer, COMPOSES the consumer's raw
+    `{judge, review}` verdicts into the 3-key disposition (the ONE composition site), and either
+    promotes the survivors into `root` (accept + `safety_passed is True`), re-yields a
+    revise-request, or halts to honest no-plan. The inner engine writes plan::/dvq:: as it generates,
+    BEFORE the whole-plan gate runs — so each pass writes to an ISOLATED scratch store, and the
+    surviving plans are PROMOTED into `root` ONLY when the gates surface them (a SAFETY_BLOCKED /
+    REVISE_EXHAUSTED halt promotes nothing — the fail-closed surface).
 
     Args:
         summary (dict): The de-identified operator summary the dispatch authors over.
@@ -125,8 +132,15 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_dispatch
         root (str | Path): The real store root the surfaced plans promote into.
         plan_date (str): The plans' YYYY-MM-DD date.
         gates (dict): Per-domain safety inputs forwarded to `run_generation`.
-        gate_dispatch (Callable): The composed post-generation gate (charge-wrapped by the consumer),
-            invoked over each pass's assembled result; returns the 3-key disposition.
+        gate_producer (Callable): The RAW-VERDICT producer (charge-wrapped by the consumer) the GATE
+            yield carries: `gate_producer(assembled_plan) -> {judge, review}`. The consumer
+            dispatches the judge + each lens through it and sends the raw verdicts back; `drive`
+            composes them via `compose` — the producer builds NO disposition (ADR-0028 OQ-2).
+        compose (Callable, optional): The raw-verdicts -> 3-key-disposition mapping
+            `compose(verdicts, assembled_plan) -> disposition` (the ONE composition site). Defaults
+            to `gate_dispatch.compose_disposition` (lazily imported to avoid the
+            `gate_dispatch -> safety_review -> plan_orchestrator -> plan_driver` import cycle); a
+            test-injection point, never a second composition site.
         on_date (str, optional): The doctor-visit-queue collation date. Forwarded to
             `run_generation`.
         reauthor (Callable, optional): The energy-bounce re-dispatch hook, forwarded verbatim.
@@ -140,14 +154,22 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_dispatch
     Yields:
         (Request) A typed `Request(kind, payload)` (ADR-0028-T1): an `AUTHOR` request whose payload
         is `(domains, summary, gates)` — the consumer sends back the captured `{domain: envelope}`
-        authors fragment — or a `GATE` request whose payload is `(assembled_plan, gate)` — the
-        consumer invokes the gate and sends back the RAW disposition.
+        authors fragment — or a `GATE` request whose payload is `(assembled_plan, gate_producer)` —
+        the consumer dispatches the judge + each lens via the producer and sends back the RAW
+        `{judge, review}` verdicts (`drive` composes them).
 
     Returns:
         (dict) On a surfaced plan, the `run_generation` result plus `dispatch_count`. On a halt, the
         honest no-plan state (`SAFETY_BLOCKED` / `REVISE_EXHAUSTED` / `PROMOTE_FAILED`). The
         dispatch-cap halt's `DispatchCapExceeded` PROPAGATES to the consumer's cap-halt handler.
     """
+    if compose is None:
+        # Lazy import: `gate_dispatch` pulls in `safety_review` -> `plan_orchestrator` -> this
+        # module, so a module-scope import would cycle. `compose_disposition` is a pure function;
+        # importing it inside the call keeps the driver independently drivable (AC-10) and module-
+        # scope free of the composer (and of any live wiring).
+        from scripts.plan.gate_dispatch import compose_disposition
+        compose = compose_disposition
     count = (lambda: budget.count) if budget is not None else (lambda: 0)
     with tempfile.TemporaryDirectory(prefix="aplus-revise-") as scratch_parent:
         revise_count = 0
@@ -158,17 +180,21 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_dispatch
             reauthor=reauthor, adjudicator=adjudicator,
         )
         while True:
-            # GATE direct-yield inversion (ADR-0028-T1): yield a GATE request carrying the assembled
-            # result + the composed gate. The CONSUMER invokes the gate over the assembled plan and
-            # `.send()`s the RAW disposition back here. The fail-closed contract is preserved verbatim
-            # (Security HIGH-1): a gate that RAISES (a lens dispatch failed mid-review, a malformed
-            # composition) is THROWN into this generator by the consumer (`gen.throw`) and reads as
-            # ambiguous -> `disposition = None` -> SAFETY_BLOCKED; `DispatchCapExceeded` is the budget
-            # halt (not a gate ambiguity), re-raised here to propagate to the consumer's cap-halt
+            # GATE direct-yield inversion (ADR-0028-T1, OQ-2): yield a GATE request carrying the
+            # assembled result + the RAW-VERDICT producer. The CONSUMER dispatches the judge + each
+            # lens through the producer and `.send()`s the raw `{judge, review}` verdicts back here;
+            # `drive` COMPOSES them via `compose` (the ONE composition site) and applies the surface
+            # gate. The fail-closed contract is preserved verbatim (Security HIGH-1): a producer that
+            # RAISES (a lens dispatch failed mid-review) is THROWN into this generator by the
+            # consumer (`gen.throw`) and reads as ambiguous -> `disposition = None` -> SAFETY_BLOCKED;
+            # a malformed raw verdict (non-dict / missing key) composes to a not-`True`
+            # `safety_passed` (fail-closed in `compose_disposition`); `DispatchCapExceeded` is the
+            # budget halt (not a gate ambiguity), re-raised to propagate to the consumer's cap-halt
             # handler. The surface gate (`safety_passed is True`) stays here, in ONE place — the
-            # consumer builds NO disposition.
+            # consumer builds NO disposition and re-derives nothing.
             try:
-                disposition = yield Request(GATE, (result, gate_dispatch))
+                verdicts = yield Request(GATE, (result, gate_producer))
+                disposition = compose(verdicts, result)
             except DispatchCapExceeded:
                 raise
             except Exception:

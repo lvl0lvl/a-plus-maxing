@@ -125,27 +125,25 @@ def _recording_safety(lens_dispatch):
 
 
 def _composing_gate(quality_wrapper, safety_wrapper, *, revise_domains=()):
-    """A composite `gate_dispatch` that runs BOTH gate callables and returns one disposition.
+    """A RAW-VERDICT producer that runs BOTH gate callables and returns `{judge, review}`.
 
-    The orchestrator-owned composite seam (Architect C-1): ONE callable drives the two gates with
-    DIFFERENT native signatures, composing `accept` (from the quality verdict's ACCEPT/REVISE) and
-    `safety_passed` (from the safety verdict's `passed` bool). On a quality REVISE it carries the
-    `revise_domains` the loop re-authors. Records each composed dispatch for the EXACT-count pin.
+    The ADR-0028-T1 GATE producer (OQ-2): ONE callable drives the two gates with DIFFERENT native
+    signatures and returns their RAW verdicts — it composes NO disposition (the driver's
+    `compose_disposition` maps `judge.verdict`->`accept`, `review.passed`->`safety_passed`, and
+    DERIVES `revise_domains` from the quality verdict). The `revise_domains=` keyword is retained for
+    call-site compatibility but is now INERT: the real `_revise_domains` derivation over the
+    assembled plan localizes the target (an empty in-scope domain localizes to itself; a
+    dimension-level miss fans to all run-set domains), reproducing what the hand-shaped override
+    named. Records each producer dispatch for the EXACT-count pin.
     """
     calls = []
 
-    def gate(assembled_plan):
+    def producer(assembled_plan):
         calls.append(assembled_plan)
-        q = quality_wrapper(assembled_plan)
-        s = safety_wrapper(assembled_plan)
-        accept = q["verdict"] == ACCEPT
-        disposition = {"accept": accept, "safety_passed": s["passed"]}
-        if not accept:
-            disposition["revise_domains"] = list(revise_domains)
-        return disposition
+        return {"judge": quality_wrapper(assembled_plan), "review": safety_wrapper(assembled_plan)}
 
-    gate.calls = calls
-    return gate
+    producer.calls = calls
+    return producer
 
 
 def _clean_composing_gate(*, revise_domains=()):
@@ -218,15 +216,23 @@ def test_ambiguous_safety_disposition_fail_closed(tmp_path):
     def _raising_gate(assembled_plan):
         raise RuntimeError("safety lens dispatch failed mid-review")
 
+    # ADR-0028-T1: the producer returns RAW `{judge, review}` verdicts; the driver composes via
+    # `compose_disposition` then applies `safety_passed is True`. The fail-closed surface now spans
+    # the raw-VERDICT family — an ACCEPT judge with a review that does not boolean-True-`passed` (an
+    # explicit-False / None / absent-key / non-bool / non-dict / None review), plus a whole-verdict
+    # malformed shape (non-dict / None) and a raised producer — each composes to a not-`True`
+    # `safety_passed` (or throws) -> SAFETY_BLOCKED. A loop reading only `passed is False` would fall
+    # through the ambiguous cases and SURFACE -> RED.
+    _accept = {"verdict": ACCEPT, "dimensions": {}, "deductions": []}
     ambiguous_gates = (
-        lambda assembled_plan: {"accept": True, "safety_passed": False},   # explicit False
-        lambda assembled_plan: {"accept": True, "safety_passed": None},    # None
-        lambda assembled_plan: {"accept": True},                            # absent key
-        lambda assembled_plan: {"accept": True, "safety_passed": "ok"},    # non-bool
-        lambda assembled_plan: {"accept": True, "safety_passed": 1},       # truthy non-bool
-        lambda assembled_plan: ["not", "a", "dict"],                        # non-dict result
-        lambda assembled_plan: None,                                        # None result
-        _raising_gate,                                                      # the gate raised
+        lambda p: {"judge": _accept, "review": {"passed": False, "findings": []}},  # explicit False
+        lambda p: {"judge": _accept, "review": {"passed": None, "findings": []}},   # None
+        lambda p: {"judge": _accept, "review": {"findings": []}},                   # absent key
+        lambda p: {"judge": _accept, "review": {"passed": "ok", "findings": []}},   # non-bool
+        lambda p: {"judge": _accept, "review": {"passed": 1, "findings": []}},      # truthy non-bool
+        lambda p: {"judge": _accept, "review": ["not", "a", "dict"]},               # non-dict review
+        lambda p: ["not", "a", "dict"],                                             # non-dict verdicts
+        _raising_gate,                                                              # the producer raised
     )
 
     for i, gate in enumerate(ambiguous_gates):
@@ -252,9 +258,11 @@ def test_autonomous_loop_requires_real_gate(tmp_path):
     deid_client = _FixedDeidClient(_deid_summary())
     dispatch = _RecordingDispatch(_sustaining_authors())
 
-    # a gate that is PROVIDED but composes NO safety tier (the no-op / absent-tier case)
+    # a producer that runs the quality judge but composes NO safety tier (the review is absent —
+    # the raw verdicts carry an ACCEPT judge but no `review`, so `compose_disposition` fail-closes
+    # `safety_passed` to not-True). The no-safety-tier case under the raw-verdict wire.
     def no_safety_tier_gate(assembled_plan):
-        return {"accept": True}  # no safety_passed asserted
+        return {"judge": {"verdict": ACCEPT, "dimensions": {}, "deductions": []}}  # no review
 
     out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
@@ -581,10 +589,9 @@ def test_standing_safety_block_is_terminal_zero_plans(tmp_path):
     safety_wrapper = _standing_block_safety()
 
     def gate(assembled_plan):
-        q = quality_wrapper(assembled_plan)
-        s = safety_wrapper(assembled_plan)
-        return {"accept": q["verdict"] == ACCEPT, "safety_passed": s["passed"],
-                "revise_domains": ["workout"]}
+        # the RAW-VERDICT producer: the standing-block review's `passed: False` composes to
+        # `safety_passed=False` -> terminal SAFETY_BLOCKED (the driver never reaches the revise leg).
+        return {"judge": quality_wrapper(assembled_plan), "review": safety_wrapper(assembled_plan)}
 
     out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
@@ -611,8 +618,13 @@ def test_safety_block_precedes_quality_revise(tmp_path):
     # quality ACCEPTs (filled plan) but safety BLOCKS — proving the safety terminal is independent
     # of the quality verdict and precedes any re-author.
     def gate(assembled_plan):
-        review_plan(assembled_plan, _no_findings_dispatch())  # exercise the callable shape
-        return {"accept": True, "safety_passed": False}
+        # the RAW-VERDICT producer: a clean ACCEPT judge but a review that does NOT pass (a finding)
+        # -> `compose_disposition` yields `accept=True, safety_passed=False` -> terminal
+        # SAFETY_BLOCKED before any re-author (safety precedes the quality REVISE branch in `drive`).
+        verdict = quality_judge(assembled_plan, _FixedJudgeClient(_clean_scores()))
+        return {"judge": verdict, "review": {"passed": False, "findings": [
+            {"id": "cumulative-stimulant-load", "concern": "exceeds the safe ceiling",
+             "severity": "high"}], "lenses": ("medical-safety-reviewer", "health-edge-case-reviewer")}}
 
     out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
@@ -688,14 +700,11 @@ def test_critical_non_overridable_never_surfaced_via_revise(tmp_path):
     safety_wrapper = _recording_safety(_no_findings_dispatch())
 
     def gate(assembled_plan):
-        q = quality_wrapper(assembled_plan)
-        s = safety_wrapper(assembled_plan)
-        # workout's empty section drives the quality structural REVISE on pass-1
-        accept = q["verdict"] == ACCEPT
-        disposition = {"accept": accept, "safety_passed": s["passed"]}
-        if not accept:
-            disposition["revise_domains"] = ["workout"]  # the held supplements is NEVER targeted
-        return disposition
+        # the RAW-VERDICT producer: workout's empty section drives the real quality structural
+        # REVISE, and `compose_disposition._revise_domains` LOCALIZES the target to the empty
+        # workout domain ONLY — the filled-but-held supplements domain is never an empty-domain
+        # structural target, so the real derivation reproduces "revise workout, never supplements".
+        return {"judge": quality_wrapper(assembled_plan), "review": safety_wrapper(assembled_plan)}
 
     out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
@@ -732,14 +741,20 @@ def test_critical_non_overridable_red_against_a_relaunder_mutant(tmp_path):
     store_read = _seed_store(tmp_path)
     liaison = _liaison("CRITICAL", override=_override_record("CRITICAL"))
 
-    # the MUTANT gate: it tries to launder the held domain by naming it a revise target every pass.
-    def relaundering_gate(assembled_plan):
+    # the MUTANT compose: it tries to launder the held domain by naming it a revise target every
+    # pass (ADR-0028-T1: the disposition is composed in `drive` via `compose`, so the mutant lives at
+    # the compose seam, not the producer). The producer returns inert raw verdicts; the mutant
+    # `compose` ignores them and names the held supplements domain a revise target.
+    def relaundering_producer(assembled_plan):
+        return {"judge": {"verdict": REVISE, "dimensions": {}, "deductions": []}, "review": {}}
+
+    def relaundering_compose(verdicts, assembled_plan):
         return {"accept": False, "safety_passed": True, "revise_domains": ["supplements"]}
 
     out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
         plan_date=PLAN_DATE, domains=("supplements", "peptides"),
-        gate_dispatch=relaundering_gate, adjudicator=liaison,
+        gate_dispatch=relaundering_producer, compose=relaundering_compose, adjudicator=liaison,
     )
 
     # the loop re-dispatched the held domain (the mutant's laundering attempt) — MORE than once
@@ -786,13 +801,10 @@ def test_high_override_clearable_domain_is_redispatched_and_records(tmp_path):
     safety_wrapper = _recording_safety(_no_findings_dispatch())
 
     def gate(assembled_plan):
-        q = quality_wrapper(assembled_plan)
-        s = safety_wrapper(assembled_plan)
-        accept = q["verdict"] == ACCEPT
-        disposition = {"accept": accept, "safety_passed": s["passed"]}
-        if not accept:
-            disposition["revise_domains"] = ["supplements"]
-        return disposition
+        # the RAW-VERDICT producer: supplements' empty pass-1 section drives the real quality
+        # structural REVISE, and `_revise_domains` localizes the target to the empty supplements
+        # domain (peptides is filled) — reproducing the "revise supplements" target.
+        return {"judge": quality_wrapper(assembled_plan), "review": safety_wrapper(assembled_plan)}
 
     out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
@@ -923,9 +935,13 @@ def test_e2e_blocked_plan_does_not_reach_the_rendered_store(tmp_path):
     deid_client = _FixedDeidClient(_deid_summary())
     dispatch = _RecordingDispatch(_sustaining_authors())
 
-    # a safety-blocking composed gate (passed: False) — the loop halts SAFETY_BLOCKED, 0 plans
+    # a safety-blocking producer: an ACCEPT judge + a not-passing review (a finding) -> the driver
+    # composes `safety_passed=False` -> the loop halts SAFETY_BLOCKED, 0 plans.
     def blocking_gate(assembled_plan):
-        return {"accept": True, "safety_passed": False}
+        return {"judge": {"verdict": ACCEPT, "dimensions": {}, "deductions": []},
+                "review": {"passed": False, "findings": [{"id": "x", "concern": "y",
+                           "severity": "high"}], "lenses": ("medical-safety-reviewer",
+                           "health-edge-case-reviewer")}}
 
     out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, store_root,
@@ -1002,13 +1018,19 @@ def test_unknown_revise_domain_fails_closed(tmp_path):
     deid_client = _FixedDeidClient(_deid_summary())
     dispatch = _RecordingDispatch(_sustaining_authors())
 
-    # a gate that REVISEs (never accepts) naming a domain not in `_ROLE_OF_DOMAIN` / the run set
-    def unknown_revise_gate(assembled_plan):
+    # a mutant `compose` that REVISEs (never accepts) naming a domain not in `_ROLE_OF_DOMAIN` / the
+    # run set (ADR-0028-T1: the out-of-run-set disposition can only arise at the compose seam — the
+    # real `compose_disposition` never escapes the run-set, so the mutant is injected there).
+    def unknown_revise_producer(assembled_plan):
+        return {"judge": {"verdict": REVISE, "dimensions": {}, "deductions": []}, "review": {}}
+
+    def unknown_revise_compose(verdicts, assembled_plan):
         return {"accept": False, "safety_passed": True, "revise_domains": ("not-a-domain",)}
 
     out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
-        plan_date=PLAN_DATE, domains=("workout",), gate_dispatch=unknown_revise_gate,
+        plan_date=PLAN_DATE, domains=("workout",),
+        gate_dispatch=unknown_revise_producer, compose=unknown_revise_compose,
     )
 
     assert out["reason"] == SAFETY_BLOCKED, f"unknown revise domain did not fail closed: {out.get('reason')}"

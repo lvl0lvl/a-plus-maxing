@@ -85,7 +85,7 @@ def test_driver_drivable_no_client_no_skill(tmp_path):
     # consumer captures each request's authors via the fixture authors_map and `.send()`s back.
     gen = plan_driver.drive(
         summary, domains, store_read, tmp_path,
-        plan_date=PLAN_DATE, gates={}, gate_dispatch=_clean_composing_gate(),
+        plan_date=PLAN_DATE, gates={}, gate_producer=_clean_composing_gate(),
     )
     result = _run_driver(gen, authors_map=authors_map)
 
@@ -249,12 +249,18 @@ def test_out_of_run_set_revise_blocked(tmp_path):
     deid_client = _FixedDeidClient(_deid_summary())
     dispatch = _RecordingDispatch(_sustaining_authors())
 
-    def out_of_set_gate(assembled_plan):
+    # the out-of-run-set disposition can only arise at the compose seam (the real
+    # `compose_disposition` never escapes the run-set) — inject a mutant `compose` (ADR-0028-T1).
+    def out_of_set_producer(assembled_plan):
+        return {"judge": {"verdict": "REVISE", "dimensions": {}, "deductions": []}, "review": {}}
+
+    def out_of_set_compose(verdicts, assembled_plan):
         return {"accept": False, "safety_passed": True, "revise_domains": ("not-a-domain",)}
 
     out = run_orchestrated(
         _raw_intake(), deid_client, dispatch, store_read, tmp_path,
-        plan_date=PLAN_DATE, domains=("workout",), gate_dispatch=out_of_set_gate,
+        plan_date=PLAN_DATE, domains=("workout",),
+        gate_dispatch=out_of_set_producer, compose=out_of_set_compose,
     )
 
     assert out["reason"] == SAFETY_BLOCKED
@@ -415,7 +421,7 @@ def test_every_yield_tagged_kind(tmp_path):
 
     gen = plan_driver.drive(
         summary, domains, store_read, tmp_path,
-        plan_date=PLAN_DATE, gates={}, gate_dispatch=_clean_composing_gate(),
+        plan_date=PLAN_DATE, gates={}, gate_producer=_clean_composing_gate(),
     )
     requests = _record_requests(gen, authors_map=authors_map)
 
@@ -437,7 +443,7 @@ def test_author_then_gate_ordering(tmp_path):
 
     gen = plan_driver.drive(
         summary, domains, store_read, tmp_path,
-        plan_date=PLAN_DATE, gates={}, gate_dispatch=_clean_composing_gate(),
+        plan_date=PLAN_DATE, gates={}, gate_producer=_clean_composing_gate(),
     )
     requests = _record_requests(gen, authors_map=authors_map)
     kinds = [r.kind for r in requests]
@@ -456,7 +462,7 @@ def test_author_payload_carries_domains_summary_gates(tmp_path):
 
     gen = plan_driver.drive(
         summary, domains, store_read, tmp_path,
-        plan_date=PLAN_DATE, gates={}, gate_dispatch=_clean_composing_gate(),
+        plan_date=PLAN_DATE, gates={}, gate_producer=_clean_composing_gate(),
     )
     first = next(gen)
     assert first.kind == plan_driver.AUTHOR
@@ -468,20 +474,23 @@ def test_author_payload_carries_domains_summary_gates(tmp_path):
 
 
 def test_gate_payload_raw_inputs_one_composition_site(tmp_path):
-    # AC-4 (GATE carries RAW INPUTS, driver composes — no-fork): the GATE request payload carries the
-    # assembled plan + the gate (RAW INPUTS, NOT a finished 3-key disposition); the consumer invokes
-    # the gate and `.send()`s the RAW disposition; `drive` applies the surface gate. PLUS a grep that
-    # EXACTLY 1 composition site (compose_gate_dispatch) + EXACTLY 1 surface gate (plan_driver.drive)
-    # survive — 0 duplicates in the consumer / SKILL.md.
+    # AC-4 (GATE carries RAW INPUTS, driver composes — no-fork, ADR-0028-T1 OQ-2): the GATE request
+    # payload carries the assembled plan + a RAW-VERDICT PRODUCER (NOT a composed disposition
+    # callable, the OQ-2-rejected shape). The PRODUCER, when invoked, returns RAW `{judge, review}`
+    # verdicts — NOT a finished `{accept, safety_passed, revise_domains}` disposition (this is the
+    # load-bearing assertion: it goes RED against the old composed-callable wire, where invoking the
+    # payload's callable returned a disposition). The consumer `.send()`s those RAW verdicts; `drive`
+    # composes them via `compose_disposition`. PLUS the no-fork grep: EXACTLY 1 composition site +
+    # EXACTLY 1 surface gate — 0 duplicates in the consumer / SKILL.md.
     store_read = _seed_store(tmp_path)
     summary = _deid_summary()
     authors_map = _sustaining_authors()
     domains = ("workout", "nutrition")
-    gate = _clean_composing_gate()
+    producer = _clean_composing_gate()
 
     gen = plan_driver.drive(
         summary, domains, store_read, tmp_path,
-        plan_date=PLAN_DATE, gates={}, gate_dispatch=gate,
+        plan_date=PLAN_DATE, gates={}, gate_producer=producer,
     )
     # drive the AUTHOR request, then capture the GATE request and inspect its payload directly
     author_req = next(gen)
@@ -490,13 +499,22 @@ def test_gate_payload_raw_inputs_one_composition_site(tmp_path):
     gate_req = gen.send({d: authors_map[d] for d in a_domains})
 
     assert gate_req.kind == plan_driver.GATE, f"the 2nd yield is not a GATE request: {gate_req.kind}"
-    assembled_plan, gate_in_payload = gate_req.payload
+    assembled_plan, producer_in_payload = gate_req.payload
     # the payload carries the assembled plan (RAW INPUT) — a dict with `results`, NOT a disposition
     assert isinstance(assembled_plan, dict) and "results" in assembled_plan
     # the payload carries NO finished disposition: no accept/safety_passed/revise_domains keys
     assert not any(k in assembled_plan for k in ("accept", "safety_passed", "revise_domains"))
-    # the payload carries the gate (the composed gate roster the consumer invokes)
-    assert gate_in_payload is gate
+    # the payload carries the PRODUCER (the same object the consumer holds — the dispatch unit)
+    assert producer_in_payload is producer
+    # LOAD-BEARING (non-tautological, RED against the old composed-callable wire): the producer
+    # returns RAW VERDICTS — a dict keyed `judge`/`review`, NOT a composed disposition. The old wire
+    # yielded a callable that returned `{accept, safety_passed, revise_domains}`; this asserts the
+    # WIRE now carries raw inputs the skill can fulfil by dispatching agents.
+    raw = producer_in_payload(assembled_plan)
+    assert set(raw.keys()) == {"judge", "review"}, f"the producer did not return raw verdicts: {raw!r}"
+    assert not any(k in raw for k in ("accept", "safety_passed", "revise_domains")), (
+        "the GATE payload's producer returned a COMPOSED disposition (the OQ-2-rejected wire shape)"
+    )
     gen.close()
 
     # the no-fork grep oracle: EXACTLY 1 composition site + EXACTLY 1 surface gate (executable)
@@ -532,7 +550,7 @@ def test_revise_pass_second_author_then_gate(tmp_path):
 
     gen = plan_driver.drive(
         summary, ("workout",), store_read, tmp_path,
-        plan_date=PLAN_DATE, gates={}, gate_dispatch=gate,
+        plan_date=PLAN_DATE, gates={}, gate_producer=gate,
     )
     kinds = []
     request = next(gen)
@@ -576,7 +594,7 @@ def test_malformed_gate_send_back_safety_blocked(tmp_path):
         store_read = _seed_store(root)
         gen = plan_driver.drive(
             summary, domains, store_read, root,
-            plan_date=PLAN_DATE, gates={}, gate_dispatch=gate,
+            plan_date=PLAN_DATE, gates={}, gate_producer=gate,
         )
         out = _run_driver(gen, authors_map=authors_map)
         assert out["reason"] == SAFETY_BLOCKED, f"malformed GATE not SAFETY_BLOCKED: {gate}"
@@ -630,16 +648,17 @@ _NO_FORK_FILES = (
 def _composition_sites():
     """Count the executable 3-key-disposition composition sites OUTSIDE the ONE in `gate_dispatch`.
 
-    A composition site builds the `{accept, safety_passed, revise_domains}` disposition. The ONE
-    legitimate site is `compose_gate_dispatch` in `gate_dispatch.py`; a SECOND in the consumer / the
-    skill is the fork. The driver in `plan_driver.py` has 1 composition site by definition (it owns
-    the surface gate) — the count returned here is the EXTRA (forked) sites in the scanned files. A
-    well-formed tree returns 1 (the single `compose_gate_dispatch` definition).
+    A composition site builds the `{accept, safety_passed, revise_domains}` disposition (ADR-0028-T1:
+    that mapping now lives in `compose_disposition`, called by `drive` — the ONE composition site; the
+    producer `compose_gate_dispatch` returns RAW verdicts and builds NO disposition). The canonical
+    site is `compose_disposition` in `gate_dispatch.py`; a SECOND in the consumer / the skill is the
+    fork. The count returned here is the canonical site + any EXTRA (forked) site in the scanned
+    files. A well-formed tree returns 1 (the single `compose_disposition` definition).
     """
     sites = 0
-    # the canonical site
+    # the canonical composition site (the disposition mapping)
     composer = Path("scripts/plan/gate_dispatch.py").read_text(encoding="utf-8")
-    sites += composer.count("def compose_gate_dispatch")
+    sites += composer.count("def compose_disposition")
     # any FORKED composer in the scanned files (an executable def, not a comment/doc reference)
     for path in _NO_FORK_FILES:
         if not path.exists():
@@ -648,7 +667,7 @@ def _composition_sites():
             stripped = raw.strip()
             if stripped.startswith("#"):
                 continue
-            if "def compose_gate_dispatch" in raw:
+            if "def compose_disposition" in raw:
                 sites += 1
     return sites
 
