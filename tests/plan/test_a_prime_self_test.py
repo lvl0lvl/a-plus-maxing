@@ -215,7 +215,7 @@ def test_audit_propagates_broken_spine_nonzero_exit():
     # this proves the audit's behavioral leg goes RED THROUGH the exit-code path.
     # (a) the broken-spine self-test exits non-zero on its own.
     self_test = subprocess.run(
-        [".venv/bin/python", "-m", "scripts.plan._a_prime_self_test", "--self-test"],
+        [str(_REPO_ROOT / ".venv" / "bin" / "python"), "-m", "scripts.plan._a_prime_self_test", "--self-test"],
         cwd=_REPO_ROOT, capture_output=True,
         env={**__import__("os").environ, "PYTHONPATH": str(_REPO_ROOT), BROKEN_SPINE_ENV: "1"},
     )
