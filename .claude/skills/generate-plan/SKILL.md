@@ -166,8 +166,8 @@ block-stands). A held domain is the honest no-plan state, surfaced, never silent
   `ModelClient.deidentify` (not `router.summarize`), the glue DRIVES the shared driver to a promoted
   synthetic run, and the FULL serialized dispatch payload carries 0 raw-PII tokens. The driver loop
   itself is covered by `tests/plan/test_plan_driver.py` / `tests/plan/test_revise_loop.py`, the inner
-  engine by `tests/plan/test_pipeline.py`. `scripts/core-capability-audit.sh --self-test` proves the
-  wired path stays green.
+  engine by `tests/plan/test_pipeline.py`. `bash scripts/core-capability-audit.sh` (it runs the A′
+  `--self-test` internally; the shell audit takes no flags) proves the wired path stays green.
 - **NOT mock-testable — the S94 operator-present attestation (the live dispatch deferral):** the LIVE
   subscription dispatch over REAL specialist + lens agents is the S94 operator-present LIVE-test
   attestation, NOT a mock-test target. The glue test drives the shared driver with a FIXTURE `dispatch`,
