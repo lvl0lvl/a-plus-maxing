@@ -34,7 +34,9 @@ A-naive forked-safety-loop failure class ADR-0026 rejects.
   five reconcile behaviors, the medical-liaison adjudication envelope + the override-record schema.
 - `docs/plan-generation/adjust-dispatch-process.md` — the ADJUST leg (a DIFFERENT flow; do not use
   this skill to adjust an existing plan — `adjust_plan` is the adjust caller).
-- `scripts/plan/plan_driver.py` `drive` — the ONE shared driver this skill DRIVES (the no-fork crown
+- `scripts/plan/plan_step.py` `step` — the per-round STEP-HARNESS this skill DRIVES THROUGH (the pause
+  boundary, skill → harness → driver; a `plan_driver.drive` generator cannot pause for the Agent tool);
+  `scripts/plan/plan_driver.py` `drive` — the ONE shared driver the harness advances (the no-fork crown
   jewel); `scripts/plan/gate_dispatch.py` `compose_gate_dispatch` — the composed quality+safety gate the
   driver gates through; `scripts/plan/deid_in.py` `deid_in` / `scripts/model/client.py`
   `ModelClient.deidentify` — the de-id-IN boundary.
@@ -60,11 +62,16 @@ Phase 0  de-id IN ── deid_in(raw_intake, ModelClient.deidentify) [0-raw-PII]
 Phase 1  per-domain author dispatch (runtime A, full profile inlined) ── one SUBSCRIPTION specialist per
             domain over the de-identified summary
             → capture {specialist, recommendations[], reconciliation{}} → build  authors = {domain: envelope}
-Phase 2  drive the ONE shared driver ── plan_driver.drive(summary, domains, store_read, root, plan_date=…,
-            gate_dispatch=<composed>, on_date=…, reauthor=<hook>, adjudicator=<hook>) — the skill DRIVES the
-            driver (which runs assemble/gates/revise via the composed gate_dispatch); it does NOT re-host the loop
-            ├─ energy bounce  → reauthor(domain, constraint)  = a 2nd personal-trainer dispatch
-            └─ held finding   → adjudicator(safety_finding)   = a medical-liaison dispatch (the gate)
+Phase 2  drive the ONE shared driver THROUGH the step-harness ── plan_step.step(serialized_state, …)
+            advances plan_driver.drive ONE yield + returns (pending Request(kind, payload), serialized_state);
+            fulfil each AUTHOR / GATE / REAUTHOR / ADJUDICATOR request via a SUBSCRIPTION agent dispatch and
+            re-call step with the appended envelope (skill → harness → driver). The driver runs assemble /
+            the composed gate_dispatch / the bounded revise loop; the skill never re-hosts it. The harness
+            value-scans each DERIVED yield payload (GATE assembled-plan payload[0] / ADJUDICATOR finding /
+            REAUTHOR constraint) before it leaves the process — 0 raw-PII, fails closed on a hit.
+            ├─ GATE          → dispatch the judge + each safety lens → return the raw {judge, review} verdicts
+            ├─ energy bounce → REAUTHOR(domain, constraint)  = a 2nd personal-trainer dispatch
+            └─ held finding  → ADJUDICATOR(safety_finding)   = a medical-liaison dispatch (the gate)
 Phase 3  render ── reinsert_out (deterministic de-id OUT) → reemit_maintained / scripts.generate.generate
 Phase 4  report ── what recorded, what HELD (the honest no-plan states), the dvq entries for the MD
 ```
@@ -106,43 +113,70 @@ summary (never the raw intake — the dispatch payload carries the summary only,
 
 Collect the captured envelopes into `authors = {domain: envelope}`.
 
-## Phase 2 — drive the ONE shared driver (the no-fork crown jewel + the gates)
+## Phase 2 — drive the ONE shared driver THROUGH the step-harness (the no-fork crown jewel + the gates)
 
-DRIVE the shared driver — do NOT call `pipeline.run_generation` directly and do NOT re-host the loop.
-The driver `plan_driver.drive(summary, domains, store_read, root, plan_date=…, gates=…,
-gate_dispatch=<composed>, on_date=…, reauthor=…, adjudicator=…)` is a control-inversion generator: it
-YIELDS a `(domains, summary, gates)` dispatch-request for each pass you must author; you dispatch each
-domain's specialist (Phase 1) + capture its envelope and SEND the captured authors back
-(`driver.send(authors)`). The driver runs `run_generation` (compute → reconcile → adjudicate-held →
-record) against an isolated scratch store, gates the assembled result through the composed
-`gate_dispatch`, and either promotes the survivors into `root` (accept + `safety_passed is True`),
-re-yields a revise-request, or halts to honest no-plan. The `run_orchestrated` consumer
-(`scripts/plan/plan_orchestrator.py`) is the reference driver (de-id IN → dispatch loop → drive the
-driver → return).
+DRIVE the shared driver THROUGH the `plan_step.py` step-harness. Do NOT hold a live `plan_driver.drive`
+generator object across Agent-tool dispatches (a generator cannot pause for the Agent tool), do NOT call
+`pipeline.run_generation` directly, and do NOT re-host the loop. The harness is the PAUSE BOUNDARY
+(skill → harness → driver):
 
-The **composed gate** is `compose_gate_dispatch(judge_client, review_dispatch, lenses=…)` — it runs the
-QUALITY judge AND each SAFETY LENS (dispatched as a SUBSCRIPTION agent over the de-identified summary,
-full profile inlined: `medical-safety-reviewer`, `health-edge-case-reviewer`) over the assembled result,
-mapping their verdicts into the 3-key disposition the driver reads. The two re-dispatch hooks are live
-subscription dispatches you supply:
+- `plan_step.step(serialized_state, …)` advances `plan_driver.drive` EXACTLY ONE yield from the
+  serialized memo-cache state and returns `(pending_request, serialized_state)`. On the FIRST call pass
+  `serialized_state=None`.
+- The `pending_request` is a typed `Request(kind, payload)` with `kind` one of `AUTHOR` / `GATE` /
+  `REAUTHOR` / `ADJUDICATOR`. FULFIL it via a SUBSCRIPTION agent dispatch (full role profile inlined per
+  INV-ROLE-INLINING), then re-call `plan_step.step(serialized_state, fulfilled_envelope=<envelope>, …)`
+  with the just-fulfilled envelope appended. Repeat until `step` returns `pending_request = None` — the
+  run completed (read its result via `plan_step.result_of`). The `run_orchestrated` consumer
+  (`scripts/plan/plan_orchestrator.py`) is the reference in-process driver of the SAME drive-protocol.
 
-- **`reauthor(domain, constraint)`** — fires when nutrition's `energy_budget` says the workout is
-  un-fuelable. `constraint` is `{"sustainable_training_kcal": <ceiling>}`. Dispatch a SECOND
-  personal-trainer (full profile) under that ceiling → return the new workout envelope (it MUST carry
-  `reconciliation.energy_cost_kcal` ≤ ceiling, or the workout is HELD — never an un-fuelable load).
-- **`adjudicator(safety_finding)`** — fires for every held finding (additive-AE / cross-domain-conflict /
-  Rx-BPMH). Dispatch the `medical-liaison` (full profile) over the `safety_finding` → return the
-  adjudication envelope (author-dispatch-process.md "the liaison adjudication envelope"). The gate
-  validates it on CONTENT (INV-OVERRIDE-RECORD-SCHEMA) and never builds an override path for a
-  CRITICAL / H1-H2 finding (INV-CRITICAL-NON-OVERRIDABLE). A content-valid override RELEASES the hold;
-  anything else leaves the block standing — the safe no-plan default.
+Per-kind fulfilment (each a SUBSCRIPTION agent dispatch, then a `step` re-call with the envelope):
+
+- **`AUTHOR` (`payload = (domains, summary, gates)`)** — dispatch each domain's specialist (Phase 1),
+  capture its envelope, and send back the `{domain: envelope}` authors fragment.
+- **`GATE` (`payload = (assembled_plan, gate_producer)`)** — dispatch the QUALITY judge AND each SAFETY
+  LENS (`medical-safety-reviewer`, `health-edge-case-reviewer`, full profile inlined) as SUBSCRIPTION
+  agents over the `assembled_plan` and return the RAW `{judge, review}` verdicts. Return the raw verdicts
+  ONLY — the driver composes them via `compose_gate_dispatch` (the ONE composition site) and applies the
+  fail-closed `safety_passed is True` surface gate; the skill builds NO disposition and re-derives no
+  release. (`gate_producer`, the `payload[1]` callable, is the in-process test producer; on the LIVE path
+  the skill dispatches the judge + lens agents itself and returns the raw verdicts.)
+- **`REAUTHOR` (`payload = (domain, constraint)`)** — the energy bounce: fires when nutrition's
+  `energy_budget` says the workout is un-fuelable. `constraint` is `{"sustainable_training_kcal":
+  <ceiling>}`. Dispatch a SECOND personal-trainer (full profile) under that ceiling → return the new
+  workout envelope (it MUST carry `reconciliation.energy_cost_kcal` ≤ ceiling, or the workout is HELD —
+  never an un-fuelable load).
+- **`ADJUDICATOR` (`payload = (safety_finding,)`)** — fires for every held finding (additive-AE /
+  cross-domain-conflict / Rx-BPMH). Dispatch the `medical-liaison` (full profile) over the
+  `safety_finding` → return the adjudication envelope (author-dispatch-process.md "the liaison
+  adjudication envelope"). The driver's inner engine validates it on CONTENT (INV-OVERRIDE-RECORD-SCHEMA)
+  and never builds an override path for a CRITICAL / H1-H2 finding (INV-CRITICAL-NON-OVERRIDABLE); a
+  content-valid override RELEASES the hold, anything else leaves the block standing (the safe no-plan
+  default). The skill returns ONLY the raw envelope — the release stays in the inner engine's `adjudicate`.
+
+**The NEW value-scan (the crown-jewel 0-leak over the DERIVED yields).** The harness value-scans every
+DERIVED yield payload BEFORE it leaves the process to a subscription agent — the GATE assembled-plan
+(`payload[0]`), the ADJUDICATOR safety-finding, and the REAUTHOR constraint — reusing
+`pii_scan.scan_text_full` (the same value-scan the `deid_in` boundary uses). These artifacts are DERIVED
+from the engine, so their PII-freeness is transitive-but-unverified (the AUTHOR seam is structurally
+clean — the orchestrator holds only the de-identified summary, so it is NOT re-scanned). 0 raw-PII; on a
+hit the harness FAILS CLOSED (the payload does NOT reach the agent) — the first-ever scan over those
+derived artifacts.
+
+**No fork at the skill.** The autonomous bounded revise loop — the scratch-store lifecycle, the
+gate→branch→re-dispatch sequencing, the `safety_passed is True` surface gate, the bounded cap, the
+scratch-and-promote — lives in EXACTLY ONE definition (`plan_driver.drive`); the composition is
+`compose_gate_dispatch` (the ONE site); the adjudication release stays in the inner engine's `adjudicate`.
+This skill DRIVES that one driver via the harness — it NEVER re-hosts the loop, re-composes the
+disposition, or re-derives the release.
 
 **Do not bypass a hold.** A held finding with no adjudicator dispatch stays held (records nothing) —
 that is the honest, correct state, not a failure to route around.
 
-For a synthetic/test run, the dispatch seam + hooks may return pre-captured fixture envelopes (see
-`tests/plan/test_generate_plan_skill_glue.py` for the glue contract + `tests/plan/test_revise_loop.py`);
-for a real run they are live SUBSCRIPTION agent dispatches.
+For a synthetic/test run, the dispatch seam + hooks return pre-captured fixture envelopes (see
+`tests/plan/test_generate_plan_skill_glue.py` for the glue contract + `tests/plan/test_plan_step.py` for
+the harness drive + `tests/plan/test_revise_loop.py`); for a real run they are live SUBSCRIPTION agent
+dispatches.
 
 ## Phase 3 — render (de-id OUT)
 
@@ -163,18 +197,24 @@ block-stands). A held domain is the honest no-plan state, surfaced, never silent
 
 - **Mock-tested (the glue contract — 0 live spend):** `tests/plan/test_generate_plan_skill_glue.py`
   exercises the A′ glue over the merged seams with FIXTURE dispatch — the de-id-IN routes through
-  `ModelClient.deidentify` (not `router.summarize`), the glue DRIVES the shared driver to a promoted
-  synthetic run, and the FULL serialized dispatch payload carries 0 raw-PII tokens. The driver loop
-  itself is covered by `tests/plan/test_plan_driver.py` / `tests/plan/test_revise_loop.py`, the inner
-  engine by `tests/plan/test_pipeline.py`. `bash scripts/core-capability-audit.sh` (it runs the A′
-  `--self-test` internally; the shell audit takes no flags) proves the wired path stays green.
+  `ModelClient.deidentify` (not `router.summarize`), the glue DRIVES the shared driver THROUGH
+  `plan_step.step` to a promoted synthetic run (0 synchronous agent calls inside `drive` — every
+  dispatch is a yielded-request fulfilment), the FULL serialized dispatch payload carries 0 raw-PII
+  tokens, AND the NEW harness value-scan over the DERIVED GATE / ADJUDICATOR / REAUTHOR yield payloads
+  catches a planted leak (fails closed) while a clean payload passes. The harness drive itself is covered
+  by `tests/plan/test_plan_step.py`, the driver loop by `tests/plan/test_plan_driver.py` /
+  `tests/plan/test_revise_loop.py`, the inner engine by `tests/plan/test_pipeline.py`. `bash
+  scripts/core-capability-audit.sh` (it runs the A′ `--self-test` internally; the shell audit takes no
+  flags) proves the wired path stays green.
 - **NOT mock-testable — the S94 operator-present attestation (the live dispatch deferral):** the LIVE
-  subscription dispatch over REAL specialist + lens agents is the S94 operator-present LIVE-test
-  attestation, NOT a mock-test target. The glue test drives the shared driver with a FIXTURE `dispatch`,
-  never a real agent; it STRUCTURALLY only ever holds the `deid_in` summary. Whether a REAL subscription
-  agent receives only the summary on the LIVE path — the residual 0-raw-PII-to-a-REAL-agent property
-  (SEC-6) — is observed at the S94 operator-present checkpoint, not in this mock-tested build. The
-  mock-tested build verifies only the glue-contract level.
+  subscription dispatch over REAL specialist + lens agents — the skill dispatching real agents per
+  harness round, real key, real spend — is the S94 operator-present LIVE-test attestation, NOT a
+  mock-test target. The glue test drives the harness with a FIXTURE `dispatch`, never a real agent; it
+  STRUCTURALLY only ever holds the `deid_in` summary + the harness's serialized state. Whether a REAL
+  subscription agent receives only a PII-free payload on the LIVE path — the residual
+  0-raw-PII-to-a-REAL-agent property (SEC-6) — is now ENFORCED at the harness boundary by the value-scan
+  (the build verifies the scan fires + fails closed on a planted leak); the LIVE 0-raw-PII-to-a-REAL-
+  agent end-to-end run is observed at the S94 operator-present checkpoint, not in this mock-tested build.
 
 ## What is deliberately NOT here
 
