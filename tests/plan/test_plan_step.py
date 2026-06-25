@@ -540,3 +540,52 @@ def test_none_adjudicator_terminates_affected_held_equal_to_reference(tmp_path):
     assert store.read("plan::peptides", root=harness_root) == []
     assert (result["results"]["supplements"]["recorded"]
             == ref_out["results"]["supplements"]["recorded"])
+
+
+# ===============================================================================
+# Cycle 6: BUG-2 — a GATE producer that RAISES fails closed through the harness
+# ===============================================================================
+
+
+def test_gate_producer_raise_fails_closed_through_harness(tmp_path):
+    # BUG-2: a GATE producer that RAISES (a safety-lens dispatch failed mid-review) must fail CLOSED to
+    # SAFETY_BLOCKED through the harness, mirroring the synchronous consumer's `driver.throw(gate_error)`
+    # -> `drive`'s GATE-yield `except Exception: disposition = None`. The OLD harness `_json_native`'d
+    # the raised producer -> a BaseException is not json-serializable -> TypeError crash (the engineered
+    # fail-closed path was DEAD). The marker fix records a json-safe raised-GATE marker and reconstructs
+    # it into a fail-closed `gen.throw` on the re-drive -> terminal SAFETY_BLOCKED, 0 plans promoted.
+    from scripts.plan.plan_driver import SAFETY_BLOCKED
+
+    store_read = _seed_store(tmp_path)
+
+    def raising_gate_producer(assembled_plan):
+        raise RuntimeError("a safety lens dispatch failed mid-review")
+
+    drive_kwargs = dict(
+        summary=_deid_summary(), domains=("workout", "nutrition"), store_read=store_read,
+        root=tmp_path, plan_date=PLAN_DATE, gates={}, gate_producer=raising_gate_producer,
+    )
+
+    # the consumer captures a GATE-producer raise and passes it back as the fulfilment (mirroring
+    # `run_orchestrated`'s `thrown = gate_error` -> `driver.throw(thrown)`); other kinds fulfil normally.
+    authors_map = _sustaining_authors()
+    pending, state = plan_step.step(None, **drive_kwargs)
+    steps, cap = 1, 20
+    while pending is not None and steps < cap:
+        if pending.kind == plan_driver.GATE:
+            assembled_plan, producer = pending.payload
+            try:
+                envelope = producer(assembled_plan)
+            except Exception as gate_error:  # noqa: BLE001 — mirror the synchronous consumer's capture
+                envelope = gate_error
+        else:
+            envelope = _fulfil(pending, authors_map=authors_map)
+        pending, state = plan_step.step(state, fulfilled_envelope=envelope, **drive_kwargs)
+        steps += 1
+
+    # the harness TERMINATED, fail-closed to SAFETY_BLOCKED, and promoted NO plan
+    assert pending is None, "the harness did not terminate on a GATE-producer raise"
+    result = plan_step.result_of(state)
+    assert result["reason"] == SAFETY_BLOCKED, f"a raised GATE did not fail closed: {result.get('reason')!r}"
+    assert store.read("plan::workout", root=tmp_path) == [], "a plan promoted past a raised GATE"
+    assert store.read("plan::nutrition", root=tmp_path) == [], "a plan promoted past a raised GATE"
