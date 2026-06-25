@@ -400,23 +400,345 @@ def test_store_seam_golden_line_has_teeth(tmp_path, monkeypatch):
     assert drifted_lines != golden, "the golden-line diff cannot catch a keying drift (no teeth)"
 
 
+# ===============================================================================
+# ADR-0028-T1: the typed discriminated-union request protocol + AUTHOR/GATE inversion
+# ===============================================================================
+
+
+def test_every_yield_tagged_kind(tmp_path):
+    # AC-2: every yielded request is a typed discriminated-union request whose `kind` is one of
+    # the four reserved tokens — a bare tuple is NEVER yielded (the count of untagged yields == 0).
+    store_read = _seed_store(tmp_path)
+    summary = _deid_summary()
+    authors_map = _sustaining_authors()
+    domains = ("workout", "nutrition")
+
+    gen = plan_driver.drive(
+        summary, domains, store_read, tmp_path,
+        plan_date=PLAN_DATE, gates={}, gate_dispatch=_clean_composing_gate(),
+    )
+    requests = _record_requests(gen, authors_map=authors_map)
+
+    assert requests, "the driver yielded nothing"
+    untagged = [r for r in requests if not hasattr(r, "kind")]
+    assert untagged == [], f"a bare/untagged request was yielded: {untagged}"
+    for r in requests:
+        assert r.kind in plan_driver.REQUEST_KINDS, f"untagged or unknown kind: {r.kind!r}"
+
+
+def test_author_then_gate_ordering(tmp_path):
+    # AC-3: a 4-domain accept fixture run records the yielded `kind` sequence == ["AUTHOR", "GATE"]
+    # then promote-on-accept (>=1 plan:: row). (Cycle 1 finalizes the GATE leg once Cycle 2 inverts
+    # the gate; pre-Cycle-2 this asserts the sequence STARTS with AUTHOR.)
+    store_read = _seed_store(tmp_path)
+    summary = _deid_summary()
+    authors_map = _sustaining_authors()
+    domains = ("workout", "nutrition")
+
+    gen = plan_driver.drive(
+        summary, domains, store_read, tmp_path,
+        plan_date=PLAN_DATE, gates={}, gate_dispatch=_clean_composing_gate(),
+    )
+    requests = _record_requests(gen, authors_map=authors_map)
+    kinds = [r.kind for r in requests]
+
+    assert kinds == [plan_driver.AUTHOR, plan_driver.GATE], f"yield-kind sequence: {kinds}"
+    assert store.read("plan::workout", root=tmp_path) != []
+
+
+def test_author_payload_carries_domains_summary_gates(tmp_path):
+    # AC-2 (AUTHOR payload shape): the AUTHOR request's payload carries (domains, summary, gates) —
+    # the same triple the bare tuple carried — so the consumer drives `_dispatch_domains` over it.
+    store_read = _seed_store(tmp_path)
+    summary = _deid_summary()
+    authors_map = _sustaining_authors()
+    domains = ("workout", "nutrition")
+
+    gen = plan_driver.drive(
+        summary, domains, store_read, tmp_path,
+        plan_date=PLAN_DATE, gates={}, gate_dispatch=_clean_composing_gate(),
+    )
+    first = next(gen)
+    assert first.kind == plan_driver.AUTHOR
+    req_domains, req_summary, req_gates = first.payload
+    assert tuple(req_domains) == domains
+    assert req_summary == summary
+    assert req_gates == {}
+    gen.close()
+
+
+def test_gate_payload_raw_inputs_one_composition_site(tmp_path):
+    # AC-4 (GATE carries RAW INPUTS, driver composes — no-fork): the GATE request payload carries the
+    # assembled plan + the gate (RAW INPUTS, NOT a finished 3-key disposition); the consumer invokes
+    # the gate and `.send()`s the RAW disposition; `drive` applies the surface gate. PLUS a grep that
+    # EXACTLY 1 composition site (compose_gate_dispatch) + EXACTLY 1 surface gate (plan_driver.drive)
+    # survive — 0 duplicates in the consumer / SKILL.md.
+    store_read = _seed_store(tmp_path)
+    summary = _deid_summary()
+    authors_map = _sustaining_authors()
+    domains = ("workout", "nutrition")
+    gate = _clean_composing_gate()
+
+    gen = plan_driver.drive(
+        summary, domains, store_read, tmp_path,
+        plan_date=PLAN_DATE, gates={}, gate_dispatch=gate,
+    )
+    # drive the AUTHOR request, then capture the GATE request and inspect its payload directly
+    author_req = next(gen)
+    assert author_req.kind == plan_driver.AUTHOR
+    a_domains, _, _ = author_req.payload
+    gate_req = gen.send({d: authors_map[d] for d in a_domains})
+
+    assert gate_req.kind == plan_driver.GATE, f"the 2nd yield is not a GATE request: {gate_req.kind}"
+    assembled_plan, gate_in_payload = gate_req.payload
+    # the payload carries the assembled plan (RAW INPUT) — a dict with `results`, NOT a disposition
+    assert isinstance(assembled_plan, dict) and "results" in assembled_plan
+    # the payload carries NO finished disposition: no accept/safety_passed/revise_domains keys
+    assert not any(k in assembled_plan for k in ("accept", "safety_passed", "revise_domains"))
+    # the payload carries the gate (the composed gate roster the consumer invokes)
+    assert gate_in_payload is gate
+    gen.close()
+
+    # the no-fork grep oracle: EXACTLY 1 composition site + EXACTLY 1 surface gate (executable)
+    assert _composition_sites() == 1, "more than one compose_gate_dispatch composition site"
+    assert _executable_surface_gates() == 1, "more than one executable safety_passed surface gate"
+
+
+def test_revise_pass_second_author_then_gate(tmp_path):
+    # AC-5: a revise-then-accept disposition → the recorded yielded `kind` sequence ==
+    # ["AUTHOR", "GATE", "AUTHOR", "GATE"] and >=1 plan promotes.
+    store_read = _seed_store(tmp_path)
+    summary = _deid_summary()
+
+    # pass-0 workout empty (REVISE), re-dispatch returns FILLED (ACCEPT on pass-1).
+    call_n = {"workout": 0}
+
+    def authors_for(domains):
+        out = {}
+        for d in domains:
+            if d == "workout":
+                call_n["workout"] += 1
+                out[d] = (_filled_workout_envelope() if call_n["workout"] >= 2
+                          else _empty_workout_envelope())
+            else:
+                out[d] = _sustaining_authors()[d]
+        return out
+
+    gate = _composing_gate(
+        _recording_quality(_clean_scores()),
+        _recording_safety(_no_findings_dispatch()),
+        revise_domains=("workout",),
+    )
+
+    gen = plan_driver.drive(
+        summary, ("workout",), store_read, tmp_path,
+        plan_date=PLAN_DATE, gates={}, gate_dispatch=gate,
+    )
+    kinds = []
+    request = next(gen)
+    try:
+        while True:
+            kinds.append(request.kind)
+            if request.kind == plan_driver.AUTHOR:
+                req_domains, _, _ = request.payload
+                fulfilment = authors_for(req_domains)
+            else:
+                assembled_plan, gate_cb = request.payload
+                fulfilment = gate_cb(assembled_plan)
+            request = gen.send(fulfilment)
+    except StopIteration:
+        pass
+
+    assert kinds == [plan_driver.AUTHOR, plan_driver.GATE, plan_driver.AUTHOR, plan_driver.GATE], kinds
+    assert store.read("plan::workout", root=tmp_path) != []
+
+
+def test_malformed_gate_send_back_safety_blocked(tmp_path):
+    # AC-6 (GATE fail-closed shape): a malformed GATE disposition sent back across the shapes (a
+    # non-dict / a missing key / a raised gate) → `drive` returns terminal SAFETY_BLOCKED, 0 plans.
+    summary = _deid_summary()
+    authors_map = _sustaining_authors()
+    domains = ("workout", "nutrition")
+
+    def _raising_gate(assembled_plan):
+        raise RuntimeError("safety lens dispatch failed mid-review")
+
+    malformed_gates = (
+        lambda p: {"accept": True, "safety_passed": False},   # explicit False
+        lambda p: {"accept": True, "safety_passed": None},    # None
+        lambda p: {"accept": True},                            # absent key
+        lambda p: ["not", "a", "dict"],                        # non-dict result
+        _raising_gate,                                         # the gate raised
+    )
+
+    for i, gate in enumerate(malformed_gates):
+        root = tmp_path / f"case-{i}"
+        store_read = _seed_store(root)
+        gen = plan_driver.drive(
+            summary, domains, store_read, root,
+            plan_date=PLAN_DATE, gates={}, gate_dispatch=gate,
+        )
+        out = _run_driver(gen, authors_map=authors_map)
+        assert out["reason"] == SAFETY_BLOCKED, f"malformed GATE not SAFETY_BLOCKED: {gate}"
+        assert out["results"] == {}
+        for domain in domains:
+            assert store.read(f"plan::{domain}", root=root) == []
+
+
+def test_unknown_kind_fails_closed(tmp_path, monkeypatch):
+    # AC-8 (unknown-kind fails closed — Negative-1 mitigation): a synthetic request whose `kind` is
+    # NOT in REQUEST_KINDS reaches the consumer's fulfilment switch → the consumer does NOT
+    # default-allow; it routes to a fail-closed halt with 0 plans surfaced. Driven by monkeypatching
+    # `plan_driver.drive` to yield ONE unrecognized-kind request, then asserting `run_orchestrated`
+    # surfaces 0 plans (no default-allow, no escaping dispatch).
+    store_read = _seed_store(tmp_path)
+    deid_client = _FixedDeidClient(_deid_summary())
+    dispatch = _RecordingDispatch(_sustaining_authors())
+
+    def _unknown_kind_driver(*args, **kwargs):
+        # a synthetic driver yielding a single request with a kind outside REQUEST_KINDS
+        sent = yield plan_driver.Request("UNRECOGNIZED", (("workout",), _deid_summary(), {}))
+        # if the consumer default-allowed and sent back, this would surface a plan — it must not
+        yield plan_driver.Request(plan_driver.AUTHOR, (("workout",), _deid_summary(), {}))
+
+    monkeypatch.setattr(plan_driver, "drive", _unknown_kind_driver)
+
+    out = run_orchestrated(
+        _raw_intake(), deid_client, dispatch, store_read, tmp_path,
+        plan_date=PLAN_DATE, domains=("workout",), gate_dispatch=_clean_composing_gate(),
+    )
+
+    # the unknown kind fails closed: 0 plans surfaced, honest no-plan reason, no escaping dispatch
+    assert out.get("results", {}) == {}, "an unknown request kind surfaced a plan (default-allow)"
+    assert out.get("reason") is not None, "the unknown kind did not route to an honest no-plan halt"
+    assert store.read("plan::workout", root=tmp_path) == []
+    # the unknown kind was NOT default-dispatched (the consumer did not fulfil it as an AUTHOR)
+    assert dispatch.calls == [], "the consumer dispatched an unrecognized-kind request"
+
+
+# --- no-fork grep oracles (AC-4) ------------------------------------------------
+
+# The files the no-fork probe scans for a SECOND composition site / surface gate (the latent
+# forked-safety-loop failure vector). `plan_step.py` is ABSENT this wave (T3 creates it).
+_NO_FORK_FILES = (
+    Path("scripts/plan/plan_orchestrator.py"),
+    Path("scripts/plan/plan_step.py"),
+    Path(".claude/skills/generate-plan/SKILL.md"),
+)
+
+
+def _composition_sites():
+    """Count the executable 3-key-disposition composition sites OUTSIDE the ONE in `gate_dispatch`.
+
+    A composition site builds the `{accept, safety_passed, revise_domains}` disposition. The ONE
+    legitimate site is `compose_gate_dispatch` in `gate_dispatch.py`; a SECOND in the consumer / the
+    skill is the fork. The driver in `plan_driver.py` has 1 composition site by definition (it owns
+    the surface gate) — the count returned here is the EXTRA (forked) sites in the scanned files. A
+    well-formed tree returns 1 (the single `compose_gate_dispatch` definition).
+    """
+    sites = 0
+    # the canonical site
+    composer = Path("scripts/plan/gate_dispatch.py").read_text(encoding="utf-8")
+    sites += composer.count("def compose_gate_dispatch")
+    # any FORKED composer in the scanned files (an executable def, not a comment/doc reference)
+    for path in _NO_FORK_FILES:
+        if not path.exists():
+            continue
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            stripped = raw.strip()
+            if stripped.startswith("#"):
+                continue
+            if "def compose_gate_dispatch" in raw:
+                sites += 1
+    return sites
+
+
+def _executable_surface_gates():
+    """Count the executable `safety_passed is True` surface gates OUTSIDE the ONE in `plan_driver`.
+
+    The ONLY surface gate is the `disposition.get("safety_passed") is True` check in
+    `plan_driver.drive`; a SECOND executable copy in the consumer / the skill is the fork. The probe
+    targets EXECUTABLE control flow (the keyed `disposition.get("safety_passed") ... is True`
+    expression at a non-comment line), NOT the bare `safety_passed is True` token (which survives
+    legitimately in `plan_orchestrator.py` docstrings/comments). Returns 1 for a well-formed tree
+    (the single surface gate in `plan_driver.py`).
+    """
+    gates = 0
+    driver = Path("scripts/plan/plan_driver.py").read_text(encoding="utf-8")
+    for raw in driver.splitlines():
+        stripped = raw.strip()
+        if stripped.startswith("#"):
+            continue
+        if 'disposition.get("safety_passed")' in raw and " is True" in raw:
+            gates += 1
+    for path in _NO_FORK_FILES:
+        if not path.exists():
+            continue
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            stripped = raw.strip()
+            if stripped.startswith("#"):
+                continue
+            if 'disposition.get("safety_passed")' in raw and " is True" in raw:
+                gates += 1
+    return gates
+
+
 # --- driver helpers -------------------------------------------------------------
 
 
-def _run_driver(gen, *, dispatch=None, authors_map=None):
-    """Advance a `plan_driver.drive` generator to completion, dispatching each yielded request.
+def _record_requests(gen, *, dispatch=None, authors_map=None):
+    """Drive a `plan_driver.drive` generator to completion, recording every yielded typed request.
 
-    The CONSUMER half of the drive-protocol (what `run_orchestrated` does): prime the generator,
-    and for each yielded `(domains, summary, gates)` dispatch-request, build the authors fragment
-    (via the fixture authors_map) and `.send()` it back. Returns the driver's final result
-    (`StopIteration.value`).
+    The typed-request consumer half: prime the generator, and for each yielded request, switch on
+    `request.kind` — fulfill an AUTHOR request from the fixture authors_map and a GATE request by
+    invoking the gate over the assembled plan — and `.send()` the fulfilment back. Returns the list
+    of yielded requests (not the final result), so a test can assert the yield-kind sequence.
+    """
+    authors_map = authors_map or _sustaining_authors()
+    requests = []
+    request = next(gen)
+    try:
+        while True:
+            requests.append(request)
+            request = _fulfil_and_advance(gen, request, authors_map)
+    except StopIteration:
+        return requests
+
+
+def _run_driver(gen, *, dispatch=None, authors_map=None):
+    """Advance a `plan_driver.drive` generator to completion, fulfilling each yielded typed request.
+
+    The CONSUMER half of the typed-request drive-protocol (what `run_orchestrated` does): prime the
+    generator, and for each yielded request switch on `request.kind` — fulfill an AUTHOR request
+    from the fixture authors_map and a GATE request by invoking the gate over the assembled plan —
+    and `.send()` the fulfilment back. A gate that RAISES is THROWN into the driver (mirroring the
+    consumer), whose fail-closed wrap reads it as ambiguous. Returns the driver's final result.
     """
     authors_map = authors_map or _sustaining_authors()
     try:
         request = next(gen)
         while True:
-            domains, summary, gates = request
-            envelopes = {d: authors_map[d] for d in domains}
-            request = gen.send(envelopes)
+            request = _fulfil_and_advance(gen, request, authors_map)
     except StopIteration as done:
         return done.value
+
+
+def _fulfil_and_advance(gen, request, authors_map):
+    """Fulfil one typed request and advance the driver — the shared consumer step for the helpers.
+
+    Switches on `request.kind`: an AUTHOR request is fulfilled from the fixture authors_map; a GATE
+    request is fulfilled by invoking the gate over the assembled plan, and a gate that RAISES is
+    THROWN into the driver (so the driver's GATE-yield fail-closed wrap converts it to ambiguous ->
+    SAFETY_BLOCKED, exactly as the production consumer does). Returns the next yielded request.
+    """
+    if request.kind == plan_driver.AUTHOR:
+        domains, summary, gates = request.payload
+        return gen.send({d: authors_map[d] for d in domains})
+    if request.kind == plan_driver.GATE:
+        assembled_plan, gate = request.payload
+        try:
+            disposition = gate(assembled_plan)
+        except Exception as gate_error:
+            return gen.throw(gate_error)
+        return gen.send(disposition)
+    raise AssertionError(f"unexpected request kind: {request.kind!r}")

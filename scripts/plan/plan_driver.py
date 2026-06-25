@@ -7,18 +7,23 @@ cap, the preserved halts, and the scratch-and-promote logic. It exists in EXACTL
 (the no-fork crown jewel) — `run_orchestrated` (API/test mode) and the ADR-0026-T3 skill
 subscription mode both DRIVE this driver, neither re-hosts the loop.
 
-`drive` is a generator-coroutine. Its drive-protocol (the shared control-inversion contract):
-  - The CONSUMER advances the driver; the driver YIELDS a dispatch-request `(domains, summary,
-    gates)` naming the domains to author and the de-identified summary to author over.
-  - The CONSUMER captures each domain's author envelope (via its `dispatch` seam — a fixture in
-    tests, a real subscription agent in the skill) and SENDS the captured envelopes back to the
-    driver (`gen.send(envelopes)`).
+`drive` is a generator-coroutine. Its drive-protocol (the shared control-inversion contract,
+ADR-0028-T1 typed-request shape): the driver YIELDS a typed `Request(kind, payload)` — never a bare
+tuple — with `kind` in `REQUEST_KINDS` (AUTHOR / GATE emitted at T1; REAUTHOR / ADJUDICATOR reserved
+for T2). The CONSUMER switches on `kind`, fulfils the request, and `.send()`s the RAW fulfilment back:
+  - AUTHOR request (`payload = (domains, summary, gates)`): the CONSUMER captures each domain's
+    author envelope (via its `dispatch` seam — a fixture in tests, a real subscription agent in the
+    skill) and SENDS the captured `{domain: envelope}` fragment back (`gen.send(envelopes)`).
+  - GATE request (`payload = (assembled_plan, gate)`): the CONSUMER invokes the composed gate over
+    the assembled plan and SENDS the RAW disposition back. `drive` then applies the fail-closed
+    `safety_passed is True` surface gate over that disposition (the surface gate stays in ONE place —
+    the consumer builds NO disposition).
   - The driver runs the inner engine (`pipeline.run_generation`) over the captured authors against
-    an ISOLATED scratch store, gates the assembled result through the injected composed
-    `gate_dispatch`, and either (a) promotes the survivors into `root` and STOPS (accept +
-    `safety_passed is True`), (b) re-yields a dispatch-request for the REVISE-targeted domains
-    (quality REVISE + safety passing, below `revise_cap`), or (c) STOPS at a terminal honest-no-plan
-    halt (`SAFETY_BLOCKED` / `REVISE_EXHAUSTED` / `PROMOTE_FAILED` / `DISPATCH_CAP_EXCEEDED`).
+    an ISOLATED scratch store, gates the assembled result via the yielded GATE request, and either
+    (a) promotes the survivors into `root` and STOPS (accept + `safety_passed is True`), (b) re-yields
+    an AUTHOR request for the REVISE-targeted domains (quality REVISE + safety passing, below
+    `revise_cap`), or (c) STOPS at a terminal honest-no-plan halt (`SAFETY_BLOCKED` /
+    `REVISE_EXHAUSTED` / `PROMOTE_FAILED` / `DISPATCH_CAP_EXCEEDED`).
   - The disposition the driver READS is the FIXED 3-key shape `{accept: bool, safety_passed: bool,
     revise_domains: list}` — `safety_passed is True` is the ONLY surface path; `revise_domains`
     names only run-set domains.
@@ -34,11 +39,36 @@ records no plan directly, and leaves the reconciler + the safety gates unchanged
 """
 
 import tempfile
+from collections import namedtuple
 from pathlib import Path
 
 from scripts.plan import pipeline
 from scripts.plan.dispatch_budget import DispatchCapExceeded
 from scripts.store import store
+
+# The typed discriminated-union drive request (ADR-0028-T1). The driver yields a `Request(kind,
+# payload)` instead of a bare tuple, so every yield is exhaustively tagged with exactly one `kind`
+# and the consumer switches on it (a mis-handled / omitted kind fails closed rather than
+# default-allowing). T1 emits AUTHOR + GATE; REAUTHOR / ADJUDICATOR are RESERVED tokens T2 fills
+# (throw/replay) — reserved here so the kind set is the stable contract downstream consumes.
+AUTHOR = "AUTHOR"
+GATE = "GATE"
+REAUTHOR = "REAUTHOR"
+ADJUDICATOR = "ADJUDICATOR"
+
+# The valid `kind` set (the no-fork single source of truth for both the driver's yields and the
+# consumer's exhaustive switch). An unrecognized kind is NOT in this set, so the consumer's switch
+# fails closed on it (Negative-1 mitigation).
+REQUEST_KINDS = frozenset({AUTHOR, GATE, REAUTHOR, ADJUDICATOR})
+
+Request = namedtuple("Request", ("kind", "payload"))
+Request.__doc__ = (
+    "A typed discriminated-union drive request the driver yields. `kind` is one of `REQUEST_KINDS`; "
+    "`payload` is the kind-specific fulfilment input the consumer reads. AUTHOR: `(domains, summary, "
+    "gates)` — the consumer dispatches each domain's specialist and sends back `{domain: envelope}`. "
+    "GATE: `(assembled_plan, gate)` — the consumer invokes the gate over the assembled plan and sends "
+    "back the RAW disposition; `drive` applies the fail-closed `safety_passed is True` surface gate."
+)
 
 # domain -> the role whose full profile the dispatch prompt inlines (INV-ROLE-INLINING). The SINGLE
 # definition (the no-fork crown jewel) for both uses: the driver's out-of-run-set revise guard reads
@@ -108,8 +138,10 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_dispatch
         revise_cap (int, optional): The bounded revise-loop cap. Defaults to `DEFAULT_REVISE_CAP`.
 
     Yields:
-        (tuple) A `(domains, summary, gates)` dispatch-request; the consumer sends back the captured
-        `{domain: envelope}` authors fragment via `.send()`.
+        (Request) A typed `Request(kind, payload)` (ADR-0028-T1): an `AUTHOR` request whose payload
+        is `(domains, summary, gates)` — the consumer sends back the captured `{domain: envelope}`
+        authors fragment — or a `GATE` request whose payload is `(assembled_plan, gate)` — the
+        consumer invokes the gate and sends back the RAW disposition.
 
     Returns:
         (dict) On a surfaced plan, the `run_generation` result plus `dispatch_count`. On a halt, the
@@ -119,14 +151,28 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_dispatch
     count = (lambda: budget.count) if budget is not None else (lambda: 0)
     with tempfile.TemporaryDirectory(prefix="aplus-revise-") as scratch_parent:
         revise_count = 0
-        authors = yield (tuple(domains), summary, gates)
+        authors = yield Request(AUTHOR, (tuple(domains), summary, gates))
         scratch = Path(scratch_parent) / "pass-0"
         result = pipeline.run_generation(
             authors, store_read, scratch, plan_date=plan_date, on_date=on_date, gates=gates,
             reauthor=reauthor, adjudicator=adjudicator,
         )
         while True:
-            disposition = _safe_gate(gate_dispatch, result)
+            # GATE direct-yield inversion (ADR-0028-T1): yield a GATE request carrying the assembled
+            # result + the composed gate. The CONSUMER invokes the gate over the assembled plan and
+            # `.send()`s the RAW disposition back here. The fail-closed contract is preserved verbatim
+            # (Security HIGH-1): a gate that RAISES (a lens dispatch failed mid-review, a malformed
+            # composition) is THROWN into this generator by the consumer (`gen.throw`) and reads as
+            # ambiguous -> `disposition = None` -> SAFETY_BLOCKED; `DispatchCapExceeded` is the budget
+            # halt (not a gate ambiguity), re-raised here to propagate to the consumer's cap-halt
+            # handler. The surface gate (`safety_passed is True`) stays here, in ONE place — the
+            # consumer builds NO disposition.
+            try:
+                disposition = yield Request(GATE, (result, gate_dispatch))
+            except DispatchCapExceeded:
+                raise
+            except Exception:
+                disposition = None
             # SAFETY GATE (the only surface path is a positive boolean-True safety assertion).
             # `False` / `None` / absent / non-bool / non-dict / a raised gate -> TERMINAL
             # SAFETY_BLOCKED: never re-authored, never looped, never overridden (AC-2, R2, HIGH-1).
@@ -159,38 +205,13 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_dispatch
             # generating.
             if any(d not in _ROLE_OF_DOMAIN or d not in domains for d in revise_domains):
                 return _honest_no_plan(SAFETY_BLOCKED, dispatch_count=count())
-            authors.update((yield (tuple(revise_domains), summary, gates)))
+            authors.update((yield Request(AUTHOR, (tuple(revise_domains), summary, gates))))
             revise_count += 1
             scratch = Path(scratch_parent) / f"pass-{revise_count}"
             result = pipeline.run_generation(
                 authors, store_read, scratch, plan_date=plan_date, on_date=on_date, gates=gates,
                 reauthor=reauthor, adjudicator=adjudicator,
             )
-
-
-def _safe_gate(gate_dispatch, result):
-    """Invoke the composed gate over the assembled result; a raised gate reads as ambiguous.
-
-    The FAIL-CLOSED safety contract (Security HIGH-1): a gate that RAISES (a lens dispatch failed
-    mid-review, a malformed composition) is an ambiguous safety disposition, not a surface path — it
-    returns `None` so the loop's `safety_passed is True` check routes it to `SAFETY_BLOCKED`.
-    `DispatchCapExceeded` is re-raised (it is the budget halt, not a gate ambiguity), propagating to
-    the consumer's cap-halt handler.
-
-    Args:
-        gate_dispatch (Callable): The charge-wrapped composed gate.
-        result (dict): The assembled `run_generation` result to gate.
-
-    Returns:
-        (Any) The gate's composed disposition, or `None` when the gate raised (the ambiguous /
-        fail-closed case).
-    """
-    try:
-        return gate_dispatch(result)
-    except DispatchCapExceeded:
-        raise
-    except Exception:
-        return None
 
 
 def _honest_no_plan(reason, *, dispatch_count, deidentified=True, **extra):

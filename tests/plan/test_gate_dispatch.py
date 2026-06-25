@@ -242,8 +242,9 @@ def test_malformed_composite_never_safety_passed_true(tmp_path):
     # AC-4 (fail-LOUD arm): across the malformed-composite family — a judge that RAISES, a review
     # dispatch that RAISES, a non-dict judge return — each gate RAISES (quality_judge / the dispatch
     # raises BEFORE the composer's `safety_passed` assignment), so this test pins the RAISE → caught →
-    # 0-safety_passed-True propagation (in production `plan_driver._safe_gate` catches the raise to
-    # None → SAFETY_BLOCKED). Count of `safety_passed is True` over the malformed family == 0. The
+    # 0-safety_passed-True propagation (in production `plan_driver.drive`'s GATE-yield fail-closed
+    # wrap catches the raise to None → SAFETY_BLOCKED). Count of `safety_passed is True` over the
+    # malformed family == 0. The
     # `safety_passed` ASSIGNMENT line itself (a non-raising malformed review) is guarded by
     # `test_malformed_missing_passed_key_never_safety_passed_true` below, not by this fail-loud arm.
     assembled = _assembled_clean_plan(tmp_path)
@@ -259,8 +260,8 @@ def test_malformed_composite_never_safety_passed_true(tmp_path):
         try:
             dispositions.append(gate(assembled))
         except Exception:
-            # a raised composer is the fail-closed contract (plan_driver._safe_gate catches it to
-            # None -> SAFETY_BLOCKED) — it surfaces 0 safety_passed-True dispositions, AC-4-satisfying.
+            # a raised composer is the fail-closed contract (plan_driver.drive's GATE-yield wrap
+            # catches it to None -> SAFETY_BLOCKED) — it surfaces 0 safety_passed-True dispositions.
             dispositions.append(None)
 
     assert _safety_passed_true_count(dispositions) == 0, (
