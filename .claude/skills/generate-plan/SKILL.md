@@ -137,10 +137,11 @@ Per-kind fulfilment (each a SUBSCRIPTION agent dispatch, then a `step` re-call w
 - **`GATE` (`payload = (assembled_plan, gate_producer)`)** — dispatch the QUALITY judge AND each SAFETY
   LENS (`medical-safety-reviewer`, `health-edge-case-reviewer`, full profile inlined) as SUBSCRIPTION
   agents over the `assembled_plan` and return the RAW `{judge, review}` verdicts. Return the raw verdicts
-  ONLY — the driver composes them via `compose_gate_dispatch` (the ONE composition site) and applies the
+  ONLY — the driver composes them via `compose_disposition` (the ONE composition site) and applies the
   fail-closed `safety_passed is True` surface gate; the skill builds NO disposition and re-derives no
-  release. (`gate_producer`, the `payload[1]` callable, is the in-process test producer; on the LIVE path
-  the skill dispatches the judge + lens agents itself and returns the raw verdicts.)
+  release. (`gate_producer`, the `payload[1]` callable, is the `compose_gate_dispatch`-built RAW-VERDICT
+  producer — the in-process test producer; on the LIVE path the skill dispatches the judge + lens agents
+  itself and returns the raw verdicts.)
 - **`REAUTHOR` (`payload = (domain, constraint)`)** — the energy bounce: fires when nutrition's
   `energy_budget` says the workout is un-fuelable. `constraint` is `{"sustainable_training_kcal":
   <ceiling>}`. Dispatch a SECOND personal-trainer (full profile) under that ceiling → return the new
@@ -166,7 +167,7 @@ derived artifacts.
 **No fork at the skill.** The autonomous bounded revise loop — the scratch-store lifecycle, the
 gate→branch→re-dispatch sequencing, the `safety_passed is True` surface gate, the bounded cap, the
 scratch-and-promote — lives in EXACTLY ONE definition (`plan_driver.drive`); the composition is
-`compose_gate_dispatch` (the ONE site); the adjudication release stays in the inner engine's `adjudicate`.
+`compose_disposition` (the ONE site); the adjudication release stays in the inner engine's `adjudicate`.
 This skill DRIVES that one driver via the harness — it NEVER re-hosts the loop, re-composes the
 disposition, or re-derives the release.
 
