@@ -30,6 +30,7 @@ import subprocess
 from pathlib import Path
 
 import scripts.plan._a_prime_self_test as ast_mod
+from scripts.plan import plan_driver
 from scripts.plan._a_prime_self_test import (
     BROKEN_SPINE_ENV,
     _broken_composer,
@@ -229,3 +230,174 @@ def test_audit_propagates_broken_spine_nonzero_exit():
         f"the audit swallowed the broken-spine self-test's non-zero exit to {audit.returncode} "
         f"(the PF-S63-02 tautology)"
     )
+
+
+# ===============================================================================
+# ADR-0028-T5 Cycle 1: the REAUTHOR + ADJUDICATOR replay-leg fixtures + drivers
+# ===============================================================================
+#
+# The existing self-test (`_sustaining_authors`, `_finding_dispatch`) yields 0 REAUTHOR + 0
+# ADJUDICATOR — the throw/replay path (ADR-0028-T2) is never EXERCISED behaviorally. These legs add
+# a NON-sustaining-author fixture (a real energy bounce -> a REAUTHOR yield/replay) and a
+# held-finding-author fixture (an author-declared cross-domain conflict -> an ADJUDICATOR
+# yield/replay), driving the REAL `run_orchestrated` consumer over a clean composed gate with a
+# fixture `reauthor` / `adjudicator` hook. The recording hooks + the kind-recording dispatch / gate
+# capture the yielded `Request.kind` sequence in fulfilment order (the consumer fulfils each yield
+# synchronously, so the recorded order IS the yield order). 0 live spend, synthetic PII-free tokens.
+
+
+def test_reauthor_leg_yields_reauthor_between_author_and_gate():
+    # AC-1: the non-sustaining-author leg (workout over the nutrition energy ceiling, nutrition
+    # `energy_budget.sustains is False`) drives a REAL energy bounce -> the memo `reauthor` callable
+    # raises the sentinel on the cache-miss pass -> `drive` yields a REAUTHOR request -> the consumer
+    # re-authors -> `drive` caches + re-drives. Assert the yielded kind sequence carries >=1 REAUTHOR
+    # BETWEEN the first AUTHOR and the first GATE.
+    out, kinds, reauthor_calls = ast_mod._run_reauthor_leg()
+    assert kinds.count(plan_driver.REAUTHOR) >= 1, f"no REAUTHOR yielded: {kinds}"
+    first_author = kinds.index(plan_driver.AUTHOR)
+    first_reauthor = kinds.index(plan_driver.REAUTHOR)
+    first_gate = kinds.index(plan_driver.GATE)
+    assert first_author < first_reauthor < first_gate, f"REAUTHOR not between AUTHOR and GATE: {kinds}"
+
+
+def test_adjudicator_leg_yields_adjudicator_between_author_and_gate():
+    # AC-2: the held-finding leg (one domain declares a cross-domain conflict via
+    # `reconciliation.conflicts`) HOLDS the declaring domain -> the memo `adjudicator` callable raises
+    # the sentinel on the cache-miss pass -> `drive` yields an ADJUDICATOR request. Assert the yielded
+    # kind sequence carries >=1 ADJUDICATOR between the first AUTHOR and the first GATE.
+    out, kinds, adjudicator_calls = ast_mod._run_adjudicator_leg()
+    assert kinds.count(plan_driver.ADJUDICATOR) >= 1, f"no ADJUDICATOR yielded: {kinds}"
+    first_author = kinds.index(plan_driver.AUTHOR)
+    first_adjudicator = kinds.index(plan_driver.ADJUDICATOR)
+    first_gate = kinds.index(plan_driver.GATE)
+    assert first_author < first_adjudicator < first_gate, f"ADJUDICATOR not between AUTHOR and GATE: {kinds}"
+
+
+def test_replay_rounds_advance_exactly_one_dispatch_each():
+    # AC-3: each replay round advances exactly ONE new cache-MISS dispatch (one new memo key), and the
+    # cached terminal replay re-fires NONE of them. The reauthor leg dispatches its hook EXACTLY once
+    # (one bounce key); the adjudicator leg dispatches its hook EXACTLY once per held finding, each a
+    # distinct key. A cached replay that re-raised (re-dispatched) a cached key would inflate these.
+    _, _, reauthor_calls = ast_mod._run_reauthor_leg()
+    assert len(reauthor_calls) == 1, f"reauthor re-dispatched on a cached replay: {reauthor_calls}"
+    _, _, adjudicator_calls = ast_mod._run_adjudicator_leg()
+    assert len(adjudicator_calls) == 1, f"adjudicator re-dispatched on a cached replay: {adjudicator_calls}"
+    assert len(set(adjudicator_calls)) == len(adjudicator_calls), (
+        f"a held finding fired more than once on the cached replay: {adjudicator_calls}"
+    )
+
+
+def test_replay_legs_complete_on_terminal_cache_all_hit():
+    # AC-4: after the last replay round caches the last hook response, the terminal cache-all-hit
+    # re-drive completes (0 sentinels escape) and returns a terminal `run_generation` result. The
+    # reauthor leg's fuelable re-author surfaces (a promote); the adjudicator leg's cleared held domain
+    # surfaces — a terminal result (a promote OR an honest-no-plan halt), never an escaping sentinel.
+    out_reauthor, _, _ = ast_mod._run_reauthor_leg()
+    assert "results" in out_reauthor, "the reauthor leg did not return a terminal run_generation result"
+    assert out_reauthor["results"]["workout"]["recorded"] is True, (
+        "the fuelable re-authored workout did not surface on the terminal replay"
+    )
+    out_adjudicator, _, _ = ast_mod._run_adjudicator_leg()
+    assert "results" in out_adjudicator, "the adjudicator leg did not return a terminal run_generation result"
+    assert out_adjudicator["results"]["workout"]["recorded"] is True, (
+        "the cleared held domain did not surface on the terminal replay"
+    )
+
+
+# ===============================================================================
+# ADR-0028-T5 Cycle 2: the non-tautology floor + the preserved gates + the audit
+# ===============================================================================
+
+
+def test_non_tautology_contrast_sustaining_yields_zero_replay():
+    # AC-5 (the non-tautology FLOOR, AR-002 / PF-S63-02): the SAME typed-request protocol over the
+    # SUSTAINING fixture (BOTH hooks wired) yields 0 REAUTHOR + 0 ADJUDICATOR, WHILE the new
+    # non-sustaining + held-finding fixtures yield >=1 of each. The explicit CONTRAST proves the >=1
+    # comes from the FIXTURE (a real bounce / a real hold), not from the protocol always yielding —
+    # the property that would be UNSATISFIABLE by the pre-existing sustaining fixtures.
+    _, sustaining_kinds = ast_mod._run_sustaining_replay_leg()
+    assert sustaining_kinds.count(plan_driver.REAUTHOR) == 0, (
+        f"the sustaining fixture yielded a REAUTHOR (no real bounce should fire): {sustaining_kinds}"
+    )
+    assert sustaining_kinds.count(plan_driver.ADJUDICATOR) == 0, (
+        f"the sustaining fixture yielded an ADJUDICATOR (no held finding should fire): {sustaining_kinds}"
+    )
+    _, reauthor_kinds, _ = ast_mod._run_reauthor_leg()
+    _, adjudicator_kinds, _ = ast_mod._run_adjudicator_leg()
+    assert reauthor_kinds.count(plan_driver.REAUTHOR) >= 1, "the non-sustaining fixture yielded 0 REAUTHOR"
+    assert adjudicator_kinds.count(plan_driver.ADJUDICATOR) >= 1, "the held-finding fixture yielded 0 ADJUDICATOR"
+
+
+def test_self_test_drives_reauthor_leg_and_breaks_nonzero(monkeypatch):
+    # AC-6 (the self-test DRIVES the reauthor leg): a replay-leg-break analogue — stub the reauthor
+    # leg to yield 0 REAUTHOR (the throw/replay path removed) and assert `_self_test()` returns
+    # NON-ZERO. If `_self_test()` did not drive the reauthor leg, the stub would be inert and it would
+    # stay 0 — so this is RED until the self-test gains the reauthor-inversion check.
+    real_leg = ast_mod._run_reauthor_leg
+
+    def zero_reauthor_leg(**kwargs):
+        out, kinds, calls = real_leg(**kwargs)
+        return out, [k for k in kinds if k != plan_driver.REAUTHOR], calls
+
+    monkeypatch.setattr(ast_mod, "_run_reauthor_leg", zero_reauthor_leg)
+    assert _self_test() != 0, "the self-test did not catch a reauthor leg yielding 0 REAUTHOR"
+
+
+def test_self_test_drives_adjudicator_leg_and_breaks_nonzero(monkeypatch):
+    # AC-6 (the self-test DRIVES the adjudicator leg): the symmetric replay-leg-break analogue — stub
+    # the adjudicator leg to yield 0 ADJUDICATOR and assert `_self_test()` returns NON-ZERO.
+    real_leg = ast_mod._run_adjudicator_leg
+
+    def zero_adjudicator_leg(**kwargs):
+        out, kinds, calls = real_leg(**kwargs)
+        return out, [k for k in kinds if k != plan_driver.ADJUDICATOR], calls
+
+    monkeypatch.setattr(ast_mod, "_run_adjudicator_leg", zero_adjudicator_leg)
+    assert _self_test() != 0, "the self-test did not catch an adjudicator leg yielding 0 ADJUDICATOR"
+
+
+# ===============================================================================
+# ADR-0028-T5 Cycle 3: the RED-capability proof (the load-bearing non-tautology)
+# ===============================================================================
+#
+# The non-tautology floor is RED-CAPABLE: the >=1-REAUTHOR / >=1-ADJUDICATOR assertion FAILS when the
+# throw/replay path (ADR-0028-T2) is removed. The sentinel-SWALLOWING mutant returns a benign value on
+# a cache MISS instead of raising `_ReplayNeeded`, so `drive` NEVER yields a REAUTHOR / ADJUDICATOR
+# request — driving the SAME fixtures through it makes the >=1 assertion go RED. This proves the >=1 is
+# NOT satisfiable by a driver that does not EXERCISE the replay path (the AR-002 / PF-S63-02 floor).
+
+
+def test_red_capability_swallowed_replay_yields_zero_reauthor():
+    # AC-5 / AR-002 (RED-CAPABLE, the load-bearing proof): drive the SAME non-sustaining fixture
+    # through the sentinel-SWALLOWING mutant and assert it yields 0 REAUTHOR — the >=1-REAUTHOR
+    # assertion goes RED against a driver that does not exercise the throw/replay path.
+    _, kinds, calls = ast_mod._run_reauthor_leg(swallow_replay=True)
+    assert kinds.count(plan_driver.REAUTHOR) == 0, f"the swallow mutant still yielded a REAUTHOR: {kinds}"
+    assert calls == [], "the swallow mutant still dispatched the reauthor hook (the sentinel was not swallowed)"
+
+
+def test_red_capability_swallowed_replay_yields_zero_adjudicator():
+    # AC-5 / AR-002 (the symmetric RED-capability proof): the SAME held-finding fixture through the
+    # swallow mutant yields 0 ADJUDICATOR — the >=1-ADJUDICATOR assertion goes RED.
+    _, kinds, calls = ast_mod._run_adjudicator_leg(swallow_replay=True)
+    assert kinds.count(plan_driver.ADJUDICATOR) == 0, f"the swallow mutant still yielded an ADJUDICATOR: {kinds}"
+    assert calls == [], "the swallow mutant still dispatched the adjudicator hook (the sentinel was not swallowed)"
+
+
+def test_red_capability_wired_path_still_yields_the_contrast():
+    # the CONTRAST that gives the mutant teeth: the SAME legs on the WIRED path (swallow_replay=False,
+    # the default) yield >=1 each. RED with the mutant, GREEN on the wired spine — the proof the >=1
+    # assertion DEPENDS on the throw/replay path, not asserted vacuously.
+    _, kinds_reauthor, _ = ast_mod._run_reauthor_leg(swallow_replay=False)
+    _, kinds_adjudicator, _ = ast_mod._run_adjudicator_leg(swallow_replay=False)
+    assert kinds_reauthor.count(plan_driver.REAUTHOR) >= 1, "the wired reauthor leg yielded 0 REAUTHOR"
+    assert kinds_adjudicator.count(plan_driver.ADJUDICATOR) >= 1, "the wired adjudicator leg yielded 0 ADJUDICATOR"
+
+
+def test_swallow_replay_env_hook_breaks_self_test(monkeypatch):
+    # AC-6 (the replay-leg-break analogue at the exit-code level): with SWALLOW_REPLAY_ENV set,
+    # `_self_test()` drives the replay legs through the swallow mutant -> 0 REAUTHOR / 0 ADJUDICATOR ->
+    # the replay-leg inversion fails -> `_self_test()` returns NON-ZERO (the audit->self-test chain
+    # goes RED on a broken throw/replay path, mirroring the BROKEN_SPINE_ENV arm).
+    monkeypatch.setenv(ast_mod.SWALLOW_REPLAY_ENV, "1")
+    assert _self_test() != 0, "the SWALLOW_REPLAY env hook did not break the replay-leg inversion"
