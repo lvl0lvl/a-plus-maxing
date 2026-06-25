@@ -58,7 +58,7 @@ def _localized_revise_domains(assembled_plan):
     for domain in _run_set_domains(assembled_plan):
         section = assembled_plan["results"][domain]["section"]
         if section.get("coverage_gap") == quality_judge_mod.assemble.EMPTY_OUTPUT_GAP:
-            localized.append(section.get("domain") or domain)
+            localized.append(domain)
     return localized
 
 
