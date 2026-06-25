@@ -7,18 +7,26 @@ allowed-tools: Skill, Agent, Read, Write, Edit, Bash, Glob, Grep, mcp__basic-mem
 
 # generate-plan
 
-The operator-facing INVOCATION path for the closed loop's GENERATE leg. The pipeline is wired in
-code (`scripts/plan/`) but had no front door: `orchestrate.generate_plans` (the cross-domain
-terminal) had no production caller until `scripts/plan/pipeline.py` `run_generation`, and nothing
-walked the orchestrator through the live specialist dispatches that produce its `authors` input.
-This skill is that front door — it codifies the dispatch lifecycle around the existing functions
-with the safety gates inline.
+The operator-facing INVOCATION path for the closed loop's GENERATE leg (the **A′ subscription-driver**
+path). The pipeline is wired in code (`scripts/plan/`); this skill is its front door — it de-identifies
+the raw intake, dispatches each plan-domain specialist + each safety lens as a SUBSCRIPTION agent over
+the de-identified summary, and DRIVES the ONE shared driver (`plan_driver.drive`) that runs
+assemble/gates/revise via the composed `gate_dispatch`. The skill DRIVES the driver — it does NOT
+re-implement the safety loop (the no-fork-at-the-skill-level constraint, below).
 
 **This skill does not re-decide the plan.** Under runtime A (`vault/design/plan-generation-pipeline-v1.md`,
 operator decision S68) the plan + safety reasoning is the dispatched specialists' / medical-liaison's;
-`scripts/` holds the wiring + the gates, never a model client. The orchestrator (you) dispatches each
-specialist with its full profile, captures the structured output, and feeds it to the seam. Originating
-plan content in code or in the orchestrator's own voice is the failure this skill exists to prevent.
+`scripts/` holds the wiring + the gates. The orchestrator (you) dispatches each specialist with its full
+profile over the de-identified summary, captures the structured output, and feeds each captured envelope
+to the shared driver per yielded dispatch-request. Originating plan content in code or in the
+orchestrator's own voice is the failure this skill exists to prevent.
+
+**No fork at the skill level (the crown-jewel constraint).** The autonomous bounded revise loop — the
+scratch-store lifecycle, the gate→branch→re-dispatch sequencing, the `safety_passed is True` surface
+gate, the bounded cap, the scratch-and-promote — lives in EXACTLY ONE definition, `plan_driver.drive`.
+This skill DRIVES that one driver (the consumer advances it and SENDs back the captured authors per
+yielded request); it NEVER re-hosts a copy of the loop. A skill-prose copy of the safety loop is the
+A-naive forked-safety-loop failure class ADR-0026 rejects.
 
 **Authoritative references (read, do not restate):**
 - `docs/plan-generation/author-dispatch-process.md` — the per-domain author dispatch, the universal
@@ -26,7 +34,10 @@ plan content in code or in the orchestrator's own voice is the failure this skil
   five reconcile behaviors, the medical-liaison adjudication envelope + the override-record schema.
 - `docs/plan-generation/adjust-dispatch-process.md` — the ADJUST leg (a DIFFERENT flow; do not use
   this skill to adjust an existing plan — `adjust_plan` is the adjust caller).
-- `scripts/plan/pipeline.py` `run_generation` — the seam this skill invokes.
+- `scripts/plan/plan_driver.py` `drive` — the ONE shared driver this skill DRIVES (the no-fork crown
+  jewel); `scripts/plan/gate_dispatch.py` `compose_gate_dispatch` — the composed quality+safety gate the
+  driver gates through; `scripts/plan/deid_in.py` `deid_in` / `scripts/model/client.py`
+  `ModelClient.deidentify` — the de-id-IN boundary.
 
 ## When to Use
 
@@ -45,21 +56,29 @@ plan content in code or in the orchestrator's own voice is the failure this skil
 ## The path (what runs)
 
 ```
-Phase 0  gather inputs ── router.summarize(store_read) [0-raw-PII] + the gated wiki + active gates
-Phase 1  per-domain author dispatch (runtime A, full profile inlined) ── one specialist per domain
+Phase 0  de-id IN ── deid_in(raw_intake, ModelClient.deidentify) [0-raw-PII] + the gated wiki + active gates
+Phase 1  per-domain author dispatch (runtime A, full profile inlined) ── one SUBSCRIPTION specialist per
+            domain over the de-identified summary
             → capture {specialist, recommendations[], reconciliation{}} → build  authors = {domain: envelope}
-Phase 2  run the reconciled pass ── pipeline.run_generation(authors, store_read, root, plan_date=…,
-            on_date=…, gates=…, reauthor=<hook>, adjudicator=<hook>)
+Phase 2  drive the ONE shared driver ── plan_driver.drive(summary, domains, store_read, root, plan_date=…,
+            gate_dispatch=<composed>, on_date=…, reauthor=<hook>, adjudicator=<hook>) — the skill DRIVES the
+            driver (which runs assemble/gates/revise via the composed gate_dispatch); it does NOT re-host the loop
             ├─ energy bounce  → reauthor(domain, constraint)  = a 2nd personal-trainer dispatch
             └─ held finding   → adjudicator(safety_finding)   = a medical-liaison dispatch (the gate)
-Phase 3  render ── python -m scripts.generate.generate <dashboard|handout|report>
+Phase 3  render ── reinsert_out (deterministic de-id OUT) → reemit_maintained / scripts.generate.generate
 Phase 4  report ── what recorded, what HELD (the honest no-plan states), the dvq entries for the MD
 ```
 
-## Phase 0 — inputs (the PII boundary)
+## Phase 0 — de-id IN (the PII boundary)
 
-1. The author's ONLY operator-state source is the **de-identified summary** (`router.summarize(store_read)`)
-   — the 0-raw-PII token state. Never hand a specialist raw operator data (ADR-0006-T0).
+1. The author's ONLY operator-state source on the A′ path is the **de-identified summary** the de-id-IN
+   boundary `deid_in(raw_intake, client)` returns — a synchronous Python `ModelClient.deidentify` call
+   (the ADR-0027 no-train backend, via `deid_in`) over the raw intake, producing the de-identified
+   band/class summary the dispatches author over. It is the 0-raw-PII token state. Never hand a specialist
+   raw operator data (ADR-0006-T0). **Disambiguation:** `router.summarize` is NOT the A′ de-id-IN /
+   operator-state source — it survives ONLY as the persisted-side store-read gate (the deterministic
+   store-summarizer the persisted path uses, unchanged, per `scripts/plan/deid_in.py`: "`router.summarize`
+   SURVIVES UNCHANGED as the persisted-side de-id (the store-read gate)").
 2. Name the **active gates**: `clearance_granted` (the LM-01 July-13 clinician clearance unlock for
    workout `load`), `red_s_lea_screen` (the nutrition critical-floor screen), wearable presence,
    hard-limits. These flow to every domain's `compute_plan` via `gates`.
@@ -67,9 +86,11 @@ Phase 4  report ── what recorded, what HELD (the honest no-plan states), the
 4. The gated **wiki** (`vault/library/`, `vault/compounds/`, `vault/biomarkers/`) is the specialists'
    evidence surface — canonical, vetted, goal-agnostic (the specialist personalizes at dispatch).
 
-## Phase 1 — dispatch each domain author (the load-bearing step)
+## Phase 1 — dispatch each domain author as a SUBSCRIPTION agent (the load-bearing step)
 
-For each domain, follow `author-dispatch-process.md` "Dispatching an author":
+For each domain, dispatch the specialist as a SUBSCRIPTION Claude Code agent over the de-identified
+summary (never the raw intake — the dispatch payload carries the summary only, 0 raw PII), following
+`author-dispatch-process.md` "Dispatching an author":
 - **Inline the full role profile verbatim** (`~/Documents/Projects/skills_library/roles/<role>/agent.md`
   or `.claude/agents/<role>/agent.md`) — INV-ROLE-INLINING + the `enforce-role-inlining` hook + the
   Agent Role Profile Mandate. Roles: `personal-trainer` (workout), `nutritionist` (nutrition),
@@ -85,12 +106,25 @@ For each domain, follow `author-dispatch-process.md` "Dispatching an author":
 
 Collect the captured envelopes into `authors = {domain: envelope}`.
 
-## Phase 2 — run the reconciled pass (the seam + the two hooks)
+## Phase 2 — drive the ONE shared driver (the no-fork crown jewel + the gates)
 
-Call `pipeline.run_generation(authors, store_read, root, plan_date=…, on_date=…, gates=…,
-reauthor=…, adjudicator=…)`. It runs `generate_plans` (compute → reconcile → adjudicate-held → record)
-then `collate_doctor_visit_queue`, returning the results + `dvq_entries`. The two hooks are live
-re-dispatches you supply:
+DRIVE the shared driver — do NOT call `pipeline.run_generation` directly and do NOT re-host the loop.
+The driver `plan_driver.drive(summary, domains, store_read, root, plan_date=…, gates=…,
+gate_dispatch=<composed>, on_date=…, reauthor=…, adjudicator=…)` is a control-inversion generator: it
+YIELDS a `(domains, summary, gates)` dispatch-request for each pass you must author; you dispatch each
+domain's specialist (Phase 1) + capture its envelope and SEND the captured authors back
+(`driver.send(authors)`). The driver runs `run_generation` (compute → reconcile → adjudicate-held →
+record) against an isolated scratch store, gates the assembled result through the composed
+`gate_dispatch`, and either promotes the survivors into `root` (accept + `safety_passed is True`),
+re-yields a revise-request, or halts to honest no-plan. The `run_orchestrated` consumer
+(`scripts/plan/plan_orchestrator.py`) is the reference driver (de-id IN → dispatch loop → drive the
+driver → return).
+
+The **composed gate** is `compose_gate_dispatch(judge_client, review_dispatch, lenses=…)` — it runs the
+QUALITY judge AND each SAFETY LENS (dispatched as a SUBSCRIPTION agent over the de-identified summary,
+full profile inlined: `medical-safety-reviewer`, `health-edge-case-reviewer`) over the assembled result,
+mapping their verdicts into the 3-key disposition the driver reads. The two re-dispatch hooks are live
+subscription dispatches you supply:
 
 - **`reauthor(domain, constraint)`** — fires when nutrition's `energy_budget` says the workout is
   un-fuelable. `constraint` is `{"sustainable_training_kcal": <ceiling>}`. Dispatch a SECOND
@@ -106,14 +140,17 @@ re-dispatches you supply:
 **Do not bypass a hold.** A held finding with no adjudicator dispatch stays held (records nothing) —
 that is the honest, correct state, not a failure to route around.
 
-For a synthetic/test run, the hooks may return pre-captured fixture envelopes (see
-`tests/plan/test_pipeline.py`); for a real run they are live agent dispatches.
+For a synthetic/test run, the dispatch seam + hooks may return pre-captured fixture envelopes (see
+`tests/plan/test_generate_plan_skill_glue.py` for the glue contract + `tests/plan/test_revise_loop.py`);
+for a real run they are live SUBSCRIPTION agent dispatches.
 
-## Phase 3 — render
+## Phase 3 — render (de-id OUT)
 
-`python -m scripts.generate.generate dashboard` (and `handout` / `report` as `--render` requests) over
-the recorded store. The renderers read ONLY `store_read` (the data-out PII boundary) and show the
-followable plan + the honest awaiting states for un-generated/held domains.
+Render the recorded store, then re-insert the operator identity OUT under the gitignored boundary:
+`reinsert_out(html, target_path)` (deterministic, model-free — the de-id OUT pass, gated on a
+confirmable-gitignored target) → `reemit_maintained(...)` / `python -m scripts.generate.generate
+<dashboard|handout|report>`. The renderers read ONLY `store_read` (the data-out PII boundary) and show
+the followable plan + the honest awaiting states for un-generated/held domains.
 
 ## Phase 4 — report
 
@@ -122,23 +159,31 @@ State plainly: which domains RECORDED, which were HELD and why (`energy-bounce-h
 the `dvq_entries` collated for the MD (each carrying the adjudicated outcome — cleared-with-override or
 block-stands). A held domain is the honest no-plan state, surfaced, never silently dropped.
 
-## Running + verifying
+## Running + verifying (what IS vs ISN'T mock-testable)
 
-- **Deterministic (no agent):** `tests/plan/test_pipeline.py` exercises `run_generation` over fixture
-  authors + fixture hooks — a clean pass, the cleared-held-finding stitch (mutation-proven against the
-  no-adjudicator control), block-stands queuing, the `on_date` default, and the store-surface battery.
-  `scripts/core-capability-audit.sh --self-test` proves the wired path stays green.
-- **Real-dispatch E2E (the integration mandate — verification means running the production path):**
-  dispatch ≥1 real specialist (full profile) over a PII-free SYNTHETIC summary, feed the captured
-  envelope through `run_generation`, render, and inspect the plan. Captured runs live under
-  `docs/plan-generation/examples/` (the per-domain author outputs, the bounce pair, the liaison
-  adjudication/conflict/BPMH envelopes — see author-dispatch-process.md).
+- **Mock-tested (the glue contract — 0 live spend):** `tests/plan/test_generate_plan_skill_glue.py`
+  exercises the A′ glue over the merged seams with FIXTURE dispatch — the de-id-IN routes through
+  `ModelClient.deidentify` (not `router.summarize`), the glue DRIVES the shared driver to a promoted
+  synthetic run, and the FULL serialized dispatch payload carries 0 raw-PII tokens. The driver loop
+  itself is covered by `tests/plan/test_plan_driver.py` / `tests/plan/test_revise_loop.py`, the inner
+  engine by `tests/plan/test_pipeline.py`. `scripts/core-capability-audit.sh --self-test` proves the
+  wired path stays green.
+- **NOT mock-testable — the S94 operator-present attestation (the live dispatch deferral):** the LIVE
+  subscription dispatch over REAL specialist + lens agents is the S94 operator-present LIVE-test
+  attestation, NOT a mock-test target. The glue test drives the shared driver with a FIXTURE `dispatch`,
+  never a real agent; it STRUCTURALLY only ever holds the `deid_in` summary. Whether a REAL subscription
+  agent receives only the summary on the LIVE path — the residual 0-raw-PII-to-a-REAL-agent property
+  (SEC-6) — is observed at the S94 operator-present checkpoint, not in this mock-tested build. The
+  mock-tested build verifies only the glue-contract level.
 
 ## What is deliberately NOT here
 
 - **The ADJUST leg** — adjusting an existing plan from tracked actuals is `adjust_plan` (a separate
   progression flow); this skill GENERATES.
-- **A non-interactive auto-dispatch CLI** — the reasoning is the specialists' (runtime A); the skill is
-  agent-in-the-loop by design, not a scripted pipeline that invents plan content.
+- **A re-hosted safety loop** — the autonomous bounded revise loop lives in EXACTLY ONE definition
+  (`plan_driver.drive`); this skill DRIVES that one driver, it never re-implements the loop (the
+  no-fork-at-the-skill-level constraint). The reasoning is the specialists' (runtime A); the skill is
+  agent-in-the-loop by design over the de-identified summary, not a scripted pipeline that invents plan
+  content.
 - **Real operator data** — populated locally (gitignored) per ADR-0005, never committed. Until then,
   runs are on synthetic fixtures.
