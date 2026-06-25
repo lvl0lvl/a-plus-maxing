@@ -142,7 +142,8 @@ DEFAULT_REVISE_CAP = 3
 
 
 def drive(summary, domains, store_read, root, *, plan_date, gates, gate_producer, compose=None,
-          on_date=None, reauthor=None, adjudicator=None, budget=None, revise_cap=DEFAULT_REVISE_CAP):
+          on_date=None, reauthor=None, adjudicator=None, budget=None, revise_cap=DEFAULT_REVISE_CAP,
+          initial_memo=None):
     """Drive the autonomous bounded revise loop as a control-inversion generator-coroutine.
 
     The ONE shared revise-loop control flow (the no-fork crown jewel). Yields a dispatch-request
@@ -190,6 +191,13 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_producer
             (charged by the consumer on each specialist dispatch + by the charge-wrapped
             `gate_dispatch`). When `None`, `dispatch_count` is reported as `0`.
         revise_cap (int, optional): The bounded revise-loop cap. Defaults to `DEFAULT_REVISE_CAP`.
+        initial_memo (dict, optional): A pre-seeded throw/replay-memo cache (ADR-0028-T3). The
+            step-harness (`plan_step.step`) re-constructs the driver each round from the SERIALIZED
+            memo cache and seeds the accumulated REAUTHOR / ADJUDICATOR responses here, so the
+            re-drive HITS those cached keys instead of re-yielding them (the OQ-5 round-based
+            replay — there is no held generator). `drive` mutates this dict in place (the harness
+            reads the accumulated cache back from the same object). `None` -> the legacy
+            generator-local cache (`{}` when a hook is wired, else `None`), unchanged.
 
     Yields:
         (Request) A typed `Request(kind, payload)` (ADR-0028-T1): an `AUTHOR` request whose payload
@@ -218,7 +226,15 @@ def drive(summary, domains, store_read, root, *, plan_date, gates, gate_producer
     # the typed request, caches the dispatched envelope here, and re-drives. On the replay the key is
     # cached, so the wrapper returns the envelope and the engine proceeds unchanged. The cache lives
     # for the whole `drive` invocation (one slot per distinct hook key across all passes / re-drives).
-    memo = {} if (reauthor is not None or adjudicator is not None) else None
+    # A harness-supplied `initial_memo` seeds the cache with the accumulated REAUTHOR / ADJUDICATOR
+    # responses from prior `plan_step.step` rounds (ADR-0028-T3): the re-drive then HITS those keys
+    # instead of re-yielding them, so the round-based replay is deterministic with no held generator.
+    # `drive` mutates it in place — the harness reads the accumulated cache back from the same object.
+    # Absent it, the legacy generator-local cache is unchanged.
+    if initial_memo is not None:
+        memo = initial_memo
+    else:
+        memo = {} if (reauthor is not None or adjudicator is not None) else None
     engine_reauthor = _memo_hook(REAUTHOR, _reauthor_key, memo) if reauthor is not None else None
     engine_adjudicator = (
         _memo_hook(ADJUDICATOR, _adjudicator_key, memo) if adjudicator is not None else None
