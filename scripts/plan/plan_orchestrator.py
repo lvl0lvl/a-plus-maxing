@@ -250,10 +250,38 @@ def run_orchestrated(raw_intake, deid_client, dispatch, store_read, root, *, pla
         )
         request = next(driver)
         while True:
-            req_domains, req_summary, req_gates = request
-            authors = _dispatch_domains(req_domains, req_summary, req_gates, dispatch, budget)
+            # The per-`kind` fulfilment switch over the typed drive-request (ADR-0028-T1). The
+            # driver yields a `Request(kind, payload)`; the consumer fulfils each kind and `.send()`s
+            # the RAW fulfilment back — it builds NO disposition (composition stays in `drive`'s ONE
+            # `compose_gate_dispatch` call; the surface gate stays in `drive`). An unrecognized kind
+            # FAILS CLOSED to honest no-plan (Negative-1: never default-allow an un-handled kind).
+            thrown = None
+            if request.kind == plan_driver.AUTHOR:
+                req_domains, req_summary, req_gates = request.payload
+                fulfilment = _dispatch_domains(req_domains, req_summary, req_gates, dispatch, budget)
+            elif request.kind == plan_driver.GATE:
+                # The GATE request carries `(assembled_plan, gate)` — the consumer invokes the
+                # charge-wrapped composed gate over the assembled plan and sends back the RAW
+                # disposition. A gate that RAISES is THROWN INTO the driver, whose GATE-yield
+                # fail-closed wrap reads it as ambiguous -> SAFETY_BLOCKED (the surface gate stays in
+                # `drive`). `DispatchCapExceeded` is the budget halt, not a gate ambiguity — it
+                # propagates to this consumer's cap-halt handler, never thrown into the driver.
+                assembled_plan, gate = request.payload
+                try:
+                    fulfilment = gate(assembled_plan)
+                except DispatchCapExceeded:
+                    raise
+                except Exception as gate_error:
+                    thrown = gate_error
+            else:
+                # Negative-1 fail-closed: an unrecognized request kind surfaces 0 plans (honest
+                # no-plan), never a default-allow that would let an un-handled kind pass silently.
+                return _honest_no_plan(SAFETY_BLOCKED, dispatch_count=budget.count)
             try:
-                request = driver.send(authors)
+                if thrown is not None:
+                    request = driver.throw(thrown)
+                else:
+                    request = driver.send(fulfilment)
             except StopIteration as done:
                 return done.value
     except DispatchCapExceeded as exceeded:
