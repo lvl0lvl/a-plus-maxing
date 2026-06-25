@@ -1142,8 +1142,8 @@ def test_deid_halt_short_circuits_before_loop(tmp_path):
 def test_replay_sentinel_is_baseexception_not_exception():
     # AC-8 (sentinel non-swallowable, the type contract): the replay sentinel is a `BaseException`
     # subclass and NOT an `Exception` subclass — so neither the engine's `except ModelCallError`
-    # nor `drive`'s GATE-yield `except Exception: disposition = None` (the `_safe_gate` analogue)
-    # can absorb it. A sentinel re-typed to `Exception` would be swallowed -> this test goes RED.
+    # nor `drive`'s GATE-yield fail-closed wrap (`except Exception: disposition = None`) can absorb
+    # it. A sentinel re-typed to `Exception` would be swallowed -> this test goes RED.
     from scripts.plan.plan_driver import _ReplayNeeded
 
     assert issubclass(_ReplayNeeded, BaseException)
@@ -1166,7 +1166,7 @@ def test_replay_sentinel_unwinds_through_except_exception():
     try:
         try:
             raises_sentinel()
-        except Exception:  # noqa: BLE001 — the deliberate `_safe_gate` analogue
+        except Exception:  # noqa: BLE001 — the shape of `drive`'s GATE-yield fail-closed wrap
             swallowed = True
     except _ReplayNeeded:
         propagated = True

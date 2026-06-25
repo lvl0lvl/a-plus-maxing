@@ -87,9 +87,9 @@ class _ReplayNeeded(BaseException):
     re-drives the pass over a FRESH scratch store.
 
     It subclasses `BaseException` DIRECTLY, NOT `Exception` — so neither the engine's
-    `except ModelCallError` nor `drive`'s GATE-yield `except Exception: disposition = None` (the
-    `_safe_gate` analogue) can swallow it into a SAFETY_BLOCKED. The non-swallowable contract rests on
-    this base; re-typing it to `Exception` is an ADR-0028 HALT condition (Architect review required).
+    `except ModelCallError` nor `drive`'s GATE-yield fail-closed wrap (`except Exception: disposition
+    = None`) can swallow it into a SAFETY_BLOCKED. The non-swallowable contract rests on this base;
+    re-typing it to `Exception` is an ADR-0028 HALT condition (Architect review required).
 
     Attributes:
         kind (str): The dispatch CLASS — `REAUTHOR` or `ADJUDICATOR` — so `drive`'s catch knows which
