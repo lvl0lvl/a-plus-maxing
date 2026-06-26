@@ -819,3 +819,238 @@ def test_deidentify_leak_variant_probe_goes_red(monkeypatch):
     surfaced_blob = json.dumps(surfaced)
     probe_passes = raw_name not in surfaced_blob
     assert not probe_passes, "the leak variant did not surface the raw token — the probe is vacuous"
+
+
+# --- ADR-0029-T2: the live no-train converse backend (patched-SDK, 0 live spend) ---
+#
+# These cases exercise `_ClaudeNoTrainBackend.converse`'s LIVE call against a PATCHED
+# anthropic SDK injected at the `_ClaudeNoTrainBackend._client` import site, mirroring the
+# ADR-0027-T1 deid posture above. The real SDK is absent from `.venv`, so the suite makes 0
+# live calls. The CONVERSE envelope is the converse analogue of `_summary_envelope_text`'s
+# deid envelope: `_summary_envelope_text` is shape-agnostic (it JSON-dumps any dict into a
+# `.content` text block), so passing a converse-shaped `{"reply", "extraction"}` fixture
+# yields a converse-shaped envelope with no new builder — `_FakeAnthropic` is reused as-is.
+
+
+def _good_converse_turn():
+    """A well-formed converse turn the patched SDK returns: reply text + extraction proposal."""
+    return {
+        "reply": "How many days a week do you currently train?",
+        "extraction": [
+            {"field": "training-frequency", "value": "4 days/week", "confidence": "stated"}
+        ],
+    }
+
+
+# --- Cycle 1: the live converse call ------------------------------------------
+
+
+def test_converse_live_returns_reply_and_extraction(monkeypatch):
+    """AC-1: live `converse` returns the contracted `{reply, extraction}` shape.
+
+    With a patched SDK returning a converse-shaped envelope (injected at `_client`, no live
+    API/key), the backend-direct call returns a dict whose `reply` is a non-empty str and
+    whose `extraction` is a list, AND the same result passes the public `ModelClient.converse`
+    validation ([:47-60]) without raising. The `NotImplementedError` stub is gone.
+    """
+    from scripts.model.client import ModelClient, _ClaudeNoTrainBackend
+
+    fake = _FakeAnthropic(response_summary=_good_converse_turn())
+    _patch_backend_client(monkeypatch, fake)
+    messages = [{"role": "user", "content": "I want to get stronger."}]
+
+    result = _ClaudeNoTrainBackend().converse(messages)
+
+    assert isinstance(result["reply"], str) and result["reply"]
+    assert isinstance(result["extraction"], list)
+
+    public = ModelClient(backend=_ClaudeNoTrainBackend()).converse(messages)
+    assert public == result  # the contracted shape passes the public validation
+
+
+def test_converse_live_resolves_runtime_key_through_client(monkeypatch):
+    """AC-2: the key is resolved at call time via `key_source.resolve` inside `_client`.
+
+    Injects a fake `anthropic` module so the REAL `_client` runs (no `_patch_backend_client`
+    here), patches `key_source.resolve` to a sentinel, and asserts the SDK `_client`
+    constructs was handed THAT sentinel as its `api_key` — the key is read at call time
+    through `key_source.resolve`, never a tracked file or a module-load capture. Driven
+    end-to-end through `converse`.
+    """
+    import sys
+    import types
+
+    from scripts.model import key_source
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    sentinel_key = "sentinel-runtime-key-xyz"
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: sentinel_key)
+
+    fake = _FakeAnthropic(response_summary=_good_converse_turn())
+    captured = {}
+
+    def _make(api_key=None):
+        captured["api_key"] = api_key
+        return fake
+
+    fake_anthropic = types.ModuleType("anthropic")
+    fake_anthropic.Anthropic = _make
+    monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic)
+
+    _ClaudeNoTrainBackend().converse([{"role": "user", "content": "hi"}])
+
+    assert captured["api_key"] == sentinel_key  # call-time key, no tracked-file read
+
+
+def test_converse_live_bounded_retry_then_succeed(monkeypatch):
+    """AC-4 (succeed-within-bound): the Nth attempt succeeds → the call returns, invoked N times."""
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    # raise on the first N-1 attempts, succeed on the Nth (the success path through the loop).
+    raise_seq = [RuntimeError("transient")] * 2 + [None]
+    fake = _FakeAnthropic(response_summary=_good_converse_turn(), raise_seq=raise_seq)
+    _patch_backend_client(monkeypatch, fake)
+
+    result = _ClaudeNoTrainBackend().converse([{"role": "user", "content": "hi"}])
+
+    assert isinstance(result, dict)
+    assert len(fake.calls) == 3  # invoked exactly the bound, succeeded on the last
+
+
+def test_converse_live_bounded_retry_then_fail(monkeypatch):
+    """AC-4 (exhaust-the-bound): all attempts raise → `ModelCallError` after EXACTLY the bound."""
+    from scripts.model.client import (
+        ModelCallError,
+        _ClaudeNoTrainBackend,
+        _CONVERSE_MAX_ATTEMPTS,
+    )
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError("always fails"))
+    _patch_backend_client(monkeypatch, fake)
+
+    with pytest.raises(ModelCallError):
+        _ClaudeNoTrainBackend().converse([{"role": "user", "content": "hi"}])
+
+    assert len(fake.calls) == _CONVERSE_MAX_ATTEMPTS  # exactly the bound — never unbounded
+
+
+def test_converse_live_makes_no_live_call_without_the_sdk():
+    """AC-4 (0 live spend): an UNPATCHED converse call never reaches a live API — the SDK is absent.
+
+    With the real `anthropic` SDK absent from `.venv` (the patch-driven posture), an UNPATCHED
+    call hits the lazy `from anthropic import Anthropic` import and raises `ModuleNotFoundError`
+    BEFORE any network request — the proof that no test path makes a live converse call (0
+    live-API spend), mirroring the deid 0-spend pin.
+    """
+    import importlib.util
+
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    assert importlib.util.find_spec("anthropic") is None, (
+        "the anthropic SDK is installed — the 0-live-spend precondition no longer holds"
+    )
+    with pytest.raises(ModuleNotFoundError):
+        _ClaudeNoTrainBackend().converse([{"role": "user", "content": "hi"}])
+
+
+# --- Cycle 2: the fail-closed / no-leak surface --------------------------------
+
+
+@pytest.mark.parametrize(
+    "fake_kwargs",
+    [
+        {"response_summary": None},  # failed: a null body
+        {"response_summary": {}},  # empty: no reply/extraction
+        {"response_summary": {"reply": "hi"}},  # malformed: missing extraction
+        {"raise_exc": RuntimeError("sdk errored")},  # errored: the SDK raised
+        {"raise_exc": subprocess.TimeoutExpired(cmd="model", timeout=30)},  # timed-out
+    ],
+    ids=["failed", "empty", "malformed", "errored", "timed-out"],
+)
+def test_converse_live_raises_typed_on_every_failure_mode(monkeypatch, fake_kwargs):
+    """AC-3: live `converse` raises `ModelCallError` on every failure mode — 0 fabricated turns.
+
+    Each failure mode injected at the patched SDK (a null / empty / malformed body, a raised
+    exception, a timeout-style raise) makes the live `converse` exhaust the bound and raise the
+    typed `ModelCallError` — never returning a fabricated or partial turn (the parse helper's
+    shape gate rejects a truthy-but-malformed body; the public `ModelClient.converse` validation
+    is the outer net). Mirrors the deid fail-closed family.
+
+    RED-capable: against the Cycle-1-PRE `NotImplementedError` stub these errored; and a converse
+    that returned a fabricated `{"reply": ..., "extraction": []}` on the empty mode (instead of
+    raising) was confirmed to fail the `== "RAISED"` assertion, then reverted.
+    """
+    from scripts.model.client import ModelCallError, _ClaudeNoTrainBackend
+
+    fake = _FakeAnthropic(**fake_kwargs)
+    _patch_backend_client(monkeypatch, fake)
+
+    returned = None
+    try:
+        returned = _ClaudeNoTrainBackend().converse([{"role": "user", "content": "hi"}])
+    except ModelCallError:
+        returned = "RAISED"
+    assert returned == "RAISED", "a failure mode returned a payload instead of raising"
+
+
+def test_converse_error_surface_carries_no_key_or_raw(monkeypatch, tmp_path):
+    """AC-3 (SEC): the raised `ModelCallError` str + .args carry no synthetic key or raw-PII token.
+
+    Seeds a synthetic key (patches `key_source.resolve`) + a synthetic raw-PII token, forces the
+    failure path with a `messages.create` whose exception message EMBEDS both tokens, and asserts
+    `str(exc)` and `exc.args` over the raised `ModelCallError` carry 0 occurrences of either — the
+    SEC-01 constant-message lock holds. RED-capable: a variant interpolating `{exc!r}` into the
+    converse message would leak the token and turn this RED (confirmed by temporarily interpolating
+    the SDK exception into the raise, observing the assertion fail, then reverting to the constant).
+    """
+    from scripts.guard import pii_scan
+    from scripts.model import key_source
+    from scripts.model.client import ModelCallError, _ClaudeNoTrainBackend
+
+    raw_token = "Jordan Faketestperson"
+    key_token = "synthetic-no-train-key-token-DO-NOT-LOG"
+    config = tmp_path / "synthetic-identity.txt"
+    config.write_text(raw_token + "\n")
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: key_token)
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError(f"sdk error on {raw_token} with {key_token}"))
+    _patch_backend_client(monkeypatch, fake)
+
+    with pytest.raises(ModelCallError) as excinfo:
+        _ClaudeNoTrainBackend().converse([{"role": "user", "content": raw_token}])
+
+    surface = str(excinfo.value) + repr(excinfo.value.args)
+    assert raw_token not in surface
+    assert key_token not in surface
+    assert pii_scan.scan_text(str(excinfo.value), token_config=config) == 0
+
+
+def test_converse_error_traceback_carries_no_key_or_raw(monkeypatch, tmp_path):
+    """AC-3 (SEC): the RENDERED traceback (`__cause__`/`__context__` chain) carries no key or raw token.
+
+    `raise ... from <sdk_exc>` would attach the raw SDK exception (carrying the raw conversation in
+    the request + the resolved key) as `__cause__` — which a caller's `logger.exception()` /
+    `traceback.print_exc()` renders. Forces the failure path with an SDK exception EMBEDDING both
+    tokens and asserts the fully-rendered traceback carries 0 occurrences of either AND
+    `__cause__ is None` (the `from None` lock). RED-capable: reverting `from None` to `from <exc>`
+    re-attaches the raw `__cause__` and turns this RED (confirmed by temporarily reverting the
+    raise, observing the assertion fail, then restoring `from None`).
+    """
+    from scripts.model import key_source
+    from scripts.model.client import ModelCallError, _ClaudeNoTrainBackend
+
+    raw_token = "Jordan Faketestperson"
+    key_token = "synthetic-no-train-key-token-DO-NOT-LOG"
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: key_token)
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError(f"sdk error on {raw_token} with {key_token}"))
+    _patch_backend_client(monkeypatch, fake)
+
+    with pytest.raises(ModelCallError) as excinfo:
+        _ClaudeNoTrainBackend().converse([{"role": "user", "content": raw_token}])
+
+    e = excinfo.value
+    assert e.__cause__ is None  # the chain is severed (`from None`)
+    tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+    assert raw_token not in tb
+    assert key_token not in tb

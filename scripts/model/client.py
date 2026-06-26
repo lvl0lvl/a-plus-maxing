@@ -169,6 +169,46 @@ def _parse_deid_summary(response):
     return summary
 
 
+def _converse_system_prompt():
+    """Build the converse system instruction: constrain the reply/extraction JSON shape.
+
+    A CONSTANT system instruction (no raw conversation interpolated — the turns are passed
+    natively as the `messages` array, never inlined here) telling the model to respond with
+    ONLY a JSON object `{"reply": str, "extraction": list}` — the assistant reply text plus a
+    list of structured field proposals. The converse analogue of `_deid_prompt`'s field-set
+    instruction; the shape gate is the downstream `_parse_converse_turn`.
+    """
+    return (
+        "You are conducting one intake turn. Respond with a single JSON object and nothing "
+        'else, shaped exactly as {"reply": <assistant reply text>, "extraction": [<zero or '
+        "more structured field proposals>]}. The reply is the text shown to the operator; the "
+        "extraction is the list of fields you inferred this turn (an empty list when none). "
+        "Emit no prose outside the JSON object."
+    )
+
+
+def _parse_converse_turn(response):
+    """Parse the model response into the `{"reply", "extraction"}` turn mapping.
+
+    Reads the first `text` content block off the SDK envelope and decodes it as the JSON turn
+    object — the assistant reply text plus a structured extraction proposal. Returns the
+    parsed mapping (the raw conversation never flows through here); a non-text / non-JSON /
+    wrong-shape response raises, failing closed at the retry loop to `ModelCallError`. The
+    shape check mirrors the public `ModelClient.converse` validation (a dict with a truthy
+    `reply` and an `extraction` key), so a truthy-but-malformed body is rejected at the
+    backend, never returned as a partial turn.
+    """
+    import json
+
+    text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), None)
+    if text is None:
+        raise ValueError("converse: model response carried no text block")
+    turn = json.loads(text)
+    if not isinstance(turn, dict) or not turn.get("reply") or "extraction" not in turn:
+        raise ValueError("converse: model response was not the {reply, extraction} shape")
+    return turn
+
+
 # The de-id call's bounded retry ceiling — at most this many `messages.create` attempts
 # before the failure propagates to the `_call` fail-closed wrapper (never an unbounded
 # retry). An in-task design constant (recipe disposition #8), named here, not a call-site
@@ -178,6 +218,16 @@ _DEID_MAX_ATTEMPTS = 3
 # The per-call timeout (seconds) the SDK request runs under — a bounded wait, never an
 # indefinite block. Passed through `with_options(timeout=...)` at call time.
 _DEID_TIMEOUT_SECONDS = 60.0
+
+# The converse call's bounded retry ceiling — at most this many `messages.create` attempts
+# before the failure propagates to the fail-closed raise (never an unbounded retry). The
+# converse analogue of `_DEID_MAX_ATTEMPTS`, named here so the bound is one machine-diffable
+# value, not a call-site literal.
+_CONVERSE_MAX_ATTEMPTS = 3
+
+# The per-call timeout (seconds) the converse SDK request runs under — a bounded wait, never
+# an indefinite block. Passed through `with_options(timeout=...)` at call time.
+_CONVERSE_TIMEOUT_SECONDS = 60.0
 
 
 class _ClaudeNoTrainBackend:
@@ -199,10 +249,44 @@ class _ClaudeNoTrainBackend:
         return Anthropic(api_key=resolve())
 
     def converse(self, messages):
-        """One intake turn against the no-train API."""
-        raise NotImplementedError(
-            "live converse is wired at the Wave-B operator checkpoint; tests inject a backend"
-        )
+        """Run one intake turn against the no-train API (the live converse call).
+
+        Sends the conversation `messages` to the `MODEL` no-train API under a bounded
+        retry-with-timeout loop and returns the model's parsed turn — `{"reply", "extraction"}`,
+        the assistant reply text plus a structured extraction proposal. A constant `system`
+        instruction constrains the shape; the raw conversation is held in memory only (the
+        local arg plus the request) and is written to no path. On bound exhaustion the raw SDK
+        exception is suppressed and a constant-message `ModelCallError` is raised — never a
+        fabricated or partial turn (the downstream `ModelClient.converse` validation is the
+        outer net).
+
+        Args:
+            messages (list[dict]): The conversation turns (`{"role", "content"}`).
+
+        Returns:
+            (dict) The parsed turn `{"reply": str, "extraction": list}`.
+        """
+        client = self._client()
+        system = _converse_system_prompt()
+        for _ in range(_CONVERSE_MAX_ATTEMPTS):
+            try:
+                response = client.with_options(timeout=_CONVERSE_TIMEOUT_SECONDS).messages.create(
+                    model=self.MODEL,
+                    max_tokens=2048,
+                    system=system,
+                    messages=messages,
+                )
+                return _parse_converse_turn(response)
+            except Exception:  # bounded: try again until the attempt ceiling
+                pass
+        # SEC-01: a CONSTANT message — never interpolate the SDK exception (it can carry the
+        # raw conversation or the resolved key). `from None` INTENTIONALLY SUPPRESSES the
+        # `__cause__`/`__context__` chain: the raw SDK exception carries the raw conversation
+        # (the request) + the resolved key, which a caller's `logger.exception()` /
+        # `traceback.print_exc()` would render. At this PII/key boundary the chained cause's
+        # debuggability is not worth the latent raw/key leak (PUBLIC repo).
+        # Raised at the backend boundary so the raw SDK exception never escapes `converse`.
+        raise ModelCallError("converse call failed") from None
 
     def author(self, domain, summary):
         """Author a domain's recommendations against the no-train API."""
