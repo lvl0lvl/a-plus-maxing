@@ -1,18 +1,18 @@
-"""Route + lifecycle tests for the loopback-only intake server (ADR-0013-T1, ADR-0013-T4).
+"""Route + lifecycle tests for the loopback-only server (ADR-0013-T1, ADR-0013-T4, ADR-0029-T1).
 
-AC-2: GET `/` against the running handler returns HTTP 200 + the intake wizard
-HTML (the `generate.run('intake')` body), proved by the wizard title string in the
-body — not a directory listing. A non-`/` GET returns 404. AC-4: the operator-stop
-lifecycle closes the listener cleanly (a fresh bind to the freed port succeeds),
-and `main` reads no stdin.
+AC-2: GET `/` against the running handler returns HTTP 200 + the served app-shell SPA
+HTML (the `generate.run('app')` body — re-pointed from the intake wizard at ADR-0029-T1),
+proved by the SPA nav marker in the body — not a directory listing. A non-`/` GET returns
+404. AC-4: the operator-stop lifecycle closes the listener cleanly (a fresh bind to the
+freed port succeeds), and `main` reads no stdin.
 
 ADR-0013-T4 adds the POST `/upload` handler E2E coverage: a POST of a synthetic
 `export.xml` (AC-1), an Apple-Health `.zip` (AC-3), and a 23andMe DNA `.zip` (AC-2)
 each chains stage -> route -> re-render — the upload lands via the UNCHANGED
-`ingest.run`/`dna.land` seam and the response re-renders the wizard reflecting the
-new load-state. The intake-only assertion (AC-5 / Risk Falsification-3): a GET for a
-dashboard/report artifact path 404s and `scripts/serve/` carries 0 artifact-serving
-route. The 0-shared-routine-edit proof (AC-6) lives in `test_route.py`.
+`ingest.run`/`dna.land` seam and the response re-renders the app shell reflecting the
+new load-state (its Upload Documents cards). The no-artifact-route assertion (AC-5 / Risk
+Falsification-3): a GET for a dashboard/report artifact path 404s and `scripts/serve/`
+carries 0 artifact-serving route. The 0-shared-routine-edit proof (AC-6) lives in `test_route.py`.
 """
 
 import http.client
@@ -29,9 +29,11 @@ from scripts.store import store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# The intake wizard title (vault/design/templates/intake.py render() <title>) the
-# GET `/` body must carry — proves the route serves the wizard, not a dir listing.
-WIZARD_TITLE = "A+ Maxing — Build your plan"
+# A served-body marker UNIQUE to the served app shell — its "Chat with Team" nav button
+# (vault/design/templates/app_shell.py, ADR-0029-T1). The intake wizard has no such nav,
+# so this distinguishes the SPA served body from the old wizard <title>; the re-render
+# tests assert it to prove GET `/` (and the POST re-render) serves the SPA, not a dir listing.
+SPA_NAV_MARKER = "Chat with Team"
 
 BOUNDARY = "----aplusboundary7MA4YWxkTrZu0gW"
 
@@ -164,17 +166,17 @@ def _post_fields(port, fields):
 
 
 # --------------------------------------------------------------------------- #
-# Cycle 1 — AC-2 GET `/` serves the wizard
+# Cycle 1 — AC-2 GET `/` serves the app shell (re-pointed from the wizard, ADR-0029-T1)
 # --------------------------------------------------------------------------- #
 
 
-def test_get_root_returns_200_with_wizard_html():
-    """AC-2: GET `/` returns HTTP 200 and the body carries the wizard title.
+def test_get_root_returns_200_with_spa_html():
+    """AC-2: GET `/` returns HTTP 200 and the body carries the SPA served surface.
 
     Runs the real server on an ephemeral loopback port in a fixture thread and
-    issues a GET `/` with http.client. The 200 body must contain the intake
-    wizard's title string — proving GET `/` serves the wizard HTML produced by
-    `generate.run('intake')`, not a directory listing.
+    issues a GET `/` with http.client. The 200 body must contain the SPA nav marker
+    — proving GET `/` serves the app-shell HTML produced by `generate.run('app')`
+    (re-pointed from the intake wizard, ADR-0029-T1), not a directory listing.
     """
     srv = serve_server.build_server(0)
     port = srv.server_address[1]
@@ -186,14 +188,14 @@ def test_get_root_returns_200_with_wizard_html():
         body = resp.read().decode("utf-8")
         conn.close()
         assert resp.status == 200, f"GET / returned {resp.status}, expected 200"
-        assert WIZARD_TITLE in body, "GET / body does not carry the wizard title (not the wizard?)"
+        assert SPA_NAV_MARKER in body, "GET / body does not carry the SPA nav marker (not the served app shell?)"
     finally:
         srv.shutdown()
         srv.server_close()
 
 
 def test_get_non_root_returns_404():
-    """AC-2 boundary: a non-`/` GET returns 404 (the server serves only the wizard).
+    """AC-2 boundary: a non-`/` GET returns 404 (the server serves only the app shell).
 
     A request to a path other than `/` must 404 — the server publishes exactly the
     GET `/` route, never a directory listing or an arbitrary-path file server.
@@ -310,7 +312,7 @@ def test_post_export_xml_lands_readings_and_rerenders(tmp_path):
         assert hrv[0]["value"] == 83.7
 
         # The response IS the re-rendered wizard, reflecting the new load-state.
-        assert WIZARD_TITLE in body, "response is not the re-rendered intake wizard"
+        assert SPA_NAV_MARKER in body, "response is not the re-rendered SPA served body"
         assert "1 readings" in body, "the re-rendered wizard does not reflect the new wearable load-state"
         assert "✓ loaded" in body, "the wearable card did not flip to loaded after the upload"
 
@@ -344,7 +346,7 @@ def test_post_apple_health_zip_lands_via_healthkit_adapter(tmp_path):
         # The DNA dropzone stayed empty — the Apple-Health zip routed to healthkit, not dna.
         dna_root = tmp_path / "dna"
         assert not (dna_root.exists() and list(dna_root.glob("*"))), "Apple-Health zip wrongly landed in the DNA dropzone"
-        assert WIZARD_TITLE in body, "response is not the re-rendered intake wizard"
+        assert SPA_NAV_MARKER in body, "response is not the re-rendered SPA served body"
     finally:
         srv.shutdown()
         srv.server_close()
@@ -368,7 +370,7 @@ def test_post_dna_zip_lands_via_dna_land_and_rerenders(tmp_path):
         assert landed and landed[0].name == "genome_v5.txt", "the DNA zip did not land via dna.land"
         assert store.read_all(tmp_path / "store") == [], "the DNA zip wrongly wrote into the time-series store"
 
-        assert WIZARD_TITLE in body, "response is not the re-rendered intake wizard"
+        assert SPA_NAV_MARKER in body, "response is not the re-rendered SPA served body"
         assert "genome_v5.txt" in body, "the re-rendered wizard does not reflect the landed DNA file"
 
         # Negative (no-leak): the re-render names the landed FILE only — never a genotype
@@ -395,7 +397,7 @@ def test_post_unknown_file_rerenders_with_message_no_crash(tmp_path):
         status, body = _post_upload(port, "mystery.json", b'[{"x": 1}]')
         # The request completes (no dropped connection / 500 from an uncaught SystemExit).
         assert status in (200, 400), f"unknown-file POST returned {status}, expected a rendered 200/400"
-        assert WIZARD_TITLE in body, "the unknown-file response is not the re-rendered wizard"
+        assert SPA_NAV_MARKER in body, "the unknown-file response is not the re-rendered SPA served body"
 
         # The handler is still alive: a follow-up GET / still serves the wizard.
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
@@ -403,7 +405,7 @@ def test_post_unknown_file_rerenders_with_message_no_crash(tmp_path):
         resp = conn.getresponse()
         follow = resp.read().decode("utf-8")
         conn.close()
-        assert resp.status == 200 and WIZARD_TITLE in follow, "the handler died after the unknown-file POST"
+        assert resp.status == 200 and SPA_NAV_MARKER in follow, "the handler died after the unknown-file POST"
     finally:
         srv.shutdown()
         srv.server_close()
@@ -415,13 +417,13 @@ def test_post_unknown_file_rerenders_with_message_no_crash(tmp_path):
 
 
 def _still_alive(port):
-    """Return True if a follow-up GET / on `port` still serves the wizard (handler alive)."""
+    """Return True if a follow-up GET / on `port` still serves the app shell (handler alive)."""
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     conn.request("GET", "/")
     resp = conn.getresponse()
     body = resp.read().decode("utf-8")
     conn.close()
-    return resp.status == 200 and WIZARD_TITLE in body
+    return resp.status == 200 and SPA_NAV_MARKER in body
 
 
 def test_post_garbage_export_xml_rerenders_no_crash(tmp_path):
@@ -437,7 +439,7 @@ def test_post_garbage_export_xml_rerenders_no_crash(tmp_path):
     try:
         status, body = _post_upload(port, "export.xml", b"this is not valid xml <<<")
         assert status == 200, f"garbage export.xml returned {status}, expected a re-rendered 200"
-        assert WIZARD_TITLE in body, "the garbage-xml response is not the re-rendered wizard"
+        assert SPA_NAV_MARKER in body, "the garbage-xml response is not the re-rendered SPA served body"
         assert _still_alive(port), "the handler died after the garbage-xml POST"
     finally:
         srv.shutdown()
@@ -456,7 +458,7 @@ def test_post_not_really_a_zip_rerenders_no_crash(tmp_path):
     try:
         status, body = _post_upload(port, "fake.zip", b"PK this looks like a zip but is not")
         assert status == 200, f"not-a-zip returned {status}, expected a re-rendered 200"
-        assert WIZARD_TITLE in body, "the not-a-zip response is not the re-rendered wizard"
+        assert SPA_NAV_MARKER in body, "the not-a-zip response is not the re-rendered SPA served body"
         assert _still_alive(port), "the handler died after the not-a-zip POST"
     finally:
         srv.shutdown()
@@ -484,7 +486,7 @@ def test_post_non_numeric_content_length_rerenders_no_crash(tmp_path):
         body = resp.read().decode("utf-8")
         conn.close()
         assert resp.status == 400, f"non-numeric Content-Length returned {resp.status}, expected 400"
-        assert WIZARD_TITLE in body, "the bad-Content-Length response is not the re-rendered wizard"
+        assert SPA_NAV_MARKER in body, "the bad-Content-Length response is not the re-rendered SPA served body"
         assert _still_alive(port), "the handler died after a non-numeric Content-Length POST"
     finally:
         srv.shutdown()
@@ -516,7 +518,7 @@ def test_post_oversize_content_length_413_without_reading_body(tmp_path):
         body = resp.read().decode("utf-8")
         conn.close()
         assert resp.status == 413, f"oversize Content-Length returned {resp.status}, expected 413"
-        assert WIZARD_TITLE in body, "the 413 body is not the re-rendered wizard"
+        assert SPA_NAV_MARKER in body, "the 413 body is not the re-rendered SPA served body"
         assert _still_alive(port), "the handler died after the oversize-Content-Length POST"
     finally:
         srv.shutdown()
@@ -541,7 +543,7 @@ def test_post_oversize_streamed_body_413_bounded_memory(tmp_path, monkeypatch):
         oversize = b"A" * (4096 + 2048)  # over the injected per-file ceiling, tiny in RAM
         status, body = _post_upload(port, "export.zip", oversize)
         assert status == 413, f"over-per-file-ceiling body returned {status}, expected 413"
-        assert WIZARD_TITLE in body, "the 413 body is not the re-rendered wizard"
+        assert SPA_NAV_MARKER in body, "the 413 body is not the re-rendered SPA served body"
         assert _still_alive(port), "the handler died after the oversize-body POST"
     finally:
         srv.shutdown()
@@ -629,7 +631,7 @@ def test_post_dual_upload_export_and_dna_both_land(tmp_path):
         assert landed and landed[0].name == "genome_v5.txt", "the DNA zip part did not land"
 
         # The re-render reflects both load-states.
-        assert WIZARD_TITLE in text, "response is not the re-rendered intake wizard"
+        assert SPA_NAV_MARKER in text, "response is not the re-rendered SPA served body"
         assert "1 readings" in text, "the re-render does not reflect the landed HRV reading"
         assert "genome_v5.txt" in text, "the re-render does not reflect the landed DNA file"
     finally:
@@ -661,7 +663,7 @@ def test_post_two_same_basename_parts_both_land_in_store(tmp_path):
         assert days == ["2026-05-06", "2026-05-07"], (
             f"both same-basename parts did not land (first upload lost?): got {days}"
         )
-        assert WIZARD_TITLE in text, "response is not the re-rendered intake wizard"
+        assert SPA_NAV_MARKER in text, "response is not the re-rendered SPA served body"
     finally:
         srv.shutdown()
         srv.server_close()
@@ -713,7 +715,7 @@ def test_post_no_file_chosen_not_staged(tmp_path):
         body += f"--{BOUNDARY}--\r\n".encode()
         status, text = _post_raw(port, bytes(body))
         assert status == 200, f"no-file submit returned {status}, expected 200"
-        assert WIZARD_TITLE in text, "the no-file response is not the re-rendered wizard"
+        assert SPA_NAV_MARKER in text, "the no-file response is not the re-rendered SPA served body"
 
         # Nothing was staged/ingested — the store and dropzone stay empty.
         assert store.read_all(tmp_path / "store") == [], "a no-file submit wrongly wrote into the store"
@@ -742,7 +744,7 @@ def test_post_unterminated_multipart_body_rerenders_no_crash(tmp_path):
         body = _file_part("export.xml", _healthkit_xml_bytes())  # no trailing close delimiter
         status, text = _post_raw(port, body)
         assert status == 200, f"unterminated body returned {status}, expected a re-rendered 200"
-        assert WIZARD_TITLE in text, "the unterminated-body response is not the re-rendered wizard"
+        assert SPA_NAV_MARKER in text, "the unterminated-body response is not the re-rendered SPA served body"
         assert _still_alive(port), "the handler died after an unterminated multipart body"
     finally:
         srv.shutdown()
@@ -760,8 +762,8 @@ def test_post_capture_fields_land_wired_tokens_and_rerenders(tmp_path):
     POSTs a multipart body whose parts are plain `fields` (no filename= -> they decode
     into `staged["fields"]`): a Step-2 `goal-domains` + `hard-limits` capture. The
     handler routes them through `capture.persist_capture` into the tmp store, then
-    re-renders the wizard via `generate.run('intake')`. Asserts the tokens landed
-    tagged source:"intake" AND the 200 response is the re-rendered wizard.
+    re-renders the served app shell via `generate.run('app')` (re-pointed at ADR-0029-T1).
+    Asserts the tokens landed tagged source:"intake" AND the 200 response is the served SPA.
     """
     srv, port = _server_with_roots(tmp_path)
     _serve_in_thread(srv)
@@ -778,7 +780,7 @@ def test_post_capture_fields_land_wired_tokens_and_rerenders(tmp_path):
         hl = store.read("hard-limits", root=tmp_path / "store")
         assert hl and hl[0]["value"] == "no overhead pressing", "hard-limits did not land"
 
-        assert WIZARD_TITLE in body, "the capture response is not the re-rendered wizard"
+        assert SPA_NAV_MARKER in body, "the capture response is not the re-rendered SPA served body"
     finally:
         srv.shutdown()
         srv.server_close()
@@ -819,7 +821,7 @@ def test_post_capture_record_only_lands_in_scaffold_not_store(tmp_path):
                 assert "mediterranean" not in v and "creatine" not in v, (
                     f"a record-only value leaked into the {token!r} field-set store item"
                 )
-        assert WIZARD_TITLE in body, "the record-only capture response is not the re-rendered wizard"
+        assert SPA_NAV_MARKER in body, "the record-only capture response is not the re-rendered SPA served body"
     finally:
         srv.shutdown()
         srv.server_close()
@@ -830,31 +832,16 @@ def test_post_capture_record_only_lands_in_scaffold_not_store(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-def test_post_step6_is_a_generate_plan_handoff_not_in_app_generation(tmp_path):
-    """AC-5 / Risk Falsification-3: the Step-6 submit is a /generate-plan handoff, 0 generation.
-
-    The Step-6 "Save & open plan generation" submit persists any still-transient
-    inputs and returns the HANDOFF state: a readiness summary + the instruction to
-    run `/generate-plan` (the agent path), NOT a generated plan. The handler performs
-    0 in-app generation.
-    """
-    srv, port = _server_with_roots(tmp_path)
-    _serve_in_thread(srv)
-    try:
-        status, body = _post_fields(port, {
-            "goal-domains": "Workout",
-            "step": "6",  # the Step-6 "Save & open plan generation" submit
-        })
-        assert status == 200, f"Step-6 submit returned {status}, expected 200"
-        # The response instructs the operator to run /generate-plan (the handoff), and
-        # is the re-rendered wizard — never a generated plan artifact.
-        assert "/generate-plan" in body, "the Step-6 response does not instruct the /generate-plan handoff"
-        assert WIZARD_TITLE in body, "the Step-6 response is not the re-rendered wizard"
-        # Still-transient inputs were persisted via the same capture path.
-        assert store.read("goal-domains", root=tmp_path / "store"), "the Step-6 submit did not persist the inputs"
-    finally:
-        srv.shutdown()
-        srv.server_close()
+# RETIRED (ADR-0029-T1, AC-7 class b): the wizard-presentation-specific
+# `test_post_step6_is_a_generate_plan_handoff_not_in_app_generation` POSTed `step:"6"`
+# (a wizard-only submit) and asserted the wizard's `/generate-plan` Step-6 handoff body —
+# a surface the served SPA does not have (the SPA's plan generation is the Plan screen's
+# "Generate plan →", driven by T4/T5, not an in-app wizard handoff). It is RETIRED rather
+# than marker-swapped (a marker swap that still POSTed `step:"6"` while claiming to test the
+# wizard handoff is the tautological dead-wizard test AC-7 forbids). Its non-presentation
+# coverage survives: the `step:"6"` submit still captures + strips `step`
+# (`test_post_step6_step_control_field_never_lands_in_the_record`, below) and the serve
+# layer does 0 in-app generation (`test_serve_layer_has_no_in_app_plan_generation_call`).
 
 
 def test_post_step6_step_control_field_never_lands_in_the_record(tmp_path):

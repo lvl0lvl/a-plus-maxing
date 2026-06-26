@@ -6,14 +6,14 @@ Confirmation 1: the first network surface the system opens, off-machine-unreacha
 by construction). The bind literal lives in exactly one place (`_LOOPBACK`) so the
 downstream tasks extend the handler without re-specifying the bind.
 
-The handler serves GET `/` with the existing intake wizard — the body IS
-`generate.run('intake')`'s rendered HTML (the server adds a transport, not a new
-wizard); a non-`/` GET returns 404. POST `/upload` (ADR-0013-T4) is a thin chain:
-stage the multipart body (`multipart.stage_uploads`, ADR-0013-T2) -> route the
-staged file into the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`)
--> re-render the wizard via `generate.run('intake')` reflecting the new load-state.
-The server serves NO generated artifact live — intake-only (ADR-0013 Falsification 3;
-the route table is exactly {GET `/`, POST `/upload`}). Stopping is `srv.shutdown()` +
+The handler serves GET `/` with the served app shell (ADR-0029-T1) — the body IS
+`generate.run('app')`'s rendered HTML (the server adds a transport, not a new view);
+a non-`/` GET returns 404. POST `/upload` (ADR-0013-T4) is a thin chain: stage the
+multipart body (`multipart.stage_uploads`, ADR-0013-T2) -> route the staged file into
+the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`) -> re-render the app
+shell via `generate.run('app')` reflecting the new load-state. The server serves NO
+generated dashboard/report artifact live (ADR-0013 Falsification 3); the route table
+is {GET `/`, POST `/upload`, POST `/chat`}. Stopping is `srv.shutdown()` +
 `srv.server_close()`, the clean operator-stop path.
 """
 
@@ -68,27 +68,29 @@ class _BoundedReader:
 
 
 def _render_intake(*, store_root=None, dna_root=None):
-    """Return the intake wizard HTML — the GET `/` body and the POST re-render body.
+    """Return the served app-shell HTML — the GET `/` body and the POST re-render body.
 
-    Drives `generate.run('intake')` (which RE-READS the live store + dropzone
-    load-state, so a re-render after an upload reflects the just-landed readings/files)
-    and reads the produced file's text. The server is glue: the body is exactly the
-    rendered wizard. `store_root`/`dna_root` are the test-seam roots the POST handler
-    ingested into; None falls through to `generate.run`'s production defaults.
+    Drives `generate.run('app')` (which RE-READS the live store + dropzone load-state,
+    so a re-render after an upload reflects the just-landed readings/files in the app
+    shell's Upload Documents cards) and reads the produced file's text. The server is
+    glue: the body is exactly the rendered app shell. `store_root`/`dna_root` are the
+    test-seam roots the POST handler ingested into; None falls through to
+    `generate.run`'s production defaults. (The name is retained from the ADR-0013
+    intake-wizard era for blast-radius minimization — every POST re-render site reuses it.)
     """
     from scripts.generate.generate import run as generate_run
 
-    return generate_run("intake", _root=store_root, _dna_root=dna_root).read_text()
+    return generate_run("app", _root=store_root, _dna_root=dna_root).read_text()
 
 
 class IntakeRequestHandler(BaseHTTPRequestHandler):
     """Serve the intake wizard at GET `/`; stage->route->re-render at POST `/upload`.
 
-    GET `/` writes HTTP 200 + the `generate.run('intake')` body; any other GET 404s.
+    GET `/` writes HTTP 200 + the `generate.run('app')` body; any other GET 404s.
     POST `/upload` stages the multipart body, routes the staged file into the unchanged
-    `ingest.run`/`dna.land` seam, and re-renders the wizard reflecting the new
-    load-state. Any other POST 404s — the route table is intake-only {GET `/`, POST
-    `/upload`}, never a directory listing or an artifact-serving route.
+    `ingest.run`/`dna.land` seam, and re-renders the app shell reflecting the new
+    load-state. Any other POST 404s — the route table is {GET `/`, POST `/upload`, POST
+    `/chat`}, never a directory listing or an artifact-serving route.
 
     Attributes:
         store_root: The time-series store root the POST handler ingests into and
