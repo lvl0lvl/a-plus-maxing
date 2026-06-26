@@ -2,7 +2,7 @@
 
 `resolve()` fetches the no-train API key from a SET env var (`ANTHROPIC_API_KEY` — the
 anthropic SDK's native var AND the operator's documented injection var) or, as a fallback,
-a macOS-keychain `security find-generic-password` command against the `quant-primary-api`
+a macOS-keychain `security find-generic-password` command against the `a-plus-maxing-api-key`
 keychain item — AT CALL TIME, never captured at module load and never read from a tracked
 file. An absent key raises `KeyUnavailableError` fail-loud, naming the env var + the
 `keychain-setup.md` runbook.
@@ -13,20 +13,21 @@ the repo (NFR-3 — the repo is PUBLIC). The client's default backend calls `res
 call time, so the key is fetched at runtime, never imported from a constant.
 """
 
+import getpass
 import os
 import subprocess
 
 # The anthropic SDK's native var AND the operator's documented runtime-injection var
 # (S90 directive: `export ANTHROPIC_API_KEY=$(security find-generic-password -s
-# "quant-primary-api" -w)`). Reading it directly means the operator's existing shell
+# "a-plus-maxing-api-key" -w)`). Reading it directly means the operator's existing shell
 # export resolves with no extra setup.
 ENV_VAR = "ANTHROPIC_API_KEY"
 
-# The keychain item the runbook stores the key under (`keychain-setup.md`). The service
-# name is a label, not a secret — the key VALUE lives only in the keychain at runtime.
-# Matches the operator's existing keychain item (`quant-primary-api`), so the keychain
-# fallback resolves the same key the operator already injects via the env var.
-_KEYCHAIN_SERVICE = "quant-primary-api"
+# This project's keychain item — the in-app Profile save (POST /settings/key, via
+# `store()`) writes the key here and `resolve()` reads it here, so an in-app paste is
+# picked up on the next call with no terminal step. The service name is a project label,
+# not a secret — the key VALUE lives only in the keychain at runtime (`keychain-setup.md`).
+_KEYCHAIN_SERVICE = "a-plus-maxing-api-key"
 
 _RUNBOOK = "scripts/model/keychain-setup.md"
 
@@ -88,3 +89,66 @@ def resolve(keychain_runner=_keychain_runner):
         f"No no-train API key found. Set the {ENV_VAR} env var, or store the key in the "
         f"macOS keychain per the {_RUNBOOK} runbook (service '{_KEYCHAIN_SERVICE}')."
     )
+
+
+class KeyStoreError(RuntimeError):
+    """Storing the no-train API key in the keychain failed.
+
+    Raised fail-loud when the keychain write returns non-zero or `security` is
+    unavailable. The message is CONSTANT and never carries the key value — a store
+    failure must not leak the secret into a traceback (NFR-3: the repo is PUBLIC).
+    """
+
+
+def _keychain_writer(key):
+    """Write the key into the macOS login keychain at call time (fail-loud on error).
+
+    Runs `security add-generic-password -U -a <user> -s <service> -w <key>` — the same
+    command the keychain-setup runbook documents (the `-U` flag updates the existing
+    item, so an in-app save rotates the key in place). Raises `KeyStoreError` on a
+    non-zero exit or an unavailable `security` binary (a non-macOS host). The key VALUE
+    is passed only as the subprocess argument — never logged, echoed, or written to a
+    file; on failure the constant-message error carries no key.
+
+    Args:
+        key (str): The no-train API key to store.
+    """
+    try:
+        completed = subprocess.run(
+            ["security", "add-generic-password", "-U",
+             "-a", getpass.getuser(), "-s", _KEYCHAIN_SERVICE, "-w", key],
+            capture_output=True,
+            text=True,
+        )
+    except (FileNotFoundError, OSError):
+        raise KeyStoreError(
+            f"Could not store the key — the macOS keychain is unavailable on this host "
+            f"(set the {ENV_VAR} env var instead, per {_RUNBOOK})."
+        ) from None
+    if completed.returncode != 0:
+        raise KeyStoreError("Could not store the key in the macOS keychain.") from None
+
+
+def store(key, *, keychain_writer=_keychain_writer):
+    """Store the no-train API key in the macOS keychain at call time.
+
+    Writes the key into the same `a-plus-maxing-api-key` item `resolve()` reads, so an
+    in-app save (the Profile screen's POST `/settings/key`) is picked up by the next
+    runtime `resolve()` with no shell command. The key is written ONLY to the OS
+    keychain — never to a tracked file, a log, or a returned value (NFR-3: the repo is
+    PUBLIC). An empty/blank key is rejected before any write.
+
+    Args:
+        key (str): The no-train API key to store.
+        keychain_writer (Callable, optional): The keychain write seam (takes the key).
+            Defaults to the macOS `security add-generic-password` command; injected in
+            tests so no real keychain or key is touched.
+
+    Raises:
+        ValueError: When the key is empty/blank — constant message, no key value.
+        KeyStoreError: When the keychain write fails.
+    """
+    key = (key or "").strip()
+    if not key:
+        raise ValueError("Refusing to store an empty API key.")
+    keychain_writer(key)

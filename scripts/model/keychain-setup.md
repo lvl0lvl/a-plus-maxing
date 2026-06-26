@@ -6,19 +6,27 @@ via `key_source.resolve()`. The key is **never** stored in this repo — the rep
 
 1. the `ANTHROPIC_API_KEY` environment variable (the anthropic SDK's native var and the
    operator's documented injection var), then
-2. the macOS keychain item under service name `quant-primary-api`.
+2. the macOS keychain item under service name `a-plus-maxing-api-key`.
 
 If neither yields a key, `resolve()` raises `KeyUnavailableError` fail-loud. Set up **one**
-of the two below.
+of the options below.
+
+## Option 0 — in-app, no terminal (recommended for alpha testers)
+
+Open **Profile** in the running app and paste your key into "API connection" → Save. The
+app writes it to the keychain item `a-plus-maxing-api-key` for you (the same item `resolve()`
+reads). Find it later in Keychain Access by searching `a-plus-maxing-api-key`. Note: if the
+`ANTHROPIC_API_KEY` env var is also set in the shell that launched the app, it takes
+precedence over this keychain item.
 
 ## Option A — environment variable (CI / a shell session)
 
 Export the key in the shell that runs the app. The operator's documented injection reads
-the key straight out of the `quant-primary-api` keychain item (no real key in any tracked
+the key straight out of the `a-plus-maxing-api-key` keychain item (no real key in any tracked
 file):
 
 ```sh
-export ANTHROPIC_API_KEY=$(security find-generic-password -s "quant-primary-api" -w)
+export ANTHROPIC_API_KEY=$(security find-generic-password -s "a-plus-maxing-api-key" -w)
 ```
 
 (or, for CI, export a literal: `export ANTHROPIC_API_KEY='<YOUR_KEY>'`.)
@@ -26,12 +34,12 @@ export ANTHROPIC_API_KEY=$(security find-generic-password -s "quant-primary-api"
 ## Option B — macOS keychain (persistent, recommended for a local operator)
 
 Store the key once in the login keychain under the service name the key source reads (the
-operator's existing item is `quant-primary-api`):
+operator's existing item is `a-plus-maxing-api-key`):
 
 ```sh
 security add-generic-password \
   -a "$USER" \
-  -s quant-primary-api \
+  -s a-plus-maxing-api-key \
   -w '<YOUR_KEY>' \
   -U
 ```
@@ -39,14 +47,14 @@ security add-generic-password \
 `key_source.resolve()` then fetches it at call time with:
 
 ```sh
-security find-generic-password -w -s quant-primary-api
+security find-generic-password -w -s a-plus-maxing-api-key
 ```
 
 To rotate the key, re-run the `add-generic-password` command (the `-U` flag updates the
 existing item). To remove it:
 
 ```sh
-security delete-generic-password -s quant-primary-api
+security delete-generic-password -s a-plus-maxing-api-key
 ```
 
 ## Verify (no live API call)
@@ -54,7 +62,7 @@ security delete-generic-password -s quant-primary-api
 `resolve()` does not call the API — it only returns the key string. Confirm it resolves:
 
 ```sh
-ANTHROPIC_API_KEY=$(security find-generic-password -s "quant-primary-api" -w) \
+ANTHROPIC_API_KEY=$(security find-generic-password -s "a-plus-maxing-api-key" -w) \
   .venv/bin/python -c "from scripts.model.key_source import resolve; print(bool(resolve()))"
 ```
 

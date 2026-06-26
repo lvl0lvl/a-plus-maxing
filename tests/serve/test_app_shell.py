@@ -118,16 +118,19 @@ def test_offfile_ref_makes_emit_raise(tmp_path):
 
 
 def test_no_cdn_lucide_in_rendered_spa():
-    """AC-3 (lucide vendored inline): the rendered SPA loads no CDN lucide script.
+    """AC-3 (lucide vendored inline): the rendered SPA loads no CDN/off-file lucide script.
 
-    The prototype's `<script src="https://unpkg.com/lucide@latest/...">` is removed
-    and every icon renders as an inline `<svg>` — so the rendered SPA carries no
-    `unpkg`, no `lucide`, and no `<script src="http...`.
+    The prototype's `<script src="https://unpkg.com/lucide@latest/...">` is gone and the
+    icons are vendored inline (the inlined icon table swapped to inline `<svg>` by the
+    bundled `createIcons`) — so the SPA carries no `unpkg`/CDN reference, no http-sourced
+    asset, and no external `<script src>`; render.emit (AC-1) is the off-file guard. The
+    bare string "lucide" legitimately survives as the local `data-lucide` attribute /
+    vendor-JS name — a local label, NOT an off-file reference.
     """
     html = _spa_html()
     assert "unpkg" not in html, "the rendered SPA still references the unpkg CDN"
-    assert "lucide" not in html, "the rendered SPA still references lucide (CDN script not removed)"
     assert 'src="http' not in html, "the rendered SPA carries an http-sourced asset"
+    assert "<script src" not in html, "the rendered SPA loads an external script (lucide not vendored inline)"
     assert "<svg" in html, "the SPA renders no inline <svg> icons (icons not vendored inline)"
 
 
@@ -338,13 +341,27 @@ def test_upload_form_is_objective_only_zero_rich_section_fields():
 # --- Cycle 2: chat composer -> /chat fetch + receipt render + single-egress surface --- #
 
 
-def test_chat_composer_fetches_chat_and_consumes_the_receipt():
-    """AC-4: the chat composer's inline JS POSTs to /chat and consumes the receipt keys."""
+def test_chat_composer_fetches_chat_renders_reply_and_intake_progress():
+    """AC-4: the chat composer POSTs to /chat, mounts the reply, AND surfaces intake progress.
+
+    The operator-approved SPA uses ONE event-delegated composer across the dashboard,
+    Upload, and Team chats (vs the merged build's single `#chat-turns`): it POSTs
+    `{turn, conversation}` to the ADR-0016 one-turn /chat lane, appends the assistant
+    `reply` to the thread, and degrades to an "unavailable" fallback when the backend
+    errors — never a fabricated reply. It also consumes the receipt's de-identified
+    `progress` (`intake_complete` / `target_domain`) into a `.chat-progress` indicator so
+    the operator sees what's left and when they can generate a plan. Failing-capable: reds
+    if the composer stops fetching /chat, carrying the turn, consuming the reply, or
+    reading the intake-progress signal.
+    """
     html = _spa_html()
     assert "fetch('/chat'" in html, "the chat composer JS does not fetch the /chat route"
-    for key in ("data.reply", "data.receipt.store", "data.progress.intake_complete", "data.degraded"):
-        assert key in html, f"the chat composer JS does not consume the receipt key {key!r}"
-    assert "id='chat-turns'" in html, "no turn-list container the assistant reply mounts into"
+    assert "turn:txt" in html, "the /chat POST body does not carry the typed turn"
+    assert "d.reply" in html, "the chat JS does not consume the assistant reply"
+    assert "chat-thread" in html, "no thread container the assistant reply mounts into"
+    assert "unavailable" in html, "the chat JS has no degraded/unavailable fallback"
+    assert "intake_complete" in html, "the chat JS does not read the intake-complete progress signal"
+    assert "chat-progress" in html, "the chat has no intake-progress indicator element"
 
 
 def test_spa_fetch_targets_are_all_same_origin_loopback():
@@ -356,8 +373,13 @@ def test_spa_fetch_targets_are_all_same_origin_loopback():
         assert t.startswith("/") and not t.startswith("//") and "://" not in t, (
             f"fetch target {t!r} is not a same-origin loopback path (a new outbound class)"
         )
-    assert set(targets) <= {"/chat", "/upload"}, (
-        f"the SPA fetches an outbound class beyond /chat + /upload: {sorted(set(targets))}"
+    # /settings/key is a LOCAL loopback route (Profile API-key save): a same-origin POST
+    # whose key is written to the on-device keychain — it never leaves the machine, so it
+    # adds NO new egress class. The off-machine egress set is still the ADR-0016 /chat
+    # one-turn alone (the per-target loopback assertion above is the egress guard).
+    assert set(targets) <= {"/chat", "/upload", "/settings/key"}, (
+        f"the SPA fetches a path beyond the known loopback routes "
+        f"(/chat + /upload + /settings/key): {sorted(set(targets))}"
     )
 
 
