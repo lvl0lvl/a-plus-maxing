@@ -106,7 +106,7 @@ select.inp{cursor:pointer}
 .doc .st{font-size:13px;font-weight:600;flex:none;display:flex;align-items:center;gap:7px}
 .doc.done{border-color:#CDEAD9;background:#FCFFFD}
 .doc.done .st{color:var(--good)}
-.doc .link{color:var(--accent);cursor:pointer}
+.doc .link{color:var(--accent)}
 .drop{border:1.5px dashed var(--ctrl);border-radius:10px;padding:20px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer}
 .drop:hover{border-color:var(--accent);color:var(--accent);background:var(--soft)}
 
@@ -219,16 +219,16 @@ _BODYWEIGHT_LB_LABELS = {
 
 def _text_field(label, name, placeholder=""):
     """A labeled single-line text input bound to the capture field `name`."""
-    return (f"<div class='field'><label for='{name}'>{label}</label>"
-            f"<input class='inp' type='text' id='{name}' name='{name}' "
+    return (f"<div class='field'><label for='{_esc(name)}'>{_esc(label)}</label>"
+            f"<input class='inp' type='text' id='{_esc(name)}' name='{_esc(name)}' "
             f"placeholder='{_esc(placeholder)}'></div>")
 
 
 def _select_field(label, name, options):
     """A labeled select bound to the capture field `name` (first option is the prompt)."""
     opts = "".join(f"<option value='{_esc(v)}'>{_esc(t)}</option>" for v, t in options)
-    return (f"<div class='field'><label for='{name}'>{label}</label>"
-            f"<select class='inp' id='{name}' name='{name}'>{opts}</select></div>")
+    return (f"<div class='field'><label for='{_esc(name)}'>{_esc(label)}</label>"
+            f"<select class='inp' id='{_esc(name)}' name='{_esc(name)}'>{opts}</select></div>")
 
 
 def _about_fields():
@@ -280,14 +280,14 @@ def _build_plan_chat():
     render into `#chat-receipt`. Same-origin only — the one outbound class is the ADR-0016
     `/chat` turn.
     """
-    intro = ("<div class='seclab' style='font-size:15px'>Build your plan</div>"
+    intro = ("<div class='seclab'>Build your plan</div>"
              "<div class='sub' style='margin:-4px 0 12px'>Talk it through with your Care Assistant — "
              "goals, training, nutrition, supplements, peptides. It captures the rich detail your "
              "documents can't.</div>")
     turns = "<div class='turns' id='chat-turns'></div>"
     receipt = "<div class='receipt' id='chat-receipt'></div>"
     composer = ("<div class='composer'>"
-                "<input class='inp' id='chat-input' "
+                "<input class='inp' id='chat-input' aria-label='Message to Care Assistant' "
                 "placeholder='Tell your Care Assistant about your goals…'>"
                 "<button class='btn primary' type='button' id='chat-send'>Send →</button></div>")
     return f"{intro}<div class='card'>{turns}{receipt}{composer}</div>"
@@ -326,7 +326,10 @@ def _script():
     class — the ADR-0016 one-turn lane), mounts the assistant reply into `#chat-turns`, and
     renders the per-turn `{reply, receipt, progress, degraded}` receipt + the fail-closed
     degraded state into `#chat-receipt`. All inline — 0 off-file `<script src>` (the
-    `render.emit` inline-asset guard); 0 non-loopback fetch (the single-egress-class boundary).
+    `render.emit` inline-asset guard). The JS-fetch egress stays same-origin: the only
+    `fetch()` target is the literal `/chat` path — `render.emit` does NOT parse `<script>`
+    bodies, so that boundary is held by `test_spa_fetch_targets_are_all_same_origin_loopback`,
+    not the emit gate.
     """
     return ("<script>"
             "function show(s){"

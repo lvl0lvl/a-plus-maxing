@@ -342,8 +342,8 @@ def test_chat_composer_fetches_chat_and_consumes_the_receipt():
     """AC-4: the chat composer's inline JS POSTs to /chat and consumes the receipt keys."""
     html = _spa_html()
     assert "fetch('/chat'" in html, "the chat composer JS does not fetch the /chat route"
-    for key in ("reply", "receipt", "progress", "degraded"):
-        assert f".{key}" in html, f"the chat composer JS does not consume the receipt key {key!r}"
+    for key in ("data.reply", "data.receipt.store", "data.progress.intake_complete", "data.degraded"):
+        assert key in html, f"the chat composer JS does not consume the receipt key {key!r}"
     assert "id='chat-turns'" in html, "no turn-list container the assistant reply mounts into"
 
 
