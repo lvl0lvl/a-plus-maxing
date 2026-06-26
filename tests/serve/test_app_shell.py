@@ -373,6 +373,29 @@ def test_upload_ingestion_state_is_honest_on_empty_store(tmp_path):
     assert "+ Link" in html, "the empty-store ingestion-state shows no not-linked document card"
 
 
+def test_doc_cards_render_loaded_labs_card_with_escaped_filename():
+    """TEST-1: a labs-LOADED status renders the loaded labs card naming the escaped file(s).
+
+    The labs-loaded branch of `_doc_cards` (`status["labs"]["loaded"]` true) flips the labs
+    card to the '✓ loaded' state and shows the landed filenames `_esc`-escaped — mirrors the
+    dna-loaded render assertion in `test_server.py` (the wearable + dna loaded branches are
+    covered there; the labs-loaded branch had none). Seeds a labs status whose filename
+    carries an HTML-special char and asserts the rendered shell carries the loaded marker,
+    the ESCAPED filename, and the second file. Failing-capable: reds if the loaded branch
+    stops naming the file or drops the escaping (an unescaped `<panel>` would leak).
+    """
+    status = {
+        "wearable": {"loaded": False},
+        "dna": {"loaded": False, "files": []},
+        "labs": {"loaded": True, "files": ["cmp_<panel>.pdf", "lipids.csv"]},
+    }
+    html = app_shell.render([], status=status)
+    assert "✓ loaded" in html, "the labs-loaded card shows no loaded marker"
+    assert "cmp_&lt;panel&gt;.pdf" in html, "the loaded labs card does not name the escaped filename"
+    assert "lipids.csv" in html, "the loaded labs card does not name the second landed file"
+    assert "cmp_<panel>.pdf" not in html, "the loaded labs card leaked the unescaped filename"
+
+
 def test_t3_additions_keep_the_spa_inline_asset_clean(tmp_path):
     """INLINE-ASSET guard (re-run under T3): generate.run('app') still emits a Path, no off-file ref."""
     path = _emit_app(tmp_path)  # render.emit RAISES ValueError on any off-file asset reference
