@@ -93,8 +93,10 @@ class _AuthorBackend:
     A faithful stand-in for the real plan-author specialist: it reasons over the
     de-identified `summary` it is handed (never a hardcoded constant). With the operator's
     goal present it authors a workout recommendation whose `detail` REFERENCES that
-    de-identified value (the content-traceability anchor); with no goal (an empty/declined
-    conversation) it returns the thin-library sentinel — the honest no-plan state. This is
+    de-identified value (the content-traceability anchor) AND carries a `load` prescription in
+    the exercise payload, so the un-cleared clearance gate has a real prescription to strip
+    (AC-1's clearance-gate proof); with no goal (an empty/declined conversation) it returns the
+    thin-library sentinel — the honest no-plan state. This is
     what makes the headline non-tautological AND the negative control work through the SAME
     backend: the envelope is a genuine function of the conversation-derived summary.
     """
@@ -116,6 +118,7 @@ class _AuthorBackend:
                         "name": "Goblet squat",
                         "sets": 3,
                         "reps": "8-12",
+                        "load": "60% 1RM",
                         "detail": f"progress toward your goal: {goal}",
                     },
                 },
@@ -128,10 +131,13 @@ def _no_live_api(request, monkeypatch):
     """0-live-spend guard: any live key resolution fails the test loudly (AC-3).
 
     Patches `key_source.resolve` to raise, so every mock test in this module proves
-    0 live calls BY CONSTRUCTION — the live backend can never resolve a key here. The
-    operator-gated `live` variant is exempt (it makes a real call by design).
+    0 live calls BY CONSTRUCTION — the live backend can never resolve a key here. Only
+    the genuine operator-gated `test_live_conversation_to_plan_operator_gated` variant is
+    exempt (it makes a real call by design); the exempt match is the EXACT test name, not
+    a `"live" in ...` substring — the loose substring also disarmed the gate on AC-4's
+    `test_live_variant_is_present_and_gated` (whose name also contains "live").
     """
-    if "live" in request.node.name:
+    if request.node.name == "test_live_conversation_to_plan_operator_gated":
         return
     import scripts.model.key_source as key_source
 
@@ -252,8 +258,10 @@ def test_conversation_to_usable_plan_headline(tmp_path):
     assert result["plan"] is not None
     # (b) >=1 domain plan recorded + rendered from the chat-extracted facts.
     assert len(result["plan"]["exercises"]) >= 1
-    # The un-cleared load prescription is dropped (the asymmetric-downside clearance gate) —
-    # the plan ships as deferred coaching, never an un-cleared load.
+    # A REAL clearance-gate proof: the mock author EMITS a `load: "60% 1RM"` prescription and,
+    # with `clearance_granted=False`, the asymmetric-downside gate drops it from every exercise —
+    # the plan ships as deferred coaching, never an un-cleared load. This goes RED if the gate
+    # stops stripping load (it was constant-true while the author emitted no `load` at all).
     assert all("load" not in ex for ex in result["plan"]["exercises"])
 
     # (c) content-traceability: the de-identified value the CONVERSATION supplied traces into
@@ -356,10 +364,16 @@ def test_post_conversation_pii_zero_leak(tmp_path):
     store_files = [str(p) for p in store_root.rglob("*") if p.is_file()]
     assert not any(EMAIL in Path(p).read_text(encoding="utf-8") for p in store_files)
 
-    # pii_scan count over the store + the summary == 0 (the de-identification held). The
-    # fixture store lines are synthetic by construction, so the structural net is off (bead
-    # dv3) and only the value/identity classes run — exactly the raw-PII classes AC-5 guards.
-    assert pii_scan.scan(store_files, include_structural=False) == 0
+    # pii_scan VALUE-class count over the store CONTENTS + the summary == 0 (the de-id held).
+    # `scan` applies ONLY the structural store-line patterns + the gitignored identity/contact
+    # token configs — it NEVER applies the email/phone/postal value classes — so a `scan` over
+    # the store returns constant-0 even if the seeded email leaked (the seeded email is neither
+    # the operator name nor contact). `scan_text_full` DOES apply the value classes (the `email`
+    # class matches the seeded address), so scanning the store text this way is FAILING-CAPABLE:
+    # it goes RED if the email survived into any store token. (bead dv3: the structural net over
+    # synthetic fixtures is pure false positive — irrelevant here since the value classes run.)
+    store_text = "".join(Path(p).read_text(encoding="utf-8") for p in store_files)
+    assert pii_scan.scan_text_full(store_text) == 0
     assert pii_scan.scan_text_full(summary_text) == 0
 
     # ...but the email WAS captured to the gitignored operator record (the honest route),
@@ -368,6 +382,16 @@ def test_post_conversation_pii_zero_leak(tmp_path):
         p.read_text(encoding="utf-8") for p in scaffold_root.rglob("*") if p.is_file()
     )
     assert EMAIL in scaffold_text
+
+    # Render-side negative symmetry (defense-in-depth): the seeded email is absent from the
+    # RENDERED dashboard too — the de-identification held all the way to the surface the
+    # operator sees (the negative mirror of the headline's positive `GOAL in dashboard_html`).
+    out = generate.run(
+        "dashboard", _root=store_root, _out_dir=tmp_path,
+        _today=datetime.date.fromisoformat(PLAN_DATE),
+    )
+    dashboard_html = out.read_text(encoding="utf-8")
+    assert EMAIL not in dashboard_html
 
 
 def test_live_variant_is_present_and_gated():
