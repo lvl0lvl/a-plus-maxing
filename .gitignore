@@ -34,3 +34,5 @@ coordination/
 
 # Claude runtime locks (harness-managed, local only)
 .claude/scheduled_tasks.lock
+.impeccable/
+prototype/
