@@ -21,6 +21,11 @@ served SHELL here — T3 wires the form/chat (this task stands up the served sur
 from html import escape as _esc
 
 from scripts.ingest import status as ingest_status
+from scripts.serve.capture import (
+    BODYWEIGHT_BANDS,
+    EQUIPMENT_ACCESS_CLASSES,
+    SEX_OPTIONS,
+)
 
 # The four left-nav screens' inline `<svg>` icons (OQ-2: only the icons the shell uses,
 # rendered inline so the SPA loads no icon CDN). Ported from prototype/app.html:272-275.
@@ -104,6 +109,15 @@ select.inp{cursor:pointer}
 .doc .link{color:var(--accent);cursor:pointer}
 .drop{border:1.5px dashed var(--ctrl);border-radius:10px;padding:20px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer}
 .drop:hover{border-color:var(--accent);color:var(--accent);background:var(--soft)}
+
+/* plan-building chat composer (Upload Documents — posts each turn to /chat) */
+.turns{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.turn{border:1px solid var(--line);border-radius:10px;padding:11px 14px;font-size:13.5px;line-height:1.5;white-space:pre-wrap}
+.turn.me{background:var(--soft);border-color:var(--soft-bd)}
+.turn.bot{background:var(--sheet)}
+.composer{display:flex;gap:10px}
+.composer .inp{flex:1}
+.receipt{font-size:12px;color:var(--muted);margin:2px 0 12px;min-height:1px}
 </style>"""
 
 
@@ -187,28 +201,96 @@ def _doc_cards(status):
     return f"{wearable}{labs_card}{medical}{dna_card}"
 
 
+# Step-1 demographic <select> option labels (display text only). The option VALUES are the
+# capture gate constants (SEX_OPTIONS / BODYWEIGHT_BANDS / EQUIPMENT_ACCESS_CLASSES) so the
+# markup and the server-side `_BOUNDED_ENUMS` gate cannot drift (AC-2). For `bodyweight-band`
+# the value is the kg gate token (so `persist_capture` validates) while the label is the
+# pounds range (so the operator reads pounds) — the raw lb is a DISPLAY LABEL, never POSTed.
+_SEX_LABELS = {"male": "Male", "female": "Female"}
+_EQUIPMENT_LABELS = {
+    "full-home-gym": "Full home gym", "commercial-gym": "Commercial gym",
+    "minimal-equipment": "Minimal equipment", "bodyweight-only": "Bodyweight only",
+}
+_BODYWEIGHT_LB_LABELS = {
+    "under-60kg": "Under 132 lb", "60-70kg": "132–154 lb", "70-80kg": "154–176 lb",
+    "80-90kg": "176–198 lb", "90-100kg": "198–220 lb", "over-100kg": "Over 220 lb",
+}
+
+
+def _text_field(label, name, placeholder=""):
+    """A labeled single-line text input bound to the capture field `name`."""
+    return (f"<div class='field'><label for='{name}'>{label}</label>"
+            f"<input class='inp' type='text' id='{name}' name='{name}' "
+            f"placeholder='{_esc(placeholder)}'></div>")
+
+
+def _select_field(label, name, options):
+    """A labeled select bound to the capture field `name` (first option is the prompt)."""
+    opts = "".join(f"<option value='{_esc(v)}'>{_esc(t)}</option>" for v, t in options)
+    return (f"<div class='field'><label for='{name}'>{label}</label>"
+            f"<select class='inp' id='{name}' name='{name}'>{opts}</select></div>")
+
+
+def _about_fields():
+    """The objective-only 'About you' demographic inputs — the four gate-bound capture name=.
+
+    Birth year writes the named-excluded `date-of-birth` raw source the capture seam
+    de-identifies into `training-age-band` (never the raw year in a token). Sex / bodyweight
+    band / equipment access are bounded `<select>`s whose option VALUES are the capture gate
+    constants (AC-2 no-drift); the bodyweight band is a coarse kg range, never raw kg/lb.
+    """
+    return ("<div class='seclab' style='margin-top:0'>About you</div><div class='grid2'>"
+            + _text_field("Birth year", "date-of-birth", "e.g. 1986")
+            + _select_field("Sex (for dosing)", "sex-for-dosing",
+                            [("", "Select…")] + [(v, _SEX_LABELS[v]) for v in SEX_OPTIONS])
+            + _select_field("Body weight range", "bodyweight-band",
+                            [("", "Select a range…")] + [(b, _BODYWEIGHT_LB_LABELS[b]) for b in BODYWEIGHT_BANDS])
+            + _select_field("Equipment access", "equipment-access-class",
+                            [("", "Select…")] + [(v, _EQUIPMENT_LABELS[v]) for v in EQUIPMENT_ACCESS_CLASSES])
+            + "</div>")
+
+
 def _upload(status):
     head = ("<div class='pagehead'><div><div class='h1'>Upload Documents</div>"
             "<div class='sub'>Start with the basics, then link any documents you have — labs, "
             "history, wearable exports. They're parsed locally into your store; nothing is uploaded.</div></div></div>")
-    about = ("<div class='seclab' style='margin-top:0'>About you</div><div class='grid2'>"
-             "<div class='field'><label>Birth year</label><input class='inp' placeholder='e.g. 1986'></div>"
-             "<div class='field'><label>Sex (for dosing)</label><select class='inp'><option>Select…</option><option>Male</option><option>Female</option></select></div>"
-             "<div class='field'><label>Body weight range</label><select class='inp'><option>Select a range…</option><option>under 130 lbs</option><option>130–150 lbs</option><option>150–175 lbs</option><option>175–200 lbs</option><option>200–225 lbs</option><option>225–250 lbs</option><option>over 250 lbs</option></select></div>"
-             "<div class='field'><label>Equipment access</label><select class='inp'><option>Select…</option><option>Full home gym</option><option>Commercial gym</option><option>Minimal equipment</option><option>Bodyweight only</option></select></div>"
-             "</div>")
     docs = "<div class='seclab'>Link your documents</div>" + _doc_cards(status)
     additional = ("<div class='seclab'>Additional documents</div>"
                   "<div class='drop'>Drop any other files here, or click to browse — anything relevant "
                   "(prior plans, imaging reports, notes). Parsed locally into your store.</div>")
-    card = f"<div class='card' style='margin-bottom:22px'>{about}{docs}{additional}</div>"
-    build = ("<div class='seclab' style='font-size:15px'>Build your plan</div>"
+    submit = ("<div style='display:flex;justify-content:flex-end;margin-top:18px'>"
+              "<button class='btn primary' type='submit'>Save your info →</button></div>")
+    # The form is OBJECTIVE-ONLY (ADR-0018 form/chat split): the four demographic inputs +
+    # the content-upload affordances POST (multipart) to the BUILT `/upload` capture seam.
+    # The rich sections (goals/training/nutrition/supplements/peptides) are the chat surface
+    # below — 0 rich-section form field here.
+    form = ("<form method='post' action='/upload' enctype='multipart/form-data'>"
+            f"{_about_fields()}{docs}{additional}{submit}</form>")
+    card = f"<div class='card' style='margin-bottom:22px'>{form}</div>"
+    return f"<section class='screen' id='screen-upload'>{head}{card}{_build_plan_chat()}</section>"
+
+
+def _build_plan_chat():
+    """The plan-building chat composer — the conversational surface that fetches POST `/chat`.
+
+    The rich detail (goals/training/nutrition/supplements/peptides) is gathered here in
+    conversation, not as form fields (the ADR-0018 split). Each turn POSTs to the BUILT
+    `/chat` route (the inline JS in `_script`); the assistant reply mounts into the
+    `#chat-turns` list and the per-turn `{store,scaffold,dropped}` receipt + degraded state
+    render into `#chat-receipt`. Same-origin only — the one outbound class is the ADR-0016
+    `/chat` turn.
+    """
+    intro = ("<div class='seclab' style='font-size:15px'>Build your plan</div>"
              "<div class='sub' style='margin:-4px 0 12px'>Talk it through with your Care Assistant — "
              "goals, training, nutrition, supplements, peptides. It captures the rich detail your "
-             "documents can't.</div>"
-             "<div class='await'><div class='at'>Your plan-building conversation opens here</div>"
-             "<div class='ad'>Load your documents above, then build your plan in conversation.</div></div>")
-    return f"<section class='screen' id='screen-upload'>{head}{card}{build}</section>"
+             "documents can't.</div>")
+    turns = "<div class='turns' id='chat-turns'></div>"
+    receipt = "<div class='receipt' id='chat-receipt'></div>"
+    composer = ("<div class='composer'>"
+                "<input class='inp' id='chat-input' "
+                "placeholder='Tell your Care Assistant about your goals…'>"
+                "<button class='btn primary' type='button' id='chat-send'>Send →</button></div>")
+    return f"{intro}<div class='card'>{turns}{receipt}{composer}</div>"
 
 
 def _plan():
@@ -238,7 +320,14 @@ def _team():
 
 
 def _script():
-    """Minimal hash-routing JS: show/hide the four screens on nav click (0 data, 0 fetch)."""
+    """Inline JS: hash-routing across the four screens + the Upload chat composer.
+
+    The chat composer POSTs each turn to the same-origin `/chat` route (the ONLY outbound
+    class — the ADR-0016 one-turn lane), mounts the assistant reply into `#chat-turns`, and
+    renders the per-turn `{reply, receipt, progress, degraded}` receipt + the fail-closed
+    degraded state into `#chat-receipt`. All inline — 0 off-file `<script src>` (the
+    `render.emit` inline-asset guard); 0 non-loopback fetch (the single-egress-class boundary).
+    """
     return ("<script>"
             "function show(s){"
             "document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));"
@@ -248,6 +337,33 @@ def _script():
             "document.querySelectorAll('.navitem').forEach(n=>n.addEventListener('click',()=>location.hash=n.dataset.screen));"
             "window.addEventListener('hashchange',()=>show((location.hash||'#dashboard').slice(1)));"
             "show((location.hash||'#dashboard').slice(1));"
+            # --- Upload chat composer: POST each turn to /chat, render reply + receipt ---
+            "var conv=[];"
+            "function addTurn(role,text){"
+            "var t=document.createElement('div');"
+            "t.className='turn '+(role==='user'?'me':'bot');"
+            "t.textContent=text;"
+            "document.getElementById('chat-turns').appendChild(t);}"
+            "function renderReceipt(data){"
+            "var el=document.getElementById('chat-receipt');"
+            "if(data.degraded){el.textContent='The assistant is unavailable — your inputs are saved; "
+            "continue with the form above.';return;}"
+            "var parts=[];"
+            "var w=(data.receipt&&data.receipt.store)?data.receipt.store.length:0;"
+            "if(w){parts.push('Captured '+w+' detail(s) this turn.');}"
+            "if(data.progress&&data.progress.intake_complete){parts.push('Intake complete.');}"
+            "el.textContent=parts.join(' ');}"
+            "var send=document.getElementById('chat-send'),input=document.getElementById('chat-input');"
+            "if(send){send.addEventListener('click',function(){"
+            "var text=input.value.trim();if(!text){return;}"
+            "addTurn('user',text);input.value='';conv.push({role:'user',content:text});"
+            "fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},"
+            "body:JSON.stringify({turn:text,conversation:conv})})"
+            ".then(function(res){return res.json();})"
+            ".then(function(data){"
+            "if(data.reply){addTurn('assistant',data.reply);conv.push({role:'assistant',content:data.reply});}"
+            "renderReceipt(data);})"
+            ".catch(function(){renderReceipt({degraded:true});});});}"
             "</script>")
 
 

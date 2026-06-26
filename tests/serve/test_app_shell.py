@@ -195,3 +195,186 @@ def test_get_root_serves_spa_not_wizard(tmp_path):
     # The bind literal is byte-unchanged (the loopback transport is not re-specified).
     src = (REPO_ROOT / "scripts" / "serve" / "server.py").read_text()
     assert '_LOOPBACK = "127.0.0.1"' in src, "the loopback bind literal changed (NFR-5)"
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0029-T3 — wire the Upload Documents surface: demographic form -> /upload,
+# chat composer -> /chat, honest ingestion-state. Fixture-driven, 0 live spend.
+# --------------------------------------------------------------------------- #
+import functools
+import re
+
+from scripts.plan.router import summarize
+from scripts.serve import capture
+from scripts.store import store
+
+# An identity config ABSENT on disk (the fresh-clone posture): value-class PII patterns
+# still run, operator-identity detection is empty. Mirrors test_intake_demographics.
+_ABSENT_IDENTITY = "vault/meta/__no_such_identity_config__.txt"
+
+# The four demographic capture field names the activated Upload form must POST.
+_DEMOGRAPHIC_NAMES = ("date-of-birth", "sex-for-dosing", "bodyweight-band", "equipment-access-class")
+
+# The bodyweight kg gate token -> its pinned pounds-range DISPLAY label. The POSTed value is
+# the kg band token (so persist_capture validates); the operator reads pounds. 6-band 1:1 map.
+_BODYWEIGHT_LB_LABELS = {
+    "under-60kg": "Under 132 lb", "60-70kg": "132–154 lb", "70-80kg": "154–176 lb",
+    "80-90kg": "176–198 lb", "90-100kg": "198–220 lb", "over-100kg": "Over 220 lb",
+}
+
+# Rich-section field names that MUST NOT appear in the objective-only Upload form — they are
+# the chat-only surface (gathered at POST /chat), never form fields (the ADR-0018 split).
+_RICH_SECTION_NAMES = (
+    "goal-domains", "goal-targets", "goal-priority-order", "hard-limits",
+    "recovery-status-band", "train-around", "dietary-pattern", "meals-per-day",
+    "allergies", "food-preferences", "supplement-stack", "peptide-stack",
+    "rx-interaction-classes", "nutrition-detail", "training-detail",
+)
+
+# The fabricated ingestion counts the prototype presented as the operator's data — an honest
+# empty-store render carries NONE of these (ADR-0009 D2 honest-data).
+_FABRICATED_INGEST = ("12,480 readings", "✓ ingested", "2 of 4 categories", "parsing labs")
+
+
+def _upload_form_html(html):
+    """Extract the POSTing `<form ... action='/upload' ...>...</form>` from the rendered SPA."""
+    m = re.search(r"<form[^>]*action='/upload'[^>]*>(.*?)</form>", html, re.DOTALL)
+    assert m is not None, "the SPA has no POSTing capture form (action='/upload')"
+    return m.group(0)
+
+
+def _form_field_names(form_html):
+    """Every `name='...'` attribute the form submits (input/select/textarea)."""
+    return set(re.findall(r"name='([^']+)'", form_html))
+
+
+def _select_block(html, name):
+    """The `<select name='<name>'>...</select>` inner block from the rendered SPA."""
+    m = re.search(rf"<select[^>]*name='{re.escape(name)}'[^>]*>(.*?)</select>", html, re.DOTALL)
+    assert m is not None, f"the {name!r} demographic select is not rendered"
+    return m.group(1)
+
+
+# --- Cycle 1: demographic form -> /upload + markup<->gate enum + round-trip --- #
+
+
+def test_upload_form_posts_the_four_demographic_names_to_upload():
+    """AC-1: the Upload 'About you' form POSTs exactly the four demographic name= to /upload."""
+    form = _upload_form_html(_spa_html())
+    assert "method='post'" in form, "the capture form is not a POST"
+    names = _form_field_names(form)
+    missing = [n for n in _DEMOGRAPHIC_NAMES if n not in names]
+    assert not missing, f"the upload form does not POST these demographic inputs: {missing}"
+
+
+def test_demographic_selects_built_from_the_gate_constants():
+    """AC-2: each demographic <select>'s option values EQUAL the gate enum constant (no-drift)."""
+    html = _spa_html()
+    for name, constant in (
+        ("sex-for-dosing", capture.SEX_OPTIONS),
+        ("bodyweight-band", capture.BODYWEIGHT_BANDS),
+        ("equipment-access-class", capture.EQUIPMENT_ACCESS_CLASSES),
+    ):
+        values = set(re.findall(r"<option value='([^']*)'", _select_block(html, name)))
+        values.discard("")
+        assert values == set(constant), (
+            f"the {name!r} options {sorted(values)} drifted from the gate constant {sorted(constant)}"
+        )
+
+
+def test_bodyweight_band_six_options_with_pinned_pounds_labels():
+    """AC-2: bodyweight-band has 6 kg-token options (not 7) with the pinned pounds labels."""
+    block = _select_block(_spa_html(), "bodyweight-band")
+    pairs = re.findall(r"<option value='([^']*)'>([^<]*)</option>", block)
+    real = [(v, t) for v, t in pairs if v != ""]
+    assert len(real) == 6, f"bodyweight-band has {len(real)} real options, expected 6 (not the prototype's 7)"
+    labels = dict(real)
+    for token, label in _BODYWEIGHT_LB_LABELS.items():
+        assert labels.get(token) == label, (
+            f"bodyweight option {token!r} label is {labels.get(token)!r}, expected the pinned {label!r}"
+        )
+
+
+def test_demographic_fields_round_trip_through_the_built_capture_seam(tmp_path):
+    """AC-3: the four form name=/value pairs round-trip through the unchanged persist_capture."""
+    html = _spa_html()
+
+    def first_opt(name):
+        vals = [v for v in re.findall(r"<option value='([^']*)'", _select_block(html, name)) if v]
+        return vals[0]
+
+    # The values the rendered form would POST: a birth year + a real option per demographic select.
+    fields = {
+        "date-of-birth": "1986",
+        "sex-for-dosing": first_opt("sex-for-dosing"),
+        "bodyweight-band": first_opt("bodyweight-band"),
+        "equipment-access-class": first_opt("equipment-access-class"),
+    }
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        fields, root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    summary = summarize(functools.partial(store.read, root=store_root), identity_config=_ABSENT_IDENTITY)
+    expected = {
+        "training-age-band": "born-1980s",  # DERIVED from the date-of-birth raw source
+        "sex-for-dosing": fields["sex-for-dosing"],
+        "bodyweight-band": fields["bodyweight-band"],
+        "equipment-access-class": fields["equipment-access-class"],
+    }
+    orphaned = [t for t in expected if summary.get(t) != expected[t]]
+    assert not orphaned, f"these demographic tokens stayed orphaned on the SPA surface: {orphaned}"
+
+
+def test_upload_form_is_objective_only_zero_rich_section_fields():
+    """AC-6 (form-leg): the Upload form's name set is EXACTLY the four demographics, 0 rich-section."""
+    names = _form_field_names(_upload_form_html(_spa_html()))
+    leaked = [n for n in _RICH_SECTION_NAMES if n in names]
+    assert not leaked, f"the objective-only form carries rich-section fields: {leaked}"
+    assert names == set(_DEMOGRAPHIC_NAMES), (
+        f"the upload form's data fields are not exactly the demographic set: {sorted(names)}"
+    )
+
+
+# --- Cycle 2: chat composer -> /chat fetch + receipt render + single-egress surface --- #
+
+
+def test_chat_composer_fetches_chat_and_consumes_the_receipt():
+    """AC-4: the chat composer's inline JS POSTs to /chat and consumes the receipt keys."""
+    html = _spa_html()
+    assert "fetch('/chat'" in html, "the chat composer JS does not fetch the /chat route"
+    for key in ("reply", "receipt", "progress", "degraded"):
+        assert f".{key}" in html, f"the chat composer JS does not consume the receipt key {key!r}"
+    assert "id='chat-turns'" in html, "no turn-list container the assistant reply mounts into"
+
+
+def test_spa_fetch_targets_are_all_same_origin_loopback():
+    """AC-6 (fetch-leg): every fetch target is a same-origin loopback path (0 non-loopback class)."""
+    html = _spa_html()
+    targets = re.findall(r"fetch\(\s*['\"]([^'\"]+)['\"]", html)
+    assert targets, "the SPA makes no fetch call (the chat composer is not wired)"
+    for t in targets:
+        assert t.startswith("/") and not t.startswith("//") and "://" not in t, (
+            f"fetch target {t!r} is not a same-origin loopback path (a new outbound class)"
+        )
+    assert set(targets) <= {"/chat", "/upload"}, (
+        f"the SPA fetches an outbound class beyond /chat + /upload: {sorted(set(targets))}"
+    )
+
+
+# --- Cycle 3: honest ingestion-state + INLINE-ASSET guard under T3's additions --- #
+
+
+def test_upload_ingestion_state_is_honest_on_empty_store(tmp_path):
+    """AC-5: the Upload ingestion-state renders the real load-state — 0 fabricated counts on empty."""
+    html = _emit_app(tmp_path).read_text()
+    present = [tok for tok in _FABRICATED_INGEST if tok in html]
+    assert present == [], f"the Upload ingestion-state presents fabricated counts: {present}"
+    # The document cards render the real empty-store load-state: not-linked '+ Link' affordances.
+    assert "+ Link" in html, "the empty-store ingestion-state shows no not-linked document card"
+
+
+def test_t3_additions_keep_the_spa_inline_asset_clean(tmp_path):
+    """INLINE-ASSET guard (re-run under T3): generate.run('app') still emits a Path, no off-file ref."""
+    path = _emit_app(tmp_path)  # render.emit RAISES ValueError on any off-file asset reference
+    assert isinstance(path, Path) and path.exists(), "generate.run('app') did not emit under T3 additions"
+    assert "<script src" not in path.read_text(), "T3 added an off-file <script src> reference"
