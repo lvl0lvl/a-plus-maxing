@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-06-10, S49)
 **Owner:** Walter McGivney
-**Relates to:** ADR-0004 (single-file artifact generation), ADR-0008 (biomarker metadata + type-routed dashboard), ADR-0021 (deterministic PII re-insertion — supersedes-posture toward D2's initials-only render rule, plan-generation engine set), `vault/design/dashboard-v1-design.md` (the frozen, Walter-approved target)
+**Relates to:** ADR-0004 (single-file artifact generation), ADR-0008 (biomarker metadata + type-routed dashboard), ADR-0021 (deterministic PII re-insertion — supersedes-posture toward D2's initials-only render rule, plan-generation engine set), ADR-0029 (single-file SPA front-end shell — tensions-with: the as-built Dashboard/Plan demo-data + parallel layout collides with D1/D2), `vault/design/dashboard-v1-design.md` (the frozen, Walter-approved target)
 
 ## Context
 
@@ -161,6 +161,21 @@ LM-02, calendar, goals, rollup) fills its zone in place.
   any TRACKED render. Recorded here in prose (this ADR carries no
   Related-Decisions table) as the inverse of ADR-0021 → 0009
   `supersedes-posture` (engine `.pipeline/engine/dag.md` §7).
+- [2026-06-26: Added inverse `tensions-with` edge to ADR-0029 (single-file SPA
+  front-end shell, Phase-8 backfill).] ADR-0029 adopts the as-built `app.html`
+  SPA, whose `Dashboard` and `Plan` screens ship a PARALLEL hand-built layout of
+  fabricated DEMO data ("Synced from WHOOP", an 84% RECOVERY ring, "SLEEP 7.8
+  HRS", an invented RHR/HRV/body-weight set) — colliding with this ADR's D1 (one
+  honest dashboard surface; `generate.run("dashboard")` IS the dashboard, no
+  parallel template — the `i2yw` two-surfaces failure D1 retired) AND D2 (a zone
+  never renders an invented number, placeholder, or sample content presented as
+  data). The reconciliation — rendering the real `dashboard.py` output or D2
+  awaiting-states in place of the fabricated rings/sample numbers — is the
+  per-surface live-wiring DEFERRED out of ADR-0029 (its OQ-3); that build wires
+  only `Upload Documents`, so the `Dashboard`/`Plan` screens stay
+  visibly-placeholder, not presented as the operator's data. Recorded here in
+  prose (this ADR carries no Related-Decisions table) as the symmetric inverse of
+  ADR-0029 → 0009 `tensions-with`.
 
 ## Review triggers
 
