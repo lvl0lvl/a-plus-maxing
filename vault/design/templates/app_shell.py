@@ -145,11 +145,24 @@ def _awaiting(screen, title, detail):
             f"<div class='at'>{title}</div><div class='ad'>{detail}</div></div>")
 
 
+def _pagehead(title, sub, trailing=""):
+    """The shared page-head scaffold: an `h1` title + a `sub` blurb, optional trailing markup.
+
+    The one source for the four screens' heads (`Dashboard`/`Upload Documents`/`Plan`/`Chat
+    with Team`), mirroring the file's `_awaiting`/`_doc_card` builder convention. `trailing`
+    carries the screen-specific right-aligned markup (the Plan screen's `<span class='pill
+    watch'>`) and is empty on the screens that have none.
+    """
+    return (f"<div class='pagehead'><div><div class='h1'>{title}</div>"
+            f"<div class='sub'>{sub}</div></div>{trailing}</div>")
+
+
 def _dashboard():
-    head = ("<div class='pagehead'><div><div class='h1'>Dashboard</div>"
-            "<div class='sub'>Your readiness, trends, calendar, and today's plan appear here "
-            "once your data is loaded and your plan is generated. Every figure shown comes from "
-            "your own data and cites its source — nothing here is filled with sample numbers.</div></div></div>")
+    head = _pagehead(
+        "Dashboard",
+        "Your readiness, trends, calendar, and today's plan appear here "
+        "once your data is loaded and your plan is generated. Every figure shown comes from "
+        "your own data and cites its source — nothing here is filled with sample numbers.")
     body = _awaiting("dashboard", "No data yet",
                      "Load your documents on the Upload Documents screen, then generate your "
                      "plan. Until then this stays empty — no estimated or example readings are shown.")
@@ -251,9 +264,10 @@ def _about_fields():
 
 
 def _upload(status):
-    head = ("<div class='pagehead'><div><div class='h1'>Upload Documents</div>"
-            "<div class='sub'>Start with the basics, then link any documents you have — labs, "
-            "history, wearable exports. They're parsed locally into your store; nothing is uploaded.</div></div></div>")
+    head = _pagehead(
+        "Upload Documents",
+        "Start with the basics, then link any documents you have — labs, "
+        "history, wearable exports. They're parsed locally into your store; nothing is uploaded.")
     docs = "<div class='seclab'>Link your documents</div>" + _doc_cards(status)
     additional = ("<div class='seclab'>Additional documents</div>"
                   "<div class='drop'>Drop any other files here, or click to browse — anything relevant "
@@ -294,10 +308,11 @@ def _build_plan_chat():
 
 
 def _plan():
-    head = ("<div class='pagehead'><div><div class='h1'>Plan</div>"
-            "<div class='sub'>Your plan is generated from a de-identified summary, every "
-            "recommendation cites a source, and nothing is final until you approve it.</div></div>"
-            "<span class='pill watch'>Draft · not yet approved</span></div>")
+    head = _pagehead(
+        "Plan",
+        "Your plan is generated from a de-identified summary, every "
+        "recommendation cites a source, and nothing is final until you approve it.",
+        "<span class='pill watch'>Draft · not yet approved</span>")
     card = ("<div class='card' style='margin-bottom:18px;display:flex;align-items:center;"
             "justify-content:space-between;gap:16px'><div><div style='font-weight:700;font-size:15px'>"
             "No approved plan yet</div><div class='sub'>Once you've loaded your documents and talked "
@@ -310,9 +325,10 @@ def _plan():
 
 
 def _team():
-    head = ("<div class='pagehead'><div><div class='h1'>Chat with Team</div>"
-            "<div class='sub'>Talk to your Care Assistant, or pick any specialist to go deeper. "
-            "Each one cites its sources and stays in its lane.</div></div></div>")
+    head = _pagehead(
+        "Chat with Team",
+        "Talk to your Care Assistant, or pick any specialist to go deeper. "
+        "Each one cites its sources and stays in its lane.")
     awaiting = _awaiting("team", "Your care team chat opens once your plan is set up",
                          "Load your documents and build your plan, then talk to your Care Assistant "
                          "here and switch to any specialist. No conversation is shown until then.")
