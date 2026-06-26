@@ -109,25 +109,27 @@ select.inp{cursor:pointer}
 .drop:hover{border-color:var(--accent);color:var(--accent);background:var(--soft)}
 
 /* ---------- chat (shared) ---------- */
-.chatwrap{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--sheet);overflow:hidden}
+.chatwrap{display:flex;flex-direction:column;border:1px solid #AEB8CE;border-radius:14px;background:var(--sheet);overflow:hidden;box-shadow:0 1px 3px rgba(16,20,38,.07)}
 #screen-team.screen.active{display:flex;flex-direction:column;height:calc(100vh - 68px);max-width:1080px}
 #screen-team .pagehead{flex:none}
 #screen-team #team-chat{flex:1;min-height:0;display:flex}
 #screen-team .chatwrap{flex:1;min-height:0}
 #screen-team .chat-thread{flex:1;max-height:none;min-height:0}
-.chat-thread{padding:20px;display:flex;flex-direction:column;justify-content:flex-end;gap:12px;min-height:230px;max-height:440px;overflow:auto}
-.msg{max-width:78%;font-size:13.5px;line-height:1.5;padding:11px 14px;border-radius:14px}
-.msg.bot{background:#F8F9FB;border:1px solid #EEF0F3;color:var(--ink);border-bottom-left-radius:4px;align-self:flex-start}
-.msg.me{align-self:flex-end;background:var(--soft);border:1px solid var(--soft-bd);color:#1D2433;border-bottom-right-radius:4px}
+.chat-thread{padding:20px;display:flex;flex-direction:column;justify-content:flex-end;gap:12px;min-height:230px;max-height:440px;overflow:auto;background:#E4E8F1}
+.msg{max-width:78%;font-size:13.5px;line-height:1.55;padding:11px 14px;border-radius:14px}
+.msg.bot{background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(16,20,38,.06);color:var(--ink);border-bottom-left-radius:4px;align-self:flex-start}
+.msg.me{align-self:flex-end;background:var(--accent);border:1px solid var(--accent-deep);color:#fff;border-bottom-right-radius:4px}
 /* the specialist card married to the chat input */
-.chat-foot{border-top:1px solid var(--line);background:#FCFCFD;padding:12px 16px 14px}
+.chat-foot{border-top:1px solid var(--line);background:#fff;padding:12px 16px 14px}
 .spec-card{display:flex;align-items:center;gap:11px;padding:8px 4px 12px}
 .spec-card .name{font-size:14px;font-weight:700}
 .spec-card .role{font-size:12px;color:var(--muted)}
 .spec-card .st{margin-left:auto;font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:6px}
 .composer{display:flex;gap:10px;align-items:stretch}
-.composer textarea{flex:1;min-height:46px;resize:none}
-.composer .btn{display:flex;align-items:center;white-space:nowrap}
+.composer textarea{flex:1;min-height:46px;resize:none;background:#ECEFF4;border:1px solid #BCC4D6;border-radius:12px;color:var(--ink);padding:12px 14px}
+.composer textarea::placeholder{color:var(--faint)}
+.composer-send{width:46px;height:46px;border-radius:12px;background:var(--accent);border:1px solid var(--accent-deep);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer;align-self:flex-end}
+.composer-send svg{width:18px;height:18px}
 
 /* ===== faithful dashboard (Pencil Clinical Light) ===== */
 .dtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;gap:16px}
@@ -184,7 +186,7 @@ select.inp{cursor:pointer}
 .ai-head .rl{font-size:11.5px;color:var(--ink2)}
 .ai-head .on{margin-left:auto;display:flex;align-items:center;gap:5px;background:#E8F7F4;color:#1FB5A6;font-size:11px;font-weight:600;border-radius:20px;padding:5px 9px}
 .ai-body{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
-.ai-msg{background:#EEF0FE;border-radius:4px 14px 14px 14px;padding:14px;font-size:13px;line-height:1.5;color:var(--ink)}
+.ai-msg{background:#EEF0FE;border-radius:14px;padding:14px;font-size:13px;line-height:1.5;color:var(--ink)}
 .ai-cite{display:inline-flex;align-items:center;gap:6px;background:#fff;border-radius:8px;padding:5px 10px;margin-top:9px;font-size:11px;font-weight:600;color:#4A55E8}
 .ai-cite svg{width:13px;height:13px}
 .ai-await{display:flex;gap:10px;background:#FBF1E0;border:1px solid #E8A23B40;border-radius:12px;padding:12px;color:#9A6A1F}
@@ -195,6 +197,10 @@ select.inp{cursor:pointer}
 .ai-in .box{flex:1;border:1px solid var(--line);border-radius:12px;padding:11px 14px;color:var(--faint);font-size:13px;background:#F5F7FB}
 .ai-in .snd{width:42px;height:42px;border-radius:12px;background:#4A55E8;display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
 .ai-in .snd svg{width:18px;height:18px}
+.aicard{display:flex;flex-direction:column}
+.dash-chatwrap{flex:1;min-height:0;border:none;border-radius:0;background:transparent;box-shadow:none}
+.dash-chatwrap .chat-thread{flex:1;min-height:0;max-height:none}
+.chat-empty{display:flex;flex-direction:column;gap:12px}
 /* performance */
 .perf-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 24px 12px;flex-wrap:wrap;border-bottom:1px solid var(--line2)}
 .tabs{display:flex;gap:8px;flex-wrap:wrap}
@@ -304,13 +310,19 @@ select.inp{cursor:pointer}
             </div>
           </div>
         </div>
-        <div class="card2">
+        <div class="card2 aicard">
           <div class="ai-head"><span class="ai-av"><i data-lucide="sparkles"></i></span><div><div class="nm">Care Assistant</div><div class="rl">Grounded in your sources</div></div><span class="on"><span class="dot active"></span>Ready</span></div>
-          <div class="ai-body">
-            <div class="ai-msg">Once your wearables, labs, or history are in, I'll surface insights here — each one citing the source it came from.</div>
-            <div class="ai-await"><i data-lucide="clock-3"></i><div><div class="t">Nothing inferred yet</div><div class="d">No estimate is shown until the underlying data exists.</div></div></div>
+          <div class="chatwrap dash-chatwrap" id="dash-chat">
+            <div class="chat-thread">
+              <div class="chat-empty">
+                <div class="ai-msg">Once your wearables, labs, or history are in, I'll surface insights here — each one citing the source it came from.</div>
+                <div class="ai-await"><i data-lucide="clock-3"></i><div><div class="t">Nothing inferred yet</div><div class="d">No estimate is shown until the underlying data exists.</div></div></div>
+              </div>
+            </div>
+            <div class="chat-foot">
+              <div class="composer"><textarea class="inp" placeholder="Ask about your data…"></textarea><button class="composer-send" aria-label="Send message"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+            </div>
           </div>
-          <div class="ai-in"><div class="box">Ask about your data…</div><div class="snd"><i data-lucide="arrow-up"></i></div></div>
         </div>
       </div>
 
@@ -455,7 +467,7 @@ function chatHTML(s, greeting){
     </div>
     <div class="chat-foot">
       <div class="spec-card">${tile(s)}<div><div class="name">${s.name}</div><div class="role">${s.role}</div></div><div class="st">${dotFor(s.status)}${s.status[0].toUpperCase()+s.status.slice(1)}</div></div>
-      <div class="composer"><textarea class="inp" placeholder="Message ${s.name}…"></textarea><button class="btn primary">Send →</button></div>
+      <div class="composer"><textarea class="inp" placeholder="Message ${s.name}…"></textarea><button class="composer-send" aria-label="Send message"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
     </div>
   </div>`;
 }
@@ -506,6 +518,7 @@ function _chatSend(composer){
  var wrap=composer.closest('.chatwrap'); if(!wrap)return;
  var thread=wrap.querySelector('.chat-thread'), ta=composer.querySelector('textarea');
  var txt=(ta.value||'').trim(); if(!txt)return;
+ var emptyState=thread.querySelector('.chat-empty'); if(emptyState)emptyState.remove();
  var host=wrap.closest('[id]'), cid=host?host.id:'chat'; _conv[cid]=_conv[cid]||[];
  var me=document.createElement('div'); me.className='msg me'; me.textContent=txt; thread.appendChild(me);
  _conv[cid].push({role:'user',content:txt}); ta.value=''; thread.scrollTop=thread.scrollHeight;
