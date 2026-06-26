@@ -230,6 +230,41 @@ def test_dispatch_holds_no_session_spanning_raw_transcript(tmp_path):
         )
 
 
+def test_model_messages_carry_only_api_valid_roles_and_content(tmp_path):
+    """BUG-1: every message handed to the backend is Anthropic-Messages-API-valid.
+
+    The Anthropic Messages API rejects (a) a `role:"system"` entry inside `messages`
+    (system is a top-level param, not a conversation role) and (b) a raw-dict `content`
+    (content must be a `str` or a list of content blocks). This NON-MOCK STRUCTURAL
+    assertion inspects the EXACT `messages` array `dispatch_turn` hands the backend's
+    `converse` (the recording mock captures the real payload) and asserts EVERY entry has
+    `role ∈ {"user","assistant"}` and `content` that is a `str` or `list` — never a dict,
+    never `role:"system"`. Failing-capable: reds against the pre-fix construction, whose
+    index-0 entry was `{"role":"system","content":<dict>}`.
+    """
+    from scripts.model.client import ModelClient
+
+    backend = _ReplyBackend(reply="ok")
+    chat.dispatch_turn(
+        "recovery is moderate",
+        [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}],
+        ["training"], [],
+        client=ModelClient(backend=backend),
+        store_root=tmp_path / "store", scaffold_root=tmp_path / "scaffold",
+    )
+    assert backend.calls, "dispatch_turn made no model call"
+    messages = backend.calls[0]
+    for entry in messages:
+        assert entry["role"] in ("user", "assistant"), (
+            f"message carries an API-invalid role {entry['role']!r} "
+            f"(system is a top-level param, not a `messages` role)"
+        )
+        assert isinstance(entry["content"], (str, list)), (
+            f"message content is {type(entry['content']).__name__}, must be a str or a "
+            f"content-block list (the API rejects a raw dict)"
+        )
+
+
 # --------------------------------------------------------------------------- #
 # Cycle 3 — AC-5 / AC-6
 # --------------------------------------------------------------------------- #
