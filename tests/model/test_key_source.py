@@ -27,11 +27,11 @@ def test_env_var_is_the_anthropic_native_var():
     """ADR-0015 S90: the env var is `ANTHROPIC_API_KEY` (the anthropic SDK + operator var).
 
     The operator's documented runtime injection sets `ANTHROPIC_API_KEY` from the
-    `quant-primary-api` keychain item. Reds if the env var is renamed away from the
+    `a-plus-maxing-api-key` keychain item. Reds if the env var is renamed away from the
     anthropic-native / operator-documented name.
     """
     assert ENV_VAR == "ANTHROPIC_API_KEY"
-    assert key_source._KEYCHAIN_SERVICE == "quant-primary-api"
+    assert key_source._KEYCHAIN_SERVICE == "a-plus-maxing-api-key"
 
 
 # --- AC-5: a set env var resolves at call time --------------------------------
@@ -81,7 +81,7 @@ def test_resolve_raises_fail_loud_when_key_absent(monkeypatch):
     message = str(excinfo.value)
     assert ENV_VAR in message, "fail-loud message must name the env var"
     assert "ANTHROPIC_API_KEY" in message, "fail-loud message must name ANTHROPIC_API_KEY"
-    assert "quant-primary-api" in message, "fail-loud message must name the keychain item"
+    assert "a-plus-maxing-api-key" in message, "fail-loud message must name the keychain item"
     assert "keychain-setup.md" in message, "fail-loud message must name the runbook"
 
 

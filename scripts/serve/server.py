@@ -38,6 +38,10 @@ DEFAULT_PORT = 8765
 _MULTIPART_OVERHEAD_MARGIN = 8 * 1024 * 1024
 MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_MARGIN
 
+# The whole-body ceiling for POST /settings/key. An API key is ~100 chars; 16 KiB is a
+# generous margin that still rejects a giant body before it is read into RAM.
+_SETTINGS_MAX_BYTES = 16 * 1024
+
 
 class _BoundedReader:
     """A read-bounded view over `rfile` that never yields more than `length` bytes.
@@ -117,8 +121,13 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     scaffold_root = None
     identity_config = None
     client = None
+    key_resolver = None
+    key_store = None
 
     def do_GET(self):
+        if self.path == "/settings/key":
+            self._key_status()
+            return
         if self.path != "/":
             self.send_error(404)
             return
@@ -127,6 +136,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/chat":
             self._do_chat()
+            return
+        if self.path == "/settings/key":
+            self._save_key()
             return
         if self.path != "/upload":
             self.send_error(404)
@@ -253,6 +265,65 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         self._write_json(200, receipt)
 
+    def _key_status(self):
+        """Write JSON `{connected: bool}` — whether a no-train key resolves at runtime.
+
+        Calls `key_source.resolve()` (env var or keychain) and reports ONLY whether a key
+        is present — never the value. An absent key (`KeyUnavailableError`) is the normal
+        not-connected path, not an error. Lets the Profile screen show Connected / Not
+        connected without ever reading the secret.
+        """
+        from scripts.model import key_source
+
+        resolver = self.key_resolver if self.key_resolver is not None else key_source.resolve
+        try:
+            resolver()
+            connected = True
+        except key_source.KeyUnavailableError:
+            connected = False
+        self._write_json(200, {"connected": connected})
+
+    def _save_key(self):
+        """Read a JSON `{api_key}` body and store it in the OS keychain.
+
+        The key is written ONLY to the keychain (via `key_source.store`) — never logged,
+        echoed in the response, or written to a file. The response carries no key value,
+        only `{ok, connected}`. An empty key is a 400; a keychain write failure is a 500
+        with a constant message. The request thread is never dropped (mirrors `/chat`'s
+        catch-and-degrade posture). Accepted over loopback only, so the secret never
+        leaves the machine (ADR-0013 transport posture).
+        """
+        import json
+
+        from scripts.model import key_source
+
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        if length > _SETTINGS_MAX_BYTES:
+            self._write_json(413, {"ok": False, "error": "too large"})
+            return
+        raw = self.rfile.read(length) if length else b""
+        try:
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+            key = (body.get("api_key") or "").strip()
+        except (ValueError, UnicodeDecodeError):
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        if not key:
+            self._write_json(400, {"ok": False, "error": "empty key"})
+            return
+        store = self.key_store if self.key_store is not None else key_source.store
+        try:
+            store(key)
+        except (ValueError, key_source.KeyStoreError):
+            # Constant message — never the key. A store failure must not leak the secret.
+            self._write_json(500, {"ok": False, "error": "could not store key"})
+            return
+        self._write_json(200, {"ok": True, "connected": True})
+
     def _write_json(self, status, obj):
         """Write a JSON response body (the `/chat` turn-receipt response-write site)."""
         import json
@@ -278,7 +349,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
 
 
 def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
-                 identity_config=None, client=None):
+                 identity_config=None, client=None, key_resolver=None, key_store=None):
     """Construct the loopback-bound intake server on `port`.
 
     The POST `/upload` handler ingests file uploads into `store_root`/`dna_root`,
@@ -306,8 +377,14 @@ def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
         (ThreadingHTTPServer) A server bound to ("127.0.0.1", port). Stop it with
         `srv.shutdown()` + `srv.server_close()`.
     """
+    # The key seams are CALLABLES held as class attributes — wrap in staticmethod so
+    # `self.key_resolver()` / `self.key_store(key)` call them plainly instead of binding
+    # `self` as a leading argument. (store_root/client are data, not callables, so they
+    # need no wrap; None passes through to the production key_source defaults.)
     handler = type("BoundIntakeRequestHandler", (IntakeRequestHandler,),
                    {"store_root": store_root, "dna_root": dna_root,
                     "scaffold_root": scaffold_root, "identity_config": identity_config,
-                    "client": client})
+                    "client": client,
+                    "key_resolver": staticmethod(key_resolver) if key_resolver is not None else None,
+                    "key_store": staticmethod(key_store) if key_store is not None else None})
     return ThreadingHTTPServer((_LOOPBACK, port), handler)
