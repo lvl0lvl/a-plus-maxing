@@ -18,6 +18,7 @@ the operator declined it. A chat-covered domain whose ADR-0019 token is NOT yet 
 """
 
 import functools
+import json
 
 from scripts.model.client import ModelCallError
 from scripts.plan import router
@@ -257,14 +258,24 @@ def _model_messages(conversation, turn_text, intent):
     NAMES the model needs to phrase the next question are. 0 store-reading content, 0 other
     operator's transcript.
 
+    The context rides as a `json.dumps`-serialized STRING-content `user` turn at index 0
+    (BUG-1): the Anthropic Messages API rejects a `role:"system"` entry inside `messages`
+    (system is a top-level param the backend already carries via `_converse_system_prompt`)
+    and rejects a raw-dict `content` (content must be a string or a list of content blocks).
+    Every entry in the returned array therefore has `role ∈ {user, assistant}` and a
+    string `content` — an API-valid payload that fails-closed no more (the pre-fix
+    `role:"system"`/raw-dict shape 400'd every live turn). The serialized view is the same
+    PII-free projection (`_deidentified_view`): token/domain NAMES + booleans, 0 raw value.
+
     Args:
         conversation (list): The live conversation turns (`{"role", "content"}`), raw.
         turn_text (str): The current operator turn (appended as the latest user turn).
         intent (TurnIntent): The de-identified next-turn intent (names + booleans only).
 
     Returns:
-        (list) The `converse` messages: the de-identified context turn, the prior
-        conversation, then the current operator turn.
+        (list) The `converse` messages: the de-identified context turn (a string-content
+        `user` turn), the prior conversation, then the current operator turn — every entry
+        `role ∈ {user, assistant}` with string-or-content-block `content`.
 
     Raises:
         MalformedControlError: When `conversation` is not a list of `{role, content}`
@@ -278,7 +289,7 @@ def _model_messages(conversation, turn_text, intent):
             "_model_messages: conversation must be a list of {role, content} dicts"
         )
     context = _deidentified_view(intent)
-    messages = [{"role": "system", "content": context}]
+    messages = [{"role": "user", "content": json.dumps(context)}]
     messages.extend(conversation)
     messages.append({"role": "user", "content": turn_text})
     return messages
