@@ -7,3 +7,4 @@
 #              (scripts/audit-research-provenance.sh) + the aplus-research gates
 pytest>=9.0
 jsonschema>=4.26
+anthropic==0.112.0

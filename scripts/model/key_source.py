@@ -103,9 +103,12 @@ class KeyStoreError(RuntimeError):
 def _keychain_writer(key):
     """Write the key into the macOS login keychain at call time (fail-loud on error).
 
-    Runs `security add-generic-password -U -a <user> -s <service> -w <key>` — the same
-    command the keychain-setup runbook documents (the `-U` flag updates the existing
-    item, so an in-app save rotates the key in place). Raises `KeyStoreError` on a
+    Runs `security add-generic-password -U -A -a <user> -s <service> -w <key>` (`-U`
+    updates the existing item, so an in-app save rotates in place; `-A` grants the item
+    an allow-all ACL so the backgrounded server's later `find-generic-password -w` read
+    is not blocked on an interactive keychain-access prompt it cannot answer — the
+    accepted tradeoff for the in-app key flow on a local single-operator machine). Raises
+    `KeyStoreError` on a
     non-zero exit or an unavailable `security` binary (a non-macOS host). The key VALUE
     is passed only as the subprocess argument — never logged, echoed, or written to a
     file; on failure the constant-message error carries no key.
@@ -115,7 +118,7 @@ def _keychain_writer(key):
     """
     try:
         completed = subprocess.run(
-            ["security", "add-generic-password", "-U",
+            ["security", "add-generic-password", "-U", "-A",
              "-a", getpass.getuser(), "-s", _KEYCHAIN_SERVICE, "-w", key],
             capture_output=True,
             text=True,
