@@ -118,7 +118,10 @@ class ModelClient:
         if not isinstance(result, list):
             raise ModelCallError("extract_readings: backend returned a non-list result")
         for reading in result:
-            if not is_conformant(reading):
+            # Guard dict-ness BEFORE the field check: `is_conformant` (shared with the store path,
+            # frozen set) does `field in reading`, which raises a raw TypeError on a non-dict scalar
+            # — a non-dict reading must fail closed as the TYPED ModelCallError (NFR-3), never leak.
+            if not isinstance(reading, dict) or not is_conformant(reading):
                 raise ModelCallError("extract_readings: backend returned a field-short reading")
         return result
 

@@ -1179,6 +1179,35 @@ def test_extract_readings_raises_typed_on_every_failure_mode(bad_result):
     assert returned == "RAISED", "a failure mode returned a payload instead of raising"
 
 
+@pytest.mark.parametrize("scalar", [None, 42, True, 1.5], ids=["none", "int", "bool", "float"])
+def test_extract_readings_non_dict_reading_element_fails_closed(scalar):
+    """AC-1a (Tier-2 MUST-FIX): a list carrying a non-dict scalar reading raises `ModelCallError`.
+
+    A list element that is not a dict (`[None]`, `[42]`, `[True]`, `[1.5]`) must fail closed with
+    the TYPED `ModelCallError`, never a raw `TypeError`. Without the `isinstance(reading, dict)`
+    guard, `keying.is_conformant(scalar)` evaluates `field in scalar` → raw `TypeError` that escapes
+    the NFR-3 typed contract callers `except ModelCallError`. RED-capable: drop the dict guard and
+    this raises `TypeError`, failing the `pytest.raises(ModelCallError)`.
+    """
+    client = ModelClient(backend=_FixtureBackend(extract_readings_result=[scalar]))
+
+    with pytest.raises(ModelCallError):
+        client.extract_readings(b"file", "application/pdf")
+
+
+def test_extract_readings_empty_list_fails_closed():
+    """AC-3 (Tier-2 SHOULD-FIX): a backend-returned `[]` fails closed via `_call`'s empty check.
+
+    Pins the documented empty-list decision: a zero-reading result is no-usable-readings, raising
+    `ModelCallError` (`_call`'s `if not result`), consistent with the `deidentify` mirror. Locks the
+    behavior against a future `_call` refactor that might let a falsy list through.
+    """
+    client = ModelClient(backend=_FixtureBackend(extract_readings_result=[]))
+
+    with pytest.raises(ModelCallError):
+        client.extract_readings(b"file", "text/csv")
+
+
 # --- Cycle 2: the live _ClaudeNoTrainBackend.extract_readings (patched SDK, 0 live spend) ---
 #
 # `_summary_envelope_text` is shape-agnostic — it JSON-dumps any object into a `.content` text
@@ -1226,6 +1255,9 @@ def test_extract_readings_pdf_carries_base64_document_block(monkeypatch):
     assert block["source"]["type"] == "base64"
     assert block["source"]["media_type"] == "application/pdf"
     assert base64.standard_b64decode(block["source"]["data"]) == raw  # the raw file reached the model
+    # Tier-2 SHOULD-FIX: the structured-output constraint is present (a regression dropping it reds).
+    # Asserts presence only — the schema internals stay discretionary (NFR-7).
+    assert "output_config" in fake.calls[0]
 
 
 def test_extract_readings_image_carries_base64_image_block(monkeypatch):
