@@ -816,10 +816,17 @@ function renderGenerate(){
      return;
    }
    if(st){ st.className='upload-status info'; st.style.display='flex'; st.textContent='Landing '+picked.length+' confirmed reading'+(picked.length===1?'':'s')+'…'; }
-   fetch('/confirm-extraction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({readings:picked})}).then(function(r){return r.json();})
-     .then(function(d){ var n=(d.landed||[]).length;
-       showReview([]);  // clear the review list back to the honest awaiting state
-       if(st){ st.className='upload-status ok'; st.textContent='✓ Landed '+n+' reading'+(n===1?'':'s')+' into your store.'; }
+   fetch('/confirm-extraction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({readings:picked})})
+     .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d||{}}; }); })
+     .then(function(res){ var d=res.d, n=(d.landed||[]).length;
+       // Gate success on the HTTP status AND the body (mirrors the /settings/key + /chat
+       // handlers): only a real land (2xx, no error/degraded, n>0) paints success and clears
+       // the panel. An HTTP error / degraded / 0-landed-after-a-non-empty-pick keeps the
+       // review panel so the operator can retry — never a false green, never silent data loss.
+       if(res.ok && !d.error && !d.degraded && n){
+         showReview([]);  // clear the review list back to the honest awaiting state — ONLY on a real land
+         if(st){ st.className='upload-status ok'; st.textContent='✓ Landed '+n+' reading'+(n===1?'':'s')+' into your store.'; }
+       } else if(st){ st.className='upload-status warn'; st.textContent='Could not land the confirmed readings — please try again.'; }
      })
      .catch(function(){ if(st){ st.className='upload-status warn'; st.textContent='Could not land the confirmed readings — please try again.'; } });
  }); }

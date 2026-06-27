@@ -581,3 +581,26 @@ def test_confirm_zero_selected_does_not_post_or_show_false_success():
     # the landed-success message lives ONLY after the fetch resolves — never on the 0-confirmed no-op path
     si = html.find("✓ Landed ")
     assert si > fi, "the landed-success message is not gated behind the confirm POST"
+
+
+def test_confirm_success_gated_on_http_status_no_false_landed():
+    """Tier-3 F2 (no false success / no data loss): '✓ Landed' + the panel-clear fire ONLY on a real land.
+
+    The /confirm-extraction error bodies (400 degraded / 413 / 415) all carry `landed:[]`, so an
+    unconditional `.then(r=>r.json()).then(d=>'✓ Landed '+(d.landed||[]).length)` would paint a green
+    'Landed 0' success on an HTTP error AND clear the pending review (`showReview([])`) — a false
+    success with silent data loss. The handler must read the response status (`res.ok`) and gate BOTH
+    the landed-success message and the `showReview([])` clear behind it (mirroring the /settings/key +
+    /chat handlers), with a failure branch that keeps the panel. Failing-capable: revert to the
+    unconditional `.then(r=>r.json())` success and the `res.ok` gate disappears.
+    """
+    html = _spa_html()
+    i = html.find("fetch('/confirm-extraction'")
+    assert i != -1, "no /confirm-extraction flow to check status-gating"
+    ok_i = html.find("res.ok", i)
+    assert ok_i != -1, "the confirm handler does not gate success on the HTTP response status (res.ok)"
+    landed_i = html.find("✓ Landed ", i)
+    clear_i = html.find("showReview([])", i)
+    assert landed_i != -1 and ok_i < landed_i, "the '✓ Landed' success is not gated behind the res.ok check"
+    assert clear_i != -1 and ok_i < clear_i, "the showReview([]) panel-clear is not gated behind the res.ok check"
+    assert "Could not land" in html[i:i + 1400], "the confirm handler has no failure branch that keeps the review panel"
