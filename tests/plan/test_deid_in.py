@@ -350,6 +350,13 @@ def test_default_no_train_backend_makes_no_live_call_and_fails_closed():
     client yields the fail-closed sentinel, not a model-authored payload. Every other `deid_in`
     test injects a fixture/mock client, so 0 live-API spend across the suite.
     """
+    import importlib.util
+
+    if importlib.util.find_spec("anthropic") is not None:
+        pytest.skip(
+            "anthropic SDK installed (operator live mode) — a default client would make a live "
+            "de-id call (real spend); the absence-based 0-spend guard is N/A in live mode"
+        )
     live_client = ModelClient()  # default _ClaudeNoTrainBackend (live method unimplemented)
 
     result = deid_in(_raw_intake(), live_client)

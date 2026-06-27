@@ -5,6 +5,11 @@
 # pytest     — the V1 Python test baseline (.venv/bin/python -m pytest -q)
 # jsonschema — gate_attest.py verify-chain, used by the research-provenance audit
 #              (scripts/audit-research-provenance.sh) + the aplus-research gates
+#
+# NOTE: the `anthropic` SDK is intentionally NOT listed here. The test suite runs with
+# the SDK ABSENT so no test path can ever make a live model call (the 0-live-spend
+# guard — the guard tests skip when the SDK is present). Install it ONLY for the
+# operator-present LIVE run: `.venv/bin/python -m pip install anthropic==0.112.0`
+# (see scripts/model/keychain-setup.md).
 pytest>=9.0
 jsonschema>=4.26
-anthropic==0.112.0

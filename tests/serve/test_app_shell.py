@@ -27,9 +27,10 @@ from vault.design.templates import app_shell
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# The four left-nav screens the served SPA body must carry (AC-6). The wizard has none
-# of "Upload Documents" / "Chat with Team", so the set distinguishes the SPA from it.
-_NAV_MARKERS = ("Dashboard", "Upload Documents", "Plan", "Chat with Team")
+# The left-nav screens the served SPA body must carry (AC-6). The wizard has none of
+# "Chat with Team" / "Profile", so the set distinguishes the SPA from it. (Upload Documents
+# was merged into the Chat-with-Team workspace, so it is no longer a separate nav item.)
+_NAV_MARKERS = ("Dashboard", "Plan", "Chat with Team", "Profile")
 
 
 def _serve_in_thread(srv):
