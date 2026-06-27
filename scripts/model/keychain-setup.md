@@ -70,6 +70,25 @@ existing item). To remove it:
 security delete-generic-password -s a-plus-maxing-api-key
 ```
 
+## Security residuals (accepted)
+
+The in-app save (Option 0) writes the keychain item with `security add-generic-password -U -A`.
+Two residuals are accepted deliberately on the single-operator local machine:
+
+- **`-A` (allow-all ACL).** The item is readable by any process running as the operator with
+  no keychain-access prompt. This is intentional: the backgrounded server resolves the key
+  without a user present to approve an interactive prompt. The accepted threat is that
+  same-user malware could read the no-train key without a prompt; the blast radius is one
+  operator's machine and one no-train API key. A future hardening is a `-T`-scoped ACL granting
+  only the specific reader — deferred because it risks reintroducing the read prompt on headless
+  resolves. (Option B's manual command omits `-A`, so a terminal-stored key keeps the default,
+  prompt-on-foreign-read ACL.)
+- **Key as subprocess argv.** The value is passed as the `-w <key>` argument to `security`, so
+  for that process's brief lifetime the plaintext key is visible in the process list (`ps -axww`)
+  to other local processes. This is inherent to `security add-generic-password` (it has no stdin
+  password path; omitting `-w` prompts interactively, which the backgrounded server cannot
+  answer). The exposure window is the duration of one `security` invocation.
+
 ## Verify (no live API call)
 
 `resolve()` does not call the API — it only returns the key string. Confirm it resolves:
