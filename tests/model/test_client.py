@@ -37,12 +37,20 @@ class _FixtureBackend:
         converse_result: The fixture `converse` returns (or an Exception to raise).
         author_result: The fixture `author` returns (or an Exception to raise).
         deidentify_result: The fixture `deidentify` returns (or an Exception to raise).
+        extract_readings_result: The fixture `extract_readings` returns (or an Exception to raise).
     """
 
-    def __init__(self, converse_result=None, author_result=None, deidentify_result=None):
+    def __init__(
+        self,
+        converse_result=None,
+        author_result=None,
+        deidentify_result=None,
+        extract_readings_result=None,
+    ):
         self.converse_result = converse_result
         self.author_result = author_result
         self.deidentify_result = deidentify_result
+        self.extract_readings_result = extract_readings_result
 
     def converse(self, messages):
         if isinstance(self.converse_result, Exception):
@@ -58,6 +66,11 @@ class _FixtureBackend:
         if isinstance(self.deidentify_result, Exception):
             raise self.deidentify_result
         return self.deidentify_result
+
+    def extract_readings(self, file_content, media_type):
+        if isinstance(self.extract_readings_result, Exception):
+            raise self.extract_readings_result
+        return self.extract_readings_result
 
 
 def _good_converse_fixture():
@@ -1052,6 +1065,381 @@ def test_converse_error_traceback_carries_no_key_or_raw(monkeypatch, tmp_path):
 
     with pytest.raises(ModelCallError) as excinfo:
         _ClaudeNoTrainBackend().converse([{"role": "user", "content": raw_token}])
+
+    e = excinfo.value
+    assert e.__cause__ is None  # the chain is severed (`from None`)
+    tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+    assert raw_token not in tb
+    assert key_token not in tb
+
+
+# --- ADR-0030-T1: the no-train extract_readings method (mock/patched-SDK, 0 live spend) ---
+#
+# `ModelClient.extract_readings(file_content, media_type)` is the no-train extraction
+# primitive: the uploaded file content + its media type in, a list of Line-Field-Set readings
+# out. These cases pin it the way the deid/converse blocks pin their methods — the public
+# fail-closed wrapper over a MOCK `_FixtureBackend` (Cycle 1), the live `_ClaudeNoTrainBackend`
+# call against a PATCHED anthropic SDK (Cycle 2), and the SEC crown-jewel no-leak pair
+# (Cycle 3). The real SDK may be present (operator live mode), so every case injects a fixture
+# backend or a fake SDK at the `_client` seam — 0 live calls, 0 key, 0 network.
+
+from scripts.store.keying import LINE_FIELDS
+
+
+def _good_reading(item="HbA1c", value="5.4%"):
+    """A well-formed Line-Field-Set reading (item, timepoint, source, value)."""
+    return {"item": item, "timepoint": "2026-01-15", "source": "quest-labs", "value": value}
+
+
+def _good_readings_list():
+    """A well-formed readings list the backend/fixture returns — every reading conformant."""
+    return [
+        _good_reading("HbA1c", "5.4%"),
+        _good_reading("ALT", "31 U/L"),
+    ]
+
+
+# --- Cycle 1: the public ModelClient.extract_readings fail-closed wrapper (MOCK backend) ---
+
+
+def test_extract_readings_returns_line_field_set_list_over_mock_backend():
+    """AC-1: `extract_readings` returns a list whose every reading carries the Line Field Set."""
+    readings = _good_readings_list()
+    client = ModelClient(backend=_FixtureBackend(extract_readings_result=readings))
+
+    result = client.extract_readings(b"%PDF-1.4 ...", "application/pdf")
+
+    assert isinstance(result, list) and result
+    for reading in result:
+        assert set(LINE_FIELDS) <= set(reading), f"reading missing a Line Field Set key: {reading}"
+
+
+def test_extract_readings_non_list_return_fails_closed():
+    """AC-1a: a non-`list` backend return raises `ModelCallError` (public fail-closed validation)."""
+    client = ModelClient(backend=_FixtureBackend(extract_readings_result={"readings": "oops"}))
+
+    with pytest.raises(ModelCallError):
+        client.extract_readings(b"file", "text/csv")
+
+
+def test_extract_readings_field_short_reading_fails_closed():
+    """AC-1a: a list carrying ONE field-short reading (missing `value`) raises `ModelCallError`."""
+    short = [{"item": "HbA1c", "timepoint": "2026-01-15", "source": "quest-labs"}]  # no `value`
+    client = ModelClient(backend=_FixtureBackend(extract_readings_result=short))
+
+    with pytest.raises(ModelCallError):
+        client.extract_readings(b"file", "text/csv")
+
+
+def test_extract_readings_returns_the_injected_parse_not_a_constant():
+    """AC-2 (NON-TAUTOLOGICAL): fixture A → readings A, a DIFFERENT fixture B → readings B.
+
+    Proves the method returns the injected backend parse, not a hardcoded constant: two
+    different fixtures yield two different (and unequal) returns, each equal to its injection.
+    """
+    readings_a = [_good_reading("HbA1c", "5.4%")]
+    readings_b = [_good_reading("Vitamin D", "42 ng/mL"), _good_reading("TSH", "2.1 mIU/L")]
+
+    client_a = ModelClient(backend=_FixtureBackend(extract_readings_result=readings_a))
+    client_b = ModelClient(backend=_FixtureBackend(extract_readings_result=readings_b))
+
+    out_a = client_a.extract_readings(b"file-a", "application/pdf")
+    out_b = client_b.extract_readings(b"file-b", "image/png")
+
+    assert out_a == readings_a
+    assert out_b == readings_b
+    assert out_a != out_b  # the return tracks the fixture — not a constant
+
+
+@pytest.mark.parametrize(
+    "bad_result",
+    [
+        None,  # failed: backend returned nothing
+        {},  # empty: backend returned an empty payload
+        "not-a-list",  # malformed: a truthy non-list body
+        RuntimeError("backend errored"),  # errored: backend raised
+        subprocess.TimeoutExpired(cmd="model", timeout=30),  # timed-out
+    ],
+    ids=["failed", "empty", "malformed", "errored", "timed-out"],
+)
+def test_extract_readings_raises_typed_on_every_failure_mode(bad_result):
+    """AC-3: `extract_readings` raises a TYPED failure on each failure mode — 0 fabricated readings.
+
+    An empty/malformed/errored/timed-out extraction must RAISE — never return a fabricated or
+    partial readings payload that could be mistaken for a valid extraction (the fail-closed
+    fidelity-ceiling contract the ingestion path depends on).
+    """
+    client = ModelClient(backend=_FixtureBackend(extract_readings_result=bad_result))
+
+    returned = None
+    try:
+        returned = client.extract_readings(b"file", "application/pdf")
+    except ModelCallError:
+        returned = "RAISED"
+    assert returned == "RAISED", "a failure mode returned a payload instead of raising"
+
+
+# --- Cycle 2: the live _ClaudeNoTrainBackend.extract_readings (patched SDK, 0 live spend) ---
+#
+# `_summary_envelope_text` is shape-agnostic — it JSON-dumps any object into a `.content` text
+# block — so a readings-LIST fixture yields a readings envelope the live parse reads back, with
+# no new builder. The fake records its `messages.create` kwargs in `.calls`.
+
+
+def test_extract_readings_live_returns_scripted_readings(monkeypatch):
+    """AC-1/AC-2 live: the backend returns the model's parsed readings, not a constant.
+
+    With a patched SDK returning a readings-list envelope, the live call returns that list; a
+    DIFFERENT scripted list → different readings (the live non-tautological proof).
+    """
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    readings_a = _good_readings_list()
+    fake_a = _FakeAnthropic(response_summary=readings_a)
+    _patch_backend_client(monkeypatch, fake_a)
+    out_a = _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
+    assert out_a == readings_a
+
+    readings_b = [_good_reading("TSH", "2.1 mIU/L")]
+    fake_b = _FakeAnthropic(response_summary=readings_b)
+    _patch_backend_client(monkeypatch, fake_b)
+    out_b = _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
+    assert out_b == readings_b
+
+    assert out_a != out_b  # the parse tracks the scripted SDK envelope — not a constant
+
+
+def test_extract_readings_pdf_carries_base64_document_block(monkeypatch):
+    """AC-5 (document): a `application/pdf` file reaches the model as a base64 `document` block."""
+    import base64
+
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    fake = _FakeAnthropic(response_summary=_good_readings_list())
+    _patch_backend_client(monkeypatch, fake)
+
+    raw = b"%PDF-1.4 fake document bytes"
+    _ClaudeNoTrainBackend().extract_readings(raw, "application/pdf")
+
+    block = fake.calls[0]["messages"][0]["content"][0]
+    assert block["type"] == "document"
+    assert block["source"]["type"] == "base64"
+    assert block["source"]["media_type"] == "application/pdf"
+    assert base64.standard_b64decode(block["source"]["data"]) == raw  # the raw file reached the model
+
+
+def test_extract_readings_image_carries_base64_image_block(monkeypatch):
+    """AC-5 (image): an image media type reaches the model as a base64 `image` block."""
+    import base64
+
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    fake = _FakeAnthropic(response_summary=_good_readings_list())
+    _patch_backend_client(monkeypatch, fake)
+
+    raw = b"\x89PNG\r\n\x1a\n fake image bytes"
+    _ClaudeNoTrainBackend().extract_readings(raw, "image/png")
+
+    block = fake.calls[0]["messages"][0]["content"][0]
+    assert block["type"] == "image"
+    assert block["source"]["type"] == "base64"
+    assert block["source"]["media_type"] == "image/png"
+    assert base64.standard_b64decode(block["source"]["data"]) == raw
+
+
+def test_extract_readings_text_carries_text_block(monkeypatch):
+    """AC-5 (text): a text media type reaches the model as a `text` block carrying the decoded text."""
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    fake = _FakeAnthropic(response_summary=_good_readings_list())
+    _patch_backend_client(monkeypatch, fake)
+
+    raw = b"item,timepoint,source,value\nHbA1c,2026-01-15,quest-labs,5.4%"
+    _ClaudeNoTrainBackend().extract_readings(raw, "text/csv")
+
+    block = fake.calls[0]["messages"][0]["content"][0]
+    assert block["type"] == "text"
+    assert block["text"] == raw.decode("utf-8")  # the decoded file text reached the model
+
+
+def test_extract_readings_live_resolves_runtime_key_through_client(monkeypatch):
+    """AC-4: the key is resolved at call time via `key_source.resolve` inside `_client`.
+
+    Injects a fake `anthropic` module so the REAL `_client` runs (no `_patch_backend_client`),
+    patches `key_source.resolve` to a sentinel, and asserts the SDK client constructed was handed
+    THAT sentinel as its `api_key` — a call-time key, never a tracked-file or module-load read.
+    """
+    import sys
+    import types
+
+    from scripts.model import key_source
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    sentinel_key = "sentinel-runtime-key-xyz"
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: sentinel_key)
+
+    fake = _FakeAnthropic(response_summary=_good_readings_list())
+    captured = {}
+
+    def _make(api_key=None):
+        captured["api_key"] = api_key
+        return fake
+
+    fake_anthropic = types.ModuleType("anthropic")
+    fake_anthropic.Anthropic = _make
+    monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic)
+
+    _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
+
+    assert captured["api_key"] == sentinel_key  # call-time key, no tracked-file read
+
+
+def test_extract_readings_live_bounded_retry_then_succeed(monkeypatch):
+    """AC-3a (succeed-within-bound): the Nth attempt succeeds → the call returns, invoked N times."""
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    raise_seq = [RuntimeError("transient")] * 2 + [None]  # raise twice, succeed on the third
+    fake = _FakeAnthropic(response_summary=_good_readings_list(), raise_seq=raise_seq)
+    _patch_backend_client(monkeypatch, fake)
+
+    result = _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
+
+    assert result == _good_readings_list()
+    assert len(fake.calls) == 3  # invoked exactly the bound, succeeded on the last
+
+
+def test_extract_readings_live_bounded_retry_then_fail(monkeypatch):
+    """AC-3a (exhaust-the-bound): all attempts raise → `ModelCallError` after EXACTLY the bound."""
+    from scripts.model.client import (
+        ModelCallError,
+        _ClaudeNoTrainBackend,
+        _EXTRACT_MAX_ATTEMPTS,
+    )
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError("always fails"))
+    _patch_backend_client(monkeypatch, fake)
+
+    with pytest.raises(ModelCallError):
+        _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
+
+    assert len(fake.calls) == _EXTRACT_MAX_ATTEMPTS  # exactly the bound — never unbounded
+
+
+@pytest.mark.parametrize(
+    "fake_kwargs",
+    [
+        {"response_summary": None},  # failed: a null body
+        {"response_summary": {}},  # empty: a non-list body
+        {"response_summary": {"item": "HbA1c"}},  # malformed: a dict, not a readings list
+        {"raise_exc": RuntimeError("sdk errored")},  # errored: the SDK raised
+        {"raise_exc": subprocess.TimeoutExpired(cmd="model", timeout=30)},  # timed-out
+    ],
+    ids=["failed", "empty", "malformed", "errored", "timed-out"],
+)
+def test_extract_readings_live_raises_typed_on_every_failure_mode(monkeypatch, fake_kwargs):
+    """AC-3 live: the live backend raises `ModelCallError` on every failure mode — 0 fabricated readings.
+
+    Each failure mode injected at the patched SDK (a null / empty / malformed body, a raised
+    exception, a timeout-style raise) makes the live `extract_readings` exhaust the bound and
+    raise the typed `ModelCallError` — never returning a fabricated or partial readings payload
+    (the parse helper's shape gate rejects a non-list body; the bounded retry exhausts).
+    """
+    from scripts.model.client import ModelCallError, _ClaudeNoTrainBackend
+
+    fake = _FakeAnthropic(**fake_kwargs)
+    _patch_backend_client(monkeypatch, fake)
+
+    returned = None
+    try:
+        returned = _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
+    except ModelCallError:
+        returned = "RAISED"
+    assert returned == "RAISED", "a failure mode returned a payload instead of raising"
+
+
+def test_extract_readings_makes_no_live_call_without_the_sdk():
+    """AC-7 (0 live spend): an UNPATCHED extract call never reaches a live API — the SDK is absent.
+
+    With the real `anthropic` SDK absent from `.venv`, an UNPATCHED call hits the lazy
+    `from anthropic import Anthropic` import inside `_client` and raises `ModuleNotFoundError`
+    BEFORE any network request — the proof that no test path makes a live extract call (0 live-API
+    spend), mirroring the deid/converse 0-spend pins. Skips when the SDK is installed (operator
+    live mode), where the patched cases cover the fail-closed paths.
+    """
+    import importlib.util
+
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    if importlib.util.find_spec("anthropic") is not None:
+        pytest.skip(
+            "anthropic SDK installed (operator live mode) — the absence-based 0-live-spend guard "
+            "is N/A; the patched failure-mode tests cover the fail-closed paths"
+        )
+    with pytest.raises(ModuleNotFoundError):
+        _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
+
+
+# --- Cycle 3: the SEC crown-jewel probes (constant message + severed chain, 0 raw-file/key leak) --
+
+
+def test_extract_readings_error_surface_carries_no_key_or_raw(monkeypatch, tmp_path):
+    """AC-6 (SEC): the raised `ModelCallError` str + .args carry no synthetic key or raw-file token.
+
+    The extract call is the first extension of the no-train lane onto the ingestion axis — whole raw
+    FILES egress. Seeds a synthetic key (patches `key_source.resolve`) + a synthetic raw-file token,
+    forces the failure path with a `messages.create` whose exception message EMBEDS both tokens, and
+    asserts `str(exc)` and `exc.args` over the raised `ModelCallError` carry 0 occurrences of either —
+    the SEC-01 constant-message lock holds. RED-capable: a variant interpolating `{exc!r}` into the
+    extract message leaks the token and turns this RED (demonstrated by temporarily interpolating the
+    SDK exception into the raise, observing the assertion fail, then reverting to the constant).
+    """
+    from scripts.guard import pii_scan
+    from scripts.model import key_source
+    from scripts.model.client import ModelCallError, _ClaudeNoTrainBackend
+
+    raw_token = "Jordan Faketestperson"  # a synthetic stand-in for raw uploaded file content
+    # Built at runtime so the source carries NO key-shaped literal (the tree-wide
+    # `test_no_api_key_literal_in_tracked_tree` gate flags any `sk-ant-…` literal in the PUBLIC repo).
+    key_token = "synthetic-no-train-key-token-DO-NOT-LOG"
+    config = tmp_path / "synthetic-identity.txt"
+    config.write_text(raw_token + "\n")
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: key_token)
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError(f"sdk error on {raw_token} with {key_token}"))
+    _patch_backend_client(monkeypatch, fake)
+
+    with pytest.raises(ModelCallError) as excinfo:
+        _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 raw file", "application/pdf")
+
+    surface = str(excinfo.value) + repr(excinfo.value.args)
+    assert raw_token not in surface
+    assert key_token not in surface
+    assert pii_scan.scan_text(str(excinfo.value), token_config=config) == 0
+
+
+def test_extract_readings_error_traceback_carries_no_key_or_raw(monkeypatch, tmp_path):
+    """AC-6a (SEC): the RENDERED traceback (`__cause__`/`__context__` chain) carries no key or raw token.
+
+    `raise ... from <sdk_exc>` would attach the raw SDK exception (carrying the raw file in the request
+    content block + the resolved key) as `__cause__` — which a caller's `logger.exception()` /
+    `traceback.print_exc()` renders. Forces the failure path with an SDK exception EMBEDDING both
+    tokens and asserts the fully-rendered traceback carries 0 occurrences of either AND
+    `__cause__ is None` (the `from None` lock). RED-capable: reverting `from None` to `from <exc>`
+    re-attaches the raw `__cause__` and turns this RED (demonstrated by temporarily reverting the
+    raise, observing the assertion fail, then restoring `from None`).
+    """
+    from scripts.model import key_source
+    from scripts.model.client import ModelCallError, _ClaudeNoTrainBackend
+
+    raw_token = "Jordan Faketestperson"
+    key_token = "synthetic-no-train-key-token-DO-NOT-LOG"
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: key_token)
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError(f"sdk error on {raw_token} with {key_token}"))
+    _patch_backend_client(monkeypatch, fake)
+
+    with pytest.raises(ModelCallError) as excinfo:
+        _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 raw file", "application/pdf")
 
     e = excinfo.value
     assert e.__cause__ is None  # the chain is severed (`from None`)
