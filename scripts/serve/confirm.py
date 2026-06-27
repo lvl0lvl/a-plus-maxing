@@ -15,6 +15,7 @@ non-conformant reading raises `ValueError` before any reading is written.
 """
 
 from scripts.ingest import ingest
+from scripts.store import store
 from scripts.store.keying import is_conformant
 
 
@@ -33,7 +34,8 @@ def land_confirmed(readings, *, root):
 
     Args:
         readings (list): The operator-confirmed Line-Field-Set reading dicts.
-        root (str | Path): The store root the confirmed readings land into.
+        root (str | Path | None): The store root the confirmed readings land into; None
+            resolves to `store.DEFAULT_ROOT` (the operator-entry build passes no store_root).
 
     Returns:
         (dict) `{"store": [landed item tokens]}` — a thin receipt of what landed.
@@ -44,8 +46,14 @@ def land_confirmed(readings, *, root):
                 "confirmed reading missing a required Line-Field-Set field; "
                 "the whole batch is rejected (nothing lands)"
             )
+    # Resolve a None root to the production default, mirroring `route_upload` and
+    # `capture.persist_capture`: the operator-entry build (`scripts/serve/__main__`)
+    # constructs the handler with no store_root (None), and an EXPLICIT None overrides the
+    # sink's own `root=store.DEFAULT_ROOT` default — so without this `store._item_path(item,
+    # None)` raises `TypeError` and the confirmed readings never land in production.
+    store_root = root if root is not None else store.DEFAULT_ROOT
     landed = []
     for reading in readings:
-        ingest.manual_entry(reading["item"], reading, root=root)
+        ingest.manual_entry(reading["item"], reading, root=store_root)
         landed.append(reading["item"])
     return {"store": landed}

@@ -612,3 +612,54 @@ def test_default_entry_wires_extract_capable_client_into_build_server():
         "the wired client is not a ModelClient (not extract-capable)"
     )
     assert captured["port"] == serve_server.DEFAULT_PORT, "the entry wired the wrong port"
+
+
+# --------------------------------------------------------------------------- #
+# Tier-3 /review-pr fixes — production None store_root resolution (F1), non-dict guard (F6)
+# --------------------------------------------------------------------------- #
+
+
+def test_confirm_land_resolves_none_store_root_to_production_default(tmp_path, monkeypatch):
+    """Tier-3 F1: the production confirm path (store_root=None) lands into store.DEFAULT_ROOT.
+
+    The operator-entry build (`scripts/serve/__main__`) constructs the handler with NO store_root,
+    so `_do_confirm_extraction` calls `land_confirmed(readings, root=None)`. Without the None ->
+    DEFAULT_ROOT resolution the EXPLICIT None overrides the sink's `root=store.DEFAULT_ROOT`
+    default and `store._item_path(item, None)` raises TypeError -> the broad except degrades it to
+    `{"landed": []}` -> confirmed readings NEVER land in production (the suite missed it because
+    every other confirm test injects a tmp store_root). Failing-capable: revert the resolution and
+    this lands nothing (the 200-with-landed assertion AND the store read both red). Mirrors
+    `test_route_default_roots_resolve_to_production_defaults`.
+    """
+    default_root = tmp_path / "prod-default-store"
+    monkeypatch.setattr(store, "DEFAULT_ROOT", default_root)
+    body = json.dumps({"readings": _CANNED_READINGS}).encode("utf-8")
+    out = _drive_confirm_inproc(
+        None, content_type="application/json", content_length=len(body), body=body
+    )
+    status_line = out.split(b"\r\n", 1)[0]
+    assert b"200" in status_line, f"production None store_root did not return 200: {status_line!r}"
+    payload = _parse_json(out.split(b"\r\n\r\n", 1)[-1].decode("utf-8"))
+    assert payload is not None and set(payload.get("landed", [])) == {"ferritin", "vitamin-d"}, (
+        f"production None store_root did not land the confirmed subset: {payload}"
+    )
+    landed = store.read_all(default_root)
+    assert {(r["item"], r["value"]) for r in landed} == {("ferritin", "120"), ("vitamin-d", "44")}, (
+        "the confirmed readings did not land into the resolved production default root"
+    )
+
+
+@pytest.mark.parametrize("scalar", [None, 42, True, 1.5, "x"])
+def test_land_confirmed_non_dict_element_lands_nothing(tmp_path, scalar):
+    """Tier-3 F6: a non-dict scalar element raises the typed ValueError and lands nothing.
+
+    Symmetric with the well-tested client.py twin guard (test_extract_readings_non_dict_reading_
+    element_fails_closed): a non-dict element hits `land_confirmed`'s `not isinstance(reading,
+    dict)` clause and raises the typed ValueError BEFORE `is_conformant` would do `field in scalar`
+    (a raw TypeError) — and nothing lands (all-or-nothing). Failing-capable: drop the isinstance
+    clause and a non-dict element raises TypeError instead, reddening the `pytest.raises(ValueError)`.
+    """
+    root = tmp_path / "store"
+    with pytest.raises(ValueError):
+        confirm.land_confirmed([scalar], root=root)
+    assert store.read_all(root) == [], "a non-dict element wrote the store"
