@@ -94,6 +94,34 @@ class ModelClient:
             raise ModelCallError("deidentify: backend returned an empty or malformed summary")
         return result
 
+    def extract_readings(self, file_content, media_type):
+        """Extract structured readings from an uploaded file (the no-train extraction seam).
+
+        The uploaded file content + its media type in, a `list` of readings out — each a `dict`
+        carrying the full Line Field Set (`item`, `timepoint`, `source`, `value` per
+        `keying.LINE_FIELDS`). Fail-closed: a non-`list` return, a `list` carrying a reading that
+        fails `keying.is_conformant` (a missing Line-Field-Set field), or any backend failure
+        (empty / errored / timed-out) raises `ModelCallError` — never a fabricated or partial
+        readings payload.
+
+        Args:
+            file_content (bytes | str): The uploaded file content (bytes for a document/image
+                media type, decodable bytes or str for a text media type).
+            media_type (str): The file's IANA media type (e.g. "application/pdf", "image/png").
+
+        Returns:
+            (list) The extracted readings, each a Line-Field-Set `dict`.
+        """
+        from scripts.store.keying import is_conformant
+
+        result = _call(self.backend.extract_readings, file_content, media_type)
+        if not isinstance(result, list):
+            raise ModelCallError("extract_readings: backend returned a non-list result")
+        for reading in result:
+            if not is_conformant(reading):
+                raise ModelCallError("extract_readings: backend returned a field-short reading")
+        return result
+
 
 def _is_author_envelope(result):
     """True when `result` is a valid author envelope or the thin-library sentinel."""
@@ -229,6 +257,105 @@ _CONVERSE_MAX_ATTEMPTS = 3
 # an indefinite block. Passed through `with_options(timeout=...)` at call time.
 _CONVERSE_TIMEOUT_SECONDS = 60.0
 
+# The extract call's bounded retry ceiling — at most this many `messages.create` attempts before
+# the failure propagates to the fail-closed raise (never an unbounded retry). The extract
+# analogue of `_DEID_MAX_ATTEMPTS`, named here so the bound is one machine-diffable value, not a
+# call-site literal.
+_EXTRACT_MAX_ATTEMPTS = 3
+
+# The per-call timeout (seconds) the extract SDK request runs under — a bounded wait, never an
+# indefinite block. Passed through `with_options(timeout=...)` at call time.
+_EXTRACT_TIMEOUT_SECONDS = 60.0
+
+
+def _extract_system_prompt():
+    """Build the extract system instruction: constrain the returned readings to the Line Field Set.
+
+    A CONSTANT system instruction (no raw file content interpolated — the file is passed natively
+    as the user-turn content block, never inlined here) telling the model to respond with ONLY a
+    JSON array of readings whose keys are drawn from `keying.LINE_FIELDS`. The extract analogue of
+    `_deid_prompt`'s field-set instruction; the shape gate is the downstream `_parse_extract_readings`.
+    """
+    from scripts.store.keying import LINE_FIELDS
+
+    field_roster = ", ".join(LINE_FIELDS)
+    return (
+        "You extract structured readings from the uploaded file content. Respond with a single "
+        "JSON array and nothing else. Each array element is a reading object whose keys are exactly "
+        f"this Line Field Set: {field_roster}. Emit no prose outside the JSON array."
+    )
+
+
+def _extract_content_block(file_content, media_type):
+    """Build the media-typed content block carrying the uploaded file for the model.
+
+    The pinned file→model mechanism: a base64 `document` source for "application/pdf", a base64
+    `image` source for an image media type, a `text` block for a text media type. A single
+    media-type dispatch — the load-bearing egress surface that carries the raw file to the model.
+    """
+    import base64
+
+    if media_type == "application/pdf":
+        return {
+            "type": "document",
+            "source": {
+                "type": "base64",
+                "media_type": media_type,
+                "data": base64.standard_b64encode(file_content).decode("utf-8"),
+            },
+        }
+    if media_type.startswith("image/"):
+        return {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": media_type,
+                "data": base64.standard_b64encode(file_content).decode("utf-8"),
+            },
+        }
+    text = file_content.decode("utf-8") if isinstance(file_content, (bytes, bytearray)) else file_content
+    return {"type": "text", "text": text}
+
+
+def _extract_output_schema():
+    """Build the `output_config.format` json_schema constraining the readings to the Line Field Set.
+
+    A top-level array of Line-Field-Set objects, derived from `keying.LINE_FIELDS` (the single
+    source of truth, not a hand-retyped roster). Structured outputs require `additionalProperties:
+    false` on objects; the internal field ordering is implementer discretion (NFR-7).
+    """
+    from scripts.store.keying import LINE_FIELDS
+
+    return {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {field: {"type": "string"} for field in LINE_FIELDS},
+            "required": list(LINE_FIELDS),
+            "additionalProperties": False,
+        },
+    }
+
+
+def _parse_extract_readings(response):
+    """Parse the model response into the readings list.
+
+    Reads the first `text` content block off the SDK envelope and decodes it as the JSON readings
+    array — the model's Line-Field-Set readings. Returns the parsed list verbatim (the raw file
+    never flows through here); a non-text / non-JSON / non-list response raises, failing closed at
+    the retry loop to `ModelCallError`. Mirrors `_parse_deid_summary`'s posture (first text block →
+    `json.loads`), with a list shape gate instead of a dict gate.
+    """
+    import json
+
+    text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), None)
+    if text is None:
+        raise ValueError("extract_readings: model response carried no text block")
+    readings = json.loads(text)
+    if not isinstance(readings, list):
+        raise ValueError("extract_readings: model response was not a JSON array")
+    return readings
+
 
 class _ClaudeNoTrainBackend:
     """The default backend: the Claude no-train commercial API.
@@ -332,3 +459,48 @@ class _ClaudeNoTrainBackend:
         # debuggability is not worth the latent raw/key leak (PUBLIC repo).
         # Raised at the backend boundary so the raw SDK exception never escapes `deidentify`.
         raise ModelCallError("deidentify call failed") from None
+
+    def extract_readings(self, file_content, media_type):
+        """Extract readings from an uploaded file against the no-train API (the live extract call).
+
+        Sends the file to the `MODEL` no-train API as the pinned media-typed content block (a base64
+        `document` source for "application/pdf", a base64 `image` source for an image media type, a
+        `text` block for a text media type) under a bounded retry-with-timeout loop, with an
+        `output_config.format` json_schema constraining the returned readings to the Line Field Set,
+        and returns the model's parsed readings list — never the raw file. The raw file is held in
+        memory only (the local arg + the request); it is written to no path. The returned list is the
+        parse of the model response, not a passthrough; the downstream `ModelClient.extract_readings`
+        `isinstance(list)` + per-reading `is_conformant` checks fail it closed on a malformed shape.
+
+        Args:
+            file_content (bytes | str): The uploaded file content (bytes for a document/image media
+                type, decodable bytes or str for a text media type).
+            media_type (str): The file's IANA media type (e.g. "application/pdf", "image/png").
+
+        Returns:
+            (list) The extracted readings, each a Line-Field-Set `dict`.
+        """
+        client = self._client()
+        system = _extract_system_prompt()
+        content_block = _extract_content_block(file_content, media_type)
+        schema = _extract_output_schema()
+        for _ in range(_EXTRACT_MAX_ATTEMPTS):
+            try:
+                response = client.with_options(timeout=_EXTRACT_TIMEOUT_SECONDS).messages.create(
+                    model=self.MODEL,
+                    max_tokens=2048,
+                    system=system,
+                    messages=[{"role": "user", "content": [content_block]}],
+                    output_config={"format": {"type": "json_schema", "schema": schema}},
+                )
+                return _parse_extract_readings(response)
+            except Exception:  # bounded: try again until the attempt ceiling
+                pass
+        # SEC-01: a CONSTANT message — never interpolate the SDK exception (it can carry the raw
+        # file bytes or the resolved key). `from None` INTENTIONALLY SUPPRESSES the
+        # `__cause__`/`__context__` chain: the raw SDK exception carries the raw file (the request
+        # content block) + the resolved key, which a caller's `logger.exception()` /
+        # `traceback.print_exc()` would render. At this PII/key boundary the chained cause's
+        # debuggability is not worth the latent raw/key leak (PUBLIC repo).
+        # Raised at the backend boundary so the raw SDK exception never escapes `extract_readings`.
+        raise ModelCallError("extract_readings call failed") from None
