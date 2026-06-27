@@ -376,11 +376,14 @@ def test_spa_fetch_targets_are_all_same_origin_loopback():
         )
     # /settings/key is a LOCAL loopback route (Profile API-key save): a same-origin POST
     # whose key is written to the on-device keychain — it never leaves the machine, so it
-    # adds NO new egress class. The off-machine egress set is still the ADR-0016 /chat
-    # one-turn alone (the per-target loopback assertion above is the egress guard).
-    assert set(targets) <= {"/chat", "/upload", "/settings/key"}, (
+    # adds NO new egress class. /confirm-extraction (ADR-0030-T4) is likewise a LOCAL
+    # same-origin POST: the operator-confirmed extracted-readings subset lands through the
+    # unchanged on-device store sink — it never leaves the machine. The off-machine egress
+    # set is still the ADR-0016 /chat one-turn alone (the per-target loopback assertion above
+    # is the egress guard, byte-unchanged; the enumerated set grows by the one authorized route).
+    assert set(targets) <= {"/chat", "/upload", "/settings/key", "/confirm-extraction"}, (
         f"the SPA fetches a path beyond the known loopback routes "
-        f"(/chat + /upload + /settings/key): {sorted(set(targets))}"
+        f"(/chat + /upload + /settings/key + /confirm-extraction): {sorted(set(targets))}"
     )
 
 
@@ -424,3 +427,129 @@ def test_t3_additions_keep_the_spa_inline_asset_clean(tmp_path):
     path = _emit_app(tmp_path)  # render.emit RAISES ValueError on any off-file asset reference
     assert isinstance(path, Path) and path.exists(), "generate.run('app') did not emit under T3 additions"
     assert "<script src" not in path.read_text(), "T3 added an off-file <script src> reference"
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0030-T4 — the SPA operator-confirm UI on Upload Documents: render the
+# extracted readings for review/confirm with an HONEST empty state; the confirm
+# action POSTs only the confirmed subset to /confirm-extraction. Fixture-driven,
+# 0 live spend (the rendered-SPA string + the real generate.run('app') emit).
+# --------------------------------------------------------------------------- #
+
+
+def _panel_build_html(html):
+    """The inner content of the locked ws-docs `#panel-build` Upload surface the panel lands in."""
+    m = re.search(
+        r'<div class="ws-panel active ws-docs" id="panel-build">(.*?)'
+        r'<div class="ws-panel" id="panel-generate">',
+        html, re.DOTALL,
+    )
+    assert m is not None, "the ws-docs #panel-build Upload surface is not in the rendered SPA"
+    return m.group(1)
+
+
+def _reading_row_template(html):
+    """The per-reading confirm/reject control template the inline JS instantiates per reading."""
+    m = re.search(r'<template[^>]*id="reading-row-tpl"[^>]*>(.*?)</template>', html, re.DOTALL)
+    assert m is not None, "the per-reading confirm/reject control template is not rendered"
+    return m.group(1)
+
+
+# Sample-reading tokens (the prototype's fabricated demo readings) that an honest empty
+# confirm-review panel MUST NOT bake into the HTML as the operator's data (ADR-0009 D2).
+_FABRICATED_READING = (
+    "BPC-157 · 250mcg", "183 lb", "49 bpm", "68 ms", "Upper Push — Hypertrophy",
+)
+
+
+# --- Cycle 1: the confirm-review panel + per-reading controls + honest empty state --- #
+
+
+def test_confirm_review_panel_and_per_reading_control_present():
+    """AC-1: the Upload surface carries a confirm-review panel + a per-reading confirm/reject control.
+
+    The confirm-review panel (container + review-list mount + confirm action) lands inside
+    the locked ws-docs `#panel-build` Upload surface, and a per-reading control template
+    renders each extracted reading's (item, timepoint, source, value) with a confirm AND a
+    reject affordance. Failing-capable: reds if the panel or any of the four reading slots /
+    the confirm / the reject affordance is absent.
+    """
+    html = _spa_html()
+    block = _panel_build_html(html)
+    assert 'id="review-panel"' in block, "no confirm-review panel in the #panel-build (ws-docs) surface"
+    assert 'id="review-list"' in block, "no review-list container the per-reading rows mount into"
+    assert 'id="confirm-readings"' in block, "no confirm action on the review panel"
+    tpl = _reading_row_template(html)
+    for field in ("item", "timepoint", "source", "value"):
+        assert f'data-field="{field}"' in tpl, f"the per-reading control renders no {field} slot"
+    assert "reading-confirm" in tpl, "the per-reading control has no confirm affordance"
+    assert "reading-reject" in tpl, "the per-reading control has no reject affordance"
+
+
+def test_confirm_review_panel_is_honest_empty_by_default():
+    """AC-3 (HONEST-DATA): the confirm-review panel's default state bakes 0 fabricated reading.
+
+    A default render (no extraction has run client-side) presents NO placeholder
+    (item, timepoint, source, value) row as the operator's data: the review-list is empty,
+    no fabricated sample-reading token appears, and the panel carries the locked awaiting-state
+    marker. Failing-capable: reds if any sample reading is baked into the panel as data or the
+    awaiting marker is dropped.
+    """
+    block = _panel_build_html(_spa_html())
+    present = [tok for tok in (_FABRICATED + _FABRICATED_READING) if tok in block]
+    assert present == [], f"the confirm-review panel presents fabricated readings: {present}"
+    assert "data-awaiting='extraction'" in block, "the panel carries no honest awaiting-state marker"
+    assert '<div id="review-list"></div>' in block, "the review-list is not empty by default (a reading is baked in)"
+
+
+def test_confirm_panel_keeps_spa_inline_asset_clean(tmp_path):
+    """AC-5 (AUTHORITATIVE inline-asset): generate.run('app') emits a Path with the panel, no off-file ref.
+
+    Drives the REAL `generate.run('app')` (render.emit RAISES ValueError on any off-file asset
+    reference) and asserts it returns a written Path that EXISTS and carries the confirm-review
+    panel, with no off-file `<script src>`. Couples the panel's presence to the emit gate — a
+    substring grep is NOT substituted for the emit probe.
+    """
+    path = _emit_app(tmp_path)
+    assert isinstance(path, Path) and path.exists(), "generate.run('app') did not emit with the confirm panel"
+    emitted = path.read_text()
+    assert 'id="review-panel"' in emitted, "the emitted SPA carries no confirm-review panel"
+    assert "<script src" not in emitted, "the confirm panel added an off-file <script src> reference"
+
+
+# --- Cycle 2: the /upload -> /confirm-extraction inline JS (only the confirmed subset) --- #
+
+
+def test_upload_extraction_payload_drives_confirm_extraction_post():
+    """AC-2: the inline JS carries a fetch('/upload') -> fetch('/confirm-extraction') flow.
+
+    The upload POST surfaces T3's extracted-readings review payload, then the confirm action
+    POSTs to `/confirm-extraction` — sending the CSRF-gate `application/json` Content-Type the
+    route requires and the aligned `{readings: ...}` body (the SAME key `/upload`'s review
+    payload returns, re-posted verbatim). Failing-capable: reds if the confirm flow is absent
+    or drops the application/json header / the aligned readings key.
+    """
+    html = _spa_html()
+    assert "fetch('/upload'" in html, "the upload flow no longer fetches /upload"
+    assert "fetch('/confirm-extraction'" in html, "the inline JS has no /confirm-extraction confirm flow"
+    i = html.find("fetch('/confirm-extraction'")
+    window = html[i:i + 220]
+    assert "'Content-Type':'application/json'" in window, "the confirm POST omits the application/json CSRF header"
+    assert "JSON.stringify({readings:" in window, "the confirm POST does not send the aligned {readings:...} body"
+
+
+def test_confirm_posts_only_the_confirmed_subset():
+    """AC-4: the confirm handler collects only the checked/confirmed rows; a rejected reading is omitted.
+
+    The confirm collector reads each per-reading row's confirm control (`.reading-confirm`) and
+    filters by its `.checked` state into a `picked` subset, then POSTs `{readings:picked}` — so an
+    unchecked/rejected reading is excluded from the body, not the full extracted set. Failing-
+    capable: reds if the collector stops filtering by the confirm control or posts the full set.
+    """
+    html = _spa_html()
+    i = html.find("fetch('/confirm-extraction'")
+    assert i != -1, "no /confirm-extraction flow to check the subset collection"
+    collector = html[max(0, i - 600):i + 60]
+    assert "reading-confirm" in collector, "the confirm collector does not read the per-reading confirm control"
+    assert ".checked" in collector, "the confirm collector does not filter by the confirm control's checked state"
+    assert "JSON.stringify({readings:picked})" in html, "the confirm POST sends a set other than the confirmed subset"
