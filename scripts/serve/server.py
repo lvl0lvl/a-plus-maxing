@@ -13,7 +13,10 @@ multipart body (`multipart.stage_uploads`, ADR-0013-T2) -> route the staged file
 the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`) -> re-render the app
 shell via `generate.run('app')` reflecting the new load-state. The server serves NO
 generated dashboard/report artifact live (ADR-0013 Falsification 3); the route table
-is {GET `/`, GET `/settings/key`, POST `/upload`, POST `/chat`, POST `/settings/key`}.
+is {GET `/`, GET `/settings/key`, POST `/upload`, POST `/chat`, POST `/settings/key`,
+POST `/confirm-extraction`}. POST `/confirm-extraction` (ADR-0030-T3) lands ONLY the
+operator-confirmed subset of an unrecognized-format upload's extracted readings through
+the UNCHANGED sink — the `/upload` handler surfaces those readings and lands 0.
 Stopping is `srv.shutdown()` +
 `srv.server_close()`, the clean operator-stop path.
 """
@@ -95,8 +98,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     POST `/upload` stages the multipart body, routes the staged file into the unchanged
     `ingest.run`/`dna.land` seam, and re-renders the app shell reflecting the new
     load-state. Any other POST 404s — the route table is {GET `/`, GET `/settings/key`,
-    POST `/upload`, POST `/chat`, POST `/settings/key`}, never a directory listing or an
-    artifact-serving route.
+    POST `/upload`, POST `/chat`, POST `/settings/key`, POST `/confirm-extraction`}, never
+    a directory listing or an artifact-serving route.
 
     Attributes:
         store_root: The time-series store root the POST handler ingests into and
@@ -142,11 +145,15 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/settings/key":
             self._save_key()
             return
+        if self.path == "/confirm-extraction":
+            self._do_confirm_extraction()
+            return
         if self.path != "/upload":
             self.send_error(404)
             return
         import tempfile
 
+        from scripts.model.client import ModelCallError
         from scripts.serve import capture, route
         from scripts.serve.multipart import stage_uploads
 
@@ -176,8 +183,21 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                 staged = stage_uploads(
                     self.headers.get("Content-Type"), _BoundedReader(self.rfile, length), staging
                 )
+                extracted = []
                 for file_part in staged["files"]:
-                    route.route_upload(file_part["path"], root=store_root, dna_root=dna_root)
+                    # Thread the instance client into T2's discriminated router: a recognized
+                    # format lands via the unchanged seam (returns a source str); an
+                    # unrecognized format routes through the no-train extract lane (returns
+                    # {"extracted_readings": [...]}) and lands 0 — those readings are surfaced
+                    # for the operator-confirm step (POST /confirm-extraction), never
+                    # auto-landed (ADR-0030 NFR-2). With self.client None the unrecognized
+                    # path preserves today's SystemExit (re-rendered below); extraction
+                    # activates only when a client is injected (the operator-gated live lane).
+                    result = route.route_upload(
+                        file_part["path"], client=self.client, root=store_root, dna_root=dna_root
+                    )
+                    if isinstance(result, dict):
+                        extracted.extend(result["extracted_readings"])
                 # The form-field capture (ADR-0014-T1): route each submitted field by its
                 # data class — a wired de-identified token to the store via the unchanged
                 # store.append, a record-only/raw value to the gitignored scaffold. The
@@ -194,18 +214,28 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                         fields, root=store_root, scaffold_root=scaffold_root,
                         identity_config=identity_config,
                     )
-        except (SystemExit, ValueError, zipfile.BadZipFile, ET.ParseError):
+        except (SystemExit, ValueError, zipfile.BadZipFile, ET.ParseError, ModelCallError):
             # A real operator input must NOT kill the request thread. SystemExit: an
-            # ambiguous/unknown extension (`_detect_source`). ValueError: a fail-loud
-            # land rejection (`dna.land`/the adapter) or a malformed multipart body.
-            # BadZipFile/ParseError: a corrupt `.zip`/`export.xml`. Re-render the wizard
-            # so the operator can pick a source / re-upload, not a stack trace + drop.
+            # ambiguous/unknown extension (`_detect_source`) with no client to extract.
+            # ValueError: a fail-loud land rejection (`dna.land`/the adapter) or a malformed
+            # multipart body. BadZipFile/ParseError: a corrupt `.zip`/`export.xml`.
+            # ModelCallError: a failed no-train extraction (`extract_readings` fail-closed,
+            # ADR-0030-T3 forward-note) — degrade with 0 fabricated readings. Re-render the
+            # app shell so the operator can pick a source / re-upload, not a stack trace + drop.
             self._write_html(200, _render_intake(store_root=store_root, dna_root=dna_root))
             return
         except UploadTooLarge:
             # A part crossed multipart's per-file ceiling mid-stream — same 413 surface
             # as the up-front Content-Length reject (the body was bounded, not RAM-held).
             self._413_too_large()
+            return
+
+        # An unrecognized-format upload surfaced extracted readings — answer with the JSON
+        # review payload (lands 0; POST /confirm-extraction is the ONLY landing path, the
+        # confirm-gate). A pure recognized-format / fields-only upload falls through to the
+        # app-shell re-render below.
+        if extracted:
+            self._write_json(200, {"extracted_readings": extracted})
             return
 
         # Re-render reflecting the new load-state (the store/dropzone were just written).
@@ -266,6 +296,38 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             })
             return
         self._write_json(200, receipt)
+
+    def _do_confirm_extraction(self):
+        """Land the operator-confirmed extracted readings via the unchanged sink.
+
+        Reads a JSON body carrying the operator-confirmed subset (`{"readings": [...]}`) and
+        lands ONLY that subset through `confirm.land_confirmed` — a CALLER of the UNCHANGED
+        `ingest.manual_entry` sink (no second sink/gate/key; the operator-confirm IS the gate).
+        This is the ONLY landing path for extracted readings; the `/upload` handler surfaces
+        them and lands 0 (ADR-0030-T3). A malformed body or a fail-loud land (a partial
+        reading's `ValueError` from the unchanged sink) is CAUGHT and answered with a degraded
+        JSON response — the request thread is never dropped (mirroring `/chat`'s catch-and-
+        degrade), and no fabricated or partial reading lands.
+        """
+        import json
+
+        from scripts.serve import confirm
+
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length) if length else b""
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+            readings = body["readings"]
+            if not isinstance(readings, list):
+                raise ValueError("confirm-extraction: readings must be a list")
+            receipt = confirm.land_confirmed(readings, root=self.store_root)
+        except Exception:
+            # Thread survival: a malformed body / a fail-loud partial-reading land must NOT
+            # kill the request thread. Answer with a degraded response, never a dropped
+            # connection — and never a fabricated or partial landed reading.
+            self._write_json(400, {"landed": [], "degraded": True, "reason": "bad request"})
+            return
+        self._write_json(200, {"landed": receipt["store"]})
 
     def _key_status(self):
         """Write JSON `{connected: bool}` — whether a no-train key resolves at runtime.
