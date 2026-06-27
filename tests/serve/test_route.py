@@ -17,6 +17,7 @@ and carries 0 second extension->source map.
 """
 
 import subprocess
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -202,3 +203,210 @@ def test_shared_ingest_routines_byte_unchanged():
     ).stdout
     changed = [line for line in rows.splitlines() if line.strip()]
     assert changed == [], f"a shared ingest routine was edited (0-shared-routine-edit broken): {changed}"
+
+
+# --------------------------------------------------------------------------- #
+# Cycle 1 — ADR-0030-T2: the universal-extraction front door
+#   AC-1 universal route; AC-2 no regression; AC-3 no auto-land;
+#   AC-4 crown-jewel file-egress; AC-5 OQ-5 no tracked residue
+# --------------------------------------------------------------------------- #
+
+# A Line-Field-Set-conformant canned readings payload (what a mock client returns).
+_CANNED_READINGS = [
+    {"item": "ferritin", "timepoint": "2026-05-01", "source": "labs", "value": "120"},
+    {"item": "vitamin-d", "timepoint": "2026-05-01", "source": "labs", "value": "44"},
+]
+
+
+class _RecordingClient:
+    """A mock no-train model client recording its `extract_readings` calls (0 live spend).
+
+    Records each `(file_content, media_type)` it receives and returns a canned readings list —
+    no live API, no key, no network socket. The crown-jewel file-egress probe asserts the file
+    content reached ONLY this recorded sink.
+
+    Attributes:
+        calls (list): The `(file_content, media_type)` tuples `extract_readings` was called with.
+    """
+
+    def __init__(self, readings=None):
+        self._readings = list(_CANNED_READINGS if readings is None else readings)
+        self.calls = []
+
+    def extract_readings(self, file_content, media_type):
+        self.calls.append((file_content, media_type))
+        return list(self._readings)
+
+
+def _spy_seam(monkeypatch):
+    """Spy `ingest.run`/`dna.land`/`store.append` so the extraction path's 0-call is provable.
+
+    The recognized-format dispatch and every store write flow through these three; the
+    extraction branch must touch none of them. Returns a dict of recorded call args per seam.
+    """
+    calls = {"ingest_run": [], "dna_land": [], "store_append": []}
+    monkeypatch.setattr(route.ingest, "run", lambda *a, **k: calls["ingest_run"].append((a, k)))
+    monkeypatch.setattr(route.dna, "land", lambda *a, **k: calls["dna_land"].append((a, k)))
+    monkeypatch.setattr(route.store, "append", lambda *a, **k: calls["store_append"].append((a, k)))
+    return calls
+
+
+def test_unrecognized_format_routes_through_extract_readings(tmp_path, monkeypatch):
+    """AC-1: an unrecognized `.pdf` + an injected client routes through `extract_readings`.
+
+    The `.pdf` extension is in no named-adapter map, so `_detect_source` SystemExits; with a
+    client injected the staged file routes through the no-train lane — `client.extract_readings`
+    is called exactly once with the staged file's content, and `ingest.run`/`dna.land` are NOT.
+    """
+    calls = _spy_seam(monkeypatch)
+    content = b"synthetic lab report PDF body"
+    staged = tmp_path / "labs.pdf"
+    staged.write_bytes(content)
+    client = _RecordingClient()
+
+    route.route_upload(staged, client=client, root=tmp_path / "store", dna_root=tmp_path / "dna")
+
+    assert len(client.calls) == 1, "extract_readings was not called exactly once"
+    assert client.calls[0][0] == content, "extract_readings did not receive the staged file content"
+    assert calls["ingest_run"] == [] and calls["dna_land"] == [], "the unrecognized format wrongly hit the named seam"
+
+
+def test_unrecognized_format_no_client_preserves_systemexit(tmp_path):
+    """No-client backward-compat: an unrecognized format with `client=None` SystemExits.
+
+    Today's no-client contract is byte-unchanged — without an injected client the
+    unrecognized-extension `_detect_source` SystemExit is preserved (the operator-entry
+    callers are unaffected; T3 threads `self.client` in to activate extraction).
+    """
+    staged = tmp_path / "labs.pdf"
+    staged.write_bytes(b"synthetic")
+
+    with pytest.raises(SystemExit):
+        route.route_upload(staged, root=tmp_path / "store", dna_root=tmp_path / "dna")
+
+
+def test_recognized_formats_do_not_call_extract_readings(tmp_path):
+    """AC-2: recognized formats still route to the named seam; extract_readings call count 0.
+
+    With the mock client injected, an `export.xml` still lands via `ingest.run` (healthkit) and
+    a 23andMe `.zip` still lands via `dna.land` — the named/dna side-effects are unchanged AND
+    `client.extract_readings` is never called on a recognized format.
+    """
+    client = _RecordingClient()
+    store_root = tmp_path / "store"
+    dna_root = tmp_path / "dna"
+
+    xml = tmp_path / "export.xml"
+    _write_healthkit_xml(xml, day="2026-05-03", value="58")
+    src_xml = route.route_upload(xml, client=client, root=store_root, dna_root=dna_root)
+    assert src_xml == "healthkit"
+    assert store.read("hrv", root=store_root)[0]["value"] == 58.0
+
+    dna_zip = tmp_path / "23andme_export.zip"
+    _dna_zip(dna_zip)
+    src_zip = route.route_upload(dna_zip, client=client, root=store_root, dna_root=dna_root)
+    assert src_zip == "dna"
+    assert list(dna_root.glob("*.txt")), "the DNA zip did not land via dna.land with a client injected"
+
+    assert client.calls == [], "extract_readings was called on a recognized format (regression)"
+
+
+def test_extraction_does_not_auto_land(tmp_path, monkeypatch):
+    """AC-3: the extraction path makes 0 store.append/dna.land; readings await confirm.
+
+    `route_upload` over an unrecognized format writes nothing — `store.read_all` is empty
+    afterward and the spy records 0 store.append/dna.land — and RETURNS the extracted readings
+    as the awaiting-confirm payload (a dict distinguishable from a landed-source string).
+    """
+    calls = _spy_seam(monkeypatch)
+    store_root = tmp_path / "store"
+    staged = tmp_path / "labs.pdf"
+    staged.write_bytes(b"synthetic lab report")
+    client = _RecordingClient()
+
+    result = route.route_upload(staged, client=client, root=store_root, dna_root=tmp_path / "dna")
+
+    assert calls["store_append"] == [] and calls["dna_land"] == [], "the extraction path auto-landed a reading"
+    assert store.read_all(store_root) == [], "the store is non-empty after the extraction route (auto-land)"
+    assert not isinstance(result, str), "the extraction return is a source string (not distinguishable from a landed route)"
+    assert result == {"extracted_readings": _CANNED_READINGS}, "the extraction route did not return the awaiting-confirm payload"
+
+
+def test_extraction_file_reaches_only_the_injected_client(tmp_path, monkeypatch):
+    """AC-4 (CROWN-JEWEL): the file content reaches ONLY `client.extract_readings`.
+
+    The mock client records the bytes it received; the seam spies record what they received.
+    Asserts the staged file content reached the injected client AND no other recorded sink
+    (`ingest.run`/`dna.land`/`store.append`) received it — the single-egress crown-jewel bound.
+    """
+    calls = _spy_seam(monkeypatch)
+    content = b"crown-jewel synthetic body bytes"
+    staged = tmp_path / "report.png"
+    staged.write_bytes(content)
+    client = _RecordingClient()
+
+    route.route_upload(staged, client=client, root=tmp_path / "store", dna_root=tmp_path / "dna")
+
+    assert [c[0] for c in client.calls] == [content], "the file content did not reach the injected client exactly once"
+    assert calls["ingest_run"] == [], "ingest.run received the unrecognized-format file"
+    assert calls["dna_land"] == [], "dna.land received the unrecognized-format file"
+    assert calls["store_append"] == [], "store.append received the unrecognized-format file"
+
+
+def test_extraction_leaves_no_tracked_residue(tmp_path):
+    """AC-5 (OQ-5): the extraction route writes the raw file to no tracked path.
+
+    Embeds a unique synthetic token (built at runtime so the literal never appears in any
+    tracked source) in the staged file; after the extraction route, scans the tracked tree
+    (`git grep`, excluding the gitignored dropzone prefixes) and asserts 0 tracked files carry
+    the token — the raw file lived only in the gitignored staged path + the in-memory client call.
+    """
+    token = "OQ5-RAW-RESIDUE-" + uuid.uuid4().hex
+    staged = tmp_path / "labs.pdf"
+    staged.write_bytes(f"synthetic lab report {token}".encode())
+    client = _RecordingClient()
+
+    route.route_upload(staged, client=client, root=tmp_path / "store", dna_root=tmp_path / "dna")
+
+    found = subprocess.run(
+        ["git", "grep", "-l", token],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    ignored = ("vault/store/", "vault/dna/raw/", "vault/labs/raw/", "vault/scaffold/filled/")
+    hits = [h for h in found.stdout.splitlines() if h.strip() and not h.startswith(ignored)]
+    assert hits == [], f"the raw upload content leaked to a tracked path (OQ-5 residue): {hits}"
+
+
+# --------------------------------------------------------------------------- #
+# Cycle 2 — ADR-0030-T2: EXTEND-NOT-REBUILD (frozen engine + plan modules)
+# --------------------------------------------------------------------------- #
+
+# The NFR-4 byte-frozen set: the ingestion engine + every scripts/plan/*.py (incl.
+# deid_in.py). T2 EXTENDS the router's front door; it re-authors none of these.
+_FROZEN_ENGINE_PATHS = (
+    "scripts/ingest/ingest.py",
+    "scripts/ingest/adapter.py",
+    *sorted(
+        str(p.relative_to(REPO_ROOT)) for p in (REPO_ROOT / "scripts" / "plan").glob("*.py")
+    ),
+)
+
+
+def test_frozen_engine_byte_unchanged():
+    """AC-6 / EXTEND-NOT-REBUILD: the ingestion engine + every scripts/plan/*.py unchanged.
+
+    `git diff --numstat <fork-point> -- <frozen set>` emits 0 rows — T2 adds the
+    universal-extraction front door onto the router; it re-authors no engine/plan module
+    (incl. scripts/plan/deid_in.py). Falsifiable: a transient edit to any frozen file emits a
+    row. Mirrors `test_shared_ingest_routines_byte_unchanged`, over the NFR-4 frozen set.
+    """
+    fork_point = subprocess.run(
+        ["git", "merge-base", "HEAD", "origin/main"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    rows = subprocess.run(
+        ["git", "diff", "--numstat", fork_point, "--", *_FROZEN_ENGINE_PATHS],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    ).stdout
+    changed = [line for line in rows.splitlines() if line.strip()]
+    assert changed == [], f"a frozen engine/plan file was edited (EXTEND-NOT-REBUILD broken): {changed}"
