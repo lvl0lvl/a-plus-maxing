@@ -466,13 +466,15 @@ _FABRICATED_READING = (
 
 
 def test_confirm_review_panel_and_per_reading_control_present():
-    """AC-1: the Upload surface carries a confirm-review panel + a per-reading confirm/reject control.
+    """AC-1: the Upload surface carries a confirm-review panel + a per-reading confirm control.
 
     The confirm-review panel (container + review-list mount + confirm action) lands inside
     the locked ws-docs `#panel-build` Upload surface, and a per-reading control template
-    renders each extracted reading's (item, timepoint, source, value) with a confirm AND a
-    reject affordance. Failing-capable: reds if the panel or any of the four reading slots /
-    the confirm / the reject affordance is absent.
+    renders each extracted reading's (item, timepoint, source, value) with a confirm affordance —
+    the checkbox is the sole include/exclude control (uncheck = exclude, reversible; the per-row
+    Reject button was removed per Tier-2 design review). The confirm checkbox carries an accessible
+    name (WCAG 4.1.2). Failing-capable: reds if the panel, any of the four reading slots, the
+    confirm affordance, or its accessible name is absent.
     """
     html = _spa_html()
     block = _panel_build_html(html)
@@ -483,7 +485,11 @@ def test_confirm_review_panel_and_per_reading_control_present():
     for field in ("item", "timepoint", "source", "value"):
         assert f'data-field="{field}"' in tpl, f"the per-reading control renders no {field} slot"
     assert "reading-confirm" in tpl, "the per-reading control has no confirm affordance"
-    assert "reading-reject" in tpl, "the per-reading control has no reject affordance"
+    # WCAG 4.1.2 Level A: the confirm checkbox must carry an accessible name (an empty <label>
+    # wrap would announce "checkbox, checked" with no name to a screen reader).
+    cb = re.search(r'<input[^>]*class="reading-confirm"[^>]*>', tpl)
+    assert cb is not None, "the per-reading confirm checkbox is not rendered"
+    assert "aria-label=" in cb.group(0), "the reading-confirm checkbox carries no accessible name (WCAG 4.1.2)"
 
 
 def test_confirm_review_panel_is_honest_empty_by_default():
@@ -539,17 +545,39 @@ def test_upload_extraction_payload_drives_confirm_extraction_post():
 
 
 def test_confirm_posts_only_the_confirmed_subset():
-    """AC-4: the confirm handler collects only the checked/confirmed rows; a rejected reading is omitted.
+    """AC-4: the confirm handler collects only the checked/confirmed rows; an unchecked reading is omitted.
 
     The confirm collector reads each per-reading row's confirm control (`.reading-confirm`) and
     filters by its `.checked` state into a `picked` subset, then POSTs `{readings:picked}` — so an
-    unchecked/rejected reading is excluded from the body, not the full extracted set. Failing-
-    capable: reds if the collector stops filtering by the confirm control or posts the full set.
+    unchecked reading is excluded from the body, not the full extracted set. Failing-capable: reds
+    if the collector stops filtering by the confirm control or posts the full set.
     """
     html = _spa_html()
     i = html.find("fetch('/confirm-extraction'")
     assert i != -1, "no /confirm-extraction flow to check the subset collection"
-    collector = html[max(0, i - 600):i + 60]
+    collector = html[max(0, i - 900):i + 60]
     assert "reading-confirm" in collector, "the confirm collector does not read the per-reading confirm control"
     assert ".checked" in collector, "the confirm collector does not filter by the confirm control's checked state"
     assert "JSON.stringify({readings:picked})" in html, "the confirm POST sends a set other than the confirmed subset"
+
+
+def test_confirm_zero_selected_does_not_post_or_show_false_success():
+    """HIGH (no false success): a 0-confirmed Confirm click does not POST and shows no landed-success.
+
+    The confirm handler guards on the confirmed subset: when `picked` is empty it returns BEFORE
+    the /confirm-extraction fetch (0 land) and shows an honest 'Nothing selected' message instead
+    of a '✓ Landed' success. Failing-capable: reds if the guard is removed — a no-op would then
+    POST `{readings:[]}` and the landed-success would render for a 0-land no-op.
+    """
+    html = _spa_html()
+    fi = html.find("fetch('/confirm-extraction'")
+    assert fi != -1, "no /confirm-extraction flow to guard"
+    gi = html.find("if(!picked.length)")
+    assert gi != -1, "the confirm handler has no 0-confirmed guard"
+    assert gi < fi, "the 0-confirmed guard does not short-circuit before the POST"
+    guard = html[gi:fi]
+    assert "return" in guard, "the 0-confirmed guard does not return before the POST"
+    assert "Nothing selected" in guard, "the 0-confirmed path shows no honest 'nothing selected' message"
+    # the landed-success message lives ONLY after the fetch resolves — never on the 0-confirmed no-op path
+    si = html.find("✓ Landed ")
+    assert si > fi, "the landed-success message is not gated behind the confirm POST"
