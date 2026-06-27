@@ -489,9 +489,8 @@ select.inp{cursor:pointer}
             </div>
             <template id="reading-row-tpl">
               <div class="doc reading-row">
-                <label class="reading-pick" style="flex:none;display:flex;align-items:center"><input type="checkbox" class="reading-confirm" checked></label>
+                <label class="reading-pick" style="flex:none;display:flex;align-items:center"><input type="checkbox" class="reading-confirm" aria-label="Confirm reading" checked></label>
                 <div class="m"><div class="t" data-field="item"></div><div class="d"><span data-field="timepoint"></span> · <span data-field="source"></span> · <span data-field="value"></span></div></div>
-                <button class="btn ghost reading-reject" type="button">Reject</button>
               </div>
             </template>
           </div>
@@ -755,7 +754,6 @@ function renderGenerate(){
      var slot=node.querySelector('[data-field="'+field+'"]'); if(slot) slot.textContent=reading[field];
    });
    node._reading=reading;  // the verbatim reading dict, re-posted to /confirm-extraction unmodified
-   node.querySelector('.reading-reject').addEventListener('click',function(){ node.remove(); });
    return node;
  }
  function showReview(readings){
@@ -802,14 +800,21 @@ function renderGenerate(){
  });
  if(drop){ drop.addEventListener('dragover',function(e){e.preventDefault();});
    drop.addEventListener('drop',function(e){e.preventDefault(); up(e.dataTransfer.files&&e.dataTransfer.files[0]);}); }
- // confirm action -> POST ONLY the operator-confirmed subset to /confirm-extraction (a rejected
- // reading is removed from the list / unchecked, so it is omitted from the body — the confirm gate).
+ // confirm action -> POST ONLY the operator-confirmed subset to /confirm-extraction. The checkbox
+ // is the sole include/exclude control (uncheck = exclude, reversible); a 0-confirmed click never
+ // POSTs and never shows a landed-success — the confirm gate, with no false-success no-op.
  if(CONFIRM_BTN){ CONFIRM_BTN.addEventListener('click',function(){
    var picked=[];
    REVIEW_LIST.querySelectorAll('.reading-row').forEach(function(row){
      var cb=row.querySelector('.reading-confirm'); if(cb&&cb.checked&&row._reading) picked.push(row._reading);
    });
    var st=document.getElementById('upload-status');
+   if(!picked.length){
+     // 0 confirmed -> do NOT POST and never show a landed-success for a no-op; the rows stay
+     // visible (unchecked) so the operator sees nothing is selected (honest: nothing landed).
+     if(st){ st.className='upload-status warn'; st.style.display='flex'; st.textContent='Nothing selected — check at least one reading to confirm.'; }
+     return;
+   }
    if(st){ st.className='upload-status info'; st.style.display='flex'; st.textContent='Landing '+picked.length+' confirmed reading'+(picked.length===1?'':'s')+'…'; }
    fetch('/confirm-extraction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({readings:picked})}).then(function(r){return r.json();})
      .then(function(d){ var n=(d.landed||[]).length;
