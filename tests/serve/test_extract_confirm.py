@@ -25,9 +25,13 @@ driven over a temp store. No live API, no key, no non-loopback socket.
 """
 
 import http.client
+import io
 import json
 import threading
+from email.message import Message
 from pathlib import Path
+
+import pytest
 
 from scripts.model.client import ModelCallError
 from scripts.serve import confirm
@@ -165,6 +169,31 @@ def _parse_json(text):
         return None
 
 
+def _drive_confirm_inproc(store_root, *, content_type, content_length, body):
+    """Drive `_do_confirm_extraction` in-process (no socket) and return the raw response bytes.
+
+    Bypasses `BaseHTTPRequestHandler.__init__`'s socket setup so the oversize-Content-Length
+    413 path is exercised deterministically — declaring a huge Content-Length while the rfile
+    carries only a tiny body has no connection-reset race here (mirrors
+    `test_serve_no_egress._build_post_handler`).
+    """
+    bound = type("BoundIntakeRequestHandler", (serve_server.IntakeRequestHandler,),
+                 {"store_root": store_root})
+    handler = bound.__new__(bound)
+    handler.path = "/confirm-extraction"
+    handler.command = "POST"
+    handler.requestline = "POST /confirm-extraction HTTP/1.1"
+    handler.request_version = "HTTP/1.1"
+    headers = Message()
+    headers["Content-Type"] = content_type
+    headers["Content-Length"] = str(content_length)
+    handler.headers = headers
+    handler.rfile = io.BytesIO(body)
+    handler.wfile = io.BytesIO()
+    handler._do_confirm_extraction()
+    return handler.wfile.getvalue()
+
+
 # --------------------------------------------------------------------------- #
 # Cycle 1 — confirm.land_confirmed: the sink-caller (AC-2 unit, AC-3, AC-4 unit)
 # --------------------------------------------------------------------------- #
@@ -188,19 +217,29 @@ def test_land_confirmed_lands_the_confirmed_subset(tmp_path):
     )
 
 
-def test_confirm_py_imports_no_model_client_no_keying():
-    """AC-3 (SINK-CALLER, structural): confirm.py imports no model client + no keying of its own.
+def test_confirm_py_imports_no_model_client_no_second_sink_or_key():
+    """AC-3 (SINK-CALLER, structural): no model client; no second sink/dedupe key; keying REUSED.
 
-    `confirm.py` makes 0 model call (imports no model client / SDK) and references no
-    keying/dedupe/direct-store-write of its own — the dedupe + the uniform missing-field
-    rejection are INHERITED from the unchanged `store.append` (reached via
-    `ingest.manual_entry`). Reds if a model import or a self-owned keying surface appears.
+    `confirm.py` makes 0 model call (imports no model client / SDK) and adds no SECOND sink
+    or dedupe key of its own — it calls neither `store.append`/`store.correct` directly nor
+    `_write_atomic`, and defines no dedupe identity (the `(item, timepoint, source)` dedupe is
+    inherited from the unchanged `ingest.manual_entry` sink). The shared conformance check
+    `keying.is_conformant` is REUSED for the all-or-nothing batch pre-validation (review
+    MUST-FIX C), never re-defined here — so it is NOT a second key. Reds if a model import,
+    a direct second sink, or a re-defined conformance/field-set surface appears.
     """
     src = (REPO_ROOT / "scripts" / "serve" / "confirm.py").read_text()
     for marker in ("anthropic", "scripts.model", "ModelClient", "extract_readings"):
         assert marker not in src, f"confirm.py references a model client ({marker!r})"
-    for marker in ("store.append(", "dedupe_key", "is_conformant", "import keying", "keying."):
-        assert marker not in src, f"confirm.py defines its own keying/dedupe ({marker!r})"
+    for marker in ("store.append(", "store.correct(", "dedupe_key", "_write_atomic"):
+        assert marker not in src, f"confirm.py adds a second sink/dedupe key ({marker!r})"
+    # The conformance check is REUSED from the shared keying module, not re-defined here.
+    assert "from scripts.store.keying import is_conformant" in src, (
+        "confirm.py should REUSE the shared keying.is_conformant for batch validation"
+    )
+    assert "def is_conformant" not in src and "LINE_FIELDS =" not in src, (
+        "confirm.py re-defines the conformance check instead of reusing the shared one"
+    )
 
 
 def test_reconfirm_appends_zero_duplicates(tmp_path):
@@ -226,8 +265,6 @@ def test_partial_confirmed_reading_lands_nothing(tmp_path):
     (the uniform `ValueError` from `_store_reading`/`store.append`); 0 readings land —
     `store.read_all == []` afterward.
     """
-    import pytest
-
     root = tmp_path / "store"
     partial = [{"item": "ferritin", "timepoint": "2026-05-01", "source": "labs"}]  # no value
     with pytest.raises(ValueError):
@@ -242,13 +279,32 @@ def test_partial_confirmed_reading_missing_item_lands_nothing(tmp_path):
     the same `ValueError` from the unchanged sink (`_store_reading`), never a raw `KeyError`,
     and lands nothing.
     """
-    import pytest
-
     root = tmp_path / "store"
     no_item = [{"timepoint": "2026-05-01", "source": "labs", "value": "120"}]  # no item
     with pytest.raises(ValueError):
         confirm.land_confirmed(no_item, root=root)
     assert store.read_all(root) == [], "a reading missing item landed despite the fail-closed sink"
+
+
+def test_mixed_valid_invalid_batch_lands_nothing(tmp_path):
+    """AC-4 / MUST-FIX C (ALL-OR-NOTHING): a mixed valid+invalid batch lands NOTHING.
+
+    A batch whose FIRST reading is conformant and whose SECOND is non-conformant (missing
+    `value`) must land NOTHING — the whole batch is validated BEFORE the first land, so the
+    valid prefix never persists (mirroring `ingest.import_csv`'s validate-then-write). The
+    landing raises `ValueError` before any write. RED-capable: with per-reading loop-landing
+    the valid prefix (ferritin) would persist and `store.read_all` would be non-empty.
+    """
+    root = tmp_path / "store"
+    batch = [
+        {"item": "ferritin", "timepoint": "2026-05-01", "source": "labs", "value": "120"},
+        {"item": "vitamin-d", "timepoint": "2026-05-01", "source": "labs"},  # invalid: no value
+    ]
+    with pytest.raises(ValueError):
+        confirm.land_confirmed(batch, root=root)
+    assert store.read_all(root) == [], (
+        "the valid prefix landed before the invalid reading (not all-or-nothing)"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -272,7 +328,7 @@ def test_upload_surfaces_extracted_readings_lands_none(tmp_path):
         assert status == 200, f"POST /upload returned {status}, expected 200"
         payload = _parse_json(text)
         assert payload is not None, "the /upload response is not a JSON review payload"
-        assert payload.get("extracted_readings") == _CANNED_READINGS, (
+        assert payload.get("readings") == _CANNED_READINGS, (
             f"the review payload did not carry the extracted readings: {payload}"
         )
         # The confirm-gate: 0 readings landed before any /confirm-extraction.
@@ -302,7 +358,7 @@ def test_upload_failed_extraction_degrades_no_drop(tmp_path):
         # No fabricated readings surfaced, none landed.
         payload = _parse_json(text)
         if payload is not None:
-            assert not payload.get("extracted_readings"), "a failed extraction fabricated readings"
+            assert not payload.get("readings"), "a failed extraction fabricated readings"
         assert store.read_all(tmp_path / "store") == [], "a failed extraction landed a reading"
         # The handler survived — a follow-up GET / still serves the app shell.
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
@@ -336,7 +392,7 @@ def test_upload_heterogeneous_recognized_lands_unrecognized_surfaced(tmp_path):
         ])
         assert status == 200, f"heterogeneous POST returned {status}, expected 200"
         payload = _parse_json(text)
-        assert payload is not None and payload.get("extracted_readings") == _CANNED_READINGS, (
+        assert payload is not None and payload.get("readings") == _CANNED_READINGS, (
             f"the unrecognized readings were not surfaced for confirm: {payload}"
         )
         # The recognized export.xml landed via the unchanged seam.
@@ -471,3 +527,88 @@ def test_route_table_gains_only_confirm_extraction(tmp_path):
             assert marker not in src, (
                 f"{py.name} references an outbound client ({marker!r}) — 0 new outbound class"
             )
+
+
+# --------------------------------------------------------------------------- #
+# Wave-3 Tier-2 review fixes — CSRF gate (B), body ceiling (D), factory wiring (A)
+# --------------------------------------------------------------------------- #
+
+
+def test_confirm_text_plain_rejected_415_no_land(tmp_path):
+    """MUST-FIX B (CSRF): a text/plain POST to /confirm-extraction is rejected 415, 0 land.
+
+    A cross-site CORS-simple POST (text/plain, no preflight) carrying attacker-chosen readings
+    must be rejected 415 BEFORE the body is parsed — the same CSRF gate `_save_key` applies —
+    and land NOTHING. Failing-capable: drop the ctype gate and the body lands (the store
+    becomes non-empty), reddening the negative assertion.
+    """
+    client = _ExtractClient()
+    srv, port = _server_with_extract(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        body = json.dumps({"readings": [_CANNED_READINGS[0]]}).encode("utf-8")
+        conn.request("POST", "/confirm-extraction", body=body,
+                     headers={"Content-Type": "text/plain"})
+        resp = conn.getresponse()
+        resp.read()
+        conn.close()
+        assert resp.status == 415, f"a text/plain confirm returned {resp.status}, expected 415"
+        assert store.read_all(tmp_path / "store") == [], (
+            "a text/plain confirm landed readings (the CSRF gate was bypassed)"
+        )
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_confirm_oversize_content_length_413_no_land(tmp_path):
+    """SHOULD-FIX D (bounded memory): an over-ceiling Content-Length is refused 413, 0 read/land.
+
+    Declares a Content-Length above `_CONFIRM_MAX_BYTES` while the rfile carries only a tiny
+    body. The handler must answer 413 from the header BEFORE reading the body, landing 0.
+    Driven in-process (no socket) so the assertion is deterministic.
+    """
+    store_root = tmp_path / "store"
+    declared = serve_server._CONFIRM_MAX_BYTES + 1
+    out = _drive_confirm_inproc(
+        store_root, content_type="application/json", content_length=declared, body=b"{}"
+    )
+    status_line = out.split(b"\r\n", 1)[0]
+    assert b"413" in status_line, f"an oversize confirm did not return 413: {status_line!r}"
+    assert store.read_all(store_root) == [], "an oversize confirm landed readings"
+
+
+def test_default_entry_wires_extract_capable_client_into_build_server():
+    """MUST-FIX A (factory wiring): the production entry wires a non-None ModelClient.
+
+    `python -m scripts.serve` must pass an extract-capable client into `build_server` so
+    `/upload` extracts in production (the dormant-wiring gap the Architect named) — NOT by a
+    handler self-default (which would make a no-client `build_server()` upload spend). Asserts
+    the default `main()` path constructs a `ModelClient` and passes it as `build_server`'s
+    `client`, via an injected `build` spy that captures the kwarg and aborts BEFORE the serve
+    loop — so the test binds no socket and makes NO live call (constructing a `ModelClient` is
+    spend-free; the SDK import + key resolve are lazy, only on an actual extract call).
+    """
+    from scripts.model.client import ModelClient
+    from scripts.serve import __main__ as entry
+
+    captured = {}
+
+    class _Abort(Exception):
+        pass
+
+    def _spy_build(port, *, client=None, **kwargs):
+        captured["port"] = port
+        captured["client"] = client
+        raise _Abort
+
+    with pytest.raises(_Abort):
+        entry.main(build=_spy_build)
+    assert captured["client"] is not None, (
+        "the production entry did not wire a client into build_server (extraction stays dormant)"
+    )
+    assert isinstance(captured["client"], ModelClient), (
+        "the wired client is not a ModelClient (not extract-capable)"
+    )
+    assert captured["port"] == serve_server.DEFAULT_PORT, "the entry wired the wrong port"

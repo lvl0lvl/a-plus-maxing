@@ -13,11 +13,21 @@ import signal
 import sys
 import threading
 
+from scripts.model.client import ModelClient
 from scripts.serve import server as serve_server
 
 
-def main(argv=None):
+def main(argv=None, *, build=serve_server.build_server, client_factory=ModelClient):
     """Build the loopback server on the default port and serve until stopped.
+
+    Wires the production no-train model client into the server (ADR-0030-T3 factory
+    wiring): `client_factory()` constructs a `ModelClient` (lazy — the SDK import + key
+    resolve happen at call time, never at construction, so this makes no live call) and
+    passes it to `build`, so the operator-entry server's `self.client` is live and a POST
+    `/upload` of an unrecognized format extracts via the no-train lane. Tests build the
+    server WITHOUT a client (`build_server()` -> `self.client=None`), so an unknown upload
+    re-renders rather than making a metered call — extraction is wired here, at the entry
+    point, not by a handler self-default.
 
     On a port collision, exit non-zero with a fail-loud message; on Ctrl-C (SIGINT),
     stop the listener cleanly. `serve_forever` runs on a worker thread so the main
@@ -25,13 +35,18 @@ def main(argv=None):
 
     Args:
         argv (list, optional): Argument vector; defaults to `sys.argv[1:]`.
+        build (Callable, optional): The server factory seam; defaults to
+            `serve_server.build_server`. Injectable so a test can assert the wiring
+            without binding a socket or making a live call.
+        client_factory (Callable, optional): The model-client factory; defaults to
+            `ModelClient`. Constructs the no-train client wired into the server.
 
     Returns:
         (int) 0 on a clean operator-stop.
     """
     port = serve_server.DEFAULT_PORT
     try:
-        srv = serve_server.build_server(port)
+        srv = build(port, client=client_factory())
     except OSError as exc:
         raise SystemExit(
             f"Port {port} is already in use ({exc}); the intake server did not start. "

@@ -46,6 +46,12 @@ MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_MARGIN
 # generous margin that still rejects a giant body before it is read into RAM.
 _SETTINGS_MAX_BYTES = 16 * 1024
 
+# The whole-body ceiling for POST /confirm-extraction. The confirmed subset is a small JSON
+# array of Line-Field-Set readings; 1 MiB is a generous margin for a full lab panel that
+# still rejects a giant body on Content-Length BEFORE it is read into RAM (the same
+# bounded-memory posture as _SETTINGS_MAX_BYTES, ADR-0030-T3 review SHOULD-FIX D).
+_CONFIRM_MAX_BYTES = 1024 * 1024
+
 
 class _BoundedReader:
     """A read-bounded view over `rfile` that never yields more than `length` bytes.
@@ -232,10 +238,12 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
 
         # An unrecognized-format upload surfaced extracted readings — answer with the JSON
         # review payload (lands 0; POST /confirm-extraction is the ONLY landing path, the
-        # confirm-gate). A pure recognized-format / fields-only upload falls through to the
-        # app-shell re-render below.
+        # confirm-gate). The payload key is `readings`, the SAME key `/confirm-extraction`
+        # consumes, so the confirm UI re-posts the operator-confirmed subset verbatim with no
+        # remap (review SHOULD-FIX E). A pure recognized-format / fields-only upload falls
+        # through to the app-shell re-render below.
         if extracted:
-            self._write_json(200, {"extracted_readings": extracted})
+            self._write_json(200, {"readings": extracted})
             return
 
         # Re-render reflecting the new load-state (the store/dropzone were just written).
@@ -300,21 +308,40 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     def _do_confirm_extraction(self):
         """Land the operator-confirmed extracted readings via the unchanged sink.
 
-        Reads a JSON body carrying the operator-confirmed subset (`{"readings": [...]}`) and
-        lands ONLY that subset through `confirm.land_confirmed` — a CALLER of the UNCHANGED
-        `ingest.manual_entry` sink (no second sink/gate/key; the operator-confirm IS the gate).
-        This is the ONLY landing path for extracted readings; the `/upload` handler surfaces
-        them and lands 0 (ADR-0030-T3). A malformed body or a fail-loud land (a partial
-        reading's `ValueError` from the unchanged sink) is CAUGHT and answered with a degraded
-        JSON response — the request thread is never dropped (mirroring `/chat`'s catch-and-
-        degrade), and no fabricated or partial reading lands.
+        Reads a JSON body carrying the operator-confirmed subset (`{"readings": [...]}`, the
+        SAME key `/upload`'s review payload returns) and lands ONLY that subset through
+        `confirm.land_confirmed` — a CALLER of the UNCHANGED `ingest.manual_entry` sink (no
+        second sink/gate/key; the operator-confirm IS the gate). This is the ONLY landing path
+        for extracted readings; the `/upload` handler surfaces them and lands 0 (ADR-0030-T3).
+
+        Requires `Content-Type: application/json` (a cross-site CORS-simple text/plain POST is
+        rejected 415 BEFORE the body is parsed — the same CSRF gate `_save_key` applies, so a
+        forged cross-site POST cannot land attacker-chosen readings). An over-ceiling
+        Content-Length is refused 413 BEFORE the body is read (bounded memory). A malformed
+        body or a fail-loud land (the all-or-nothing batch's `ValueError`) is CAUGHT and
+        answered with a degraded JSON response — the request thread is never dropped
+        (mirroring `/chat`'s catch-and-degrade), and no fabricated or partial reading lands.
         """
         import json
 
         from scripts.serve import confirm
 
+        # CSRF gate (mirrors `_save_key`): require application/json so a cross-site "simple"
+        # request (text/plain, no CORS preflight) cannot drive this landing route — a genuine
+        # application/json cross-site POST forces a preflight the server never answers.
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"landed": [], "error": "unsupported content-type"})
+            return
         try:
             length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._write_json(400, {"landed": [], "degraded": True, "reason": "bad request"})
+            return
+        if length > _CONFIRM_MAX_BYTES:
+            self._write_json(413, {"landed": [], "error": "too large"})
+            return
+        try:
             raw = self.rfile.read(length) if length else b""
             body = json.loads(raw.decode("utf-8")) if raw else {}
             readings = body["readings"]
@@ -322,8 +349,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                 raise ValueError("confirm-extraction: readings must be a list")
             receipt = confirm.land_confirmed(readings, root=self.store_root)
         except Exception:
-            # Thread survival: a malformed body / a fail-loud partial-reading land must NOT
-            # kill the request thread. Answer with a degraded response, never a dropped
+            # Thread survival: a malformed body / a fail-loud all-or-nothing batch land must
+            # NOT kill the request thread. Answer with a degraded response, never a dropped
             # connection — and never a fabricated or partial landed reading.
             self._write_json(400, {"landed": [], "degraded": True, "reason": "bad request"})
             return
