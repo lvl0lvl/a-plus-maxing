@@ -13,7 +13,8 @@ multipart body (`multipart.stage_uploads`, ADR-0013-T2) -> route the staged file
 the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`) -> re-render the app
 shell via `generate.run('app')` reflecting the new load-state. The server serves NO
 generated dashboard/report artifact live (ADR-0013 Falsification 3); the route table
-is {GET `/`, POST `/upload`, POST `/chat`}. Stopping is `srv.shutdown()` +
+is {GET `/`, GET `/settings/key`, POST `/upload`, POST `/chat`, POST `/settings/key`}.
+Stopping is `srv.shutdown()` +
 `srv.server_close()`, the clean operator-stop path.
 """
 
@@ -93,8 +94,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     GET `/` writes HTTP 200 + the `generate.run('app')` body; any other GET 404s.
     POST `/upload` stages the multipart body, routes the staged file into the unchanged
     `ingest.run`/`dna.land` seam, and re-renders the app shell reflecting the new
-    load-state. Any other POST 404s — the route table is {GET `/`, POST `/upload`, POST
-    `/chat`}, never a directory listing or an artifact-serving route.
+    load-state. Any other POST 404s — the route table is {GET `/`, GET `/settings/key`,
+    POST `/upload`, POST `/chat`, POST `/settings/key`}, never a directory listing or an
+    artifact-serving route.
 
     Attributes:
         store_root: The time-series store root the POST handler ingests into and
@@ -297,6 +299,14 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
 
         from scripts.model import key_source
 
+        # Require application/json so a cross-site "simple" request (text/plain, which
+        # triggers no CORS preflight) cannot drive this secret-write route: a genuine
+        # application/json cross-site POST forces a preflight the server never answers,
+        # so the browser blocks it (SEC-001 — CSRF on the first secret-write surface).
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"ok": False, "error": "unsupported content-type"})
+            return
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
@@ -308,10 +318,18 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length) if length else b""
         try:
             body = json.loads(raw.decode("utf-8")) if raw else {}
-            key = (body.get("api_key") or "").strip()
         except (ValueError, UnicodeDecodeError):
             self._write_json(400, {"ok": False, "error": "bad request"})
             return
+        # A top-level non-object JSON body (123 / [] / "x") or a non-string api_key has no
+        # .get / .strip — guard both so a malformed body is a 400, never an uncaught
+        # AttributeError that drops the request thread (BUG-001; the catch-and-degrade
+        # posture this docstring already promises).
+        if not isinstance(body, dict):
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        api_key = body.get("api_key")
+        key = api_key.strip() if isinstance(api_key, str) else ""
         if not key:
             self._write_json(400, {"ok": False, "error": "empty key"})
             return
