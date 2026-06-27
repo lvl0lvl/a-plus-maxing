@@ -8,7 +8,8 @@ reads that design and injects the ONE load-state-dependent surface — the Uploa
 documents" cards (`<!--DOC_CARDS-->`) — from the ingestion `status` (resolved by
 `generate.run('app')` via `scripts.ingest.status`): an empty store shows honest "+ Link"
 cards, a loaded stream shows the landed names/counts (names/counts only, never a raw reading
-value or rsid). `_lucide.py` vendors the icons.
+value or rsid). The page's lucide icons are vendored inline in `app_view.html`; the four
+document-card icons are `_DOC_ICONS` below.
 """
 import html as _html
 import pathlib
