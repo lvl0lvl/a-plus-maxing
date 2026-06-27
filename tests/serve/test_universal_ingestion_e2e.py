@@ -383,14 +383,29 @@ def test_negative_control_operator_confirms_none_lands_nothing(tmp_path):
 def test_negative_control_empty_extraction_is_honest_no_data(tmp_path):
     """AC-2 (b): an empty-extraction (blank document) -> honest empty state, NOT a fabricated reading.
 
-    The mock returns `[]` (a blank/empty document); the /upload response offers 0 readings for
-    review and the store stays empty — proving the empty-extraction case is the honest no-data
-    state, never a fabricated reading. The mock WAS invoked (the lane ran, it just had nothing).
+    The mock returns `[]` (a blank/empty document). Under the current fail-closed behavior an
+    empty extraction degrades to the no-data app-shell re-render (a NON-JSON response), so 0
+    readings are offered for review and the store stays empty.
+
+    NON-TAUTOLOGICAL + failing-capable: a bare `_offered_readings(...) == []` would pass for ANY
+    non-JSON response (it returns `[]` whenever the content-type is not application/json), so it
+    cannot tell an honest no-data re-render from a fabrication. This pins the DISTINGUISHING shape
+    — the response is the no-data re-render, NOT an application/json review payload — so a
+    fabrication mutation (surfacing any reading on an empty extraction) flips the response to an
+    application/json payload with a non-empty `readings`, reddening BOTH the content-type and the
+    offered-readings assertions. The positive contrast is the headline test, where a NON-empty
+    extraction DOES surface an application/json review payload. (The deeper empty-list-is-a-valid-
+    return refinement — a distinct empty-state JSON instead of the fail-closed degrade — is a
+    deferred follow-up; this test pins the current honest-no-data behavior, not that refinement.)
+    The mock WAS invoked (the lane ran, it just had nothing).
     """
     backend = _FixtureBackend(())
     with _running_server(tmp_path, backend) as port:
         status, ctype, body = _post_upload(port, "report.pdf", _fixture_bytes(_raw_token()))
         assert status == 200
+        assert ctype != "application/json", (
+            "an empty extraction must surface the no-data re-render, NOT a review payload"
+        )
         assert _offered_readings(ctype, body) == [], "an empty extraction offers no fabricated reading"
         assert store.read_all(tmp_path / "store") == []
     assert backend.extract_calls, "the extract lane was exercised (not a silent no-op)"
