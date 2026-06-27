@@ -122,6 +122,10 @@ select.inp{cursor:pointer}
 .msg.sys{align-self:center;background:transparent;border:none;box-shadow:none;color:var(--muted);font-size:11.5px;text-align:center;max-width:90%;padding:2px 0}
 .chat-progress{display:none;align-items:center;gap:7px;font-size:12px;font-weight:600;padding:8px 11px;border-radius:9px;margin-bottom:10px;background:var(--soft);color:var(--accent)}
 .chat-progress.done{background:var(--good-bg);color:var(--good);cursor:pointer}
+.upload-status{display:none;align-items:center;gap:8px;font-size:13px;font-weight:600;padding:10px 13px;border-radius:10px;margin:0 0 12px;line-height:1.4}
+.upload-status.info{background:var(--soft);color:var(--accent)}
+.upload-status.ok{background:var(--good-bg);color:var(--good)}
+.upload-status.warn{background:var(--watch-bg);color:var(--watch)}
 /* the specialist card married to the chat input */
 .chat-foot{border-top:1px solid var(--line);background:#fff;padding:12px 16px 14px}
 .spec-card{display:flex;align-items:center;gap:11px;padding:8px 4px 12px}
@@ -377,7 +381,9 @@ select.inp{cursor:pointer}
         </form>
 
         <div class="seclab">Link your documents</div>
-        <!--DOC_CARDS-->
+        <div id="upload-status" class="upload-status"></div>
+        <input type="file" id="filepick" style="display:none">
+        <div id="doc-cards"><!--DOC_CARDS--></div>
 
         <div class="seclab">Additional documents</div>
         <div class="drop">Drop any other files here, or click to browse — anything relevant (prior plans, imaging reports, notes). Parsed locally into your store.</div>
@@ -574,8 +580,8 @@ function _chatSend(composer){
  fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turn:txt,conversation:_conv[cid]})})
   .then(function(r){return r.json();})
   .then(function(d){var b=document.createElement('div'); b.className='msg bot';
-    b.textContent=(d&&d.reply)?d.reply:'(The assistant is unavailable — if you have not connected an API key yet, the chat can\'t respond. Your message is still captured.)';
-    if(d&&d.reply)_conv[cid].push({role:'assistant',content:d.reply});
+    if(d&&d.reply){ b.textContent=d.reply; _conv[cid].push({role:'assistant',content:d.reply}); }
+    else { b.textContent='(The assistant couldn\'t answer'+((d&&d.reason)?' — '+d.reason:'')+'. Your message was still captured. If this keeps happening, check that Profile shows your key as Connected.)'; }
     thread.appendChild(b); _progressUpdate(wrap, thread, d&&d.progress); thread.scrollTop=thread.scrollHeight;})
   .catch(function(){var b=document.createElement('div'); b.className='msg bot'; b.textContent='(The assistant is unavailable right now.)'; thread.appendChild(b); thread.scrollTop=thread.scrollHeight;});
 }
@@ -610,6 +616,52 @@ function _pfKeySave(){
  _pfApplyName(saved);
  var av=document.getElementById('top-av'); if(av) av.addEventListener('click',function(){ go('profile'); });
  var sb=document.getElementById('pf-key-save'); if(sb) sb.addEventListener('click', _pfKeySave);
+})();
+
+// ---------- document upload: + Link / dropzone -> file picker -> POST /upload ----------
+(function(){
+ var fp=document.getElementById('filepick'); if(!fp)return;
+ var drop=document.querySelector('#screen-upload .drop');
+ function refresh(html){
+   var doc=new DOMParser().parseFromString(html,'text/html');
+   ['#doc-cards','#screen-upload .statusbar'].forEach(function(sel){
+     var fresh=doc.querySelector(sel), cur=document.querySelector(sel);
+     if(fresh&&cur) cur.innerHTML=fresh.innerHTML;
+   });
+ }
+ function docHTML(){ var e=document.getElementById('doc-cards'); return e?e.innerHTML:''; }
+ function up(f){
+   if(!f)return;
+   var st=document.getElementById('upload-status'), before=docHTML();
+   if(st){ st.className='upload-status info'; st.style.display='flex'; st.textContent='Linking '+f.name+'…'; }
+   var fd=new FormData(); fd.append('document',f,f.name);
+   fetch('/upload',{method:'POST',body:fd}).then(function(r){return r.text();})
+     .then(function(html){
+       refresh(html); if(!st)return;
+       // The server re-renders on every /upload (even when it can't read the file); a
+       // change in the doc-cards is the proof a file actually LANDED into the store.
+       if(docHTML()!==before){ st.className='upload-status ok'; st.textContent='✓ Linked '+f.name+' — it\'s in your store.';
+         setTimeout(function(){ if(st.textContent.indexOf('✓ Linked '+f.name)===0) st.style.display='none'; },6000); }
+       else { st.className='upload-status warn'; st.textContent='No new data landed from '+f.name+' — it may already be loaded, or it\'s not a supported export (an Apple Health .zip/.xml, a labs PDF/CSV, or a 23andMe .zip).'; }
+     })
+     .catch(function(){ if(st){ st.className='upload-status warn'; st.textContent='Upload failed — please try again.'; } });
+ }
+ fp.addEventListener('change',function(){ up(fp.files&&fp.files[0]); fp.value=''; });
+ document.addEventListener('click',function(e){
+   if(e.target.closest('#screen-upload .doc .link')||e.target.closest('#screen-upload .drop')){ e.preventDefault(); fp.click(); }
+ });
+ if(drop){ drop.addEventListener('dragover',function(e){e.preventDefault();});
+   drop.addEventListener('drop',function(e){e.preventDefault(); up(e.dataTransfer.files&&e.dataTransfer.files[0]);}); }
+ // demographic 'About you' form -> fetch POST (no full-page reload), confirm + refresh
+ var df=document.querySelector("#screen-upload form[action='/upload']");
+ if(df){ df.addEventListener('submit',function(e){
+   e.preventDefault(); var fd=new FormData(df);
+   var btn=df.querySelector("button[type='submit']"), lbl=btn?btn.textContent:'';
+   if(btn){ btn.textContent='Saving…'; btn.disabled=true; }
+   fetch('/upload',{method:'POST',body:fd}).then(function(r){return r.text();})
+     .then(function(html){ refresh(html); if(btn){ btn.textContent='Saved ✓'; setTimeout(function(){btn.textContent=lbl;btn.disabled=false;},1800);} })
+     .catch(function(){ if(btn){ btn.textContent=lbl;btn.disabled=false;} });
+ }); }
 })();
 
 </script>

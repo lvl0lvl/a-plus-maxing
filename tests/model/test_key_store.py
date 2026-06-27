@@ -11,7 +11,9 @@ import pytest
 
 from scripts.model import key_source
 
-_SYNTHETIC_KEY = "sk-ant-synthetic-AAAA1111BBBB2222"
+# A non-secret fixture that is deliberately NOT shaped like a real key (no `sk-ant-…`
+# prefix) so the NFR-3 tracked-tree key-literal scan stays comprehensive over test files.
+_SYNTHETIC_KEY = "synthetic-test-key-store-fixture"
 
 
 def test_store_passes_stripped_key_to_writer():

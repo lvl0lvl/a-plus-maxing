@@ -14,7 +14,9 @@ import threading
 from scripts.model import key_source
 from scripts.serve import server as serve_server
 
-_SYNTHETIC_KEY = "sk-ant-synthetic-CCCC3333DDDD4444"
+# A non-secret fixture deliberately NOT shaped like a real key (no `sk-ant-…` prefix) so
+# the NFR-3 tracked-tree key-literal scan stays comprehensive over test files.
+_SYNTHETIC_KEY = "synthetic-test-key-route-fixture"
 
 
 def _serve_in_thread(srv):

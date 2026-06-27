@@ -322,6 +322,14 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             # Constant message — never the key. A store failure must not leak the secret.
             self._write_json(500, {"ok": False, "error": "could not store key"})
             return
+        # Make the just-saved key resolvable in THIS running server immediately: resolve()
+        # checks the env var first, so the chat works right after Save without a keychain
+        # read (a backgrounded server can otherwise need a one-time keychain-access prompt
+        # the operator can't approve). The key lives in process memory only — never logged,
+        # returned, or filed; the keychain write is the cross-restart persistence.
+        import os
+
+        os.environ[key_source.ENV_VAR] = key
         self._write_json(200, {"ok": True, "connected": True})
 
     def _write_json(self, status, obj):
