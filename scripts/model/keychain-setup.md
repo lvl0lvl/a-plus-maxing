@@ -1,5 +1,18 @@
 # No-Train API Key — Runtime Setup
 
+## Prerequisite — install the model SDK (live run only)
+
+The `anthropic` SDK is intentionally NOT in `requirements.txt` — the test suite runs with
+it absent so no test can make a live model call (0-live-spend). Before the operator-present
+live run, install it into the instance `.venv`:
+
+```sh
+.venv/bin/python -m pip install anthropic==0.112.0
+```
+
+Without it, `converse`/`deidentify` fail closed (`ModelCallError`) — the chat degrades but
+spends nothing.
+
 The model client (`scripts/model/client.py`) resolves the no-train API key at **runtime**
 via `key_source.resolve()`. The key is **never** stored in this repo — the repo is PUBLIC.
 `resolve()` reads two sources, in order:
