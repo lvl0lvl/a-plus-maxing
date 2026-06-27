@@ -481,6 +481,19 @@ select.inp{cursor:pointer}
               <div class="row"><span style="font-weight:600">Ingestion</span><span style="color:var(--muted)">Nothing ingested yet</span></div>
               <div class="bar"><i style="width:0%"></i></div>
             </div>
+            <div class="seclab">Review extracted readings</div>
+            <div id="review-panel">
+              <div class="empty" data-awaiting='extraction'>Readings we extract from an unrecognized document appear here for you to review and confirm before anything lands in your store.</div>
+              <div id="review-list"></div>
+              <button class="btn primary" id="confirm-readings" type="button" style="display:none;width:100%;margin-top:10px">Confirm readings →</button>
+            </div>
+            <template id="reading-row-tpl">
+              <div class="doc reading-row">
+                <label class="reading-pick" style="flex:none;display:flex;align-items:center"><input type="checkbox" class="reading-confirm" checked></label>
+                <div class="m"><div class="t" data-field="item"></div><div class="d"><span data-field="timepoint"></span> · <span data-field="source"></span> · <span data-field="value"></span></div></div>
+                <button class="btn ghost reading-reject" type="button">Reject</button>
+              </div>
+            </template>
           </div>
           <div class="ws-panel" id="panel-generate"></div>
         </aside>
@@ -730,14 +743,51 @@ function renderGenerate(){
    });
  }
  function docHTML(){ var e=document.getElementById('doc-cards'); return e?e.innerHTML:''; }
+ // ---- confirm-review panel: render T3's extracted readings for operator confirm ----
+ var REVIEW_TPL=document.getElementById('reading-row-tpl');
+ var REVIEW_LIST=document.getElementById('review-list');
+ var REVIEW_PANEL=document.getElementById('review-panel');
+ var CONFIRM_BTN=document.getElementById('confirm-readings');
+ function awaitingEl(){ return REVIEW_PANEL?REVIEW_PANEL.querySelector("[data-awaiting='extraction']"):null; }
+ function readingRow(reading){
+   var node=REVIEW_TPL.content.firstElementChild.cloneNode(true);
+   ['item','timepoint','source','value'].forEach(function(field){
+     var slot=node.querySelector('[data-field="'+field+'"]'); if(slot) slot.textContent=reading[field];
+   });
+   node._reading=reading;  // the verbatim reading dict, re-posted to /confirm-extraction unmodified
+   node.querySelector('.reading-reject').addEventListener('click',function(){ node.remove(); });
+   return node;
+ }
+ function showReview(readings){
+   if(!REVIEW_LIST||!REVIEW_TPL)return;
+   REVIEW_LIST.innerHTML='';
+   readings.forEach(function(reading){ REVIEW_LIST.appendChild(readingRow(reading)); });
+   var aw=awaitingEl(); if(aw) aw.style.display=readings.length?'none':'';
+   if(CONFIRM_BTN) CONFIRM_BTN.style.display=readings.length?'block':'none';
+ }
  function up(f){
    if(!f)return;
    var st=document.getElementById('upload-status'), before=docHTML();
    if(st){ st.className='upload-status info'; st.style.display='flex'; st.textContent='Linking '+f.name+'…'; }
    var fd=new FormData(); fd.append('document',f,f.name);
-   fetch('/upload',{method:'POST',body:fd}).then(function(r){return r.text();})
-     .then(function(html){
-       refresh(html); if(!st)return;
+   fetch('/upload',{method:'POST',body:fd}).then(function(r){
+     // Discriminate T3's response: an unrecognized-format upload returns the extracted-readings
+     // JSON review payload (application/json, key `readings`); a recognized-format / fields-only
+     // upload returns the re-rendered app-shell HTML (the named-adapter / DNA path, unchanged).
+     if((r.headers.get('content-type')||'').indexOf('application/json')!==-1){
+       return r.json().then(function(d){ return {readings:d.readings||[]}; });
+     }
+     return r.text().then(function(html){ return {html:html}; });
+   })
+     .then(function(res){
+       if(res.readings){
+         // The extraction path: /upload landed 0 — populate the review panel so the operator
+         // confirms what lands (POST /confirm-extraction is the only landing path, the gate).
+         showReview(res.readings);
+         if(st){ st.className='upload-status info'; st.textContent='Review the readings we found in '+f.name+', then confirm what lands.'; }
+         return;
+       }
+       refresh(res.html); if(!st)return;
        // The server re-renders on every /upload (even when it can't read the file); a
        // change in the doc-cards is the proof a file actually LANDED into the store.
        if(docHTML()!==before){ st.className='upload-status ok'; st.textContent='✓ Linked '+f.name+' — it\'s in your store.';
@@ -752,6 +802,22 @@ function renderGenerate(){
  });
  if(drop){ drop.addEventListener('dragover',function(e){e.preventDefault();});
    drop.addEventListener('drop',function(e){e.preventDefault(); up(e.dataTransfer.files&&e.dataTransfer.files[0]);}); }
+ // confirm action -> POST ONLY the operator-confirmed subset to /confirm-extraction (a rejected
+ // reading is removed from the list / unchecked, so it is omitted from the body — the confirm gate).
+ if(CONFIRM_BTN){ CONFIRM_BTN.addEventListener('click',function(){
+   var picked=[];
+   REVIEW_LIST.querySelectorAll('.reading-row').forEach(function(row){
+     var cb=row.querySelector('.reading-confirm'); if(cb&&cb.checked&&row._reading) picked.push(row._reading);
+   });
+   var st=document.getElementById('upload-status');
+   if(st){ st.className='upload-status info'; st.style.display='flex'; st.textContent='Landing '+picked.length+' confirmed reading'+(picked.length===1?'':'s')+'…'; }
+   fetch('/confirm-extraction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({readings:picked})}).then(function(r){return r.json();})
+     .then(function(d){ var n=(d.landed||[]).length;
+       showReview([]);  // clear the review list back to the honest awaiting state
+       if(st){ st.className='upload-status ok'; st.textContent='✓ Landed '+n+' reading'+(n===1?'':'s')+' into your store.'; }
+     })
+     .catch(function(){ if(st){ st.className='upload-status warn'; st.textContent='Could not land the confirmed readings — please try again.'; } });
+ }); }
  // demographic 'About you' form -> fetch POST (no full-page reload), confirm + refresh
  var df=document.querySelector("#screen-team form[action='/upload']");
  if(df){ df.addEventListener('submit',function(e){
