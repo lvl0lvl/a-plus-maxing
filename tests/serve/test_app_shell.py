@@ -718,3 +718,18 @@ def test_genuinely_empty_not_partial_keeps_honest_awaiting():
     assert note is not None and "display:none" in note.group(0), "the partial-note element is not default-hidden"
     html = _spa_html().replace(" ", "")
     assert "if(partial)" in html, "the note-show is not gated behind the partial signal (a non-partial render would show it)"
+
+
+def test_extraction_note_carries_role_status_for_screen_readers():
+    """design-reviewer S1 (WCAG 4.1.3): the dynamically-shown partial-note carries role="status".
+
+    The #extraction-note element is shown client-side when an extraction is partial; without
+    role="status" (implicit aria-live="polite") a screen reader never announces the
+    document-quality note. Mirrors the T4/W4 reading-confirm aria-label precedent. Failing-capable:
+    reds if role="status" is removed from the note element.
+    """
+    note = _extraction_note_open_tag(_panel_build_html(_spa_html()))
+    assert note is not None, "no partial-extraction note element in the review-panel surface"
+    assert 'role="status"' in note.group(0), (
+        'the #extraction-note carries no role="status" — its partial note is never announced (WCAG 4.1.3)'
+    )
