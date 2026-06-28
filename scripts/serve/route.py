@@ -105,8 +105,10 @@ def route_upload(staged_path, *, client=None, root=None, dna_root=None):
 
     Returns:
         (str) The source a recognized upload routed to ("healthkit"/"whoop"/"oura"/"garmin"/
-        "dna"), OR (dict) `{"extracted_readings": list}` — the awaiting-confirm payload an
-        unrecognized-format extraction routed to.
+        "dna"), OR (dict) the awaiting-confirm payload an unrecognized-format extraction routed
+        to — `{"extracted_readings": list}` for a non-PDF format, or `{"extracted_readings": list,
+        "extraction_complete": bool, "extraction_note": str | None}` for a PDF (the honest
+        partial/too-large signal the PDF arm carries).
     """
     path = Path(staged_path)
     if path.suffix.lower() == ".zip":
