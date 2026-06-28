@@ -1224,13 +1224,13 @@ def test_extract_readings_live_returns_scripted_readings(monkeypatch):
     from scripts.model.client import _ClaudeNoTrainBackend
 
     readings_a = _good_readings_list()
-    fake_a = _FakeAnthropic(response_summary=readings_a)
+    fake_a = _FakeAnthropic(response_summary={"readings": readings_a})
     _patch_backend_client(monkeypatch, fake_a)
     out_a = _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
     assert out_a == readings_a
 
     readings_b = [_good_reading("TSH", "2.1 mIU/L")]
-    fake_b = _FakeAnthropic(response_summary=readings_b)
+    fake_b = _FakeAnthropic(response_summary={"readings": readings_b})
     _patch_backend_client(monkeypatch, fake_b)
     out_b = _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
     assert out_b == readings_b
@@ -1244,7 +1244,7 @@ def test_extract_readings_pdf_carries_base64_document_block(monkeypatch):
 
     from scripts.model.client import _ClaudeNoTrainBackend
 
-    fake = _FakeAnthropic(response_summary=_good_readings_list())
+    fake = _FakeAnthropic(response_summary={"readings": _good_readings_list()})
     _patch_backend_client(monkeypatch, fake)
 
     raw = b"%PDF-1.4 fake document bytes"
@@ -1266,7 +1266,7 @@ def test_extract_readings_image_carries_base64_image_block(monkeypatch):
 
     from scripts.model.client import _ClaudeNoTrainBackend
 
-    fake = _FakeAnthropic(response_summary=_good_readings_list())
+    fake = _FakeAnthropic(response_summary={"readings": _good_readings_list()})
     _patch_backend_client(monkeypatch, fake)
 
     raw = b"\x89PNG\r\n\x1a\n fake image bytes"
@@ -1283,7 +1283,7 @@ def test_extract_readings_text_carries_text_block(monkeypatch):
     """AC-5 (text): a text media type reaches the model as a `text` block carrying the decoded text."""
     from scripts.model.client import _ClaudeNoTrainBackend
 
-    fake = _FakeAnthropic(response_summary=_good_readings_list())
+    fake = _FakeAnthropic(response_summary={"readings": _good_readings_list()})
     _patch_backend_client(monkeypatch, fake)
 
     raw = b"item,timepoint,source,value\nHbA1c,2026-01-15,quest-labs,5.4%"
@@ -1292,6 +1292,57 @@ def test_extract_readings_text_carries_text_block(monkeypatch):
     block = fake.calls[0]["messages"][0]["content"][0]
     assert block["type"] == "text"
     assert block["text"] == raw.decode("utf-8")  # the decoded file text reached the model
+
+
+def test_extract_output_schema_is_object_rooted_for_structured_outputs():
+    """The structured-output schema ROOT must be an object — the API rejects a top-level array.
+
+    The live bug (S99 operator run): `_extract_output_schema` returned a top-level ARRAY, which the
+    GA structured-outputs API rejects, so EVERY extraction 400'd → fail-closed ModelCallError →
+    /upload degraded → the SPA showed "No new data landed". The mock-seam tests were blind (they
+    inject a backend that returns a list, never exercising the real schema). This asserts the
+    API contract directly: an object root + additionalProperties:false on every object + the
+    readings array pinned to the Line Field Set. Failing-capable: revert the schema to a top-level
+    array and the root-type assertion reds.
+    """
+    from scripts.model.client import _extract_output_schema
+    from scripts.store.keying import LINE_FIELDS
+
+    schema = _extract_output_schema()
+    assert schema["type"] == "object", "structured-output schema root must be an object, not a top-level array"
+    assert schema.get("additionalProperties") is False, "the object root must set additionalProperties:false"
+    assert schema["required"] == ["readings"]
+    arr = schema["properties"]["readings"]
+    assert arr["type"] == "array", "readings must be an array of Line-Field-Set objects"
+    item = arr["items"]
+    assert item["type"] == "object" and item["additionalProperties"] is False
+    assert set(item["required"]) == set(LINE_FIELDS), "the item object pins the Line Field Set"
+
+
+def test_parse_extract_readings_unwraps_readings_object():
+    """The parse reads the `readings` array off the object root the schema constrains.
+
+    A bare top-level array (the pre-fix model shape) is rejected — failing closed — never silently
+    accepted, so the parse stays aligned with the object-rooted schema.
+    """
+    import json
+
+    from scripts.model.client import _parse_extract_readings
+
+    class _Block:
+        type = "text"
+
+        def __init__(self, text):
+            self.text = text
+
+    class _Resp:
+        def __init__(self, text):
+            self.content = [_Block(text)]
+
+    rows = [_good_reading("ferritin", "120")]
+    assert _parse_extract_readings(_Resp(json.dumps({"readings": rows}))) == rows
+    with pytest.raises(ValueError):
+        _parse_extract_readings(_Resp(json.dumps(rows)))  # a bare array is the API-invalid pre-fix shape
 
 
 def test_extract_readings_live_resolves_runtime_key_through_client(monkeypatch):
@@ -1310,7 +1361,7 @@ def test_extract_readings_live_resolves_runtime_key_through_client(monkeypatch):
     sentinel_key = "sentinel-runtime-key-xyz"
     monkeypatch.setattr(key_source, "resolve", lambda *a, **k: sentinel_key)
 
-    fake = _FakeAnthropic(response_summary=_good_readings_list())
+    fake = _FakeAnthropic(response_summary={"readings": _good_readings_list()})
     captured = {}
 
     def _make(api_key=None):
@@ -1331,7 +1382,7 @@ def test_extract_readings_live_bounded_retry_then_succeed(monkeypatch):
     from scripts.model.client import _ClaudeNoTrainBackend
 
     raise_seq = [RuntimeError("transient")] * 2 + [None]  # raise twice, succeed on the third
-    fake = _FakeAnthropic(response_summary=_good_readings_list(), raise_seq=raise_seq)
+    fake = _FakeAnthropic(response_summary={"readings": _good_readings_list()}, raise_seq=raise_seq)
     _patch_backend_client(monkeypatch, fake)
 
     result = _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
