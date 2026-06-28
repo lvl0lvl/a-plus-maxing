@@ -276,16 +276,19 @@ def _extract_system_prompt():
 
     A CONSTANT system instruction (no raw file content interpolated — the file is passed natively
     as the user-turn content block, never inlined here) telling the model to respond with ONLY a
-    JSON array of readings whose keys are drawn from `keying.LINE_FIELDS`. The extract analogue of
-    `_deid_prompt`'s field-set instruction; the shape gate is the downstream `_parse_extract_readings`.
+    JSON object `{"readings": [...]}` whose array elements' keys are drawn from `keying.LINE_FIELDS`
+    (an object root, mirroring the object-rooted structured-output schema the API requires). The
+    extract analogue of `_deid_prompt`'s field-set instruction; the shape gate is the downstream
+    `_parse_extract_readings`.
     """
     from scripts.store.keying import LINE_FIELDS
 
     field_roster = ", ".join(LINE_FIELDS)
     return (
         "You extract structured readings from the uploaded file content. Respond with a single "
-        "JSON array and nothing else. Each array element is a reading object whose keys are exactly "
-        f"this Line Field Set: {field_roster}. Emit no prose outside the JSON array."
+        'JSON object of the form {"readings": [...]} and nothing else. Each element of the '
+        f"`readings` array is a reading object whose keys are exactly this Line Field Set: "
+        f"{field_roster}. Emit no prose outside the JSON object."
     )
 
 
@@ -323,41 +326,52 @@ def _extract_content_block(file_content, media_type):
 def _extract_output_schema():
     """Build the `output_config.format` json_schema constraining the readings to the Line Field Set.
 
-    A top-level array of Line-Field-Set objects, derived from `keying.LINE_FIELDS` (the single
-    source of truth, not a hand-retyped roster). Structured outputs require `additionalProperties:
-    false` on objects; the internal field ordering is implementer discretion (NFR-7).
+    An OBJECT wrapping a `readings` array of Line-Field-Set objects, derived from
+    `keying.LINE_FIELDS` (the single source of truth, not a hand-retyped roster). Structured
+    outputs require the schema ROOT to be an object (a top-level array is rejected by the API) and
+    `additionalProperties: false` on every object; the internal field ordering is implementer
+    discretion (NFR-7). The parse (`_parse_extract_readings`) unwraps the `readings` array.
     """
     from scripts.store.keying import LINE_FIELDS
 
     return {
-        "type": "array",
-        "items": {
-            "type": "object",
-            "properties": {field: {"type": "string"} for field in LINE_FIELDS},
-            "required": list(LINE_FIELDS),
-            "additionalProperties": False,
+        "type": "object",
+        "properties": {
+            "readings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {field: {"type": "string"} for field in LINE_FIELDS},
+                    "required": list(LINE_FIELDS),
+                    "additionalProperties": False,
+                },
+            },
         },
+        "required": ["readings"],
+        "additionalProperties": False,
     }
 
 
 def _parse_extract_readings(response):
     """Parse the model response into the readings list.
 
-    Reads the first `text` content block off the SDK envelope and decodes it as the JSON readings
-    array — the model's Line-Field-Set readings. Returns the parsed list verbatim (the raw file
-    never flows through here); a non-text / non-JSON / non-list response raises, failing closed at
-    the retry loop to `ModelCallError`. Mirrors `_parse_deid_summary`'s posture (first text block →
-    `json.loads`), with a list shape gate instead of a dict gate.
+    Reads the first `text` content block off the SDK envelope and decodes it as the JSON
+    `{"readings": [...]}` object the object-rooted output schema constrains — then unwraps and
+    returns the `readings` list verbatim (the raw file never flows through here). A non-text /
+    non-JSON / non-object response, or one whose `readings` is not a list, raises — failing closed
+    at the retry loop to `ModelCallError`. Mirrors `_parse_deid_summary`'s posture (first text block
+    → `json.loads`), reading the `readings` array off the object root (structured outputs reject a
+    top-level array, so the model returns the object wrapper, not a bare list).
     """
     import json
 
     text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), None)
     if text is None:
         raise ValueError("extract_readings: model response carried no text block")
-    readings = json.loads(text)
-    if not isinstance(readings, list):
-        raise ValueError("extract_readings: model response was not a JSON array")
-    return readings
+    payload = json.loads(text)
+    if not isinstance(payload, dict) or not isinstance(payload.get("readings"), list):
+        raise ValueError('extract_readings: model response was not a {"readings": [...]} object')
+    return payload["readings"]
 
 
 class _ClaudeNoTrainBackend:
