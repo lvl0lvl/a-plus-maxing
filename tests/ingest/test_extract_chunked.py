@@ -24,6 +24,7 @@ import pytest
 from scripts.ingest import extract_chunked
 from scripts.ingest.extract_chunked import (
     _CHUNK_CHARS,
+    _CHUNK_OVERLAP,
     _MAX_CHUNKS,
     extract_all,
 )
@@ -200,6 +201,55 @@ def test_chunk_model_call_error_propagates_no_fabricated_readings():
 
     with pytest.raises(ModelCallError):
         extract_all(text, client)
+
+
+# --- Cycle 3: overlap-mechanism completeness guard + empty-document boundary ---
+
+
+def _distinct_line_text(n_chars, line_len=80):
+    """Build >= n_chars of newline-delimited text with a UNIQUE index per line.
+
+    Distinct-per-line content (a zero-padded index heading each line) makes the overlap
+    assertion non-tautological: identical lines (`_text_of_chars`) would let a chunk's tail
+    coincide with the next chunk's head even WITHOUT carry-over. Size is RELATIVE to the
+    imported module constants so the fixture survives any OQ-2 retuning (NFR-7).
+    """
+    n_lines = (n_chars // line_len) + 1
+    return "".join(f"{i:06d}" + ("y" * (line_len - 7)) + "\n" for i in range(n_lines))
+
+
+def test_overlap_carryover_shares_chars_across_consecutive_chunks():
+    """SHOULD-FIX #1: the _CHUNK_OVERLAP carry-over makes each chunk's tail the next chunk's head.
+
+    Over distinct-per-line text, asserts consecutive recorded call contents SHARE the trailing
+    _CHUNK_OVERLAP chars (the boundary-straddling completeness guarantee) — a finding landing on
+    a chunk boundary is captured in BOTH neighbours. Disabling the carry-over in `_split_chunks`
+    (`current = ""`) REDs this; the distinct indices keep it from passing tautologically. The
+    existing dedupe test exercises only collapse-on-duplicate, never the overlap MECHANISM.
+    """
+    text = _distinct_line_text(3 * _CHUNK_CHARS)
+    client = _RecordingClient(default_factory=lambda i: [_reading(f"item-{i}")])
+
+    extract_all(text, client)
+
+    contents = [content for content, _ in client.calls]
+    assert len(contents) >= 2  # genuinely multi-chunk → a boundary exists to straddle
+    for i in range(len(contents) - 1):
+        # the trailing _CHUNK_OVERLAP chars of chunk i seed the head of chunk i+1
+        assert contents[i + 1].startswith(contents[i][-_CHUNK_OVERLAP:])
+
+
+def test_empty_text_returns_complete_empty_readings_no_note():
+    """SHOULD-FIX #2: a genuinely-empty document → complete True, [] readings, None note.
+
+    Distinct from the over-budget partial (complete False): the empty input is honestly complete
+    with nothing to extract — never a false partial signal. RED if the empty case ever drifts.
+    """
+    assert extract_all("", _RecordingClient(scripts=[])) == {
+        "readings": [],
+        "complete": True,
+        "note": None,
+    }
 
 
 def test_extract_chunked_reuses_keying_imports_no_model_sdk():
