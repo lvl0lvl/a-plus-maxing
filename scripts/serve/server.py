@@ -159,6 +159,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         import tempfile
 
+        from scripts.ingest.pdf_extract import PdfExtractError
         from scripts.model.client import ModelCallError
         from scripts.serve import capture, route
         from scripts.serve.multipart import stage_uploads
@@ -190,6 +191,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                     self.headers.get("Content-Type"), _BoundedReader(self.rfile, length), staging
                 )
                 extracted = []
+                partial = False
+                notes = []
                 for file_part in staged["files"]:
                     # Thread the instance client into T2's discriminated router: a recognized
                     # format lands via the unchanged seam (returns a source str); an
@@ -204,6 +207,15 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                     )
                     if isinstance(result, dict):
                         extracted.extend(result["extracted_readings"])
+                        # The honest-partial signal (ADR-0031-T4): the PDF arm reports
+                        # extraction_complete / extraction_note; the non-PDF arm omits them
+                        # (the absent key defaults to complete / no note). ANY incomplete file
+                        # marks the whole upload partial; each truthy note is collected.
+                        if not result.get("extraction_complete", True):
+                            partial = True
+                        note = result.get("extraction_note")
+                        if note:
+                            notes.append(note)
                 # The form-field capture (ADR-0014-T1): route each submitted field by its
                 # data class — a wired de-identified token to the store via the unchanged
                 # store.append, a record-only/raw value to the gitignored scaffold. The
@@ -220,14 +232,16 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                         fields, root=store_root, scaffold_root=scaffold_root,
                         identity_config=identity_config,
                     )
-        except (SystemExit, ValueError, zipfile.BadZipFile, ET.ParseError, ModelCallError):
+        except (SystemExit, ValueError, zipfile.BadZipFile, ET.ParseError, ModelCallError, PdfExtractError):
             # A real operator input must NOT kill the request thread. SystemExit: an
             # ambiguous/unknown extension (`_detect_source`) with no client to extract.
             # ValueError: a fail-loud land rejection (`dna.land`/the adapter) or a malformed
             # multipart body. BadZipFile/ParseError: a corrupt `.zip`/`export.xml`.
             # ModelCallError: a failed no-train extraction (`extract_readings` fail-closed,
-            # ADR-0030-T3 forward-note) — degrade with 0 fabricated readings. Re-render the
-            # app shell so the operator can pick a source / re-upload, not a stack trace + drop.
+            # ADR-0030-T3 forward-note). PdfExtractError: a total local PDF-extraction failure
+            # (T1's fail-loud raise, ADR-0031-T4) — degrade like ModelCallError with 0 fabricated
+            # readings. Re-render the app shell so the operator can pick a source / re-upload,
+            # not a stack trace + drop.
             self._write_html(200, _render_intake(store_root=store_root, dna_root=dna_root))
             return
         except UploadTooLarge:
@@ -236,14 +250,17 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._413_too_large()
             return
 
-        # An unrecognized-format upload surfaced extracted readings — answer with the JSON
-        # review payload (lands 0; POST /confirm-extraction is the ONLY landing path, the
-        # confirm-gate). The payload key is `readings`, the SAME key `/confirm-extraction`
-        # consumes, so the confirm UI re-posts the operator-confirmed subset verbatim with no
-        # remap (review SHOULD-FIX E). A pure recognized-format / fields-only upload falls
-        # through to the app-shell re-render below.
-        if extracted:
-            self._write_json(200, {"readings": extracted})
+        # An unrecognized-format upload surfaced extracted readings OR an honest-partial signal
+        # — answer with the JSON review payload (lands 0; POST /confirm-extraction is the ONLY
+        # landing path, the confirm-gate). The payload key is `readings`, the SAME key
+        # `/confirm-extraction` consumes, so the confirm UI re-posts the operator-confirmed
+        # subset verbatim with no remap (review SHOULD-FIX E). F1 (ADR-0031-T4): the signal
+        # surfaces even when `extracted == []` but `partial == True` — a too-dense / over-budget
+        # PDF must NOT collapse into the silent "no new data" re-render. A truly-empty /
+        # recognized-format / fields-only upload (extracted == [] AND not partial) still falls
+        # through to the app-shell re-render below (the honest empty-vs-partial distinction).
+        if extracted or partial:
+            self._write_json(200, {"readings": extracted, "partial": partial, "notes": notes})
             return
 
         # Re-render reflecting the new load-state (the store/dropzone were just written).

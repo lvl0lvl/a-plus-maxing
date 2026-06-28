@@ -25,13 +25,19 @@ the extracted readings as the awaiting-confirm payload (they do NOT auto-land; t
 confirm step lands the confirmed subset). The file content reaches ONLY the injected client;
 this module imports no outbound client / SDK. With no client injected the unrecognized-format
 SystemExit is preserved (today's no-client contract byte-unchanged).
+
+ADR-0031-T4 TIGHTENS that branch for a PDF: the raw PDF binary stays LOCAL. An unrecognized
+`application/pdf` upload is local-extracted to TEXT via `pdf_extract.extract_text` (the raw
+bytes reach ONLY the on-device subprocess) and chunk-structured via `extract_chunked.extract_all`
+(the model receives only `text/plain`), returning the readings plus the honest partial/too-large
+signal. Every OTHER unrecognized format keeps the ADR-0030 raw-content path byte-unchanged.
 """
 
 import mimetypes
 import zipfile
 from pathlib import Path
 
-from scripts.ingest import dna, ingest
+from scripts.ingest import dna, extract_chunked, ingest, pdf_extract
 from scripts.ingest.__main__ import _adapter, _detect_source
 from scripts.ingest.adapters.healthkit import _export_xml_member
 from scripts.store import store
@@ -124,22 +130,42 @@ def route_upload(staged_path, *, client=None, root=None, dna_root=None):
 
 
 def _extract_unrecognized(path, client):
-    """Route an unrecognized-format staged file through the no-train extract lane (ADR-0030-T2).
+    """Route an unrecognized-format staged file through the no-train extract lane.
 
-    Reads the staged file content from the gitignored staged path ONLY, derives the media type
-    from its extension, and calls the injected `client.extract_readings(file_content, media_type)`.
-    The extracted readings are RETURNED as the awaiting-confirm payload — they are NOT written to
-    the store / DNA dropzone (the operator confirm step lands the confirmed subset). The file
-    content reaches ONLY the injected client; nothing is written to any tracked path (OQ-5).
+    Branches on the media type. For a PDF (`application/pdf`) the raw binary stays LOCAL
+    (ADR-0031-T4): the staged file is local-extracted to TEXT via `pdf_extract.extract_text(path)`
+    — the raw bytes reach ONLY the local subprocess, never the model — and the text is
+    chunk-structured via `extract_chunked.extract_all(text, client)` (the model receives only
+    `text/plain` chunks). That arm RETURNS `{"extracted_readings", "extraction_complete",
+    "extraction_note"}` — the awaiting-confirm payload carrying the honest partial/too-large signal.
+
+    For any OTHER unrecognized format the ADR-0030 raw-content path is byte-unchanged: the file
+    content is read from the gitignored staged path, the media type is derived, and
+    `client.extract_readings(file_content, media_type)` is called — returning
+    `{"extracted_readings": list}` (no honest-signal keys; the non-PDF arm has no partial concept,
+    so the server defaults the absent keys to complete/None).
+
+    Either arm makes 0 `store.append` / `dna.land`: the readings are RETURNED (the operator confirm
+    step lands the confirmed subset). The content reaches ONLY the injected client / the local PDF
+    subprocess; nothing is written to any tracked path (OQ-3/OQ-5).
 
     Args:
         path (Path): The gitignored staged-upload path.
         client (ModelClient): The injected no-train model client exposing `extract_readings`.
 
     Returns:
-        (dict) `{"extracted_readings": list}` — the awaiting-confirm payload, distinguishable
-        from the recognized-format arm's source string.
+        (dict) `{"extracted_readings": list}` for a non-PDF format, or `{"extracted_readings": list,
+        "extraction_complete": bool, "extraction_note": str | None}` for a PDF — the awaiting-confirm
+        payload, distinguishable from the recognized-format arm's source string.
     """
-    file_content = path.read_bytes()
     media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    if media_type == "application/pdf":
+        text = pdf_extract.extract_text(path)
+        result = extract_chunked.extract_all(text, client)
+        return {
+            "extracted_readings": result["readings"],
+            "extraction_complete": result["complete"],
+            "extraction_note": result["note"],
+        }
+    file_content = path.read_bytes()
     return {"extracted_readings": client.extract_readings(file_content, media_type)}

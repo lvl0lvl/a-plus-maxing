@@ -252,15 +252,17 @@ def _spy_seam(monkeypatch):
 
 
 def test_unrecognized_format_routes_through_extract_readings(tmp_path, monkeypatch):
-    """AC-1: an unrecognized `.pdf` + an injected client routes through `extract_readings`.
+    """AC-1: an unrecognized `.bin` + an injected client routes through `extract_readings`.
 
-    The `.pdf` extension is in no named-adapter map, so `_detect_source` SystemExits; with a
+    The `.bin` extension is in no named-adapter map, so `_detect_source` SystemExits; with a
     client injected the staged file routes through the no-train lane — `client.extract_readings`
     is called exactly once with the staged file's content, and `ingest.run`/`dna.land` are NOT.
+    (ADR-0031-T4 repoint: `.pdf` is now reserved for the local-extract-first branch; this test
+    covers the PRESERVED non-PDF raw-content arm via `.bin` -> application/octet-stream.)
     """
     calls = _spy_seam(monkeypatch)
-    content = b"synthetic lab report PDF body"
-    staged = tmp_path / "labs.pdf"
+    content = b"synthetic lab report octet-stream body"
+    staged = tmp_path / "labs.bin"
     staged.write_bytes(content)
     client = _RecordingClient()
 
@@ -320,7 +322,7 @@ def test_extraction_does_not_auto_land(tmp_path, monkeypatch):
     """
     calls = _spy_seam(monkeypatch)
     store_root = tmp_path / "store"
-    staged = tmp_path / "labs.pdf"
+    staged = tmp_path / "labs.bin"
     staged.write_bytes(b"synthetic lab report")
     client = _RecordingClient()
 
@@ -362,7 +364,7 @@ def test_extraction_leaves_no_tracked_residue(tmp_path):
     the token — the raw file lived only in the gitignored staged path + the in-memory client call.
     """
     token = "OQ5-RAW-RESIDUE-" + uuid.uuid4().hex
-    staged = tmp_path / "labs.pdf"
+    staged = tmp_path / "labs.bin"
     staged.write_bytes(f"synthetic lab report {token}".encode())
     client = _RecordingClient()
 
@@ -378,14 +380,189 @@ def test_extraction_leaves_no_tracked_residue(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
+# ADR-0031-T4 — the PDF local-extract-first branch (crown-jewel + honest signal)
+#   AC-1 PDF local-extract route; AC-2 crown-jewel raw-binary egress;
+#   AC-3 non-PDF unchanged; AC-4 honest-signal return; AC-5 no auto-land;
+#   AC-6 OQ-3/OQ-5 residue (raw-binary + extracted-text tokens)
+# --------------------------------------------------------------------------- #
+
+
+def test_pdf_upload_routes_through_local_extract_first(tmp_path, monkeypatch):
+    """AC-1: a `.pdf` routes pdf_extract.extract_text -> extract_chunked over the text path.
+
+    A `.pdf` (media type application/pdf) routes through `pdf_extract.extract_text(path)` (called
+    once with the staged path) and then the REAL `extract_chunked.extract_all(text, client)` — the
+    recording client receives the `text/plain` chunk calls, never the raw `application/pdf`
+    document path. STUBS `pdf_extract.extract_text` (no real pdftotext/marker run, 0 spend).
+    """
+    extract_calls = []
+    monkeypatch.setattr(
+        route.pdf_extract, "extract_text",
+        lambda path: extract_calls.append(Path(path)) or "Ferritin 120 ng/mL on 2026-05-01\n",
+    )
+    staged = tmp_path / "labs.pdf"
+    staged.write_bytes(b"%PDF-1.4 raw binary body")
+    client = _RecordingClient()
+
+    route.route_upload(staged, client=client, root=tmp_path / "store", dna_root=tmp_path / "dna")
+
+    assert extract_calls == [staged], "pdf_extract.extract_text was not called once with the staged path"
+    assert len(client.calls) >= 1, "the real extract_chunked did not call the recording client (text path not taken)"
+    assert all(mt == "text/plain" for _c, mt in client.calls), (
+        "a non-text/plain media_type reached the model (the raw application/pdf document path was taken)"
+    )
+
+
+def test_pdf_crown_jewel_raw_binary_reaches_only_local_extractor(tmp_path, monkeypatch):
+    """AC-2 (CROWN-JEWEL): the raw PDF binary reaches ONLY the local extractor; the model gets text only.
+
+    Stages a `.pdf` whose bytes carry a runtime-unique raw-binary token ABSENT from the stubbed
+    extracted text. The recording client records every `(content, media_type)`; every recorded
+    media_type must be `text/plain` AND the raw-binary token must appear in NO recorded call
+    content (the raw bytes reach only `pdf_extract.extract_text`). The mock call-record is
+    authoritative — not a substring grep alone.
+    """
+    raw_token = "RAW-BINARY-" + uuid.uuid4().hex
+    monkeypatch.setattr(route.pdf_extract, "extract_text", lambda path: "Ferritin 120 ng/mL on 2026-05-01\n")
+    staged = tmp_path / "labs.pdf"
+    staged.write_bytes(f"%PDF-1.4 {raw_token}".encode())
+    client = _RecordingClient()
+
+    route.route_upload(staged, client=client, root=tmp_path / "store", dna_root=tmp_path / "dna")
+
+    assert client.calls, "the model client was never called (the text path did not run)"
+    assert all(mt == "text/plain" for _c, mt in client.calls), "a non-text/plain media_type reached the model"
+    for content, _mt in client.calls:
+        as_text = content if isinstance(content, str) else content.decode("utf-8", errors="ignore")
+        assert raw_token not in as_text, "the raw-binary token reached the model (crown-jewel breach)"
+
+
+def test_pdf_honest_signal_in_route_return(tmp_path, monkeypatch):
+    """AC-4 (route leg): the route maps extract_chunked's {readings,complete,note} onto the honest signal.
+
+    STUBS `extract_chunked.extract_all` to script the partial signal: a `complete=False`+note run
+    must surface as `extraction_complete=False`+the note in the route return; a `complete=True`,
+    `note=None` run as `extraction_complete=True`/`extraction_note=None`. The return key is
+    `extracted_readings` (the awaiting-confirm payload key the server + /confirm-extraction read).
+    """
+    monkeypatch.setattr(route.pdf_extract, "extract_text", lambda path: "some extracted text")
+    staged = tmp_path / "labs.pdf"
+    staged.write_bytes(b"%PDF-1.4 body")
+    client = _RecordingClient()
+
+    monkeypatch.setattr(
+        route.extract_chunked, "extract_all",
+        lambda text, c: {"readings": _CANNED_READINGS, "complete": False, "note": "document too large"},
+    )
+    partial = route.route_upload(staged, client=client, root=tmp_path / "store", dna_root=tmp_path / "dna")
+    assert partial == {
+        "extracted_readings": _CANNED_READINGS,
+        "extraction_complete": False,
+        "extraction_note": "document too large",
+    }, f"the route did not surface the partial honest signal: {partial}"
+
+    monkeypatch.setattr(
+        route.extract_chunked, "extract_all",
+        lambda text, c: {"readings": _CANNED_READINGS, "complete": True, "note": None},
+    )
+    complete = route.route_upload(staged, client=client, root=tmp_path / "store", dna_root=tmp_path / "dna")
+    assert complete == {
+        "extracted_readings": _CANNED_READINGS,
+        "extraction_complete": True,
+        "extraction_note": None,
+    }, f"a complete extraction did not surface extraction_complete=True/note=None: {complete}"
+
+
+def test_pdf_extraction_does_not_auto_land(tmp_path, monkeypatch):
+    """AC-5: the PDF extraction path makes 0 store.append/dna.land; readings await confirm.
+
+    `route_upload` over a `.pdf` writes nothing — the spy records 0 store.append/dna.land,
+    `store.read_all` is empty afterward — and RETURNS the awaiting-confirm honest-signal dict
+    (not a landed-source string).
+    """
+    calls = _spy_seam(monkeypatch)
+    monkeypatch.setattr(route.pdf_extract, "extract_text", lambda path: "Ferritin 120 ng/mL on 2026-05-01\n")
+    store_root = tmp_path / "store"
+    staged = tmp_path / "labs.pdf"
+    staged.write_bytes(b"%PDF-1.4 synthetic lab report")
+    client = _RecordingClient()
+
+    result = route.route_upload(staged, client=client, root=store_root, dna_root=tmp_path / "dna")
+
+    assert calls["store_append"] == [] and calls["dna_land"] == [], "the PDF extraction path auto-landed a reading"
+    assert store.read_all(store_root) == [], "the store is non-empty after the PDF extraction route (auto-land)"
+    assert not isinstance(result, str), "the PDF extraction return is a source string (not the awaiting-confirm payload)"
+    assert "extracted_readings" in result and "extraction_complete" in result, (
+        "the PDF route did not return the awaiting-confirm honest-signal payload"
+    )
+
+
+def test_pdf_extraction_leaves_no_tracked_residue_oq3(tmp_path, monkeypatch):
+    """AC-6 (OQ-3/OQ-5): the PDF route leaks NO raw-binary OR extracted-text token to a tracked path.
+
+    OQ-5 (ADR-0030) is the raw-FILE residue; OQ-3 (ADR-0031) is the raw-BINARY + EXTRACTED-TEXT
+    residue — ONE tracked-tree scan covers BOTH. Seeds a runtime-unique raw-binary token into the
+    staged PDF bytes AND a DISTINCT runtime-unique extracted-text token into the stubbed extractor
+    return; after the route, `git grep` the tracked tree (excluding the gitignored dropzone
+    prefixes) for BOTH tokens -> 0 hits each (the raw binary lived only in the gitignored staged
+    path + the local extractor; the text lived only in the in-memory client call).
+    """
+    raw_token = "OQ3-RAW-BINARY-" + uuid.uuid4().hex
+    text_token = "OQ3-EXTRACTED-TEXT-" + uuid.uuid4().hex
+    monkeypatch.setattr(
+        route.pdf_extract, "extract_text",
+        lambda path: f"Ferritin 120 ng/mL on 2026-05-01 {text_token}\n",
+    )
+    staged = tmp_path / "labs.pdf"
+    staged.write_bytes(f"%PDF-1.4 {raw_token}".encode())
+    client = _RecordingClient()
+
+    route.route_upload(staged, client=client, root=tmp_path / "store", dna_root=tmp_path / "dna")
+
+    ignored = ("vault/store/", "vault/dna/raw/", "vault/labs/raw/", "vault/scaffold/filled/")
+    for token in (raw_token, text_token):
+        found = subprocess.run(["git", "grep", "-l", token], cwd=REPO_ROOT, capture_output=True, text=True)
+        hits = [h for h in found.stdout.splitlines() if h.strip() and not h.startswith(ignored)]
+        assert hits == [], f"the {token!r} residue leaked to a tracked path (OQ-3 breach): {hits}"
+
+
+def test_non_pdf_unrecognized_uses_unchanged_raw_content_path(tmp_path, monkeypatch):
+    """AC-3: a NON-PDF unrecognized upload keeps the UNCHANGED raw-content path; extract_text uncalled.
+
+    A `.bin` (unrecognized, NOT application/pdf) routes through the byte-unchanged
+    `client.extract_readings(file_content, media_type)` raw-content arm — `pdf_extract.extract_text`
+    is NEVER called (the local-extract-first branch is PDF-only, crit 3 no-regression) and the
+    non-PDF return shape `{"extracted_readings": [...]}` is preserved (no honest-signal keys).
+    """
+    pdf_calls = []
+    monkeypatch.setattr(route.pdf_extract, "extract_text", lambda path: pdf_calls.append(path) or "x")
+    content = b"synthetic octet-stream body"
+    staged = tmp_path / "labs.bin"
+    staged.write_bytes(content)
+    client = _RecordingClient()
+
+    result = route.route_upload(staged, client=client, root=tmp_path / "store", dna_root=tmp_path / "dna")
+
+    assert pdf_calls == [], "pdf_extract.extract_text was called on a NON-PDF unrecognized upload (scope error)"
+    assert client.calls == [(content, "application/octet-stream")], (
+        "the non-PDF arm did not call extract_readings once with the raw content + octet-stream media type"
+    )
+    assert result == {"extracted_readings": _CANNED_READINGS}, "the non-PDF arm return shape changed (regression)"
+
+
+# --------------------------------------------------------------------------- #
 # Cycle 2 — ADR-0030-T2: EXTEND-NOT-REBUILD (frozen engine + plan modules)
 # --------------------------------------------------------------------------- #
 
-# The NFR-4 byte-frozen set: the ingestion engine + every scripts/plan/*.py (incl.
-# deid_in.py). T2 EXTENDS the router's front door; it re-authors none of these.
+# The byte-frozen set: the ingestion engine + every scripts/plan/*.py (incl. deid_in.py) +
+# the store sink keying/store.append (ADR-0031-T4 NFR-3 EXTENSION — T4 dispatches to the
+# UNCHANGED keying.dedupe_key / store sink via extract_chunked, never re-authoring them). T4
+# EXTENDS the router + the /upload payload (NEW front-step edits), re-authoring none of these.
 _FROZEN_ENGINE_PATHS = (
     "scripts/ingest/ingest.py",
     "scripts/ingest/adapter.py",
+    "scripts/store/keying.py",
+    "scripts/store/store.py",
     *sorted(
         str(p.relative_to(REPO_ROOT)) for p in (REPO_ROOT / "scripts" / "plan").glob("*.py")
     ),

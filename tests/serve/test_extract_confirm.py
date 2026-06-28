@@ -40,6 +40,9 @@ from scripts.store import store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+# ADR-0031-T4 repoint: `.pdf` is now reserved for the local-extract-first branch; the three
+# /upload surfacing tests below exercise the PRESERVED non-PDF raw-content path via `.bin`
+# (-> application/octet-stream) so every existing assertion stays valid against that branch.
 BOUNDARY = "----aplusboundary7MA4YWxkTrZu0gW"
 
 # A Line-Field-Set-conformant canned readings payload (what the mock client returns for an
@@ -324,7 +327,7 @@ def test_upload_surfaces_extracted_readings_lands_none(tmp_path):
     srv, port = _server_with_extract(tmp_path, client)
     _serve_in_thread(srv)
     try:
-        status, text = _post_upload(port, [("labs.pdf", b"%PDF-1.4 synthetic lab report")])
+        status, text = _post_upload(port, [("labs.bin", b"synthetic lab report octet-stream body")])
         assert status == 200, f"POST /upload returned {status}, expected 200"
         payload = _parse_json(text)
         assert payload is not None, "the /upload response is not a JSON review payload"
@@ -353,7 +356,7 @@ def test_upload_failed_extraction_degrades_no_drop(tmp_path):
     srv, port = _server_with_extract(tmp_path, client)
     _serve_in_thread(srv)
     try:
-        status, text = _post_upload(port, [("labs.pdf", b"%PDF-1.4 synthetic lab report")])
+        status, text = _post_upload(port, [("labs.bin", b"synthetic lab report octet-stream body")])
         assert status in (200, 400), f"a failed extraction returned {status} (dropped thread?)"
         # No fabricated readings surfaced, none landed.
         payload = _parse_json(text)
@@ -378,7 +381,7 @@ def test_upload_heterogeneous_recognized_lands_unrecognized_surfaced(tmp_path):
     """Forward-note 2 (heterogeneous upload): recognized lands as today, unrecognized surfaced.
 
     A single POST mixing a recognized `export.xml` (routes to `ingest.run`, lands) and an
-    unrecognized `.pdf` (routes to extraction, surfaced for confirm). The recognized reading
+    unrecognized `.bin` (routes to extraction, surfaced for confirm). The recognized reading
     lands in the store as today; the unrecognized readings collect into the JSON review payload
     and land 0 (they await `/confirm-extraction`).
     """
@@ -388,7 +391,7 @@ def test_upload_heterogeneous_recognized_lands_unrecognized_surfaced(tmp_path):
     try:
         status, text = _post_upload(port, [
             ("export.xml", _healthkit_xml_bytes(day="2026-05-02", value="58")),
-            ("labs.pdf", b"%PDF-1.4 synthetic lab report"),
+            ("labs.bin", b"synthetic lab report octet-stream body"),
         ])
         assert status == 200, f"heterogeneous POST returned {status}, expected 200"
         payload = _parse_json(text)
