@@ -270,6 +270,14 @@ _EXTRACT_MAX_ATTEMPTS = 3
 # indefinite block. Passed through `with_options(timeout=...)` at call time.
 _EXTRACT_TIMEOUT_SECONDS = 60.0
 
+# The output-token ceiling for the extract response. A real lab/biomarker panel emits dozens of
+# Line-Field-Set readings; at the prior 2048 the JSON readings array truncated mid-object
+# (stop_reason="max_tokens") -> json.loads failed -> fail-closed ModelCallError -> the operator
+# saw "no new data" (S99 live run). 16384 fits a large panel with headroom. A document so dense it
+# still truncates here (e.g. a multi-page genetics/SNP report — ADR-0030's noted out-of-sweet-spot
+# format) is a format-fit limit, not a ceiling to keep raising.
+_EXTRACT_MAX_TOKENS = 16384
+
 
 def _extract_system_prompt():
     """Build the extract system instruction: constrain the returned readings to the Line Field Set.
@@ -505,7 +513,7 @@ class _ClaudeNoTrainBackend:
             try:
                 response = client.with_options(timeout=_EXTRACT_TIMEOUT_SECONDS).messages.create(
                     model=self.MODEL,
-                    max_tokens=2048,
+                    max_tokens=_EXTRACT_MAX_TOKENS,
                     system=system,
                     messages=[{"role": "user", "content": [content_block]}],
                     output_config={"format": {"type": "json_schema", "schema": schema}},

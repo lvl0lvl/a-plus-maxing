@@ -1345,6 +1345,23 @@ def test_parse_extract_readings_unwraps_readings_object():
         _parse_extract_readings(_Resp(json.dumps(rows)))  # a bare array is the API-invalid pre-fix shape
 
 
+def test_extract_readings_requests_a_generous_max_tokens(monkeypatch):
+    """A real lab/biomarker panel emits dozens of readings; the output ceiling must be generous.
+
+    The live S99 bug: max_tokens=2048 truncated the JSON readings array mid-object
+    (stop_reason=max_tokens) → json.loads failed → fail-closed ModelCallError → the operator saw
+    "no new data". Asserts the extract call requests the named ceiling, well above the prior 2048
+    literal. Failing-capable: drop it back to a small literal and the >= floor reds.
+    """
+    from scripts.model.client import _ClaudeNoTrainBackend, _EXTRACT_MAX_TOKENS
+
+    fake = _FakeAnthropic(response_summary={"readings": _good_readings_list()})
+    _patch_backend_client(monkeypatch, fake)
+    _ClaudeNoTrainBackend().extract_readings(b"%PDF-1.4 ...", "application/pdf")
+    assert fake.calls[0]["max_tokens"] == _EXTRACT_MAX_TOKENS
+    assert _EXTRACT_MAX_TOKENS >= 8192, "a real lab panel needs a generous output ceiling"
+
+
 def test_extract_readings_live_resolves_runtime_key_through_client(monkeypatch):
     """AC-4: the key is resolved at call time via `key_source.resolve` inside `_client`.
 
