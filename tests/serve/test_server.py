@@ -17,6 +17,7 @@ carries 0 artifact-serving route. The 0-shared-routine-edit proof (AC-6) lives i
 
 import http.client
 import io
+import json
 import socket
 import subprocess
 import sys
@@ -24,6 +25,8 @@ import threading
 import zipfile
 from pathlib import Path
 
+from scripts.ingest.pdf_extract import PdfExtractError
+from scripts.serve import route
 from scripts.serve import server as serve_server
 from scripts.store import store
 
@@ -889,3 +892,183 @@ def test_serve_layer_has_no_in_app_plan_generation_call():
         assert "orchestrator" not in src, (
             f"{py.name} references the plan orchestrator — no in-app generation in the serve layer"
         )
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0031-T4 — /upload surfaces the honest-partial signal (partial/notes) + F1
+#   AC-4 partial surfaced; F1 empty-but-partial emits the JSON signal (NOT the
+#   silent HTML re-render); AC-4 complete -> partial:false; PdfExtractError
+#   thread-survival fold-in; the route-table re-assertion (GREEN by construction)
+# --------------------------------------------------------------------------- #
+
+# A Line-Field-Set-conformant canned readings payload (what the route extract path returns).
+_CANNED_READINGS = [
+    {"item": "ferritin", "timepoint": "2026-05-01", "source": "labs", "value": "120"},
+    {"item": "vitamin-d", "timepoint": "2026-05-01", "source": "labs", "value": "44"},
+]
+
+
+class _StubClient:
+    """A no-op mock model client (the route extract path is stubbed; the client is never called)."""
+
+    def extract_readings(self, file_content, media_type):
+        return []
+
+
+def _server_with_client(tmp_path, client):
+    """Build a loopback server over tmp roots + an injected mock client (0 spend)."""
+    srv = serve_server.build_server(
+        0, store_root=tmp_path / "store", dna_root=tmp_path / "dna",
+        scaffold_root=tmp_path / "scaffold", client=client,
+    )
+    return srv, srv.server_address[1]
+
+
+def _post_upload_ct(port, filename, payload):
+    """POST a multipart upload to `/upload`; return (status, base-content-type, body text)."""
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    body = _multipart_upload(filename, payload)
+    conn.request("POST", "/upload", body=body,
+                 headers={"Content-Type": f"multipart/form-data; boundary={BOUNDARY}"})
+    resp = conn.getresponse()
+    ctype = (resp.getheader("Content-Type") or "").split(";", 1)[0].strip().lower()
+    text = resp.read().decode("utf-8")
+    conn.close()
+    return resp.status, ctype, text
+
+
+def test_upload_pdf_partial_signal_surfaced(tmp_path, monkeypatch):
+    """AC-4: a partial PDF extraction surfaces `partial: true` + the note in the /upload payload.
+
+    Stubs the route extract path to return a partial signal (`complete=False` + a note); the
+    /upload response must be a JSON review payload carrying the extracted readings, `partial: true`,
+    and the note in `notes`. STUBS pdf_extract.extract_text + extract_chunked.extract_all so the
+    test drives server.py's surfacing logic at 0 real-pdftotext cost.
+    """
+    monkeypatch.setattr(route.pdf_extract, "extract_text", lambda path: "some extracted text")
+    monkeypatch.setattr(
+        route.extract_chunked, "extract_all",
+        lambda text, c: {"readings": _CANNED_READINGS, "complete": False, "note": "document too large"},
+    )
+    srv, port = _server_with_client(tmp_path, _StubClient())
+    _serve_in_thread(srv)
+    try:
+        status, ctype, body = _post_upload_ct(port, "labs.pdf", b"%PDF-1.4 body")
+        assert status == 200 and ctype == "application/json", "a partial PDF extraction must surface a JSON review payload"
+        payload = json.loads(body)
+        assert payload["readings"] == _CANNED_READINGS, f"the review payload did not carry the readings: {payload}"
+        assert payload["partial"] is True, f"a partial extraction was not flagged partial: {payload}"
+        assert "document too large" in payload["notes"], f"the partial note was not surfaced: {payload}"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_upload_partial_empty_surfaces_signal_not_silent_rerender(tmp_path, monkeypatch):
+    """F1 (load-bearing): `extracted == []` + `partial == True` emits the honest signal, NOT silence.
+
+    The route extract path returns `{readings: [], complete: False, note: <note>}` (a too-dense /
+    over-budget PDF that yielded no readings within budget). The /upload handler must emit the
+    honest-signal JSON payload (`partial: true`, notes non-empty, `readings: []`) — NOT fall through
+    to the silent "no new data" app-shell HTML re-render. Failing-capable: the pre-fix `if extracted:`
+    gate is False on `[]` and falls through to the HTML re-render (the SPA_NAV_MARKER body).
+    """
+    monkeypatch.setattr(route.pdf_extract, "extract_text", lambda path: "some extracted text")
+    monkeypatch.setattr(
+        route.extract_chunked, "extract_all",
+        lambda text, c: {"readings": [], "complete": False, "note": "document too large to extract within budget"},
+    )
+    srv, port = _server_with_client(tmp_path, _StubClient())
+    _serve_in_thread(srv)
+    try:
+        status, ctype, body = _post_upload_ct(port, "labs.pdf", b"%PDF-1.4 body")
+        assert status == 200, f"the empty-but-partial upload returned {status}, expected 200"
+        assert ctype == "application/json", "F1: an empty-but-partial extraction must emit the JSON honest signal"
+        assert SPA_NAV_MARKER not in body, "F1: the silent app-shell HTML re-render was served instead of the honest signal"
+        payload = json.loads(body)
+        assert payload["readings"] == [], f"the empty-but-partial payload should carry no readings: {payload}"
+        assert payload["partial"] is True, f"the empty-but-partial signal was not flagged partial: {payload}"
+        assert payload["notes"] and "document too large to extract within budget" in payload["notes"], (
+            f"the empty-but-partial note was not surfaced: {payload}"
+        )
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_upload_complete_extraction_partial_false(tmp_path, monkeypatch):
+    """AC-4: a complete PDF extraction surfaces `partial: false` and empty `notes`.
+
+    The route extract path returns `{readings: <canned>, complete: True, note: None}`; the
+    /upload JSON payload must carry `partial: false` and `notes: []` (a complete extraction is
+    not flagged partial).
+    """
+    monkeypatch.setattr(route.pdf_extract, "extract_text", lambda path: "some extracted text")
+    monkeypatch.setattr(
+        route.extract_chunked, "extract_all",
+        lambda text, c: {"readings": _CANNED_READINGS, "complete": True, "note": None},
+    )
+    srv, port = _server_with_client(tmp_path, _StubClient())
+    _serve_in_thread(srv)
+    try:
+        status, ctype, body = _post_upload_ct(port, "labs.pdf", b"%PDF-1.4 body")
+        assert status == 200 and ctype == "application/json", "a complete PDF extraction surfaces a JSON review payload"
+        payload = json.loads(body)
+        assert payload["readings"] == _CANNED_READINGS, f"the review payload did not carry the readings: {payload}"
+        assert payload["partial"] is False, f"a complete extraction was wrongly flagged partial: {payload}"
+        assert payload["notes"] == [], f"a complete extraction surfaced a note: {payload}"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_upload_pdf_extract_failure_degrades_no_drop(tmp_path, monkeypatch):
+    """A total local-extraction failure (`PdfExtractError`) degrades the thread, never drops it.
+
+    Monkeypatches pdf_extract.extract_text to raise `PdfExtractError` (T1's fail-loud raise on
+    total failure). The /upload handler must degrade gracefully — a re-rendered response (not a
+    dropped connection / 5xx), 0 fabricated/landed readings, and a still-alive handler (a follow-up
+    GET / still serves the SPA). Failing-capable: pre-fix `PdfExtractError` is not in the catch
+    tuple -> uncaught -> the request thread drops.
+    """
+    def _raise(path):
+        raise PdfExtractError("total extraction failure")
+
+    monkeypatch.setattr(route.pdf_extract, "extract_text", _raise)
+    srv, port = _server_with_client(tmp_path, _StubClient())
+    _serve_in_thread(srv)
+    try:
+        status, ctype, body = _post_upload_ct(port, "labs.pdf", b"%PDF-1.4 body")
+        assert status in (200, 400), f"a PdfExtractError returned {status} (dropped thread / 5xx?)"
+        assert ctype != "application/json", "a failed extraction surfaced a JSON readings payload (fabricated?)"
+        assert SPA_NAV_MARKER in body, "a failed extraction did not degrade to the app-shell re-render"
+        assert store.read_all(tmp_path / "store") == [], "a failed extraction landed a reading"
+        assert _still_alive(port), "the handler died after a PdfExtractError (thread dropped)"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_upload_route_table_unchanged(tmp_path):
+    """The route table + the loopback bind are byte-unchanged — T4 adds no route/bind.
+
+    An unknown POST still 404s and GET / still serves the SPA (the dispatch did not gain/lose a
+    route), and the `_LOOPBACK = "127.0.0.1"` bind literal is byte-unchanged. A STANDING
+    re-assertion — GREEN by construction.
+    """
+    srv, port = _server_with_client(tmp_path, _StubClient())
+    _serve_in_thread(srv)
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("POST", "/not-a-route", body=b"", headers={"Content-Type": "application/json"})
+        unk = conn.getresponse()
+        unk.read()
+        conn.close()
+        assert unk.status == 404, f"an unknown POST returned {unk.status}, expected 404"
+        assert _still_alive(port), "GET / stopped serving the SPA (a route was lost)"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+    src = (REPO_ROOT / "scripts" / "serve" / "server.py").read_text()
+    assert '_LOOPBACK = "127.0.0.1"' in src, "the loopback bind literal changed (T4 must not touch the bind)"

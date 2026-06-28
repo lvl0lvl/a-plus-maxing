@@ -62,6 +62,10 @@ from scripts.store import store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+# ADR-0031-T4 repoint: `.pdf` is now reserved for the local-extract-first branch; these E2Es
+# exercise the PRESERVED non-PDF raw-content -> model -> confirm -> land path via `report.bin`
+# (-> application/octet-stream). Every assertion below (incl. the crown-jewel raw-bytes-reach-
+# the-model probe) stays valid for the ADR-0031-preserved non-PDF branch.
 BOUNDARY = "----aplusboundary7MA4YWxkTrZu0gW"
 
 # The synthetic fixture readings — distinct items/timepoints/values so the latest-wins
@@ -258,7 +262,7 @@ def _upload_confirm_land(root_base, backend, token=None):
     no-data state) it confirms nothing and returns the empty store.
     """
     with _running_server(root_base, backend) as port:
-        status, ctype, body = _post_upload(port, "report.pdf", _fixture_bytes(token or _raw_token()))
+        status, ctype, body = _post_upload(port, "report.bin", _fixture_bytes(token or _raw_token()))
         assert status == 200
         offered = _offered_readings(ctype, body)
         if offered:
@@ -281,7 +285,7 @@ def test_headline_synthetic_upload_confirm_lands_traced_reading(tmp_path):
     """
     backend = _FixtureBackend(READINGS_A)
     with _running_server(tmp_path, backend) as port:
-        status, ctype, body = _post_upload(port, "report.pdf", _fixture_bytes(_raw_token()))
+        status, ctype, body = _post_upload(port, "report.bin", _fixture_bytes(_raw_token()))
         assert status == 200
         assert ctype == "application/json", "an unrecognized-format upload surfaces a JSON review payload"
         offered = body["readings"]
@@ -324,7 +328,7 @@ def test_confirm_gate_store_empty_until_confirm(tmp_path):
     """
     backend = _FixtureBackend(READINGS_A)
     with _running_server(tmp_path, backend) as port:
-        status, ctype, body = _post_upload(port, "report.pdf", _fixture_bytes(_raw_token()))
+        status, ctype, body = _post_upload(port, "report.bin", _fixture_bytes(_raw_token()))
         assert status == 200 and ctype == "application/json"
         assert body["readings"], "the /upload body carries the extracted readings for review"
         # Confirm bypassed -> 0 land.
@@ -370,7 +374,7 @@ def test_negative_control_operator_confirms_none_lands_nothing(tmp_path):
     """
     backend = _FixtureBackend(READINGS_A)
     with _running_server(tmp_path, backend) as port:
-        status, ctype, body = _post_upload(port, "report.pdf", _fixture_bytes(_raw_token()))
+        status, ctype, body = _post_upload(port, "report.bin", _fixture_bytes(_raw_token()))
         assert status == 200 and ctype == "application/json"
         assert body["readings"], "readings were surfaced for review"
 
@@ -401,7 +405,7 @@ def test_negative_control_empty_extraction_is_honest_no_data(tmp_path):
     """
     backend = _FixtureBackend(())
     with _running_server(tmp_path, backend) as port:
-        status, ctype, body = _post_upload(port, "report.pdf", _fixture_bytes(_raw_token()))
+        status, ctype, body = _post_upload(port, "report.bin", _fixture_bytes(_raw_token()))
         assert status == 200
         assert ctype != "application/json", (
             "an empty extraction must surface the no-data re-render, NOT a review payload"
@@ -426,7 +430,7 @@ def test_crown_jewel_file_reaches_only_the_mock_extract_lane(tmp_path):
     token = _raw_token()
     backend = _FixtureBackend(READINGS_A)
     with _running_server(tmp_path, backend) as port:
-        status, ctype, body = _post_upload(port, "report.pdf", _fixture_bytes(token))
+        status, ctype, body = _post_upload(port, "report.bin", _fixture_bytes(token))
         assert status == 200 and ctype == "application/json"
         _post_confirm(port, body["readings"])
 
@@ -493,7 +497,7 @@ def test_fail_closed_extraction_failure_lands_nothing(tmp_path, mode):
     """
     backend = _FailBackend(mode)
     with _running_server(tmp_path, backend) as port:
-        status, ctype, body = _post_upload(port, "report.pdf", _fixture_bytes(_raw_token()))
+        status, ctype, body = _post_upload(port, "report.bin", _fixture_bytes(_raw_token()))
         # Thread survived (not a dropped connection) and offered no JSON readings payload.
         assert status == 200
         assert ctype != "application/json"
