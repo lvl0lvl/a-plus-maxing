@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-06-10, S49)
 **Owner:** Walter McGivney
-**Relates to:** ADR-0004 (single-file artifact generation), ADR-0008 (biomarker metadata + type-routed dashboard), ADR-0021 (deterministic PII re-insertion — supersedes-posture toward D2's initials-only render rule, plan-generation engine set), ADR-0029 (single-file SPA front-end shell — tensions-with: the as-built Dashboard/Plan demo-data + parallel layout collides with D1/D2), `vault/design/dashboard-v1-design.md` (the frozen, Walter-approved target)
+**Relates to:** ADR-0004 (single-file artifact generation), ADR-0008 (biomarker metadata + type-routed dashboard), ADR-0021 (deterministic PII re-insertion — supersedes-posture toward D2's initials-only render rule, plan-generation engine set), ADR-0029 (single-file SPA front-end shell — tensions-with: the as-built Dashboard/Plan demo-data + parallel layout collides with D1/D2), ADR-0031 (local-extraction-first PDF + genetics genotype-fact ingestion — constrains: the honest-data principle bounds genotype-fact capture and honest completeness), `vault/design/dashboard-v1-design.md` (the frozen, Walter-approved target)
 
 ## Context
 
@@ -176,6 +176,18 @@ LM-02, calendar, goals, rollup) fills its zone in place.
   visibly-placeholder, not presented as the operator's data. Recorded here in
   prose (this ADR carries no Related-Decisions table) as the symmetric inverse of
   ADR-0029 → 0009 `tensions-with`.
+- [2026-06-28: Added inverse `constrains` edge to ADR-0031 (local-extraction-first
+  PDF ingestion + genetics genotype-fact capture, Phase-8 backfill).] ADR-0031's
+  PDF/genetics ingestion is CONSTRAINED by this ADR's honest-data principle (D2's
+  zone-state honesty rule, extended from the render surface to ingest):
+  operator-confirm-before-land is unchanged; completeness is HONEST (a too-large
+  document surfaces a partial / too-large signal, never a silent "no new data");
+  and the genetics path stores the durable GENOTYPE FACT (`item` = gene+rsID,
+  `value` = alleles, `timepoint` = sample date, `source` = `dna-report`), NOT the
+  report's dated interpretation — the read is re-derived from current evidence at
+  plan time, honoring D2's no-invented / no-stale-data posture. Recorded here in
+  prose (this ADR carries no Related-Decisions table) as the inverse of
+  ADR-0031 → 0009 `constrains` (inbound; [.pipeline/dag.md](.pipeline/dag.md)).
 
 ## Review triggers
 
