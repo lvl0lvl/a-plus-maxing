@@ -604,3 +604,117 @@ def test_confirm_success_gated_on_http_status_no_false_landed():
     assert landed_i != -1 and ok_i < landed_i, "the '✓ Landed' success is not gated behind the res.ok check"
     assert clear_i != -1 and ok_i < clear_i, "the showReview([]) panel-clear is not gated behind the res.ok check"
     assert "Could not land" in html[i:i + 1400], "the confirm handler has no failure branch that keeps the review panel"
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0031-T5 — the SPA honest-partial note on the review panel: surface T4's
+# {readings, partial, notes} /upload payload so a too-large/dense extraction shows
+# an honest note instead of the silent "no new data" awaiting state (QA-1). The
+# note lands in the EXISTING locked Clinical-Light review panel (no redesign, no
+# new surface). Fixture-driven, 0 live spend (the rendered-SPA string + the real
+# generate.run('app') emit).
+# --------------------------------------------------------------------------- #
+
+
+def _extraction_note_open_tag(block):
+    """The opening <div ...> tag of the partial-extraction note element, or None."""
+    return re.search(r'<div[^>]*id="extraction-note"[^>]*>', block)
+
+
+# --- Cycle 1: the partial-note element + default honest-empty (inline-asset clean) --- #
+
+
+def test_partial_note_keeps_spa_inline_asset_clean(tmp_path):
+    """AC-4 (AUTHORITATIVE inline-asset): generate.run('app') emits a Path with the note, no off-file ref.
+
+    Drives the REAL `generate.run('app')` (render.emit RAISES ValueError on any off-file asset
+    reference) and asserts it returns a written Path that EXISTS and carries the partial-extraction
+    note element, with no off-file `<script src>`. The note adds 0 off-file asset; a substring grep
+    is NOT substituted for the emit probe. Failing-capable: reds if the note element is absent or it
+    introduces an off-file `<script src>`.
+    """
+    path = _emit_app(tmp_path)
+    assert isinstance(path, Path) and path.exists(), "generate.run('app') did not emit with the partial-note element"
+    emitted = path.read_text()
+    assert 'id="extraction-note"' in emitted, "the emitted SPA carries no partial-extraction note element"
+    assert "<script src" not in emitted, "the partial note added an off-file <script src> reference"
+
+
+def test_partial_note_element_default_hidden_and_honest_empty():
+    """AC-1 (HONEST-EMPTY): the partial-note element is present, default-hidden, and bakes 0 note/fabricated data.
+
+    The note element (`id="extraction-note"`) lands in the locked ws-docs `#panel-build` review-panel
+    surface, is DEFAULT-HIDDEN (carries `display:none` — its text is injected client-side from T4's
+    `notes`), and bakes NO note text / NO fabricated reading as the operator's data. The existing
+    honest-empty invariants still hold (the awaiting marker + the exactly-empty review-list).
+    Failing-capable: reds if the note element is absent, is not default-hidden, bakes note/fabricated
+    text, or breaks the honest-empty invariants.
+    """
+    block = _panel_build_html(_spa_html())
+    note = re.search(r'<div[^>]*id="extraction-note"[^>]*>(.*?)</div>', block, re.DOTALL)
+    assert note is not None, "no partial-extraction note element in the #panel-build (ws-docs) review-panel surface"
+    open_tag = _extraction_note_open_tag(block)
+    assert open_tag is not None and "display:none" in open_tag.group(0), "the partial-note element is not default-hidden"
+    assert note.group(1).strip() == "", "the partial-note element bakes note text into the default render (not honest-empty)"
+    present = [tok for tok in (_FABRICATED + _FABRICATED_READING) if tok in note.group(0)]
+    assert present == [], f"the partial-note element bakes fabricated tokens: {present}"
+    # the existing honest-empty invariants are preserved (the note is a default-hidden SIBLING)
+    assert "data-awaiting='extraction'" in block, "the panel's honest awaiting-state marker was dropped"
+    assert '<div id="review-list"></div>' in block, "the review-list is no longer empty by default (the note broke it)"
+
+
+# --- Cycle 2: the partial/notes inline-JS branch + the QA-1 awaiting-state gate --- #
+
+
+def test_partial_extraction_note_path_wired():
+    """AC-2: the inline JS reads d.partial/d.notes from /upload and references the note element.
+
+    The `up(f)` upload-response / `showReview` flow READS the partial signal + notes from T4's
+    `/upload` JSON payload (`d.partial`, `d.notes` — the discriminator no longer drops them) AND
+    references the note element (`getElementById('extraction-note')`) so the note is populated/shown
+    from the payload. Failing-capable: reds if the discriminator drops `d.partial`/`d.notes` or the
+    inline JS never reaches the note element.
+    """
+    html = _spa_html()
+    assert "d.partial" in html, "the upload discriminator drops the partial signal (no d.partial)"
+    assert "d.notes" in html, "the upload discriminator drops the notes (no d.notes)"
+    assert "getElementById('extraction-note')" in html, "the inline JS never references the partial-note element"
+
+
+def test_partial_empty_shows_note_and_hides_awaiting():
+    """QA-1 (LOAD-BEARING): partial+empty shows the note + hides the awaiting state.
+
+    The awaiting-display gate in `showReview` is `readings.length||partial` (NOT just
+    `readings.length`), so `partial==True` with `readings==[]` HIDES the silent 'no new data'
+    awaiting state; AND the note-show gates on the `partial` signal (the note is shown + populated
+    from `notes` when partial, independent of `readings.length`). Whitespace is normalized before
+    the substring assertion so the gate matches regardless of spacing. Failing-capable: reds if the
+    gate reverts to `readings.length` only, or the note-show drops the `partial` gate.
+    """
+    html = _spa_html().replace(" ", "")
+    assert "readings.length||partial" in html, (
+        "the awaiting-display gate is not (readings.length||partial) — a partial+empty extraction "
+        "would re-show the silent 'no new data' awaiting state (QA-1)"
+    )
+    assert "if(partial)" in html, "the note-show does not gate on the partial signal"
+    assert "notes.join" in html, "the note is not populated from the notes list when partial"
+
+
+def test_genuinely_empty_not_partial_keeps_honest_awaiting():
+    """AC-3 (empty side): a genuinely-empty (not-partial) extraction keeps the honest awaiting state, note hidden.
+
+    A genuinely-empty extraction (0 findings, not partial) still shows the honest awaiting state and
+    NOT the note: the default-rendered awaiting `.empty` div is visible (no `display:none` baked onto
+    it), the note element is default-hidden, and the note-show is gated behind `partial` (so a
+    non-partial response leaves the note hidden). Failing-capable: reds if the note is shown
+    unconditionally (the partial gate dropped) or the awaiting marker is removed — proving a partial
+    is never collapsed into, and the empty state is never replaced by, the note.
+    """
+    block = _panel_build_html(_spa_html())
+    aw = re.search(r"<div[^>]*data-awaiting='extraction'[^>]*>", block)
+    assert aw is not None, "the honest awaiting-state marker was removed"
+    assert "display:none" not in aw.group(0), "the awaiting `.empty` div is hidden by default (honest empty broken)"
+    note = _extraction_note_open_tag(block)
+    assert note is not None and "display:none" in note.group(0), "the partial-note element is not default-hidden"
+    html = _spa_html().replace(" ", "")
+    assert "if(partial)" in html, "the note-show is not gated behind the partial signal (a non-partial render would show it)"

@@ -484,6 +484,7 @@ select.inp{cursor:pointer}
             <div class="seclab">Review extracted readings</div>
             <div id="review-panel">
               <div class="empty" data-awaiting='extraction'>Readings we extract from an unrecognized document appear here for you to review and confirm before anything lands in your store.</div>
+              <div id="extraction-note" class="upload-status warn" style="display:none"></div>
               <div id="review-list"></div>
               <button class="btn primary" id="confirm-readings" type="button" style="display:none;width:100%;margin-top:10px">Confirm readings →</button>
             </div>
@@ -756,12 +757,20 @@ function renderGenerate(){
    node._reading=reading;  // the verbatim reading dict, re-posted to /confirm-extraction unmodified
    return node;
  }
- function showReview(readings){
+ function showReview(readings, partial, notes){
    if(!REVIEW_LIST||!REVIEW_TPL)return;
+   partial=!!partial; notes=notes||[];
    REVIEW_LIST.innerHTML='';
    readings.forEach(function(reading){ REVIEW_LIST.appendChild(readingRow(reading)); });
-   var aw=awaitingEl(); if(aw) aw.style.display=readings.length?'none':'';
+   // QA-1: hide the awaiting "no new data" empty state when there ARE readings OR the extraction
+   // was partial — a too-large/dense document shows the honest note below, never a silent nothing-found.
+   var aw=awaitingEl(); if(aw) aw.style.display=(readings.length||partial)?'none':'';
    if(CONFIRM_BTN) CONFIRM_BTN.style.display=readings.length?'block':'none';
+   var note=document.getElementById('extraction-note');
+   if(note){
+     if(partial){ note.textContent=(notes&&notes.length)?notes.join(' '):'This document was too large or dense to fully extract — some readings may be missing.'; note.style.display='flex'; }
+     else { note.textContent=''; note.style.display='none'; }
+   }
  }
  function up(f){
    if(!f)return;
@@ -773,7 +782,7 @@ function renderGenerate(){
      // JSON review payload (application/json, key `readings`); a recognized-format / fields-only
      // upload returns the re-rendered app-shell HTML (the named-adapter / DNA path, unchanged).
      if((r.headers.get('content-type')||'').indexOf('application/json')!==-1){
-       return r.json().then(function(d){ return {readings:d.readings||[]}; });
+       return r.json().then(function(d){ return {readings:d.readings||[], partial:!!d.partial, notes:d.notes||[]}; });
      }
      return r.text().then(function(html){ return {html:html}; });
    })
@@ -781,8 +790,8 @@ function renderGenerate(){
        if(res.readings){
          // The extraction path: /upload landed 0 — populate the review panel so the operator
          // confirms what lands (POST /confirm-extraction is the only landing path, the gate).
-         showReview(res.readings);
-         if(st){ st.className='upload-status info'; st.textContent='Review the readings we found in '+f.name+', then confirm what lands.'; }
+         showReview(res.readings, res.partial, res.notes);
+         if(st){ st.className='upload-status info'; st.textContent=(res.partial&&!res.readings.length)?'We couldn\'t fully read '+f.name+' — see the note below.':'Review the readings we found in '+f.name+', then confirm what lands.'; }
          return;
        }
        refresh(res.html); if(!st)return;
