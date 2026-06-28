@@ -130,6 +130,23 @@ def test_extract_text_raises_pdf_extract_error_when_both_extractors_empty(monkey
         pdf_extract.extract_text("/fake/empty.pdf")
 
 
+def test_extract_text_absent_binary_raises_pdf_extract_error(monkeypatch):
+    """RISKY-1: an absent binary (subprocess FileNotFoundError) raises the typed PdfExtractError.
+
+    On a poppler-less clone `subprocess.run(["pdftotext", ...])` raises `FileNotFoundError`
+    (an `OSError`). The "total failure -> PdfExtractError" contract must cover it so T4's
+    `except PdfExtractError` catches it — an un-typed OSError would escape that tuple and drop
+    the request thread. RED without the wrap: the FileNotFoundError propagates un-typed.
+    """
+    def fake_run(*args, **kwargs):
+        raise FileNotFoundError(2, "No such file or directory", "pdftotext")
+
+    monkeypatch.setattr(pdf_extract.subprocess, "run", fake_run)
+
+    with pytest.raises(pdf_extract.PdfExtractError):
+        pdf_extract.extract_text("/fake/report.pdf")
+
+
 def test_pdf_extract_imports_no_outbound_client_or_sdk():
     """AC-5: the module references no outbound HTTP client and no model SDK."""
     src = __import__("pathlib").Path(pdf_extract.__file__).read_text()

@@ -102,10 +102,15 @@ def extract_text(pdf_path):
     Returns:
         (str) The extracted text.
     """
-    text = _run_pdftotext(pdf_path)
-    if len(text.strip()) >= _LOW_TEXT_CHARS:
-        return text
-    text = _run_marker(pdf_path)
+    try:
+        text = _run_pdftotext(pdf_path)
+        if len(text.strip()) >= _LOW_TEXT_CHARS:
+            return text
+        text = _run_marker(pdf_path)
+    except OSError as exc:
+        # An absent binary makes subprocess.run raise FileNotFoundError (an OSError);
+        # wrap it into the typed PdfExtractError so total failure is actually total.
+        raise PdfExtractError(_EXTRACT_FAILED_MSG) from exc
     if text.strip():
         return text
     raise PdfExtractError(_EXTRACT_FAILED_MSG)
