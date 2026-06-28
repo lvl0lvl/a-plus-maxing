@@ -92,8 +92,10 @@ def _split_chunks(text, chunk_chars, overlap):
     Lines accumulate into a chunk until the next line would push it over `chunk_chars`; the chunk
     is emitted and the next chunk seeds with the trailing `overlap` characters (so a finding
     straddling the boundary lands in both neighbours). A single line longer than `chunk_chars` is
-    hard-split into `chunk_chars`-bounded pieces — a degenerate no-newline run, bounded to honor
-    the per-chunk size contract. Each emitted chunk is a contiguous slice of `text`.
+    hard-split into `(chunk_chars - overlap)`-bounded pieces — a degenerate no-newline run — so the
+    carry-over seed still survives in assembly (seed + piece <= chunk_chars) and a finding
+    straddling a hard-split boundary lands in both neighbours too, never silently dropped. Each
+    emitted chunk is a contiguous slice of `text`.
 
     Args:
         text (str): The text to split.
@@ -106,11 +108,19 @@ def _split_chunks(text, chunk_chars, overlap):
     if not text:
         return []
 
+    # A degenerate no-newline run longer than chunk_chars is hard-split into pieces bounded at
+    # (chunk_chars - overlap), NOT chunk_chars: the assembly seeds each non-first chunk with
+    # `overlap` trailing chars, so a piece <= (chunk_chars - overlap) keeps seed + piece within
+    # chunk_chars and the seed is never dropped — a reading straddling a hard-split boundary still
+    # lands in both neighbours. A chunk_chars-sized piece would force the seed-drop and silently
+    # lose the straddling reading while still reporting complete=True (the honest-completeness bug).
+    hard_split = max(1, chunk_chars - overlap)
     segments = []
     for line in text.splitlines(keepends=True):
-        while len(line) > chunk_chars:
-            segments.append(line[:chunk_chars])
-            line = line[chunk_chars:]
+        if len(line) > chunk_chars:
+            while len(line) > hard_split:
+                segments.append(line[:hard_split])
+                line = line[hard_split:]
         if line:
             segments.append(line)
 

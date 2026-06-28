@@ -239,6 +239,32 @@ def test_overlap_carryover_shares_chars_across_consecutive_chunks():
         assert contents[i + 1].startswith(contents[i][-_CHUNK_OVERLAP:])
 
 
+def test_long_line_hard_split_keeps_boundary_straddling_token_whole():
+    """HARD-SPLIT completeness: a token straddling a hard-split boundary survives WHOLE in a chunk.
+
+    A single newline-free line longer than `_CHUNK_CHARS` is hard-split mid-line. A reading whose
+    text straddles the hard-split boundary must still land WHOLE in some chunk — the both-chunks
+    overlap guarantee extended to the degenerate no-newline run — never cut across two chunks and
+    lost from both while `extract_all` falsely reports `complete=True`. The old `chunk_chars`-sized
+    hard-split dropped the assembly's overlap seed at the boundary (`400 + chunk_chars > chunk_chars`)
+    and split the token across two chunks (present in neither) → REDs this. The fix bounds hard-split
+    pieces at `chunk_chars - overlap` so the seed survives. Sized RELATIVE to the constants (NFR-7).
+    """
+    token = "STRADDLE_TOKEN"
+    # one long no-newline line; the token starts just before the _CHUNK_CHARS hard-split boundary
+    line = ("a" * (_CHUNK_CHARS - 4)) + token + ("b" * _CHUNK_CHARS) + "\n"
+    client = _RecordingClient(default_factory=lambda i: [_reading(f"item-{i}")])
+
+    result = extract_all(line, client)
+
+    contents = [content for content, _ in client.calls]
+    assert len(contents) >= 2  # the long line genuinely hard-split into multiple chunks
+    assert all(len(c) <= _CHUNK_CHARS for c in contents)  # per-chunk size contract honored
+    # captured WHOLE in some chunk — never cut across the hard-split boundary and lost from both
+    assert any(token in c for c in contents)
+    assert result["complete"] is True  # honestly within budget — and the token was NOT lost
+
+
 def test_empty_text_returns_complete_empty_readings_no_note():
     """SHOULD-FIX #2: a genuinely-empty document → complete True, [] readings, None note.
 
