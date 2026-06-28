@@ -1546,3 +1546,111 @@ def test_extract_readings_error_traceback_carries_no_key_or_raw(monkeypatch, tmp
     tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
     assert raw_token not in tb
     assert key_token not in tb
+
+
+# --- ADR-0031-T3: the genetics genotype-fact extract mapping (PROMPT-ONLY, 0 live spend) ---
+#
+# T3 tunes ONE constant string — `_extract_system_prompt` — so a genetics/SNP report maps to
+# DURABLE GENOTYPE FACTS in the existing Line Field Set: item=gene+rsID, timepoint=sample-date,
+# source="dna-report", value=alleles; capture EVERY finding; store the FACT, not the dated
+# interpretation. No schema change (the genotype fact rides the four LINE_FIELDS). The fixture
+# backend echoes the scripted readings regardless of `system`, so AC-2/AC-3/AC-4 are
+# non-tautological LOCKS; the genuinely RED-on-T3 probe is the AC-1 prompt structural assertion.
+
+
+def _good_genotype_reading(item="MTNR1B rs10830963", value="(C;G)"):
+    """A durable genotype-fact reading: item=gene+rsID, source=dna-report, value=alleles."""
+    return {"item": item, "timepoint": "2019-12-13", "source": "dna-report", "value": value}
+
+
+def test_extract_system_prompt_carries_genetics_genotype_fact_mapping():
+    """AC-1: the extract prompt carries the genetics genotype-fact mapping directives.
+
+    Structural token assertions over the constant system instruction (failing-capable, NOT
+    exact-wording-pinned per NFR-7): the gene+rsID/sample-date/`dna-report`/alleles mapping rule,
+    the capture-ALL directive, and the store-the-fact-not-the-interpretation directive. RED-first:
+    the current prompt carries none of these tokens.
+    """
+    from scripts.model.client import _extract_system_prompt
+
+    prompt = _extract_system_prompt()
+    low = prompt.lower()
+    # (a) the mapping rule — gene+rsID -> item, "dna-report" -> source, alleles -> value
+    assert "rsid" in low, "the prompt must name the gene+rsID -> item mapping"
+    assert "dna-report" in prompt, 'the prompt must name the literal "dna-report" source value'
+    assert "allele" in low, "the prompt must name the alleles -> value mapping"
+    # (b) capture-ALL — a universal quantifier co-occurring with `finding`
+    assert ("every" in low or "all" in low) and "finding" in low, "the prompt must capture every finding"
+    # (c) not-the-interpretation — store the durable fact, not the dated interpretation
+    assert "interpretation" in low, "the prompt must store the fact, not the interpretation"
+
+
+def test_extract_readings_genetics_fixture_non_tautological(monkeypatch):
+    """AC-2 (NON-TAUTOLOGICAL): genetics fixture A -> readings A, a DIFFERENT fixture B -> readings B.
+
+    Via the patched SDK, a genetics report's bytes yield the scripted genotype readings whose `item`
+    carries a gene+rsID and `source == "dna-report"`; a different genetics fixture yields different
+    readings (B != A). Proves the path carries the model's genotype-shaped parse, not a code
+    constant. 0 live spend.
+    """
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    readings_a = [_good_genotype_reading("MTNR1B rs10830963", "(C;G)")]
+    fake_a = _FakeAnthropic(response_summary={"readings": readings_a})
+    _patch_backend_client(monkeypatch, fake_a)
+    out_a = _ClaudeNoTrainBackend().extract_readings(b"# Genetics / SNP report\nMTNR1B rs10830963 (C;G)", "text/plain")
+    assert out_a == readings_a
+    for reading in out_a:
+        assert "rs" in reading["item"], f"genotype reading item must carry an rsID: {reading}"
+        assert reading["source"] == "dna-report", f"genotype reading source must be dna-report: {reading}"
+
+    readings_b = [_good_genotype_reading("APOE rs429358", "(T;T)")]
+    fake_b = _FakeAnthropic(response_summary={"readings": readings_b})
+    _patch_backend_client(monkeypatch, fake_b)
+    out_b = _ClaudeNoTrainBackend().extract_readings(b"# Genetics / SNP report\nAPOE rs429358 (T;T)", "text/plain")
+    assert out_b == readings_b
+    assert out_a != out_b  # the parse tracks the scripted envelope — not a constant
+
+
+def test_extract_readings_genetics_value_is_the_allele_not_the_interpretation(monkeypatch):
+    """AC-3: the genotype reading's `value` is the allele call, never the dated interpretation.
+
+    A genetics fixture stores `value` = the alleles "(C;G)"; the returned reading carries that allele
+    call and NONE of the trait/risk interpretation narrative (the durable FACT, not the dated
+    interpretation; no fabricated genotype — the value is the model's parse). Failing-capable: a
+    fixture whose `value` carried the interpretation narrative reds the absence assertion.
+    """
+    import json
+
+    from scripts.model.client import _ClaudeNoTrainBackend
+
+    reading = _good_genotype_reading("MTNR1B rs10830963", "(C;G)")
+    fake = _FakeAnthropic(response_summary={"readings": [reading]})
+    _patch_backend_client(monkeypatch, fake)
+
+    got = _ClaudeNoTrainBackend().extract_readings(b"MTNR1B rs10830963 (C;G)", "text/plain")[0]
+    assert got["value"] == "(C;G)"  # the allele call, the durable fact
+    serialized = json.dumps(got)
+    for interp_token in ("risk", "increased fasting glucose"):
+        assert interp_token not in got["value"], f"value carried the interpretation token: {interp_token}"
+        assert interp_token not in serialized, f"reading carried the interpretation token: {interp_token}"
+
+
+def test_extract_output_schema_unchanged_for_genotype_fact():
+    """AC-4: the genotype fact maps onto the four LINE_FIELDS — no schema change, no second data model.
+
+    The structured-output schema keeps its object root + readings array + the item object whose
+    `properties` keys are EXACTLY the Line Field Set (no fifth genetics field bolted on).
+    Failing-capable: adding a genetics property to the schema reds the keys-exactly-LINE_FIELDS
+    assertion.
+    """
+    from scripts.model.client import _extract_output_schema
+    from scripts.store.keying import LINE_FIELDS
+
+    schema = _extract_output_schema()
+    assert schema["type"] == "object"
+    assert schema.get("additionalProperties") is False
+    assert schema["required"] == ["readings"]
+    item = schema["properties"]["readings"]["items"]
+    assert item["additionalProperties"] is False
+    assert set(item["properties"]) == set(LINE_FIELDS), "no genetics field bolted onto the schema"

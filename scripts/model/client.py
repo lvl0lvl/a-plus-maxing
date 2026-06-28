@@ -287,7 +287,10 @@ def _extract_system_prompt():
     JSON object `{"readings": [...]}` whose array elements' keys are drawn from `keying.LINE_FIELDS`
     (an object root, mirroring the object-rooted structured-output schema the API requires). The
     extract analogue of `_deid_prompt`'s field-set instruction; the shape gate is the downstream
-    `_parse_extract_readings`.
+    `_parse_extract_readings`. For a genetics/SNP/DNA report it carries the genotype-fact mapping
+    (gene+rsID -> item, sample-date -> timepoint, "dna-report" -> source, alleles -> value; capture
+    every finding; store the durable fact, not the dated interpretation) — the fact maps onto the
+    same four fields, so the output schema is unchanged (ADR-0031 non-goal #3).
     """
     from scripts.store.keying import LINE_FIELDS
 
@@ -296,7 +299,15 @@ def _extract_system_prompt():
         "You extract structured readings from the uploaded file content. Respond with a single "
         'JSON object of the form {"readings": [...]} and nothing else. Each element of the '
         f"`readings` array is a reading object whose keys are exactly this Line Field Set: "
-        f"{field_roster}. Emit no prose outside the JSON object."
+        f"{field_roster}. "
+        "For a genetics, SNP, or DNA report, map EVERY SNP finding (the whole report, not a "
+        '"Noteworthy" subset) to one genotype-fact reading: set `item` to the gene symbol '
+        'followed by its rsID (e.g. "MTNR1B rs10830963"), `timepoint` to the genome sample date, '
+        '`source` to the literal "dna-report", and `value` to the allele call (e.g. "(C;G)"). '
+        "Store the durable genotype FACT — the alleles — and do NOT store the report's "
+        "interpretation (the trait or risk narrative), which is dated and re-derivable at plan "
+        "time. "
+        "Emit no prose outside the JSON object."
     )
 
 
