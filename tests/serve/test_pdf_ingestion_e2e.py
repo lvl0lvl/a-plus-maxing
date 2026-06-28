@@ -495,8 +495,10 @@ def test_negative_control_no_usable_readings_lands_nothing(tmp_path, monkeypatch
     Drives the SAME pipeline in two honest-no-data sub-cases, proving AC-1's land assertion goes
     RED when there is no usable reading (it is NOT a constant-pass):
       (a) the operator confirms NONE of the surfaced readings -> 0 land.
-      (b) the mock returns [] (a blank extraction). Each chunk's empty return fail-closes the
-          lane (ModelCallError), which the /upload handler catches and degrades to the no-data
+      (b) the mock returns [] (a blank extraction). An empty mock return raises nothing:
+          `extract_all` returns `{readings: [], complete: True}` and the route reports
+          `extraction_complete: True`, so the server's `if extracted or partial:` is False
+          (extracted == [] AND not partial) and it falls through to the honest no-data HTML
           re-render (a NON-JSON response) — 0 fabricated readings offered, store stays empty.
     Both confirm `store.read_all == []`.
     """
@@ -602,6 +604,54 @@ def test_probe_crown_jewel_raw_binary_egress_text_lane_only(tmp_path, monkeypatc
     assert all(mt == "text/plain" for _c, mt in backend.extract_calls)
     # The seeded raw-binary token reached NO model call content.
     received = "".join(str(c) for c, _mt in backend.extract_calls)
+    assert token not in received, "the raw-binary token reached a model call (crown-jewel breach)"
+
+    # No OTHER sink received the raw token (the tmp instance roots carry none).
+    for root in (tmp_path / "store", tmp_path / "dna", tmp_path / "scaffold"):
+        if not root.exists():
+            continue
+        for p in root.rglob("*"):
+            if p.is_file():
+                assert token not in p.read_text(errors="ignore"), f"{p} carries the raw-binary token"
+
+    # The landed readings carry only the structured (item, value), never the raw bytes.
+    landed = store.read_all(tmp_path / "store")
+    assert _tuples(landed) == _tuples(READINGS_A)
+    assert all(token not in str(r) for r in landed)
+
+
+@pytest.mark.skipif(shutil.which("pdftotext") is None, reason="poppler/pdftotext not installed")
+def test_probe_crown_jewel_real_pdftotext_raw_binary_egress_text_lane_only(tmp_path):
+    """AC-3 (CROWN-JEWEL, REAL-pdftotext, NON-VACUOUS): the raw PDF binary reaches ONLY the
+    local extractor — driven through the REAL pdftotext subprocess, not the stub.
+
+    The stubbed crown-jewel variant returns a CONSTANT text, so the seeded raw-binary token can
+    never enter the pipeline BY CONSTRUCTION (its three token-tracing legs give 0 independent
+    coverage). This variant feeds a REAL token-bearing PDF (the token appended AFTER `%%EOF`, where
+    a real pdftotext extraction never picks it up) through the REAL `pdf_extract.extract_text` ->
+    chunk -> the recording mock backend -> confirm. Real extraction actually PROCESSES the
+    token-bearing bytes, so the token-absence assertions are non-vacuous: the seeded token reaches
+    NEITHER any model call's content, NOR any tmp sink, NOR any landed reading, while the real page
+    text DOES reach the text/plain model lane (proving the local subprocess ran). 0 live spend
+    (recording mock at the ADR-0015 seam); marker never run.
+    """
+    token = _raw_token()
+    pdf = _pdf_bytes(token, page_text="Ferritin 120 ng/mL sample 2026-05-01 cohort fixture")
+    backend = _FixtureBackend(READINGS_A)
+    with _running_server(tmp_path, backend) as port:
+        status, ctype, body = _post_upload(port, "report.pdf", pdf)
+        assert status == 200 and ctype == "application/json"
+        _post_confirm(port, body["readings"])
+
+    assert backend.extract_calls, "the model lane never received the extracted text"
+    # Every model call carried text/plain — the raw application/pdf document path was never taken.
+    assert all(mt == "text/plain" for _c, mt in backend.extract_calls)
+    received = "".join(str(c) for c, _mt in backend.extract_calls)
+    # The REAL pdftotext output reached the model lane (the local subprocess genuinely ran) — this
+    # is what makes the absence assertion below non-vacuous (a stub could not feed the page text).
+    assert "Ferritin" in received, "real pdftotext did not feed the extracted text to the chunker"
+    # NON-VACUOUS: the seeded raw-binary token was PROCESSED by real extraction yet reached NO
+    # model call content (the crown-jewel text-only boundary held on real-extracted bytes).
     assert token not in received, "the raw-binary token reached a model call (crown-jewel breach)"
 
     # No OTHER sink received the raw token (the tmp instance roots carry none).
