@@ -4,8 +4,9 @@ The ONE new named egress class ADR-0032 adds to ADR-0001 — generic, operator-d
 ALLELE-AGNOSTIC genetic-variant literature queries. `build_variant_query` carries only the variant
 (gene + rsID), never the operator's allele; `assert_query_de_associated` is the fail-closed guard that
 RAISES before any outbound query carrying an allele call or an operator-identity token can leave; and
-`dispatch_variant_research` refuses the EXCLUDED (sensitive) variants, guards the query, and STUBS the
-dispatch (the live, metered `aplus-research` run is OQ-1 — 0 spend here).
+`dispatch_variant_research` refuses any variant ABSENT from the OQ-3 curated allowlist FIRST (the
+EXCLUDED denylist kept as defense-in-depth), guards the query, and STUBS the dispatch (the live,
+metered `aplus-research` run is OQ-1 — 0 spend here).
 
 The research engine `aplus-research` runs on the SUBSCRIPTION/agent research lane, NOT the no-train
 `ModelClient` backend (`scripts/model/client.py`). This module imports only `re`, T2's curated/excluded
@@ -14,7 +15,7 @@ set, and the read-only operator-PII scanner — no outbound HTTP client, no mode
 
 import re
 
-from scripts.genetics.variants import EXCLUDED_VARIANTS
+from scripts.genetics.variants import EXCLUDED_VARIANTS, PLANNING_RELEVANT_VARIANTS
 from scripts.guard import pii_scan
 
 # An allele call in an outbound query is the de-association breach: the paired-genotype form
@@ -22,7 +23,13 @@ from scripts.guard import pii_scan
 # neither (it asks about EACH genotype's implications, never the operator's own call).
 _ALLELE_CALL = re.compile(r"\([ACGTDI]+;[ACGTDI]+\)|genotype is \(?[ACGTDI]")
 
-# The sensitive / non-actionable genes ADR-0032 never auto-researches (APOE/DRD2/BDNF).
+# The OQ-3 curated planning-relevant allowlist: dispatch refuses ANY (gene, rsid) absent from
+# this set FIRST — auto-research is scoped to the curated variants, never a non-curated one
+# (even a non-excluded sensitive variant, e.g. BRCA1 rs80357906, is refused before any build).
+_CURATED_VARIANTS = frozenset(PLANNING_RELEVANT_VARIANTS)
+
+# The sensitive / non-actionable genes ADR-0032 never auto-researches (APOE/DRD2/BDNF). Kept as
+# defense-in-depth — an excluded variant is, by construction, also absent from _CURATED_VARIANTS.
 _EXCLUDED_GENES = frozenset(gene for (gene, _) in EXCLUDED_VARIANTS)
 
 
@@ -77,8 +84,11 @@ def assert_query_de_associated(query, *, identity_config=pii_scan.DEFAULT_IDENTI
 def dispatch_variant_research(gene, rsid, *, dispatcher=None):
     """Dispatch de-associated current-science research for a planning-relevant variant (STUB).
 
-    Refuses an EXCLUDED (sensitive) variant FIRST — before any query is built —
-    so APOE/DRD2/BDNF is never auto-researched. Otherwise it builds the generic
+    Refuses any variant ABSENT from the OQ-3 curated allowlist FIRST — before any
+    query is built — so a non-curated variant (even a non-excluded sensitive one,
+    e.g. BRCA1 rs80357906) is never auto-researched; the EXCLUDED (APOE/DRD2/BDNF)
+    denylist is kept as defense-in-depth (an excluded variant is, by construction,
+    also non-curated). Otherwise it builds the generic
     allele-agnostic query, GUARDS it fail-closed via `assert_query_de_associated`,
     and either runs a 0-spend dry-run (the default) or hands the guarded query to
     an injected dispatcher. The live, metered `aplus-research` Agent dispatch is
@@ -94,6 +104,10 @@ def dispatch_variant_research(gene, rsid, *, dispatcher=None):
         (str | Any) The would-be de-associated query (dry-run), or the injected
         dispatcher's result.
     """
+    if (gene, rsid) not in _CURATED_VARIANTS:
+        raise ValueError(
+            f"{gene} {rsid} is not in the OQ-3 curated planning-relevant set — never auto-researched"
+        )
     if gene in _EXCLUDED_GENES:
         raise ValueError(f"{gene} is an excluded (sensitive) variant — never auto-researched")
     query = build_variant_query(gene, rsid)

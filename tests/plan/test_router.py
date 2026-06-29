@@ -1731,6 +1731,46 @@ def test_genetic_trait_classes_carries_no_raw_allele_call_fail_closed(tmp_path):
     assert "(A;A)" not in str(exc.value)
 
 
+def test_genetic_trait_classes_pii_scan_branch_fail_closed(tmp_path):
+    """QA-1 CROWN JEWEL (pii_scan half): a trait-class token embedding a structural
+    value-class token (an email) makes `summarize` RAISE via the deriver's `pii_scan`
+    backstop — the third fail-closed trigger, distinct from `rs\\d+` and `(allele;allele)`.
+
+    The two sibling tests cover the `rs\\d+` and `(allele;allele)` triggers; NONE exercises
+    the `pii_scan.scan_text(tok, ...)` condition, so a surgical removal of JUST that
+    condition would pass them all. An email (`operator@example.com`) trips ONLY `pii_scan`
+    (it matches neither raw-genotype pattern), so removing the `pii_scan` condition reds
+    THIS test — pinning the crown-jewel's third branch. Uses the REAL store (store.append
+    to a tmp root + the real `store.read`), consistent with the AC-10 production path.
+    """
+    from functools import partial
+
+    from scripts.store import store
+
+    # REAL store: append the operator's CYP1A2 genotype to a tmp store root.
+    store_root = tmp_path / "store"
+    store.append(
+        "CYP1A2 rs762551",
+        {"item": "CYP1A2 rs762551", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "dna-report", "value": "(A;A)"},
+        root=store_root,
+    )
+    store_read = partial(store.read, root=store_root)
+
+    # A fixture page whose trait-class TOKEN field embeds a structural value-class token
+    # (an email) — trips the deriver's pii_scan backstop, not the genotype patterns.
+    lib = tmp_path / "genetics"
+    lib.mkdir()
+    _write_genetics_page(lib, "CYP1A2", "rs762551", [
+        ("(A;A)", "metabolizer-operator@example.com", "a leaky trait-class carrying contact PII"),
+    ])
+    with pytest.raises(ValueError) as exc:
+        router.summarize(store_read, genetics_library_root=lib)
+    assert "genetic-trait-classes" in str(exc.value)        # names the field
+    assert "fail-closed" in str(exc.value)
+    assert "operator@example.com" not in str(exc.value)     # never echoes the value
+
+
 def test_genetic_trait_classes_always_set_empty_on_no_dna(tmp_path):
     """AC-4 ALWAYS-SET: a no-DNA `store_read` -> "" AND dispatch does NOT partial-raise."""
     summary = router.summarize(_clean_store_read(), genetics_library_root=tmp_path)
