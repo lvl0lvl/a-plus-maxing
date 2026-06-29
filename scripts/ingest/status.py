@@ -48,6 +48,28 @@ def _dropzone(root, suffixes):
     return {"loaded": bool(files), "files": files}
 
 
+def dna_status(store_read, dna_root):
+    """Load-state of DNA: a 23andMe file in the dropzone OR extracted genotype readings in the store.
+
+    A 23andMe `.txt`/`.zip` lands in the gitignored dropzone; a genetics-report PDF instead lands
+    as `source == "dna-report"` genotype readings in the store (ADR-0031 local extraction). Either
+    counts as DNA loaded — `count` is the genotype-reading count when present, else the dropzone is
+    returned unchanged. Surfaces counts only, never a genotype value.
+
+    Args:
+        store_read (list): The store read model (reading dicts).
+        dna_root (str | Path): The DNA dropzone (production: `vault/dna/raw/`).
+
+    Returns:
+        (dict) `{"loaded": bool, "files": [...]}` plus `count` when genotype readings are present.
+    """
+    drop = _dropzone(dna_root, {".txt"})
+    genotypes = [r for r in store_read if r.get("source") == "dna-report"]
+    if genotypes:
+        return {"loaded": True, "files": drop["files"], "count": len(genotypes)}
+    return drop
+
+
 def resolve(store_read, *, dna_root, labs_root):
     """Return the per-source ingestion load-state for the intake screen.
 
@@ -61,6 +83,6 @@ def resolve(store_read, *, dna_root, labs_root):
     """
     return {
         "wearable": wearable_status(store_read),
-        "dna": _dropzone(dna_root, {".txt"}),
+        "dna": dna_status(store_read, dna_root),
         "labs": _dropzone(labs_root, {".pdf", ".csv", ".txt", ".json"}),
     }
