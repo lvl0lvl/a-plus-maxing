@@ -12,6 +12,24 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Scope Contract — Session 102 (2026-06-29)
+
+Goal: Build DNA-AWARE PLANNING via the full autonomous pipeline (`/create-adr` → `/create-spec` → `/create-build-plan` → `/create-task-plan` → `/execute-plan` → `/review-pr` → `/merge` → full close). The operator-APPROVED architecture: the care assistant requests CURRENT-science research on the operator's planning-relevant variants → a DNA research agent answers via the existing `aplus-research` skill with a GENERIC, de-associated query (per gene/variant, NEVER "the operator has this") → vetted findings cached in a NEW genetics/SNP library section keyed to the VARIANT → the care assistant matches the operator's local genotypes to the library findings LOCALLY → the no-train planner uses the CURRENT-science implications (NOT the 2013 report). (Operator-directed: "DNA-aware first — show me what crosses" + "move through the autonomous build pipeline … follow the stop rules".)
+
+Acceptance criteria:
+- [ ] AC1 (ADR): `/create-adr` produces the DNA-aware-planning ADR (the genetics/SNP library entity + the care-assistant↔research-agent↔library flow + the de-id boundary for genetic signal: only generic gene/variant questions leave the machine, operator identity + raw genotypes + the genotype↔operator link stay local) through verify→judge→red-team→fix → accepted; amends the boundary ADRs as needed.
+- [ ] AC2 (spec→build-plan→recipes): `/create-spec` → `/create-build-plan` → `/create-task-plan` produce wave-sequenced binary-AC artifacts, each through its own judge gate.
+- [ ] AC3 (build): `/execute-plan` builds every wave (TDD, EXECUTED checkpoints, Tier-2 review, plan-integrity gating); the privacy boundary held by execution (generic queries only; 0 operator-identity egress); EXTEND-NOT-REBUILD; mock/fixture-tested (0 live spend in the build).
+- [ ] AC4 (Tier-3 + merge): `/review-pr` 6-agent (profile-less blind-triage + EXECUTED blind-verify intact) → legitimate findings fixed + blind-verified → `/merge` to main.
+- [ ] AC5 (close): full automatic close — `close-audit.sh --session 102` + harvest gate green; SHA cited.
+
+Files I WILL touch: `docs/adr/`, `docs/spec/`, `docs/build-plan/`, `docs/task-plan/` (the new pipeline artifacts); a NEW `vault/library/genetics/` section + its ingestion-gated entity schema; the care-assistant/planner research-hookup + the local genotype↔library matching + their tests; `.claude/skills/aplus-research/` ONLY if a genetics-variant mode is needed; `HANDOFF.md`/close docs (by EXPLICIT path).
+Files I will NOT touch: the byte-frozen inner plan engine `scripts/plan/*` + `scripts/store/*` beyond an additive read-surface (EXTEND-NOT-REBUILD); `main` directly; the keychain; `.claude/settings.json` hooks; the operator's raw genotypes' egress (they stay LOCAL).
+NOT doing (the genuine STOP gate): kicking off the LIVE `aplus-research` variant lookups (real literature research = time + spend) — that is operator-gated; I design + build the wiring to that point, then confirm with the operator before researching real variants. Also: APOE/DRD2/BDNF are EXCLUDED from the planning-relevant set.
+Invariants at risk: ADR-0001/0016 (crown-jewel — the NEW egress is generic gene/variant research questions only; the de-id boundary EXTENSION is operator-approved, PF-S63-02 guard-loosening sign-off satisfied by this directive); INV-WIKI-INGESTION-GATED (the new genetics library section is ingestion-gated); EXTEND-NOT-REBUILD; INV-BRANCH-NOT-MAIN; the close gates; PF-S92-01 (do NOT over-stop — APPLIED: proceeding through the pipeline); PF-S96-01; PF-S101-01 (run the FULL suite + full gated review before 'done').
+
+**Core-capability-first gate (PF-S63-02):** YES — this makes the operator's DNA actually inform the plan (the core value the operator asked for), using current science not the outdated 2013 report, without crossing the privacy boundary. Directly on the core-capability path.
+
 ## Scope Contract — Session 101 (2026-06-29)
 
 Goal: The operator-present LIVE run of the merged ADR-0031 ingestion + build the live plan path so a real plan renders over the operator's real data, then land it (`/review-pr`→`/merge`) + full close. (Operator-directed, reactive/live: "restart the server" → the live genetics-PDF upload → "wire the dashboard and plan to my real data, do what you need" → "keep going and pre-tune the author so the filters pass". AUTONOMOUS within the live session; the close was operator-instructed at the end.)
