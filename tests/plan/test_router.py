@@ -7,6 +7,8 @@ absent from the named-excluded list — proving the check is "allow only field-s
 tokens", not "block known-bad fields".
 """
 
+from pathlib import Path
+
 import pytest
 
 from scripts.plan import router
@@ -1582,3 +1584,220 @@ def test_chat_token_misplacement_token_in_excluded_reds_at_load():
     )
     assert "AssertionError" in result.stderr
     assert "tripwire-did-not-red" not in result.stdout
+
+
+# =========================================================================== #
+# ADR-0032-T3 — the additive de-identified `genetic-trait-classes` token + the
+# local deriver. The planner consumes ONLY the coarse trait-class token; the raw
+# rsID+allele genotype NEVER crosses to the no-train lane (the crown jewel, NFR-1).
+# The deriver mirrors `_rx_interaction_classes_token` and calls T2's matcher
+# (`scripts.genetics.match.match_genotypes`). Mock/fixture-tested, 0 live spend.
+# =========================================================================== #
+
+
+def _write_genetics_page(library_root, gene, rsid, findings, slug=None):
+    """Write a fixture genetics page in the pinned T1<->T2 format (mirrors test_match)."""
+    slug = slug or f"{gene.replace('/', '-').lower()}-{rsid}"
+    lines = [
+        "---",
+        f"title: {gene} {rsid}",
+        "type: genetics",
+        f"gene: {gene}",
+        f"rsid: {rsid}",
+        "evidence_tier: B",
+        "last_verified: 2026-06-29",
+        "provenance_dir: design/genetics-fixture",
+        "provenance_slug: genetics-fixture",
+        "---",
+        "",
+        f"# {gene} {rsid}",
+        "",
+        "## Genotype Findings",
+    ]
+    for genotype, trait_class, prose in findings:
+        lines.append(f"- {genotype}: {trait_class} — {prose} [1]")
+    page = Path(library_root) / f"{slug}.md"
+    page.write_text("\n".join(lines) + "\n")
+    return page
+
+
+def _dna_store_read(gene, rsid, genotype):
+    """A store.read seeded with ONE operator `dna-report` genotype reading for a variant."""
+    return _store_read_factory([
+        {"item": f"{gene} {rsid}", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "dna-report", "value": genotype},
+    ])
+
+
+def test_genetic_trait_classes_in_field_set():
+    """AC-1: `genetic-trait-classes` is a SUMMARY_FIELD_SET member + the tripwire holds.
+
+    The module-load `isdisjoint(EXCLUDED_RAW_PII)` tripwire ran at import (else this
+    module failed to collect); re-affirm the additive member did not break it. RED-first
+    today: the member is absent.
+    """
+    assert "genetic-trait-classes" in router.SUMMARY_FIELD_SET
+    assert set(router.SUMMARY_FIELD_SET).isdisjoint(set(router.EXCLUDED_RAW_PII))
+
+
+def test_genetic_trait_classes_token_non_tautological(tmp_path):
+    """AC-2: the token IS the matched finding (A != B), not a plumbed constant. 0 spend.
+
+    A fixture page maps the operator's LOCAL allele to a coarse trait class; genotype A
+    and genotype B map to DIFFERENT classes, so a constant-return deriver reds (out_a ==
+    out_b). Cross-checks T2's per-genotype lookup.
+    """
+    _write_genetics_page(tmp_path, "CYP1A2", "rs762551", [
+        ("(A;A)", "fast-caffeine-metabolism", "fast metabolizer"),
+        ("(C;C)", "slow-caffeine-metabolism", "slow metabolizer"),
+    ])
+    out_a = router.summarize(
+        _dna_store_read("CYP1A2", "rs762551", "(A;A)"),
+        genetics_library_root=tmp_path,
+    )["genetic-trait-classes"]
+    out_b = router.summarize(
+        _dna_store_read("CYP1A2", "rs762551", "(C;C)"),
+        genetics_library_root=tmp_path,
+    )["genetic-trait-classes"]
+    assert out_a == "fast-caffeine-metabolism"
+    assert out_b == "slow-caffeine-metabolism"
+    assert out_b != out_a
+
+
+def test_genetic_trait_classes_token_joined_sorted_deduped(tmp_path):
+    """AC-2 contract: multiple matches -> a `;`-joined, SORTED, deduped coarse scalar."""
+    _write_genetics_page(tmp_path, "CYP1A2", "rs762551", [("(A;A)", "zeta-class", "z")])
+    _write_genetics_page(tmp_path, "ACTN3", "rs1815739", [("(C;C)", "alpha-class", "a")])
+    store_read = _store_read_factory([
+        {"item": "CYP1A2 rs762551", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "dna-report", "value": "(A;A)"},
+        {"item": "ACTN3 rs1815739", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "dna-report", "value": "(C;C)"},
+    ])
+    token = router.summarize(store_read, genetics_library_root=tmp_path)["genetic-trait-classes"]
+    assert token == "alpha-class;zeta-class"  # sorted + ;-joined
+
+
+def test_genetic_trait_classes_carries_no_raw_genotype_fail_closed(tmp_path):
+    """AC-3 CROWN JEWEL: the token carries 0 raw genotypes; a raw-genotype-bearing
+    trait-class token makes `summarize` RAISE (fail-closed) rather than leak it.
+
+    FAILING-CAPABLE: a deriver that passes the raw genotype through reds both halves —
+    the absence assertion (a) AND the fail-closed raise (b).
+    """
+    import re
+
+    # (a) a normal match's token carries no rsID and no allele-call pattern.
+    _write_genetics_page(tmp_path, "CYP1A2", "rs762551", [
+        ("(A;A)", "fast-caffeine-metabolism", "fast"),
+    ])
+    token = router.summarize(
+        _dna_store_read("CYP1A2", "rs762551", "(A;A)"),
+        genetics_library_root=tmp_path,
+    )["genetic-trait-classes"]
+    assert not re.search(r"rs\d+", token)
+    assert not re.search(r"\([ACGTDI]+;[ACGTDI]+\)", token)
+
+    # (b) a page whose finding embeds a raw genotype IN the trait-class token ->
+    #     summarize RAISES (fail-closed), naming the field, never echoing the genotype.
+    leak_root = tmp_path / "leak"
+    leak_root.mkdir()
+    _write_genetics_page(leak_root, "CYP1A2", "rs762551", [
+        ("(A;A)", "carrier-of-rs762551", "a leaky trait-class carrying an rsID"),
+    ])
+    with pytest.raises(ValueError) as exc:
+        router.summarize(
+            _dna_store_read("CYP1A2", "rs762551", "(A;A)"),
+            genetics_library_root=leak_root,
+        )
+    assert "genetic-trait-classes" in str(exc.value)
+    assert "fail-closed" in str(exc.value)
+    assert "rs762551" not in str(exc.value)  # names the field, never echoes the genotype
+
+
+def test_genetic_trait_classes_carries_no_raw_allele_call_fail_closed(tmp_path):
+    """AC-3 CROWN JEWEL (allele-call half): a trait-class token carrying an `(X;Y)`
+    allele-call makes `summarize` RAISE, never echoing the genotype."""
+    _write_genetics_page(tmp_path, "CYP1A2", "rs762551", [
+        ("(A;A)", "metabolizer-(A;A)", "a leaky trait-class carrying an allele call"),
+    ])
+    with pytest.raises(ValueError) as exc:
+        router.summarize(
+            _dna_store_read("CYP1A2", "rs762551", "(A;A)"),
+            genetics_library_root=tmp_path,
+        )
+    assert "genetic-trait-classes" in str(exc.value)
+    assert "fail-closed" in str(exc.value)
+    assert "(A;A)" not in str(exc.value)
+
+
+def test_genetic_trait_classes_always_set_empty_on_no_dna(tmp_path):
+    """AC-4 ALWAYS-SET: a no-DNA `store_read` -> "" AND dispatch does NOT partial-raise."""
+    summary = router.summarize(_clean_store_read(), genetics_library_root=tmp_path)
+    assert summary["genetic-trait-classes"] == ""
+    assert set(summary.keys()) == set(router.SUMMARY_FIELD_SET)  # field present, complete
+    router.dispatch(summary)  # must not raise a partial-summary error
+
+
+def test_dispatch_whitelists_genetic_trait_classes_rejects_raw_genotype(tmp_path):
+    """AC-5: dispatch ADMITS `genetic-trait-classes` (now a field-set member); a
+    raw-genotype field name is REJECTED by the same `set(payload) <= field-set` whitelist."""
+    summary = router.summarize(_clean_store_read(), genetics_library_root=tmp_path)
+    assert "genetic-trait-classes" in summary
+    router.dispatch(summary)  # the new field rides through the whitelist — no raise
+    summary["MTNR1B rs10830963"] = "(C;G)"  # a raw-genotype field name, out-of-set
+    with pytest.raises(ValueError) as exc:
+        router.dispatch(summary)
+    assert "MTNR1B rs10830963" in str(exc.value)
+
+
+def test_summarize_no_arg_production_path_is_dna_aware(tmp_path, monkeypatch):
+    """AC-10 FIX-1/CQ-1: `None` resolves to the real default; the frozen no-arg
+    production `summarize(store_read)` call is DNA-aware WITHOUT a caller edit.
+
+    Exercises the REAL store (not a fake `store_read`): the genotype is `store.append`-ed
+    to a tmp root, and `summarize` is handed the SAME bound `store.read` shape the frozen
+    production callers use — `functools.partial(store.read, root=...)` (generate_plan.py:356
+    / orchestrate.py:537). With the real store, the production no-arg path runs T2's matcher
+    over the WHOLE curated set, reading each derived item key through `store._item_path`'s
+    direct-child safety check — so a `/`-bearing curated gene (BUG-1) would crash this path
+    mid-iteration. The prior fake-`store_read` build MASKED that path-escape (PF-S99-01 /
+    PF-S101-01: the AC-10 integration criterion must exercise the real store path it claims
+    to verify, not a stand-in that never reaches `_item_path`).
+
+    Monkeypatches the module-level default library root to a fixture library, calls the
+    no-arg signature, and asserts a NON-EMPTY token tracing to the fixture page. The
+    negative control (matching page absent from that same default-resolved library -> "")
+    DISTINGUISHES "wired to the real default, no match" from "feature disabled": an inert
+    `None`->`""`-always build reds the non-empty assertion (the always-set AC-4 passes
+    identically either way and cannot catch it).
+    """
+    from functools import partial
+
+    from scripts.store import store
+
+    # REAL store: append the operator's CYP1A2 genotype to a tmp store root.
+    store_root = tmp_path / "store"
+    store.append(
+        "CYP1A2 rs762551",
+        {"item": "CYP1A2 rs762551", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "dna-report", "value": "(A;A)"},
+        root=store_root,
+    )
+    store_read = partial(store.read, root=store_root)  # the frozen production call shape
+
+    lib = tmp_path / "genetics"
+    lib.mkdir()
+    _write_genetics_page(lib, "CYP1A2", "rs762551", [
+        ("(A;A)", "fast-caffeine-metabolism", "fast"),
+    ])
+    monkeypatch.setattr(router, "GENETICS_LIBRARY_DEFAULT_ROOT", lib)
+    # NO genetics_library_root passed — the frozen production signature, over the REAL store.
+    token = router.summarize(store_read)["genetic-trait-classes"]
+    assert token == "fast-caffeine-metabolism"  # non-empty, traces to the fixture page
+
+    # Negative control: same REAL store + default-resolved library, matching page ABSENT -> "".
+    empty_lib = tmp_path / "genetics-empty"
+    empty_lib.mkdir()
+    monkeypatch.setattr(router, "GENETICS_LIBRARY_DEFAULT_ROOT", empty_lib)
+    assert router.summarize(store_read)["genetic-trait-classes"] == ""

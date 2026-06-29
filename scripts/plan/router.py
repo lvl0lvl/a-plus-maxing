@@ -10,8 +10,11 @@ version-controlled source-of-truth for the PII boundary (Security MEDIUM-2); the
 field NAMES were supplied by the spike at build time.
 """
 
+import re
 from datetime import datetime, timezone
+from pathlib import Path
 
+from scripts.genetics import match
 from scripts.guard import pii_scan
 from scripts.store import biomarker_meta
 
@@ -44,6 +47,12 @@ SUMMARY_FIELD_SET = (
     "supplement-stack-class",
     "peptide-use-class",
     "training-volume-band",
+    # genetics (de-identified, ADR-0032-T3) — the COARSE genetic-trait CLASSES the
+    # operator's curated genotypes resolve to against the local library; the raw
+    # rsID+allele genotype NEVER crosses to the no-train planner (the crown jewel,
+    # NFR-1). Match-derived (T2's `match_genotypes`), not raw-PII-backed — its own
+    # dedicated `summarize` branch, NOT a `_RAW_TO_FIELD`/`_ALWAYS_SET_DERIVED` member.
+    "genetic-trait-classes",
 )
 
 # Named-excluded raw-PII fields (ADR-0006-T0). Enumerates the raw-PII the
@@ -143,6 +152,30 @@ TREND_DIRECTIONS = ("improving", "flat", "regressing")
 # read; only these curated class tokens cross the boundary.
 RX_INTERACTION_CLASS_FIELD = "rx-interaction-classes"
 
+# The de-identified genetics field (ADR-0032-T3): the COARSE genetic-trait CLASSES the
+# operator's curated genotypes resolve to. The raw rsID+allele genotype is NEVER read
+# into the token — the deriver collects each match's `trait_class` only (the crown
+# jewel, NFR-1). Resolution (genotype -> trait class) is T2's LOCAL library lookup
+# (`scripts.genetics.match`), never a model call.
+GENETIC_TRAIT_CLASS_FIELD = "genetic-trait-classes"
+
+# The `None`->real-default genetics library root (FIX-1/CQ-1). Mirrors
+# `store.DEFAULT_ROOT = Path("vault/store")`: a `summarize(store_read)` with NO
+# `genetics_library_root` resolves to the REAL `vault/library/genetics/`, so the frozen
+# no-arg production callers (`generate_plan.py`/`orchestrate.py`/`chat.py`) are DNA-aware
+# WITHOUT a caller edit. `None` resolves HERE, to the live library — it does NOT disable
+# the feature.
+GENETICS_LIBRARY_DEFAULT_ROOT = Path("vault/library/genetics")
+
+# Crown-jewel backstop (NFR-1): a coarse trait-class token must carry NO raw genotype.
+# A curated finding is contracted to a coarse class, but that contract is unenforced
+# upstream — a token matching an rsID (`rs\d+`) or an allele-call (`(allele;allele)`)
+# makes the deriver fail-closed rather than leak the genotype to the no-train planner.
+_RAW_GENOTYPE_PATTERNS = (
+    re.compile(r"rs\d+"),
+    re.compile(r"\([ACGTDI]+;[ACGTDI]+\)"),
+)
+
 
 def rx_interaction_class_set(summary):
     """The normalized set of operator Rx-interaction-class tokens from a summary.
@@ -203,6 +236,63 @@ def _rx_interaction_classes_token(store_read, identity_config):
             raise ValueError(
                 f"summarize: {RX_INTERACTION_CLASS_FIELD!r} carries raw operator PII; the "
                 f"de-identified-class-tokens-by-curation assumption is violated (fail-closed)"
+            )
+    return ";".join(tokens)
+
+
+def _genetic_trait_classes_token(store_read, genetics_library_root, identity_config):
+    """Derive the de-identified `genetic-trait-classes` token from matched library findings.
+
+    Calls T2's `match.match_genotypes` against the resolved local genetics library,
+    collects each match's COARSE `trait_class`, and emits a deterministic `;`-joined
+    scalar (sorted, deduped). ALWAYS set (no DNA / no resolved match -> the empty token
+    `""`), mirroring `_rx_interaction_classes_token` so a no-DNA operator never trips
+    `dispatch`'s partial-summary raise. The raw rsID+allele genotype NEVER enters the
+    token — only the coarse trait class crosses to the no-train planner (the crown
+    jewel, NFR-1).
+
+    `genetics_library_root` of `None` resolves to the module-level
+    `GENETICS_LIBRARY_DEFAULT_ROOT` (the REAL `vault/library/genetics/`), so the frozen
+    no-arg `summarize(store_read)` callers are DNA-aware in production WITHOUT a caller
+    edit (FIX-1/CQ-1) — `None` does NOT disable the feature.
+
+    Per-token fail-closed backstop (the crown jewel): a curated finding is contracted to
+    a coarse trait class, never a raw genotype, but that contract is unenforced upstream.
+    A collected token matching a raw-genotype pattern (`rs\\d+` or `(allele;allele)`) OR
+    carrying operator PII (`pii_scan.scan_text`) RAISES at the boundary rather than
+    crossing it. Names the field, never the value (no genotype/PII echo).
+
+    Args:
+        store_read (Callable): The per-item store read surface (`store.read`),
+            pre-bound to the instance root by the caller (the T2 matcher's contract).
+        genetics_library_root (str | Path | None): The `vault/library/genetics/` root;
+            `None` resolves to the real `GENETICS_LIBRARY_DEFAULT_ROOT`.
+        identity_config (str | Path): The operator-identity token config passed to the
+            8j6 PII scan (the value `summarize` resolves for the boundary).
+
+    Returns:
+        (str) The coarse `;`-joined, sorted, deduped trait-class scalar, or `""` when no
+        curated variant resolves.
+
+    Raises:
+        ValueError: When a collected trait-class token carries a raw genotype or operator
+            PII (fail-closed) — surfaced at the boundary, never leaked downstream.
+    """
+    library_root = (
+        genetics_library_root
+        if genetics_library_root is not None
+        else GENETICS_LIBRARY_DEFAULT_ROOT
+    )
+    matches = match.match_genotypes(store_read, library_root=library_root)
+    tokens = sorted({m["trait_class"] for m in matches})
+    for tok in tokens:
+        if any(p.search(tok) for p in _RAW_GENOTYPE_PATTERNS) or pii_scan.scan_text(
+            tok, token_config=identity_config
+        ):
+            raise ValueError(
+                f"summarize: {GENETIC_TRAIT_CLASS_FIELD!r} carries a raw genotype or raw "
+                f"operator PII; the coarse-trait-class-by-curation assumption is violated "
+                f"(fail-closed)"
             )
     return ";".join(tokens)
 
@@ -537,7 +627,8 @@ assert all(
 )
 
 
-def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
+def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG,
+              genetics_library_root=None):
     """Derive the plan-reasoning summary from store-read state.
 
     Reads operator state through the store read model (`store_read`, the
@@ -566,6 +657,12 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
             because the default resolves under the cwd and an ABSENT file
             silently empties identity-token detection
             (`pii_scan._load_token_patterns` returns `[]`).
+        genetics_library_root (str | Path, optional): The `vault/library/genetics/`
+            root the `genetic-trait-classes` deriver resolves the operator's curated
+            genotypes against (ADR-0032-T3). `None` (the default the three frozen
+            callers pass) resolves to the module-level `GENETICS_LIBRARY_DEFAULT_ROOT`
+            (the REAL library), so the no-arg production call is DNA-aware WITHOUT a
+            caller edit — `None` does NOT disable the feature (FIX-1/CQ-1).
 
     Returns:
         (dict) A name-addressable summary keyed by the Summary Field-Set fields.
@@ -589,6 +686,18 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG):
             # operator never trips dispatch's partial-summary raise. The 8j6 PII
             # backstop scans the curated value inside the deriver.
             summary[field] = _rx_interaction_classes_token(store_read, identity_config)
+            continue
+        if field == GENETIC_TRAIT_CLASS_FIELD:
+            # ADR-0032-T3: coarse genetic trait classes from T2's LOCAL matcher.
+            # ALWAYS set (no DNA / no match -> the empty token `""`), so a no-DNA
+            # operator never trips dispatch's partial-summary raise. `genetics_library_root`
+            # of None resolves to the real GENETICS_LIBRARY_DEFAULT_ROOT (FIX-1/CQ-1 —
+            # the no-arg production call is DNA-aware without a caller edit). The raw
+            # rsID+allele genotype NEVER enters the token (the crown jewel); the deriver
+            # fail-closes on a raw-genotype-bearing token.
+            summary[field] = _genetic_trait_classes_token(
+                store_read, genetics_library_root, identity_config
+            )
             continue
         if field in _ALWAYS_SET_DERIVED:
             # chat-sourced rich-domain bands (ADR-0019-T1): ALWAYS set — a fresh operator

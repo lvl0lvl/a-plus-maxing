@@ -558,13 +558,23 @@ def test_non_pdf_unrecognized_uses_unchanged_raw_content_path(tmp_path, monkeypa
 # the store sink keying/store.append (ADR-0031-T4 NFR-3 EXTENSION — T4 dispatches to the
 # UNCHANGED keying.dedupe_key / store sink via extract_chunked, never re-authoring them). T4
 # EXTENDS the router + the /upload payload (NEW front-step edits), re-authoring none of these.
+# ADR-0032-T3 sanctioned exception: scripts/plan/router.py is the NAMED additive seam
+# for the de-identified `genetic-trait-classes` token (the DNA-aware planning build). The
+# INNER engine modules (orchestrate/pipeline/assemble/generate_plan/adjudicate/adjust/track)
+# stay byte-frozen; router.py is excluded from this frozen glob because T3 legitimately
+# EXTENDS it (the genetics deriver + its field-set member). This is the "update the earlier
+# E2E when a later phase changes the expected behavior" mandate — the additive router.py
+# edit is sanctioned by ADR-0032-T3, so this prior-phase frozen-set test must not freeze it.
+# See docs/adr/ADR-0032 + tests/plan/test_router.py (the T3 genetics ACs).
 _FROZEN_ENGINE_PATHS = (
     "scripts/ingest/ingest.py",
     "scripts/ingest/adapter.py",
     "scripts/store/keying.py",
     "scripts/store/store.py",
     *sorted(
-        str(p.relative_to(REPO_ROOT)) for p in (REPO_ROOT / "scripts" / "plan").glob("*.py")
+        str(p.relative_to(REPO_ROOT))
+        for p in (REPO_ROOT / "scripts" / "plan").glob("*.py")
+        if p.name != "router.py"  # ADR-0032-T3 sanctioned additive seam (see above)
     ),
 )
 
