@@ -9,6 +9,7 @@ leave the machine, and an unresolved variant is reported as an honest research
 gap, never a fabricated finding.
 """
 
+import os
 from pathlib import Path
 
 from scripts.genetics.variants import PLANNING_RELEVANT_VARIANTS, variant_item
@@ -70,9 +71,33 @@ def _find_page(library_root, gene, rsid):
     return None
 
 
+def _store_safe_item(gene, rsid):
+    """Derive the variant's `dna-report` store-item key, store-path-safe (BUG-1).
+
+    The variant->store-item key derivation: `variant_item(gene, rsid)`, guarded so a
+    path-escaping curated gene token can never reach `store.read`. The real fix is the
+    curated data (`variants.py`: every gene token is a store-conformant name), but a
+    future `/`-bearing (or otherwise path-traversing) curated gene MUST fail-closed
+    HERE — naming the gene at the derivation seam — rather than crash mid-iteration in
+    `store._item_path`'s cryptic path-escape raise (which the production matcher reads
+    for EVERY curated variant). Mirrors the store's own direct-child item rule.
+    """
+    item = variant_item(gene, rsid)
+    if "/" in item or os.sep in item or (os.altsep and os.altsep in item) or item in (
+        "",
+        ".",
+        "..",
+    ):
+        raise ValueError(
+            f"curated gene token {gene!r} derives a store-path-unsafe item key {item!r} "
+            f"(BUG-1, ADR-0032-T3); curated gene tokens must be store-conformant"
+        )
+    return item
+
+
 def _operator_genotype(store_read, gene, rsid):
     """Return the operator's latest `dna-report` allele call for a variant, or None."""
-    readings = [r for r in store_read(variant_item(gene, rsid)) if r.get("source") == "dna-report"]
+    readings = [r for r in store_read(_store_safe_item(gene, rsid)) if r.get("source") == "dna-report"]
     if not readings:
         return None
     return readings[-1]["value"]

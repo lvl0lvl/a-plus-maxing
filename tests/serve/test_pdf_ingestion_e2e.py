@@ -92,13 +92,21 @@ _OUTBOUND_CLIENT_MARKERS = (
 # The byte-frozen set the EXTEND-NOT-REBUILD numstat probe binds — mirrors
 # tests/serve/test_route.py::_FROZEN_ENGINE_PATHS, EXTENDED with keying.py + store.py (the
 # genetics readings land via the UNCHANGED sink, never re-authoring it).
+# ADR-0032-T3 sanctioned exception: scripts/plan/router.py is the NAMED additive seam for the
+# de-identified `genetic-trait-classes` token (the DNA-aware planning build). The INNER engine
+# modules (orchestrate/pipeline/assemble/generate_plan/adjudicate/adjust/track) stay byte-frozen;
+# router.py is excluded from this frozen glob because T3 legitimately EXTENDS it. This is the
+# "update the earlier E2E when a later phase changes the expected behavior" mandate, mirroring
+# test_route.py::_FROZEN_ENGINE_PATHS. See docs/adr/ADR-0032 + tests/plan/test_router.py.
 _FROZEN_ENGINE_PATHS = (
     "scripts/ingest/ingest.py",
     "scripts/ingest/adapter.py",
     "scripts/store/keying.py",
     "scripts/store/store.py",
     *sorted(
-        str(p.relative_to(REPO_ROOT)) for p in (REPO_ROOT / "scripts" / "plan").glob("*.py")
+        str(p.relative_to(REPO_ROOT))
+        for p in (REPO_ROOT / "scripts" / "plan").glob("*.py")
+        if p.name != "router.py"  # ADR-0032-T3 sanctioned additive seam (see above)
     ),
 )
 

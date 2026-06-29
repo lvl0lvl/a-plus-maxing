@@ -13,7 +13,14 @@ PLANNING_RELEVANT_VARIANTS = [
     ("MTHFR", "rs1801131"),
     ("MTHFR", "rs1801133"),
     ("FADS2", "rs1535"),
-    ("LCT/MCM6", "rs4988235"),
+    # Store-conformant gene token: the dna-report item is `MCM6 rs4988235` (the gene
+    # as the ingestion records it), NOT `LCT/MCM6`. A `/`-bearing token makes the
+    # derived store key `LCT/MCM6 rs4988235`, which `store._item_path` rejects as a
+    # path escape (the `/` resolves to a `LCT` sub-directory) — crashing the matcher —
+    # AND mismatches the operator's actual stored item. Every gene token here MUST be a
+    # store-path-safe, store-conformant name (no `/`); the regression guard in
+    # tests/genetics/test_match.py pins it (BUG-1, ADR-0032-T3).
+    ("MCM6", "rs4988235"),
     ("MTNR1B", "rs10830963"),
     ("FTO", "rs9939609"),
     ("SOD2", "rs4880"),

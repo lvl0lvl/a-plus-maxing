@@ -66,7 +66,7 @@ def test_curated_variant_set_is_exactly_oq3_and_excluded_disjoint():
         ("MTHFR", "rs1801131"),
         ("MTHFR", "rs1801133"),
         ("FADS2", "rs1535"),
-        ("LCT/MCM6", "rs4988235"),
+        ("MCM6", "rs4988235"),
         ("MTNR1B", "rs10830963"),
         ("FTO", "rs9939609"),
         ("SOD2", "rs4880"),
@@ -82,6 +82,47 @@ def test_curated_variant_set_is_exactly_oq3_and_excluded_disjoint():
     assert planning_genes.isdisjoint(excluded_genes)
 
     assert variant_item("MTNR1B", "rs10830963") == "MTNR1B rs10830963"
+
+
+def test_no_curated_or_excluded_gene_token_is_store_path_unsafe():
+    """BUG-1 regression guard (ADR-0032-T3): no curated/excluded gene token carries a
+    store-path-unsafe char, and every derived store-item key is store-safe.
+
+    A `/`-bearing gene (the original `LCT/MCM6`) makes the derived item key
+    `LCT/MCM6 rs4988235`, which `store._item_path` rejects as a path escape — crashing
+    the production matcher mid-iteration — AND mismatches the operator's real
+    `MCM6 rs4988235` item. This pins every gene token to a store-conformant name so a
+    future `/`-bearing gene cannot reland. Cross-checks against the REAL store-item
+    safety rule (`store._item_path`), not a re-implementation.
+    """
+    import os
+
+    from scripts.store import store
+
+    for gene, rsid in (*PLANNING_RELEVANT_VARIANTS, *EXCLUDED_VARIANTS):
+        # No path-unsafe character in the gene token itself.
+        assert "/" not in gene and "\\" not in gene and os.sep not in gene, gene
+        # And the DERIVED store-item key resolves as a direct child of the store root
+        # (the store's own safety contract) — never raises a path-escape ValueError.
+        item = variant_item(gene, rsid)
+        store._item_path(item, "/tmp/aplus-genetics-keysafe-probe")  # raises if unsafe
+
+
+def test_store_safe_item_fail_closes_on_path_escaping_gene():
+    """BUG-1 defensive guard: the match key-deriver fail-closes on a `/`-bearing gene,
+    naming the gene, before it can reach `store.read`.
+
+    The real fix is the curated data, but the derivation seam must never hand a
+    path-escaping key to the store. Failing-capable: a `/`-bearing gene raises a clear
+    curated-data error here, not the cryptic store path-escape downstream.
+    """
+    import pytest
+
+    with pytest.raises(ValueError) as exc:
+        match._store_safe_item("LCT/MCM6", "rs4988235")
+    assert "LCT/MCM6" in str(exc.value)
+    # the store-conformant name derives cleanly.
+    assert match._store_safe_item("MCM6", "rs4988235") == "MCM6 rs4988235"
 
 
 def test_genotype_selects_per_genotype_finding_by_operator_allele(tmp_path):
