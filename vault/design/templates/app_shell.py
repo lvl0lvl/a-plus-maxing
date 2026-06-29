@@ -67,7 +67,11 @@ def _doc_cards(status):
 
     dna = status["dna"]
     if dna.get("loaded"):
-        dna_card = _doc_card("dna", "DNA (23andMe)", f"{_esc(dna['files'][0])} landed", _LOADED)
+        # A dropzone 23andMe file names the file; an extracted genetics-report PDF (ADR-0031,
+        # no dropzone file) names its genotype-reading count instead — never crash on files[0].
+        dna_detail = (f"{_esc(dna['files'][0])} landed" if dna.get("files")
+                      else f"{dna.get('count', 0)} genotypes landed")
+        dna_card = _doc_card("dna", "DNA", dna_detail, _LOADED)
     else:
         dna_card = _doc_card("dna", "DNA (23andMe)", "23andMe raw .zip", _LINK)
 
