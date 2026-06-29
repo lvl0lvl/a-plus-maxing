@@ -62,6 +62,8 @@ def _genotype_findings(text):
 def _find_page(library_root, gene, rsid):
     """Return the genetics page whose frontmatter `gene`+`rsid` match, or None."""
     for page in sorted(Path(library_root).glob("*.md")):
+        if page.name.startswith("_"):
+            continue  # never parse the `_template.md` scaffold as a real page
         fields = _frontmatter(page.read_text())
         if fields.get("gene") == gene and fields.get("rsid") == rsid:
             return page
