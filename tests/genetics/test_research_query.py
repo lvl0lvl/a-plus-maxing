@@ -116,6 +116,48 @@ def test_dispatch_refuses_excluded_variant(monkeypatch):
     assert build_calls == []
 
 
+def test_dispatch_refuses_non_curated_variant_before_build(monkeypatch):
+    """SEC-1: a non-curated, non-excluded variant (BRCA1 rs80357906) is REFUSED before build.
+
+    Auto-research is scoped to the OQ-3 curated allowlist; the dispatch refuses on ABSENCE
+    from `PLANNING_RELEVANT_VARIANTS` FIRST — so a non-excluded BUT non-curated sensitive
+    variant is never auto-crossed. The refusal precedes `build_variant_query`, so neither the
+    build spy nor the recording dispatcher records a call. Failing-capable: moving the
+    allowlist check AFTER the build reds this (`build_calls` would be non-empty).
+    """
+    non_curated = ("BRCA1", "rs80357906")
+    assert non_curated not in set(PLANNING_RELEVANT_VARIANTS)  # not curated...
+    assert non_curated[0] not in {gene for gene, _ in EXCLUDED_VARIANTS}  # ...and not excluded
+    recording = RecordingDispatcher()
+    build_calls = []
+    real_build = research_query.build_variant_query
+
+    def spy_build(gene, rsid):
+        build_calls.append((gene, rsid))
+        return real_build(gene, rsid)
+
+    monkeypatch.setattr(research_query, "build_variant_query", spy_build)
+    with pytest.raises(ValueError):
+        research_query.dispatch_variant_research(*non_curated, dispatcher=recording)
+    assert recording.calls == []
+    assert build_calls == []
+
+
+def test_dispatch_curated_variant_still_dispatches():
+    """SEC-1 control: the allowlist still ADMITS a curated variant (no over-rejection).
+
+    The curated set dispatches exactly as before the allowlist gate — the injected
+    dispatcher is called once with the guarded query. Pins that refuse-on-absence did
+    not close the happy path.
+    """
+    gene, rsid = _curated_variant()
+    recording = RecordingDispatcher()
+    result = research_query.dispatch_variant_research(gene, rsid, dispatcher=recording)
+    assert len(recording.calls) == 1
+    assert recording.calls[0] == build_variant_query(gene, rsid)
+    assert result == recording.result
+
+
 def test_dispatch_default_is_zero_spend_dry_run():
     """AC-5 (dry-run): the default dispatcher=None returns the guarded query, 0 outbound call."""
     gene, rsid = _curated_variant()
