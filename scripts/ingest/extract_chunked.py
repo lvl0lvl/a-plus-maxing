@@ -25,8 +25,11 @@ converted into a fabricated reading or a false `complete` (the fail-closed inher
 from scripts.store.keying import dedupe_key, is_conformant
 
 # Max characters per text/plain chunk handed to the model. An OQ-2 build-tunable value, named
-# here as one machine-diffable constant rather than a call-site literal (NFR-7).
-_CHUNK_CHARS = 8000
+# here as one machine-diffable constant rather than a call-site literal (NFR-7). Sized so a
+# real multi-page report (e.g. a ~350 KB genetics export) splits into ~9 chunks — one model
+# call each — rather than ~45, keeping a live upload to ~1-2 min and within the chunk budget;
+# the compact genotype-fact output per chunk stays well under `_EXTRACT_MAX_TOKENS` (S100 live run).
+_CHUNK_CHARS = 40000
 
 # Characters of carry-over between consecutive chunks so a finding straddling a chunk boundary
 # appears in both neighbours (captured, then deduped). An OQ-2 build-tunable value (NFR-7).

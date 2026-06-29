@@ -278,6 +278,14 @@ _EXTRACT_TIMEOUT_SECONDS = 60.0
 # format) is a format-fit limit, not a ceiling to keep raising.
 _EXTRACT_MAX_TOKENS = 16384
 
+# Bounds for the live plan-author call (ADR-0015-T3 / H-1) — the analogues of the extract
+# bounds, named as machine-diffable constants. The author turns the de-identified `summary`
+# into a domain specialist's recommendation envelope; the response is the envelope JSON, so a
+# moderate ceiling fits a per-domain recommendation set with headroom.
+_AUTHOR_MAX_ATTEMPTS = 3
+_AUTHOR_TIMEOUT_SECONDS = 60.0
+_AUTHOR_MAX_TOKENS = 8192
+
 
 def _extract_system_prompt():
     """Build the extract system instruction: constrain the returned readings to the Line Field Set.
@@ -393,6 +401,99 @@ def _parse_extract_readings(response):
     return payload["readings"]
 
 
+# The plan-author specialist persona per domain. The author sees ONLY the de-identified band/class
+# summary (no raw PII), and its envelope flows through `assemble`'s safety filters + the per-domain
+# gates downstream — so the prompt's job is honest, evidence-grounded, conservative recommendations,
+# not a finished prescription. Unsupported or speculative claims are to be omitted, not invented; the
+# downstream HALT/coverage-gap filters render an honest no-plan rather than a fabricated regimen.
+_AUTHOR_SPECIALIST = {
+    "workout": "Strength-Coach",
+    "nutrition": "Nutrition-Specialist",
+    "supplements": "Supplement-Specialist",
+    "peptides": "Peptide-Specialist",
+}
+_AUTHOR_PAYLOAD_GUIDE = {
+    "workout": 'each recommendation\'s `payload` is one exercise: {"name": str, "sets": int, '
+               '"reps": str (optional), "detail": str (optional), "load": str (optional)}',
+    "nutrition": 'each `payload` is one nutrition target: {"target": str, "detail": str (optional)}',
+    "supplements": 'each `payload` is one supplement: {"name": str, "dose": str (optional), '
+                   '"timing": str (optional)}',
+    "peptides": 'each `payload` is one peptide note: {"name": str, "detail": str (optional)}',
+}
+
+
+def _author_system_prompt(domain):
+    """Build the plan-author system prompt for `domain` (the live-author persona instruction)."""
+    specialist = _AUTHOR_SPECIALIST.get(domain, "Specialist")
+    payload_guide = _AUTHOR_PAYLOAD_GUIDE.get(domain, "each `payload` is the actionable detail")
+    return (
+        f"You are a {specialist}, one of a panel of independent specialists composing a single "
+        f"operator's health plan. You receive ONLY a de-identified band/class summary of the "
+        f"operator (no names, no raw values) and must produce {domain} recommendations grounded in "
+        f"that summary.\n\n"
+        f"Rules:\n"
+        f"- Recommend ONLY what the summary supports and what is evidence-grounded. If the summary "
+        f"is too thin to responsibly recommend anything in {domain}, return an empty "
+        f"recommendations list — never invent or speculate.\n"
+        f"- Each recommendation carries: `claim` (the one-line recommendation), `category` (a short "
+        f"tag, e.g. \"{domain}\"), `grounding` (\"human\" | \"animal\" | \"mechanistic\" — the "
+        f"strongest evidence basis), `source` (a real citation or guideline; never fabricate one), "
+        f"`confidence_tier` (\"strong\" | \"moderate\" | \"limited\"), and `payload` ({payload_guide}).\n"
+        f"- Be conservative: prefer fewer, well-supported recommendations. A downstream safety panel "
+        f"filters your output; do not rely on it to catch overreach.\n"
+        f'- Return ONLY the JSON object {{"specialist": "{specialist}", "recommendations": [...]}}.'
+    )
+
+
+def _author_output_schema():
+    """The structured-output JSON schema constraining the author envelope (object root)."""
+    return {
+        "type": "object",
+        "properties": {
+            "specialist": {"type": "string"},
+            "recommendations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "claim": {"type": "string"},
+                        "category": {"type": "string"},
+                        "grounding": {"type": "string"},
+                        "source": {"type": "string"},
+                        "confidence_tier": {"type": "string"},
+                        "payload": {"type": "object", "additionalProperties": True},
+                    },
+                    "required": ["claim", "category", "grounding", "source",
+                                 "confidence_tier", "payload"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["specialist", "recommendations"],
+        "additionalProperties": False,
+    }
+
+
+def _parse_author_envelope(response):
+    """Parse the model response into the author envelope `{"specialist", "recommendations"}`.
+
+    Reads the first `text` block off the SDK envelope and decodes the object the schema constrains.
+    A non-text / non-JSON / non-object response, a missing string `specialist`, or a non-list
+    `recommendations` raises — failing closed at the retry loop to `ModelCallError` (the honest
+    no-plan state, never a fabricated regimen). Mirrors `_parse_extract_readings`'s posture.
+    """
+    import json
+
+    text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), None)
+    if text is None:
+        raise ValueError("author: model response carried no text block")
+    payload = json.loads(text)
+    if (not isinstance(payload, dict) or not isinstance(payload.get("specialist"), str)
+            or not isinstance(payload.get("recommendations"), list)):
+        raise ValueError('author: model response was not a {"specialist", "recommendations"} object')
+    return {"specialist": payload["specialist"], "recommendations": payload["recommendations"]}
+
+
 class _ClaudeNoTrainBackend:
     """The default backend: the Claude no-train commercial API.
 
@@ -452,10 +553,48 @@ class _ClaudeNoTrainBackend:
         raise ModelCallError("converse call failed") from None
 
     def author(self, domain, summary):
-        """Author a domain's recommendations against the no-train API."""
-        raise NotImplementedError(
-            "live author is wired by ADR-0015-T3; tests inject a backend"
+        """Author a domain's recommendations against the no-train API (the live author call).
+
+        Sends the de-identified band/class `summary` (no raw PII) to the `MODEL` no-train API under
+        a bounded retry-with-timeout loop, with an `output_config.format` json_schema constraining
+        the response to the `{"specialist", "recommendations": [...]}` envelope, and returns the
+        parsed envelope. The summary is held in memory only (the prompt string); it is written to no
+        path. The returned envelope is the parse of the model response; the downstream `assemble`
+        safety filters + per-domain gates fail it closed (an honest no-plan) on overreach.
+
+        Args:
+            domain (str): A `plan_schema.PLAN_DOMAINS` member (the specialist persona to author as).
+            summary (dict): The de-identified band/class summary `assemble` hands the specialist.
+
+        Returns:
+            (dict) The author envelope `{"specialist": str, "recommendations": list}`.
+        """
+        import json
+
+        client = self._client()
+        system = _author_system_prompt(domain)
+        schema = _author_output_schema()
+        prompt = (
+            f"Author your {domain} recommendations for this de-identified operator summary:\n"
+            f"{json.dumps(summary, sort_keys=True)}"
         )
+        for _ in range(_AUTHOR_MAX_ATTEMPTS):
+            try:
+                response = client.with_options(timeout=_AUTHOR_TIMEOUT_SECONDS).messages.create(
+                    model=self.MODEL,
+                    max_tokens=_AUTHOR_MAX_TOKENS,
+                    system=system,
+                    messages=[{"role": "user", "content": prompt}],
+                    output_config={"format": {"type": "json_schema", "schema": schema}},
+                )
+                return _parse_author_envelope(response)
+            except Exception:  # bounded: try again until the attempt ceiling
+                pass
+        # SEC-01: a CONSTANT message — never interpolate the SDK exception (it can carry the
+        # de-identified summary or the resolved key). `from None` suppresses the cause chain so a
+        # caller's `logger.exception()` cannot render the raw request/key (PUBLIC repo). Raised at
+        # the backend boundary so the raw SDK exception never escapes `author`.
+        raise ModelCallError("author call failed") from None
 
     def deidentify(self, raw_intake):
         """De-identify a raw plan-intake against the no-train API (the live de-id-IN call).
