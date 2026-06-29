@@ -65,7 +65,7 @@ def _find_page(library_root, gene, rsid):
     for page in sorted(Path(library_root).glob("*.md")):
         if page.name.startswith("_"):
             continue  # never parse the `_template.md` scaffold as a real page
-        fields = _frontmatter(page.read_text())
+        fields = _frontmatter(page.read_text(encoding="utf-8"))
         if fields.get("gene") == gene and fields.get("rsid") == rsid:
             return page
     return None
@@ -108,7 +108,7 @@ def _resolve_finding(library_root, gene, rsid, genotype):
     page = _find_page(library_root, gene, rsid)
     if page is None:
         return None
-    finding = _genotype_findings(page.read_text()).get(_normalize_genotype(genotype))
+    finding = _genotype_findings(page.read_text(encoding="utf-8")).get(_normalize_genotype(genotype))
     if finding is None:
         return None
     trait_class, implication = finding
