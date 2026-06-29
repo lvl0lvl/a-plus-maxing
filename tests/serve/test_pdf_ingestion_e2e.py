@@ -106,9 +106,19 @@ _FROZEN_ENGINE_PATHS = (
     *sorted(
         str(p.relative_to(REPO_ROOT))
         for p in (REPO_ROOT / "scripts" / "plan").glob("*.py")
-        if p.name != "router.py"  # ADR-0032-T3 sanctioned additive seam (see above)
+        if p.name != "router.py"  # additive seam — guarded by test_router_additive_only_from_fork
     ),
 )
+
+# HIST1 / PF-S63-02: router.py is excluded from the byte-frozen set above because
+# ADR-0032-T3 legitimately EXTENDS it — but a WHOLESALE exclusion would let a future
+# NON-ADDITIVE rewrite of router.py's existing ~600 lines (the de-id summary spine, a
+# crown-jewel gate) pass CI silently. The additive-only guard below names that failure
+# class and still protects router.py: DELETIONS are capped at the sanctioned ADR-0032-T3
+# count (the `summarize` signature reflow + the removed redundant function-local
+# `import re`, QUAL1 = 2), while INSERTIONS stay unbounded.
+_ROUTER_ADDITIVE_PATH = "scripts/plan/router.py"
+_ROUTER_SANCTIONED_DELETIONS = 2
 
 # Synthetic fixture readings — distinct items/timepoints/values so the latest-wins
 # (item, timepoint, source) store identity never collapses two, and so fixture A and B yield
@@ -989,3 +999,28 @@ def test_probe_extend_not_rebuild_frozen_set_numstat_zero():
     ).stdout
     changed = [line for line in rows.splitlines() if line.strip()]
     assert changed == [], f"a frozen engine/plan file was edited (EXTEND-NOT-REBUILD broken): {changed}"
+
+
+def test_router_additive_only_from_fork():
+    """HIST1 / PF-S63-02: scripts/plan/router.py changed ADDITIVELY ONLY from the fork.
+
+    router.py is the sanctioned ADR-0032-T3 additive seam, so it is NOT byte-frozen — but
+    a NON-ADDITIVE rewrite of its existing engine logic (more deleted lines than the
+    sanctioned change) is the crown-jewel-spine regression this guard catches. Falsifiable:
+    deleting any existing non-sanctioned line pushes the deletion count over the threshold
+    and REDs this test. INSERTIONS are unbounded (additive extension is allowed).
+    """
+    fork_point = subprocess.run(
+        ["git", "merge-base", "HEAD", "origin/main"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    fields = subprocess.run(
+        ["git", "diff", "--numstat", fork_point, "--", _ROUTER_ADDITIVE_PATH],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    ).stdout.split()
+    # numstat row: "<insertions>\t<deletions>\t<path>"; absent row -> unchanged -> 0 deletions.
+    deletions = int(fields[1]) if fields else 0
+    assert deletions <= _ROUTER_SANCTIONED_DELETIONS, (
+        f"router.py deleted {deletions} lines (> {_ROUTER_SANCTIONED_DELETIONS} sanctioned) "
+        f"— a NON-ADDITIVE rewrite of the de-id summary spine (PF-S63-02 guard-loosening)"
+    )
