@@ -126,11 +126,15 @@ marker_populated() {
 
 genotype_finding_lines() {
     # Print each "- " bullet line in the ## Genotype Findings section, in order.
+    # BUG1: tolerate leading whitespace so an INDENTED finding bullet is collected —
+    # the matcher (scripts/genetics/match.py _genotype_findings) does line.strip()
+    # THEN startswith("- "), so it parses indented findings; a col-0-only collector
+    # would let an indented finding's raw genotype (SEC-ORD-02) ride past the gate.
     local f="$1"
     awk '
         /^## Genotype Findings[[:space:]]*$/ { insec=1; next }
         insec && /^## / { exit }                        # next section
-        insec && /^-[[:space:]]/ { print }
+        insec && /^[[:space:]]*-[[:space:]]/ { print }
     ' "$f"
 }
 
@@ -223,9 +227,14 @@ check_genetics() {
 
     # SEC-ORD-01: 0 operator-identity tokens in the body — the genetics library is
     # variant-keyed + reusable, never operator-associated (crown-jewel). READ-ONLY
-    # shell-out to scripts.guard.pii_scan.scan_text; PYTHONPATH is the SCRIPT's own
-    # checkout root (a temp vault under test carries no scripts/). The page PATH is
+    # shell-out to scripts.guard.pii_scan.scan_text_full; PYTHONPATH is the SCRIPT's
+    # own checkout root (a temp vault under test carries no scripts/). The page PATH is
     # passed; content is read in-python — no operator PII is interpolated here.
+    #
+    # SEC1 fix: scan_text TRUNCATES at _MAX_SCAN_TEXT_LEN (4096) — an operator-identity
+    # token past byte 4096 of a whole genetics PAGE would pass the gate fail-OPEN on a
+    # PUBLIC repo. scan_text_full is the no-cap match-anywhere sibling; the cap only
+    # bounds the router's single short field value, not a page-spanning whole-file scan.
     #
     # SEC-W1-03 fail-open fix: pii_scan.DEFAULT_IDENTITY_CONFIG is a RELATIVE path
     # that resolves against the process CWD — a manual `wiki-ingest-lint.sh <page>`
@@ -237,7 +246,7 @@ check_genetics() {
     local root cfg hits
     root="$(cd "$SCRIPT_DIR/.." && pwd)"
     cfg="$REPO_ROOT/vault/meta/operator-identity.txt"
-    if ! hits="$(PYTHONPATH="$root" python3 -c 'import sys; from scripts.guard.pii_scan import scan_text; print(scan_text(open(sys.argv[1], encoding="utf-8").read(), token_config=sys.argv[2]))' "$f" "$cfg" 2>/dev/null)"; then
+    if ! hits="$(PYTHONPATH="$root" python3 -c 'import sys; from scripts.guard.pii_scan import scan_text_full; print(scan_text_full(open(sys.argv[1], encoding="utf-8").read(), token_config=sys.argv[2]))' "$f" "$cfg" 2>/dev/null)"; then
         violation "$INV" "$rel: SEC-ORD-01 operator-token scan failed to run"
     elif [ "${hits:-0}" -ge 1 ]; then
         violation "$INV" "$rel: operator-identity token(s) in body (SEC-ORD-01 — genetics library must be operator-free)"

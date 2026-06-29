@@ -34,6 +34,9 @@
 #   G7b NAME-class operator token via temp-repo identity config (SEC-ORD-01) -> FAIL (config-driven name path)
 #   G8 raw genotype in a ## Genotype Findings trait-token field (SEC-ORD-02) -> FAIL (raw genotype)
 #   G-grammar finding line missing the ' — ' em-dash (matcher-unparseable)   -> FAIL (per-line grammar)
+#   G9 operator token AFTER >4096 bytes of filler (SEC1 scan_text_full)       -> FAIL (whole-page scan, no cap)
+#   G10 INDENTED finding bullet w/ raw rsID in trait-token (BUG1 col-tolerant) -> FAIL (raw genotype)
+#   G-WIKI vault/WIKI.md carries the library/genetics schema section (T1 AC-7) -> PASS (schema present)
 
 set -uo pipefail
 PASS=0; FAIL=0
@@ -409,6 +412,43 @@ emit_genetics cyp1a2-rs762551 \
 run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
 { [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "grammar"; } \
     && ok "genetics finding line missing em-dash FAILs (per-line grammar)" || { bad "G-grammar expected rc1+grammar got $RC"; echo "$OUT"; }
+
+# Case G9 (SEC1 regression): a value-class operator token AFTER >4096 bytes of benign
+# filler must still FAIL the SEC-ORD-01 whole-page scan. The old shell-out used
+# scan_text, which TRUNCATES at _MAX_SCAN_TEXT_LEN=4096 (fail-OPEN past the cap on a
+# PUBLIC repo); the fix uses scan_text_full (no cap). Filler is plain prose (no '- '
+# bullets, no '## ' headings) so it stays inside Genotype Findings without becoming a
+# finding line — only the page-spanning SEC-ORD-01 scan sees the trailing token. REDs
+# against the old capped scan_text (the token past 4096 is truncated away -> vacuous PASS).
+emit_genetics cyp1a2-rs762551 > "$GN/cyp1a2-rs762551.md"
+{ printf '\n'
+  for i in $(seq 1 90); do
+      printf 'Filler reference %02d: benign curated commentary, no PII, no finding-bullet shape, padding the page well beyond the four-thousand-ninety-six byte cap.\n' "$i"
+  done
+  printf 'Further reading: contact the cohort author at not-walter@example.com\n'
+} >> "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "operator-identity token"; } \
+    && ok "genetics operator-token past 4096 bytes FAILs (SEC-ORD-01 scan_text_full)" || { bad "G9 expected rc1+detection got $RC"; echo "$OUT"; }
+
+# Case G10 (BUG1 regression): an INDENTED finding bullet carrying a raw rsID in its
+# trait-token must FAIL (SEC-ORD-02). The matcher (_genotype_findings) strips leading
+# whitespace then matches '- ', so it parses indented findings the col-0 gate awk never
+# collected. Non-tautological vs G2: only one indented finding line is appended. REDs
+# against the old /^-[[:space:]]/ col-0 anchor (the indented line is invisible -> PASS).
+emit_genetics cyp1a2-rs762551 > "$GN/cyp1a2-rs762551.md"
+printf '  - (C;C): rs999bad — indented finding smuggling a raw rsID in the trait token\n' >> "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -qi "raw genotype"; } \
+    && ok "genetics indented finding w/ raw rsID FAILs (SEC-ORD-02 col-tolerant)" || { bad "G10 expected rc1+raw genotype got $RC"; echo "$OUT"; }
+
+# Case G-WIKI (TEST1): vault/WIKI.md carries the library/genetics/ schema section (T1 AC-7) —
+# the '### library/genetics/' heading AND the '## Genotype Findings' grammar token. Guards
+# the canonical schema doc against either being dropped (it had no committed regression test).
+WIKI_MD="$(cd "$SCRIPT_DIR/../.." && pwd)/vault/WIKI.md"
+{ grep -q '^### library/genetics/' "$WIKI_MD" && grep -q '## Genotype Findings' "$WIKI_MD"; } \
+    && ok "WIKI.md carries the library/genetics schema section (T1 AC-7)" \
+    || bad "G-WIKI expected '### library/genetics/' + '## Genotype Findings' in $WIKI_MD"
 
 echo
 echo "test_wiki_ingest_lint: ${PASS} passed, ${FAIL} failed"
