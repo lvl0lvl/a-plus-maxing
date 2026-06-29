@@ -419,9 +419,9 @@ _AUTHOR_PAYLOAD_GUIDE = {
                  'targets `calorie_goal` (int > 0) and `macros` ({"protein": int, "carbs": int, '
                  '"fat": int}, each int > 0), AND at least one `meal` ({"name": str, "kcal": int '
                  '(optional), "contents": str (optional)}). Carry the day targets in one payload '
-                 '({"calorie_goal": int, "macros": {...}}) and each meal in a payload '
-                 '({"meal": {"name": str, ...}}). Without BOTH day targets AND >= 1 meal, nothing '
-                 'records — so emit them or return no nutrition recommendations',
+                 '({"calorie_goal": int, "macros": {...}, "water_l": number (optional)}) and each '
+                 'meal in a payload ({"meal": {"name": str, ...}}). Without BOTH day targets AND '
+                 '>= 1 meal, nothing records — so emit them or return no nutrition recommendations',
     "supplements": 'each `payload` is one supplement item: {"name": str, "dose": str, "timing": str '
                    '(optional)}',
     "peptides": 'ONE compound regimen total — `payload` is {"compound": non-empty str, "dose": str, '
@@ -443,7 +443,7 @@ def _author_system_prompt(domain):
         f"is too thin to responsibly recommend anything in {domain}, return an empty "
         f"recommendations list — never invent or speculate.\n"
         f"- Each recommendation carries ALL of: `claim` (the one-line recommendation), `category` "
-        f"(a short tag, e.g. \"{domain}\"), `grounding` (\"human\" | \"animal\" | \"mechanistic\" — "
+        f"(a short tag, e.g. \"{domain}\"), `grounding` (\"human\" | \"animal\" | \"in-vitro\" — "
         f"the strongest evidence basis; prefer \"human\"), `source` (a real citation or guideline; "
         f"never fabricate one), `confidence_tier` (\"strong\" | \"moderate\" | \"limited\"), "
         f"`reversibility` (a short phrase stating whether the operator can stop/undo it and how "
@@ -463,12 +463,16 @@ def _author_system_prompt(domain):
 # each domain's actionable payload is a CONCRETE closed object matching its `plan_schema` validator
 # + translator (workout exercise / nutrition day-target-or-meal / supplements item / peptides
 # compound regimen). Optional fields are omitted from `required` (the model fills what applies).
+# `minimum`/`minLength` mirror the `plan_schema` validators (sets 1..100, calorie_goal/macros > 0,
+# non-empty required strings) so the schema-valid envelope is also VALUE-valid — a soft model-side
+# hint, NOT the enforcement (BUG-03: the structured-output API does not reliably enforce
+# minimum/minLength; the real fix is the engine catch in `record_plan`/`compute_plan`, bead deferred).
 _AUTHOR_PAYLOAD_SCHEMA = {
     "workout": {
         "type": "object",
         "properties": {
-            "name": {"type": "string"},
-            "sets": {"type": "integer"},
+            "name": {"type": "string", "minLength": 1},
+            "sets": {"type": "integer", "minimum": 1, "maximum": 100},
             "reps": {"type": "string"},
             "detail": {"type": "string"},
             "load": {"type": "string"},
@@ -479,13 +483,13 @@ _AUTHOR_PAYLOAD_SCHEMA = {
     "nutrition": {
         "type": "object",
         "properties": {
-            "calorie_goal": {"type": "integer"},
+            "calorie_goal": {"type": "integer", "minimum": 1},
             "macros": {
                 "type": "object",
                 "properties": {
-                    "protein": {"type": "integer"},
-                    "carbs": {"type": "integer"},
-                    "fat": {"type": "integer"},
+                    "protein": {"type": "integer", "minimum": 1},
+                    "carbs": {"type": "integer", "minimum": 1},
+                    "fat": {"type": "integer", "minimum": 1},
                 },
                 "required": ["protein", "carbs", "fat"],
                 "additionalProperties": False,
@@ -494,7 +498,7 @@ _AUTHOR_PAYLOAD_SCHEMA = {
             "meal": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string"},
+                    "name": {"type": "string", "minLength": 1},
                     "kcal": {"type": "integer"},
                     "contents": {"type": "string"},
                 },
@@ -508,8 +512,8 @@ _AUTHOR_PAYLOAD_SCHEMA = {
     "supplements": {
         "type": "object",
         "properties": {
-            "name": {"type": "string"},
-            "dose": {"type": "string"},
+            "name": {"type": "string", "minLength": 1},
+            "dose": {"type": "string", "minLength": 1},
             "timing": {"type": "string"},
         },
         "required": ["name", "dose"],
@@ -518,9 +522,9 @@ _AUTHOR_PAYLOAD_SCHEMA = {
     "peptides": {
         "type": "object",
         "properties": {
-            "compound": {"type": "string"},
-            "dose": {"type": "string"},
-            "route": {"type": "string"},
+            "compound": {"type": "string", "minLength": 1},
+            "dose": {"type": "string", "minLength": 1},
+            "route": {"type": "string", "minLength": 1},
             "cycle_length_weeks": {"type": "integer"},
             "evidence": {"type": "string"},
         },

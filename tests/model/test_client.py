@@ -84,17 +84,25 @@ def _good_converse_fixture():
 
 
 def _good_author_fixture(slug="personal-trainer"):
-    """A well-formed backend `author` envelope, grounded against generate_plan.py:37."""
+    """A well-formed backend `author` envelope, ALIGNED to `_author_output_schema("workout")`.
+
+    TEST-03 (de-tautologize): the prior fixture diverged from the live structured-output schema
+    (payload key `exercise` not `name`, tier "high", no `grounding`), so a mock-seam test passing
+    over it proved nothing about the real schema. This fixture carries every schema-required field
+    (the universal contract + the workout `name`/`sets` payload) and validates against the live
+    `_author_output_schema("workout")` (see `test_good_author_fixture_validates_against_live_workout_schema`).
+    """
     return {
         "specialist": slug,
         "recommendations": [
             {
                 "claim": "Train the squat pattern twice weekly.",
-                "source": "wiki/strength-basics",
-                "confidence_tier": "high",
-                "reversibility": "fully reversible",
                 "category": "movement",
-                "payload": {"exercise": "back squat", "sets": 3, "reps": 5},
+                "grounding": "human",
+                "source": "wiki/strength-basics",
+                "confidence_tier": "moderate",
+                "reversibility": "fully reversible — stop anytime",
+                "payload": {"name": "back squat", "sets": 3, "reps": "5"},
             }
         ],
     }
@@ -1654,3 +1662,128 @@ def test_extract_output_schema_unchanged_for_genotype_fact():
     item = schema["properties"]["readings"]["items"]
     assert item["additionalProperties"] is False
     assert set(item["properties"]) == set(LINE_FIELDS), "no genetics field bolted onto the schema"
+
+
+# --- ADR-0015-T3 / PR #270: the live author call's fail-closed SEC surface + the envelope parse ---
+#
+# The author leg's analogues of the deid/extract SEC crown-jewel pair + the parse shape gate.
+# Every case injects a fake SDK at the `_ClaudeNoTrainBackend._client` seam (0 live call, 0 key,
+# 0 network) or exercises the pure `_parse_author_envelope` directly.
+
+
+def test_author_error_surface_carries_no_key_summary_or_raw(monkeypatch, tmp_path):
+    """SEC-01 (author crown-jewel): the raised `ModelCallError` is a constant message, severed chain, 0 leak.
+
+    Mirrors the deidentify/extract_readings SEC-01 pattern for the live `author` call. A patched SDK
+    whose `messages.create` raises an exception EMBEDDING a synthetic secret + key, over a
+    de-identified summary that ALSO carries the secret, makes the live `author` exhaust the bound and
+    raise the typed `ModelCallError` with the CONSTANT message "author call failed", `__cause__ is
+    None` (the `from None` lock), and neither the secret, the summary, nor the key on `str(exc)` /
+    `.args` / the fully-rendered traceback. RED-capable: interpolating `{exc!r}` into the author raise
+    leaks the token; reverting `from None` to `from <exc>` re-attaches the raw `__cause__`.
+    """
+    from scripts.guard import pii_scan
+    from scripts.model import key_source
+    from scripts.model.client import ModelCallError, _ClaudeNoTrainBackend
+
+    secret_token = "Jordan Faketestperson"
+    key_token = "synthetic-no-train-key-token-DO-NOT-LOG"
+    config = tmp_path / "synthetic-identity.txt"
+    config.write_text(secret_token + "\n")
+    monkeypatch.setattr(key_source, "resolve", lambda *a, **k: key_token)
+
+    fake = _FakeAnthropic(raise_exc=RuntimeError(f"sdk error on {secret_token} with {key_token}"))
+    _patch_backend_client(monkeypatch, fake)
+
+    summary = {"goal-domains": ["workout"], "secret-field": secret_token}
+    with pytest.raises(ModelCallError) as excinfo:
+        _ClaudeNoTrainBackend().author("workout", summary)
+
+    e = excinfo.value
+    assert str(e) == "author call failed"  # the CONSTANT message (no interpolation)
+    assert e.__cause__ is None  # the chain is severed (`from None`)
+    surface = str(e) + repr(e.args)
+    assert secret_token not in surface
+    assert key_token not in surface
+    assert pii_scan.scan_text(str(e), token_config=config) == 0
+    tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+    assert secret_token not in tb  # the rendered traceback carries neither the summary secret...
+    assert key_token not in tb  # ...nor the resolved key
+
+
+# Author-envelope response fixtures (the parse reads the first `text` content block off the SDK
+# envelope). Defined at module scope so the parametrize decorator can build them at collection.
+
+
+class _AuthTextBlock:
+    """An SDK text content block — the author parse reads `.text` off the first one."""
+
+    type = "text"
+
+    def __init__(self, text):
+        self.text = text
+
+
+class _AuthNonTextBlock:
+    """A non-text SDK content block (no `.text`) — the no-text-block rejection case."""
+
+    type = "image"
+
+
+class _AuthResp:
+    """A minimal SDK response envelope: `.content` is a list of content blocks."""
+
+    def __init__(self, blocks):
+        self.content = blocks
+
+
+def _author_text_resp(text):
+    """An author SDK response carrying `text` as its single text block."""
+    return _AuthResp([_AuthTextBlock(text)])
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        _AuthResp([_AuthNonTextBlock()]),  # no text block
+        _author_text_resp("not json {{{"),  # non-JSON text (json.loads raises ValueError subclass)
+        _author_text_resp(json.dumps([1, 2, 3])),  # non-dict (a JSON array)
+        _author_text_resp(json.dumps({"specialist": 7, "recommendations": []})),  # non-str specialist
+        _author_text_resp(json.dumps({"specialist": "x", "recommendations": "oops"})),  # non-list recs
+    ],
+    ids=["no-text-block", "non-json", "non-dict", "non-str-specialist", "non-list-recommendations"],
+)
+def test_parse_author_envelope_rejects_malformed_shapes(response):
+    """`_parse_author_envelope` RAISES on every malformed shape (the fail-closed parse gate).
+
+    A non-text / non-JSON / non-dict response, a non-str `specialist`, or a non-list
+    `recommendations` each raises — the honest no-plan state at the retry loop's
+    `ModelCallError`, never a fabricated regimen.
+    """
+    from scripts.model.client import _parse_author_envelope
+
+    with pytest.raises(ValueError):
+        _parse_author_envelope(response)
+
+
+def test_parse_author_envelope_accepts_well_formed_envelope():
+    """A well-formed `{specialist, recommendations}` envelope parses to the dict verbatim."""
+    from scripts.model.client import _parse_author_envelope
+
+    env = {"specialist": "Strength-Coach", "recommendations": [{"claim": "squat 2x/week"}]}
+    assert _parse_author_envelope(_author_text_resp(json.dumps(env))) == env
+
+
+def test_good_author_fixture_validates_against_live_workout_schema():
+    """TEST-03 (de-tautologize): the workout author fixture conforms to the LIVE author schema.
+
+    Pins `_good_author_fixture()` to `_author_output_schema("workout")` via jsonschema (in `.venv`),
+    so the mock-seam author tests that pass over it can no longer drift from the structured-output
+    schema the live call constrains. Failing-capable: revert the fixture's payload key to `exercise`
+    (or drop `grounding`) and jsonschema.validate raises.
+    """
+    import jsonschema
+
+    from scripts.model.client import _author_output_schema
+
+    jsonschema.validate(_good_author_fixture(), _author_output_schema("workout"))

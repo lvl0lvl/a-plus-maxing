@@ -258,13 +258,29 @@ def _pdf_bytes(token=None, page_text="SYNTHETIC GENETICS REPORT no-PII"):
 
 
 def _multichunk_text(markers):
-    """Build extracted text that splits into >= len(markers) chunks, one marker per section."""
-    return "".join(marker + "\n" + ("filler line text. " * 440) + "\n" for marker in markers)
+    """Build extracted text that splits into >= len(markers) chunks, one marker per section.
+
+    Each marker heads a section whose filler body is ~`extract_chunked._CHUNK_CHARS`, so two full
+    sections never fit in one chunk and `len(markers)` markers yield >= `len(markers)` chunks (with
+    headroom under `_MAX_CHUNKS`, so the upload reports `partial: false`). Sized RELATIVE to the
+    imported `extract_chunked._CHUNK_CHARS` (NFR-7) — never a hardcoded char count, so the fixtures
+    survive any OQ-2 retuning of the chunk constants.
+    """
+    filler = "filler line text. " * (extract_chunked._CHUNK_CHARS // len("filler line text. "))
+    return "".join(marker + "\n" + filler + "\n" for marker in markers)
 
 
 def _over_budget_text():
-    """Build extracted text that splits into > extract_chunked._MAX_CHUNKS chunks (partial)."""
-    return "".join("section" + str(i) + "\n" + ("x" * 7900) + "\n" for i in range(45))
+    """Build extracted text that splits into > extract_chunked._MAX_CHUNKS chunks (partial).
+
+    Each section's body exceeds `extract_chunked._CHUNK_CHARS`, so `_MAX_CHUNKS + 1` sections force
+    the split past the `_MAX_CHUNKS` budget and the honest-partial signal trips. Sized RELATIVE to
+    the imported constants (NFR-7) — never a hardcoded char count.
+    """
+    body = "x" * (extract_chunked._CHUNK_CHARS + 1)
+    return "".join(
+        "section" + str(i) + "\n" + body + "\n" for i in range(extract_chunked._MAX_CHUNKS + 1)
+    )
 
 
 def _raw_token():

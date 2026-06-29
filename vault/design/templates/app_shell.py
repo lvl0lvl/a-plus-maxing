@@ -11,6 +11,7 @@ cards, a loaded stream shows the landed names/counts (names/counts only, never a
 value or rsid). The page's lucide icons are vendored inline in `app_view.html`; the four
 document-card icons are `_DOC_ICONS` below.
 """
+import datetime as _datetime
 import html as _html
 import pathlib
 
@@ -85,9 +86,6 @@ def _default_status(store_read):
             "labs": {"loaded": False, "files": []}}
 
 
-import datetime as _datetime
-import html as _html
-
 _PLAN_LABELS = [("workout", "Workout"), ("nutrition", "Nutrition"),
                 ("supplements", "Supplements"), ("peptides", "Peptides")]
 
@@ -102,11 +100,6 @@ _AWAITING_PLAN = (
     '<button class="btn primary" style="flex:none">Generate plan &rarr;</button>'
     "</div>"
 )
-
-
-def _esc(value):
-    """HTML-escape a plan value for safe server-side interpolation."""
-    return _html.escape(str(value), quote=True)
 
 
 def _plan_item_lines(domain, plan):
@@ -193,7 +186,8 @@ def render(store_read=None, *, status=None, _today=None):
             load-state when `status` is not injected. None renders the empty state.
         status (dict, optional): The full ingestion load-state (wearable/dna/labs), injected
             by `generate.run('app')`. None falls back to a store-only default.
-        _today (date, optional): Accepted for render-engine seam parity; unused here.
+        _today (date, optional): The render date driving the Plan screen's plan-for-today
+            resolution (`_plan_zone`); defaults to today's date.
 
     Returns:
         (str) The full self-contained SPA HTML document.
