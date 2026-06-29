@@ -23,6 +23,14 @@
 #   14 valid page w/ unresolved forward-ref link               -> PASS (link advisory, non-blocking)
 #   15 biomarker source: wearable (ADR-0011 D4 generalized enum) -> PASS
 #   16 biomarker source: oura (ADR-0011 D4 retired the device token) -> FAIL (enum)
+#   G1 wiki_entity_type genetics path -> genetics, other library -> library  -> routing
+#   G2 valid genetics variant page                                          -> PASS
+#   G3 genetics missing gene / rsid                                         -> FAIL (frontmatter)
+#   G4 genetics missing / empty ## Genotype Findings                        -> FAIL (structural)
+#   G5 genetics missing provenance, not grandfathered                       -> FAIL (no waiver)
+#   G6 genetics _template.md (non-gated)                                    -> PASS (skipped)
+#   G7 genetics page + injected operator email in body (SEC-ORD-01)         -> FAIL (operator token)
+#   G8 raw genotype in a ## Genotype Findings trait-token field (SEC-ORD-02) -> FAIL (raw genotype)
 
 set -uo pipefail
 PASS=0; FAIL=0
@@ -36,6 +44,7 @@ TMP="$(mktemp -d)"
 trap 'cd /; rm -rf "$TMP"' EXIT
 REPO="$TMP/repo"
 mkdir -p "$REPO/vault/compounds" "$REPO/vault/biomarkers" "$REPO/vault/library/peptides" \
+         "$REPO/vault/library/genetics" \
          "$REPO/vault/meta" "$REPO/vault/library" "$REPO/design/.test-design-work"
 
 # bda stubs (ignore args; exit code is the point)
@@ -53,6 +62,8 @@ cat > "$REPO/vault/meta/index.md" <<'IDX'
 - [[biomarkers/test-marker]]
 ## library/
 - [[library/peptides/test-layer]]
+## genetics/
+- [[library/genetics/cyp1a2-rs762551]]
 IDX
 
 # grandfather allowlist
@@ -161,12 +172,37 @@ Body content with a citation.
 EOF
 }
 
+emit_genetics() {  # $1 = slug ; emits a fully-valid variant-keyed genetics page
+    cat <<EOF
+---
+title: CYP1A2 rs762551
+type: genetics
+permalink: a-plus-maxing/library/genetics/$1
+gene: CYP1A2
+rsid: rs762551
+evidence_tier: B
+created: 2026-06-02
+last_verified: 2026-06-02
+provenance_dir: design/.test-design-work
+provenance_slug: test-compound
+---
+
+# CYP1A2 rs762551
+
+## Genotype Findings
+- (A;A): fast-caffeine-metabolism — clears caffeine quickly, tolerates higher intake [1]
+- (A;C): intermediate-caffeine-metabolism — intermediate clearance [2]
+- (C;C): slow-caffeine-metabolism — slow clearance; higher CV risk at high intake [3]
+EOF
+}
+
 run() {  # $1 = bda stub ; $2.. = page args (repo-relative). sets RC + OUT
     OUT="$(cd "$REPO" && WIKI_REPO_ROOT="$REPO" WIKI_BDA_CMD="$1" bash "$SCRIPT" "${@:2}" 2>&1)"
     RC=$?
 }
 
 CP="$REPO/vault/compounds"; BM="$REPO/vault/biomarkers"; LB="$REPO/vault/library/peptides"
+GN="$REPO/vault/library/genetics"
 
 # Case 1: valid compound -> PASS
 emit_compound test-compound > "$CP/test-compound.md"
@@ -267,6 +303,73 @@ emit_biomarker test-marker | sed 's/^source: lab/source: oura/' > "$BM/test-mark
 run "$TMP/bda-pass.sh" vault/biomarkers/test-marker.md
 { [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "source: oura"; } \
     && ok "biomarker source: oura FAILs (D4 retired the oura token)" || { bad "case16 expected rc1+source: oura got $RC"; echo "$OUT"; }
+
+# ---- genetics library section (ADR-0032-T1) ----
+
+# Case G1: wiki_entity_type routes a genetics path -> genetics, other library -> library (AC-1)
+G1=$( source "$(cd "$SCRIPT_DIR/.." && pwd)/lib/wiki-helpers.sh"
+      printf '%s %s' "$(wiki_entity_type "$REPO/vault/library/genetics/x.md")" \
+                     "$(wiki_entity_type "$REPO/vault/library/peptides/x.md")" )
+[ "$G1" = "genetics library" ] \
+    && ok "genetics path types 'genetics', other library types 'library'" \
+    || bad "G1 expected 'genetics library' got '$G1'"
+
+# Case G2: valid genetics variant page -> PASS (positive control)
+emit_genetics cyp1a2-rs762551 > "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+[ "$RC" -eq 0 ] && ok "valid genetics page PASSes" || { bad "G2 expected rc0 got $RC"; echo "$OUT"; }
+
+# Case G3a: missing gene -> FAIL (non-tautological vs G2)
+emit_genetics cyp1a2-rs762551 | grep -v '^gene:' > "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "field 'gene'"; } \
+    && ok "genetics missing gene FAILs" || { bad "G3a expected rc1+gene got $RC"; echo "$OUT"; }
+
+# Case G3b: missing rsid -> FAIL
+emit_genetics cyp1a2-rs762551 | grep -v '^rsid:' > "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "field 'rsid'"; } \
+    && ok "genetics missing rsid FAILs" || { bad "G3b expected rc1+rsid got $RC"; echo "$OUT"; }
+
+# Case G4a: ## Genotype Findings section missing (renamed) -> FAIL (structural)
+emit_genetics cyp1a2-rs762551 | sed 's/^## Genotype Findings/## GenotypeFindingsTypo/' > "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "Genotype Findings"; } \
+    && ok "genetics missing Genotype Findings section FAILs" || { bad "G4a expected rc1 got $RC"; echo "$OUT"; }
+
+# Case G4b: ## Genotype Findings present but empty (no finding bullet) -> FAIL (populated)
+emit_genetics cyp1a2-rs762551 | sed '/^## Genotype Findings/,$d' > "$GN/cyp1a2-rs762551.md"
+printf '\n## Genotype Findings\n' >> "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "Genotype Findings"; } \
+    && ok "genetics empty Genotype Findings FAILs" || { bad "G4b expected rc1 got $RC"; echo "$OUT"; }
+
+# Case G5: missing provenance, not grandfathered -> FAIL (no genetics waiver)
+emit_genetics cyp1a2-rs762551 | grep -v '^provenance_' > "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "missing provenance"; } \
+    && ok "genetics missing provenance FAILs (no waiver)" || { bad "G5 expected rc1 got $RC"; echo "$OUT"; }
+
+# Case G6: _template.md is non-gated -> PASS (skipped, mirrors case 13)
+emit_genetics x > "$GN/_template.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/_template.md
+{ [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "not a gated entity page"; } \
+    && ok "genetics _template skipped, PASSes" || { bad "G6 expected rc0+skip got $RC"; echo "$OUT"; }
+
+# Case G7: G2 page + one injected value-class operator token in body -> FAIL (SEC-ORD-01)
+emit_genetics cyp1a2-rs762551 > "$GN/cyp1a2-rs762551.md"
+printf '\nFurther reading: contact the cohort author at not-walter@example.com\n' >> "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -qi "operator"; } \
+    && ok "genetics operator-token in body FAILs (SEC-ORD-01)" || { bad "G7 expected rc1+operator got $RC"; echo "$OUT"; }
+
+# Case G8: raw genotype in a Genotype-Findings trait-token field -> FAIL (SEC-ORD-02)
+emit_genetics cyp1a2-rs762551 \
+  | sed 's/^- (A;A): fast-caffeine-metabolism/- (A;A): fast-caffeine-metabolism rs762551/' \
+  > "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -qi "raw genotype"; } \
+    && ok "genetics raw-genotype in trait-token FAILs (SEC-ORD-02)" || { bad "G8 expected rc1+raw genotype got $RC"; echo "$OUT"; }
 
 echo
 echo "test_wiki_ingest_lint: ${PASS} passed, ${FAIL} failed"

@@ -196,6 +196,30 @@ n=1 trials per `library/methodology/n-of-1-trial-design.md`. Uses the existing `
 ### library/ (existing)
 Research corpus — papers, methodology, evidence summaries. Citation source for wiki pages. Entries already carry `evidence_tier:` in frontmatter per `evidence-tiers.md`.
 
+### library/genetics/
+Variant-keyed, current-science findings for a single gene/SNP — the canonical, vetted, **operator-free** genetics library. Keyed to the VARIANT (gene + rsid), reusable across operators, and ingestion-gated exactly like `compounds/`/`biomarkers/` (no genetics waiver). The local matcher consumes this format; it carries no operator-identifying data.
+
+**Page template:**
+```
+---
+title: <GENE rsID>
+type: genetics
+gene: <HGNC symbol, e.g. CYP1A2>
+rsid: <rs-id, e.g. rs762551>
+evidence_tier: S | A | B | C | D
+last_verified: YYYY-MM-DD
+provenance_dir: <design/.../ aplus-research design-work dir>
+provenance_slug: <bda slug>
+---
+
+## Genotype Findings
+- <genotype>: <trait-class-token> — <current-science prose> [citation]
+```
+
+- **Frontmatter (gated):** `gene` + `rsid` key the variant (NOT the filename); `evidence_tier` is the `S|A|B|C|D` enum; `last_verified` is a `YYYY-MM-DD` date. Provenance (`provenance_dir`/`provenance_slug`) is required like every other library section.
+- **`## Genotype Findings` (one line per genotype):** `- <genotype>: <trait-class-token> — <prose> [citation]`. The raw genotype is the SELECTOR before the `: ` ONLY — it must NEVER appear inside the `<trait-class-token>` field (the coarse de-id class the matcher returns). `<trait-class-token>` is a hyphenated de-id class (e.g. `fast-caffeine-metabolism`).
+- **Operator-free:** the page carries 0 operator-identifying tokens — the section is keyed to the variant, not the operator (the ingestion gate enforces both this and the selector-only genotype rule).
+
 ### dna/ (existing)
 Genetic variant pages derived from 23andMe raw data.
 
