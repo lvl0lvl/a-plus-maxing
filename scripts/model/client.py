@@ -413,12 +413,19 @@ _AUTHOR_SPECIALIST = {
     "peptides": "Peptide-Specialist",
 }
 _AUTHOR_PAYLOAD_GUIDE = {
-    "workout": 'each recommendation\'s `payload` is one exercise: {"name": str, "sets": int, '
+    "workout": 'each recommendation\'s `payload` is one exercise: {"name": str, "sets": int >= 1, '
                '"reps": str (optional), "detail": str (optional), "load": str (optional)}',
-    "nutrition": 'each `payload` is one nutrition target: {"target": str, "detail": str (optional)}',
-    "supplements": 'each `payload` is one supplement: {"name": str, "dose": str (optional), '
-                   '"timing": str (optional)}',
-    "peptides": 'each `payload` is one peptide note: {"name": str, "detail": str (optional)}',
+    "nutrition": 'recommendations AGGREGATE into ONE day plan — across them you MUST supply day '
+                 'targets `calorie_goal` (int > 0) and `macros` ({"protein": int, "carbs": int, '
+                 '"fat": int}, each int > 0), AND at least one `meal` ({"name": str, "kcal": int '
+                 '(optional), "contents": str (optional)}). Carry the day targets in one payload '
+                 '({"calorie_goal": int, "macros": {...}}) and each meal in a payload '
+                 '({"meal": {"name": str, ...}}). Without BOTH day targets AND >= 1 meal, nothing '
+                 'records — so emit them or return no nutrition recommendations',
+    "supplements": 'each `payload` is one supplement item: {"name": str, "dose": str, "timing": str '
+                   '(optional)}',
+    "peptides": 'ONE compound regimen total — `payload` is {"compound": non-empty str, "dose": str, '
+                '"route": str, "cycle_length_weeks": int (optional), "evidence": str (optional)}',
 }
 
 
@@ -435,10 +442,17 @@ def _author_system_prompt(domain):
         f"- Recommend ONLY what the summary supports and what is evidence-grounded. If the summary "
         f"is too thin to responsibly recommend anything in {domain}, return an empty "
         f"recommendations list — never invent or speculate.\n"
-        f"- Each recommendation carries: `claim` (the one-line recommendation), `category` (a short "
-        f"tag, e.g. \"{domain}\"), `grounding` (\"human\" | \"animal\" | \"mechanistic\" — the "
-        f"strongest evidence basis), `source` (a real citation or guideline; never fabricate one), "
-        f"`confidence_tier` (\"strong\" | \"moderate\" | \"limited\"), and `payload` ({payload_guide}).\n"
+        f"- Each recommendation carries ALL of: `claim` (the one-line recommendation), `category` "
+        f"(a short tag, e.g. \"{domain}\"), `grounding` (\"human\" | \"animal\" | \"mechanistic\" — "
+        f"the strongest evidence basis; prefer \"human\"), `source` (a real citation or guideline; "
+        f"never fabricate one), `confidence_tier` (\"strong\" | \"moderate\" | \"limited\"), "
+        f"`reversibility` (a short phrase stating whether the operator can stop/undo it and how "
+        f"quickly, e.g. \"fully reversible — stop anytime\" / \"slowly reversible over weeks\"), and "
+        f"`payload` ({payload_guide}). EVERY field is REQUIRED — a recommendation missing any of "
+        f"them is discarded by the safety panel, so omit the whole recommendation rather than ship "
+        f"one with a blank field.\n"
+        f"- If a recommendation cites a number, put it in the claim/payload text, not as a bare "
+        f"figure — a numeric field without its units and a reference range is discarded.\n"
         f"- Be conservative: prefer fewer, well-supported recommendations. A downstream safety panel "
         f"filters your output; do not rely on it to catch overreach.\n"
         f'- Return ONLY the JSON object {{"specialist": "{specialist}", "recommendations": [...]}}.'
@@ -461,10 +475,11 @@ def _author_output_schema():
                         "grounding": {"type": "string"},
                         "source": {"type": "string"},
                         "confidence_tier": {"type": "string"},
+                        "reversibility": {"type": "string"},
                         "payload": {"type": "object", "additionalProperties": True},
                     },
                     "required": ["claim", "category", "grounding", "source",
-                                 "confidence_tier", "payload"],
+                                 "confidence_tier", "reversibility", "payload"],
                     "additionalProperties": False,
                 },
             },
