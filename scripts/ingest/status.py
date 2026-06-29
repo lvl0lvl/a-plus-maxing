@@ -51,10 +51,12 @@ def _dropzone(root, suffixes):
 def dna_status(store_read, dna_root):
     """Load-state of DNA: a 23andMe file in the dropzone OR extracted genotype readings in the store.
 
-    A 23andMe `.txt`/`.zip` lands in the gitignored dropzone; a genetics-report PDF instead lands
-    as `source == "dna-report"` genotype readings in the store (ADR-0031 local extraction). Either
-    counts as DNA loaded — `count` is the genotype-reading count when present, else the dropzone is
-    returned unchanged. Surfaces counts only, never a genotype value.
+    The dropzone scan recognizes a 23andMe `.txt` raw export only (the `{".txt"}` suffix filter); a
+    `.zip` export arrives via a different path (the `python -m scripts.ingest 23andme.zip` unpack),
+    not this dropzone listing. A genetics-report PDF instead lands as `source == "dna-report"`
+    genotype readings in the store (ADR-0031 local extraction). Either counts as DNA loaded — `count`
+    is the genotype-reading count when present, else the dropzone is returned unchanged. Surfaces
+    counts only, never a genotype value.
 
     Args:
         store_read (list): The store read model (reading dicts).

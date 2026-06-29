@@ -569,8 +569,13 @@ document.getElementById('team-list').innerHTML = SPECIALISTS.map(s =>
 function statusPill(st){const m={active:['Active','#1FB5A6','#1FB5A6','#E8F7F4'],pending:['Pending','#E8A23B','#9A6A1F','#FBF1E0'],idle:['Idle','#9AA1B4','#9AA1B4','#F5F7FB']}[st];return `<span class="spill" style="background:${m[3]};color:${m[2]}"><span class="sdot" style="background:${m[1]}"></span>${m[0]}</span>`;}
 document.getElementById('dash-team').innerHTML = SPECIALISTS.slice(1).map(s =>
   `<div class="speccard">${tile(s)}<div class="sinfo"><div class="sname">${s.name}</div><div class="ssub">${s.role}</div></div>${statusPill(s.status)}</div>`).join('');
-document.getElementById('plan-specialists').innerHTML = SPECIALISTS.slice(1).map(s =>
-  `<div class="plspec"><div class="plspec-top"><span class="tile" style="background:${s.bg};color:${s.color}"><i data-lucide="${s.icon}"></i></span><div class="plspec-info"><div class="plspec-name">${s.name}</div><div class="plspec-role">${s.role}</div></div></div><div class="plspec-empty">Generated on plan run</div></div>`).join('');
+// only fill the placeholder specialist grid when the awaiting-plan state is present; when the
+// server has substituted <!--PLAN_ZONE--> with real recorded plans, the data-awaiting='plan'
+// element is absent, so the grid stays empty and the recorded plans are the sole Plan-screen content.
+if(document.querySelector('#screen-plan [data-awaiting="plan"]')){
+  document.getElementById('plan-specialists').innerHTML = SPECIALISTS.slice(1).map(s =>
+    `<div class="plspec"><div class="plspec-top"><span class="tile" style="background:${s.bg};color:${s.color}"><i data-lucide="${s.icon}"></i></span><div class="plspec-info"><div class="plspec-name">${s.name}</div><div class="plspec-role">${s.role}</div></div></div><div class="plspec-empty">Generated on plan run</div></div>`).join('');
+}
 
 // a chat surface: specialist card married to the input
 function chatHTML(s, greeting){

@@ -1062,4 +1062,47 @@ def test_self_test_passes_with_mock_client_author():
     assert _self_test() == 0
 
 
+# --- PR #270: the non-tautological schema <-> record link (the live author schema records) ---
+
+
+def test_schema_conformant_author_records_a_plan_each_domain(tmp_path):
+    """Non-tautological schema<->record: a rec conforming to the LIVE author schema records a plan.
+
+    For each of the four plan domains, an author envelope whose recommendations conform to
+    `client._author_output_schema(domain)` (validated via jsonschema, in `.venv`) runs through the
+    captured-envelope `generate_plan` path and RECORDS a plan — coupling the structured-output schema
+    the live author call constrains to a real recordable plan. Motivated by BUG-03/API-02 (the schema
+    is the soft model-side hint; the engine `record_plan` catch is the deferred real fix), this proves
+    the tightened schema still admits a recordable, value-valid envelope. Failing-capable: a domain
+    whose schema-conformant author no longer records reds the per-domain assertion.
+    """
+    import jsonschema
+
+    from scripts.model.client import _author_output_schema
+
+    cases = {
+        "workout": _author(_workout_rec("Goblet squat", 3, grounding="human")),
+        "nutrition": _author(
+            _nutrition_target_rec(grounding="human"),
+            _nutrition_meal_rec("Breakfast", grounding="human"),
+            specialist="nutritionist",
+        ),
+        "supplements": _author(
+            _supplement_rec("Creatine", "5 g", grounding="human"), specialist="supplement-specialist"
+        ),
+        "peptides": _author(
+            _peptide_rec("BPC-157", "250 mcg", "subcutaneous", grounding="human"),
+            specialist="peptide-specialist",
+        ),
+    }
+    for domain, author in cases.items():
+        jsonschema.validate(author, _author_output_schema(domain))  # conforms to the LIVE schema
+        root = tmp_path / domain
+        store_read = _seed_store(root)
+        result = generate_plan(domain, author, store_read, root, plan_date=PLAN_DATE)
+        assert result["recorded"] is True, (
+            f"{domain}: a schema-conformant author did not record ({result['reason']})"
+        )
+
+
 # --- AC-6 closes as the suite pass (Step 8 regression).

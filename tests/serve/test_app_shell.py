@@ -733,3 +733,87 @@ def test_extraction_note_carries_role_status_for_screen_readers():
     assert 'role="status"' in note.group(0), (
         'the #extraction-note carries no role="status" — its partial note is never announced (WCAG 4.1.3)'
     )
+
+
+# --------------------------------------------------------------------------- #
+# PR #270 — the wired Plan-screen render guards: the placeholder specialist grid
+# stays empty when real plans render (HIST-02), the plan-zone marker is substituted,
+# an injected exercise name is HTML-escaped (XSS), and the extracted-genotype dna
+# status renders in BOTH templates without an IndexError (API-01). Fixture-driven.
+# --------------------------------------------------------------------------- #
+
+
+def test_rendered_spa_substitutes_plan_zone_and_keeps_specialists_grid():
+    """HIST-02: the SPA substitutes the <!--PLAN_ZONE--> marker and keeps the #plan-specialists grid.
+
+    `render` replaces `<!--PLAN_ZONE-->` with the Plan-screen body (the awaiting state on an empty
+    store), so the raw marker is GONE from the rendered SPA; the `#plan-specialists` grid element
+    (which the init JS still references) stays present. Failing-capable: reds if the marker is left
+    un-substituted or the grid element is deleted (the line-572 init JS would then null-deref).
+    """
+    html = _spa_html()
+    assert "<!--PLAN_ZONE-->" not in html, "the plan-zone marker was not substituted by render"
+    assert 'id="plan-specialists"' in html, "the #plan-specialists grid the init JS references is gone"
+
+
+def test_plan_specialists_fill_gated_on_awaiting_plan_state():
+    """HIST-02: the placeholder specialist-grid fill is GATED on the awaiting-plan state.
+
+    The init JS only populates `#plan-specialists` with the 'Generated on plan run' placeholder cards
+    when the awaiting-plan element (`#screen-plan [data-awaiting="plan"]`) is present — so when the
+    server has substituted <!--PLAN_ZONE--> with real recorded plans (that element absent), the
+    placeholder grid stays empty and the recorded plans are the sole Plan content. Failing-capable:
+    reds if the fill becomes unconditional again (the dual-render the finding flagged).
+    """
+    html = _spa_html().replace(" ", "")
+    assert "if(document.querySelector('#screen-plan[data-awaiting=\"plan\"]')){" in html, (
+        "the #plan-specialists placeholder fill is not gated on the awaiting-plan state (dual-render)"
+    )
+
+
+def test_plan_zone_escapes_injected_exercise_name(tmp_path):
+    """XSS: a `<script>` in a recorded exercise name renders HTML-escaped, never raw.
+
+    Seeds a `plan::workout` reading whose exercise name carries `<script>alert(1)</script>`, renders
+    the SPA over the store read, and asserts the name appears HTML-ESCAPED (`&lt;script&gt;...`) and
+    the raw `<script>alert(1)</script>` token is ABSENT — the server-side `_esc` on every plan value
+    holds. Failing-capable: drop the `_esc` on the exercise name and the raw token leaks into markup.
+    """
+    import datetime
+
+    from scripts.store import plan_schema, store
+
+    payload = "<script>alert(1)</script>"
+    plan_schema.record_plan(
+        "workout", {"exercises": [{"name": payload, "sets": 3}]},
+        "2026-06-18", "personal-trainer", tmp_path,
+    )
+    html = app_shell.render(store.read_all(tmp_path), _today=datetime.date(2026, 6, 18))
+
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html, "the injected exercise name is not HTML-escaped"
+    assert payload not in html, "the raw <script> token leaked into the rendered markup (XSS)"
+
+
+def test_extracted_genotype_dna_status_renders_in_both_doc_cards():
+    """API-01: an extracted-genotype dna status (files: [], count: N) renders in BOTH templates.
+
+    `dna_status` over `dna-report` readings with an empty dropzone returns `{loaded: True, files: [],
+    count: N}`; BOTH `app_shell._doc_cards` AND `intake._doc_cards` must render it WITHOUT an
+    IndexError (the prior `dna['files'][0]` guarded only by `if loaded` crashed on the empty files
+    list). Each renders the genotype-count detail instead of a filename. Failing-capable: revert
+    either guard to `dna['files'][0]` and the matching render raises.
+    """
+    from scripts.ingest import status as ingest_status
+    from vault.design.templates import intake
+
+    readings = [
+        {"item": "MTNR1B rs10830963", "timepoint": "2026-04-01", "source": "dna-report", "value": "(C;G)"},
+        {"item": "APOE rs429358", "timepoint": "2026-04-01", "source": "dna-report", "value": "(T;T)"},
+    ]
+    dna = ingest_status.dna_status(readings, REPO_ROOT / "no_such_dna_dropzone_dir")
+    assert dna == {"loaded": True, "files": [], "count": 2}
+
+    status = {"wearable": {"loaded": False}, "labs": {"loaded": False, "files": []}, "dna": dna}
+    # Neither render raises (the API-01 crash); each names the genotype count, not a (missing) file.
+    assert "2 genotypes landed" in app_shell._doc_cards(status), "app_shell did not render the genotype count"
+    assert "2 genotypes landed" in intake._doc_cards(status), "intake did not render the genotype count"
