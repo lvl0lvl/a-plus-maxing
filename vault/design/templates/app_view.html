@@ -775,7 +775,18 @@ function renderGenerate(){
  function up(f){
    if(!f)return;
    var st=document.getElementById('upload-status'), before=docHTML();
-   if(st){ st.className='upload-status info'; st.style.display='flex'; st.textContent='Linking '+f.name+'…'; }
+   // The /upload response only arrives AFTER the server finishes extracting (a large PDF =>
+   // several sequential model passes, up to ~1-2 min). Tick a live elapsed counter so the bar
+   // visibly works and sets the expectation, instead of a frozen line that reads as "dead".
+   var t0=Date.now(), tick=null;
+   function stopTick(){ if(tick){ clearInterval(tick); tick=null; } }
+   if(st){
+     st.className='upload-status info'; st.style.display='flex';
+     var setMsg=function(){ var s=Math.round((Date.now()-t0)/1000);
+       st.textContent='⏳ Extracting '+f.name+' — reading it locally, then pulling readings'
+         +(s>2?' · '+s+'s':'…')+(s>15?'  (a large document takes a minute or two — keep this tab open)':''); };
+     setMsg(); tick=setInterval(setMsg,1000);
+   }
    var fd=new FormData(); fd.append('document',f,f.name);
    fetch('/upload',{method:'POST',body:fd}).then(function(r){
      // Discriminate T3's response: an unrecognized-format upload returns the extracted-readings
@@ -787,6 +798,7 @@ function renderGenerate(){
      return r.text().then(function(html){ return {html:html}; });
    })
      .then(function(res){
+       stopTick();
        if(res.readings){
          // The extraction path: /upload landed 0 — populate the review panel so the operator
          // confirms what lands (POST /confirm-extraction is the only landing path, the gate).
@@ -801,7 +813,7 @@ function renderGenerate(){
          setTimeout(function(){ if(st.textContent.indexOf('✓ Linked '+f.name)===0) st.style.display='none'; },6000); }
        else { st.className='upload-status warn'; st.textContent='No new data landed from '+f.name+' — it may already be loaded, or it\'s not a supported export (an Apple Health .zip/.xml, a labs PDF/CSV, or a 23andMe .zip).'; }
      })
-     .catch(function(){ if(st){ st.className='upload-status warn'; st.textContent='Upload failed — please try again.'; } });
+     .catch(function(){ stopTick(); if(st){ st.className='upload-status warn'; st.textContent='Upload failed — please try again.'; } });
  }
  fp.addEventListener('change',function(){ up(fp.files&&fp.files[0]); fp.value=''; });
  document.addEventListener('click',function(e){
