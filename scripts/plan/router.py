@@ -296,6 +296,7 @@ def _genetic_trait_classes_token(store_read, genetics_library_root, identity_con
             )
     return ";".join(tokens)
 
+
 # The juc registry-driven recent-trend-direction feed (2026-06-12 decision §1):
 # every registered-polarity marker (non-None `good_direction`), read under the
 # `biomarker::` namespace only. Version-controlled VIA the registry — never
@@ -527,7 +528,6 @@ def _training_volume_band(readings):
     `max()` of unrelated integers. A range like '4-5x' captures the digit adjacent to the
     unit ('5' -> high).
     """
-    import re
 
     if not readings:
         return _NOT_DISCUSSED
