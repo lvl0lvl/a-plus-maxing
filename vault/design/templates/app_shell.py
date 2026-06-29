@@ -96,7 +96,7 @@ _AWAITING_PLAN = (
     '<div class="sub">Once you\'ve loaded your documents and talked through your goals, generate your '
     "plan here. When you approve it, this screen shows your approved plan.</div></div>"
     '<button class="btn primary" style="flex:none">Generate plan &rarr;</button>'
-    '</div><div class="plan-grid" id="plan-specialists"></div>'
+    "</div>"
 )
 
 
