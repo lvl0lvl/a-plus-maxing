@@ -81,12 +81,108 @@ def _default_status(store_read):
             "labs": {"loaded": False, "files": []}}
 
 
+import datetime as _datetime
+import html as _html
+
+_PLAN_LABELS = [("workout", "Workout"), ("nutrition", "Nutrition"),
+                ("supplements", "Supplements"), ("peptides", "Peptides")]
+
+# The static Plan-screen body shown when no plan is recorded for today — the honest awaiting state
+# (preserved from the pre-wiring template, injected by `_plan_zone` so the no-plan case is unchanged).
+_AWAITING_PLAN = (
+    '<div class="card" style="margin-bottom:18px;display:flex;align-items:center;'
+    "justify-content:space-between;gap:16px\">"
+    "<div data-awaiting='plan'><div style=\"font-weight:700;font-size:15px\">No approved plan yet</div>"
+    '<div class="sub">Once you\'ve loaded your documents and talked through your goals, generate your '
+    "plan here. When you approve it, this screen shows your approved plan.</div></div>"
+    '<button class="btn primary" style="flex:none">Generate plan &rarr;</button>'
+    '</div><div class="plan-grid" id="plan-specialists"></div>'
+)
+
+
+def _esc(value):
+    """HTML-escape a plan value for safe server-side interpolation."""
+    return _html.escape(str(value), quote=True)
+
+
+def _plan_item_lines(domain, plan):
+    """Render one domain's recorded plan value into a list of `<li>` strings."""
+    if not isinstance(plan, dict):
+        return []
+    lines = []
+    if domain == "workout":
+        for ex in plan.get("exercises", []):
+            sets, reps = ex.get("sets"), ex.get("reps")
+            head = f"{sets}×{reps}" if sets and reps else (f"{sets} sets" if sets else "")
+            tail = " · ".join(p for p in (head, ex.get("detail")) if p)
+            suffix = f" — {_esc(tail)}" if tail else ""
+            lines.append(f"<li><b>{_esc(ex.get('name', ''))}</b>{suffix}</li>")
+    elif domain == "nutrition":
+        m = plan.get("macros") or {}
+        water = f" · water {_esc(plan['water_l'])}L" if plan.get("water_l") else ""
+        lines.append(
+            f"<li><b>{_esc(plan.get('calorie_goal', '?'))} kcal/day</b> — protein "
+            f"{_esc(m.get('protein', '?'))}g · carbs {_esc(m.get('carbs', '?'))}g · fat "
+            f"{_esc(m.get('fat', '?'))}g{water}</li>"
+        )
+        for meal in plan.get("meals", []):
+            kcal = f" ({_esc(meal['kcal'])} kcal)" if meal.get("kcal") else ""
+            contents = f" — {_esc(meal['contents'])}" if meal.get("contents") else ""
+            lines.append(f"<li><b>{_esc(meal.get('name', ''))}</b>{kcal}{contents}</li>")
+    elif domain == "supplements":
+        for item in plan.get("items", []):
+            timing = f" · {_esc(item['timing'])}" if item.get("timing") else ""
+            lines.append(
+                f"<li><b>{_esc(item.get('name', ''))}</b> — {_esc(item.get('dose', ''))}{timing}</li>"
+            )
+    elif domain == "peptides":
+        route = f" · {_esc(plan['route'])}" if plan.get("route") else ""
+        lines.append(
+            f"<li><b>{_esc(plan.get('compound', ''))}</b> — {_esc(plan.get('dose', ''))}{route}</li>"
+        )
+    return lines
+
+
+def _plan_zone(store_read, today):
+    """Read each domain's recorded plan for `today` and render the Plan-screen body.
+
+    `store_read` is the flat reading list `store.read_all` returns; the domain's plan readings are
+    filtered out by item name and resolved with `plan_schema.resolve_plan` (the same resolution the
+    dashboard plan zone uses). Renders one card per domain with a plan recorded for today; with no
+    plan in any domain, returns the unchanged honest awaiting state.
+    """
+    from scripts.store import plan_schema
+
+    rows = store_read if isinstance(store_read, list) else []
+    cards = []
+    for domain, label in _PLAN_LABELS:
+        item = f"{plan_schema._PREFIX_PLAN}{domain}"
+        readings = [r for r in rows if isinstance(r, dict) and r.get("item") == item]
+        resolved = plan_schema.resolve_plan(readings, today)
+        plan = resolved.get("plan")
+        lines = _plan_item_lines(domain, plan) if plan is not None else []
+        if not lines:
+            continue
+        specialist = resolved.get("specialist") or label
+        cards.append(
+            f'<div class="card" style="margin-bottom:14px">'
+            f'<div style="font-weight:700;font-size:15px;margin-bottom:6px">{_esc(label)}'
+            f'<span class="sub" style="font-weight:500"> · {_esc(specialist)}</span></div>'
+            f'<ul style="margin:0;padding-left:18px;line-height:1.6">{"".join(lines)}</ul></div>'
+        )
+    if not cards:
+        return _AWAITING_PLAN
+    return "".join(cards)
+
+
 def render(store_read=None, *, status=None, _today=None):
     """Return the inline-asset SPA shell HTML with the Upload doc-cards at the live load-state.
 
-    The design is `app_view.html` (passes render.emit's off-file guard); the only injected
-    surface is the four 'Link your documents' cards (`<!--DOC_CARDS-->`), rendered from
-    `status`. No fabricated data — an empty store shows honest "+ Link" cards.
+    The design is `app_view.html` (passes render.emit's off-file guard); two surfaces are
+    injected: the four 'Link your documents' cards (`<!--DOC_CARDS-->`, rendered from `status`)
+    and the Plan-screen body (`<!--PLAN_ZONE-->`, the domains' recorded plans for today resolved
+    from `store_read`, else the honest awaiting state). No fabricated data — an empty store shows
+    honest "+ Link" cards and the no-plan awaiting state.
 
     Args:
         store_read (list, optional): The store read model; drives the wearable card's
@@ -101,4 +197,9 @@ def render(store_read=None, *, status=None, _today=None):
     if store_read is None:
         store_read = []
     status = status if status is not None else _default_status(store_read)
-    return _VIEW.read_text(encoding="utf-8").replace("<!--DOC_CARDS-->", _doc_cards(status))
+    today = (_today or _datetime.date.today()).isoformat()
+    return (
+        _VIEW.read_text(encoding="utf-8")
+        .replace("<!--DOC_CARDS-->", _doc_cards(status))
+        .replace("<!--PLAN_ZONE-->", _plan_zone(store_read, today))
+    )
