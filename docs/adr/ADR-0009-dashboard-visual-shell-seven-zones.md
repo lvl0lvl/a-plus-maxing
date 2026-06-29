@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-06-10, S49)
 **Owner:** Walter McGivney
-**Relates to:** ADR-0004 (single-file artifact generation), ADR-0008 (biomarker metadata + type-routed dashboard), ADR-0021 (deterministic PII re-insertion — supersedes-posture toward D2's initials-only render rule, plan-generation engine set), ADR-0029 (single-file SPA front-end shell — tensions-with: the as-built Dashboard/Plan demo-data + parallel layout collides with D1/D2), ADR-0031 (local-extraction-first PDF + genetics genotype-fact ingestion — constrains: the honest-data principle bounds genotype-fact capture and honest completeness), `vault/design/dashboard-v1-design.md` (the frozen, Walter-approved target)
+**Relates to:** ADR-0004 (single-file artifact generation), ADR-0008 (biomarker metadata + type-routed dashboard), ADR-0021 (deterministic PII re-insertion — supersedes-posture toward D2's initials-only render rule, plan-generation engine set), ADR-0029 (single-file SPA front-end shell — tensions-with: the as-built Dashboard/Plan demo-data + parallel layout collides with D1/D2), ADR-0031 (local-extraction-first PDF + genetics genotype-fact ingestion — constrains: the honest-data principle bounds genotype-fact capture and honest completeness), ADR-0032 (DNA-aware planning via de-associated current-science variant research — complements: the genetic read rests on current cited, vetted science, not the stale report or an invented read), `vault/design/dashboard-v1-design.md` (the frozen, Walter-approved target)
 
 ## Context
 
@@ -188,6 +188,16 @@ LM-02, calendar, goals, rollup) fills its zone in place.
   plan time, honoring D2's no-invented / no-stale-data posture. Recorded here in
   prose (this ADR carries no Related-Decisions table) as the inverse of
   ADR-0031 → 0009 `constrains` (inbound; [.pipeline/dag.md](.pipeline/dag.md)).
+- [2026-06-29: Added inverse `complements` edge to ADR-0032 (DNA-aware planning
+  via de-associated current-science variant research, Phase-8 backfill).]
+  ADR-0032's DNA-aware planning and this ADR's honest-data principle (D2's
+  no-invented / no-stale-data posture) reinforce each other: the operator's
+  genetic read rests on the stored GENOTYPE FACT (ADR-0031's `dna-report`
+  readings) re-interpreted by CURRENT cited, vetted science (the gated
+  `aplus-research` engine + the new `vault/library/genetics/` section), never
+  the report's dated interpretation or an invented read. Neither requires the
+  other. Recorded here in prose (this ADR carries no Related-Decisions table) as
+  the inverse of ADR-0032 → 0009 `complements`.
 
 ## Review triggers
 
