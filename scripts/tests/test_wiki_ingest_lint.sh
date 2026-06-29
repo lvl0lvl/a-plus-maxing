@@ -27,10 +27,13 @@
 #   G2 valid genetics variant page                                          -> PASS
 #   G3 genetics missing gene / rsid                                         -> FAIL (frontmatter)
 #   G4 genetics missing / empty ## Genotype Findings                        -> FAIL (structural)
+#   G4c ## Genotype Findings with only the template placeholder bullet       -> FAIL (no populated finding)
 #   G5 genetics missing provenance, not grandfathered                       -> FAIL (no waiver)
 #   G6 genetics _template.md (non-gated)                                    -> PASS (skipped)
-#   G7 genetics page + injected operator email in body (SEC-ORD-01)         -> FAIL (operator token)
+#   G7 genetics page + injected operator email in body (SEC-ORD-01)         -> FAIL (detection phrase)
+#   G7b NAME-class operator token via temp-repo identity config (SEC-ORD-01) -> FAIL (config-driven name path)
 #   G8 raw genotype in a ## Genotype Findings trait-token field (SEC-ORD-02) -> FAIL (raw genotype)
+#   G-grammar finding line missing the ' — ' em-dash (matcher-unparseable)   -> FAIL (per-line grammar)
 
 set -uo pipefail
 PASS=0; FAIL=0
@@ -344,6 +347,15 @@ run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
 { [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "Genotype Findings"; } \
     && ok "genetics empty Genotype Findings FAILs" || { bad "G4b expected rc1 got $RC"; echo "$OUT"; }
 
+# Case G4c: ## Genotype Findings whose only bullet is the literal template placeholder
+# -> FAIL (no populated finding; QA-2). The placeholder satisfies the grammar but its
+# `<...>`-led body is not real content.
+emit_genetics cyp1a2-rs762551 | sed '/^## Genotype Findings/,$d' > "$GN/cyp1a2-rs762551.md"
+printf '\n## Genotype Findings\n- <genotype>: <trait-class-token> — ...\n' >> "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "has no populated finding"; } \
+    && ok "genetics template-placeholder-only finding FAILs (no populated finding)" || { bad "G4c expected rc1 got $RC"; echo "$OUT"; }
+
 # Case G5: missing provenance, not grandfathered -> FAIL (no genetics waiver)
 emit_genetics cyp1a2-rs762551 | grep -v '^provenance_' > "$GN/cyp1a2-rs762551.md"
 run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
@@ -356,12 +368,29 @@ run "$TMP/bda-pass.sh" vault/library/genetics/_template.md
 { [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "not a gated entity page"; } \
     && ok "genetics _template skipped, PASSes" || { bad "G6 expected rc0+skip got $RC"; echo "$OUT"; }
 
-# Case G7: G2 page + one injected value-class operator token in body -> FAIL (SEC-ORD-01)
+# Case G7: G2 page + one injected value-class operator token in body -> FAIL (SEC-ORD-01).
+# Asserts the DETECTION-specific phrase, not a bare "operator" — "operator-identity
+# token" appears only in the detection message, never in the "operator-token scan
+# failed to run" error (SEC-W1-02/QA-1: a scan that merely ERRORS must not pass G7).
 emit_genetics cyp1a2-rs762551 > "$GN/cyp1a2-rs762551.md"
 printf '\nFurther reading: contact the cohort author at not-walter@example.com\n' >> "$GN/cyp1a2-rs762551.md"
 run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
-{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -qi "operator"; } \
-    && ok "genetics operator-token in body FAILs (SEC-ORD-01)" || { bad "G7 expected rc1+operator got $RC"; echo "$OUT"; }
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "operator-identity token"; } \
+    && ok "genetics operator-token in body FAILs (SEC-ORD-01)" || { bad "G7 expected rc1+detection got $RC"; echo "$OUT"; }
+
+# Case G7b: NAME-class operator token (SEC-W1-02) — write a synthetic name into the
+# temp repo's gitignored operator-identity config, inject that name into the body,
+# assert FAIL with the operator-identity-token message. Guards the config-driven NAME
+# path (the primary "operator-free library" threat) that G7's value-class email does
+# NOT cover, and proves the SEC-W1-03 absolute-config fix loads $REPO_ROOT's config.
+mkdir -p "$REPO/vault/meta"
+printf 'SyntheticOperatorName\n' > "$REPO/vault/meta/operator-identity.txt"
+emit_genetics cyp1a2-rs762551 > "$GN/cyp1a2-rs762551.md"
+printf '\nCurated by SyntheticOperatorName.\n' >> "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "operator-identity token"; } \
+    && ok "genetics NAME-token in body FAILs (SEC-ORD-01 config-driven name path)" || { bad "G7b expected rc1+detection got $RC"; echo "$OUT"; }
+rm -f "$REPO/vault/meta/operator-identity.txt"
 
 # Case G8: raw genotype in a Genotype-Findings trait-token field -> FAIL (SEC-ORD-02)
 emit_genetics cyp1a2-rs762551 \
@@ -370,6 +399,16 @@ emit_genetics cyp1a2-rs762551 \
 run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
 { [ "$RC" -eq 1 ] && echo "$OUT" | grep -qi "raw genotype"; } \
     && ok "genetics raw-genotype in trait-token FAILs (SEC-ORD-02)" || { bad "G8 expected rc1+raw genotype got $RC"; echo "$OUT"; }
+
+# Case G-grammar: a finding line missing the ' — ' em-dash PASSES the populated check
+# but the T2 matcher would silently skip it -> FAIL (Arch-1/QA-2 per-line grammar).
+# Non-tautological vs G2: only the em-dash is removed from one otherwise-valid line.
+emit_genetics cyp1a2-rs762551 \
+  | sed 's/^- (A;A): fast-caffeine-metabolism — clears caffeine quickly, tolerates higher intake \[1\]/- (A;A): fast-caffeine-metabolism clears caffeine quickly, tolerates higher intake [1]/' \
+  > "$GN/cyp1a2-rs762551.md"
+run "$TMP/bda-pass.sh" vault/library/genetics/cyp1a2-rs762551.md
+{ [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "grammar"; } \
+    && ok "genetics finding line missing em-dash FAILs (per-line grammar)" || { bad "G-grammar expected rc1+grammar got $RC"; echo "$OUT"; }
 
 echo
 echo "test_wiki_ingest_lint: ${PASS} passed, ${FAIL} failed"

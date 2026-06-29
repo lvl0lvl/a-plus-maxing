@@ -194,9 +194,10 @@ check_library() {
 check_genetics() {
     # Strict variant-keyed battery for vault/library/genetics/ pages: frontmatter
     # struct (gene/rsid/evidence_tier/last_verified) + a populated ## Genotype
-    # Findings section. (SEC-ORD-01 operator-token scan + SEC-ORD-02
-    # raw-genotype-in-trait-token guard are added in Cycle 2.) Provenance + index
-    # are the shared checks (check_provenance runs before this dispatch — no waiver).
+    # Findings section with per-line matcher grammar. The SEC-ORD-01 operator-token
+    # scan + SEC-ORD-02 raw-genotype-in-trait-token guard are implemented below.
+    # Provenance + index are the shared checks (check_provenance runs before this
+    # dispatch — no waiver).
     local f="$1" rel="$2"
     require_field "$f" "$rel" type
     require_field "$f" "$rel" gene
@@ -208,14 +209,35 @@ check_genetics() {
     [ "$(genotype_findings_populated "$f")" = "yes" ] \
         || violation "$INV" "$rel: '## Genotype Findings' has no populated finding bullet"
 
+    # Per-line grammar (Arch-1/QA-2): each finding bullet must be the matcher's
+    # 'genotype: trait — prose' shape — selector ':' trait ' — ' prose (em-dash is
+    # U+2014, byte-identical to the emitter). A line missing the colon or the em-dash
+    # PASSES the populated check but the T2 matcher (scripts/genetics/match.py
+    # _genotype_findings) SILENTLY skips it (degrades to a research-gap, no gate
+    # signal), so a gate-passing page is guaranteed matcher-parseable.
+    local gline
+    while IFS= read -r gline; do
+        printf '%s\n' "$gline" | grep -qE '^- .+: .+ — .+' \
+            || violation "$INV" "$rel: '## Genotype Findings' line not in 'genotype: trait — prose' grammar (T2 matcher would silently skip): '$gline'"
+    done < <(genotype_finding_lines "$f")
+
     # SEC-ORD-01: 0 operator-identity tokens in the body — the genetics library is
     # variant-keyed + reusable, never operator-associated (crown-jewel). READ-ONLY
     # shell-out to scripts.guard.pii_scan.scan_text; PYTHONPATH is the SCRIPT's own
     # checkout root (a temp vault under test carries no scripts/). The page PATH is
     # passed; content is read in-python — no operator PII is interpolated here.
-    local root hits
+    #
+    # SEC-W1-03 fail-open fix: pii_scan.DEFAULT_IDENTITY_CONFIG is a RELATIVE path
+    # that resolves against the process CWD — a manual `wiki-ingest-lint.sh <page>`
+    # from a non-root cwd would silently load NO name tokens (fail-open for the
+    # operator-NAME class). Pass an ABSOLUTE config rooted at $REPO_ROOT (the vault
+    # under lint; == the script's checkout root in production) so name coverage is
+    # cwd-independent. Config absent (fresh clone) -> empty name set, value patterns
+    # still run — fail-closed direction.
+    local root cfg hits
     root="$(cd "$SCRIPT_DIR/.." && pwd)"
-    if ! hits="$(PYTHONPATH="$root" python3 -c 'import sys; from scripts.guard.pii_scan import scan_text, DEFAULT_IDENTITY_CONFIG; print(scan_text(open(sys.argv[1], encoding="utf-8").read(), token_config=DEFAULT_IDENTITY_CONFIG))' "$f" 2>/dev/null)"; then
+    cfg="$REPO_ROOT/vault/meta/operator-identity.txt"
+    if ! hits="$(PYTHONPATH="$root" python3 -c 'import sys; from scripts.guard.pii_scan import scan_text; print(scan_text(open(sys.argv[1], encoding="utf-8").read(), token_config=sys.argv[2]))' "$f" "$cfg" 2>/dev/null)"; then
         violation "$INV" "$rel: SEC-ORD-01 operator-token scan failed to run"
     elif [ "${hits:-0}" -ge 1 ]; then
         violation "$INV" "$rel: operator-identity token(s) in body (SEC-ORD-01 — genetics library must be operator-free)"

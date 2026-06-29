@@ -254,6 +254,28 @@ def test_noncurated_variant_genotype_never_matched(tmp_path):
     assert item not in store_read.calls
 
 
+def test_find_page_skips_underscore_prefixed_template(tmp_path):
+    # a `_template.md` scaffold carrying matching gene/rsid frontmatter must never be
+    # parsed as the real page (Arch-3). Without the skip, _find_page would resolve it
+    # and surface the template's placeholder finding; with the skip it is an honest gap.
+    gene, rsid = "CYP1A2", "rs762551"
+    assert (gene, rsid) in PLANNING_RELEVANT_VARIANTS
+    template = Path(tmp_path) / "_template.md"
+    template.write_text(
+        "---\ntype: genetics\n"
+        f"gene: {gene}\nrsid: {rsid}\n---\n\n"
+        "## Genotype Findings\n- (A;A): TEMPLATE-LEAK — should never resolve [1]\n"
+    )
+    item = variant_item(gene, rsid)
+    store_read = RecordingStoreRead({item: [_reading(item, "(A;A)")]})
+
+    matches = match.match_genotypes(store_read, library_root=tmp_path)
+    assert not any(m["trait_class"] == "TEMPLATE-LEAK" for m in matches)
+
+    gaps = match.unmatched_planning_variants(store_read, library_root=tmp_path)
+    assert any(g["gene"] == gene and g["rsid"] == rsid for g in gaps)
+
+
 def test_match_module_imports_no_outbound_client_no_sdk_no_store_write():
     forbidden = [
         "anthropic",
