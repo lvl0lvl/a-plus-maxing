@@ -83,12 +83,16 @@ wiki_resolve_link() {
 }
 
 wiki_entity_type() {
-    # Echo the gated entity type for a path: compound | biomarker | library | other.
+    # Echo the gated entity type for a path:
+    # compound | biomarker | genetics | library | other.
+    # genetics is matched BEFORE the library catch-all (more-specific glob first),
+    # so a vault/library/genetics/ page routes to the strict check_genetics battery.
     case "$1" in
-        *vault/compounds/*)  echo compound ;;
-        *vault/biomarkers/*) echo biomarker ;;
-        *vault/library/*)    echo library ;;
-        *)                   echo other ;;
+        *vault/compounds/*)        echo compound ;;
+        *vault/biomarkers/*)       echo biomarker ;;
+        *vault/library/genetics/*) echo genetics ;;
+        *vault/library/*)          echo library ;;
+        *)                         echo other ;;
     esac
 }
 

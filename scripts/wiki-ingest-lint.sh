@@ -124,6 +124,30 @@ marker_populated() {
     ' "$f"
 }
 
+genotype_finding_lines() {
+    # Print each "- " bullet line in the ## Genotype Findings section, in order.
+    local f="$1"
+    awk '
+        /^## Genotype Findings[[:space:]]*$/ { insec=1; next }
+        insec && /^## / { exit }                        # next section
+        insec && /^-[[:space:]]/ { print }
+    ' "$f"
+}
+
+genotype_findings_populated() {
+    # Echo "yes" iff the ## Genotype Findings section has >=1 finding bullet that
+    # is real content — a "- " line whose body after the dash is not a <placeholder>
+    # or #comment (the same populated-vs-template discrimination as marker_populated).
+    local f="$1" line body first
+    while IFS= read -r line; do
+        body="${line#-}"; body="${body#"${body%%[![:space:]]*}"}"   # strip "- " + leading ws
+        first="${body:0:1}"
+        if [ -n "$body" ] && [ "$first" != "<" ] && [ "$first" != "#" ]; then
+            echo yes; return
+        fi
+    done < <(genotype_finding_lines "$f")
+}
+
 check_experimental() {
     # WIKI.md Conventions: risk_tier=experimental requires populated contraindications,
     # a linked monitoring biomarker, and stopping criteria.
@@ -165,6 +189,49 @@ check_library() {
     require_field "$f" "$rel" title
     require_field "$f" "$rel" type
     [ -n "$(wiki_sections "$f")" ] || violation "$INV" "$rel: library page has no '## ' sections"
+}
+
+check_genetics() {
+    # Strict variant-keyed battery for vault/library/genetics/ pages: frontmatter
+    # struct (gene/rsid/evidence_tier/last_verified) + a populated ## Genotype
+    # Findings section. (SEC-ORD-01 operator-token scan + SEC-ORD-02
+    # raw-genotype-in-trait-token guard are added in Cycle 2.) Provenance + index
+    # are the shared checks (check_provenance runs before this dispatch — no waiver).
+    local f="$1" rel="$2"
+    require_field "$f" "$rel" type
+    require_field "$f" "$rel" gene
+    require_field "$f" "$rel" rsid
+    check_enum  "$f" "$rel" evidence_tier "S A B C D"
+    check_date  "$f" "$rel" last_verified
+    wiki_has_section "$f" "Genotype Findings" \
+        || violation "$INV" "$rel: missing required section '## Genotype Findings'"
+    [ "$(genotype_findings_populated "$f")" = "yes" ] \
+        || violation "$INV" "$rel: '## Genotype Findings' has no populated finding bullet"
+
+    # SEC-ORD-01: 0 operator-identity tokens in the body — the genetics library is
+    # variant-keyed + reusable, never operator-associated (crown-jewel). READ-ONLY
+    # shell-out to scripts.guard.pii_scan.scan_text; PYTHONPATH is the SCRIPT's own
+    # checkout root (a temp vault under test carries no scripts/). The page PATH is
+    # passed; content is read in-python — no operator PII is interpolated here.
+    local root hits
+    root="$(cd "$SCRIPT_DIR/.." && pwd)"
+    if ! hits="$(PYTHONPATH="$root" python3 -c 'import sys; from scripts.guard.pii_scan import scan_text, DEFAULT_IDENTITY_CONFIG; print(scan_text(open(sys.argv[1], encoding="utf-8").read(), token_config=DEFAULT_IDENTITY_CONFIG))' "$f" 2>/dev/null)"; then
+        violation "$INV" "$rel: SEC-ORD-01 operator-token scan failed to run"
+    elif [ "${hits:-0}" -ge 1 ]; then
+        violation "$INV" "$rel: operator-identity token(s) in body (SEC-ORD-01 — genetics library must be operator-free)"
+    fi
+
+    # SEC-ORD-02: no raw-genotype pattern in a finding line's trait-class-token field
+    # (between the first ": " and the first " — "). The genotype is the SELECTOR
+    # before the ": " ONLY; a raw rsID/allele must not ride the de-id trait-token.
+    local line token
+    while IFS= read -r line; do
+        token="$(printf '%s\n' "$line" | sed -E 's/^- [^:]*: //; s/ — .*$//')"
+        if printf '%s\n' "$token" | grep -qE 'rs[0-9]+|\([ACGTDI]+;[ACGTDI]+\)'; then
+            violation "$INV" "$rel: raw genotype in '## Genotype Findings' trait-class-token (SEC-ORD-02 — genotype belongs in the selector only): '$token'"
+        fi
+    done < <(genotype_finding_lines "$f")
+    return 0
 }
 
 check_index() {
@@ -224,6 +291,7 @@ check_page() {
     case "$type" in
         compound)  check_compound  "$abs" "$rel" ;;
         biomarker) check_biomarker "$abs" "$rel" ;;
+        genetics)  check_genetics  "$abs" "$rel" ;;
         library)   check_library   "$abs" "$rel" ;;
     esac
     check_index "$abs" "$rel"
