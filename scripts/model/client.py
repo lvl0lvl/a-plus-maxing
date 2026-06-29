@@ -459,8 +459,88 @@ def _author_system_prompt(domain):
     )
 
 
-def _author_output_schema():
-    """The structured-output JSON schema constraining the author envelope (object root)."""
+# The per-domain `payload` schema — structured outputs reject `additionalProperties: true`, so
+# each domain's actionable payload is a CONCRETE closed object matching its `plan_schema` validator
+# + translator (workout exercise / nutrition day-target-or-meal / supplements item / peptides
+# compound regimen). Optional fields are omitted from `required` (the model fills what applies).
+_AUTHOR_PAYLOAD_SCHEMA = {
+    "workout": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "sets": {"type": "integer"},
+            "reps": {"type": "string"},
+            "detail": {"type": "string"},
+            "load": {"type": "string"},
+        },
+        "required": ["name", "sets"],
+        "additionalProperties": False,
+    },
+    "nutrition": {
+        "type": "object",
+        "properties": {
+            "calorie_goal": {"type": "integer"},
+            "macros": {
+                "type": "object",
+                "properties": {
+                    "protein": {"type": "integer"},
+                    "carbs": {"type": "integer"},
+                    "fat": {"type": "integer"},
+                },
+                "required": ["protein", "carbs", "fat"],
+                "additionalProperties": False,
+            },
+            "water_l": {"type": "number"},
+            "meal": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "kcal": {"type": "integer"},
+                    "contents": {"type": "string"},
+                },
+                "required": ["name"],
+                "additionalProperties": False,
+            },
+        },
+        "required": [],
+        "additionalProperties": False,
+    },
+    "supplements": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "dose": {"type": "string"},
+            "timing": {"type": "string"},
+        },
+        "required": ["name", "dose"],
+        "additionalProperties": False,
+    },
+    "peptides": {
+        "type": "object",
+        "properties": {
+            "compound": {"type": "string"},
+            "dose": {"type": "string"},
+            "route": {"type": "string"},
+            "cycle_length_weeks": {"type": "integer"},
+            "evidence": {"type": "string"},
+        },
+        "required": ["compound", "dose", "route"],
+        "additionalProperties": False,
+    },
+}
+
+
+def _author_output_schema(domain):
+    """The structured-output JSON schema constraining the author envelope for `domain`.
+
+    Object-rooted (structured outputs reject a top-level array), every object closed with
+    `additionalProperties: false` (the API rejects `true`). The `payload` is the domain's concrete
+    closed schema (`_AUTHOR_PAYLOAD_SCHEMA`); an unknown domain falls back to a free-form-but-closed
+    object so the call still succeeds.
+    """
+    payload_schema = _AUTHOR_PAYLOAD_SCHEMA.get(
+        domain, {"type": "object", "properties": {}, "additionalProperties": False}
+    )
     return {
         "type": "object",
         "properties": {
@@ -476,7 +556,7 @@ def _author_output_schema():
                         "source": {"type": "string"},
                         "confidence_tier": {"type": "string"},
                         "reversibility": {"type": "string"},
-                        "payload": {"type": "object", "additionalProperties": True},
+                        "payload": payload_schema,
                     },
                     "required": ["claim", "category", "grounding", "source",
                                  "confidence_tier", "reversibility", "payload"],
@@ -588,7 +668,7 @@ class _ClaudeNoTrainBackend:
 
         client = self._client()
         system = _author_system_prompt(domain)
-        schema = _author_output_schema()
+        schema = _author_output_schema(domain)
         prompt = (
             f"Author your {domain} recommendations for this de-identified operator summary:\n"
             f"{json.dumps(summary, sort_keys=True)}"
