@@ -378,12 +378,15 @@ def test_spa_fetch_targets_are_all_same_origin_loopback():
     # whose key is written to the on-device keychain — it never leaves the machine, so it
     # adds NO new egress class. /confirm-extraction (ADR-0030-T4) is likewise a LOCAL
     # same-origin POST: the operator-confirmed extracted-readings subset lands through the
-    # unchanged on-device store sink — it never leaves the machine. The off-machine egress
-    # set is still the ADR-0016 /chat one-turn alone (the per-target loopback assertion above
-    # is the egress guard, byte-unchanged; the enumerated set grows by the one authorized route).
-    assert set(targets) <= {"/chat", "/upload", "/settings/key", "/confirm-extraction"}, (
+    # unchanged on-device store sink — it never leaves the machine. /generate-plan is the
+    # in-app plan-engine trigger: a same-origin POST that authors over the de-identified
+    # summary through the no-train author (the SAME off-machine class as /chat, never a new
+    # one) and records locally. The off-machine egress set is still the no-train author lane
+    # (the per-target loopback assertion above is the egress guard, byte-unchanged; the
+    # enumerated set grows by the one authorized in-app route).
+    assert set(targets) <= {"/chat", "/upload", "/settings/key", "/confirm-extraction", "/generate-plan"}, (
         f"the SPA fetches a path beyond the known loopback routes "
-        f"(/chat + /upload + /settings/key + /confirm-extraction): {sorted(set(targets))}"
+        f"(/chat + /upload + /settings/key + /confirm-extraction + /generate-plan): {sorted(set(targets))}"
     )
 
 
@@ -817,3 +820,28 @@ def test_extracted_genotype_dna_status_renders_in_both_doc_cards():
     # Neither render raises (the API-01 crash); each names the genotype count, not a (missing) file.
     assert "2 genotypes landed" in app_shell._doc_cards(status), "app_shell did not render the genotype count"
     assert "2 genotypes landed" in intake._doc_cards(status), "intake did not render the genotype count"
+
+
+# --------------------------------------------------------------------------- #
+# In-app 'Generate plan' trigger: the Plan-screen button POSTs /generate-plan and
+# the inline JS swaps the re-rendered Plan zone in. Fixture-driven (rendered-SPA string).
+# --------------------------------------------------------------------------- #
+
+
+def test_plan_screen_generate_button_wired_to_generate_plan():
+    """The Plan-screen 'Generate plan' button is wired to POST /generate-plan and render the reply.
+
+    The awaiting-plan state carries a `#plan-gen-run` button + a `#plan-gen-status` line, the Plan
+    zone is wrapped in a stable `#plan-zone` container the inline JS swaps the re-rendered plans
+    into, and the inline JS fetches `/generate-plan` and reads the `need_key` / `plan_html` /
+    `results` reply. Failing-capable: reds if the button / status / zone is dropped or the fetch
+    + reply-reads are unwired.
+    """
+    html = _spa_html()
+    assert 'id="plan-gen-run"' in html, "the Plan screen has no Generate-plan button"
+    assert "id='plan-gen-status'" in html or 'id="plan-gen-status"' in html, "no generate-status line"
+    assert 'id="plan-zone"' in html, "the Plan zone has no stable container the JS swaps into"
+    assert "fetch('/generate-plan'" in html, "the Plan JS does not POST /generate-plan"
+    assert "d.need_key" in html, "the Plan JS does not read the no-key signal"
+    assert "d.plan_html" in html, "the Plan JS does not render the returned plan zone"
+    assert "d.results" in html, "the Plan JS does not surface the per-domain results"

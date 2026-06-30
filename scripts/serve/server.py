@@ -14,10 +14,14 @@ the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`) -> re-render t
 shell via `generate.run('app')` reflecting the new load-state. The server serves NO
 generated dashboard/report artifact live (ADR-0013 Falsification 3); the route table
 is {GET `/`, GET `/settings/key`, POST `/upload`, POST `/chat`, POST `/settings/key`,
-POST `/confirm-extraction`}. POST `/confirm-extraction` (ADR-0030-T3) lands ONLY the
-operator-confirmed subset of an unrecognized-format upload's extracted readings through
-the UNCHANGED sink — the `/upload` handler surfaces those readings and lands 0.
-Stopping is `srv.shutdown()` +
+POST `/confirm-extraction`, POST `/generate-plan`}. POST `/confirm-extraction`
+(ADR-0030-T3) lands ONLY the operator-confirmed subset of an unrecognized-format
+upload's extracted readings through the UNCHANGED sink — the `/upload` handler surfaces
+those readings and lands 0. POST `/generate-plan` authors + records a plan for each
+`plan_schema.PLAN_DOMAINS` over the stored data via the UNCHANGED
+`scripts.plan.generate_plan` caller (the serve layer re-implements no assembly/safety
+logic — it only CALLS it) and answers the re-rendered Plan zone + per-domain outcomes
+as JSON. Stopping is `srv.shutdown()` +
 `srv.server_close()`, the clean operator-stop path.
 """
 
@@ -104,8 +108,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     POST `/upload` stages the multipart body, routes the staged file into the unchanged
     `ingest.run`/`dna.land` seam, and re-renders the app shell reflecting the new
     load-state. Any other POST 404s — the route table is {GET `/`, GET `/settings/key`,
-    POST `/upload`, POST `/chat`, POST `/settings/key`, POST `/confirm-extraction`}, never
-    a directory listing or an artifact-serving route.
+    POST `/upload`, POST `/chat`, POST `/settings/key`, POST `/confirm-extraction`,
+    POST `/generate-plan`}, never a directory listing or an artifact-serving route.
 
     Attributes:
         store_root: The time-series store root the POST handler ingests into and
@@ -153,6 +157,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/confirm-extraction":
             self._do_confirm_extraction()
+            return
+        if self.path == "/generate-plan":
+            self._do_generate_plan()
             return
         if self.path != "/upload":
             self.send_error(404)
@@ -372,6 +379,67 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._write_json(400, {"landed": [], "degraded": True, "reason": "bad request"})
             return
         self._write_json(200, {"landed": receipt["store"]})
+
+    def _do_generate_plan(self):
+        """Author + record a plan for every plan domain over the stored data; answer JSON.
+
+        The in-app trigger for the plan engine — the operator's "Generate plan" press. For
+        each `plan_schema.PLAN_DOMAINS` domain it authors the envelope through the instance
+        no-train client and records the surviving plan via the UNCHANGED
+        `scripts.plan.generate_plan` caller (de-identified summary -> the safety-filter pass
+        -> record_plan): the serve layer re-implements no assembly/safety logic, it only
+        CALLS it. Each domain is wrapped so ONE domain's hard failure (a fail-loud
+        `record_plan` ValueError / an unknown-domain KeyError) or honest no-plan reason (an
+        author-call-failed degrade) records the others and surfaces that domain's reason —
+        the whole run never aborts on one domain. The reply is JSON
+        `{need_key, results, plan_html}`: `results` maps each domain to `"recorded"` or its
+        honest no-plan reason, and `plan_html` is the re-rendered Plan zone the front-end
+        swaps in.
+
+        No-key state: with no instance author client (`self.client is None` — no API key set,
+        mirroring `/upload`'s None-client path) it records NOTHING and answers `need_key` so
+        the front-end routes the operator to connect their key — never a crash. The plan is
+        generated privately through the no-train author, which needs the instance key.
+        """
+        import datetime
+        import functools
+
+        from scripts.plan.generate_plan import generate_plan
+        from scripts.store import plan_schema, store
+
+        # No instance author client -> the no-key state. The plan needs the no-train author
+        # (the instance API key); record nothing and route the operator to connect it.
+        if self.client is None:
+            self._write_json(200, {"need_key": True, "results": {}, "plan_html": None})
+            return
+
+        store_root = self.store_root if self.store_root is not None else store.DEFAULT_ROOT
+        # The reader is instance-root pre-bound (the router.summarize caller contract — an
+        # unbound reader silently reads the wrong instance). Record under today so the plan
+        # resolves as today's on the Plan screen (date equality is plan_schema's resolution).
+        store_read = functools.partial(store.read, root=store_root)
+        today = datetime.date.today().isoformat()
+
+        results = {}
+        for domain in plan_schema.PLAN_DOMAINS:
+            try:
+                outcome = generate_plan(
+                    domain, store_read=store_read, root=store_root,
+                    plan_date=today, client=self.client,
+                )
+                results[domain] = (
+                    "recorded" if outcome["recorded"] else (outcome["reason"] or "no-plan")
+                )
+            except (ValueError, KeyError) as exc:
+                # One domain's hard failure records nothing for THAT domain but never aborts
+                # the run — the others still generate. The honest reason is surfaced, never a
+                # stack trace / dropped request thread.
+                results[domain] = f"error: {type(exc).__name__}"
+
+        from vault.design.templates import app_shell
+
+        plan_html = app_shell._plan_zone(store.read_all(store_root), today)
+        self._write_json(200, {"need_key": False, "results": results, "plan_html": plan_html})
 
     def _key_status(self):
         """Write JSON `{connected: bool}` — whether a no-train key resolves at runtime.

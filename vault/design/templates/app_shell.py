@@ -97,8 +97,9 @@ _AWAITING_PLAN = (
     "<div data-awaiting='plan'><div style=\"font-weight:700;font-size:15px\">No approved plan yet</div>"
     '<div class="sub">Once you\'ve loaded your documents and talked through your goals, generate your '
     "plan here. When you approve it, this screen shows your approved plan.</div></div>"
-    '<button class="btn primary" style="flex:none">Generate plan &rarr;</button>'
+    '<button class="btn primary" id="plan-gen-run" style="flex:none">Generate plan &rarr;</button>'
     "</div>"
+    "<div id='plan-gen-status' class='sub' role='status' style='display:none;margin-bottom:18px'></div>"
 )
 
 
