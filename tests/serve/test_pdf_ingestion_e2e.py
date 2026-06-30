@@ -393,8 +393,16 @@ def _post_confirm(port, readings):
 
 
 def _tuples(readings):
-    """Return the order-independent set of (item, timepoint, source, value) tuples."""
-    return {(r["item"], r["timepoint"], r["source"], r["value"]) for r in readings}
+    """Order-independent set of (item, timepoint, source, value) tuples — the BARE landed readings.
+
+    Excludes the additive `biomarker::` trend-feed mirror `confirm.land_confirmed` writes for a
+    registered-polarity marker (the dead-feed fix): that mirror is a derived trend copy of a
+    confirmed reading, not a distinct confirmed reading, so it is filtered from this equality.
+    """
+    return {
+        (r["item"], r["timepoint"], r["source"], r["value"])
+        for r in readings if not r["item"].startswith("biomarker::")
+    }
 
 
 def _offered_readings(ctype, body):
@@ -466,7 +474,8 @@ def test_headline_pdf_local_extract_chunk_confirm_lands_traced_reading(tmp_path,
         landed = store.read_all(tmp_path / "store")
     # Content-traceable: the landed readings EQUAL the confirmed fixture subset.
     assert _tuples(landed) == _tuples(READINGS_A)
-    assert {(r["item"], r["value"]) for r in landed} == {(r["item"], r["value"]) for r in READINGS_A}
+    assert {(r["item"], r["value"]) for r in landed if not r["item"].startswith("biomarker::")} == {
+        (r["item"], r["value"]) for r in READINGS_A}
     # The raw PDF stayed local: the model lane received only text/plain chunks.
     assert backend.extract_calls
     assert all(mt == "text/plain" for _c, mt in backend.extract_calls)
@@ -578,7 +587,9 @@ def test_confirm_gate_store_empty_until_confirm(tmp_path, monkeypatch):
         assert store.read_all(tmp_path / "store") == []
 
         _post_confirm(port, body["readings"])
-        assert len(store.read_all(tmp_path / "store")) == len(READINGS_A)
+        # filter the additive biomarker:: trend-feed mirror (a registered marker mirrors on confirm).
+        bare = [r for r in store.read_all(tmp_path / "store") if not r["item"].startswith("biomarker::")]
+        assert len(bare) == len(READINGS_A)
 
 
 def test_mock_tested_no_live_key_resolution_zero_spend(tmp_path, monkeypatch):

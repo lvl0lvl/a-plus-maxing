@@ -1496,3 +1496,90 @@ def test_format_agnostic_upload_feeds_the_plan_e2e(tmp_path):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+class _TrendEchoClient:
+    """One mock no-train client for BOTH lanes (0 live API): extract_readings + author.
+
+    `extract_readings` returns the fixed lab readings; `author` ECHOES the de-identified
+    `recent-trend-direction` the summary carries into the workout plan (so the rendered plan is
+    content-traceable to the lab trend), and records the summary it saw. Non-workout domains
+    return the thin-library sentinel (an honest no-plan) to keep the E2E on the traceable path.
+    """
+
+    def __init__(self, extracted):
+        self._extracted = list(extracted)
+        self.author_summaries = {}
+
+    def extract_readings(self, file_content, media_type):
+        return list(self._extracted)
+
+    def author(self, domain, summary):
+        self.author_summaries[domain] = summary
+        if domain == "workout":
+            trend = summary.get("recent-trend-direction") or "flat"
+            return {"specialist": "personal-trainer", "recommendations": [
+                _rec(f"address the {trend} marker trend in programming", "training",
+                     "ACSM resistance-training guidelines 2024",
+                     {"name": "Goblet squat", "sets": 3, "reps": "8-12",
+                      "detail": f"recent trend: {trend}"})]}
+        return {"specialist": f"{domain}-specialist", "thin_library": True}
+
+
+def test_format_agnostic_lab_value_moves_the_plan_e2e(tmp_path):
+    """E2E (lab-value-in -> plan-out): a confirmed registered biomarker TRENDS and reaches the plan.
+
+    The dead-feed fix, end-to-end: upload an arbitrary `.xyz` -> the no-train extract lane surfaces
+    TWO rising LDL readings (a real trend) -> POST /confirm-extraction lands them (bare AND the
+    additive `biomarker::ldl` mirror) -> POST /generate-plan -> `router.summarize`'s
+    recent-trend-direction goes `regressing` (rising LDL, a down-polarity marker) -> the author
+    SEES it in its summary -> the workout plan reflects it. Content-traceable lab-in -> plan-out:
+    the rising-LDL trend moves the plan OFF the default `flat`.
+
+    Failing-capable / mutation-proof: drop the `confirm.land_confirmed` biomarker mirror and
+    `biomarker::ldl` stays empty, recent-trend-direction reverts to `flat`, and the `regressing`
+    assertions red (the exact dead-feed gap this fix closes).
+    """
+    _seed_summary_store(tmp_path / "store")
+    rising_ldl = [
+        {"item": "ldl", "timepoint": "2026-04-01", "source": "labs", "value": "90"},
+        {"item": "ldl", "timepoint": "2026-05-01", "source": "labs", "value": "140"},
+    ]
+    client = _TrendEchoClient(rising_ldl)
+    srv, port = _server_with_author(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        # 1) arbitrary-format upload -> the extract lane surfaces the two LDL readings for confirm.
+        ustatus, uctype, ubody = _post_upload_ct(port, "labs.xyz", b"\x01 arbitrary lab export bytes")
+        assert ustatus == 200 and uctype == "application/json", (
+            f"the arbitrary-format lab upload did not surface a review payload ({ustatus}, {uctype})"
+        )
+        review = json.loads(ubody)
+        assert review["readings"] == rising_ldl, f"the extract lane did not surface the readings: {review}"
+
+        # 2) confirm -> both land bare AND mirror into biomarker::ldl (two timepoints -> a trend).
+        cstatus, _ = _post_confirm_extraction(port, review["readings"])
+        assert cstatus == 200, f"confirm-extraction returned {cstatus}, expected 200"
+        mirrored = store.read("biomarker::ldl", root=tmp_path / "store")
+        assert len(mirrored) == 2, (
+            f"the confirmed LDL readings did not mirror into the biomarker:: trend feed: {mirrored}"
+        )
+
+        # 3) generate-plan -> the rising-LDL trend reaches the author summary + the rendered plan.
+        gstatus, gbody = _post_generate_plan(port)
+        assert gstatus == 200, f"generate-plan returned {gstatus}, expected 200"
+        payload = json.loads(gbody)
+        assert payload["results"]["workout"] == "recorded", f"workout did not record: {payload['results']}"
+        seen = client.author_summaries.get("workout")
+        assert seen is not None and seen.get("recent-trend-direction") == "regressing", (
+            f"the lab trend did not reach the author summary (still default flat?): "
+            f"{seen and seen.get('recent-trend-direction')}"
+        )
+        # plan-out content-traceable: the rendered plan carries the lab-driven trend, NOT the default.
+        assert "recent trend: regressing" in payload["plan_html"], "the plan does not reflect the lab trend"
+        assert "recent trend: flat" not in payload["plan_html"], (
+            "the plan still shows the default flat — the lab value did not move it"
+        )
+    finally:
+        srv.shutdown()
+        srv.server_close()
