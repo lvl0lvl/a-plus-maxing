@@ -191,3 +191,190 @@ def test_research_query_imports_no_outbound_client_no_sdk():
         "scripts.model",
     ):
         assert marker not in source, f"outbound/SDK marker leaked into research_query.py: {marker!r}"
+
+
+# --- Cycle 3: the un-stubbed landing mechanism (a finding -> a gated genetics page) ---
+
+import functools  # noqa: E402
+import os  # noqa: E402
+import subprocess  # noqa: E402
+
+from scripts.genetics import match  # noqa: E402
+from scripts.genetics.research_query import (  # noqa: E402
+    dispatch_variant_research,
+    land_finding_page,
+)
+from scripts.genetics.variants import variant_item  # noqa: E402
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _finding(gene, rsid, genotype_findings, *, tier="B"):
+    """A de-identified variant finding dict an injected dispatcher would return."""
+    return {
+        "gene": gene,
+        "rsid": rsid,
+        "evidence_tier": tier,
+        "created": "2026-06-29",
+        "last_verified": "2026-06-29",
+        "provenance_dir": "design/.test-provenance",
+        "provenance_slug": "genetics-specialist",
+        "genotype_findings": genotype_findings,
+    }
+
+
+def _wiki_repo(tmp_path, slug):
+    """Scaffold a temp wiki repo + a 0-spend stub bda; return (repo, genetics_dir, bda)."""
+    repo = tmp_path / "wikirepo"
+    gdir = repo / "vault/library/genetics"
+    gdir.mkdir(parents=True)
+    (repo / "vault/meta").mkdir(parents=True)
+    (repo / "design/.test-provenance").mkdir(parents=True)
+    (repo / "vault/meta/index.md").write_text(
+        f"# Index\n## genetics\n- [[library/genetics/{slug}]]\n", encoding="utf-8"
+    )
+    bda = tmp_path / "bda-pass.sh"
+    bda.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    bda.chmod(0o755)
+    return repo, gdir, bda
+
+
+def _run_gate(repo, bda, page_relpath):
+    """Run wiki-ingest-lint.sh over a repo-relative page; return (exit_code, output)."""
+    proc = subprocess.run(
+        ["bash", str(_REPO_ROOT / "scripts/wiki-ingest-lint.sh"), page_relpath],
+        cwd=repo,
+        env={**os.environ, "WIKI_REPO_ROOT": str(repo), "WIKI_BDA_CMD": str(bda)},
+        capture_output=True,
+        text=True,
+    )
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+def test_dispatch_lands_gated_page_from_finding(tmp_path):
+    """The un-stubbed dispatch lands a finding as a gate-valid genetics page (mock dispatcher, 0 spend).
+
+    Non-tautological: the written page PASSES the real wiki-ingest-lint battery (bda stubbed
+    0-spend), proving a structurally-gated page was written — not merely that a file exists. The
+    dispatcher receives the GUARDED, allele-agnostic query (de-association held on the landing path).
+    """
+    gene, rsid = "CYP1A2", "rs762551"
+    slug = f"{gene.lower()}-{rsid}"
+    repo, gdir, bda = _wiki_repo(tmp_path, slug)
+    finding = _finding(
+        gene,
+        rsid,
+        [
+            ("(A;A)", "fast-caffeine-metabolism", "fast clearance [http://example/1]"),
+            ("(C;C)", "slow-caffeine-metabolism", "slow clearance [http://example/2]"),
+        ],
+    )
+    seen = {}
+
+    def dispatcher(query):
+        seen["query"] = query
+        return finding
+
+    page = dispatch_variant_research(gene, rsid, dispatcher=dispatcher, library_root=gdir)
+
+    # the dispatcher received the guarded, allele-agnostic query (de-association held)
+    assert seen["query"] == build_variant_query(gene, rsid)
+    assert assert_query_de_associated(seen["query"]) is None
+    # a gate-valid page was written (passes the real ingestion battery, bda stubbed)
+    assert page.exists()
+    rc, out = _run_gate(repo, bda, f"vault/library/genetics/{slug}.md")
+    assert rc == 0, out
+
+
+def test_landed_page_round_trips_through_matcher(tmp_path):
+    """The landed page resolves through the consumption matcher (mechanism -> consumption).
+
+    A genotype the operator carries -> the dispatch-landed page -> match.match_genotypes -> the
+    coarse trait class. Non-tautological: a DIFFERENT genotype -> a DIFFERENT trait class (A != B).
+    """
+    gene, rsid = "CYP1A2", "rs762551"
+    finding = _finding(
+        gene,
+        rsid,
+        [
+            ("(A;A)", "fast-caffeine-metabolism", "fast [http://example/1]"),
+            ("(C;C)", "slow-caffeine-metabolism", "slow [http://example/2]"),
+        ],
+    )
+    dispatch_variant_research(gene, rsid, dispatcher=lambda q: finding, library_root=tmp_path)
+    item = variant_item(gene, rsid)
+
+    def read_a(it):
+        return [{"item": it, "source": "dna-report", "value": "(A;A)"}] if it == item else []
+
+    def read_c(it):
+        return [{"item": it, "source": "dna-report", "value": "(C;C)"}] if it == item else []
+
+    m_a = match.match_genotypes(read_a, library_root=tmp_path)
+    m_c = match.match_genotypes(read_c, library_root=tmp_path)
+    trait_a = next(m["trait_class"] for m in m_a if m["rsid"] == rsid)
+    trait_c = next(m["trait_class"] for m in m_c if m["rsid"] == rsid)
+    assert trait_a == "fast-caffeine-metabolism"
+    assert trait_c == "slow-caffeine-metabolism"
+    assert trait_a != trait_c
+
+
+def test_dispatch_without_library_root_writes_no_page(tmp_path):
+    """A dispatcher WITHOUT library_root returns the finding and writes no page (back-compat control)."""
+    gene, rsid = "CYP1A2", "rs762551"
+    finding = _finding(gene, rsid, [("(A;A)", "fast-caffeine-metabolism", "fast [http://example/1]")])
+    result = dispatch_variant_research(gene, rsid, dispatcher=lambda q: finding)
+    assert result == finding
+    assert not list(tmp_path.glob("*.md"))
+
+
+def test_dispatch_refuses_finding_variant_mismatch(tmp_path):
+    """A dispatcher returning a finding for a DIFFERENT variant raises and lands no page (boundary check)."""
+    finding = _finding("MCM6", "rs4988235", [("(T;T)", "lactase-persistent", "x [http://example/1]")])
+    with pytest.raises(ValueError):
+        dispatch_variant_research(
+            "CYP1A2", "rs762551", dispatcher=lambda q: finding, library_root=tmp_path
+        )
+    assert not list(tmp_path.glob("*.md"))
+
+
+def test_landed_page_with_no_findings_fails_gate(tmp_path):
+    """A finding with no genotype lines lands a page the gate REJECTS (the gate is not always-pass)."""
+    gene, rsid = "CYP1A2", "rs762551"
+    slug = f"{gene.lower()}-{rsid}"
+    repo, gdir, bda = _wiki_repo(tmp_path, slug)
+    dispatch_variant_research(gene, rsid, dispatcher=lambda q: _finding(gene, rsid, []), library_root=gdir)
+    rc, out = _run_gate(repo, bda, f"vault/library/genetics/{slug}.md")
+    assert rc == 1, out  # empty ## Genotype Findings -> a real gate violation
+
+
+def test_landed_page_drives_genetic_trait_token_in_summary(tmp_path):
+    """The LANDED page drives router.summarize's de-id genetic-trait-classes token (mechanism -> plan).
+
+    Ties the un-stubbed landing to the plan-summary boundary: a genotype + the dispatch-landed page
+    -> the coarse token (no raw genotype). Non-tautological: a no-DNA store -> the empty token.
+    """
+    from scripts.plan import router
+    from scripts.store import keying, store
+
+    gene, rsid = "CYP1A2", "rs762551"
+    lib = tmp_path / "genlib"
+    finding = _finding(gene, rsid, [("(A;A)", "fast-caffeine-metabolism", "fast [http://example/1]")])
+    dispatch_variant_research(gene, rsid, dispatcher=lambda q: finding, library_root=lib)
+
+    root = tmp_path / "inst"
+    root.mkdir()
+    item = variant_item(gene, rsid)
+    store.append(
+        item,
+        {f: None for f in keying.LINE_FIELDS}
+        | {"item": item, "timepoint": "2026-06-29T00:00:00+00:00", "source": "dna-report", "value": "(A;A)"},
+        root=root,
+    )
+    summary = router.summarize(functools.partial(store.read, root=root), genetics_library_root=lib)
+    assert summary["genetic-trait-classes"] == "fast-caffeine-metabolism"
+
+    empty_root = tmp_path / "inst_empty"
+    empty_root.mkdir()
+    empty = router.summarize(functools.partial(store.read, root=empty_root), genetics_library_root=lib)
+    assert empty["genetic-trait-classes"] == ""
