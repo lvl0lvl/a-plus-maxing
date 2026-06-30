@@ -875,23 +875,36 @@ def test_post_step6_step_control_field_never_lands_in_the_record(tmp_path):
         srv.server_close()
 
 
-def test_serve_layer_has_no_in_app_plan_generation_call():
-    """AC-5 / Risk Falsification-3: scripts/serve/ carries 0 assemble/plan-generation call.
+def test_serve_layer_delegates_plan_generation_no_reimplementation():
+    """The serve layer generates plans by DELEGATING to generate_plan — it re-implements none.
 
-    Step 6 is a `/generate-plan` HANDOFF; the serve layer adds no in-app plan
-    generation. Assert no `assemble` import/call and no plan-generation reference in
-    scripts/serve/. Reds if an in-app generation call is added (the negative control
-    in the recipe: temporarily add an assemble call -> this reds).
+    The POST `/generate-plan` route (the in-app plan-engine trigger) authors + records a plan
+    by CALLING the unchanged `scripts.plan.generate_plan` caller — it imports/calls neither
+    `assemble` (the safety-filter pass) nor the plan `orchestrator` directly, so the serve
+    layer never forks the safety pipeline the frozen `scripts/plan/*` owns. The delegation
+    is asserted positively (server.py references `generate_plan`) so this is not vacuous.
+    Reds if the serve layer ever re-implements assembly/orchestration, OR if the delegation
+    to generate_plan is removed.
+    SUPERSEDES the pre-PR `test_serve_layer_has_no_in_app_plan_generation_call`: the serve
+    layer NOW does in-app generation (the operator's "Generate plan" press), but via
+    delegation, not re-implementation — the earlier test's "0 in-app generation" premise is
+    retired with this route landing.
     """
     serve_dir = REPO_ROOT / "scripts" / "serve"
     for py in serve_dir.glob("*.py"):
         src = py.read_text()
         assert "assemble" not in src, (
-            f"{py.name} references plan assembly — Step 6 is a /generate-plan handoff, 0 in-app generation"
+            f"{py.name} references plan assembly — the serve layer must DELEGATE to "
+            f"generate_plan, never re-implement assemble"
         )
         assert "orchestrator" not in src, (
-            f"{py.name} references the plan orchestrator — no in-app generation in the serve layer"
+            f"{py.name} references the plan orchestrator — the serve layer delegates to "
+            f"generate_plan, never the orchestrator directly"
         )
+    server_src = (serve_dir / "server.py").read_text()
+    assert "generate_plan" in server_src, (
+        "server.py no longer delegates to generate_plan — the in-app plan trigger is unwired"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -1072,3 +1085,244 @@ def test_upload_route_table_unchanged(tmp_path):
 
     src = (REPO_ROOT / "scripts" / "serve" / "server.py").read_text()
     assert '_LOOPBACK = "127.0.0.1"' in src, "the loopback bind literal changed (T4 must not touch the bind)"
+
+
+# --------------------------------------------------------------------------- #
+# POST /generate-plan — the in-app plan-engine trigger: author + record a plan for
+# each plan domain over the stored data via the unchanged generate_plan caller, then
+# answer the re-rendered Plan zone + per-domain outcomes. Fixture-driven, 0 live spend
+# (a mock no-train author client injected at the seam — no key, no API call).
+# --------------------------------------------------------------------------- #
+
+import datetime
+
+from scripts.model.client import ModelCallError
+from scripts.plan.generate_plan import AUTHOR_CALL_FAILED
+from scripts.store import keying, plan_schema
+
+
+class _MockAuthorClient:
+    """A mock no-train author client: per-domain envelope (or raise) for author(domain, summary).
+
+    Mirrors the `ModelClient.author(domain, summary)` seam `generate_plan` calls — 0 live API,
+    0 key. `raise_for` maps a domain to an exception instance the author raises for that domain
+    (drives the per-domain degrade / resilience paths).
+    """
+
+    def __init__(self, envelopes, *, raise_for=None):
+        self._envelopes = envelopes
+        self._raise_for = raise_for or {}
+        self.calls = []
+
+    def author(self, domain, summary):
+        self.calls.append(domain)
+        if domain in self._raise_for:
+            raise self._raise_for[domain]
+        return self._envelopes[domain]
+
+
+def _rec(claim, category, source, payload):
+    """A complete, HALT-clearing universal recommendation (the assemble survival contract)."""
+    return {
+        "claim": claim, "source": source, "confidence_tier": "established",
+        "reversibility": "fully reversible on discontinuation", "category": category,
+        "payload": payload,
+    }
+
+
+def _domain_envelopes(*, workout_name="Goblet squat"):
+    """One surviving per-domain author envelope each (proven-shape recs from test_generate_plan)."""
+    return {
+        "workout": {"specialist": "personal-trainer", "recommendations": [
+            _rec(f"rebuild a movement base with {workout_name.lower()}", "training",
+                 "ACSM resistance-training guidelines 2024",
+                 {"name": workout_name, "sets": 3, "reps": "8-12", "detail": "controlled tempo"})]},
+        "nutrition": {"specialist": "nutritionist", "recommendations": [
+            _rec("set energy and protein at maintenance to support recovery", "nutrition",
+                 "ISSN position stand on protein and exercise 2017",
+                 {"calorie_goal": 2600, "macros": {"protein": 190, "carbs": 250, "fat": 80}}),
+            _rec("distribute protein across the day with breakfast", "nutrition",
+                 "ISSN position stand on protein and exercise 2017",
+                 {"meal": {"name": "Breakfast", "contents": "eggs, oats, berries", "kcal": 650}})]},
+        "supplements": {"specialist": "supplement-specialist", "recommendations": [
+            _rec("supplement creatine to close a documented gap", "supplementation",
+                 "Examine.com creatine monograph 2024",
+                 {"name": "Creatine monohydrate", "dose": "5 g", "timing": "daily"})]},
+        "peptides": {"specialist": "peptide-specialist", "recommendations": [
+            _rec("run bpc-157 for localized tissue support", "peptide-therapy",
+                 "vault/library/peptides/bpc-157 research-report 2026",
+                 {"compound": "BPC-157", "dose": "250 mcg", "route": "subcutaneous"})]},
+    }
+
+
+def _seed_summary_store(store_root):
+    """Seed the PII-free operator-state items `router.summarize` reads (hard-limits benign)."""
+    fields = {
+        "goal-targets": "return to pre-Jan-2026 loading",
+        "goal-priority-order": "recovery>strength",
+        "recovery-status-band": "moderate",
+        "hard-limits": "no overhead pressing",
+    }
+    for item, value in fields.items():
+        store.append(
+            item,
+            {f: None for f in keying.LINE_FIELDS}
+            | {"item": item, "timepoint": "2026-06-18", "source": "intake", "value": value},
+            root=store_root,
+        )
+
+
+def _post_generate_plan(port):
+    """POST /generate-plan on the running server; return (status, response_text)."""
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=60)
+    conn.request("POST", "/generate-plan", body=b"")
+    resp = conn.getresponse()
+    text = resp.read().decode("utf-8")
+    conn.close()
+    return resp.status, text
+
+
+def test_generate_plan_records_all_domains_and_renders(tmp_path):
+    """E2E happy path: POST /generate-plan records every domain + the re-render is content-traceable.
+
+    Seeds the summary store, injects a MOCK author returning a valid per-domain envelope, then
+    POSTs /generate-plan. Asserts: every `plan_schema.PLAN_DOMAINS` domain is RECORDED in the
+    store (`plan::<domain>` resolves a plan for today), and the re-rendered Plan zone in the JSON
+    reply carries a recommendation TRACEABLE to each mock author's output (a content assertion,
+    not merely "a plan exists"). The mock author is reached once per domain — 0 live API / key.
+    """
+    _seed_summary_store(tmp_path / "store")
+    client = _MockAuthorClient(_domain_envelopes())
+    srv, port = _server_with_client(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"POST /generate-plan returned {status}, expected 200"
+        payload = json.loads(body)
+        assert payload["need_key"] is False, "a present author client must not report need_key"
+        assert payload["results"] == {d: "recorded" for d in plan_schema.PLAN_DOMAINS}, (
+            f"not every domain recorded: {payload['results']}"
+        )
+
+        # Each domain's plan is RECORDED in the store (resolved for today).
+        today = datetime.date.today().isoformat()
+        for domain in plan_schema.PLAN_DOMAINS:
+            resolved = plan_schema.read_plan(domain, today, tmp_path / "store")
+            assert resolved["plan"] is not None, f"{domain} plan was not recorded into the store"
+
+        # Content-traceable: the re-rendered Plan zone carries a recommendation from each author.
+        plan_html = payload["plan_html"]
+        for token in ("Goblet squat", "Breakfast", "Creatine monohydrate", "BPC-157"):
+            assert token in plan_html, f"the re-rendered Plan zone does not carry {token!r}"
+
+        # The author was reached exactly once per domain (no live API, no duplicate calls).
+        assert sorted(client.calls) == sorted(plan_schema.PLAN_DOMAINS), (
+            f"the author was not reached once per domain: {client.calls}"
+        )
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_generate_plan_different_author_yields_different_plan(tmp_path):
+    """Non-tautological: a DIFFERENT mock author output -> a DIFFERENT rendered plan.
+
+    Runs /generate-plan twice over two isolated stores with two different workout authors; the
+    rendered Plan zone reflects EACH author's distinct exercise — A's name appears only in A's
+    render and B's only in B's. Proves the render is driven by the author's output, not a fixed
+    string baked into the template (the failing-capable A != B control).
+    """
+    def gen(sub, name):
+        root = tmp_path / sub
+        _seed_summary_store(root / "store")
+        srv, port = _server_with_client(root, _MockAuthorClient(_domain_envelopes(workout_name=name)))
+        _serve_in_thread(srv)
+        try:
+            status, body = _post_generate_plan(port)
+            assert status == 200, f"POST /generate-plan returned {status}, expected 200"
+            return json.loads(body)["plan_html"]
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
+    a = gen("a", "Goblet squat")
+    b = gen("b", "Bulgarian split squat")
+    assert "Goblet squat" in a and "Goblet squat" not in b, "author A's exercise leaked / missing"
+    assert "Bulgarian split squat" in b and "Bulgarian split squat" not in a, (
+        "author B's exercise leaked / missing — the render is not driven by the author output"
+    )
+
+
+def test_generate_plan_no_key_records_nothing(tmp_path):
+    """No-key path: client=None -> honest need_key, 0 plans recorded, no crash/500.
+
+    Builds the server WITHOUT an author client (`self.client is None`, the no-key state). POST
+    /generate-plan must answer the honest need_key state, record 0 plans (the engine is never
+    called), and keep the handler alive — never a crash or a 500.
+    """
+    _seed_summary_store(tmp_path / "store")
+    srv, port = _server_with_roots(tmp_path)  # build_server() -> self.client is None
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"no-key POST /generate-plan returned {status}, expected 200"
+        payload = json.loads(body)
+        assert payload["need_key"] is True, "a None author client must report need_key"
+        assert payload["results"] == {}, "the no-key path must not run the engine for any domain"
+
+        for domain in plan_schema.PLAN_DOMAINS:
+            assert store.read(f"plan::{domain}", root=tmp_path / "store") == [], (
+                f"the no-key path wrongly recorded a {domain} plan"
+            )
+        assert _still_alive(port), "the handler died after a no-key /generate-plan POST"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_generate_plan_one_domain_failure_does_not_abort_run(tmp_path):
+    """Per-domain resilience: one domain's failure records the others + surfaces an honest reason.
+
+    Injects an author that RAISES a plain ValueError for nutrition (caught by the route's
+    per-domain try/except) and a ModelCallError for peptides (degraded by generate_plan to the
+    honest author-call-failed reason). The two healthy domains (workout, supplements) still
+    RECORD, the run never aborts (all four domains appear in `results`), and each failing
+    domain records nothing while surfacing its honest no-plan reason — not a stack trace, not a
+    500, not a silently-dropped run.
+    """
+    _seed_summary_store(tmp_path / "store")
+    client = _MockAuthorClient(_domain_envelopes(), raise_for={
+        "nutrition": ValueError("author blew up"),
+        "peptides": ModelCallError("backend author failed"),
+    })
+    srv, port = _server_with_client(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"resilience POST /generate-plan returned {status}, expected 200"
+        payload = json.loads(body)
+        results = payload["results"]
+
+        # The run did NOT abort — all four domains were attempted and reported.
+        assert set(results) == set(plan_schema.PLAN_DOMAINS), (
+            f"the run aborted on one domain's failure: {results}"
+        )
+        # The two healthy domains recorded.
+        assert results["workout"] == "recorded" and results["supplements"] == "recorded"
+        # The raised-ValueError domain records nothing, honest reason surfaced (not a stack trace).
+        assert results["nutrition"].startswith("error"), (
+            f"nutrition's raised failure was not caught as an honest reason: {results['nutrition']}"
+        )
+        # The ModelCallError domain degrades to the honest author-call-failed no-plan reason.
+        assert results["peptides"] == AUTHOR_CALL_FAILED, (
+            f"peptides did not degrade to author-call-failed: {results['peptides']}"
+        )
+
+        today = datetime.date.today().isoformat()
+        assert plan_schema.read_plan("workout", today, tmp_path / "store")["plan"] is not None
+        assert plan_schema.read_plan("supplements", today, tmp_path / "store")["plan"] is not None
+        assert store.read("plan::nutrition", root=tmp_path / "store") == [], "nutrition wrongly recorded"
+        assert store.read("plan::peptides", root=tmp_path / "store") == [], "peptides wrongly recorded"
+    finally:
+        srv.shutdown()
+        srv.server_close()

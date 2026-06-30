@@ -436,7 +436,7 @@ select.inp{cursor:pointer}
         <div><div class="h1">Plan</div><div class="sub">Your plan is generated from a de-identified summary, every recommendation cites a source, and nothing is final until you approve it.</div></div>
         <span class="pill watch">Draft · not yet approved</span>
       </div>
-      <!--PLAN_ZONE-->
+      <div id="plan-zone"><!--PLAN_ZONE--></div>
       <div class="plan-grid" id="plan-specialists"></div>
     </section>
 
@@ -863,6 +863,53 @@ function renderGenerate(){
      .then(function(html){ refresh(html); if(btn){ btn.textContent='Saved ✓'; setTimeout(function(){btn.textContent=lbl;btn.disabled=false;},1800);} })
      .catch(function(){ if(btn){ btn.textContent=lbl;btn.disabled=false;} });
  }); }
+})();
+
+// ---------- Plan screen: 'Generate plan' -> POST /generate-plan -> render recorded plans ----------
+(function(){
+ function run(btn){
+   var st=document.getElementById('plan-gen-status');
+   if(btn){ btn.disabled=true; btn.textContent='Generating…'; }
+   // The POST holds the connection while the four domains author + assemble (a real no-train
+   // author pass, up to ~1-2 min). Tick a live elapsed counter so the wait never reads as frozen.
+   var t0=Date.now(), tick=null;
+   function stopTick(){ if(tick){ clearInterval(tick); tick=null; } }
+   if(st){
+     st.style.display='block'; st.style.color='';
+     var setMsg=function(){ var s=Math.round((Date.now()-t0)/1000);
+       st.textContent='Generating your plan privately over your data — this runs the no-train author and takes ~1–2 min'
+         +(s>2?' · '+s+'s':'…')+(s>20?'  (keep this tab open)':''); };
+     setMsg(); tick=setInterval(setMsg,1000);
+   }
+   fetch('/generate-plan',{method:'POST'})
+     .then(function(r){return r.json();})
+     .then(function(d){ stopTick(); d=d||{};
+       if(d.need_key){
+         if(st){ st.style.color='var(--watch)'; st.textContent='Connect your Anthropic API key in Profile first — your plan is generated privately through the no-train author, which needs your key.'; }
+         if(btn){ btn.disabled=false; btn.textContent='Generate plan →'; }
+         return;
+       }
+       // Swap in the re-rendered Plan zone (the recorded plans, or the awaiting state again
+       // with the button if nothing recorded so the operator can retry).
+       var zone=document.getElementById('plan-zone');
+       if(zone && typeof d.plan_html==='string'){ zone.innerHTML=d.plan_html; }
+       // Surface honest per-domain no-plan reasons for any domain that produced nothing.
+       var results=d.results||{}, names=Object.keys(results);
+       var noplan=names.filter(function(k){return results[k]!=='recorded';});
+       var got=names.length-noplan.length;
+       if(zone && noplan.length){
+         var note=document.createElement('div'); note.className='sub'; note.style.margin='14px 0';
+         note.textContent=(got?'Generated '+got+' plan'+(got===1?'':'s')+'. ':'')
+           +'No plan yet for: '+noplan.map(function(k){return k+' ('+results[k]+')';}).join(', ')+'.';
+         zone.appendChild(note);
+       }
+     })
+     .catch(function(){ stopTick();
+       if(st){ st.style.color='var(--watch)'; st.textContent='Plan generation failed — please try again.'; }
+       if(btn){ btn.disabled=false; btn.textContent='Generate plan →'; }
+     });
+ }
+ document.addEventListener('click',function(e){ var b=e.target.closest('#plan-gen-run'); if(b){ e.preventDefault(); run(b); }});
 })();
 
 </script>
