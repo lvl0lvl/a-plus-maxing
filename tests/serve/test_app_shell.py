@@ -845,3 +845,94 @@ def test_plan_screen_generate_button_wired_to_generate_plan():
     assert "d.need_key" in html, "the Plan JS does not read the no-key signal"
     assert "d.plan_html" in html, "the Plan JS does not render the returned plan zone"
     assert "d.results" in html, "the Plan JS does not surface the per-domain results"
+
+
+# --------------------------------------------------------------------------- #
+# Intake demographic re-hydration: the 'About you' form pre-fills from the
+# operator's saved store values so they do not re-type saved demographics each
+# visit. Fixture-driven (the rendered-SPA string over a seeded store root).
+# --------------------------------------------------------------------------- #
+
+
+def _seed_demographics(root, values, *, timepoint="2026-06-01T00:00:00+00:00", source="intake"):
+    """Append one `source:"intake"` reading per (item, value) pair under the store root."""
+    for item, value in values.items():
+        store.append(
+            item, {"item": item, "timepoint": timepoint, "source": source, "value": value}, root=root,
+        )
+
+
+def test_demographic_form_prefills_each_saved_value(tmp_path):
+    """PREFILL-1: a store with saved demographics pre-fills EACH form field + shows the saved banner.
+
+    Seeds the five demographic readings the operator's store holds (the four objective form
+    demographics + the chat-only goal-domains) and renders the SPA over the resolved read model.
+    Each of the four form fields is pre-filled from its saved value: the birth-year input carries
+    `value='1986'`, and each <select> pre-SELECTS the saved option. The '✓ Saved — edit to update'
+    banner is shown so the operator sees they were remembered. Failing-capable: reds if any field
+    renders blank/default or the banner is absent.
+    """
+    root = tmp_path / "store"
+    _seed_demographics(root, {
+        "date-of-birth": "1986",
+        "sex-for-dosing": "male",
+        "bodyweight-band": "70-80kg",
+        "equipment-access-class": "full-home-gym",
+        "goal-domains": "Workout;Nutrition",  # chat-only field: no form surface, not pre-filled
+    })
+    html = app_shell.render(store.read_all(root))
+    assert "name='date-of-birth' placeholder=\"e.g. 1986\" value='1986'>" in html, "birth-year not pre-filled"
+    assert "<option value='male' selected>" in html, "sex-for-dosing not pre-selected"
+    assert "<option value='70-80kg' selected>" in html, "bodyweight-band not pre-selected"
+    assert "<option value='full-home-gym' selected>" in html, "equipment-access-class not pre-selected"
+    assert "data-prefill='saved'" in html and "✓ Saved" in html, "no saved-state banner on the pre-filled form"
+    # goal-domains has no <select>/checkbox surface on the objective-only form, so it is not
+    # injected as a fabricated form option (it stays a chat-only field gathered at POST /chat).
+    assert "<option value='Workout' selected>" not in html, "goal-domains was injected as a form option"
+
+
+def test_prefill_tracks_the_saved_band_and_resolves_latest(tmp_path):
+    """PREFILL-2 (non-tautological + latest-wins): a DIFFERENT saved band pre-selects a DIFFERENT option.
+
+    Content-traceability: rendering with bodyweight-band='90-100kg' pre-selects the 90-100kg option
+    and NOT the under-60kg option; with bodyweight-band='under-60kg' it pre-selects under-60kg and
+    NOT 90-100kg — the pre-fill tracks the stored value, it is not a fixed/tautological selection.
+    Latest-wins: with two readings for the item, the greater-timepoint value is pre-selected and the
+    stale one is not. Failing-capable: reds if the selection is fixed, ignores the saved value, or
+    pre-selects the older reading.
+    """
+    root_a = tmp_path / "a"
+    _seed_demographics(root_a, {"bodyweight-band": "90-100kg"})
+    html_a = app_shell.render(store.read_all(root_a))
+    assert "<option value='90-100kg' selected>" in html_a, "the saved 90-100kg band is not pre-selected"
+    assert "<option value='under-60kg' selected>" not in html_a, "a different (unsaved) band was pre-selected"
+
+    root_b = tmp_path / "b"
+    _seed_demographics(root_b, {"bodyweight-band": "under-60kg"})
+    html_b = app_shell.render(store.read_all(root_b))
+    assert "<option value='under-60kg' selected>" in html_b, "the saved under-60kg band is not pre-selected"
+    assert "<option value='90-100kg' selected>" not in html_b, "a different (unsaved) band was pre-selected"
+
+    root_c = tmp_path / "c"
+    _seed_demographics(root_c, {"bodyweight-band": "under-60kg"}, timepoint="2026-05-01T00:00:00+00:00")
+    _seed_demographics(root_c, {"bodyweight-band": "90-100kg"}, timepoint="2026-06-01T00:00:00+00:00")
+    html_c = app_shell.render(store.read_all(root_c))
+    assert "<option value='90-100kg' selected>" in html_c, "the latest reading is not pre-selected"
+    assert "<option value='under-60kg' selected>" not in html_c, "the stale (older) reading was pre-selected"
+
+
+def test_demographic_form_blank_default_on_empty_store():
+    """PREFILL-3 (HONEST-EMPTY): an empty store renders the form blank/default with no banner.
+
+    With no saved readings, no demographic <select> carries a `selected` option, the birth-year
+    input carries no `value=` attribute (only its placeholder), and the saved-state banner is
+    absent — the form is honest blank, no fabricated pre-fill. Failing-capable: reds if any option
+    is pre-selected, the input gains a value, or the banner renders on an empty store.
+    """
+    html = _spa_html()  # app_shell.render([])
+    assert "data-prefill='saved'" not in html, "the saved-state banner renders on an empty store"
+    assert "name='date-of-birth' placeholder=\"e.g. 1986\">" in html, "the birth-year input is not blank/default"
+    for name in ("sex-for-dosing", "bodyweight-band", "equipment-access-class"):
+        assert "selected" not in _select_block(html, name), (
+            f"the {name} select pre-selects an option on an empty store"
+        )
