@@ -1182,6 +1182,73 @@ def _post_generate_plan(port):
     return resp.status, text
 
 
+def _post_confirm_extraction(port, readings):
+    """POST /confirm-extraction (application/json) on the running server; return (status, body)."""
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
+    conn.request("POST", "/confirm-extraction", body=json.dumps({"readings": readings}).encode(),
+                 headers={"Content-Type": "application/json"})
+    resp = conn.getresponse()
+    text = resp.read().decode("utf-8")
+    conn.close()
+    return resp.status, text
+
+
+def _resolving_key():
+    """A key_resolver that RESOLVES (returns a key) — the connected-Profile state for tests."""
+    return "sk-ant-test-key"
+
+
+def _unavailable_key():
+    """A key_resolver that raises KeyUnavailableError — the live-but-keyless production state."""
+    from scripts.model import key_source
+
+    raise key_source.KeyUnavailableError("no key set")
+
+
+def _server_with_author(tmp_path, client, *, key_resolver=_resolving_key):
+    """Server over tmp roots + a mock author client + (by default) a key that RESOLVES.
+
+    The default `key_resolver` returns a key so /generate-plan's no-key guard passes and the
+    injected mock author runs (the happy / resilience / E2E tests need a resolvable key AND a
+    client — the production no-key guard now gates on key availability, not just a None client).
+    Pass `key_resolver=_unavailable_key` to exercise the live-but-keyless path.
+    """
+    srv = serve_server.build_server(
+        0, store_root=tmp_path / "store", dna_root=tmp_path / "dna",
+        scaffold_root=tmp_path / "scaffold", client=client, key_resolver=key_resolver,
+    )
+    return srv, srv.server_address[1]
+
+
+class _FormatAgnosticClient:
+    """One mock no-train client for BOTH lanes (0 live API): extract_readings + author.
+
+    `extract_readings` returns a fixed extracted-reading set (the arbitrary-format extraction the
+    no-train extract lane yields); `author` ECHOES the de-identified `active-issue-class` the
+    summary carries into the workout plan, so the rendered plan is content-traceable to the
+    uploaded reading, and records the summary each author call saw. The non-workout domains return
+    the thin-library sentinel (an honest no-plan) to keep the E2E focused on the traceable path.
+    """
+
+    def __init__(self, extracted):
+        self._extracted = list(extracted)
+        self.author_summaries = {}
+
+    def extract_readings(self, file_content, media_type):
+        return list(self._extracted)
+
+    def author(self, domain, summary):
+        self.author_summaries[domain] = summary
+        if domain == "workout":
+            issue = summary.get("active-issue-class") or "general-issue"
+            return {"specialist": "personal-trainer", "recommendations": [
+                _rec(f"prioritize a {issue} rehab base before loading", "training",
+                     "ACSM resistance-training guidelines 2024",
+                     {"name": "Goblet squat", "sets": 3, "reps": "8-12",
+                      "detail": f"rehab focus: {issue}"})]}
+        return {"specialist": f"{domain}-specialist", "thin_library": True}
+
+
 def test_generate_plan_records_all_domains_and_renders(tmp_path):
     """E2E happy path: POST /generate-plan records every domain + the re-render is content-traceable.
 
@@ -1193,13 +1260,13 @@ def test_generate_plan_records_all_domains_and_renders(tmp_path):
     """
     _seed_summary_store(tmp_path / "store")
     client = _MockAuthorClient(_domain_envelopes())
-    srv, port = _server_with_client(tmp_path, client)
+    srv, port = _server_with_author(tmp_path, client)
     _serve_in_thread(srv)
     try:
         status, body = _post_generate_plan(port)
         assert status == 200, f"POST /generate-plan returned {status}, expected 200"
         payload = json.loads(body)
-        assert payload["need_key"] is False, "a present author client must not report need_key"
+        assert payload["need_key"] is False, "a present author client + resolvable key must not report need_key"
         assert payload["results"] == {d: "recorded" for d in plan_schema.PLAN_DOMAINS}, (
             f"not every domain recorded: {payload['results']}"
         )
@@ -1235,7 +1302,7 @@ def test_generate_plan_different_author_yields_different_plan(tmp_path):
     def gen(sub, name):
         root = tmp_path / sub
         _seed_summary_store(root / "store")
-        srv, port = _server_with_client(root, _MockAuthorClient(_domain_envelopes(workout_name=name)))
+        srv, port = _server_with_author(root, _MockAuthorClient(_domain_envelopes(workout_name=name)))
         _serve_in_thread(srv)
         try:
             status, body = _post_generate_plan(port)
@@ -1295,7 +1362,7 @@ def test_generate_plan_one_domain_failure_does_not_abort_run(tmp_path):
         "nutrition": ValueError("author blew up"),
         "peptides": ModelCallError("backend author failed"),
     })
-    srv, port = _server_with_client(tmp_path, client)
+    srv, port = _server_with_author(tmp_path, client)
     _serve_in_thread(srv)
     try:
         status, body = _post_generate_plan(port)
@@ -1323,6 +1390,109 @@ def test_generate_plan_one_domain_failure_does_not_abort_run(tmp_path):
         assert plan_schema.read_plan("supplements", today, tmp_path / "store")["plan"] is not None
         assert store.read("plan::nutrition", root=tmp_path / "store") == [], "nutrition wrongly recorded"
         assert store.read("plan::peptides", root=tmp_path / "store") == [], "peptides wrongly recorded"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_generate_plan_live_client_but_no_key_returns_need_key(tmp_path):
+    """No-key (live client, no key behind it): need_key BEFORE any author call — the production case.
+
+    In production `self.client` is ALWAYS a live ModelClient (never None), so the None-only guard
+    never fires for a keyless operator. The route uses the SAME key-availability check the Profile
+    status reports (`key_source.resolve` via the `key_resolver` seam): a live client whose key does
+    NOT resolve -> need_key:true, 0 plans recorded, and NO author/live call attempted. Failing-
+    capable: revert to the `self.client is None`-only guard and this reds (the live client would be
+    called and the operator would get four cryptic author-call-failed degrades, not the honest
+    need_key).
+    """
+    _seed_summary_store(tmp_path / "store")
+    client = _MockAuthorClient(_domain_envelopes())  # a live (non-None) author client...
+    srv, port = _server_with_author(tmp_path, client, key_resolver=_unavailable_key)  # ...no key resolves
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"live-but-keyless POST /generate-plan returned {status}, expected 200"
+        payload = json.loads(body)
+        assert payload["need_key"] is True, "a live-but-keyless client must report need_key (not None-only)"
+        assert payload["results"] == {}, "the keyless path must not run the engine for any domain"
+        # The honest need_key is returned BEFORE any author/live call — no spend on a keyless press.
+        assert client.calls == [], "the author was called despite no key (a live call was attempted)"
+        for domain in plan_schema.PLAN_DOMAINS:
+            assert store.read(f"plan::{domain}", root=tmp_path / "store") == [], (
+                f"the keyless path wrongly recorded a {domain} plan"
+            )
+        assert _still_alive(port), "the handler died after a live-but-keyless /generate-plan POST"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_format_agnostic_upload_feeds_the_plan_e2e(tmp_path):
+    """E2E (arbitrary-format-in -> plan-out): an UNRECOGNIZED upload's extracted reading reaches the plan.
+
+    Executes the full format-agnostic chain on ONE server with ONE mock no-train client (both
+    lanes, 0 live API): POST /upload of an arbitrary `.xyz` -> the route's no-train extract lane ->
+    a `clinical-notes` reading surfaced for confirm (lands 0); POST /confirm-extraction -> the
+    reading lands via the UNCHANGED `store.append`; POST /generate-plan -> `router.summarize`
+    DERIVES `active-issue-class` from that landed reading -> the author SEES it in its summary ->
+    the workout plan ECHOES it. Asserts the reading landed, the author's received summary carries
+    the upload-derived class, and the rendered plan is content-traceable to the arbitrary upload
+    (`lower-limb-region` present from "knee pain"; an unrelated `upper-limb-region` absent — the
+    render is driven by the upload, not baked).
+
+    NOTE (scoping the wiring): the chain is wired only for readings that land under a
+    summarize-recognized item name (here `clinical-notes` -> `active-issue-class`). A bare
+    biomarker/lab item (e.g. `ferritin`) lands in the store but does NOT reach the author summary
+    — see the session finding (summarize is a closed PII-boundary whitelist; the `biomarker::`
+    trend feed is fed by no ingestion path). This E2E proves the chain is genuinely end-to-end for
+    the recognized-item case, not that every extracted reading reaches the plan.
+    """
+    _seed_summary_store(tmp_path / "store")
+    # The reading the arbitrary-format extraction yields: a medical-history clinical narrative;
+    # `router.summarize` derives `active-issue-class` from the `clinical-notes` item.
+    extracted = [{
+        "item": "clinical-notes", "timepoint": "2026-05-01", "source": "medical",
+        "value": "persistent left knee pain limiting deep squats",
+    }]
+    client = _FormatAgnosticClient(extracted)
+    srv, port = _server_with_author(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        # 1) Upload an arbitrary made-up format -> the no-train extract lane surfaces the readings
+        #    for confirm (lands 0; confirm is the only landing path).
+        ustatus, uctype, ubody = _post_upload_ct(port, "history.xyz", b"\x01\x02 arbitrary made-up format bytes")
+        assert ustatus == 200 and uctype == "application/json", (
+            f"the arbitrary-format upload did not surface a review payload ({ustatus}, {uctype})"
+        )
+        review = json.loads(ubody)
+        assert review["readings"] == extracted, f"the extract lane did not surface the reading: {review}"
+        assert store.read("clinical-notes", root=tmp_path / "store") == [], (
+            "the upload auto-landed the reading (the confirm gate is broken)"
+        )
+
+        # 2) Operator confirms -> the reading lands via the UNCHANGED store.append sink.
+        cstatus, _ = _post_confirm_extraction(port, review["readings"])
+        assert cstatus == 200, f"confirm-extraction returned {cstatus}, expected 200"
+        landed = store.read("clinical-notes", root=tmp_path / "store")
+        assert landed and "knee" in str(landed[-1]["value"]), "the confirmed reading did not land in the store"
+
+        # 3) Generate the plan -> summarize includes the landed reading -> the author sees it.
+        gstatus, gbody = _post_generate_plan(port)
+        assert gstatus == 200, f"generate-plan returned {gstatus}, expected 200"
+        payload = json.loads(gbody)
+        assert payload["results"]["workout"] == "recorded", f"workout did not record: {payload['results']}"
+
+        # The author's RECEIVED summary carries the class DERIVED from the arbitrary upload —
+        # proving the format-agnostic reading reached the author INPUT (not just the store).
+        seen = client.author_summaries.get("workout")
+        assert seen is not None and seen.get("active-issue-class") == "lower-limb-region", (
+            f"the upload-derived reading did not reach the author summary: {seen}"
+        )
+        # plan-out content-traceable: the rendered plan reflects the upload-derived class, and an
+        # unrelated class is ABSENT (the render is driven by the arbitrary upload, not baked).
+        assert "lower-limb-region" in payload["plan_html"], "the rendered plan does not reflect the uploaded reading"
+        assert "upper-limb-region" not in payload["plan_html"], "an unrelated class leaked (render not upload-driven)"
     finally:
         srv.shutdown()
         srv.server_close()
