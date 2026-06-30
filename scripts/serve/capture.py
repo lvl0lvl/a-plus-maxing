@@ -27,6 +27,34 @@ operator/liaison CURATION step at the store layer per `router.py`, not serve-lay
 and the untrusted rx form field is captured record-only (Wave-B FIX-A) rather than wired
 into the model-bound item. The `router.summarize` 8j6 PII gate is the runtime backstop
 that fail-closes if raw PII ever reaches a field-set item.
+
+The comprehensive 9-step intake field->destination contract (ADR-0033-0035-T1). Every
+collected field routes to exactly ONE destination by its data class. The routing
+MACHINERY pre-exists (ADR-0014/0018/0019); this roster makes the full contract explicit
+so the capture regions T2/T3 extend over this same file stay legible. The three classes:
+
+- Rich-domain free-text -> named-excluded raw source -> coarse derived token. The four
+  `_CHAT_RAW_SOURCE_FIELDS` fields (`nutrition-detail` / `supplement-stack` /
+  `peptide-stack` / `training-detail`) write their `EXCLUDED_RAW_PII` raw source via the
+  UNCHANGED `store.append`; `router.summarize` then DERIVES the coarse `_ALWAYS_SET_DERIVED`
+  token (`dietary-pattern-class` / `supplement-stack-class` / `peptide-use-class` /
+  `training-volume-band`) -- the band token is NEVER written directly. These are fed by
+  bounded selects: the submitted OPTION VALUE must carry the deriver keyword
+  (`vegan`->`plant-based`, `5 days/week`->`high`, `none`->`none`, `BPC-157`->`peptide-in-use`),
+  so a high-frequency display ("5 or more days") must submit a digit-adjacent-unit VALUE,
+  never the literal display text (which derives the no-signal `moderate`).
+- Directly-wired -> own-name store item. Goals (`goal-domains` / `goal-targets` /
+  `goal-priority-order` / `hard-limits`) and demographics (`sex-for-dosing` /
+  `bodyweight-band` / `equipment-access-class`) write under their own `WIRED_TOKENS` name;
+  the Step-1 birth-year field writes the raw `date-of-birth` source `summarize` derives
+  `training-age-band` from (never the band directly).
+- Record-only -> the gitignored scaffold, NEVER a field-set store item. The raw
+  `rx-interaction-classes` med field (deliberately absent from `WIRED_TOKENS`) PLUS the
+  sensitive fields (race / ethnicity, occupation, sleep, stress, smoker, alcohol) fall to
+  the default record-only branch. The sensitive record-only roster is CLOSED -- no
+  recreational-substance field has dedicated routing here (a forward constraint on the T4
+  wizard markup: no such control); an unknown field of that class falls to the same generic
+  record-only branch as any other unrecognized field.
 """
 
 import datetime

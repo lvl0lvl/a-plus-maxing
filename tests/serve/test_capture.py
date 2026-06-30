@@ -911,3 +911,223 @@ def test_chat_fields_are_not_wired_tokens(tmp_path):
     for _field, raw_source, token, _v, _f, _b in _CHAT_CAPTURE_CASES:
         assert token not in capture.WIRED_TOKENS, token
         assert raw_source not in SUMMARY_FIELD_SET, raw_source
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T1 — the comprehensive intake field->destination contract.
+# T1 PINS the 9-step contract over the EXISTING capture routing (ADR-0014/0018/0019):
+# the four rich-domain fields carry REAL signal (not the absent-source default), the
+# OQ-1 select VALUE resolves to its deriver bucket, raw meds + sensitive fields route
+# record-only, and an edited re-capture re-runs the SAME raw-source path. The routing
+# pre-exists; each test pins it, failing-capable by its named mutation.
+# --------------------------------------------------------------------------- #
+
+# (field, bucket-keyword value, derived token, the deriver's no-signal default, expected).
+_T1_REAL_SIGNAL_CASES = [
+    ("nutrition-detail", "vegan", "dietary-pattern-class", "general-diet", "plant-based"),
+    ("supplement-stack", "creatine, whey", "supplement-stack-class", "none", "multi-supplement"),
+    ("peptide-stack", "BPC-157", "peptide-use-class", "none", "peptide-in-use"),
+    ("training-detail", "5 days/week", "training-volume-band", "moderate", "high"),
+]
+
+
+@pytest.mark.parametrize("field, value, token, no_signal_default, expected", _T1_REAL_SIGNAL_CASES)
+def test_rich_domain_field_carries_real_signal_vs_not_discussed_default(
+    field, value, token, no_signal_default, expected, tmp_path,
+):
+    """AC-1: a rich-domain capture lands REAL signal; a fresh store reads not-discussed.
+
+    A fresh store (no capture) reads the `not-discussed` absent-source sentinel for the
+    always-set token; after a bucket-keyword capture the token derives its real bucket
+    (not `not-discussed`, not the deriver's no-signal default) — the real-signal contrast
+    the existing round-trip test omits.
+
+    Failing-capable: drop the field's key from `capture._CHAT_RAW_SOURCE_FIELDS` and it
+    routes record-only, the token stays `not-discussed`, reddening the non-default assert.
+    """
+    store_root = tmp_path / "store"
+    # The real-signal CONTRAST: a fresh store reads the absent-source sentinel.
+    assert _summary(store_root).get(token) == "not-discussed", (
+        f"a fresh store did not read {token!r} as the not-discussed sentinel"
+    )
+    capture.persist_capture(
+        {field: value},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    derived = _summary(store_root).get(token)
+    assert derived == expected, (
+        f"{field!r}={value!r} derived {derived!r}, not the expected {expected!r}"
+    )
+    assert derived not in ("not-discussed", no_signal_default), (
+        f"{token!r} carried the no-signal value {derived!r}, not real signal"
+    )
+
+
+# (field, submitted select VALUE, derived token, expected bucket) — the OQ-1 pin. The
+# select OPTION VALUE (not the display text) carries the deriver keyword; the
+# `"5 days/week"`->high row encodes the crux that a "5 or more days" display must submit
+# a digit-adjacent-unit VALUE (a `"5 or more days"` literal derives `moderate`, not high).
+_T1_OQ1_VALUE_BUCKET_CASES = [
+    ("nutrition-detail", "vegan", "dietary-pattern-class", "plant-based"),
+    ("nutrition-detail", "keto", "dietary-pattern-class", "restricted"),
+    ("training-detail", "5 days/week", "training-volume-band", "high"),
+    ("training-detail", "2x", "training-volume-band", "low"),
+    ("supplement-stack", "none", "supplement-stack-class", "none"),
+    ("supplement-stack", "creatine, whey", "supplement-stack-class", "multi-supplement"),
+    ("peptide-stack", "none", "peptide-use-class", "none"),
+    ("peptide-stack", "BPC-157", "peptide-use-class", "peptide-in-use"),
+]
+
+
+@pytest.mark.parametrize("field, value, token, expected_bucket", _T1_OQ1_VALUE_BUCKET_CASES)
+def test_oq1_select_value_resolves_to_expected_deriver_bucket(
+    field, value, token, expected_bucket, tmp_path,
+):
+    """AC-2 (OQ-1): a bounded select VALUE resolves to its expected deriver bucket.
+
+    The pinned T1<->T4 format coupling: the select OPTION VALUE carries a deriver-matching
+    keyword through `persist_capture`->`summarize`. Each row's bucket is real signal (a
+    determinate class, never the `not-discussed` absent-source sentinel).
+
+    Failing-capable: a deriver-keyword change or a `_RAW_TO_FIELD` repoint reds the row.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {field: value},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    derived = _summary(store_root).get(token)
+    assert derived == expected_bucket, (
+        f"{field!r}={value!r} resolved to {derived!r}, not the expected {expected_bucket!r}"
+    )
+    assert derived != "not-discussed", (
+        f"{token!r} read the absent-source default, not the submitted select value"
+    )
+
+
+def test_comprehensive_capture_records_raw_meds_zero_rx_class_writes(tmp_path):
+    """AC-3: a comprehensive 9-step submission records raw meds, writes 0 rx-class tokens.
+
+    The crown-jewel negative at comprehensive-roster scale: a full submission (goals +
+    demographics + the four rich-domain fields + a raw `rx-interaction-classes` med field)
+    writes 0 `rx-interaction-classes` store items; the raw drug name lands record-only in
+    the gitignored scaffold and in NO field-set item, while the rich-domain tokens still
+    derive real signal.
+
+    Failing-capable: re-add `rx-interaction-classes` to `capture.WIRED_TOKENS` and the raw
+    drug name reaches the model-bound store item, reddening the empty-read assert.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    fields = {
+        "goal-domains": "Workout;Nutrition",
+        "recovery-status-band": "moderate",
+        "sex-for-dosing": "male",
+        "bodyweight-band": "80-90kg",
+        "equipment-access-class": "full-home-gym",
+        "nutrition-detail": "vegan",
+        "supplement-stack": "creatine, whey",
+        "peptide-stack": "BPC-157",
+        "training-detail": "5 days/week",
+        "rx-interaction-classes": "warfarin 5mg; metformin 500mg",
+    }
+    capture.persist_capture(
+        fields, root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Crown jewel: 0 rx-interaction-classes store writes from persist_capture.
+    assert store.read("rx-interaction-classes", root=store_root) == [], (
+        "the rx form field wrote the model-bound store item (must route record-only)"
+    )
+    # The raw drug name landed in the gitignored scaffold receipt.
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert "warfarin" in scaffold_text, "the raw med field did not land in the gitignored scaffold"
+    # Negative (load-bearing): the drug name is in NO field-set store item.
+    for token in SUMMARY_FIELD_SET:
+        for reading in store.read(token, root=store_root):
+            assert "warfarin" not in str(reading["value"]), (
+                f"a raw drug name reached the {token!r} field-set store item"
+            )
+    # Real signal coexists with record-only meds: the four rich-domain tokens derive non-default.
+    summary = _summary(store_root)
+    assert summary.get("dietary-pattern-class") == "plant-based"
+    assert summary.get("supplement-stack-class") == "multi-supplement"
+    assert summary.get("peptide-use-class") == "peptide-in-use"
+    assert summary.get("training-volume-band") == "high"
+
+
+def test_sensitive_fields_route_record_only_no_cannabis(tmp_path):
+    """AC-4: race/occupation/sleep/stress/smoker/alcohol record-only; NO cannabis routing.
+
+    Each sensitive field routes to the gitignored scaffold receipt and writes 0 field-set
+    store tokens. A probe `cannabis` field lands record-only like any unrecognized field —
+    the contract carries NO cannabis-specific routing key/token in `capture.py`.
+
+    Failing-capable: wire any sensitive field into `capture.WIRED_TOKENS` and its value
+    reaches a field-set store item, reddening the 0-store-token assertion.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    sensitive = {
+        "race": "RACE-XYZ",
+        "ethnicity": "ETHNICITY-XYZ",
+        "occupation": "OCCUPATION-XYZ",
+        "sleep": "SLEEP-XYZ 6 hours",
+        "stress": "STRESS-XYZ high",
+        "smoker": "SMOKER-XYZ never",
+        "alcohol": "ALCOHOL-XYZ weekly",
+        "cannabis": "CANNABIS-XYZ probe",
+    }
+    receipt = capture.persist_capture(
+        sensitive, root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Each sensitive (and the probe) field name is recorded in the scaffold receipt.
+    for name in sensitive:
+        assert name in receipt["scaffold"], f"{name!r} did not route record-only to the scaffold"
+    # Negative (load-bearing): no sensitive value reaches ANY field-set store item.
+    markers = ("RACE-XYZ", "ETHNICITY-XYZ", "OCCUPATION-XYZ", "SLEEP-XYZ", "STRESS-XYZ",
+               "SMOKER-XYZ", "ALCOHOL-XYZ", "CANNABIS-XYZ")
+    for token in SUMMARY_FIELD_SET:
+        for reading in store.read(token, root=store_root):
+            v = str(reading["value"])
+            for marker in markers:
+                assert marker not in v, f"a sensitive value {marker!r} leaked into {token!r}"
+    # Negative (the no-cannabis contract): no cannabis-specific routing key/token exists.
+    assert "cannabis" not in capture.WIRED_TOKENS
+    assert "cannabis" not in capture._CHAT_RAW_SOURCE_FIELDS
+    assert "cannabis" not in capture._BOUNDED_ENUMS
+    capture_src = (REPO_ROOT / "scripts" / "serve" / "capture.py").read_text().lower()
+    assert "cannabis" not in capture_src, "a cannabis-specific key/token entered capture.py"
+
+
+def test_editable_re_capture_re_runs_same_path_no_direct_band_write(tmp_path):
+    """AC-5: an edited re-capture re-runs the raw-source path; the band is never written direct.
+
+    An edited rich-domain field re-submitted through `persist_capture` re-routes through its
+    raw-source item (append-only), `summarize` re-derives from the latest reading, and the
+    band token is never written directly (0 new write surface).
+
+    Failing-capable: a direct-band-write path would land a `dietary-pattern-class` store
+    item, reddening the 0-direct-write assertion.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    capture.persist_capture(
+        {"nutrition-detail": "omnivore"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    capture.persist_capture(
+        {"nutrition-detail": "vegan"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Both readings landed in the raw source (append-only), edited value last.
+    readings = store.read("raw-nutrition-free-text", root=store_root)
+    assert len(readings) == 2, f"re-capture did not append (got {len(readings)} readings)"
+    assert readings[-1]["value"] == "vegan", "the edited re-capture is not the latest reading"
+    # summarize re-derives from the latest (edited) reading.
+    assert _summary(store_root).get("dietary-pattern-class") == "plant-based", (
+        "summarize did not re-derive from the edited latest reading"
+    )
+    # The band token is NEVER written directly (0 new write surface).
+    assert store.read("dietary-pattern-class", root=store_root) == [], (
+        "the band token was written directly (must be derived, not stored)"
+    )
