@@ -396,10 +396,15 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         honest no-plan reason, and `plan_html` is the re-rendered Plan zone the front-end
         swaps in.
 
-        No-key state: with no instance author client (`self.client is None` — no API key set,
-        mirroring `/upload`'s None-client path) it records NOTHING and answers `need_key` so
-        the front-end routes the operator to connect their key — never a crash. The plan is
-        generated privately through the no-train author, which needs the instance key.
+        No-key state: with no USABLE no-train author it records NOTHING and answers `need_key`
+        so the front-end routes the operator to connect their key — never a crash. "No usable
+        author" is BOTH the absent client (`self.client is None`, the test-built path) AND the
+        present-but-keyless client: the operator-entry server always wires a live `ModelClient`,
+        so in production a missing key shows up not as a None client but as no resolvable key.
+        The guard uses the SAME availability check the Profile status reports (`_key_available`
+        -> `key_source.resolve`), so a keyless operator gets the honest "connect your key"
+        guidance rather than four cryptic per-domain author-call-failed degrades — and the
+        engine is never called (no live spend) until a key is connected.
         """
         import datetime
         import functools
@@ -407,9 +412,11 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         from scripts.plan.generate_plan import generate_plan
         from scripts.store import plan_schema, store
 
-        # No instance author client -> the no-key state. The plan needs the no-train author
-        # (the instance API key); record nothing and route the operator to connect it.
-        if self.client is None:
+        # No usable no-train author -> the no-key state. The author client may be absent
+        # (`self.client is None`) OR present-but-keyless (no key resolves); either way the
+        # plan needs the instance key, so record nothing and route the operator to connect it
+        # BEFORE the engine is called (no live spend on a keyless press).
+        if self.client is None or not self._key_available():
             self._write_json(200, {"need_key": True, "results": {}, "plan_html": None})
             return
 
@@ -441,23 +448,31 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         plan_html = app_shell._plan_zone(store.read_all(store_root), today)
         self._write_json(200, {"need_key": False, "results": results, "plan_html": plan_html})
 
-    def _key_status(self):
-        """Write JSON `{connected: bool}` — whether a no-train key resolves at runtime.
+    def _key_available(self):
+        """Whether a no-train key resolves at runtime — the Profile 'connected' availability check.
 
-        Calls `key_source.resolve()` (env var or keychain) and reports ONLY whether a key
-        is present — never the value. An absent key (`KeyUnavailableError`) is the normal
-        not-connected path, not an error. Lets the Profile screen show Connected / Not
-        connected without ever reading the secret.
+        The SINGLE key-availability predicate shared by the Profile status (GET /settings/key)
+        and the POST /generate-plan no-key guard, so the two cannot silently diverge: a key is
+        available iff `key_source.resolve()` (or the injected `key_resolver`) returns without
+        raising `KeyUnavailableError`. Reports presence ONLY — it never reads the secret value.
         """
         from scripts.model import key_source
 
         resolver = self.key_resolver if self.key_resolver is not None else key_source.resolve
         try:
             resolver()
-            connected = True
+            return True
         except key_source.KeyUnavailableError:
-            connected = False
-        self._write_json(200, {"connected": connected})
+            return False
+
+    def _key_status(self):
+        """Write JSON `{connected: bool}` — whether a no-train key resolves at runtime.
+
+        Reports ONLY whether a key is present (via `_key_available`) — never the value. An
+        absent key is the normal not-connected path, not an error. Lets the Profile screen
+        show Connected / Not connected without ever reading the secret.
+        """
+        self._write_json(200, {"connected": self._key_available()})
 
     def _save_key(self):
         """Read a JSON `{api_key}` body and store it in the OS keychain.
