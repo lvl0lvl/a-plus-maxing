@@ -95,6 +95,44 @@ def test_staged_export_xml_routes_into_ingest_run(tmp_path):
     assert hrv[0]["source"] == "healthkit"
 
 
+def _write_healthkit_rhr_resp_xml(path, pairs):
+    """Write an export.xml with a RestingHeartRate + a RespiratoryRate record per (day, value)."""
+    rows = "".join(
+        f' <Record type="HKQuantityTypeIdentifierRestingHeartRate" startDate="{d} 08:00:00 -0500" value="{v}"/>\n'
+        f' <Record type="HKQuantityTypeIdentifierRespiratoryRate" startDate="{d} 08:00:00 -0500" value="14"/>\n'
+        for d, v in pairs
+    )
+    path.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<HealthData locale="en_US">\n' + rows + "</HealthData>\n")
+
+
+def test_wearable_upload_mirrors_registered_marker_into_trend_namespace(tmp_path):
+    """The wearable land path mirrors a registered-polarity marker (rhr) into biomarker::; not others.
+
+    The dead-feed fix on the wearable path: `route_upload` captures the readings `ingest.run` lands
+    and mirrors the registered-polarity ones into the `biomarker::<marker>` namespace the router's
+    recent-trend-direction feed reads. A healthkit export with rhr (registered, down-polarity) +
+    resp-rate (mapped but UNregistered) over two days lands both bare, but only `rhr` mirrors into
+    `biomarker::rhr` (both timepoints), while `resp-rate` does NOT. Mutation-proof: drop the route
+    mirror and biomarker::rhr is empty.
+    """
+    staged = tmp_path / "export.xml"
+    _write_healthkit_rhr_resp_xml(staged, [("2026-04-01", "50"), ("2026-05-01", "70")])
+    store_root = tmp_path / "store"
+
+    route.route_upload(staged, root=store_root, dna_root=tmp_path / "dna")
+
+    # bare lands unchanged (additive): both rhr and resp-rate landed bare, two timepoints each.
+    assert len(store.read("rhr", root=store_root)) == 2, "the wearable rhr readings did not land bare"
+    assert len(store.read("resp-rate", root=store_root)) == 2, "the wearable resp-rate readings did not land bare"
+    # the registered-polarity marker is mirrored into the trend namespace, BOTH timepoints.
+    mirrored = store.read("biomarker::rhr", root=store_root)
+    assert [r["value"] for r in mirrored] == [50.0, 70.0], (
+        f"rhr was not mirrored into biomarker:: with both timepoints: {mirrored}"
+    )
+    # the mapped-but-unregistered marker is NOT mirrored (no polarity -> not in the trend feed).
+    assert store.read("biomarker::resp-rate", root=store_root) == [], "an unregistered marker was wrongly mirrored"
+
+
 def test_staged_apple_health_zip_routes_into_ingest_run(tmp_path):
     """AC-3 (route leg): an Apple-Health `.zip` content-branches to healthkit `ingest.run`.
 

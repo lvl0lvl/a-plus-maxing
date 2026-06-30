@@ -40,11 +40,39 @@ from pathlib import Path
 from scripts.ingest import dna, extract_chunked, ingest, pdf_extract
 from scripts.ingest.__main__ import _adapter, _detect_source
 from scripts.ingest.adapters.healthkit import _export_xml_member
+from scripts.serve import biomarker_mirror
 from scripts.store import store
 
 # The production DNA dropzone — the CLI's `_load_dna` default (scripts/ingest/__main__.py:120).
 # The store default lives in `store.DEFAULT_ROOT`; both resolve a `None` root to the real instance.
 _DEFAULT_DNA_ROOT = Path("vault/dna/raw")
+
+
+class _CapturingAdapter:
+    """Wrap a source adapter to RECORD the readings it yields as `ingest.run` consumes them.
+
+    The frozen `ingest.run` lands each `read_readings` reading via `store.append` and returns
+    nothing, so the serve layer never sees what landed. This transparent wrapper delegates the
+    adapter contract (`source_tag` + `read_readings`) and captures each yielded reading in
+    `captured` — one parse, the exact readings landed — so `route_upload` can mirror the
+    registered-polarity ones into the `biomarker::` trend feed (the dead-feed fix) without
+    editing the frozen `ingest.run`/adapter or re-parsing the export.
+
+    Attributes:
+        captured (list): The readings the wrapped adapter yielded (== what `ingest.run` landed).
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.captured = []
+
+    def source_tag(self):
+        return self._inner.source_tag()
+
+    def read_readings(self, export_file):
+        for reading in self._inner.read_readings(export_file):
+            self.captured.append(reading)
+            yield reading
 
 
 def _zip_is_apple_health(zip_path):
@@ -127,7 +155,15 @@ def route_upload(staged_path, *, client=None, root=None, dna_root=None):
     if source == "dna":
         dna.land(path, dna_root if dna_root is not None else _DEFAULT_DNA_ROOT)
     else:
-        ingest.run(_adapter(source), path, root=root if root is not None else store.DEFAULT_ROOT)
+        store_root = root if root is not None else store.DEFAULT_ROOT
+        # Capture the readings `ingest.run` lands (the frozen sink returns nothing), then mirror
+        # the registered-polarity ones (rhr/hrv/sleep-hours) into the `biomarker::` namespace the
+        # router's recent-trend-direction feed reads — so a wearable marker trends and reaches the
+        # plan (the dead-feed gap). Same mirror rule as the confirmed-extraction land path;
+        # additive — the bare `ingest.run` land is unchanged.
+        adapter = _CapturingAdapter(_adapter(source))
+        ingest.run(adapter, path, root=store_root)
+        biomarker_mirror.mirror_registered(adapter.captured, store_root)
     return source
 
 
