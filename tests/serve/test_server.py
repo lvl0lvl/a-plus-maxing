@@ -876,34 +876,32 @@ def test_post_step6_step_control_field_never_lands_in_the_record(tmp_path):
 
 
 def test_serve_layer_delegates_plan_generation_no_reimplementation():
-    """The serve layer generates plans by DELEGATING to generate_plan — it re-implements none.
+    """The serve layer generates plans by DELEGATING to the frozen plan engine — it re-implements none.
 
-    The POST `/generate-plan` route (the in-app plan-engine trigger) authors + records a plan
-    by CALLING the unchanged `scripts.plan.generate_plan` caller — it imports/calls neither
-    `assemble` (the safety-filter pass) nor the plan `orchestrator` directly, so the serve
-    layer never forks the safety pipeline the frozen `scripts/plan/*` owns. The delegation
-    is asserted positively (server.py references `generate_plan`) so this is not vacuous.
-    Reds if the serve layer ever re-implements assembly/orchestration, OR if the delegation
-    to generate_plan is removed.
-    SUPERSEDES the pre-PR `test_serve_layer_has_no_in_app_plan_generation_call`: the serve
-    layer NOW does in-app generation (the operator's "Generate plan" press), but via
-    delegation, not re-implementation — the earlier test's "0 in-app generation" premise is
-    retired with this route landing.
+    The POST `/generate-plan` route (the in-app plan-engine trigger) gathers each domain's author
+    envelope then CALLS the frozen cross-domain orchestrator `orchestrate.generate_plans` (which runs
+    the supplement<->peptide additive-AE screen + the other cross-domain holds before recording) — it
+    re-implements no `assemble` (the safety-filter pass), so the serve layer never forks the safety
+    pipeline the frozen `scripts/plan/*` owns. The delegation is asserted positively (server.py
+    references `generate_plans` + `orchestrate`) so this is not vacuous. Reds if the serve layer ever
+    re-implements the assembler, OR if the delegation to the frozen orchestrator is removed (the
+    cross-domain-safety bypass the TEST1 review finding flagged).
+    SUPERSEDES the pre-PR `test_serve_layer_has_no_in_app_plan_generation_call`: the serve layer NOW
+    does in-app generation (the operator's "Generate plan" press), via delegation to the FROZEN
+    orchestrator (NOT a per-domain `generate_plan` loop, which bypassed the cross-domain reconciler),
+    not re-implementation.
     """
     serve_dir = REPO_ROOT / "scripts" / "serve"
     for py in serve_dir.glob("*.py"):
         src = py.read_text()
         assert "assemble" not in src, (
-            f"{py.name} references plan assembly — the serve layer must DELEGATE to "
-            f"generate_plan, never re-implement assemble"
-        )
-        assert "orchestrator" not in src, (
-            f"{py.name} references the plan orchestrator — the serve layer delegates to "
-            f"generate_plan, never the orchestrator directly"
+            f"{py.name} references plan assembly — the serve layer must DELEGATE to the frozen "
+            f"plan engine, never re-implement assemble"
         )
     server_src = (serve_dir / "server.py").read_text()
-    assert "generate_plan" in server_src, (
-        "server.py no longer delegates to generate_plan — the in-app plan trigger is unwired"
+    assert "generate_plans" in server_src and "orchestrate" in server_src, (
+        "server.py no longer delegates to the frozen cross-domain orchestrator "
+        "(orchestrate.generate_plans) — the in-app plan trigger bypasses the cross-domain safety screen"
     )
 
 
@@ -1097,6 +1095,7 @@ def test_upload_route_table_unchanged(tmp_path):
 import datetime
 
 from scripts.model.client import ModelCallError
+from scripts.plan import orchestrate
 from scripts.plan.generate_plan import AUTHOR_CALL_FAILED
 from scripts.store import keying, plan_schema
 
@@ -1172,10 +1171,10 @@ def _seed_summary_store(store_root):
         )
 
 
-def _post_generate_plan(port):
-    """POST /generate-plan on the running server; return (status, response_text)."""
+def _post_generate_plan(port, *, content_type="application/json"):
+    """POST /generate-plan (application/json, the CSRF-gated content-type); return (status, body)."""
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=60)
-    conn.request("POST", "/generate-plan", body=b"")
+    conn.request("POST", "/generate-plan", body=b"{}", headers={"Content-Type": content_type})
     resp = conn.getresponse()
     text = resp.read().decode("utf-8")
     conn.close()
@@ -1639,6 +1638,172 @@ def test_wearable_upload_trend_moves_the_plan_e2e(tmp_path):
         assert "recent trend: flat" not in payload["plan_html"], (
             "the plan still shows the default flat — the wearable value did not move it"
         )
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+# --------------------------------------------------------------------------- #
+# PR #274 review fixes — BUG1 (thread survival on author ImportError), SEC1 (CSRF
+# content-type gate), TEST1 (cross-domain additive-AE hold), TEST3 (production
+# None store_root). Fixture-driven, 0 live spend.
+# --------------------------------------------------------------------------- #
+
+
+class _ImportErrorAuthorClient:
+    """A live-shaped client whose author() raises ImportError — the un-installed-SDK pre-live state."""
+
+    def __init__(self):
+        self.calls = []
+
+    def author(self, domain, summary):
+        self.calls.append(domain)
+        raise ImportError("anthropic SDK is not installed")
+
+
+class _AdditiveAEClient:
+    """A mock author declaring a SHARED additive-AE class on BOTH the supplement + the peptide.
+
+    The cross-domain additive-AE screen must HOLD the supplement (the safe no-stack default) rather
+    than ship both a supplement and a peptide whose declared additive-AE classes compose. The shared
+    class is declared in the envelope's `reconciliation.ae_profile` (lifted into the candidate `meta`
+    by compute_plan, read by the orchestrator's screen). Non-compound domains return thin-library.
+    """
+
+    def __init__(self):
+        self.calls = []
+
+    def author(self, domain, summary):
+        self.calls.append(domain)
+        ae = {"reconciliation": {"ae_profile": {"additive_classes": ["bleeding-risk"]}}}
+        if domain == "supplements":
+            return {"specialist": "supplement-specialist", "recommendations": [
+                _rec("supplement high-dose fish oil daily", "supplementation",
+                     "Examine.com omega-3 monograph 2024",
+                     {"name": "High-dose fish oil", "dose": "4 g", "timing": "daily"})], **ae}
+        if domain == "peptides":
+            return {"specialist": "peptide-specialist", "recommendations": [
+                _rec("run bpc-157 for localized tissue support", "peptide-therapy",
+                     "vault/library/peptides/bpc-157 research-report 2026",
+                     {"compound": "BPC-157", "dose": "250 mcg", "route": "subcutaneous"})], **ae}
+        return {"specialist": f"{domain}-specialist", "thin_library": True}
+
+
+def test_generate_plan_author_importerror_degrades_thread_survives(tmp_path):
+    """BUG1 (first-press killer): an author ImportError (un-installed SDK) degrades, never drops the thread.
+
+    The documented pre-live state: the operator connects a key (so `_key_available()` passes) but the
+    anthropic SDK is not installed, so `ModelClient.author` -> `_client()` raises ImportError. Without
+    a thread-survival guard this escapes all catches and DROPS the request thread (RemoteDisconnected,
+    no response). The handler must instead answer an honest degraded response — a 200 with each domain
+    surfacing an honest 'model-backend-unavailable' reason, 0 plans recorded — and stay alive.
+    Failing-capable: remove the per-domain ImportError catch + the outer guard and this reds (no
+    response / a 5xx / a dropped connection).
+    """
+    _seed_summary_store(tmp_path / "store")
+    srv, port = _server_with_author(tmp_path, _ImportErrorAuthorClient())  # resolving key + live-shaped client
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"an author ImportError returned {status} (dropped thread / 5xx?), expected 200"
+        payload = json.loads(body)  # a valid JSON response came back -> the thread was NOT dropped
+        assert payload["need_key"] is False, "a resolving key must not report need_key"
+        assert set(payload["results"]) == set(plan_schema.PLAN_DOMAINS)
+        assert all(v == "model-backend-unavailable" for v in payload["results"].values()), payload["results"]
+        for domain in plan_schema.PLAN_DOMAINS:
+            assert store.read(f"plan::{domain}", root=tmp_path / "store") == [], f"{domain} wrongly recorded"
+        assert _still_alive(port), "the handler died after an author ImportError (thread dropped)"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_generate_plan_rejects_non_json_content_type_415(tmp_path):
+    """SEC1 (CSRF / forced-spend): a non-application/json POST is refused 415 — no spend, no plan.
+
+    `/generate-plan` (like `_save_key` / `_do_confirm_extraction`) gates on Content-Type: a cross-site
+    CORS-simple `text/plain` POST is refused 415 BEFORE the no-key check / any author call, so a forged
+    cross-site POST cannot drive spend on the operator's key + plan writes (a genuine application/json
+    cross-site POST forces a preflight the server never answers). The author is never reached.
+    Failing-capable: drop the Content-Type gate and a text/plain POST drives generation.
+    """
+    _seed_summary_store(tmp_path / "store")
+    client = _MockAuthorClient(_domain_envelopes())
+    srv, port = _server_with_author(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        status, _ = _post_generate_plan(port, content_type="text/plain")
+        assert status == 415, f"a text/plain /generate-plan POST returned {status}, expected 415"
+        assert client.calls == [], "the author was reached despite the rejected content-type (forced spend)"
+        for domain in plan_schema.PLAN_DOMAINS:
+            assert store.read(f"plan::{domain}", root=tmp_path / "store") == [], f"{domain} wrongly recorded"
+        assert _still_alive(port), "the handler died after a rejected content-type POST"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_generate_plan_holds_cross_domain_additive_ae_pair(tmp_path):
+    """TEST1 (cross-domain safety): a supplement+peptide additive-AE pair is HELD, not both shipped.
+
+    The in-app button runs the FROZEN cross-domain orchestrator (orchestrate.generate_plans), so the
+    supplement<->peptide additive-AE screen runs over the per-domain candidates BEFORE recording. Both
+    authors declare a SHARED additive-AE class (`bleeding-risk`); the screen HOLDS the supplement (the
+    safe no-stack default — no liaison adjudicator is wired in-app to release it). The peptide records;
+    the supplement does NOT — proving the in-app path no longer bypasses the cross-domain safety layer.
+    Failing-capable: revert the in-app path to the per-domain generate_plan loop and BOTH the supplement
+    AND the peptide record (the cross-domain-safety bypass the TEST1 review finding flagged).
+    """
+    _seed_summary_store(tmp_path / "store")
+    srv, port = _server_with_author(tmp_path, _AdditiveAEClient())
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"POST /generate-plan returned {status}, expected 200"
+        results = json.loads(body)["results"]
+        assert results["peptides"] == "recorded", f"the peptide did not record: {results}"
+        assert results["supplements"] == orchestrate.ADDITIVE_AE_HELD, (
+            f"the supplement was not held by the additive-AE screen (cross-domain bypass?): {results}"
+        )
+        today = datetime.date.today().isoformat()
+        assert plan_schema.read_plan("peptides", today, tmp_path / "store")["plan"] is not None
+        assert store.read("plan::supplements", root=tmp_path / "store") == [], "the held supplement was wrongly recorded"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_generate_plan_production_none_store_root_resolves_default(tmp_path, monkeypatch):
+    """TEST3 (F1 class): the production None-store_root path resolves to store.DEFAULT_ROOT, no TypeError.
+
+    The operator-entry build (`scripts/serve/__main__`) constructs the server with NO store_root, so
+    `_do_generate_plan` runs with `self.store_root is None` and must resolve it to `store.DEFAULT_ROOT`
+    (the S99 F1 showstopper class — an explicit None overriding a default and raising TypeError deep in
+    the path). Builds the server WITHOUT store_root (+ a resolving key + a mock author), monkeypatches
+    `store.DEFAULT_ROOT` to a tmp dir, POSTs /generate-plan, and asserts a coherent 200 (not degraded)
+    with plans recorded into the resolved default root.
+    """
+    from scripts.store import store as store_mod
+
+    default_root = tmp_path / "prod-default-store"
+    monkeypatch.setattr(store_mod, "DEFAULT_ROOT", default_root)
+    _seed_summary_store(default_root)
+    srv = serve_server.build_server(
+        0, client=_MockAuthorClient(_domain_envelopes()), key_resolver=_resolving_key,
+    )  # no store_root -> the production __main__ shape
+    port = srv.server_address[1]
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"production None store_root returned {status}, expected 200"
+        payload = json.loads(body)
+        assert payload.get("degraded") is not True, f"the None store_root path degraded (TypeError?): {payload}"
+        assert payload["results"] == {d: "recorded" for d in plan_schema.PLAN_DOMAINS}, payload["results"]
+        today = datetime.date.today().isoformat()
+        for domain in plan_schema.PLAN_DOMAINS:
+            assert plan_schema.read_plan(domain, today, default_root)["plan"] is not None, (
+                f"{domain} did not land into the resolved production default root"
+            )
     finally:
         srv.shutdown()
         srv.server_close()

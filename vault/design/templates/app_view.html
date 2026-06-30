@@ -881,7 +881,7 @@ function renderGenerate(){
          +(s>2?' · '+s+'s':'…')+(s>20?'  (keep this tab open)':''); };
      setMsg(); tick=setInterval(setMsg,1000);
    }
-   fetch('/generate-plan',{method:'POST'})
+   fetch('/generate-plan',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
      .then(function(r){return r.json();})
      .then(function(d){ stopTick(); d=d||{};
        if(d.need_key){

@@ -27,6 +27,15 @@ from scripts.guard import pii_scan
 # neither (it asks about EACH genotype's implications, never the operator's own call).
 _ALLELE_CALL = re.compile(r"\([ACGTDI]+;[ACGTDI]+\)|genotype is \(?[ACGTDI]")
 
+# SEC2 path-traversal guard: a landed page's slug must be a safe lowercased filename token — no
+# path separator, no `..`, no leading dot — so `Path(root)/f"{slug}.md"` can never escape the root.
+_SAFE_SLUG = re.compile(r"[a-z0-9][a-z0-9-]*")
+
+# SEC3 raw-genotype guard (symmetric with the outbound `_ALLELE_CALL` egress guard): a coarse
+# trait-class token must carry NO raw genotype — an rsID or a paired-allele call — or the landed
+# page would leak a genotype into the PUBLIC wiki the page commits to.
+_RAW_GENOTYPE = re.compile(r"rs\d+|\([ACGTDI]+;[ACGTDI]+\)")
+
 # The OQ-3 curated planning-relevant allowlist: dispatch refuses ANY (gene, rsid) absent from
 # this set FIRST — auto-research is scoped to the curated variants, never a non-curated one
 # (even a non-excluded sensitive variant, e.g. BRCA1 rs80357906, is refused before any build).
@@ -109,6 +118,23 @@ def land_finding_page(finding, *, library_root):
     gene = finding["gene"]
     rsid = finding["rsid"]
     slug = finding.get("slug") or f"{gene.lower()}-{rsid}"
+    # SEC2 (path traversal): a slug is the page filename — fail-closed on any non-safe token BEFORE
+    # any write, so `finding['slug']` can never drive a write outside the library root (e.g. a
+    # `../../meta/...` slug). The validated slug also keys the frontmatter permalink below.
+    if not _SAFE_SLUG.fullmatch(slug):
+        raise ValueError(
+            f"genetics page slug {slug!r} is not a safe filename token (^[a-z0-9][a-z0-9-]*$) — "
+            f"refusing to write (path-traversal guard)"
+        )
+    # SEC3 (public-repo guard): the landed page commits to a PUBLIC repo, so each coarse trait-class
+    # token must carry no raw genotype — symmetric with the outbound de-association guard. (The
+    # whole-page operator-PII rescan runs below, over the rendered content.)
+    for _genotype, trait_class, _prose in finding["genotype_findings"]:
+        if _RAW_GENOTYPE.search(str(trait_class)):
+            raise ValueError(
+                f"genetics trait-class token {trait_class!r} carries a raw genotype — refusing to "
+                f"land (public-repo guard)"
+            )
     lines = [
         "---",
         f"title: {gene} {rsid}",
@@ -129,10 +155,21 @@ def land_finding_page(finding, *, library_root):
     ]
     for genotype, trait_class, prose in finding["genotype_findings"]:
         lines.append(f"- {genotype}: {trait_class} — {prose}")
+    content = "\n".join(lines) + "\n"
+    # SEC3 (public-repo guard, symmetric with the outbound `assert_query_de_associated`): rescan the
+    # rendered page for operator PII before it lands — the dispatcher content is otherwise verbatim,
+    # and the page commits to a PUBLIC repo. Fail-closed rather than leak.
+    if pii_scan.scan_text_full(content):
+        raise ValueError(
+            "genetics finding page carries operator PII — refusing to land (public-repo guard)"
+        )
     root = Path(library_root)
     root.mkdir(parents=True, exist_ok=True)
     page = root / f"{slug}.md"
-    page.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # SEC2 belt-and-suspenders: even a pattern-valid slug must resolve INSIDE the library root.
+    if root.resolve() not in page.resolve().parents:
+        raise ValueError(f"genetics page path {page!r} escapes the library root — refusing to write")
+    page.write_text(content, encoding="utf-8")
     return page
 
 

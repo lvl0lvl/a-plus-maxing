@@ -319,6 +319,52 @@ def test_landed_page_round_trips_through_matcher(tmp_path):
     assert trait_a != trait_c
 
 
+def test_land_finding_page_rejects_path_traversal_slug(tmp_path):
+    """SEC2 (path traversal): a malicious `slug` raises and writes NOTHING — write-anywhere closed.
+
+    `land_finding_page` builds the page filename from `finding['slug']`; an unvalidated slug like
+    `../../meta/operator-identity` would write a `.md` OUTSIDE the library root (proven write-anywhere).
+    The fix fail-closes on any non-safe slug (`^[a-z0-9][a-z0-9-]*$`) BEFORE any write. Asserts the
+    call raises AND no `.md` was written anywhere under tmp (neither in nor outside the root).
+    """
+    gene, rsid = "CYP1A2", "rs762551"
+    root = tmp_path / "wikirepo" / "vault/library/genetics"
+    root.mkdir(parents=True)
+    finding = _finding(gene, rsid, [("(A;A)", "fast-caffeine-metabolism", "fast [http://example/1]")])
+    finding["slug"] = "../../meta/operator-identity"  # the proven traversal slug
+    with pytest.raises(ValueError):
+        land_finding_page(finding, library_root=root)
+    assert list(tmp_path.rglob("*.md")) == [], "a page was written despite the path-traversal slug"
+
+
+def test_land_finding_page_rejects_operator_pii(tmp_path):
+    """SEC3 (public-repo PII): a finding whose rendered content carries operator PII raises, lands nothing.
+
+    The landed page commits to a PUBLIC repo; `land_finding_page` rescans the rendered page for operator
+    PII (symmetric with the outbound de-association guard) and fail-closes. A prose carrying an email
+    address trips `pii_scan.scan_text_full`. Asserts the call raises and writes no page.
+    """
+    gene, rsid = "CYP1A2", "rs762551"
+    finding = _finding(gene, rsid, [("(A;A)", "fast-caffeine-metabolism", "contact operator@example.com")])
+    with pytest.raises(ValueError):
+        land_finding_page(finding, library_root=tmp_path)
+    assert list(tmp_path.glob("*.md")) == [], "a page leaked operator PII into the public wiki"
+
+
+def test_land_finding_page_rejects_raw_genotype_in_trait_class(tmp_path):
+    """SEC3 (raw genotype): a trait-class token carrying a raw genotype raises, lands nothing.
+
+    A coarse trait-class token must carry no raw genotype (rs-id / paired-allele call) — symmetric with
+    the outbound guard (the genotype field legitimately carries the per-genotype call; the CLASS token
+    must not). A finding whose trait_class embeds a `(C;G)` call trips the guard. Asserts no page lands.
+    """
+    gene, rsid = "CYP1A2", "rs762551"
+    finding = _finding(gene, rsid, [("(A;A)", "carries (C;G) allele", "x [http://example/1]")])
+    with pytest.raises(ValueError):
+        land_finding_page(finding, library_root=tmp_path)
+    assert list(tmp_path.glob("*.md")) == [], "a page leaked a raw genotype into the public wiki"
+
+
 def test_dispatch_without_library_root_writes_no_page(tmp_path):
     """A dispatcher WITHOUT library_root returns the finding and writes no page (back-compat control)."""
     gene, rsid = "CYP1A2", "rs762551"
