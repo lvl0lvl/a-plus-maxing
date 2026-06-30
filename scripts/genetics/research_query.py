@@ -1,19 +1,23 @@
-"""Care-assistant→DNA-research-agent hookup (STUB): the de-associated variant-query egress.
+"""Care-assistant→DNA-research-agent hookup: the de-associated variant-query egress + page landing.
 
 The ONE new named egress class ADR-0032 adds to ADR-0001 — generic, operator-de-associated,
 ALLELE-AGNOSTIC genetic-variant literature queries. `build_variant_query` carries only the variant
 (gene + rsID), never the operator's allele; `assert_query_de_associated` is the fail-closed guard that
-RAISES before any outbound query carrying an allele call or an operator-identity token can leave; and
+RAISES before any outbound query carrying an allele call or an operator-identity token can leave;
 `dispatch_variant_research` refuses any variant ABSENT from the OQ-3 curated allowlist FIRST (the
-EXCLUDED denylist kept as defense-in-depth), guards the query, and STUBS the dispatch (the live,
-metered `aplus-research` run is OQ-1 — 0 spend here).
+EXCLUDED denylist kept as defense-in-depth), guards the query, runs the INJECTED dispatcher, and
+`land_finding_page` writes the returned finding as a gated `vault/library/genetics/` page the local
+matcher consumes. The default dispatch is still a 0-spend dry-run; the live, metered `aplus-research`
+run (the dispatcher that produces the ingestion-gate attestation chain) is OQ-1.
 
 The research engine `aplus-research` runs on the SUBSCRIPTION/agent research lane, NOT the no-train
-`ModelClient` backend (`scripts/model/client.py`). This module imports only `re`, T2's curated/excluded
-set, and the read-only operator-PII scanner — no outbound HTTP client, no model SDK.
+`ModelClient` backend (`scripts/model/client.py`). The dispatcher is INJECTED, so this module itself
+imports only `re`, `pathlib`, T2's curated/excluded set, and the read-only operator-PII scanner — no
+outbound HTTP client, no model SDK. The landed page is variant-keyed + operator-free by construction.
 """
 
 import re
+from pathlib import Path
 
 from scripts.genetics.variants import EXCLUDED_VARIANTS, PLANNING_RELEVANT_VARIANTS
 from scripts.guard import pii_scan
@@ -81,28 +85,90 @@ def assert_query_de_associated(query, *, identity_config=pii_scan.DEFAULT_IDENTI
         )
 
 
-def dispatch_variant_research(gene, rsid, *, dispatcher=None):
-    """Dispatch de-associated current-science research for a planning-relevant variant (STUB).
+def land_finding_page(finding, *, library_root):
+    """Write a de-associated variant finding as a gated `vault/library/genetics/` page.
+
+    The variant-keyed, operator-free page the local matcher (`scripts.genetics.match`)
+    consumes. The finding carries only variant-general, de-identified content — a
+    gene/rsID key, the evidence + provenance frontmatter, and one coarse trait-class
+    finding per genotype — so the written page is reusable across operators and never
+    operator-associated. The emitted finding lines use the matcher↔gate grammar
+    `- <genotype>: <trait-class> — <prose>` with the U+2014 em-dash both sides pin.
+
+    Args:
+        finding (dict): The de-identified variant finding. Keys: `gene`, `rsid`,
+            `evidence_tier`, `created`, `last_verified`, `provenance_dir`,
+            `provenance_slug`, and `genotype_findings` (a list of
+            `(genotype, trait_class, prose)` tuples). An optional `slug` overrides
+            the default `<gene-lower>-<rsid>`.
+        library_root (str | Path): The `vault/library/genetics/` root to write into.
+
+    Returns:
+        (Path) The written page path.
+    """
+    gene = finding["gene"]
+    rsid = finding["rsid"]
+    slug = finding.get("slug") or f"{gene.lower()}-{rsid}"
+    lines = [
+        "---",
+        f"title: {gene} {rsid}",
+        "type: genetics",
+        f"permalink: a-plus-maxing/library/genetics/{slug}",
+        f"gene: {gene}",
+        f"rsid: {rsid}",
+        f"evidence_tier: {finding['evidence_tier']}",
+        f"created: {finding['created']}",
+        f"last_verified: {finding['last_verified']}",
+        f"provenance_dir: {finding['provenance_dir']}",
+        f"provenance_slug: {finding['provenance_slug']}",
+        "---",
+        "",
+        f"# {gene} {rsid}",
+        "",
+        "## Genotype Findings",
+    ]
+    for genotype, trait_class, prose in finding["genotype_findings"]:
+        lines.append(f"- {genotype}: {trait_class} — {prose}")
+    root = Path(library_root)
+    root.mkdir(parents=True, exist_ok=True)
+    page = root / f"{slug}.md"
+    page.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return page
+
+
+def dispatch_variant_research(gene, rsid, *, dispatcher=None, library_root=None):
+    """Dispatch de-associated current-science research for a planning-relevant variant.
 
     Refuses any variant ABSENT from the OQ-3 curated allowlist FIRST — before any
     query is built — so a non-curated variant (even a non-excluded sensitive one,
     e.g. BRCA1 rs80357906) is never auto-researched; the EXCLUDED (APOE/DRD2/BDNF)
     denylist is kept as defense-in-depth (an excluded variant is, by construction,
-    also non-curated). Otherwise it builds the generic
-    allele-agnostic query, GUARDS it fail-closed via `assert_query_de_associated`,
-    and either runs a 0-spend dry-run (the default) or hands the guarded query to
-    an injected dispatcher. The live, metered `aplus-research` Agent dispatch is
-    OQ-1 — this stub makes no live call.
+    also non-curated). Otherwise it builds the generic allele-agnostic query, GUARDS
+    it fail-closed via `assert_query_de_associated`, then:
+
+    - `dispatcher=None` (the default): a 0-spend dry-run returning the guarded query.
+    - `dispatcher` given, `library_root=None`: runs the dispatcher, returns its
+      finding (no page written).
+    - `dispatcher` AND `library_root` given: runs the dispatcher and LANDS the
+      returned finding as a gated genetics page via `land_finding_page`, returning
+      the page path.
+
+    The live, metered `aplus-research` Agent dispatch (the dispatcher that produces
+    the ingestion-gate attestation chain) is OQ-1; the dispatcher is injected, so no
+    live call is made here by default.
 
     Args:
         gene (str): The gene symbol.
         rsid (str): The rs-id.
         dispatcher (callable, optional): A one-arg callable receiving the guarded
-            query; when None, the call is a dry-run returning the query.
+            query and returning a finding dict; when None, the call is a dry-run
+            returning the query.
+        library_root (str | Path, optional): When given with a dispatcher, the
+            `vault/library/genetics/` root the returned finding is landed into.
 
     Returns:
-        (str | Any) The would-be de-associated query (dry-run), or the injected
-        dispatcher's result.
+        (str | dict | Path) The de-associated query (dry-run), the dispatcher's
+        finding (no `library_root`), or the landed page path (`library_root` given).
     """
     if (gene, rsid) not in _CURATED_VARIANTS:
         raise ValueError(
@@ -114,4 +180,12 @@ def dispatch_variant_research(gene, rsid, *, dispatcher=None):
     assert_query_de_associated(query)
     if dispatcher is None:
         return query
-    return dispatcher(query)
+    finding = dispatcher(query)
+    if library_root is None:
+        return finding
+    if finding.get("gene") != gene or finding.get("rsid") != rsid:
+        raise ValueError(
+            f"dispatched finding {finding.get('gene')} {finding.get('rsid')!r} does not match "
+            f"the requested variant {gene} {rsid} — refusing to land a mismatched page"
+        )
+    return land_finding_page(finding, library_root=library_root)
