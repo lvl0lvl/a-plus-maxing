@@ -205,19 +205,52 @@ def _drive_confirm_inproc(store_root, *, content_type, content_length, body):
 def test_land_confirmed_lands_the_confirmed_subset(tmp_path):
     """AC-2 (unit): land_confirmed lands exactly the confirmed readings via the unchanged sink.
 
-    Over a list of conformant Line-Field-Set readings, `store.read_all` carries exactly those
-    readings (each traceable to its `(item, value)`), landed through `ingest.manual_entry`.
+    Over a list of conformant Line-Field-Set readings, the BARE store items carry exactly the
+    confirmed readings (each traceable to its `(item, value)`), landed through
+    `ingest.manual_entry`. ferritin/vitamin-d are registered-polarity markers, so they ALSO
+    mirror into the additive `biomarker::` trend namespace (the dead-feed fix, covered by the
+    dedicated mirror test) — filtered out of the bare-subset assertion here.
     """
     root = tmp_path / "store"
     receipt = confirm.land_confirmed(_CANNED_READINGS, root=root)
     landed = store.read_all(root)
-    by_item = {r["item"]: r["value"] for r in landed}
+    by_item = {r["item"]: r["value"] for r in landed if not r["item"].startswith("biomarker::")}
     assert by_item == {"ferritin": "120", "vitamin-d": "44"}, (
         f"the confirmed subset did not land exactly: {by_item}"
     )
     assert set(receipt["store"]) == {"ferritin", "vitamin-d"}, (
         f"the receipt does not report the landed item tokens: {receipt}"
     )
+
+
+def test_land_confirmed_mirrors_registered_biomarker_into_trend_namespace(tmp_path):
+    """A registered-polarity biomarker mirrors into biomarker:: (the router trend feed); others don't.
+
+    The dead-feed fix (additive): a confirmed reading whose item is a registered-polarity marker
+    (`ldl`) lands BOTH bare (the unchanged manual_entry sink) AND under `biomarker::ldl` via the
+    existing `loop_schema.record_biomarker`, so the router's recent-trend-direction feed sees it.
+    A registered-but-polarity-less item (`bodyweight`) and an unregistered item (`clinical-notes`)
+    are NOT mirrored — only the bare land. Two timepoints of the registered marker persist under
+    biomarker:: so a trend is computable. Mutation-proof: remove the mirror and biomarker::ldl is
+    empty.
+    """
+    root = tmp_path / "store"
+    confirm.land_confirmed([
+        {"item": "ldl", "timepoint": "2026-04-01", "source": "labs", "value": "90"},
+        {"item": "ldl", "timepoint": "2026-05-01", "source": "labs", "value": "140"},
+        {"item": "bodyweight", "timepoint": "2026-05-01", "source": "labs", "value": "183"},
+        {"item": "clinical-notes", "timepoint": "2026-05-01", "source": "medical", "value": "left knee pain"},
+    ], root=root)
+    # the registered-polarity marker is mirrored into the trend namespace, BOTH timepoints.
+    mirrored = store.read("biomarker::ldl", root=root)
+    assert [r["value"] for r in mirrored] == ["90", "140"], (
+        f"ldl was not mirrored into biomarker:: with both timepoints: {mirrored}"
+    )
+    # the bare land is unchanged (additive — a mirror, not a move).
+    assert len(store.read("ldl", root=root)) == 2, "the bare ldl land was lost (the mirror is not additive)"
+    # a polarity-less registered item and an unregistered item are NOT mirrored.
+    assert store.read("biomarker::bodyweight", root=root) == [], "a polarity-less marker was wrongly mirrored"
+    assert store.read("biomarker::clinical-notes", root=root) == [], "an unregistered item was wrongly mirrored"
 
 
 def test_confirm_py_imports_no_model_client_no_second_sink_or_key():
@@ -258,7 +291,10 @@ def test_reconfirm_appends_zero_duplicates(tmp_path):
     confirm.land_confirmed(_CANNED_READINGS, root=root)
     second = store.read_all(root)
     assert first == second, "a re-confirm of the same readings appended duplicate lines"
-    assert len(second) == 2, f"the re-confirm changed the store line count: {len(second)}"
+    # 2 bare items + 2 biomarker:: mirror items (ferritin/vitamin-d are registered markers); the
+    # additive mirror dedupes on re-confirm exactly like the bare land (record_biomarker's own
+    # (item, timepoint, source) identity).
+    assert len(second) == 4, f"the re-confirm changed the store line count: {len(second)}"
 
 
 def test_partial_confirmed_reading_lands_nothing(tmp_path):
@@ -429,7 +465,10 @@ def test_confirm_extraction_lands_only_confirmed_subset(tmp_path):
         confirmed = [_CANNED_READINGS[0]]  # the operator confirms ONLY ferritin
         status, resp = _post_confirm(port, {"readings": confirmed})
         assert status == 200, f"/confirm-extraction returned {status}, expected 200"
-        landed_items = {r["item"]: r["value"] for r in store.read_all(tmp_path / "store")}
+        # The bare confirmed subset (ferritin is also a registered marker -> it ALSO mirrors into
+        # biomarker::ferritin, the additive trend feed; filtered out of the bare-subset assertion).
+        landed_items = {r["item"]: r["value"] for r in store.read_all(tmp_path / "store")
+                        if not r["item"].startswith("biomarker::")}
         assert landed_items == {"ferritin": "120"}, (
             f"the confirmed subset did not land exactly (non-confirmed leaked?): {landed_items}"
         )
@@ -647,7 +686,10 @@ def test_confirm_land_resolves_none_store_root_to_production_default(tmp_path, m
         f"production None store_root did not land the confirmed subset: {payload}"
     )
     landed = store.read_all(default_root)
-    assert {(r["item"], r["value"]) for r in landed} == {("ferritin", "120"), ("vitamin-d", "44")}, (
+    # The bare confirmed readings (ferritin/vitamin-d are registered markers -> they ALSO mirror
+    # into the additive biomarker:: trend feed; filtered out of the bare-subset assertion).
+    bare = {(r["item"], r["value"]) for r in landed if not r["item"].startswith("biomarker::")}
+    assert bare == {("ferritin", "120"), ("vitamin-d", "44")}, (
         "the confirmed readings did not land into the resolved production default root"
     )
 
