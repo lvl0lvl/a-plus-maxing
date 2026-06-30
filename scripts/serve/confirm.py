@@ -8,14 +8,14 @@ makes 0 model call (imports no model client); the `(item, timepoint, source)` de
 INHERITED from the unchanged sink.
 
 Biomarker-trend mirror (additive): a landed reading whose item is a REGISTERED-polarity
-biomarker (`biomarker_meta.METADATA` with a non-None `good_direction`) is ALSO recorded into
-the `biomarker::<marker>` namespace via the EXISTING `loop_schema.record_biomarker` (called,
-never re-implemented — a frozen store writer). That namespace is what the router's
-`recent-trend-direction` feed reads; without this mirror a confirmed lab value landed only
-under its bare item name, never trended, and never reached the plan author (the dead-feed
-gap). The mirror is purely additive — the bare manual_entry land is unchanged, and the
-biomarker:: dedupe is `record_biomarker`'s own `(item, timepoint, source)` identity. Only the
-de-identified marker NAME + numeric value cross — the same coarse trend the dashboard reads.
+biomarker is ALSO recorded into the `biomarker::<marker>` namespace the router's
+`recent-trend-direction` feed reads, via the shared `biomarker_mirror.mirror_registered` (the
+ONE mirror rule, also used by the wearable land path `route.route_upload`, so the two cannot
+diverge; it CALLS the frozen `loop_schema.record_biomarker`, never re-implements it). Without
+this mirror a confirmed lab value landed only under its bare item name, never trended, and
+never reached the plan author (the dead-feed gap). The mirror is purely additive — the bare
+manual_entry land is unchanged, and the biomarker:: dedupe is `record_biomarker`'s own
+`(item, timepoint, source)` identity.
 
 The landing is ALL-OR-NOTHING (mirroring `ingest.import_csv`'s validate-then-write
 precedent): the whole batch is validated against the SHARED conformance check
@@ -25,7 +25,8 @@ non-conformant reading raises `ValueError` before any reading is written.
 """
 
 from scripts.ingest import ingest
-from scripts.store import biomarker_meta, loop_schema, store
+from scripts.serve import biomarker_mirror
+from scripts.store import store
 from scripts.store.keying import is_conformant
 
 
@@ -40,8 +41,8 @@ def land_confirmed(readings, *, root):
     reading, root)`; the dedupe (a re-confirm of an already-landed reading appends 0
     duplicate lines) is inherited from the sink — this caller adds no second sink/dedupe key.
     A landed reading whose item is a REGISTERED-polarity biomarker is ADDITIONALLY mirrored
-    into the `biomarker::<marker>` namespace via the existing `loop_schema.record_biomarker`
-    (the frozen store writer, called not re-implemented), so a confirmed lab value trends and
+    into the `biomarker::<marker>` namespace via the shared `biomarker_mirror.mirror_registered`
+    (the ONE rule, shared with the wearable land path), so a confirmed lab value trends and
     reaches the router's `recent-trend-direction` feed — additive, the bare land is unchanged.
     Returns a thin receipt of the landed item tokens, mirroring `capture.persist_capture`'s
     shape.
@@ -70,15 +71,9 @@ def land_confirmed(readings, *, root):
     for reading in readings:
         ingest.manual_entry(reading["item"], reading, root=store_root)
         landed.append(reading["item"])
-        # Additive biomarker-trend mirror: a registered-polarity marker is ALSO recorded into
-        # the biomarker:: namespace the router's recent-trend-direction feed reads (the bare
-        # manual_entry land above never populated it, so a lab value never trended -> never
-        # reached the plan). Normalize to the registry's canonical marker key (prefix-stripped,
-        # lowercased) so the mirror lands under the exact `biomarker::<marker>` the feed reads.
-        meta = biomarker_meta.get(reading["item"])
-        if meta is not None and meta["good_direction"] is not None:
-            marker = biomarker_meta._strip_prefix(reading["item"]).lower()
-            loop_schema.record_biomarker(
-                marker, reading["timepoint"], reading["value"], store_root
-            )
+    # Additive biomarker-trend mirror: a registered-polarity marker is ALSO recorded into the
+    # biomarker:: namespace the router's recent-trend-direction feed reads (the bare manual_entry
+    # land never populated it, so a lab value never trended -> never reached the plan). The ONE
+    # mirror rule, shared with the wearable land path (route.route_upload).
+    biomarker_mirror.mirror_registered(readings, store_root)
     return {"store": landed}

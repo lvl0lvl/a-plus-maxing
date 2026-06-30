@@ -1583,3 +1583,62 @@ def test_format_agnostic_lab_value_moves_the_plan_e2e(tmp_path):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def _healthkit_rhr_xml(pairs):
+    """Apple-Health export.xml bytes carrying one RestingHeartRate record per (day, value)."""
+    rows = "".join(
+        f' <Record type="HKQuantityTypeIdentifierRestingHeartRate" startDate="{d} 08:00:00 -0500" value="{v}"/>\n'
+        for d, v in pairs
+    )
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n<HealthData locale="en_US">\n'
+            + rows + "</HealthData>\n").encode()
+
+
+def test_wearable_upload_trend_moves_the_plan_e2e(tmp_path):
+    """E2E (wearable-in -> plan-out): a recognized healthkit upload TRENDS and reaches the plan.
+
+    The wearable dead-feed fix, end-to-end: upload a RECOGNIZED Apple-Health export.xml carrying
+    rising RHR over two days (a real trend) -> the route's wearable arm auto-lands it via the frozen
+    `ingest.run` AND mirrors `biomarker::rhr` (the captured-readings mirror) -> POST /generate-plan
+    -> `router.summarize`'s recent-trend-direction goes `regressing` (rising RHR, a down-polarity
+    marker) -> the author SEES it in its summary -> the workout plan reflects it. Content-traceable
+    wearable-in -> plan-out: the rising-RHR trend moves the plan OFF the default `flat`.
+
+    Failing-capable / mutation-proof: drop the `route_upload` biomarker mirror and `biomarker::rhr`
+    stays empty, recent-trend-direction reverts to `flat`, and the `regressing` assertions red (the
+    wearable dead-feed gap this fix closes — the operator's dominant data, ~6113 healthkit readings).
+    """
+    _seed_summary_store(tmp_path / "store")
+    client = _TrendEchoClient([])  # the extract lane is unused (a recognized format auto-lands)
+    srv, port = _server_with_author(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        # 1) recognized wearable upload -> auto-lands via ingest.run AND mirrors the registered marker.
+        ustatus, _ = _post_upload(
+            port, "export.xml", _healthkit_rhr_xml([("2026-04-01", "50"), ("2026-05-01", "70")])
+        )
+        assert ustatus == 200, f"wearable upload returned {ustatus}, expected 200"
+        mirrored = store.read("biomarker::rhr", root=tmp_path / "store")
+        assert len(mirrored) == 2, (
+            f"the wearable RHR readings did not mirror into the biomarker:: trend feed: {mirrored}"
+        )
+
+        # 2) generate-plan -> the rising-RHR trend reaches the author summary + the rendered plan.
+        gstatus, gbody = _post_generate_plan(port)
+        assert gstatus == 200, f"generate-plan returned {gstatus}, expected 200"
+        payload = json.loads(gbody)
+        assert payload["results"]["workout"] == "recorded", f"workout did not record: {payload['results']}"
+        seen = client.author_summaries.get("workout")
+        assert seen is not None and seen.get("recent-trend-direction") == "regressing", (
+            f"the wearable trend did not reach the author summary (still default flat?): "
+            f"{seen and seen.get('recent-trend-direction')}"
+        )
+        # plan-out content-traceable: the rendered plan carries the wearable-driven trend, NOT default.
+        assert "recent trend: regressing" in payload["plan_html"], "the plan does not reflect the wearable trend"
+        assert "recent trend: flat" not in payload["plan_html"], (
+            "the plan still shows the default flat — the wearable value did not move it"
+        )
+    finally:
+        srv.shutdown()
+        srv.server_close()

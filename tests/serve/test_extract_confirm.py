@@ -437,9 +437,12 @@ def test_upload_heterogeneous_recognized_lands_unrecognized_surfaced(tmp_path):
         # The recognized export.xml landed via the unchanged seam.
         hrv = store.read("hrv", root=tmp_path / "store")
         assert len(hrv) == 1 and hrv[0]["value"] == 58.0, "the recognized export.xml did not land"
-        # The unrecognized readings landed 0 — only the recognized reading is in the store.
-        all_items = {r["item"] for r in store.read_all(tmp_path / "store")}
-        assert all_items == {"hrv"}, f"an unrecognized extracted reading auto-landed: {all_items}"
+        # The unrecognized readings landed 0 — only the recognized reading is in the store (bare).
+        # (hrv is a registered marker, so it ALSO mirrors into biomarker::hrv, the additive trend
+        # feed; filtered out — the assertion is that NO unrecognized extracted reading auto-landed.)
+        bare_items = {r["item"] for r in store.read_all(tmp_path / "store")
+                      if not r["item"].startswith("biomarker::")}
+        assert bare_items == {"hrv"}, f"an unrecognized extracted reading auto-landed: {bare_items}"
     finally:
         srv.shutdown()
         srv.server_close()
