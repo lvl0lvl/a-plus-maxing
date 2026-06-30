@@ -381,72 +381,112 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         self._write_json(200, {"landed": receipt["store"]})
 
     def _do_generate_plan(self):
-        """Author + record a plan for every plan domain over the stored data; answer JSON.
+        """Author + reconcile + record a plan for the plan domains over stored data; answer JSON.
 
-        The in-app trigger for the plan engine — the operator's "Generate plan" press. For
-        each `plan_schema.PLAN_DOMAINS` domain it authors the envelope through the instance
-        no-train client and records the surviving plan via the UNCHANGED
-        `scripts.plan.generate_plan` caller (de-identified summary -> the safety-filter pass
-        -> record_plan): the serve layer re-implements no assembly/safety logic, it only
-        CALLS it. Each domain is wrapped so ONE domain's hard failure (a fail-loud
-        `record_plan` ValueError / an unknown-domain KeyError) or honest no-plan reason (an
-        author-call-failed degrade) records the others and surfaces that domain's reason —
-        the whole run never aborts on one domain. The reply is JSON
-        `{need_key, results, plan_html}`: `results` maps each domain to `"recorded"` or its
-        honest no-plan reason, and `plan_html` is the re-rendered Plan zone the front-end
-        swaps in.
+        The in-app trigger for the plan engine — the operator's "Generate plan" press. It gathers
+        each `plan_schema.PLAN_DOMAINS` author's envelope through the instance no-train client (the
+        ONE model call per domain), then runs the FROZEN cross-domain orchestrator
+        (`orchestrate.generate_plans`, CALLED not re-implemented): it reconciles ACROSS domains
+        BEFORE recording — the supplement<->peptide additive-AE screen, the nutrition->workout
+        energy bounce, the cross-domain-conflict + supplement<->Rx-BPMH holds — and records only the
+        survivors via `record_plan`. No reauthor/adjudicator hook is wired here (the agent-harness A'
+        path), so a HELD finding stays HELD (the safe default): a supplement+peptide additive-AE pair
+        is held, NOT both shipped. The in-app path therefore never RELEASES a hold via a liaison
+        override — that needs the care-assistant A' run; the in-app plan is screened, not
+        liaison-adjudicated (strictly more conservative, never laxer). The reply is JSON
+        `{need_key, results, plan_html}`: `results` maps each domain to `"recorded"` or its honest
+        no-plan/hold reason, and `plan_html` is the re-rendered Plan zone the front-end swaps in.
 
-        No-key state: with no USABLE no-train author it records NOTHING and answers `need_key`
-        so the front-end routes the operator to connect their key — never a crash. "No usable
-        author" is BOTH the absent client (`self.client is None`, the test-built path) AND the
-        present-but-keyless client: the operator-entry server always wires a live `ModelClient`,
-        so in production a missing key shows up not as a None client but as no resolvable key.
-        The guard uses the SAME availability check the Profile status reports (`_key_available`
-        -> `key_source.resolve`), so a keyless operator gets the honest "connect your key"
-        guidance rather than four cryptic per-domain author-call-failed degrades — and the
-        engine is never called (no live spend) until a key is connected.
+        Resilience + thread survival: each author call is isolated per domain so one domain's failure
+        (a ModelCallError degrade, an un-importable model-backend SDK / un-constructable client raising
+        ImportError, any unexpected author error) records the others and surfaces that domain's
+        honest reason — the run never aborts on one domain. The whole body is wrapped in a
+        catch-and-degrade (mirroring `_do_chat` / `_do_confirm_extraction`): a malformed state / an
+        unexpected exception answers an honest degraded JSON, never a dropped request thread (no
+        RemoteDisconnected).
+
+        CSRF gate (mirrors `_save_key` / `_do_confirm_extraction`): a non-`application/json` POST is
+        refused 415 BEFORE any work — a cross-site CORS-simple `text/plain` POST cannot drive forced
+        spend on the operator's key + plan writes (a genuine application/json cross-site POST forces a
+        preflight the server never answers).
+
+        No-key state: with no USABLE no-train author (`self.client is None` OR no resolvable key — the
+        SAME availability check the Profile status reports) it records NOTHING and answers `need_key`
+        BEFORE any spend; the engine is never called until a key is connected.
         """
         import datetime
         import functools
 
-        from scripts.plan.generate_plan import generate_plan
-        from scripts.store import plan_schema, store
+        # CSRF gate (SEC): require application/json so a cross-site CORS-simple POST cannot drive
+        # plan generation (forced spend + plan writes) — refuse before any work.
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"need_key": False, "results": {}, "plan_html": None,
+                                   "error": "unsupported content-type"})
+            return
 
-        # No usable no-train author -> the no-key state. The author client may be absent
-        # (`self.client is None`) OR present-but-keyless (no key resolves); either way the
-        # plan needs the instance key, so record nothing and route the operator to connect it
-        # BEFORE the engine is called (no live spend on a keyless press).
+        # No usable no-train author -> the no-key state (BEFORE any spend). `self.client` may be
+        # absent (test-built) OR present-but-keyless (production: a live ModelClient with no resolvable
+        # key); either way route the operator to connect their key, engine uncalled.
         if self.client is None or not self._key_available():
             self._write_json(200, {"need_key": True, "results": {}, "plan_html": None})
             return
 
-        store_root = self.store_root if self.store_root is not None else store.DEFAULT_ROOT
-        # The reader is instance-root pre-bound (the router.summarize caller contract — an
-        # unbound reader silently reads the wrong instance). Record under today so the plan
-        # resolves as today's on the Plan screen (date equality is plan_schema's resolution).
-        store_read = functools.partial(store.read, root=store_root)
-        today = datetime.date.today().isoformat()
+        try:
+            from scripts.model.client import ModelCallError
+            from scripts.plan import orchestrate, router
+            from scripts.plan.generate_plan import AUTHOR_CALL_FAILED
+            from scripts.store import plan_schema, store
+            from vault.design.templates import app_shell
 
-        results = {}
-        for domain in plan_schema.PLAN_DOMAINS:
-            try:
-                outcome = generate_plan(
-                    domain, store_read=store_read, root=store_root,
-                    plan_date=today, client=self.client,
-                )
+            store_root = self.store_root if self.store_root is not None else store.DEFAULT_ROOT
+            # The reader is instance-root pre-bound (the router.summarize caller contract). Record
+            # under today so the plan resolves as today's on the Plan screen (date equality).
+            store_read = functools.partial(store.read, root=store_root)
+            today = datetime.date.today().isoformat()
+
+            # Gather each domain's author envelope through the no-train client (the ONE model call
+            # per domain), isolated per domain: a ModelCallError degrades to the honest
+            # author-call-failed reason; an un-importable SDK / un-constructable client degrades to
+            # an honest model-backend-unavailable reason; any other unexpected author error degrades
+            # THAT domain — never a thread drop, never an aborted run.
+            summary = router.summarize(store_read)
+            authors = {}
+            author_errors = {}
+            for domain in plan_schema.PLAN_DOMAINS:
+                try:
+                    authors[domain] = self.client.author(domain, summary)
+                except ModelCallError:
+                    author_errors[domain] = AUTHOR_CALL_FAILED
+                except (ImportError, ModuleNotFoundError):
+                    author_errors[domain] = "model-backend-unavailable"
+                except Exception as exc:
+                    author_errors[domain] = f"error: {type(exc).__name__}"
+
+            # Reconcile across domains BEFORE recording (the FROZEN orchestrator, CALLED). No
+            # reauthor/adjudicator hook is wired (the agent-harness A' path), so a held finding stays
+            # HELD — the safe default: a supplement+peptide additive-AE pair is held, not both shipped.
+            outcome = orchestrate.generate_plans(authors, store_read, store_root, plan_date=today)
+
+            results = {}
+            for domain in plan_schema.PLAN_DOMAINS:
+                if domain in author_errors:
+                    results[domain] = author_errors[domain]
+                    continue
+                record = outcome["results"].get(domain)
                 results[domain] = (
-                    "recorded" if outcome["recorded"] else (outcome["reason"] or "no-plan")
+                    "recorded" if record and record["recorded"] else ((record or {}).get("reason") or "no-plan")
                 )
-            except (ValueError, KeyError) as exc:
-                # One domain's hard failure records nothing for THAT domain but never aborts
-                # the run — the others still generate. The honest reason is surfaced, never a
-                # stack trace / dropped request thread.
-                results[domain] = f"error: {type(exc).__name__}"
 
-        from vault.design.templates import app_shell
-
-        plan_html = app_shell._plan_zone(store.read_all(store_root), today)
-        self._write_json(200, {"need_key": False, "results": results, "plan_html": plan_html})
+            plan_html = app_shell._plan_zone(store.read_all(store_root), today)
+            self._write_json(200, {"need_key": False, "results": results, "plan_html": plan_html})
+        except Exception:
+            # Thread survival (mirrors _do_chat / _do_confirm_extraction): a malformed state / an
+            # unexpected exception (an un-importable SDK at summary time, a fail-loud record rejection,
+            # the PII gate raise) must NOT drop the request thread. Answer an honest degraded response
+            # — never a RemoteDisconnected, never a fabricated plan.
+            self._write_json(200, {"need_key": False, "results": {}, "plan_html": None,
+                                   "degraded": True, "reason": "could not generate plan"})
 
     def _key_available(self):
         """Whether a no-train key resolves at runtime — the Profile 'connected' availability check.
