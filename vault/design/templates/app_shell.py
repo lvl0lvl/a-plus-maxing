@@ -31,6 +31,15 @@ _DOC_ICONS = {
 _LINK = "<span class='link'>+ Link</span>"
 _LOADED = "<span style='color:var(--good);font-weight:600'>✓ loaded</span>"
 
+# The 'About you' demographic store items the served form pre-fills from (each form field
+# name == its store item name; `capture.persist_capture` writes each under its own name).
+# `date-of-birth` is the raw birth-year text input; the other three are <select> tokens whose
+# saved value pre-SELECTS the matching option. `goal-domains` is DELIBERATELY ABSENT — it is a
+# chat-only rich-section field (gathered at POST /chat), not a field on this objective-only form,
+# so it has no select/checkbox surface here to pre-fill.
+_DEMOGRAPHIC_SELECTS = ("sex-for-dosing", "bodyweight-band", "equipment-access-class")
+_DEMOGRAPHIC_DOB = "date-of-birth"
+
 
 def _esc(value):
     """HTML-escape a display string — a filename/source is never trusted raw into markup."""
@@ -173,14 +182,88 @@ def _plan_zone(store_read, today):
     return "".join(cards)
 
 
+def _latest_values(store_read, names):
+    """The latest-by-timepoint stored value for each of `names`, from the flat store read.
+
+    `store_read` is the flat reading list `store.read_all` returns (item-then-timepoint
+    ordered). For each requested item this keeps the reading with the greatest `timepoint`
+    (ties resolve to the last seen, mirroring the store's last-in-file resolution). An item
+    with no reading is simply absent from the result — no fabricated default.
+
+    Args:
+        store_read (list): The flat cross-item reading list.
+        names (tuple): The item names to resolve a latest value for.
+
+    Returns:
+        (dict) Item name -> its latest stored value, only for items that have a reading.
+    """
+    latest = {}
+    rows = store_read if isinstance(store_read, list) else []
+    for r in rows:
+        if not isinstance(r, dict) or r.get("item") not in names:
+            continue
+        timepoint = r.get("timepoint", "")
+        prior = latest.get(r["item"])
+        if prior is None or timepoint >= prior[0]:
+            latest[r["item"]] = (timepoint, r.get("value"))
+    return {item: value for item, (_tp, value) in latest.items()}
+
+
+def _prefill_form(html, store_read):
+    """Pre-fill the 'About you' demographic form from the operator's saved store values.
+
+    Reads the latest saved reading per demographic item and re-renders the existing static
+    form markup with the matching <select> option pre-SELECTED and the birth-year input's
+    value pre-filled, so the operator does not re-type data the store already holds. A field
+    with no saved reading stays blank/default (no fabricated value). When any demographic is
+    pre-filled, a '✓ Saved — edit to update' banner is injected as the form's first child so
+    the operator sees they were remembered. The saved bands/classes are de-identified; the
+    birth year is the operator's own value rendered back over the local loopback (no egress).
+
+    Args:
+        html (str): The rendered SPA HTML (post DOC_CARDS/PLAN_ZONE substitution).
+        store_read (list): The flat cross-item reading list driving the pre-fill.
+
+    Returns:
+        (str) The HTML with the demographic form pre-filled, or unchanged when nothing saved.
+    """
+    saved = _latest_values(store_read, (_DEMOGRAPHIC_DOB, *_DEMOGRAPHIC_SELECTS))
+    if not saved:
+        return html  # nothing saved — honest blank/default form, no banner
+
+    for name in _DEMOGRAPHIC_SELECTS:
+        value = saved.get(name)
+        if value is None:
+            continue
+        option = f"<option value='{_esc(value)}'>"
+        html = html.replace(option, f"<option value='{_esc(value)}' selected>", 1)
+
+    dob = saved.get(_DEMOGRAPHIC_DOB)
+    if dob is not None:
+        html = html.replace(
+            "name='date-of-birth' placeholder=\"e.g. 1986\">",
+            f"name='date-of-birth' placeholder=\"e.g. 1986\" value='{_esc(dob)}'>",
+            1,
+        )
+
+    banner = ("<div class='upload-status' data-prefill='saved'>"
+              "<span style='color:var(--good);font-weight:600'>✓ Saved — edit to update</span></div>")
+    return html.replace(
+        "<form action='/upload' method='post'>",
+        f"<form action='/upload' method='post'>{banner}",
+        1,
+    )
+
+
 def render(store_read=None, *, status=None, _today=None):
     """Return the inline-asset SPA shell HTML with the Upload doc-cards at the live load-state.
 
-    The design is `app_view.html` (passes render.emit's off-file guard); two surfaces are
-    injected: the four 'Link your documents' cards (`<!--DOC_CARDS-->`, rendered from `status`)
-    and the Plan-screen body (`<!--PLAN_ZONE-->`, the domains' recorded plans for today resolved
-    from `store_read`, else the honest awaiting state). No fabricated data — an empty store shows
-    honest "+ Link" cards and the no-plan awaiting state.
+    The design is `app_view.html` (passes render.emit's off-file guard); three surfaces are
+    injected: the four 'Link your documents' cards (`<!--DOC_CARDS-->`, rendered from `status`),
+    the Plan-screen body (`<!--PLAN_ZONE-->`, the domains' recorded plans for today resolved from
+    `store_read`, else the honest awaiting state), and the 'About you' demographic form pre-filled
+    from the operator's latest saved readings (`_prefill_form`). No fabricated data — an empty
+    store shows honest "+ Link" cards, the no-plan awaiting state, and a blank/default form.
 
     Args:
         store_read (list, optional): The store read model; drives the wearable card's
@@ -197,8 +280,9 @@ def render(store_read=None, *, status=None, _today=None):
         store_read = []
     status = status if status is not None else _default_status(store_read)
     today = (_today or _datetime.date.today()).isoformat()
-    return (
+    html = (
         _VIEW.read_text(encoding="utf-8")
         .replace("<!--DOC_CARDS-->", _doc_cards(status))
         .replace("<!--PLAN_ZONE-->", _plan_zone(store_read, today))
     )
+    return _prefill_form(html, store_read)
