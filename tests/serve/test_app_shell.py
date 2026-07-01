@@ -1166,3 +1166,176 @@ def test_wizard_keeps_spa_inline_asset_clean(tmp_path):
     emitted = path.read_text()
     assert 'id="screen-wizard"' in emitted, "the emitted SPA carries no Create-Profile wizard"
     assert "<script src" not in emitted, "the wizard added an off-file <script src> reference"
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T5 — the Create-Profile EQUIPMENT screen (`#screen-equipment`):
+# the 4-class `equipment-access-class` SELECT + the access-gated 4-group / 29-item
+# checklist (the SPECIFIC cardio machines, never a generic "cardio machine") + the
+# bodyweight-only hide-and-note + a distinct inline `<svg>` per item. Markup-only —
+# the Create-Profile submit is wired by T10 (the T4↔T5 seam adjudication), so these
+# cases assert the served MARKUP, region-scoped to `#screen-equipment`. E1 is
+# RE-SCOPED region-scoped: the recipe's stale whole-SPA `count==1` is dropped because
+# the SPA legitimately carries TWO `equipment-access-class` controls by design — the
+# Create-Profile equipment screen (this) and the unlocked My-Info `#panel-build`
+# surface (create once, edit later). Rendered-HTML / real-emit, 0 live spend.
+# --------------------------------------------------------------------------- #
+
+from scripts.plan import router as _router
+
+# The four checklist group headings (mockup `#mock-equipment`), `&` HTML-escaped to `&amp;`.
+_EQUIP_GROUP_HEADINGS = (
+    "Free weights &amp; racks", "Cardio machines", "Resistance machines",
+    "Bodyweight &amp; accessories",
+)
+# The per-group item counts, in heading order (7 + 6 + 5 + 11 = 29).
+_EQUIP_GROUP_COUNTS = (7, 6, 5, 11)
+# The six SPECIFIC cardio machines (never a single generic "cardio machine").
+_CARDIO_MACHINES = ("Treadmill", "Exercise bike", "Stair", "Elliptical", "Rowing", "Air")
+# The pinned bodyweight-only note copy (mockup `#equip-bw-note`).
+_EQUIP_BW_NOTE = "No equipment needed — we'll program bodyweight-only"
+# The new record-only local field the 29 detail items submit under (NOT a planner token).
+_EQUIP_DETAIL_FIELD = "equipment-detail"
+
+
+def _equip_screen(html):
+    """The `#screen-equipment` Create-Profile equipment screen region from the rendered SPA."""
+    m = re.search(r'<section[^>]*id="screen-equipment"[^>]*>(.*?)</section>', html, re.DOTALL)
+    assert m is not None, "the rendered SPA carries no `#screen-equipment` Create-Profile equipment screen"
+    return m.group(1)
+
+
+def _equip_group_counts(region):
+    """Per-group `equipment-detail` item counts, in `_EQUIP_GROUP_HEADINGS` order.
+
+    Each group heading is immediately followed by its `.equip-grid`, whose only children are the
+    item `<label>`s (no nested `<div>`), so the group's items are the `name='equipment-detail'`
+    controls captured between the heading and the grid's closing `</div>`.
+    """
+    counts = []
+    for heading in _EQUIP_GROUP_HEADINGS:
+        i = region.find(heading)
+        assert i != -1, f"the equipment screen is missing the group heading {heading!r}"
+        grid = re.search(r'<div class="equip-grid">(.*?)</div>', region[i:], re.DOTALL)
+        assert grid is not None, f"the {heading!r} group has no `.equip-grid` item container"
+        counts.append(grid.group(1).count(f"name='{_EQUIP_DETAIL_FIELD}'"))
+    return tuple(counts)
+
+
+# --- Cycle 1: the access SELECT (region-scoped no-drift) + gating + bw-note + field-name --- #
+
+
+def test_equip_screen_access_select_is_region_scoped_four_class_no_drift():
+    """E1 (AC-1, RE-SCOPED region-scoped per the T4↔T5 seam adjudication): the equipment screen
+    carries the 4-class `equipment-access-class` select, option values == the gate constant.
+
+    The recipe's stale whole-SPA `count==1` guard is DROPPED: the served SPA legitimately carries
+    two `equipment-access-class` controls — the Create-Profile equipment screen (this one) and the
+    unlocked My-Info `#panel-build` surface. So the no-drift assertion is SCOPED to
+    `#screen-equipment`, and is failing-capable there (the panel-build select can NOT satisfy it):
+    before the equipment screen exists `_equip_screen` reds; a dropped/extra class or a
+    label-not-token value reds the set-equality.
+    """
+    region = _equip_screen(_spa_html())
+    values = set(re.findall(r"<option value='([^']*)'", _select_block(region, "equipment-access-class")))
+    values.discard("")
+    assert values == set(capture.EQUIPMENT_ACCESS_CLASSES), (
+        f"the equipment screen access-class options {sorted(values)} drifted from the gate "
+        f"constant {sorted(capture.EQUIPMENT_ACCESS_CLASSES)}"
+    )
+
+
+def test_equip_screen_access_gates_checklist_and_bodyweight_only_note():
+    """E2 (AC-3): the access select carries a gating hook; the checklist container is present
+    (shown for a non-bodyweight value); the bodyweight-only note is present, default-hidden, pinned.
+
+    Server-rendered static HTML + client JS, so the markup half is asserted (the test does not
+    execute JS): the access select's `onchange=` gating hook, the `#equip-detail` checklist host
+    (default-shown), and the `#equip-bw-note` element default-hidden (`display:none`) carrying the
+    pinned copy. Failing-capable: remove the hook / the container / the note or its copy → reds.
+    """
+    region = _equip_screen(_spa_html())
+    sel_open = re.search(r"<select[^>]*name='equipment-access-class'[^>]*>", region)
+    assert sel_open is not None, "the equipment screen has no equipment-access-class select"
+    assert "onchange=" in sel_open.group(0), "the access select carries no gating hook (onchange=)"
+    assert 'id="equip-detail"' in region, "the equipment screen has no access-gated checklist container"
+    note = re.search(r'<div[^>]*id="equip-bw-note"[^>]*>', region)
+    assert note is not None, "the equipment screen has no bodyweight-only note element"
+    assert "display:none" in note.group(0), "the bodyweight-only note is not default-hidden"
+    assert _EQUIP_BW_NOTE in region, "the bodyweight-only note is missing its pinned copy"
+
+
+def test_equip_detail_items_submit_record_only_local_field_not_planner_token():
+    """E3 (AC-5, MARKUP half / QA-F2): the access select submits the planner token; the 29 detail
+    items submit under the NEW local field `equipment-detail`, record-only BY CONSTRUCTION.
+
+    The access select submits `name='equipment-access-class'` (the pinned planner token); the 29
+    detail items submit under `name='equipment-detail'` — a field absent from BOTH
+    `router.SUMMARY_FIELD_SET` and `capture.WIRED_TOKENS`, so `persist_capture`'s default routes it
+    record-only (the planner gets no new token from the detailed set). The routing itself is T1's
+    `test_capture.py` contract — asserted here only at the field-NAME + membership level. Failing-
+    capable: naming the detail field a SUMMARY_FIELD_SET token reds the `∉` assertions.
+    """
+    region = _equip_screen(_spa_html())
+    assert "name='equipment-access-class'" in region, "the equipment access select does not submit the planner token"
+    assert region.count(f"name='{_EQUIP_DETAIL_FIELD}'") == 29, (
+        "the equipment screen does not carry 29 detail items under the record-only `equipment-detail` field"
+    )
+    assert _EQUIP_DETAIL_FIELD not in _router.SUMMARY_FIELD_SET, "`equipment-detail` leaked into the planner SUMMARY_FIELD_SET"
+    assert _EQUIP_DETAIL_FIELD not in capture.WIRED_TOKENS, "`equipment-detail` leaked into capture.WIRED_TOKENS"
+
+
+# --- Cycle 2: the 4-group / 29-item checklist + distinct inline <svg> + the render gate --- #
+
+
+def test_equip_checklist_four_groups_29_items_specific_cardio_machines():
+    """E4 (AC-2): the checklist carries the four groups with per-group counts (7, 6, 5, 11) and the
+    SIX specific cardio machines (never a single generic "cardio machine").
+
+    Parses `#screen-equipment` for the four group headings and counts each group's
+    `equipment-detail` items. Also asserts the cardio group enumerates >= 5 of the 6 named machines
+    — the not-a-generic-"cardio machine" guard. Failing-capable: a miscount or a generic-collapse
+    of the cardio group reds.
+    """
+    region = _equip_screen(_spa_html())
+    for heading in _EQUIP_GROUP_HEADINGS:
+        assert heading in region, f"the equipment checklist is missing the group heading {heading!r}"
+    assert _equip_group_counts(region) == _EQUIP_GROUP_COUNTS, (
+        f"the per-group item counts are not {_EQUIP_GROUP_COUNTS} (sum 29)"
+    )
+    ci, ri = region.find("Cardio machines"), region.find("Resistance machines")
+    cardio_seg = region[ci:ri]
+    present = [m for m in _CARDIO_MACHINES if m in cardio_seg]
+    assert len(present) >= 5, f"the cardio group names only {present} — a generic-collapse regression"
+
+
+def test_equip_items_carry_distinct_inline_svg_icons_no_off_file_asset():
+    """E5 (AC-4, markup leg): each of the 29 items carries a distinct inline `.eq-ic` `<svg>` icon,
+    with 0 off-file asset in the equipment region.
+
+    Counts the per-item icon svgs (the `.eq-ic` block) == 29, asserts the set of distinct icon-svg
+    blocks has >= 20 members (not one repeated placeholder), and asserts the region carries no
+    off-file `<img src>` / non-`data:` external `src`. Failing-capable: a single repeated
+    placeholder icon reds the distinct-count; an off-file `<img src>` reds the no-asset assertion.
+    """
+    region = _equip_screen(_spa_html())
+    icons = re.findall(r'<span class="eq-ic"><svg.*?</svg></span>', region, re.DOTALL)
+    assert len(icons) == 29, f"the equipment region carries {len(icons)} per-item icons, expected 29"
+    assert len(set(icons)) >= 20, f"the item icons are not distinct ({len(set(icons))} unique) — a repeated placeholder"
+    assert "<img" not in region, "the equipment region carries an off-file <img> asset"
+    assert 'src="http' not in region and "src='http" not in region, "the equipment region carries an http-sourced asset"
+
+
+def test_equip_screen_keeps_spa_inline_asset_clean(tmp_path):
+    """E6 (AC-4, AUTHORITATIVE inline-asset): generate.run('app') emits a Path with the equipment
+    screen, no off-file ref.
+
+    Drives the REAL `generate.run('app')` (render.emit RAISES ValueError on any off-file asset
+    reference) and asserts it returns a written Path that EXISTS, carries `#screen-equipment`, and
+    has no off-file `<script src>`. A substring grep is NOT substituted for the emit probe.
+    """
+    path = _emit_app(tmp_path)
+    assert isinstance(path, Path) and path.exists(), "generate.run('app') did not emit with the equipment screen"
+    emitted = path.read_text()
+    assert 'id="screen-equipment"' in emitted, "the emitted SPA carries no `#screen-equipment` equipment screen"
+    assert "<script src" not in emitted, "the equipment screen added an off-file <script src> reference"
