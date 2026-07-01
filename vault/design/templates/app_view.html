@@ -341,6 +341,45 @@ select.inp{cursor:pointer}
 .pitem .ptit{font-size:13.5px;font-weight:600;margin-top:3px}
 .pitem .pdet{font-size:11.5px;color:var(--ink2);margin-top:2px;line-height:1.4}
 
+/* ===== Create-Profile wizard (ADR-0034; gate-served by T6/W4) ===== */
+.gatehead{display:flex;align-items:center;gap:16px;padding:0 26px;height:60px;background:var(--sheet);border-bottom:1px solid var(--line)}
+.gatehead .tb-brand{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.gatehead .tb-brand small{font-size:11px;font-weight:400;color:var(--muted);margin-left:8px}
+.gatehead .ghp{margin-left:auto;display:flex;align-items:center;gap:12px;min-width:280px}
+.gatehead .ghp .bar{flex:1}
+.gatehead .ghp .pct{font-size:12px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.gate-body{max-width:1000px;margin:0 auto;padding:30px 26px 60px}
+.wizard{display:grid;grid-template-columns:252px 1fr;gap:30px;align-items:start}
+.stepper{position:sticky;top:20px}
+.stepper .sttl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);padding:0 11px 9px}
+.step-item{display:flex;gap:11px;align-items:center;padding:9px 11px;border-radius:9px;cursor:pointer;color:var(--ink2);font-size:13.5px;font-weight:600;width:100%;border:none;background:none;text-align:left}
+.step-item:hover{background:var(--line2)}
+.step-item.active{background:var(--soft);color:var(--accent)}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--line2);color:var(--muted);flex:none;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700}
+.step-item.active .step-num{background:var(--accent);color:#fff}
+.wstep{display:none}
+.wstep.active{display:block}
+.wstep .h1{margin-bottom:4px}
+.wform-foot{display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:18px;border-top:1px solid var(--line2)}
+.opts{display:flex;flex-wrap:wrap;gap:9px;margin-top:7px}
+.opt{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:9px 15px;font-size:13px;font-weight:600;color:var(--ink2);cursor:pointer;background:#fff;user-select:none}
+.opt:hover{border-color:var(--ctrl)}
+.opt .obox{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--ctrl);flex:none;display:flex;align-items:center;justify-content:center}
+.opt .obox svg{width:11px;height:11px;color:#fff;opacity:0}
+.opt.on{border-color:var(--good);background:var(--good-bg);color:#0F8C80}
+.opt.on .obox{background:var(--good);border-color:var(--good)}
+.opt.on .obox svg{opacity:1}
+.opt.radio .obox{border-radius:50%}
+.note{font-size:12px;color:var(--ink2);background:var(--line2);border-radius:9px;padding:11px 13px;line-height:1.5;margin-top:11px}
+.note.warn{background:var(--watch-bg);color:#9A6A1F}
+.note b{color:var(--ink)}
+.note.warn b{color:#7A5310}
+.qcard{border:1px solid var(--line);border-radius:12px;padding:15px 16px;margin-top:12px}
+.qcard .q{font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.4}
+.keystate{border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:12px}
+.keystate .klab{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+.inp:disabled{background:var(--line2);color:var(--faint);cursor:not-allowed;border-color:var(--line)}
+.keymask{letter-spacing:3px}
 </style></head>
 <body>
 <div class="app">
@@ -463,9 +502,9 @@ select.inp{cursor:pointer}
           <div class="ws-panel active ws-docs" id="panel-build">
             <div class="seclab" style="margin-top:0">Your details</div>
             <form action='/upload' method='post'>
-              <div class="field"><label for='date-of-birth'>Birth year</label><input class="inp" type='text' id='date-of-birth' name='date-of-birth' placeholder="e.g. 1986"></div>
+              <div class="field"><label for='date-of-birth'>Birthdate</label><input class="inp" type='date' id='date-of-birth' name='date-of-birth'></div>
               <div class="field" style="margin-top:10px"><label for='sex-for-dosing'>Sex (for dosing)</label><select class="inp" id='sex-for-dosing' name='sex-for-dosing'><option value=''>Select…</option><option value='male'>Male</option><option value='female'>Female</option></select></div>
-              <div class="field" style="margin-top:10px"><label for='bodyweight-band'>Body weight range</label><select class="inp" id='bodyweight-band' name='bodyweight-band'><option value=''>Select a range…</option><option value='under-60kg'>Under 132 lb</option><option value='60-70kg'>132–154 lb</option><option value='70-80kg'>154–176 lb</option><option value='80-90kg'>176–198 lb</option><option value='90-100kg'>198–220 lb</option><option value='over-100kg'>Over 220 lb</option></select></div>
+              <div class="field" style="margin-top:10px"><label for='bodyweight-kg'>Body weight</label><div style="display:flex;gap:10px"><input class="inp" type='number' id='bodyweight-kg' name='bodyweight-kg' placeholder="Weight" style="flex:1"><select class="inp" aria-label="Weight unit" style="width:92px;flex:none"><option value='lbs'>lbs</option><option value='kg'>kg</option></select></div></div>
               <div class="field" style="margin-top:10px"><label for='equipment-access-class'>Equipment access</label><select class="inp" id='equipment-access-class' name='equipment-access-class'><option value=''>Select…</option><option value='full-home-gym'>Full home gym</option><option value='commercial-gym'>Commercial gym</option><option value='minimal-equipment'>Minimal equipment</option><option value='bodyweight-only'>Bodyweight only</option></select></div>
               <div style="margin-top:14px"><button class="btn primary" type='submit'>Save details</button></div>
             </form>
@@ -517,6 +556,148 @@ select.inp{cursor:pointer}
         <div style="display:flex;align-items:center;gap:13px;margin-top:14px">
           <button class="btn primary" id="pf-key-save">Save key</button>
           <span id="pf-key-msg" style="font-size:12.5px;color:var(--muted)"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CREATE-PROFILE WIZARD (ADR-0034; gate-served by T6/W4) ============ -->
+    <section class="screen" id="screen-wizard">
+      <header class="gatehead">
+        <div class="tb-brand">A+ Maxing<small>Create your profile</small></div>
+        <div class="ghp"><div class="bar"><i id="wiz-bar" style="width:11%"></i></div><span class="pct" id="wiz-pct">Step 1 of 9</span></div>
+      </header>
+      <div class="gate-body">
+        <div class="wizard">
+          <nav class="stepper" id="stepper">
+            <div class="sttl">Profile setup</div>
+            <button type="button" class="step-item active" data-go="1" onclick="gotoStep(1)"><span class="step-num">1</span>Demographics</button>
+            <button type="button" class="step-item" data-go="2" onclick="gotoStep(2)"><span class="step-num">2</span>Goals</button>
+            <button type="button" class="step-item" data-go="3" onclick="gotoStep(3)"><span class="step-num">3</span>Training &amp; activity</button>
+            <button type="button" class="step-item" data-go="4" onclick="gotoStep(4)"><span class="step-num">4</span>Diet</button>
+            <button type="button" class="step-item" data-go="5" onclick="gotoStep(5)"><span class="step-num">5</span>Supplements &amp; peptides</button>
+            <button type="button" class="step-item" data-go="6" onclick="gotoStep(6)"><span class="step-num">6</span>Medications</button>
+            <button type="button" class="step-item" data-go="7" onclick="gotoStep(7)"><span class="step-num">7</span>Health &amp; lifestyle</button>
+            <button type="button" class="step-item" data-go="8" onclick="gotoStep(8)"><span class="step-num">8</span>Documents</button>
+            <button type="button" class="step-item" data-go="9" onclick="gotoStep(9)"><span class="step-num">9</span>API key</button>
+          </nav>
+          <div id="wsteps">
+            <div class="wstep active" data-step="1">
+              <div class="h1">Demographics</div>
+              <div class="sub">The basics your care team needs to dose and plan safely. Identity stays on your device.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="field"><label>Birthdate</label><input class="inp" type='date' name='date-of-birth'><div class="note">Your exact age is computed from this; your full birth date stays on your machine — only your age is used.</div></div>
+                <div class="field" style="margin-top:11px"><label>Sex (for dosing)</label><select class="inp" name='sex-for-dosing'><option value=''>Select…</option><option value='male'>Male</option><option value='female'>Female</option></select></div>
+                <div class="field" style="margin-top:11px"><label>Race &amp; ethnicity <span style="color:var(--faint);font-weight:500">(optional)</span></label><select class="inp" name='race-ethnicity'><option value=''>Select…</option><option>White / Caucasian</option><option>Black / African American</option><option>Hispanic / Latino</option><option>East Asian</option><option>South Asian</option><option>Middle Eastern</option><option>Native American</option><option>Pacific Islander</option><option>Mixed</option><option>Prefer not to say</option></select><div class="note">Kept on your device for dosing and research population-matching — never sent to the planner. Sensitive, so it is optional.</div></div>
+                <div class="field" style="margin-top:11px"><label>Body weight</label><div style="display:flex;gap:10px"><input class="inp" type='number' name='bodyweight-kg' placeholder="Weight" style="flex:1"><select class="inp" aria-label="Weight unit" style="width:92px;flex:none"><option value='lbs'>lbs</option><option value='kg'>kg</option></select></div><div class="note">Logged over time so your plan can track weight-change progress.</div></div>
+                <div class="field" style="margin-top:11px"><label>Occupation</label><input class="inp" name='occupation' placeholder="What do you do?"></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()" style="visibility:hidden">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="2">
+              <div class="h1">Goals</div>
+              <div class="sub">What you want your plan to move. You can re-order these any time.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="seclab" style="margin-top:0">Which domains should your plan cover?</div>
+                <div class="opts">
+                  <label class="opt" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Workout</label>
+                  <label class="opt" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Nutrition</label>
+                  <label class="opt" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Supplements</label>
+                  <label class="opt" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Peptides</label>
+                </div>
+                <input type="hidden" name='goal-domains'>
+                <div class="field" style="margin-top:14px"><label>Targets</label><textarea class="inp" name='goal-targets' style="min-height:74px;resize:vertical" placeholder="What does success look like for you?"></textarea></div>
+                <div class="field" style="margin-top:11px"><label>Priority order</label><input class="inp" name='goal-priority-order' placeholder="e.g. Workout, Supplements, Peptides, Nutrition"></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="3">
+              <div class="h1">Training &amp; activity</div>
+              <div class="sub">Sets your training-volume baseline — and screens for anything that should pause hard training.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="field"><label>Your training, in your words</label><textarea class="inp" name='training-detail' style="min-height:80px;resize:vertical" placeholder="Days per week, session length, what you train…"></textarea></div>
+                <div class="qcard"><div class="q">During exercise, do you ever have chest pain, dizziness, or shortness of breath?</div><div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>No</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label></div><div class="note warn"><b>Safety screen.</b> A <b>Yes</b> pauses hard-training recommendations and flags a doctor visit before your plan includes heavy load.</div></div>
+                <div class="field" style="margin-top:11px"><label>Anything we should train around (injury, surgery)?</label><input class="inp" name='train-around' placeholder="e.g. left shoulder impingement"></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="4">
+              <div class="h1">Diet</div>
+              <div class="sub">The shape of how you eat. We keep this light here and go deeper in the chat.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="field"><label>Your diet, in your words</label><textarea class="inp" name='nutrition-detail' style="min-height:80px;resize:vertical" placeholder="Eating pattern, foods you avoid, a typical day…"></textarea></div>
+                <div class="field" style="margin-top:11px"><label>Food allergies</label><input class="inp" name='hard-limits' placeholder="List foods that cause a reaction"></div>
+                <div class="note"><b>Allergies become hard limits</b> your plan will never cross. We'll fine-tune protein target, meal timing, and foods you avoid with you in the <b>chat</b>.</div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="5">
+              <div class="h1">Supplements &amp; peptides</div>
+              <div class="sub">What you already take, so recommendations build on it instead of doubling up.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="field"><label>Current supplement stack</label><textarea class="inp" name='supplement-stack' style="min-height:80px;resize:vertical" placeholder="e.g. Creatine 5g daily, Vitamin D3, Omega-3…"></textarea></div>
+                <div class="field" style="margin-top:11px"><label>Peptides you use</label><input class="inp" name='peptide-stack' placeholder="List any peptides you currently use"></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="6">
+              <div class="h1">Medications</div>
+              <div class="sub">For interaction-safety only. These stay on your machine.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="field"><label>Current prescription medications</label><textarea class="inp" name='rx-interaction-classes' style="min-height:74px;resize:vertical" placeholder="Medication, dose, and what it's for — one per line"></textarea></div>
+                <div class="note"><b>Kept on your machine.</b> Your care assistant turns these into interaction-safety signals — <b>de-associated, with no name attached</b> — and you'll confirm before anything is used in a plan.</div>
+                <div class="field" style="margin-top:11px"><label>Drug allergies</label><input class="inp" name='drug-allergies' placeholder="Medication + your reaction"></div>
+                <div class="note">Drug allergies become <b>hard limits</b>.</div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="7">
+              <div class="h1">Health &amp; lifestyle</div>
+              <div class="sub">Sleep, stress, and a couple of brief screens. Honest answers make the plan safer.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="seclab" style="margin-top:0">Sleep</div>
+                <div class="field"><label>Average hours of sleep</label><input class="inp" name='sleep-hours' style="max-width:140px" placeholder="e.g. 7"></div>
+                <div class="qcard"><div class="q">Has anyone told you that you snore loudly or stop breathing while asleep?</div><div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>No</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label></div><div class="note warn"><b>Screening.</b> A <b>Yes</b> flags a sleep-apnea conversation for your doctor visit — never a plan input.</div></div>
+                <div class="seclab">Stress &amp; mood</div>
+                <div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Low stress</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Moderate</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>High</label></div>
+                <div class="qcard"><div class="q">Over the last 2 weeks — little interest or pleasure in doing things?</div><div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Not at all</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Several days</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>More than half</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Nearly every day</label></div><div class="q" style="margin-top:13px">Over the last 2 weeks — feeling down, depressed, or hopeless?</div><div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Not at all</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Several days</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>More than half</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Nearly every day</label></div><div class="note">A brief, gentle mood check (PHQ-2). Your answers route to a <b>private referral signal</b>, never into your plan.</div></div>
+                <div class="seclab">Substance use</div>
+                <div class="field"><label>Smoker</label><div class="opts" style="margin-top:0"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Former</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Never</label></div><div class="field" style="margin-top:10px;margin-left:14px;padding-left:13px;border-left:2px solid var(--line)"><label>How many years since you quit? <span style="color:var(--faint);font-weight:500">(if Former)</span></label><div style="display:flex;gap:9px;align-items:center"><input type="number" class="inp" name='smoker-quit-years' style="max-width:120px" placeholder="years"><span style="font-size:13px;color:var(--ink2)">years</span></div></div></div>
+                <div class="field" style="margin-top:11px"><label>Alcohol</label><select class="inp" name='alcohol-frequency'><option value=''>Select…</option><option>None</option><option>Rarely (a few times a year)</option><option>Monthly (1–3/mo)</option><option>Weekly (1–3/wk)</option><option>Most days (4+/wk)</option></select></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="8">
+              <div class="h1">Documents</div>
+              <div class="sub">Link what you have. Everything is parsed locally on your device.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="note">Supported exports — wearables (Apple Health, Garmin, Whoop, Oura, Fitbit), labs (PDF or CSV), and DNA (23andMe, AncestryDNA). Each file is <b>parsed locally</b> on your device and never uploaded.</div>
+                <div class="doc" style="margin-top:11px"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12h4l2 6 4-14 2 8h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><div class="m"><div class="t">Wearable export</div><div class="d">Activity, sleep &amp; vitals — parsed locally</div></div><div class="st"><span class="link">+ Link</span></div></div>
+                <div class="doc"><svg class="ic" viewBox="0 0 24 24"><path d="M6 2h7l5 5v15H6z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 2v5h5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><div class="m"><div class="t">Labs &amp; bloodwork</div><div class="d">PDF or CSV of a recent panel</div></div><div class="st"><span class="link">+ Link</span></div></div>
+                <div class="doc"><svg class="ic" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 8h6M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.6"/></svg><div class="m"><div class="t">Medical history</div><div class="d">Visit summaries, prior plans, records</div></div><div class="st"><span class="link">+ Link</span></div></div>
+                <div class="doc"><svg class="ic" viewBox="0 0 24 24"><path d="M8 3c0 5 8 6 8 9s-8 4-8 9M16 3c0 5-8 6-8 9s8 4 8 9" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><div class="m"><div class="t">DNA</div><div class="d">23andMe or AncestryDNA raw export</div></div><div class="st"><span class="link">+ Link</span></div></div>
+                <div class="drop" style="margin-top:10px">Drop files here or click to browse — labs, history, wearable exports, prior plans. Parsed locally.</div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="9">
+              <div class="h1">API key</div>
+              <div class="sub">The Care Assistant needs an Anthropic API key to answer. Stored in your device keychain as <b>a-plus-maxing-api-key</b> — never uploaded, never written to a file.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="keystate">
+                  <div class="klab">Before you save</div>
+                  <div style="margin-bottom:10px"><span class="pill muted">No key saved</span></div>
+                  <div class="field"><label>Anthropic API key</label><input class="inp" type="password" placeholder="sk-ant-…"></div>
+                  <div style="margin-top:12px"><button type="button" class="btn primary">Save key</button></div>
+                </div>
+                <div class="keystate">
+                  <div class="klab">After you save</div>
+                  <div class="field"><label>Anthropic API key</label><input class="inp keymask" type="text" value="••••••••••••••••••••" disabled></div>
+                  <div style="display:flex;align-items:center;gap:13px;margin-top:12px"><button type="button" class="btn ghost">Replace key</button><span style="font-size:13px;font-weight:600;color:var(--good);display:inline-flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>✓ Saved to keychain · stored, never shown again</span></div>
+                </div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; review →</button></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -813,7 +994,7 @@ function renderGenerate(){
        // change in the doc-cards is the proof a file actually LANDED into the store.
        if(docHTML()!==before){ st.className='upload-status ok'; st.textContent='✓ Linked '+f.name+' — it\'s in your store.';
          setTimeout(function(){ if(st.textContent.indexOf('✓ Linked '+f.name)===0) st.style.display='none'; },6000); }
-       else { st.className='upload-status warn'; st.textContent='No new data landed from '+f.name+' — it may already be loaded, or it\'s not a supported export (an Apple Health .zip/.xml, a labs PDF/CSV, or a 23andMe .zip).'; }
+       else { st.className='upload-status warn'; st.textContent='No new data landed from '+f.name+' — it may already be loaded, or it\'s not a supported format (a wearable export, a labs PDF/CSV, or a DNA raw export).'; }
      })
      .catch(function(){ stopTick(); if(st){ st.className='upload-status warn'; st.textContent='Upload failed — please try again.'; } });
  }
@@ -912,5 +1093,21 @@ function renderGenerate(){
  document.addEventListener('click',function(e){ var b=e.target.closest('#plan-gen-run'); if(b){ e.preventDefault(); run(b); }});
 })();
 
+/* Create-Profile wizard step navigation (local; no fetch, no off-file asset) */
+(function(){
+  function setStep(n){
+    var steps=document.querySelectorAll('#wsteps .wstep');
+    if(!steps.length) return;
+    n=Math.max(1,Math.min(steps.length,n));
+    document.querySelectorAll('#wsteps .wstep').forEach(function(s){ s.classList.toggle('active', s.getAttribute('data-step')===String(n)); });
+    document.querySelectorAll('#stepper .step-item').forEach(function(it){ it.classList.toggle('active', it.getAttribute('data-go')===String(n)); });
+    var bar=document.getElementById('wiz-bar'); if(bar){ bar.style.width=Math.round(n/steps.length*100)+'%'; }
+    var pct=document.getElementById('wiz-pct'); if(pct){ pct.textContent='Step '+n+' of '+steps.length; }
+  }
+  function current(){ var a=document.querySelector('#wsteps .wstep.active'); return a?parseInt(a.getAttribute('data-step'),10):1; }
+  window.gotoStep=function(n){ setStep(n); };
+  window.nextStep=function(){ setStep(current()+1); };
+  window.prevStep=function(){ setStep(current()-1); };
+})();
 </script>
 </body></html>

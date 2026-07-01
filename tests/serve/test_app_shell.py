@@ -216,18 +216,17 @@ from scripts.store import store
 # still run, operator-identity detection is empty. Mirrors test_intake_demographics.
 _ABSENT_IDENTITY = "vault/meta/__no_such_identity_config__.txt"
 
-# The four demographic capture field names the activated Upload form must POST.
-_DEMOGRAPHIC_NAMES = ("date-of-birth", "sex-for-dosing", "bodyweight-band", "equipment-access-class")
+# The four demographic capture field names the amended `#panel-build` "Your details" form
+# POSTs (ADR-0034: the born-year text -> a full-date `date-of-birth`, the `bodyweight-band`
+# select -> a `bodyweight-kg` NUMBER input; `bodyweight-band` is RETIRED from the markup).
+_DEMOGRAPHIC_NAMES = ("date-of-birth", "sex-for-dosing", "bodyweight-kg", "equipment-access-class")
 
-# The bodyweight kg gate token -> its pinned pounds-range DISPLAY label. The POSTed value is
-# the kg band token (so persist_capture validates); the operator reads pounds. 6-band 1:1 map.
-_BODYWEIGHT_LB_LABELS = {
-    "under-60kg": "Under 132 lb", "60-70kg": "132–154 lb", "70-80kg": "154–176 lb",
-    "80-90kg": "176–198 lb", "90-100kg": "198–220 lb", "over-100kg": "Over 220 lb",
-}
+# The four pinned rich-domain free-text field names the comprehensive ADR-0034 wizard carries
+# (the `_CHAT_RAW_SOURCE_FIELDS` keys) and the objective-only `#panel-build` form does NOT.
+_WIZARD_RICH_FIELDS = ("nutrition-detail", "supplement-stack", "peptide-stack", "training-detail")
 
-# Rich-section field names that MUST NOT appear in the objective-only Upload form — they are
-# the chat-only surface (gathered at POST /chat), never form fields (the ADR-0018 split).
+# Rich-section field names that MUST NOT appear in the objective-only `#panel-build` form —
+# the comprehensive intake routes them through the wizard, never this demographic sub-form.
 _RICH_SECTION_NAMES = (
     "goal-domains", "goal-targets", "goal-priority-order", "hard-limits",
     "recovery-status-band", "train-around", "dietary-pattern", "meals-per-day",
@@ -272,11 +271,15 @@ def test_upload_form_posts_the_four_demographic_names_to_upload():
 
 
 def test_demographic_selects_built_from_the_gate_constants():
-    """AC-2: each demographic <select>'s option values EQUAL the gate enum constant (no-drift)."""
+    """AC-2: each demographic <select>'s option values EQUAL the gate enum constant (no-drift).
+
+    The `bodyweight-band` leg is RETIRED — ADR-0034 replaces the band <select> with a
+    `bodyweight-kg` number input (no `<option>`s). Only `sex-for-dosing` /
+    `equipment-access-class` stay bounded selects checked against the gate constants.
+    """
     html = _spa_html()
     for name, constant in (
         ("sex-for-dosing", capture.SEX_OPTIONS),
-        ("bodyweight-band", capture.BODYWEIGHT_BANDS),
         ("equipment-access-class", capture.EQUIPMENT_ACCESS_CLASSES),
     ):
         values = set(re.findall(r"<option value='([^']*)'", _select_block(html, name)))
@@ -286,56 +289,67 @@ def test_demographic_selects_built_from_the_gate_constants():
         )
 
 
-def test_bodyweight_band_six_options_with_pinned_pounds_labels():
-    """AC-2: bodyweight-band has 6 kg-token options (not 7) with the pinned pounds labels."""
-    block = _select_block(_spa_html(), "bodyweight-band")
-    pairs = re.findall(r"<option value='([^']*)'>([^<]*)</option>", block)
-    real = [(v, t) for v, t in pairs if v != ""]
-    assert len(real) == 6, f"bodyweight-band has {len(real)} real options, expected 6 (not the prototype's 7)"
-    labels = dict(real)
-    for token, label in _BODYWEIGHT_LB_LABELS.items():
-        assert labels.get(token) == label, (
-            f"bodyweight option {token!r} label is {labels.get(token)!r}, expected the pinned {label!r}"
-        )
+def test_bodyweight_is_amended_number_input_with_unit_select():
+    """AC-2 (amended weight): `#panel-build` carries a `bodyweight-kg` NUMBER input + a lbs/kg unit.
+
+    ADR-0034 replaces the 6-option `bodyweight-band` <select> with a `bodyweight-kg` number
+    input (logged over time, not a coarse band) beside a lbs/kg unit select. The retired
+    `bodyweight-band` token is ABSENT from the rendered SPA (no silent stale option). Failing-
+    capable: reds if the number input is missing or the `bodyweight-band` select survives.
+    """
+    html = _spa_html()
+    assert re.search(r"<input[^>]*type='number'[^>]*name='bodyweight-kg'", html), (
+        "the amended `#panel-build` form carries no `bodyweight-kg` number input"
+    )
+    assert "bodyweight-band" not in html, "the retired `bodyweight-band` band select still renders"
+    # the unit select sits beside the number input, offering lbs + kg
+    assert ">lbs</option>" in html and ">kg</option>" in html, "no lbs/kg unit select beside the weight"
 
 
 def test_demographic_fields_round_trip_through_the_built_capture_seam(tmp_path):
-    """AC-3: the four form name=/value pairs round-trip through the unchanged persist_capture."""
+    """AC-3: the W1-valid demographic legs round-trip through the unchanged persist_capture.
+
+    Two legs, each W1-valid AND W2-invariant (no cross-wave coupling to T2's deriver/weight
+    capture): (a) the full-date `date-of-birth` persists VERBATIM to the `date-of-birth` raw
+    store item via the UNCHANGED `_DOB_FIELD` special-case (the raw write does not change when
+    T2 repurposes the deriver to exact-age); (b) `sex-for-dosing` passes through to its own
+    WIRED_TOKEN. The amended weight is a `bodyweight-kg` field whose CAPTURE routing is T2's W2
+    work (record-only at W1, store empty), so a weight->store round-trip is DELIBERATELY absent
+    here — the weight is covered by the AC-2 markup + AC-7 prefill cases, both bypassing capture.
+    """
     html = _spa_html()
 
     def first_opt(name):
         vals = [v for v in re.findall(r"<option value='([^']*)'", _select_block(html, name)) if v]
         return vals[0]
 
-    # The values the rendered form would POST: a birth year + a real option per demographic select.
-    fields = {
-        "date-of-birth": "1986",
-        "sex-for-dosing": first_opt("sex-for-dosing"),
-        "bodyweight-band": first_opt("bodyweight-band"),
-        "equipment-access-class": first_opt("equipment-access-class"),
-    }
+    fields = {"date-of-birth": "1986-04-12", "sex-for-dosing": first_opt("sex-for-dosing")}
     store_root = tmp_path / "store"
     capture.persist_capture(
         fields, root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
     )
+    # (a) the full date round-trips VERBATIM to the named-excluded `date-of-birth` raw source.
+    dob = store.read("date-of-birth", root=store_root)
+    assert dob and dob[-1]["value"] == "1986-04-12", "the DOB full date did not round-trip to its raw store item"
+    # (b) `sex-for-dosing` passes through to the summary token (a WIRED_TOKEN, stable across W2).
     summary = summarize(functools.partial(store.read, root=store_root), identity_config=_ABSENT_IDENTITY)
-    expected = {
-        "training-age-band": "born-1980s",  # DERIVED from the date-of-birth raw source
-        "sex-for-dosing": fields["sex-for-dosing"],
-        "bodyweight-band": fields["bodyweight-band"],
-        "equipment-access-class": fields["equipment-access-class"],
-    }
-    orphaned = [t for t in expected if summary.get(t) != expected[t]]
-    assert not orphaned, f"these demographic tokens stayed orphaned on the SPA surface: {orphaned}"
+    assert summary.get("sex-for-dosing") == fields["sex-for-dosing"], "sex-for-dosing did not pass through"
 
 
 def test_upload_form_is_objective_only_zero_rich_section_fields():
-    """AC-6 (form-leg): the Upload form's name set is EXACTLY the four demographics, 0 rich-section."""
+    """AC-6 (form-leg): the `#panel-build` "Your details" form's name set is EXACTLY the amended demographics.
+
+    ADR-0034 SUPERSEDES the ADR-0018 "objective-only form vs chat-only rich fields" split: the
+    comprehensive intake routes the rich-domain fields through the WIZARD (asserted positively in
+    Case W6), so the assertion is SCOPED to the `#panel-build` demographic sub-form (the first
+    `action='/upload'` form) — its data fields are EXACTLY the four amended demographics, with no
+    rich-section field leaking onto this objective sub-form.
+    """
     names = _form_field_names(_upload_form_html(_spa_html()))
     leaked = [n for n in _RICH_SECTION_NAMES if n in names]
-    assert not leaked, f"the objective-only form carries rich-section fields: {leaked}"
+    assert not leaked, f"the `#panel-build` demographic form carries rich-section fields: {leaked}"
     assert names == set(_DEMOGRAPHIC_NAMES), (
-        f"the upload form's data fields are not exactly the demographic set: {sorted(names)}"
+        f"the `#panel-build` form's data fields are not exactly the amended demographic set: {sorted(names)}"
     )
 
 
@@ -863,76 +877,292 @@ def _seed_demographics(root, values, *, timepoint="2026-06-01T00:00:00+00:00", s
 
 
 def test_demographic_form_prefills_each_saved_value(tmp_path):
-    """PREFILL-1: a store with saved demographics pre-fills EACH form field + shows the saved banner.
+    """PREFILL-1: a store with saved demographics pre-fills EACH amended form field + shows the banner.
 
-    Seeds the five demographic readings the operator's store holds (the four objective form
-    demographics + the chat-only goal-domains) and renders the SPA over the resolved read model.
-    Each of the four form fields is pre-filled from its saved value: the birth-year input carries
-    `value='1986'`, and each <select> pre-SELECTS the saved option. The '✓ Saved — edit to update'
-    banner is shown so the operator sees they were remembered. Failing-capable: reds if any field
-    renders blank/default or the banner is absent.
+    Seeds the saved demographic readings (the amended full-date birthdate + the `bodyweight-kg`
+    number + the two selects + the chat-only goal-domains) and renders the SPA over the resolved
+    read model. The amended date input carries `value='1986-04-12'`, the `bodyweight-kg` number
+    carries `value='82'`, and each <select> pre-SELECTS the saved option. The '✓ Saved — edit to
+    update' banner is shown so the operator sees they were remembered. Failing-capable: reds if any
+    field renders blank/default or the banner is absent.
     """
     root = tmp_path / "store"
     _seed_demographics(root, {
-        "date-of-birth": "1986",
+        "date-of-birth": "1986-04-12",
         "sex-for-dosing": "male",
-        "bodyweight-band": "70-80kg",
+        "bodyweight-kg": "82",
         "equipment-access-class": "full-home-gym",
         "goal-domains": "Workout;Nutrition",  # chat-only field: no form surface, not pre-filled
     })
     html = app_shell.render(store.read_all(root))
-    assert "name='date-of-birth' placeholder=\"e.g. 1986\" value='1986'>" in html, "birth-year not pre-filled"
+    assert "name='date-of-birth' value='1986-04-12'>" in html, "the full-date birthdate is not pre-filled"
+    assert "name='bodyweight-kg' value='82'" in html, "the bodyweight-kg number is not pre-filled"
     assert "<option value='male' selected>" in html, "sex-for-dosing not pre-selected"
-    assert "<option value='70-80kg' selected>" in html, "bodyweight-band not pre-selected"
     assert "<option value='full-home-gym' selected>" in html, "equipment-access-class not pre-selected"
     assert "data-prefill='saved'" in html and "✓ Saved" in html, "no saved-state banner on the pre-filled form"
-    # goal-domains has no <select>/checkbox surface on the objective-only form, so it is not
+    # goal-domains has no <select>/checkbox surface on the demographic sub-form, so it is not
     # injected as a fabricated form option (it stays a chat-only field gathered at POST /chat).
     assert "<option value='Workout' selected>" not in html, "goal-domains was injected as a form option"
 
 
-def test_prefill_tracks_the_saved_band_and_resolves_latest(tmp_path):
-    """PREFILL-2 (non-tautological + latest-wins): a DIFFERENT saved band pre-selects a DIFFERENT option.
+def test_prefill_tracks_the_saved_weight_and_resolves_latest(tmp_path):
+    """PREFILL-2 (non-tautological + latest-wins): a DIFFERENT saved weight pre-fills a DIFFERENT value.
 
-    Content-traceability: rendering with bodyweight-band='90-100kg' pre-selects the 90-100kg option
-    and NOT the under-60kg option; with bodyweight-band='under-60kg' it pre-selects under-60kg and
-    NOT 90-100kg — the pre-fill tracks the stored value, it is not a fixed/tautological selection.
-    Latest-wins: with two readings for the item, the greater-timepoint value is pre-selected and the
-    stale one is not. Failing-capable: reds if the selection is fixed, ignores the saved value, or
-    pre-selects the older reading.
+    Content-traceability: rendering with bodyweight-kg='90' pre-fills value='90' and NOT '60'; with
+    bodyweight-kg='60' it pre-fills '60' and NOT '90' — the pre-fill tracks the stored value, it is
+    not a fixed/tautological fill. Latest-wins: with two readings for the item, the greater-timepoint
+    value is pre-filled and the stale one is not. Failing-capable: reds if the fill is fixed, ignores
+    the saved value, or pre-fills the older reading.
     """
     root_a = tmp_path / "a"
-    _seed_demographics(root_a, {"bodyweight-band": "90-100kg"})
+    _seed_demographics(root_a, {"bodyweight-kg": "90"})
     html_a = app_shell.render(store.read_all(root_a))
-    assert "<option value='90-100kg' selected>" in html_a, "the saved 90-100kg band is not pre-selected"
-    assert "<option value='under-60kg' selected>" not in html_a, "a different (unsaved) band was pre-selected"
+    assert "name='bodyweight-kg' value='90'" in html_a, "the saved 90 weight is not pre-filled"
+    assert "name='bodyweight-kg' value='60'" not in html_a, "a different (unsaved) weight was pre-filled"
 
     root_b = tmp_path / "b"
-    _seed_demographics(root_b, {"bodyweight-band": "under-60kg"})
+    _seed_demographics(root_b, {"bodyweight-kg": "60"})
     html_b = app_shell.render(store.read_all(root_b))
-    assert "<option value='under-60kg' selected>" in html_b, "the saved under-60kg band is not pre-selected"
-    assert "<option value='90-100kg' selected>" not in html_b, "a different (unsaved) band was pre-selected"
+    assert "name='bodyweight-kg' value='60'" in html_b, "the saved 60 weight is not pre-filled"
+    assert "name='bodyweight-kg' value='90'" not in html_b, "a different (unsaved) weight was pre-filled"
 
     root_c = tmp_path / "c"
-    _seed_demographics(root_c, {"bodyweight-band": "under-60kg"}, timepoint="2026-05-01T00:00:00+00:00")
-    _seed_demographics(root_c, {"bodyweight-band": "90-100kg"}, timepoint="2026-06-01T00:00:00+00:00")
+    _seed_demographics(root_c, {"bodyweight-kg": "60"}, timepoint="2026-05-01T00:00:00+00:00")
+    _seed_demographics(root_c, {"bodyweight-kg": "90"}, timepoint="2026-06-01T00:00:00+00:00")
     html_c = app_shell.render(store.read_all(root_c))
-    assert "<option value='90-100kg' selected>" in html_c, "the latest reading is not pre-selected"
-    assert "<option value='under-60kg' selected>" not in html_c, "the stale (older) reading was pre-selected"
+    assert "name='bodyweight-kg' value='90'" in html_c, "the latest reading is not pre-filled"
+    assert "name='bodyweight-kg' value='60'" not in html_c, "the stale (older) reading was pre-filled"
 
 
 def test_demographic_form_blank_default_on_empty_store():
-    """PREFILL-3 (HONEST-EMPTY): an empty store renders the form blank/default with no banner.
+    """PREFILL-3 (HONEST-EMPTY): an empty store renders the amended form blank/default with no banner.
 
-    With no saved readings, no demographic <select> carries a `selected` option, the birth-year
-    input carries no `value=` attribute (only its placeholder), and the saved-state banner is
+    With no saved readings, no demographic <select> carries a `selected` option, the amended date
+    + `bodyweight-kg` number inputs carry no `value=` attribute, and the saved-state banner is
     absent — the form is honest blank, no fabricated pre-fill. Failing-capable: reds if any option
-    is pre-selected, the input gains a value, or the banner renders on an empty store.
+    is pre-selected, an input gains a value, or the banner renders on an empty store.
     """
     html = _spa_html()  # app_shell.render([])
     assert "data-prefill='saved'" not in html, "the saved-state banner renders on an empty store"
-    assert "name='date-of-birth' placeholder=\"e.g. 1986\">" in html, "the birth-year input is not blank/default"
-    for name in ("sex-for-dosing", "bodyweight-band", "equipment-access-class"):
+    assert "name='date-of-birth'>" in html, "the amended date input is not blank/default"
+    assert "value='" not in _panel_build_html(html).split("name='bodyweight-kg'", 1)[1][:40], (
+        "the bodyweight-kg number carries a value on an empty store"
+    )
+    for name in ("sex-for-dosing", "equipment-access-class"):
         assert "selected" not in _select_block(html, name), (
             f"the {name} select pre-selects an option on an empty store"
         )
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T4 Cycle 1 — the AMENDED demographic inputs (full-date birthdate
+# + bodyweight-kg number) + the `_prefill_form` CONSUMER-INTEGRITY rework: the
+# retargeted string-replace cannot silently no-op against the RETIRED targets.
+# --------------------------------------------------------------------------- #
+
+
+def test_amended_birthdate_is_full_date_input_old_year_text_gone():
+    """AC-2 (amended birthdate): `#panel-build` carries a full-date `date-of-birth` input, year-text GONE.
+
+    ADR-0034 replaces the born-year text input (`placeholder="e.g. 1986"`) with a full-date
+    `<input type='date' name='date-of-birth'>`. The retired year-text markup is ABSENT from the
+    rendered SPA — so a stale `_prefill_form` replace against it cannot pass vacuously. Failing-
+    capable: reds if the date input is missing or the old year-text placeholder survives.
+    """
+    html = _spa_html()
+    assert re.search(r"<input[^>]*type='date'[^>]*name='date-of-birth'", html), (
+        "the amended `#panel-build` form carries no full-date `date-of-birth` input"
+    )
+    assert 'placeholder="e.g. 1986"' not in html, "the retired born-year text input still renders"
+
+
+def test_prefill_consumer_integrity_no_silent_noop(tmp_path):
+    """AC-7 (consumer integrity): the reworked `_prefill_form` fills the AMENDED targets, retired ones GONE.
+
+    The silent-no-op trap (CLAUDE.md Factory-to-Component Wiring Rule): `_prefill_form` prefills by
+    STRING REPLACE against literal markup. T4 retires the `placeholder="e.g. 1986"` year-text target
+    AND the `bodyweight-band` <option> target; a replace against an absent literal would silently
+    no-op (a saved value renders blank, no error). This gate proves the consumer + markup were
+    reconciled together: a seeded full-date DOB + `bodyweight-kg` reading PREFILL the amended date
+    `value=` + number `value=` (the replace hits the NEW targets), AND both retired targets are GONE
+    from the rendered SPA (so no stale replace can pass vacuously). Failing-capable: revert the
+    markup (keep the year-text) and the date `value=` assertion reds; revert the consumer retarget
+    (keep targeting the year-text literal) and the prefill no-ops -> the `value=` assertion reds.
+    """
+    root = tmp_path / "store"
+    _seed_demographics(root, {"date-of-birth": "1986-04-12", "bodyweight-kg": "82"})
+    html = app_shell.render(store.read_all(root))
+    # the prefill hits the AMENDED targets (the rework wired the new replace literals)
+    assert "name='date-of-birth' value='1986-04-12'>" in html, "the amended date input was not pre-filled"
+    assert "name='bodyweight-kg' value='82'" in html, "the amended bodyweight-kg number was not pre-filled"
+    assert "data-prefill='saved'" in html and "✓ Saved" in html, "no saved-state banner on the pre-filled form"
+    # the RETIRED targets are GONE — a stale replace cannot pass vacuously
+    assert 'placeholder="e.g. 1986"' not in html, "the retired year-text replace target still renders"
+    assert "bodyweight-band" not in html, "the retired bodyweight-band <option> replace target still renders"
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T4 Cycle 2 — the 9-step Create-Profile WIZARD (matching the
+# operator-signed-off mockup), the rich-domain + safety field names, the generic
+# render-state-driven source labels, the existing-seam Documents/API-key reuse,
+# and the inline-asset render gate. Rendered-HTML / real-emit, 0 live spend.
+# --------------------------------------------------------------------------- #
+
+# The 9 wizard step headings in mockup order (`prototype/intake-onboarding-mockup.html`), as
+# they appear in the rendered markup (the `&` in three headings is HTML-escaped to `&amp;`).
+_WIZARD_STEP_HEADINGS = (
+    "Demographics", "Goals", "Training &amp; activity", "Diet", "Supplements &amp; peptides",
+    "Medications", "Health &amp; lifestyle", "Documents", "API key",
+)
+
+# The generic multi-source wearable/DNA names the wizard Documents step lists (parsed locally),
+# so no single operator source is the sole affordance (NFR-4 recurring-flag class).
+_GENERIC_SOURCES = ("Apple Health", "Garmin", "Whoop", "Oura", "Fitbit", "23andMe", "AncestryDNA")
+
+# Every same-origin loopback path the SPA may fetch/POST to (no new route — ADR-0033).
+_KNOWN_LOOPBACK = {"/chat", "/upload", "/settings/key", "/confirm-extraction", "/generate-plan"}
+
+
+def _wizard_html(html):
+    """The `#screen-wizard` Create-Profile wizard section the 9 steps live in."""
+    m = re.search(r'<section[^>]*id="screen-wizard"[^>]*>(.*?)</section>', html, re.DOTALL)
+    assert m is not None, "the rendered SPA carries no `#screen-wizard` Create-Profile section"
+    return m.group(1)
+
+
+def test_wizard_has_nine_step_containers_with_headings():
+    """W1/AC-1: the wizard parses to 9 `data-step` containers (1-9) each with its mockup heading.
+
+    Failing-capable: a missing step container or a dropped heading reds the per-step assertion.
+    """
+    wiz = _wizard_html(_spa_html())
+    steps = set(re.findall(r'data-step="(\d)"', wiz))
+    assert steps == {str(n) for n in range(1, 10)}, f"the wizard does not carry steps 1-9: {sorted(steps)}"
+    for heading in _WIZARD_STEP_HEADINGS:
+        assert heading in wiz, f"the wizard is missing the step heading {heading!r}"
+
+
+def test_wizard_demographics_step_carries_amended_fields_and_guidance():
+    """W2/AC-2: the wizard demographics step carries the amended fields + the privacy guidance copy.
+
+    The full-date `date-of-birth`, the `bodyweight-kg` number + lbs/kg unit, `sex-for-dosing`, the
+    OPTIONAL race/ethnicity field + occupation, plus the 'only your age is used' / 'stays on your
+    machine' / 'never sent to the planner' guidance. Failing-capable: reds if any field or the
+    privacy copy is dropped.
+    """
+    wiz = _wizard_html(_spa_html())
+    assert re.search(r"<input[^>]*type='date'[^>]*name='date-of-birth'", wiz), "no full-date birthdate in the wizard"
+    assert re.search(r"<input[^>]*type='number'[^>]*name='bodyweight-kg'", wiz), "no bodyweight-kg number in the wizard"
+    assert ">lbs</option>" in wiz and ">kg</option>" in wiz, "no lbs/kg unit select in the wizard demographics step"
+    assert "name='sex-for-dosing'" in wiz, "no sex-for-dosing field in the wizard"
+    assert "name='race-ethnicity'" in wiz, "no optional race/ethnicity field in the wizard"
+    assert "name='occupation'" in wiz, "no occupation field in the wizard"
+    assert "only your age is used" in wiz, "the birthdate privacy guidance is missing"
+    assert "stays on your machine" in wiz, "the on-device birthdate copy is missing"
+    assert "never sent to the planner" in wiz, "the race/ethnicity de-identification copy is missing"
+
+
+def test_wizard_carries_rich_domain_and_safety_controls_no_cannabis():
+    """W3/AC-3: the wizard carries the pinned rich-domain field names + the safety screens, NO cannabis.
+
+    The four `_CHAT_RAW_SOURCE_FIELDS` rich-domain names, the exercise-safety (chest pain / dizziness
+    / shortness of breath), apnea, PHQ-2, smoker (Yes/Former→years/Never), and alcohol
+    (None/Rarely/Monthly/Weekly/Most days) controls. The sensitive record-only roster is CLOSED — no
+    recreational-substance control (capture.py forward constraint). Failing-capable: reds if a field
+    name or safety control is absent, or a cannabis control appears.
+    """
+    wiz = _wizard_html(_spa_html())
+    for field in _WIZARD_RICH_FIELDS:
+        assert f"name='{field}'" in wiz, f"the wizard does not carry the rich-domain field {field!r}"
+    # exercise-safety screen
+    assert "chest pain" in wiz and "dizziness" in wiz and "shortness of breath" in wiz, "no exercise-safety screen"
+    # sleep-apnea screen
+    assert "stop breathing" in wiz, "no sleep-apnea screen"
+    # PHQ-2
+    assert "little interest or pleasure" in wiz and "down, depressed, or hopeless" in wiz, "no PHQ-2 screen"
+    # smoker: Yes / Former (-> years since quit) / Never
+    assert "Former" in wiz and "Never" in wiz and "since you quit" in wiz, "no smoker (Former->years/Never) control"
+    # alcohol frequency band
+    for band in ("None", "Rarely", "Monthly", "Weekly", "Most days"):
+        assert band in wiz, f"the alcohol frequency band {band!r} is missing"
+    # the CLOSED record-only roster: no recreational-substance control
+    assert "cannabis" not in wiz.lower(), "the wizard carries a cannabis/recreational-substance control (forbidden)"
+
+
+def test_wizard_documents_and_key_reuse_existing_seams_with_key_affordance():
+    """W4/AC-4: Documents reuses /upload→/confirm-extraction, the key step /settings/key; no new route.
+
+    Every fetch target stays within the known same-origin loopback set (the wizard adds NO new path),
+    and the API-key step carries the empty-vs-saved keystate affordance (masked + greyed `disabled` +
+    `✓ Saved`). Failing-capable: reds if a new fetch path appears or the key affordance is absent.
+    """
+    html = _spa_html()
+    assert "fetch('/upload'" in html, "the existing /upload flow the wizard Documents step reuses is gone"
+    assert "fetch('/confirm-extraction'" in html, "the existing /confirm-extraction flow is gone"
+    assert "/settings/key" in html, "the existing /settings/key flow the wizard key step reuses is gone"
+    targets = set(re.findall(r"fetch\(\s*['\"]([^'\"]+)['\"]", html))
+    assert targets and targets <= _KNOWN_LOOPBACK, f"the wizard added a fetch path beyond the known set: {sorted(targets - _KNOWN_LOOPBACK)}"
+    wiz = _wizard_html(html)
+    assert "keymask" in wiz, "the wizard key step carries no masked key affordance"
+    assert "disabled" in wiz, "the wizard key step carries no greyed (disabled) saved-key state"
+    assert "✓ Saved" in wiz, "the wizard key step carries no '✓ Saved' affordance"
+
+
+def test_wizard_and_doc_cards_use_generic_render_state_driven_source_labels():
+    """W5/AC-5: all three surfaces use GENERIC source labels (the NFR-4 recurring-flag class).
+
+    (a) the wizard Documents step lists the generic multi-source affordance ('parsed locally' + the
+    named sources) with no single-operator-source as the sole label; (b) `_doc_cards`: the literal
+    'Wearable export (Apple Health)' is GONE, and a NON-'Apple Health' loaded source renders a
+    render-state-driven '· detected: <source>' suffix; (c) the upload-status copy no longer singles
+    out one operator source. Failing-capable: revert any surface to the hardcoded single source.
+    """
+    html = _spa_html()
+    wiz = _wizard_html(html)
+    # (a) wizard Documents step: generic multi-source affordance
+    assert "parsed locally" in wiz, "the wizard Documents step drops the 'parsed locally' assurance"
+    for source in _GENERIC_SOURCES:
+        assert source in wiz, f"the wizard Documents step does not name the supported source {source!r}"
+    # (b) _doc_cards: the hardcoded single-source title is gone; the source is render-state-driven
+    assert "Wearable export (Apple Health)" not in html, "the _doc_cards wearable card still hardcodes 'Apple Health'"
+    status = {
+        "wearable": {"loaded": True, "source": "Garmin", "count": 1, "items": ["hrv"],
+                     "range": ["2026-06-01", "2026-06-02"]},
+        "dna": {"loaded": False, "files": []},
+        "labs": {"loaded": False, "files": []},
+    }
+    loaded = app_shell.render([], status=status)
+    assert "Wearable export · detected: Garmin" in loaded, "the wearable title does not track the loaded source (render-state-driven)"
+    assert "Wearable export (Apple Health)" not in loaded, "the loaded wearable card still hardcodes 'Apple Health'"
+    # (c) the upload-status copy no longer singles out one operator source
+    assert "an Apple Health .zip" not in html, "the upload-status copy still singles out one operator source"
+
+
+def test_wizard_carries_rich_fields_panel_build_form_does_not():
+    """W6/AC-2/AC-6: the rich-domain fields route through the WIZARD, not the objective `#panel-build` form.
+
+    The ADR-0034 supersession positive control (pairs with the re-scoped objective-only reconcile):
+    each rich-domain field is in the wizard AND absent from the `#panel-build` form name set — proving
+    the objective-only assertion re-SCOPED the coverage, not deleted it. Failing-capable: reds if a
+    rich field leaks onto the demographic form or is missing from the wizard.
+    """
+    html = _spa_html()
+    wiz = _wizard_html(html)
+    panel_form_names = _form_field_names(_upload_form_html(html))
+    for field in _WIZARD_RICH_FIELDS:
+        assert f"name='{field}'" in wiz, f"the wizard does not carry the rich-domain field {field!r}"
+        assert field not in panel_form_names, f"the rich-domain field {field!r} leaked onto the objective `#panel-build` form"
+
+
+def test_wizard_keeps_spa_inline_asset_clean(tmp_path):
+    """W7/AC-6 (AUTHORITATIVE inline-asset): generate.run('app') emits a Path with the wizard, no off-file ref.
+
+    Drives the REAL `generate.run('app')` (render.emit RAISES ValueError on any off-file asset
+    reference) and asserts it returns a written Path that EXISTS, carries the wizard, and has no
+    off-file `<script src>`. A substring grep is NOT substituted for the emit probe.
+    """
+    path = _emit_app(tmp_path)
+    assert isinstance(path, Path) and path.exists(), "generate.run('app') did not emit with the wizard"
+    emitted = path.read_text()
+    assert 'id="screen-wizard"' in emitted, "the emitted SPA carries no Create-Profile wizard"
+    assert "<script src" not in emitted, "the wizard added an off-file <script src> reference"

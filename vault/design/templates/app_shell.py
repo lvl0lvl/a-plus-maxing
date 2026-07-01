@@ -33,12 +33,14 @@ _LOADED = "<span style='color:var(--good);font-weight:600'>✓ loaded</span>"
 
 # The 'About you' demographic store items the served form pre-fills from (each form field
 # name == its store item name; `capture.persist_capture` writes each under its own name).
-# `date-of-birth` is the raw birth-year text input; the other three are <select> tokens whose
-# saved value pre-SELECTS the matching option. `goal-domains` is DELIBERATELY ABSENT — it is a
-# chat-only rich-section field (gathered at POST /chat), not a field on this objective-only form,
+# `date-of-birth` is the amended full-date input and `bodyweight-kg` the amended number input
+# (each pre-fills its `value=`); the two SELECT tokens pre-SELECT their saved option (ADR-0034
+# retired the `bodyweight-band` select). `goal-domains` is DELIBERATELY ABSENT — it is a
+# chat-only rich-section field (gathered at POST /chat), not a field on this demographic form,
 # so it has no select/checkbox surface here to pre-fill.
-_DEMOGRAPHIC_SELECTS = ("sex-for-dosing", "bodyweight-band", "equipment-access-class")
+_DEMOGRAPHIC_SELECTS = ("sex-for-dosing", "equipment-access-class")
 _DEMOGRAPHIC_DOB = "date-of-birth"
+_DEMOGRAPHIC_WEIGHT = "bodyweight-kg"
 
 
 def _esc(value):
@@ -63,9 +65,11 @@ def _doc_cards(status):
     if we.get("loaded"):
         sub = (f"{_esc(we['source'])} · {we['count']} readings · {_esc(', '.join(we['items']))} · "
                f"{_esc(we['range'][0])} – {_esc(we['range'][1])}")
-        wearable = _doc_card("wearable", "Wearable export (Apple Health)", sub, _LOADED)
+        # Generic title; the source is render-state-driven from the load-state, never a hardcode
+        # (NFR-4: the operator flagged a hardcoded single source as a recurring failure class).
+        wearable = _doc_card("wearable", f"Wearable export · detected: {_esc(we['source'])}", sub, _LOADED)
     else:
-        wearable = _doc_card("wearable", "Wearable export (Apple Health)", "Apple Health export.xml", _LINK)
+        wearable = _doc_card("wearable", "Wearable export", "Wearable / fitness tracker export", _LINK)
 
     labs = status["labs"]
     if labs.get("loaded"):
@@ -213,12 +217,13 @@ def _prefill_form(html, store_read):
     """Pre-fill the 'About you' demographic form from the operator's saved store values.
 
     Reads the latest saved reading per demographic item and re-renders the existing static
-    form markup with the matching <select> option pre-SELECTED and the birth-year input's
-    value pre-filled, so the operator does not re-type data the store already holds. A field
-    with no saved reading stays blank/default (no fabricated value). When any demographic is
-    pre-filled, a '✓ Saved — edit to update' banner is injected as the form's first child so
-    the operator sees they were remembered. The saved bands/classes are de-identified; the
-    birth year is the operator's own value rendered back over the local loopback (no egress).
+    form markup with the matching <select> option pre-SELECTED and the amended full-date
+    birthdate + `bodyweight-kg` number inputs' `value=` pre-filled, so the operator does not
+    re-type data the store already holds. A field with no saved reading stays blank/default
+    (no fabricated value). When any demographic is pre-filled, a '✓ Saved — edit to update'
+    banner is injected as the form's first child so the operator sees they were remembered.
+    The saved classes are de-identified; the birthdate/weight are the operator's own values
+    rendered back over the local loopback (no egress).
 
     Args:
         html (str): The rendered SPA HTML (post DOC_CARDS/PLAN_ZONE substitution).
@@ -227,7 +232,7 @@ def _prefill_form(html, store_read):
     Returns:
         (str) The HTML with the demographic form pre-filled, or unchanged when nothing saved.
     """
-    saved = _latest_values(store_read, (_DEMOGRAPHIC_DOB, *_DEMOGRAPHIC_SELECTS))
+    saved = _latest_values(store_read, (_DEMOGRAPHIC_DOB, _DEMOGRAPHIC_WEIGHT, *_DEMOGRAPHIC_SELECTS))
     if not saved:
         return html  # nothing saved — honest blank/default form, no banner
 
@@ -241,8 +246,16 @@ def _prefill_form(html, store_read):
     dob = saved.get(_DEMOGRAPHIC_DOB)
     if dob is not None:
         html = html.replace(
-            "name='date-of-birth' placeholder=\"e.g. 1986\">",
-            f"name='date-of-birth' placeholder=\"e.g. 1986\" value='{_esc(dob)}'>",
+            "id='date-of-birth' name='date-of-birth'>",
+            f"id='date-of-birth' name='date-of-birth' value='{_esc(dob)}'>",
+            1,
+        )
+
+    weight = saved.get(_DEMOGRAPHIC_WEIGHT)
+    if weight is not None:
+        html = html.replace(
+            "name='bodyweight-kg' placeholder=\"Weight\"",
+            f"name='bodyweight-kg' value='{_esc(weight)}' placeholder=\"Weight\"",
             1,
         )
 
