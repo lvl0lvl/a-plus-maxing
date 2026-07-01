@@ -1667,16 +1667,25 @@ def test_t7_generate_plan_tab_two_buttons_and_honest_empty_roster():
     The `#panel-generate` static markup carries BOTH `>Generate plan<` + `>Update plan<` buttons + a
     `.gen-roster` container; the `renderGenerate` JS builds a per-specialist row over `SPECIALISTS`, EACH
     carrying a `<div class="bar"><i style="width:0%"></i></div>` — rendered HONEST-EMPTY (ADR-0029): 0
-    fabricated demo strings, 0 fabricated progress widths. Failing-capable: the live single button /
-    `.agent-prog` (not `.bar`) reds the two-button + per-specialist-`.bar` assertions; porting the mockup's
-    fabricated `ST` percentages reds the honest-empty guard.
+    fabricated demo strings, 0 fabricated progress widths. The per-specialist `.bar` is anchored to the
+    `agentRow` ROSTER template source (NOT a whole-body substring — the same honest-empty bar literal also
+    lives in the pre-existing `#panel-build` ingestion statusbar, so a whole-body check would be satisfied
+    by the statusbar and NOT red on a roster regression). Failing-capable: the live single button /
+    `.agent-prog` (not `.bar`) reds the two-button + per-specialist-`.bar` assertions; neutralizing the
+    roster row's `.bar` reds the agentRow-anchored leg; porting the mockup's fabricated `ST` percentages
+    reds the honest-empty guard.
     """
     html = _unlocked_html()
     assert '>Generate plan<' in html, "the Generate-Plan panel has no `Generate plan` button"
     assert '>Update plan<' in html, "the Generate-Plan panel has no `Update plan` button"
     assert 'class="gen-roster"' in html, "the Generate-Plan panel has no `.gen-roster` container"
-    assert '<div class="bar"><i style="width:0%"></i></div>' in html, (
-        "renderGenerate does not emit a honest-empty per-specialist `.bar` row"
+    # anchor the honest-empty `.bar` to the roster template (the `agentRow` function body), so a
+    # regression that drops/alters the roster row's bar reds even though the statusbar bar is unchanged.
+    m = re.search(r"function agentRow\(s\)\{(.*?)\}", html, re.DOTALL)
+    assert m is not None, "the per-specialist `agentRow` roster template is not in the rendered <script>"
+    agent_row_src = m.group(1)
+    assert 'class="genrow"' in agent_row_src and 'class="bar"' in agent_row_src and 'width:0%' in agent_row_src, (
+        "the `agentRow` roster row does not emit a honest-empty per-specialist `.bar` (width:0%)"
     )
     assert 'SPECIALISTS.map' in html, "renderGenerate does not build the roster over the full SPECIALISTS set"
     for demo in _FABRICATED:
