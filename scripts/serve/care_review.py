@@ -29,8 +29,10 @@ backend injected at the ADR-0015 model-client backend seam, at 0 live spend.
 
 import datetime
 import json
+import re
 from pathlib import Path
 
+from scripts.guard import pii_scan
 from scripts.model.client import ModelCallError
 from scripts.plan import router
 from scripts.serve.capture import DEFAULT_SCAFFOLD_ROOT
@@ -40,6 +42,13 @@ from scripts.store import store
 # (capture.py: deliberately absent from WIRED_TOKENS, so the untrusted raw drug free-text lands
 # record-only, never the model-bound token). The curation reads the raw drug names from here.
 _RX_MED_FIELD = "rx-interaction-classes"
+
+# The leg-2 DOB fail-closed pattern (Security MEDIUM-2): `pii_scan` carries no date-of-birth
+# detector, so a bare `1986-04-12` typed into the med free-text would egress undetected by the
+# value-class scan alone. A drug name legitimately never contains a date, so any ISO or slashed
+# date token in a med value is treated as identity and fails the curation closed (defers). The
+# pattern is deliberately conservative — an ISO `YYYY-MM-DD` or a slashed `D/M/Y` / `M-D-Y`.
+_DATE_LIKE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b")
 
 
 def review(store_read, *, client, key_available, store_root=None,
@@ -74,7 +83,7 @@ def review(store_read, *, client, key_available, store_root=None,
         summary = router.summarize(store_read)
     try:
         reply = client.converse(_clarifying_messages(summary))
-        curation = _curate_meds(client, scaffold_root, store_root)
+        curation = _curate_meds(client, scaffold_root, store_root, identity_config)
     except ModelCallError as exc:
         # Fail-closed (NFR-2): a failed model call never fabricates a question or a fact and never
         # writes a store item — surface the failure honestly, mirroring chat._degraded_turn.
@@ -84,7 +93,10 @@ def review(store_read, *, client, key_available, store_root=None,
         "questions": [reply["reply"]],
         "reply": reply["reply"],
         "curation": curation,
-        "progress": _progress("Reviewing your intake and preparing clarifying questions"),
+        # The final-save fire path: the profile IS complete (the trigger's precondition), so the
+        # status reflects the true complete state the existing `_progressUpdate` surface renders.
+        "progress": _progress("Reviewing your intake and preparing clarifying questions",
+                              intake_complete=True),
     }
 
 
@@ -130,17 +142,33 @@ def _curation_messages(medications):
     return [{"role": "user", "content": json.dumps(context, sort_keys=True)}]
 
 
-def _curate_meds(client, scaffold_root, store_root):
+def _curate_meds(client, scaffold_root, store_root, identity_config):
     """The de-associated meds-curation leg: propose the de-id class token, confirm-when-unsure.
 
-    Returns None when no medication is recorded (no curation request is made). Otherwise it makes
-    the DISTINCT curation `converse` call over the drug names and reads the class proposal: a
-    confident proposal persists the de-identified class token; an uncertain one writes 0 and
-    surfaces a confirm question (the ADR-0035 confirm-when-unsure default).
+    Returns None when no medication is recorded (no curation request is made). Otherwise it FIRST
+    runs the leg-2 value-level identity gate — the analogue of leg-1's `router.summarize` 8j6 gate
+    (Security HIGH-1 / QA MUST-FIX): `capture` routes the raw med free-text record-only UNSCANNED,
+    so a med value carrying operator identity/contact (`pii_scan.scan_text_full`) OR a date-looking
+    token (a DOB `pii_scan` cannot detect) must NOT egress. Mirroring leg-1's FAIL-CLOSED posture
+    (`summarize` RAISES; it never partial-strips — a partial strip is the leaky de-id the crown
+    jewel refuses), the curation DEFERS with 0 `converse` call rather than send a leaky request.
+    Only when EVERY med value is clean does it make the DISTINCT curation `converse` call over the
+    drug names and read the class proposal: a confident proposal persists the de-identified class
+    token; an uncertain one writes 0 and surfaces a confirm question (confirm-when-unsure).
     """
     medications = _scaffold_meds(scaffold_root)
     if not medications:
         return None
+    if any(_med_value_has_identity(value, identity_config) for value in medications):
+        # Fail-closed: 0 curation converse call, an honest deferred state (no partial strip).
+        return {
+            "deferred": True,
+            "reason": ("remove personal details (a name, date of birth, email, phone, or "
+                       "address) from your medication list before I can classify it"),
+            "proposed_classes": [],
+            "confirmed": False,
+            "confirm_question": None,
+        }
     result = client.converse(_curation_messages(medications))
     proposals = [p for p in (result.get("extraction") or []) if isinstance(p, dict)]
     proposed = _normalize_classes(
@@ -179,6 +207,21 @@ def _scaffold_meds(scaffold_root):
         if isinstance(value, str) and value.strip():
             medications.append(value.strip())
     return medications
+
+
+def _med_value_has_identity(value, identity_config):
+    """Whether a raw med value carries operator identity/contact (pii_scan) or a DOB-like date.
+
+    The leg-2 fail-closed value gate. Runs the full-length `pii_scan.scan_text_full` (operator
+    identity + the tractable value-classes — any-domain email, phone, US/CA postal) over the med
+    free-text, PLUS the `_DATE_LIKE` DOB backstop (`pii_scan` has no date detector). True on any
+    hit — the caller defers the curation rather than egress a leaky de-identified request.
+    """
+    if identity_config is not None:
+        hits = pii_scan.scan_text_full(value, token_config=identity_config)
+    else:
+        hits = pii_scan.scan_text_full(value)
+    return hits > 0 or bool(_DATE_LIKE.search(value))
 
 
 def _normalize_classes(tokens):
@@ -225,6 +268,12 @@ def _deferred(reason):
     }
 
 
-def _progress(status):
-    """The 'what it is doing' status the existing `.chat-progress`/`.bar` + `_progressUpdate` surface renders."""
-    return {"status": status, "intake_complete": False, "target_domain": None}
+def _progress(status, intake_complete=False):
+    """The 'what it is doing' status the existing `.chat-progress`/`.bar` + `_progressUpdate` surface renders.
+
+    `intake_complete` reflects the TRUE profile-completeness state (QA SHOULD-FIX): the final-save
+    fire path passes True (the trigger only fires on a complete profile), so `_progressUpdate`
+    renders the ready-to-generate state rather than a stale "still building" one; the deferred
+    (no-key / failed-call) states keep it False.
+    """
+    return {"status": status, "intake_complete": intake_complete, "target_domain": None}

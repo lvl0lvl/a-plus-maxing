@@ -274,6 +274,63 @@ def test_no_raw_drug_string_as_planner_token_or_in_dispatch(tmp_path):
     assert payload["rx-interaction-classes"] == "cyp3a4-pgp"
 
 
+def test_curation_defers_fail_closed_on_identity_in_med_value(tmp_path):
+    """AC-2 leg 2 (adversarial): identity + a bare DOB typed INTO the med free-text NEVER egresses.
+
+    The leg-2 crown-jewel de-association contract: `capture` routes the raw med free-text
+    record-only UNSCANNED, so an operator who types a name / DOB / email into the medication list
+    must NOT have it serialized into the curation `converse` request. Mirrors leg-1's FAIL-CLOSED
+    8j6 posture (`router.summarize` RAISES on a PII pass-through; it never partial-strips): the
+    curation DEFERS with 0 `converse` call rather than send a leaky de-identified request.
+    RED-capable: the pre-fix `_curate_meds` (no value gate) egresses the poisoned value verbatim —
+    `pii_scan.scan_text_full` over the recorded curation request counts the name + email (> 0) and
+    the curation request is present in `backend.calls`; this test reds it.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    _seed_full(store_root)
+    idcfg = _identity_config(tmp_path)
+    poisoned = (f"atorvastatin 20mg prescribed to {_FAKE_LEGAL_NAME}, DOB 1986-04-12, "
+                "jane.doe@example.com")
+    capture.persist_capture({"rx-interaction-classes": poisoned, "favorite-color": "blue"},
+                            root=store_root, scaffold_root=scaffold_root)
+    backend = _CareBackend()
+    result = care_review.review(
+        _reader(store_root), client=ModelClient(backend=backend), key_available=True,
+        store_root=store_root, scaffold_root=scaffold_root, identity_config=idcfg,
+    )
+    # 0 curation converse call — the poisoned med value never egressed.
+    curation_calls = [c for c in backend.calls if "rx-interaction-curation" in json.dumps(c)]
+    assert curation_calls == [], "the poisoned med value egressed a curation request (leg-2 breach)"
+    # No recorded request (clarifying included) carries the identity / DOB / email.
+    for call in backend.calls:
+        text = json.dumps(call)
+        assert pii_scan.scan_text_full(text, token_config=idcfg) == 0, "operator PII reached a request"
+        assert _FAKE_LEGAL_NAME not in text and "1986-04-12" not in text and "jane.doe@example.com" not in text
+    # The curation deferred honestly (an honest reason) and wrote 0 rx-interaction-classes token.
+    assert result["curation"]["deferred"] is True and result["curation"].get("reason"), (
+        "the poisoned-med curation did not defer honestly"
+    )
+    assert store.read("rx-interaction-classes", root=store_root) == [], "a poisoned curation wrote a token"
+    # Leg 1 still delivered its clarifying questions (only the curation deferred).
+    assert result["questions"], "leg 1 was suppressed by the leg-2 fail-closed gate"
+
+
+def test_clean_med_value_still_curates_after_the_gate(tmp_path):
+    """The leg-2 gate fires ONLY on a PII/date hit — a clean med value still curates normally."""
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    _seed_full(store_root)
+    _seed_scaffold_med(store_root, scaffold_root, value="atorvastatin 20mg, metformin 500mg")
+    backend = _CareBackend(confident=True)
+    result = care_review.review(
+        _reader(store_root), client=ModelClient(backend=backend), key_available=True,
+        store_root=store_root, scaffold_root=scaffold_root, identity_config=_identity_config(tmp_path),
+    )
+    assert result["curation"]["confirmed"] is True, "a clean med value did not curate normally"
+    assert store.read("rx-interaction-classes", root=store_root), "the clean curation persisted no token"
+
+
 def test_confirm_when_unsure_writes_zero_unconfirmed_class(tmp_path):
     """AC-4: an uncertain classification surfaces a confirm question + writes 0 until confirmed."""
     store_root = tmp_path / "store"
