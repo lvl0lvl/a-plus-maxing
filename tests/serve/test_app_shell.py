@@ -239,15 +239,6 @@ _DEMOGRAPHIC_NAMES = ("date-of-birth", "sex-for-dosing", "bodyweight-kg", "equip
 # (the `_CHAT_RAW_SOURCE_FIELDS` keys) and the objective-only `#panel-build` form does NOT.
 _WIZARD_RICH_FIELDS = ("nutrition-detail", "supplement-stack", "peptide-stack", "training-detail")
 
-# Rich-section field names that MUST NOT appear in the objective-only `#panel-build` form —
-# the comprehensive intake routes them through the wizard, never this demographic sub-form.
-_RICH_SECTION_NAMES = (
-    "goal-domains", "goal-targets", "goal-priority-order", "hard-limits",
-    "recovery-status-band", "train-around", "dietary-pattern", "meals-per-day",
-    "allergies", "food-preferences", "supplement-stack", "peptide-stack",
-    "rx-interaction-classes", "nutrition-detail", "training-detail",
-)
-
 # The fabricated ingestion counts the prototype presented as the operator's data — an honest
 # empty-store render carries NONE of these (ADR-0009 D2 honest-data).
 _FABRICATED_INGEST = ("12,480 readings", "✓ ingested", "2 of 4 categories", "parsing labs")
@@ -350,21 +341,22 @@ def test_demographic_fields_round_trip_through_the_built_capture_seam(tmp_path):
     assert summary.get("sex-for-dosing") == fields["sex-for-dosing"], "sex-for-dosing did not pass through"
 
 
-def test_upload_form_is_objective_only_zero_rich_section_fields():
-    """AC-6 (form-leg): the `#panel-build` "Your details" form's name set is EXACTLY the amended demographics.
+def test_myinfo_upload_form_carries_comprehensive_editable_set():
+    """T7/AC-2 (RECONCILED — supersedes the T4-era objective-only #panel-build split): the UNLOCKED
+    My-Info `#panel-build` form is the COMPREHENSIVE editable intake set, all POSTing the ONE `/upload` seam.
 
-    ADR-0034 SUPERSEDES the ADR-0018 "objective-only form vs chat-only rich fields" split: the
-    comprehensive intake routes the rich-domain fields through the WIZARD (asserted positively in
-    Case W6), so the assertion is SCOPED to the `#panel-build` demographic sub-form (the first
-    `action='/upload'` form) — its data fields are EXACTLY the four amended demographics, with no
-    rich-section field leaking onto this objective sub-form.
+    ADR-0033-0035-T7 reshapes the unlocked `#panel-build` from the first-run objective-only demographic
+    form into the editable My-Info panel — so it now carries the demographics AND the pinned rich-domain
+    fields, all inside the single `<form action='/upload'>` (an edit re-de-identifies through the existing
+    capture seam). The objective-only-vs-rich split now lives in the WIZARD (`test_wizard_carries_rich_fields`
+    is the positive control). Failing-capable: the reshape dropping a demographic OR a rich field reds the
+    membership assertion; a second (non-`/upload`) write target is caught by `test_t7_my_info_editable_*`.
     """
     names = _form_field_names(_upload_form_html(_spa_html()))
-    leaked = [n for n in _RICH_SECTION_NAMES if n in names]
-    assert not leaked, f"the `#panel-build` demographic form carries rich-section fields: {leaked}"
-    assert names == set(_DEMOGRAPHIC_NAMES), (
-        f"the `#panel-build` form's data fields are not exactly the amended demographic set: {sorted(names)}"
-    )
+    for field in _DEMOGRAPHIC_NAMES:
+        assert field in names, f"the My-Info `/upload` form dropped the demographic field {field!r}"
+    for field in _WIZARD_RICH_FIELDS:
+        assert field in names, f"the My-Info `/upload` form does not carry the rich-domain field {field!r}"
 
 
 # --- Cycle 2: chat composer -> /chat fetch + receipt render + single-egress surface --- #
@@ -1163,20 +1155,18 @@ def test_wizard_and_doc_cards_use_generic_render_state_driven_source_labels():
     assert "an Apple Health .zip" not in html, "the upload-status copy still singles out one operator source"
 
 
-def test_wizard_carries_rich_fields_panel_build_form_does_not():
-    """W6/AC-2/AC-6: the rich-domain fields route through the WIZARD, not the objective `#panel-build` form.
+def test_wizard_carries_rich_fields():
+    """W6/AC-2/AC-6: the rich-domain fields route through the Create-Profile WIZARD (the comprehensive intake).
 
-    The ADR-0034 supersession positive control (pairs with the re-scoped objective-only reconcile):
-    each rich-domain field is in the wizard AND absent from the `#panel-build` form name set — proving
-    the objective-only assertion re-SCOPED the coverage, not deleted it. Failing-capable: reds if a
-    rich field leaks onto the demographic form or is missing from the wizard.
+    The wizard positive control: each pinned rich-domain field is carried by `#screen-wizard`. (RECONCILED
+    for ADR-0033-0035-T7 — which reshaped the unlocked `#panel-build` into the editable My-Info panel that
+    now ALSO carries these fields, retiring the T4-era "and absent from #panel-build" half; the comprehensive
+    My-Info form is asserted by `test_myinfo_upload_form_carries_comprehensive_editable_set`.) Failing-capable:
+    reds if a rich field is missing from the wizard.
     """
-    html = _spa_html()
-    wiz = _wizard_html(html)
-    panel_form_names = _form_field_names(_upload_form_html(html))
+    wiz = _wizard_html(_spa_html())
     for field in _WIZARD_RICH_FIELDS:
         assert f"name='{field}'" in wiz, f"the wizard does not carry the rich-domain field {field!r}"
-        assert field not in panel_form_names, f"the rich-domain field {field!r} leaked onto the objective `#panel-build` form"
 
 
 def test_wizard_keeps_spa_inline_asset_clean(tmp_path):
@@ -1517,8 +1507,8 @@ def test_unlock_target_opens_chat_with_team_my_info_slot():
     The complete profile serves the full shell with EXACTLY one active `.screen` = `screen-team`
     (server-side) and the default-active right-panel `ws-tab` is the My-Info SLOT `data-tab="build"`.
     RED-first screen half: the unconditional render marks no `.screen` active server-side. The tab-slot
-    half is the standing-green lock (`data-tab="build"` carries `ws-tab active` statically). The "My
-    Info" LABEL assertion is T7's at W5 (the live slot label is still "Build Plan").
+    half is the standing-green lock (`data-tab="build"` carries `ws-tab active` statically). This asserts
+    the STABLE slot id only; the "My Info" LABEL assertion is T7's (`test_t7_opens_on_my_info_label`).
     """
     html = app_shell.render(_complete_profile_readings())
     active = re.findall(r'<section class="screen active" id="([^"]+)"', html)
@@ -1526,3 +1516,183 @@ def test_unlock_target_opens_chat_with_team_my_info_slot():
     assert '<button class="ws-tab active" data-tab="build">' in html, (
         "the My-Info workspace-tab SLOT `data-tab=\"build\"` is not the default-active tab in the unlocked body"
     )
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T7 — the UNLOCKED shell reshape: the workspace tabs relabeled
+# `My Plan | My Info | Generate Plan` (0 old `Build Plan`/bare `Generate`), the
+# editable My-Info panel re-de-identifying through the EXISTING `/upload` seam
+# (no second write path), "+ Add documents" on the same seam, and the Generate-
+# Plan tab (two buttons + the full specialist roster, each `.bar` honest-empty).
+# Every case renders the UNLOCKED body (a complete-store fixture flips T6's gate)
+# with a LOCKED negative control; fixture-driven, 0 live spend, 0 network.
+# --------------------------------------------------------------------------- #
+
+
+def _unlocked_html():
+    """The UNLOCKED full shell body (a complete profile flips T6's gate to the platform shell)."""
+    return app_shell.render(_complete_profile_readings())
+
+
+def _active_ws_tab_text(html):
+    """The visible text of the default-active workspace `.ws-tab` in the unlocked body."""
+    m = re.search(r'<button class="ws-tab active"[^>]*>(.*?)</button>', html)
+    assert m is not None, "no default-active workspace tab in the unlocked body"
+    return m.group(1)
+
+
+# --- Cycle 1: the tab rename + opens-on-My-Info LABEL (AC1, AC5) --- #
+
+
+def test_t7_workspace_tabs_renamed_no_old_labels():
+    """T7-1/AC1: the unlocked workspace tabs read `My Plan | My Info | Generate Plan`, 0 old labels.
+
+    The middle tab is relabeled `Build Plan` -> `My Info` and the third `Generate` -> `Generate Plan`,
+    keeping the STABLE `data-tab="build"`/`"generate"` slot ids. The blanket `>Build Plan<`/`>Generate<`
+    checks also force the `#panel-myplan` stale copy (which named the old tab labels) fixed. Failing-
+    capable: before the relabel `data-tab="build">Build Plan<` (+ the stale copy) are present -> reds.
+    """
+    html = _unlocked_html()
+    assert 'data-tab="build">My Info<' in html, "the middle tab was not relabeled to `My Info`"
+    assert 'data-tab="generate">Generate Plan<' in html, "the third tab was not relabeled to `Generate Plan`"
+    assert '>Build Plan<' not in html, "an old `Build Plan` tab/copy text-node survives in the unlocked body"
+    assert '>Generate<' not in html, "an old bare `Generate` tab/copy text-node survives in the unlocked body"
+
+
+def test_t7_opens_on_my_info_label():
+    """T7-2/AC5 (the deferred QA-F1 LABEL assertion): the default-active workspace tab is `My Info`.
+
+    The unlocked default-active `.ws-tab` (the same stable `data-tab="build"` slot T6 set default-active
+    in W4) now carries the visible label `My Info`, and its `#panel-build` panel is the active right-panel.
+    Failing-capable: before the relabel the active slot reads `Build Plan` -> the `== "My Info"` reds.
+    """
+    html = _unlocked_html()
+    assert _active_ws_tab_text(html) == "My Info", "the default-active workspace tab label is not `My Info`"
+    assert '<div class="ws-panel active ws-docs" id="panel-build">' in html, (
+        "the `#panel-build` My-Info panel is not the active right-panel"
+    )
+
+
+def test_t7_negative_control_locked_body_has_no_workspace_tabs():
+    """T7-3 (non-tautological negative control): the LOCKED body carries NO workspace tabs.
+
+    The workspace tabs live in `#screen-team`, which T6's gate serves ONLY on a complete profile; the
+    LOCKED first-run body (`app_shell.render([])`) has no `#screen-team`, so no `.ws-tabs`. This proves
+    the T7 cases test the UNLOCKED render (not a constant): were the gate not hiding `#screen-team` when
+    locked, this reds. (The recipe's stale `_spa_html()` was repointed at the complete profile pre-T7, so
+    the locked control renders `[]` directly.)
+    """
+    html = app_shell.render([])  # the first-run LOCKED Create-Profile body
+    assert 'class="ws-tabs"' not in html, "the LOCKED body leaks the workspace tabs (the gate did not hide #screen-team)"
+    assert 'data-tab="build"' not in html, "the LOCKED body leaks the My-Info tab slot"
+
+
+# --- Cycle 2: the editable My-Info `/upload` panel + "+ Add documents" + prefill (AC2, AC3) --- #
+
+# The ten My-Info section headings (`.seclab` text) the editable panel renders, `&` -> `&amp;`.
+_MYINFO_SECTIONS = (
+    "Demographics", "Goals", "Training &amp; activity", "Diet", "Supplements &amp; peptides",
+    "Medications", "Health &amp; lifestyle", "Equipment", "Documents", "API key",
+)
+
+
+def test_t7_my_info_editable_resubmits_through_upload_no_second_write_path():
+    """T7-4/AC2 (crown-jewel STRUCTURAL, SEC-F1): the My-Info panel is the full editable intake set,
+    every edit re-submitting through the EXISTING `/upload` seam — 0 second write path.
+
+    The `#panel-build` My-Info panel renders all ten intake sections AND carries the EXISTING
+    `<form action='/upload' method='post'>`; every `action='...'` in the panel equals `/upload`
+    (0 non-`/upload` write target), so no edit bypasses the `persist_capture` -> `summarize`
+    de-identification. The action-set stays `{"/upload"}` because the API-key affordance is NOT a
+    `<form action='/settings/key'>` (it points to Profile's existing `fetch('/settings/key')`).
+    Failing-capable: a second `action='/save-profile'` form reds the set assertion; dropping the
+    `/upload` form reds the form assertion; the first-run 4-field demographic form (no rich sections)
+    reds the section-heading assertions. The BEHAVIORAL no-bypass proof is T9's SEC-F1 E2E probe.
+    """
+    panel = _panel_build_html(_unlocked_html())
+    for section in _MYINFO_SECTIONS:
+        assert f'>{section}</div>' in panel, f"the My-Info panel is missing the `{section}` section heading"
+    assert "<form action='/upload' method='post'>" in panel, "the My-Info edit form does not target the `/upload` seam"
+    actions = set(re.findall(r"action='([^']*)'", panel))
+    assert actions == {"/upload"}, f"the My-Info panel carries a non-`/upload` write target: {sorted(actions)}"
+
+
+def test_t7_add_documents_posts_to_existing_upload_route():
+    """T7-5/AC3: the My-Info "+ Add documents" affordance reuses the EXISTING `/upload` flow, no new route.
+
+    The `+ Add documents` control + its panel land in the My-Info panel; the add-docs upload controls
+    reuse the `#screen-team` file-picker -> `POST /upload` path the shell already wires — so no new
+    route literal (`/add-docs`/`/documents`/`/save-profile`) appears. Failing-capable: a hardcoded
+    `fetch('/add-docs'...)` reds the no-new-route assertion; the affordance absent reds its presence.
+    """
+    panel = _panel_build_html(_unlocked_html())
+    assert "+ Add documents" in panel, "the My-Info panel has no `+ Add documents` affordance"
+    for literal in ("/add-docs", "/documents", "/save-profile"):
+        assert literal not in panel, f"the add-docs affordance introduced a new route literal {literal!r}"
+
+
+def test_t7_my_info_prefill_renders_saved_answers_across_intake_set(tmp_path):
+    """T7-6/AC2 (prefill leg): the My-Info panel renders the operator's saved answers across the full
+    intake set (select pre-SELECTED / `value=` injected), a field with NO saved reading staying blank.
+
+    Seeds the complete required set PLUS saved rich-section values (a `raw-nutrition-free-text` raw
+    source for the `nutrition-detail` field, per the pinned capture<->form contract) and renders over
+    the resolved read model. The saved sex-for-dosing select pre-selects, the seeded nutrition-detail
+    input carries its saved value, and an UNSAVED rich field (`training-detail`) stays blank (no
+    fabricated value). Failing-capable: reds if a saved value is not rendered back or an unsaved field
+    gains a value.
+    """
+    root = tmp_path / "store"
+    _seed_complete_profile(root)  # seeds sex-for-dosing='male', goal-targets, etc.
+    _seed_demographics(root, {"raw-nutrition-free-text": "Mediterranean high-protein"})
+    panel = _panel_build_html(app_shell.render(store.read_all(root)))
+    assert "<option value='male' selected>" in panel, "the saved sex-for-dosing is not pre-selected in My-Info"
+    assert "name='nutrition-detail' value='Mediterranean high-protein'>" in panel, (
+        "the saved nutrition-detail raw source is not rendered back into the My-Info field"
+    )
+    assert "name='goal-targets' value='Build strength and improve sleep'>" in panel, (
+        "the saved goal-targets is not rendered back into the My-Info field"
+    )
+    # an UNSAVED rich field stays blank — honest-data, no fabricated value
+    assert "name='training-detail'>" in panel, "the unsaved training-detail field did not stay blank"
+    assert "name='training-detail' value=" not in panel, "an unsaved training-detail field was pre-filled"
+
+
+# --- Cycle 3: the Generate-Plan tab (two buttons + honest-empty `.bar` roster) + inline-asset gate (AC4, AC6) --- #
+
+
+def test_t7_generate_plan_tab_two_buttons_and_honest_empty_roster():
+    """T7-7/AC4: the Generate-Plan panel carries two buttons + the specialist roster, each `.bar` honest-empty.
+
+    The `#panel-generate` static markup carries BOTH `>Generate plan<` + `>Update plan<` buttons + a
+    `.gen-roster` container; the `renderGenerate` JS builds a per-specialist row over `SPECIALISTS`, EACH
+    carrying a `<div class="bar"><i style="width:0%"></i></div>` — rendered HONEST-EMPTY (ADR-0029): 0
+    fabricated demo strings, 0 fabricated progress widths. Failing-capable: the live single button /
+    `.agent-prog` (not `.bar`) reds the two-button + per-specialist-`.bar` assertions; porting the mockup's
+    fabricated `ST` percentages reds the honest-empty guard.
+    """
+    html = _unlocked_html()
+    assert '>Generate plan<' in html, "the Generate-Plan panel has no `Generate plan` button"
+    assert '>Update plan<' in html, "the Generate-Plan panel has no `Update plan` button"
+    assert 'class="gen-roster"' in html, "the Generate-Plan panel has no `.gen-roster` container"
+    assert '<div class="bar"><i style="width:0%"></i></div>' in html, (
+        "renderGenerate does not emit a honest-empty per-specialist `.bar` row"
+    )
+    assert 'SPECIALISTS.map' in html, "renderGenerate does not build the roster over the full SPECIALISTS set"
+    for demo in _FABRICATED:
+        assert demo not in html, f"the unlocked body baked in the fabricated demo string {demo!r}"
+    for w in ("width:62%", "width:54%", "width:40%", "width:33%", "width:47%"):
+        assert w not in html, f"the Generate roster baked in a fabricated progress width {w!r} (ADR-0029 honest-data)"
+
+
+def test_t7_unlocked_shell_passes_inline_asset_gate(tmp_path):
+    """T7-8/AC6: the REAL `generate.run('app')` emits the UNLOCKED body — T7's additions carry no off-file asset.
+
+    Drives `render.emit` over the unlocked (complete-store) SPA via the real `generate.run('app')`; it
+    returns a written `Path` that EXISTS (does not raise the off-file `ValueError`) and the emitted body
+    carries the Generate roster. The existing `test_offfile_ref_makes_emit_raise` proves the gate is the
+    real emit, not a substring grep. Failing-capable: an off-file `<img src=...>` in T7's markup raises here.
+    """
+    path = _emit_app(tmp_path)
+    assert isinstance(path, Path) and path.exists(), "the unlocked shell did not emit (an off-file asset in T7's markup?)"
+    assert 'class="gen-roster"' in path.read_text(), "the emitted unlocked body carries no Generate roster"

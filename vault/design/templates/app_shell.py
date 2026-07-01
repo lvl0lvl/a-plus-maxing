@@ -44,6 +44,22 @@ _DEMOGRAPHIC_SELECTS = ("sex-for-dosing", "equipment-access-class")
 _DEMOGRAPHIC_DOB = "date-of-birth"
 _DEMOGRAPHIC_WEIGHT = "bodyweight-kg"
 
+# The unlocked My-Info panel's editable free-text fields (ADR-0033-0035-T7), each mapped to the
+# store item its saved value resolves from — the pinned capture<->form contract: the goal tokens
+# write a store item of their own name; the four `_CHAT_RAW_SOURCE_FIELDS` write a `raw-*-free-text`
+# raw-source item (see `scripts.serve.capture`). A field whose store item has no reading stays
+# blank (no fabricated value). Distinct from `_DEMOGRAPHIC_SELECTS`: these are `value=`-injected
+# text inputs, not option-pre-selected <select>s.
+_MYINFO_TEXT_FIELDS = {
+    "goal-domains": "goal-domains",
+    "goal-targets": "goal-targets",
+    "goal-priority-order": "goal-priority-order",
+    "training-detail": "raw-training-detail-free-text",
+    "nutrition-detail": "raw-nutrition-free-text",
+    "supplement-stack": "raw-supplement-free-text",
+    "peptide-stack": "raw-peptide-free-text",
+}
+
 # The first-run completeness gate (ADR-0033 Decision / OQ-2 / ST-04). The served body is
 # CONDITIONAL on `_intake_complete`: the SEVEN directly-captured required `summarize` tokens
 # are all CONDITIONALLY set (omitted from the summary when their source reading is absent), so
@@ -254,7 +270,8 @@ def _prefill_form(html, store_read):
         (str) The HTML with the demographic form pre-filled, or unchanged when nothing saved.
     """
     saved = _latest_values(store_read, (_DEMOGRAPHIC_DOB, _DEMOGRAPHIC_WEIGHT, *_DEMOGRAPHIC_SELECTS))
-    if not saved:
+    rich = _latest_values(store_read, tuple(set(_MYINFO_TEXT_FIELDS.values())))
+    if not saved and not rich:
         return html  # nothing saved — honest blank/default form, no banner
 
     for name in _DEMOGRAPHIC_SELECTS:
@@ -263,6 +280,14 @@ def _prefill_form(html, store_read):
             continue
         option = f"<option value='{_esc(value)}'>"
         html = html.replace(option, f"<option value='{_esc(value)}' selected>", 1)
+
+    # The unlocked My-Info panel's free-text fields (T7): inject each field's latest saved value
+    # from its mapped store item. A field with no saved reading stays blank (honest-data).
+    for field, item in _MYINFO_TEXT_FIELDS.items():
+        value = rich.get(item)
+        if value is None:
+            continue
+        html = html.replace(f"name='{field}'>", f"name='{field}' value='{_esc(value)}'>", 1)
 
     dob = saved.get(_DEMOGRAPHIC_DOB)
     if dob is not None:
@@ -280,6 +305,8 @@ def _prefill_form(html, store_read):
             1,
         )
 
+    if not saved:
+        return html  # only rich free-text prefilled — no demographic banner (unchanged semantics)
     banner = ("<div class='upload-status' data-prefill='saved'>"
               "<span style='color:var(--good);font-weight:600'>✓ Saved — edit to update</span></div>")
     return html.replace(

@@ -130,6 +130,19 @@ select.inp{cursor:pointer}
 .statusbar .row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:9px}
 .bar{height:8px;border-radius:99px;background:var(--line2);overflow:hidden}
 .bar > i{display:block;height:100%;background:var(--good);border-radius:99px;transition:width .4s}
+.mi-head{display:flex;align-items:center;gap:9px;margin-bottom:4px}
+.mi-head .mi-edit{margin-left:auto;font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;border:1px solid var(--soft-bd);background:var(--soft);border-radius:8px;padding:5px 10px}
+.mi-note{font-size:11.5px;color:var(--muted);line-height:1.45;margin-bottom:12px}
+.genrow{display:flex;align-items:center;gap:11px;border:1px solid var(--line);border-radius:12px;background:#FBFCFE;padding:10px 12px;margin-bottom:8px}
+.genrow .gm{flex:1;min-width:0}
+.genrow .gtop{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.genrow .gn{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.genrow .gstat{margin-left:auto;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;flex:none}
+.genrow .gstat.done{color:var(--good)}
+.genrow .gstat.working{color:var(--accent)}
+.genrow .gstat.queued{color:var(--faint)}
+.genrow .gstat .spin{width:11px;height:11px}
+.genrow .bar{height:6px}
 .drop{border:1.5px dashed var(--ctrl);border-radius:10px;padding:20px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer}
 .drop:hover{border-color:var(--accent);color:var(--accent);background:var(--soft)}
 
@@ -169,16 +182,6 @@ select.inp{cursor:pointer}
 .ws-docs .doc{padding:11px 12px;gap:10px;margin-bottom:8px}
 .ws-docs .doc .d{font-size:11px;white-space:normal;line-height:1.35}
 .ws-side .seclab{font-size:12px;margin:16px 0 9px}
-.ws-genplan{width:100%;padding:13px;font-size:14px;margin-top:16px}
-/* generate tab: agent rows + progress */
-.agent-group-lab{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:8px 0 4px}
-.agent-row{display:flex;align-items:center;gap:11px;padding:9px 2px}
-.agent-row .am{flex:1;min-width:0}
-.agent-row .an{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
-.agent-row .ap{font-size:11px;color:var(--faint);font-weight:600;flex:none}
-.agent-prog{height:6px;border-radius:99px;background:var(--line2);margin-top:7px;overflow:hidden}
-.agent-prog > i{display:block;height:100%;background:var(--accent);border-radius:99px;width:0%;transition:width .5s}
-.agent-prog.done > i{background:var(--good)}
 .chat-thread{padding:20px;display:flex;flex-direction:column;justify-content:flex-end;gap:12px;min-height:230px;max-height:440px;overflow:auto;background:#E4E8F1}
 .msg{max-width:78%;font-size:13.5px;line-height:1.55;padding:11px 14px;border-radius:14px}
 .msg.bot{background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(16,20,38,.06);color:var(--ink);border-bottom-left-radius:4px;align-self:flex-start}
@@ -505,26 +508,61 @@ select.inp{cursor:pointer}
         <aside class="ws-side">
           <div class="ws-tabs">
             <button class="ws-tab" data-tab="myplan">My Plan</button>
-            <button class="ws-tab active" data-tab="build">Build Plan</button>
-            <button class="ws-tab" data-tab="generate">Generate</button>
+            <button class="ws-tab active" data-tab="build">My Info</button>
+            <button class="ws-tab" data-tab="generate">Generate Plan</button>
           </div>
           <div class="ws-panel" id="panel-myplan">
-            <div class="empty" style="margin-top:36px">Your finalized plan appears here once it's generated — every item attributed to a specialist and reviewed for safety. Build it in the <b>Build Plan</b> tab, then run it from <b>Generate</b>.</div>
+            <div class="empty" style="margin-top:36px">Your finalized plan appears here once it's generated — every item attributed to a specialist and reviewed for safety. Run it from <b>Generate Plan</b>.</div>
           </div>
           <div class="ws-panel active ws-docs" id="panel-build">
-            <div class="seclab" style="margin-top:0">Your details</div>
+            <div class="mi-note">Everything you told us at intake — editable. An edit re-runs the same on-device de-identification path before anything reaches your plan.</div>
             <form action='/upload' method='post'>
-              <div class="field"><label for='date-of-birth'>Birthdate</label><input class="inp" type='date' id='date-of-birth' name='date-of-birth'></div>
-              <div class="field" style="margin-top:10px"><label for='sex-for-dosing'>Sex (for dosing)</label><select class="inp" id='sex-for-dosing' name='sex-for-dosing'><option value=''>Select…</option><option value='male'>Male</option><option value='female'>Female</option></select></div>
-              <div class="field" style="margin-top:10px"><label for='bodyweight-kg'>Body weight</label><div style="display:flex;gap:10px"><input class="inp" type='number' id='bodyweight-kg' name='bodyweight-kg' placeholder="Weight" style="flex:1"><select class="inp" aria-label="Weight unit" style="width:92px;flex:none"><option value='lbs'>lbs</option><option value='kg'>kg</option></select></div></div>
-              <div class="field" style="margin-top:10px"><label for='equipment-access-class'>Equipment access</label><select class="inp" id='equipment-access-class' name='equipment-access-class'><option value=''>Select…</option><option value='full-home-gym'>Full home gym</option><option value='commercial-gym'>Commercial gym</option><option value='minimal-equipment'>Minimal equipment</option><option value='bodyweight-only'>Bodyweight only</option></select></div>
-              <div style="margin-top:14px"><button class="btn primary" type='submit'>Save details</button></div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Demographics</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='date-of-birth'>Birthdate</label><input class="inp" type='date' disabled id='date-of-birth' name='date-of-birth'></div>
+                <div class="field" style="margin-top:11px"><label for='sex-for-dosing'>Sex (for dosing)</label><select class="inp" id='sex-for-dosing' name='sex-for-dosing' disabled><option value=''>Select…</option><option value='male'>Male</option><option value='female'>Female</option></select></div>
+                <div class="field" style="margin-top:11px"><label for='bodyweight-kg'>Body weight</label><div style="display:flex;gap:10px"><input class="inp" type='number' id='bodyweight-kg' name='bodyweight-kg' placeholder="Weight" disabled style="flex:1"><select class="inp" aria-label="Weight unit" disabled style="width:92px;flex:none"><option value='lbs'>lbs</option><option value='kg'>kg</option></select></div></div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Goals</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='goal-domains'>Domains</label><input class="inp" disabled id='goal-domains' name='goal-domains'></div>
+                <div class="field" style="margin-top:11px"><label for='goal-targets'>Targets</label><input class="inp" disabled id='goal-targets' name='goal-targets'></div>
+                <div class="field" style="margin-top:11px"><label for='goal-priority-order'>Priority order</label><input class="inp" disabled id='goal-priority-order' name='goal-priority-order'></div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Training &amp; activity</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='training-detail'>Training detail</label><input class="inp" disabled id='training-detail' name='training-detail'></div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Diet</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='nutrition-detail'>Nutrition detail</label><input class="inp" disabled id='nutrition-detail' name='nutrition-detail'></div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Supplements &amp; peptides</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='supplement-stack'>Supplement stack</label><input class="inp" disabled id='supplement-stack' name='supplement-stack'></div>
+                <div class="field" style="margin-top:11px"><label for='peptide-stack'>Peptides</label><input class="inp" disabled id='peptide-stack' name='peptide-stack'></div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="seclab">Medications</div>
+                <div class="note">Editing a medication re-runs the care-assistant interaction review (de-associated, no name attached). Manage medications in <b>Chat with Team</b>.</div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="seclab">Health &amp; lifestyle</div>
+                <div class="note">Sleep, stress, and the safety screens you answered at intake. Update them in <b>Chat with Team</b>.</div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Equipment</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='equipment-access-class'>Access</label><select class="inp" id='equipment-access-class' name='equipment-access-class' disabled><option value=''>Select…</option><option value='full-home-gym'>Full home gym</option><option value='commercial-gym'>Commercial gym</option><option value='minimal-equipment'>Minimal equipment</option><option value='bodyweight-only'>Bodyweight only</option></select></div>
+              </div>
             </form>
-            <div class="seclab">Link your documents</div>
+            <div class="seclab">Documents</div>
             <div id="upload-status" class="upload-status"></div>
             <input type="file" id="filepick" style="display:none">
             <div id="doc-cards"><!--DOC_CARDS--></div>
-            <div class="drop" style="margin-top:10px">Drop files here or click to browse — labs, history, wearable exports, prior plans. Parsed locally.</div>
+            <div style="margin-top:8px"><span class="link" style="color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer" onclick="toggleAddDocs(this)">+ Add documents</span></div>
+            <div class="adddocs-panel" style="display:none;margin-top:10px">
+              <div class="drop">Drop files here or click to browse — labs, history, wearable exports, prior plans. Parsed locally.</div>
+            </div>
             <div class="statusbar">
               <div class="row"><span style="font-weight:600">Ingestion</span><span style="color:var(--muted)">Nothing ingested yet</span></div>
               <div class="bar"><i style="width:0%"></i></div>
@@ -542,8 +580,17 @@ select.inp{cursor:pointer}
                 <div class="m"><div class="t" data-field="item"></div><div class="d"><span data-field="timepoint"></span> · <span data-field="source"></span> · <span data-field="value"></span></div></div>
               </div>
             </template>
+            <div style="margin-bottom:6px">
+              <div class="seclab">API key</div>
+              <div class="note">Your Anthropic API key is stored in your device keychain — never uploaded, never written to a file. Manage it in <b>Profile → API connection</b>.</div>
+            </div>
           </div>
-          <div class="ws-panel" id="panel-generate"></div>
+          <div class="ws-panel" id="panel-generate">
+            <div style="display:flex;gap:10px;margin-top:2px;margin-bottom:9px"><button class="btn primary" style="flex:1">Generate plan</button><button class="btn ghost" style="flex:1">Update plan</button></div>
+            <div style="font-size:11.5px;color:var(--ink2);line-height:1.45;margin-bottom:14px"><b>Generate plan</b> builds a fresh plan from scratch. <b>Update plan</b> re-runs your existing plan with your latest data.</div>
+            <div class="seclab" style="margin-top:0">Care-team build status</div>
+            <div class="gen-roster"></div>
+          </div>
         </aside>
       </div>
     </section>
@@ -951,6 +998,26 @@ function _pfKeySave(){
  var sb=document.getElementById('pf-key-save'); if(sb) sb.addEventListener('click', _pfKeySave);
 })();
 
+// ---------- My-Info: per-section Edit enables the fields; Save re-submits the /upload seam ----------
+function toggleEdit(btn){
+  var head=btn.closest('.mi-head'); if(!head)return; var sec=head.parentElement;
+  if(btn.textContent.trim()==='Edit'){
+    sec.querySelectorAll('input,textarea,select').forEach(function(i){ i.disabled=false; });
+    btn.textContent='Save';
+  } else {
+    var f=btn.closest('form'); if(f){ f.requestSubmit ? f.requestSubmit() : f.submit(); }
+    btn.textContent='Edit';
+  }
+}
+// ---------- My-Info: '+ Add documents' opens the upload panel (reuses the /upload file-picker path) ----------
+function toggleAddDocs(el){
+  var panel=el.closest('div').nextElementSibling;
+  if(panel&&panel.classList.contains('adddocs-panel')){
+    var open=(panel.style.display==='none');
+    panel.style.display=open?'block':'none';
+    el.textContent=open?'− Hide documents':'+ Add documents';
+  }
+}
 // ---------- collapsible specialist column + workspace tabs ----------
 (function(){
  var app=document.querySelector('.app'), tg=document.getElementById('specs-toggle');
@@ -968,24 +1035,15 @@ function _pfKeySave(){
    });
  });
 })();
-// The 3 plan-review roles (the gate the assembled plan passes before finalization):
-// Quality Judge (accuracy), Safety Review (contraindications), Medical Liaison (adjudication).
-const REVIEW_AGENTS = [
-  {id:'quality', name:'Quality Judge',   role:'Accuracy & quality',               icon:'sparkles',    color:'#4A55E8', bg:'#EEF0FE'},
-  {id:'safety',  name:'Safety Review',   role:'Contraindications & interactions', icon:'stethoscope', color:'#E5557A', bg:'#FCEBF0'},
-  {id:'liaison', name:'Medical Liaison', role:'Final adjudication',               icon:'check',       color:'#1FB5A6', bg:'#E8F7F4'},
-];
-function agentRow(a){
-  return `<div class="agent-row">${tile(a)}<div class="am"><div class="an">${a.name}</div><div class="agent-prog"><i style="width:0%"></i></div></div></div>`;
+// One Care-team build-status row per specialist, rendered HONEST-EMPTY (ADR-0029): every `.bar` is
+// width:0% / queued — no fabricated done/working progress until a live plan run drives them.
+function agentRow(s){
+  return '<div class="genrow">'+tile(s)+'<div class="gm"><div class="gtop"><span class="gn">'+s.name+'</span><span class="gstat queued">queued</span></div><div class="bar"><i style="width:0%"></i></div></div></div>';
 }
 function renderGenerate(){
-  var p=document.getElementById('panel-generate'); if(!p)return;
-  p.innerHTML =
-    '<div class="agent-group-lab">Review agents</div>' + REVIEW_AGENTS.map(agentRow).join('') +
-    '<div class="agent-group-lab" style="margin-top:16px">Specialists</div>' + SPECIALISTS.filter(s=>s.id!=='care').map(agentRow).join('') +
-    '<button class="btn primary ws-genplan" id="gen-run">Generate plan →</button>';
+  var rows=SPECIALISTS.map(agentRow).join('');
+  document.querySelectorAll('.gen-roster').forEach(function(el){ el.innerHTML=rows; });
   icons();
-  var b=document.getElementById('gen-run'); if(b) b.addEventListener('click',function(){ b.textContent='Plan generation runs at the live step'; b.disabled=true; });
 }
 
 // ---------- document upload: + Link / dropzone -> file picker -> POST /upload ----------
