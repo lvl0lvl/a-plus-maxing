@@ -15,6 +15,43 @@ from scripts.plan import router
 from scripts.store import biomarker_meta
 
 
+def _expected_age(iso_dob):
+    """The exact integer age (as a str) for `iso_dob` relative to today's UTC date.
+
+    Mirrors `router._age_band`'s computation so the exact-age assertion is grounded in the
+    run date, not a literal that goes stale — the load-bearing non-tautology check is the
+    A != B difference (a constant-return deriver reds it).
+    """
+    from datetime import datetime, timezone
+    dob = datetime.strptime(iso_dob, "%Y-%m-%d").date()
+    today = datetime.now(timezone.utc).date()
+    return str(today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day)))
+
+
+# The pinned pre-edit Summary Field-Set membership (AC-1). The OQ-5 repurpose changes
+# `training-age-band`/`bodyweight-band`'s DERIVATION, never the tuple — this literal proves
+# no token was added or removed (byte-identical field set).
+_PINNED_FIELD_SET = (
+    "training-age-band",
+    "sex-for-dosing",
+    "bodyweight-band",
+    "equipment-access-class",
+    "goal-domains",
+    "goal-targets",
+    "goal-priority-order",
+    "recovery-status-band",
+    "active-issue-class",
+    "hard-limits",
+    "recent-trend-direction",
+    "rx-interaction-classes",
+    "dietary-pattern-class",
+    "supplement-stack-class",
+    "peptide-use-class",
+    "training-volume-band",
+    "genetic-trait-classes",
+)
+
+
 # --- store-read fakes ----------------------------------------------------------
 
 
@@ -47,8 +84,12 @@ def _clean_records():
          "source": "intake", "value": "tweaked back in January"},
         {"item": "sex-for-dosing", "timepoint": "2026-01-01T00:00:00+00:00",
          "source": "intake", "value": "male"},
-        {"item": "bodyweight-band", "timepoint": "2026-01-01T00:00:00+00:00",
-         "source": "intake", "value": "80-90kg"},
+        # OQ-5 repurpose: bodyweight-band is now DERIVED from the local `bodyweight-kg`
+        # dated series (current weight + trend), never a directly-stored pass-through band.
+        {"item": "bodyweight-kg", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "85.0"},
+        {"item": "bodyweight-kg", "timepoint": "2026-02-01T00:00:00+00:00",
+         "source": "intake", "value": "82.0"},
         {"item": "goal-domains", "timepoint": "2026-01-01T00:00:00+00:00",
          "source": "intake", "value": "strength;recovery"},
         {"item": "goal-targets", "timepoint": "2026-01-01T00:00:00+00:00",
@@ -129,14 +170,15 @@ def test_summarize_reads_through_store():
     summary = router.summarize(store_read)
     # The read callable was the state source: it was invoked.
     assert store_read.calls, "summarize did not invoke the store read model"
-    # F15: a token VALUE derives from the supplied records (1986 DOB → born-1980s).
-    assert summary["training-age-band"] == "born-1980s"
-    # And it tracks the input: a different DOB year produces a different band.
+    # F15: a token VALUE derives from the supplied records (full DOB → exact age).
+    assert summary["training-age-band"] == _expected_age("1986-04-12")
+    # And it tracks the input: a different DOB year produces a different age.
     other = _store_read_factory([
         {"item": "date-of-birth", "timepoint": "2026-01-01T00:00:00+00:00",
          "source": "intake", "value": "1972-08-09"},
     ])
-    assert router.summarize(other)["training-age-band"] == "born-1970s"
+    assert router.summarize(other)["training-age-band"] == _expected_age("1972-08-09")
+    assert summary["training-age-band"] != router.summarize(other)["training-age-band"]
 
 
 def _reading(value):
@@ -145,24 +187,33 @@ def _reading(value):
              "source": "intake", "value": value}]
 
 
-@pytest.mark.parametrize("value, expected", [
-    ("1986-04-12", "born-1980s"),
-    ("1972-08-09", "born-1970s"),
-    ("2001-12-31", "born-2000s"),
-    ("not-a-date", "age-band-unknown"),
-    # BUG-2 (Wave-B review): malformed birth years must NOT garble into a fake band.
-    ("86", "age-band-unknown"),        # 2-char — was 'born-860s'
-    ("3026", "age-band-unknown"),      # future year — was 'born-3020s'
-    ("198", "age-band-unknown"),       # 3-char — was 'born-1980s' (wrong)
-    ("  1986", "born-1980s"),          # leading-space valid year — was rejected
-    ("1986", "born-1980s"),            # bare valid year — unchanged
-    ("1900", "born-1900s"),            # lower range bound — accepted
-    ("1899", "age-band-unknown"),      # below the 1900 floor — rejected
+@pytest.mark.parametrize("iso_dob", [
+    "1986-04-12",
+    "1972-08-09",
+    "2001-12-31",
+    "  1986-04-12  ",   # surrounding whitespace is stripped before parsing
+    "1900-01-01",
 ])
-def test_age_band_token_value(value, expected):
-    """F17 + BUG-2: _age_band emits the correct birth-decade band, banding malformed/
-    out-of-range years `age-band-unknown` rather than fabricating a born-decade."""
-    assert router._age_band(_reading(value)) == expected
+def test_age_band_exact_age_from_full_dob(iso_dob):
+    """OQ-5 (AC-2): _age_band emits the EXACT integer age (years) from the full ISO DOB —
+    computed dynamically relative to today's UTC date, never a born-decade band."""
+    assert router._age_band(_reading(iso_dob)) == _expected_age(iso_dob.strip())
+
+
+@pytest.mark.parametrize("value", [
+    "not-a-date",
+    "1986",          # a bare year is no longer a parseable full DOB
+    "86",
+    "198",
+    "1986-13-40",    # out-of-range month/day — unparseable
+    "3026-01-01",    # future-dated — never fabricate an age
+])
+def test_age_band_unparseable_or_future_is_sentinel(value):
+    """OQ-5 (AC-3 fail-safe): a malformed/unparseable or future-dated DOB derives the
+    `age-unknown` sentinel rather than crashing or echoing the raw value."""
+    token = router._age_band(_reading(value))
+    assert token == "age-unknown"
+    assert value.strip() not in token  # the raw value never survives into the sentinel
 
 
 @pytest.mark.parametrize("value, expected", [
@@ -573,14 +624,16 @@ def test_summarize_passthrough_accepts_clean_non_str_values():
     pass-through-of-non-str contract so a future change that coerced or rejected
     non-str values would be caught.
     """
+    # `equipment-access-class` is a still-pass-through token (read under its own name);
+    # `bodyweight-band` is no longer pass-through (OQ-5 derives it from `bodyweight-kg`).
     store_read = _store_read_factory([
-        {"item": "bodyweight-band", "timepoint": "2026-01-01T00:00:00+00:00",
+        {"item": "equipment-access-class", "timepoint": "2026-01-01T00:00:00+00:00",
          "source": "intake", "value": 80},
         {"item": "recovery-status-band", "timepoint": "2026-01-01T00:00:00+00:00",
          "source": "intake", "value": None},
     ])
     summary = router.summarize(store_read)
-    assert summary["bodyweight-band"] == 80
+    assert summary["equipment-access-class"] == 80
     assert summary["recovery-status-band"] is None
 
 
@@ -736,11 +789,14 @@ def test_summarize_with_root_bound_partial_reads_only_the_clone_store(tmp_path, 
     summary = router.summarize(partial(store.read, root=clone_root))
 
     # The summary reflects ONLY the clone's data...
-    assert summary["training-age-band"] == "born-1980s"  # clone DOB, not the 1955 plant
+    assert summary["training-age-band"] == _expected_age("1986-04-12")  # clone DOB, not the 1955 plant
     assert summary["goal-targets"] == "return to pre-Jan-2026 loading"
     # ...nothing was read from DEFAULT_ROOT (the planted sentinels never surface)...
     assert "DEFAULT-ROOT-SENTINEL" not in str(summary)
-    assert "born-1950s" not in str(summary)
+    # ...and the crown jewel holds: neither full-DOB string (the clone's OR the 1955 plant)
+    # crosses — only the de-associated exact age does.
+    assert "1955-01-01" not in str(summary)
+    assert "1986-04-12" not in str(summary)
     # ...and the clone store backs the FULL field set (no partial-read fallback).
     assert set(summary.keys()) == set(router.SUMMARY_FIELD_SET)
 
@@ -1841,3 +1897,144 @@ def test_summarize_no_arg_production_path_is_dna_aware(tmp_path, monkeypatch):
     empty_lib.mkdir()
     monkeypatch.setattr(router, "GENETICS_LIBRARY_DEFAULT_ROOT", empty_lib)
     assert router.summarize(store_read)["genetic-trait-classes"] == ""
+
+
+# =========================================================================== #
+# ADR-0033-0035-T2 — OQ-5 actual-age + actual-weight de-association (REPURPOSE).
+# `training-age-band` now carries the EXACT AGE (from the local full date-of-birth);
+# `bodyweight-band` now carries the CURRENT WEIGHT + TREND (from the local bodyweight-kg
+# series). The full DOB + the raw per-day weight history NEVER cross to the no-train
+# planner (the crown jewel, NFR-1). Mock/fixture-tested, 0 live spend.
+# =========================================================================== #
+
+
+def _weight_series(values):
+    """A `bodyweight-kg` dated series store_read over the given per-day values (chronological)."""
+    return _store_read_factory([
+        {"item": "bodyweight-kg", "timepoint": f"2026-{i + 1:02d}-01T00:00:00+00:00",
+         "source": "intake", "value": v}
+        for i, v in enumerate(values)
+    ])
+
+
+def test_summary_field_set_byte_identical_after_repurpose():
+    """AC-1: the repurpose changes DERIVATION, not the field set — the tuple is byte-identical.
+
+    A clean reimport re-runs the module-load tripwires (they must hold with the additive
+    `bodyweight-kg` member); the tuple equals the pinned pre-edit membership, proving no
+    token was added or removed.
+    """
+    import importlib
+    importlib.reload(router)  # re-runs the load-time tripwires; raises if any red
+    assert router.SUMMARY_FIELD_SET == _PINNED_FIELD_SET
+
+
+def test_training_age_band_is_exact_age_non_tautological():
+    """AC-2: training-age-band is the EXACT integer age; a different birth-year DOB yields a
+    different age (a constant-return deriver reds age_a == age_b)."""
+    dob_a, dob_b = "1986-04-12", "1972-08-09"
+    age_a = router.summarize(_store_read_factory([
+        {"item": "date-of-birth", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": dob_a},
+    ]))["training-age-band"]
+    age_b = router.summarize(_store_read_factory([
+        {"item": "date-of-birth", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": dob_b},
+    ]))["training-age-band"]
+    assert age_a == _expected_age(dob_a)
+    assert age_b == _expected_age(dob_b)
+    assert age_a != age_b  # non-tautological: different DOB year -> different age
+
+
+def test_training_age_band_carries_no_full_dob_crown_jewel(monkeypatch):
+    """AC-3 CROWN JEWEL (SEC-F2 + QA-F3): the full DOB never reaches the summary.
+
+    PRIMARY (format-agnostic): the token is the integer age; the seeded full-DOB string is
+    absent from the serialized summary in any format; `pii_scan.scan_text` over the summary
+    returns 0. NEGATIVE CONTROL (QA-F3, prove-it-can-RED at THIS wave): stub the training-age
+    deriver to echo the raw DOB and confirm the seeded-substring scan goes RED — the probe is
+    non-vacuous.
+    """
+    import re
+
+    from scripts.guard import pii_scan
+
+    dob = "1986-03-12"
+    store_read = _store_read_factory([
+        {"item": "date-of-birth", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": dob},
+    ])
+    summary = router.summarize(store_read)
+    assert summary["training-age-band"] == _expected_age(dob)
+    # PRIMARY, format-agnostic: no rendering of the seeded full DOB survives.
+    for fragment in (dob, "1986/03/12", "03/12/1986", "March 12 1986"):
+        assert fragment not in str(summary), fragment
+    # SUPPLEMENTARY (does NOT stand alone): the enumerated MM/DD / month-day regex is absent.
+    assert not re.search(r"\b\d{4}[-/]\d{2}[-/]\d{2}\b", str(summary))
+    # pii_scan over the serialized summary returns 0 identity/value hits (SEC-F2).
+    assert pii_scan.scan_text(str(summary)) == 0
+    # NEGATIVE CONTROL: stub the deriver to leak the raw DOB -> the substring scan RED.
+    monkeypatch.setitem(router._FIELD_DERIVATION, "training-age-band",
+                        lambda readings: str(readings[-1]["value"]))
+    leaked = router.summarize(store_read)
+    assert dob in str(leaked)  # the leak IS present under the stub — the probe can RED
+
+
+def test_bodyweight_band_is_current_weight_plus_trend_non_tautological():
+    """AC-4: bodyweight-band carries the CURRENT weight + a coarse trend; a down-trending
+    series yields a distinct trend from a flat one (a constant return reds down != flat)."""
+    down = router.summarize(_weight_series(["85.0", "84.0", "83.0", "82.0"]))["bodyweight-band"]
+    flat = router.summarize(_weight_series(["80.0", "80.0"]))["bodyweight-band"]
+    assert down != flat  # non-tautological
+    assert "down" in down and "flat" in flat
+    assert "82" in down  # the current weight traces to the LATEST reading
+
+
+def test_bodyweight_series_stays_local_crown_jewel(monkeypatch):
+    """AC-5 CROWN JEWEL (QA-F3): only the current weight crosses; the per-day history stays
+    local, and `dispatch` rejects a raw bodyweight-kg payload field.
+
+    NEGATIVE CONTROL: stub the deriver to echo the raw series and confirm the seeded-substring
+    scan goes RED — the probe is non-vacuous at THIS wave.
+    """
+    series = ["85.0", "84.0", "83.0", "82.0"]
+    store_read = _weight_series(series)
+    summary = router.summarize(store_read)
+    # Only the current (82) crosses; the non-current per-day history is absent.
+    for historical in ("85.0", "84.0", "83.0"):
+        assert historical not in str(summary), historical
+    # dispatch rejects a raw bodyweight-kg payload field (the out-of-field-set whitelist).
+    complete = router.summarize(_clean_store_read())
+    complete["bodyweight-kg"] = "82.0"
+    with pytest.raises(ValueError) as exc:
+        router.dispatch(complete)
+    assert "bodyweight-kg" in str(exc.value)
+    # NEGATIVE CONTROL: stub the deriver to leak the raw series -> the substring scan RED.
+    monkeypatch.setitem(router._FIELD_DERIVATION, "bodyweight-band",
+                        lambda readings: str([r["value"] for r in readings]))
+    leaked = router.summarize(store_read)
+    assert "85.0" in str(leaked)  # the leak IS present under the stub — the probe can RED
+
+
+def test_age_and_weight_conditional_omitted_when_absent():
+    """AC-6: training-age-band + bodyweight-band stay CONDITIONAL (omitted when their source
+    is absent, not in `_ALWAYS_SET_DERIVED`); a complete summary still dispatches.
+
+    RED-first (weight half): a directly-stored `bodyweight-band` item is now IGNORED (the
+    source is `bodyweight-kg`); with no `bodyweight-kg` reading the token is OMITTED — today's
+    pass-through would include it.
+    """
+    assert "training-age-band" not in router._ALWAYS_SET_DERIVED
+    assert "bodyweight-band" not in router._ALWAYS_SET_DERIVED
+    # No date-of-birth, no bodyweight-kg, but a STALE directly-stored bodyweight-band item.
+    store_read = _store_read_factory([
+        {"item": "bodyweight-band", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "80-90kg"},
+        {"item": "sex-for-dosing", "timepoint": "2026-01-01T00:00:00+00:00",
+         "source": "intake", "value": "male"},
+    ])
+    summary = router.summarize(store_read)
+    assert "training-age-band" not in summary
+    assert "bodyweight-band" not in summary  # RED today: pass-through would include the stale item
+    # A complete clean summary (both sources present) dispatches without a partial raise.
+    router.dispatch(router.summarize(_clean_store_read()))

@@ -45,9 +45,11 @@ so the capture regions T2/T3 extend over this same file stay legible. The three 
   never the literal display text (which derives the no-signal `moderate`).
 - Directly-wired -> own-name store item. Goals (`goal-domains` / `goal-targets` /
   `goal-priority-order` / `hard-limits`) and demographics (`sex-for-dosing` /
-  `bodyweight-band` / `equipment-access-class`) write under their own `WIRED_TOKENS` name;
-  the Step-1 birth-year field writes the raw `date-of-birth` source `summarize` derives
-  `training-age-band` from (never the band directly).
+  `equipment-access-class`) write under their own `WIRED_TOKENS` name; the Step-1 birth-date
+  field writes the raw `date-of-birth` source `summarize` derives `training-age-band` (the
+  exact age) from, and the body-weight number writes the raw `bodyweight-kg` local series
+  `summarize` derives `bodyweight-band` (current weight + trend) from — never the age/band
+  token directly (OQ-5, ADR-0034).
 - Record-only -> the gitignored scaffold, NEVER a field-set store item. The raw
   `rx-interaction-classes` med field (deliberately absent from `WIRED_TOKENS`) PLUS the
   sensitive fields (race / ethnicity, occupation, sleep, stress, smoker, alcohol) fall to
@@ -82,12 +84,12 @@ WIRED_TOKENS = (
     "hard-limits",
     "recovery-status-band",
     # Step-1 demographics (ADR-0018-T1): bounded pass-through tokens written under their
-    # own name. `sex-for-dosing`/`equipment-access-class` are direct class selections;
-    # `bodyweight-band` is a coarse de-identified BAND (never raw kg). `training-age-band`
-    # is DELIBERATELY ABSENT — it is DERIVED from the named-excluded `date-of-birth` source
-    # the birth-year field writes (see `_DOB_FIELD`), never written directly.
+    # own name. `sex-for-dosing`/`equipment-access-class` are direct class selections.
+    # `training-age-band` + `bodyweight-band` are DELIBERATELY ABSENT — both are DERIVED
+    # (OQ-5, ADR-0034): from the named-excluded `date-of-birth` (see `_DOB_FIELD`) and the
+    # named-excluded `bodyweight-kg` local series (see `_WEIGHT_FIELD`) the Step-1 fields
+    # write, never a band/age token directly.
     "sex-for-dosing",
-    "bodyweight-band",
     "equipment-access-class",
 )
 # `rx-interaction-classes` is DELIBERATELY ABSENT from the wired set (Wave-B FIX-A).
@@ -105,11 +107,20 @@ WIRED_TOKENS = (
 _TRAIN_AROUND_FIELD = "train-around"
 _RAW_SYMPTOM_ITEM = "raw-symptom-free-text"
 
-# The Step-1 birth-year form field -> the RAW `date-of-birth` store item `summarize`
-# de-identifies into `training-age-band` via `_age_band` (born-decade band, raw year never
-# in the token). Mirrors the `_TRAIN_AROUND_FIELD -> _RAW_SYMPTOM_ITEM` special-case: the
-# field writes the named-excluded raw source, NEVER the `training-age-band` token directly.
+# The Step-1 birth-date form field -> the RAW `date-of-birth` store item `summarize`
+# de-identifies into `training-age-band` via `_age_band` (the exact age, the full DOB never
+# in the token; OQ-5). Mirrors the `_TRAIN_AROUND_FIELD -> _RAW_SYMPTOM_ITEM` special-case:
+# the field writes the named-excluded raw source, NEVER the `training-age-band` token directly.
 _DOB_FIELD = "date-of-birth"
+
+# The Step-1 body-weight number form field -> the RAW `bodyweight-kg` local time-series
+# `summarize` de-identifies into the current-weight+trend `bodyweight-band` token (via
+# `_bodyweight_trend`; the per-day history never in the token, OQ-5 ADR-0034). Mirrors
+# `_DOB_FIELD`: the field writes the named-excluded raw source (the dashboard chart's local
+# feed), NEVER the `bodyweight-band` token directly. The form field name == the store item
+# name (the simplest T2<->T4 coupling); capture receives the kg-normalized number (the
+# lbs/kg unit conversion is T4's client-side affordance).
+_WEIGHT_FIELD = "bodyweight-kg"
 
 # The chat-sourced rich-domain free-text form fields (ADR-0019-T1) -> their NAMED-EXCLUDED
 # raw source store items, which `summarize` de-identifies into the coarse band/class tokens
@@ -136,12 +147,13 @@ _CHAT_RAW_SOURCE_FIELDS = {
 # so EVERY token must be in the enum for the whole value to be accepted.
 RECOVERY_STATUS_BANDS = ("low", "moderate", "high")
 GOAL_DOMAINS = ("Workout", "Nutrition", "Supplements", "Peptides")
-# Step-1 demographic bounded vocabularies (ADR-0018-T1). `intake.py` builds its Step-1
-# `<select>` options FROM these constants (AC-6 markup<->gate no-drift). All three are
-# de-identified classes: `sex-for-dosing` is the clinically-relevant dosing dimension;
-# `BODYWEIGHT_BANDS` are coarse ranges so no raw kg is ever stored; `EQUIPMENT_ACCESS_CLASSES`
-# is the operator's training-environment class (the authoritative source for the token,
-# replacing the removed postal-address inference).
+# Step-1 demographic bounded vocabularies (ADR-0018-T1). `sex-for-dosing` /
+# `EQUIPMENT_ACCESS_CLASSES` are de-identified classes the Step-1 `<select>`s and the
+# server-side gate share. `BODYWEIGHT_BANDS` is DE-WIRED from the live capture path (OQ-5,
+# ADR-0034: the body-weight number now routes to the named-excluded `bodyweight-kg` local
+# series via `_WEIGHT_FIELD`); the constant is RETAINED only because the superseded,
+# non-served legacy `vault/design/templates/intake.py` still imports it (full deletion +
+# intake.py retirement is bead `rod1`).
 SEX_OPTIONS = ("male", "female")
 BODYWEIGHT_BANDS = ("under-60kg", "60-70kg", "70-80kg", "80-90kg", "90-100kg", "over-100kg")
 EQUIPMENT_ACCESS_CLASSES = ("full-home-gym", "commercial-gym", "minimal-equipment", "bodyweight-only")
@@ -149,7 +161,6 @@ _BOUNDED_ENUMS = {
     "recovery-status-band": ({b.lower() for b in RECOVERY_STATUS_BANDS}, False),
     "goal-domains": ({d.lower() for d in GOAL_DOMAINS}, True),
     "sex-for-dosing": ({s.lower() for s in SEX_OPTIONS}, False),
-    "bodyweight-band": ({b.lower() for b in BODYWEIGHT_BANDS}, False),
     "equipment-access-class": ({e.lower() for e in EQUIPMENT_ACCESS_CLASSES}, False),
 }
 
@@ -302,11 +313,18 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
             store.append(_RAW_SYMPTOM_ITEM, _reading(_RAW_SYMPTOM_ITEM, value), root=store_root)
             written_tokens.append(_RAW_SYMPTOM_ITEM)
         elif name == _DOB_FIELD:
-            # The Step-1 birth year -> the RAW `date-of-birth` item summarize de-identifies
-            # into training-age-band (via `_age_band`, a born-decade band). NEVER
-            # training-age-band directly — the raw year is named-excluded raw PII.
+            # The Step-1 birth date -> the RAW `date-of-birth` item summarize de-identifies
+            # into training-age-band (via `_age_band`, the exact age). NEVER training-age-band
+            # directly — the full DOB is named-excluded raw PII (OQ-5).
             store.append(_DOB_FIELD, _reading(_DOB_FIELD, value), root=store_root)
             written_tokens.append(_DOB_FIELD)
+        elif name == _WEIGHT_FIELD:
+            # The Step-1 body-weight number -> the RAW `bodyweight-kg` local series summarize
+            # de-identifies into the current-weight+trend bodyweight-band token (via
+            # `_bodyweight_trend`). NEVER bodyweight-band directly — the per-day weight log is
+            # named-excluded raw PII (the dashboard chart's local feed, OQ-5 ADR-0034).
+            store.append(_WEIGHT_FIELD, _reading(_WEIGHT_FIELD, value), root=store_root)
+            written_tokens.append(_WEIGHT_FIELD)
         elif name in _CHAT_RAW_SOURCE_FIELDS:
             # A chat-sourced rich-domain free-text (nutrition/supplement/peptide/training
             # detail) -> its NAMED-EXCLUDED raw source item, which summarize de-identifies

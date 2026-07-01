@@ -19,6 +19,7 @@ scaffold. Each gate carries its negative control proving it is failing-capable.
 """
 
 import functools
+import importlib
 import subprocess
 import sys
 from pathlib import Path
@@ -869,34 +870,98 @@ def test_chat_field_writes_raw_source_summarize_derives_band(
     )
 
 
-@pytest.mark.parametrize("bad_year", ["not-a-year", "86", "3026", "198"])
-def test_malformed_birth_year_through_capture_seam_bands_unknown(bad_year, tmp_path):
-    """BUG-2 + TEST-3: a malformed birth year through the capture seam derives
-    `age-band-unknown`, with the raw string nowhere in the emitted token.
+@pytest.mark.parametrize("bad_dob", ["not-a-date", "1986", "3026-01-01", "1986-13-40"])
+def test_malformed_dob_through_capture_seam_is_age_unknown(bad_dob, tmp_path):
+    """OQ-5 (TEST-3): a malformed/unparseable or future-dated full DOB through the capture
+    seam derives the `age-unknown` sentinel, with the raw string nowhere in the token.
 
-    The Step-1 birth-year field writes the RAW `date-of-birth` store item; `summarize`
-    de-identifies it via `_age_band`. A malformed/non-numeric/out-of-range year must band
-    `age-band-unknown` (post-BUG-2-fix) rather than garble into a fake born-decade, and
-    the raw string must not appear under the field-set token. Failing-capable: the pre-fix
-    `_age_band` garbled '86'->'born-860s', '3026'->'born-3020s', '198'->'born-1980s'.
+    The Step-1 birth-date field writes the RAW `date-of-birth` store item; `summarize`
+    de-identifies it via `_age_band` (repurposed to the exact-age deriver). A value that is
+    not a parseable past ISO date must derive `age-unknown` rather than crash or echo the raw
+    value. Failing-capable: an echoing deriver leaks the raw string into the token.
     """
     store_root = tmp_path / "store"
     capture.persist_capture(
-        {"date-of-birth": bad_year},
+        {"date-of-birth": bad_dob},
         root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
     )
-    # The raw year landed in the named-excluded raw source, never the band token directly.
-    assert store.read("date-of-birth", root=store_root), "the birth-year field wrote no raw source"
+    # The raw value landed in the named-excluded raw source, never the token directly.
+    assert store.read("date-of-birth", root=store_root), "the birth-date field wrote no raw source"
     assert store.read("training-age-band", root=store_root) == [], (
-        "the birth-year field wrongly wrote training-age-band directly (must be derived)"
+        "the birth-date field wrongly wrote training-age-band directly (must be derived)"
     )
     summary = _summary(store_root)
-    assert summary.get("training-age-band") == "age-band-unknown", (
-        f"a malformed birth year {bad_year!r} did not band age-band-unknown"
+    assert summary.get("training-age-band") == "age-unknown", (
+        f"a malformed DOB {bad_dob!r} did not derive the age-unknown sentinel"
     )
     # The raw malformed string appears nowhere in the emitted token.
-    assert bad_year not in str(summary.get("training-age-band", "")), (
-        f"the raw birth-year string {bad_year!r} leaked into the training-age-band token"
+    assert bad_dob not in str(summary.get("training-age-band", "")), (
+        f"the raw DOB string {bad_dob!r} leaked into the training-age-band token"
+    )
+
+
+def test_bodyweight_band_de_wired_weight_routes_to_kg_series(tmp_path):
+    """AC-8 (OQ-5): `bodyweight-band` is DE-WIRED; a captured weight routes to the local
+    `bodyweight-kg` series, and 0 `bodyweight-band` store item is written.
+
+    The band-consumer de-wire (bead `rod1`): `bodyweight-band` is out of `WIRED_TOKENS` +
+    `_BOUNDED_ENUMS`, but the `BODYWEIGHT_BANDS` constant is RETAINED (still imported by the
+    non-served legacy `intake.py`; full deletion is bead `rod1`). A captured `bodyweight-kg`
+    number writes a `bodyweight-kg` reading (the named-excluded local series) via the
+    UNCHANGED `store.append`; `import scripts.serve.capture` raises no AssertionError (the
+    `WIRED_TOKENS <= SUMMARY_FIELD_SET` tripwire holds after the removal).
+    """
+    assert "bodyweight-band" not in capture.WIRED_TOKENS
+    assert "bodyweight-band" not in capture._BOUNDED_ENUMS
+    # The de-wire-not-delete disposition: the constant is retained (legacy intake.py importer).
+    assert hasattr(capture, "BODYWEIGHT_BANDS")
+
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"bodyweight-kg": "82.0"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    # The weight number wrote the named-excluded local `bodyweight-kg` series...
+    kg = store.read("bodyweight-kg", root=store_root)
+    assert kg and kg[-1]["value"] == "82.0", "the weight number did not write the bodyweight-kg series"
+    # ...and 0 `bodyweight-band` store item (the de-wired token is never written directly).
+    assert store.read("bodyweight-band", root=store_root) == [], (
+        "a bodyweight-band store item was written (the token must be derived, not stored)"
+    )
+    # The load-time tripwire holds after the removal (no AssertionError at import).
+    importlib.reload(capture)
+
+
+def test_weight_capture_round_trips_to_bodyweight_band_token(tmp_path):
+    """AC-9 round-trip (cross-checks Cycle 1): a captured weight -> the local `bodyweight-kg`
+    series -> `summarize` derives the current-weight+trend `bodyweight-band` token.
+
+    Proves the capture->`bodyweight-kg`->deriver round-trip end-to-end over a tmp store.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"bodyweight-kg": "82.0"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    token = _summary(store_root).get("bodyweight-band")
+    assert token is not None, "summarize did not derive bodyweight-band from the bodyweight-kg series"
+    assert "82" in token, f"the current weight did not trace into the derived token: {token!r}"
+    # It is the DERIVED current-weight+trend scalar, not a coarse WIRED enum band.
+    assert token not in capture.BODYWEIGHT_BANDS, "bodyweight-band is a coarse WIRED band (de-wire incomplete)"
+
+
+def test_full_dob_captures_to_local_date_of_birth_item(tmp_path):
+    """OQ-5: a full ISO DOB captures to the named-excluded local `date-of-birth` item (pins
+    the raw source survives the amendment), and 0 `training-age-band` is written directly."""
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"date-of-birth": "1986-04-12"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    dob = store.read("date-of-birth", root=store_root)
+    assert dob and dob[-1]["value"] == "1986-04-12", "the full DOB did not write the date-of-birth item"
+    assert store.read("training-age-band", root=store_root) == [], (
+        "training-age-band was written directly (must be derived from the date-of-birth source)"
     )
 
 
@@ -1023,7 +1088,7 @@ def test_comprehensive_capture_records_raw_meds_zero_rx_class_writes(tmp_path):
         "goal-domains": "Workout;Nutrition",
         "recovery-status-band": "moderate",
         "sex-for-dosing": "male",
-        "bodyweight-band": "80-90kg",
+        "bodyweight-kg": "82.0",
         "equipment-access-class": "full-home-gym",
         "nutrition-detail": "vegan",
         "supplement-stack": "creatine, whey",

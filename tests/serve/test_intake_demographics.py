@@ -21,6 +21,7 @@ Cycle 2 (AC-4, AC-5, AC-6) — Step-1 markup activation + form objective-only + 
 no-drift (in the second test block below).
 """
 
+import datetime
 import functools
 import importlib
 
@@ -33,27 +34,37 @@ from scripts.store import store
 # posture), while the value-class patterns (any-domain email, phone, postal) still run.
 _ABSENT_IDENTITY = "vault/meta/__no_such_identity_config__.txt"
 
-# The four demographic FORM fields -> their submitted (de-identified) values. Birth year
-# writes the named-excluded `date-of-birth` raw source (summarize derives training-age-band);
-# the other three are bounded pass-through tokens written under their own name.
-_BIRTH_YEAR_VALUE = "1986"  # a 4-digit birth year -> date-of-birth store item -> born-1980s
+
+def _exact_age(iso_dob):
+    """The exact integer age (as a str) for `iso_dob` relative to today's UTC date (OQ-5)."""
+    dob = datetime.datetime.strptime(iso_dob, "%Y-%m-%d").date()
+    today = datetime.datetime.now(datetime.timezone.utc).date()
+    return str(today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day)))
+
+
+# The four demographic FORM fields -> their submitted (de-identified) values. The full DOB
+# writes the named-excluded `date-of-birth` raw source (summarize derives the exact age); the
+# body-weight number writes the named-excluded `bodyweight-kg` local series (summarize derives
+# current weight + trend); sex/equipment are bounded pass-through tokens (OQ-5, ADR-0034).
+_DOB_VALUE = "1986-04-12"   # a full ISO DOB -> date-of-birth store item -> exact age
 _SEX_VALUE = "male"
-_BODYWEIGHT_BAND_VALUE = "80-90kg"
+_WEIGHT_KG_VALUE = "82"     # a kg-normalized weight -> bodyweight-kg series -> current+trend
 _EQUIPMENT_VALUE = "full-home-gym"
 
-# Each orphan token paired with the resolved value `summarize` must return for it.
+# Each orphan token paired with the resolved value `summarize` must return for it. A single
+# captured weight yields the current + `flat` (the insufficient-series floor).
 _TOKEN_EXPECTED = {
-    "training-age-band": "born-1980s",
+    "training-age-band": _exact_age(_DOB_VALUE),
     "sex-for-dosing": _SEX_VALUE,
-    "bodyweight-band": _BODYWEIGHT_BAND_VALUE,
+    "bodyweight-band": f"{float(_WEIGHT_KG_VALUE):g};flat",
     "equipment-access-class": _EQUIPMENT_VALUE,
 }
 
 # The demographic FORM fields POSTed for each token (the field name the capture seam reads).
 _DEMOGRAPHIC_FIELDS = {
-    "date-of-birth": _BIRTH_YEAR_VALUE,  # birth year -> the raw date-of-birth source item
+    "date-of-birth": _DOB_VALUE,          # full DOB -> the raw date-of-birth source item
     "sex-for-dosing": _SEX_VALUE,
-    "bodyweight-band": _BODYWEIGHT_BAND_VALUE,
+    "bodyweight-kg": _WEIGHT_KG_VALUE,    # weight number -> the raw bodyweight-kg series item
     "equipment-access-class": _EQUIPMENT_VALUE,
 }
 
@@ -114,17 +125,17 @@ def test_birth_year_writes_date_of_birth_source_never_training_age_band(tmp_path
     """
     store_root = tmp_path / "store"
     capture.persist_capture(
-        {"date-of-birth": _BIRTH_YEAR_VALUE},
+        {"date-of-birth": _DOB_VALUE},
         root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
     )
     # The raw source item is written under date-of-birth, NOT training-age-band.
-    assert store.read("date-of-birth", root=store_root), "birth year did not write the date-of-birth source item"
+    assert store.read("date-of-birth", root=store_root), "the DOB field did not write the date-of-birth source item"
     assert store.read("training-age-band", root=store_root) == [], (
-        "birth year wrongly wrote training-age-band directly (must be derived, not stored)"
+        "the DOB field wrongly wrote training-age-band directly (must be derived, not stored)"
     )
     summary = _summary(store_root)
-    assert summary.get("training-age-band") == "born-1980s", (
-        "summarize did not derive training-age-band from the date-of-birth source item"
+    assert summary.get("training-age-band") == _exact_age(_DOB_VALUE), (
+        "summarize did not derive the exact age from the date-of-birth source item"
     )
 
 
@@ -151,9 +162,9 @@ def test_negative_control_sex_unwired_stays_orphaned(tmp_path):
 
 
 def test_negative_control_bodyweight_unwired_stays_orphaned(tmp_path):
-    """AC-1 negative control: with NO bodyweight POST, `bodyweight-band` does not resolve."""
+    """AC-1 negative control: with NO bodyweight-kg POST, `bodyweight-band` does not resolve."""
     store_root = tmp_path / "store"
-    fields = {k: v for k, v in _DEMOGRAPHIC_FIELDS.items() if k != "bodyweight-band"}
+    fields = {k: v for k, v in _DEMOGRAPHIC_FIELDS.items() if k != "bodyweight-kg"}
     capture.persist_capture(
         fields, root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
     )
@@ -195,41 +206,43 @@ def test_negative_control_training_age_unwired_stays_orphaned(tmp_path):
 
 
 def test_birth_year_raw_value_never_appears_in_training_age_band(tmp_path):
-    """AC-2: a crafted full DOB at the source -> 0 raw DOB in the training-age-band token.
+    """AC-2 (OQ-5): a crafted full DOB at the source -> the exact age, 0 raw DOB in the token.
 
-    Seed a full birth date with a distinctive sentinel year at the `date-of-birth` source;
-    `summarize` must emit `training-age-band` as a born-decade band (`born-NNN0s`) with the
-    raw DOB value NOWHERE in the token. The derived path runs NO 8j6 scan, so this
-    INDEPENDENT per-token output scan is the de-identification proof.
+    Seed a full birth date at the `date-of-birth` source; `summarize` must emit
+    `training-age-band` as the exact integer age with the raw DOB value (and its year/month/
+    day) NOWHERE in the token. The derived path runs NO 8j6 scan, so this INDEPENDENT
+    per-token output scan is the de-identification proof (the crown jewel, NFR-1).
     """
     store_root = tmp_path / "store"
-    crafted = "1986-04-12"  # a full DOB string — the day/month must never survive into the token
+    crafted = "1986-04-12"  # a full DOB string — no part of it may survive into the token
     capture.persist_capture(
         {"date-of-birth": crafted},
         root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
     )
     token = _summary(store_root).get("training-age-band")
-    assert token == "born-1980s", f"training-age-band was not the born-decade band (got {token!r})"
-    assert "04" not in token and "12" not in token, "a raw DOB day/month survived into training-age-band"
+    assert token == _exact_age(crafted), f"training-age-band was not the exact age (got {token!r})"
     assert crafted not in token, "the raw DOB string survived into training-age-band"
+    assert "1986" not in token, "the raw birth year survived into training-age-band"
 
 
-def test_bodyweight_band_carries_no_raw_kg(tmp_path):
-    """AC-2: the bodyweight-band token is a coarse band, never a raw kg value.
+def test_bodyweight_derives_current_weight_and_trend(tmp_path):
+    """AC-2 (OQ-5, reconciled): a captured weight -> the DERIVED current-weight+trend token.
 
-    The form submits a de-identified band (the band-select shape); the emitted token is the
-    band itself. Assert the token equals the submitted band and that no raw-kg artifact
-    (a bare 2-3 digit weight like `83`) reaches the token — the band is the coarsest unit.
+    The de-wire (bead `rod1`): the body-weight number writes the named-excluded `bodyweight-kg`
+    local series; `summarize` DERIVES the de-associated current-weight+trend `bodyweight-band`
+    token (NOT a directly-captured WIRED band). The token traces to the submitted weight and
+    carries a coarse trend word — it is NOT a coarse enum band (the old WIRED contract).
     """
     store_root = tmp_path / "store"
     capture.persist_capture(
-        {"bodyweight-band": _BODYWEIGHT_BAND_VALUE},
+        {"bodyweight-kg": _WEIGHT_KG_VALUE},
         root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
     )
     token = _summary(store_root).get("bodyweight-band")
-    assert token == _BODYWEIGHT_BAND_VALUE, f"bodyweight-band stored the wrong value: {token!r}"
-    # The band is a coarse range token, not a precise weight — assert it is in the bounded enum.
-    assert token in capture.BODYWEIGHT_BANDS, "bodyweight-band is not a coarse enum band (raw-kg risk)"
+    assert token is not None, "summarize did not derive bodyweight-band from the bodyweight-kg series"
+    assert _WEIGHT_KG_VALUE in token, f"the current weight did not trace into the token: {token!r}"
+    # The de-associated current+trend scalar, NOT a coarse WIRED enum band.
+    assert token not in capture.BODYWEIGHT_BANDS, "bodyweight-band is a coarse WIRED band (de-wire incomplete)"
 
 
 def test_sex_and_equipment_carry_only_their_class(tmp_path):
