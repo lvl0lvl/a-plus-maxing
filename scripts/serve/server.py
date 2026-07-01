@@ -270,6 +270,16 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._write_json(200, {"readings": extracted, "partial": partial, "notes": notes})
             return
 
+        # ADR-0033-0035-T8: the final-save care-agent review. When this form-capture just
+        # completed the profile (T6's predicate) AND a usable no-train key + client are present,
+        # fire the review and deliver its clarifying questions + status in the response. With no
+        # key / no client / an incomplete profile it returns None and the existing HTML re-render
+        # below is the honest 0-spend degrade.
+        review_response = self._maybe_care_review(store_root, scaffold_root, identity_config, fields)
+        if review_response is not None:
+            self._write_json(200, review_response)
+            return
+
         # Re-render reflecting the new load-state (the store/dropzone were just written).
         # The re-render carries the wizard's Step-6 `/generate-plan` handoff state — the
         # server performs 0 in-app generation; Step 6 routes the operator to the agent path.
@@ -278,6 +288,45 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     def _413_too_large(self):
         """Write a 413 wizard re-render for an over-ceiling upload (no dropped connection)."""
         self._write_html(413, _render_intake(store_root=self.store_root, dna_root=self.dna_root))
+
+    def _maybe_care_review(self, store_root, scaffold_root, identity_config, fields):
+        """Fire the care-agent review after a complete-profile final save; return its receipt or None.
+
+        The ADR-0033-0035-T8 trigger. Returns the care-review JSON receipt (>= 1 clarifying question
+        + the meds-curation state + the "what it is doing" progress status the existing
+        `.chat-progress`/`.bar`/`_progressUpdate` surface renders) when a form-field capture just
+        completed the profile (T6's `app_shell._intake_complete` predicate) AND a usable no-train
+        key + injected client are present — the conservative complete-state superset that satisfies
+        both the AC1 final-save and the AC6 material-edit re-trigger with no edge-detection. Returns
+        None (the caller falls through to the existing app-shell HTML re-render) when no fields were
+        captured, the profile is incomplete, or no key/client is available (the AC5 honest 0-spend
+        degrade — the trigger short-circuits BEFORE any model call). The review REUSES the instance
+        `self.client` (no second model client) and the instance `_key_available` no-key predicate; a
+        review failure is caught and degrades to None so it never drops the request thread (mirrors
+        `_do_chat`).
+        """
+        if not fields or self.client is None or not self._key_available():
+            return None
+        import functools
+
+        from scripts.serve import care_review
+        from scripts.store import store
+        from vault.design.templates import app_shell
+
+        resolved_root = store_root if store_root is not None else store.DEFAULT_ROOT
+        try:
+            if not app_shell._intake_complete(store.read_all(resolved_root)):
+                return None
+            store_read = functools.partial(store.read, root=resolved_root)
+            return care_review.review(
+                store_read, client=self.client, key_available=True,
+                store_root=resolved_root, scaffold_root=scaffold_root,
+                identity_config=identity_config,
+            )
+        except Exception:
+            # Thread survival (mirrors _do_chat): a review failure never drops the request thread —
+            # fall through to the existing HTML re-render.
+            return None
 
     def _do_chat(self):
         """Run one POST `/chat` per-turn dispatch and write the JSON turn receipt.

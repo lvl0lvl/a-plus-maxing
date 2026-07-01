@@ -1854,3 +1854,194 @@ def test_generate_plan_production_none_store_root_resolves_default(tmp_path, mon
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T8 — the final-save care-agent review trigger (the crown-jewel
+#   BOTH-legs egress): the review fires + delivers questions in the final-save
+#   response (AC-1 E2E), the no-key 0-spend degrade (AC-5 E2E), the material-edit
+#   re-trigger (AC-6), no-new-route / no-new-client (AC-7), and the loading-bar +
+#   status surface under the Care-Assistant card (spec File Manifest / OQ-4).
+#   Recording-mock/string-driven, 0 live spend.
+# --------------------------------------------------------------------------- #
+
+# The FORM fields that complete the first-run profile via the capture path (the field NAMES the
+# markup submits, routed by data class): seven wired/derived-source tokens + the three
+# safety-screen answers (form names `exercise-safety`/`phq2`/`apnea` -> the `safety-screen::*`
+# markers). Distinct from `_COMPLETE_PROFILE` (which seeds the STORE ITEM names directly).
+_CARE_FORM_FIELDS = {
+    "date-of-birth": "1986-04-12",
+    "bodyweight-kg": "82",
+    "sex-for-dosing": "male",
+    "equipment-access-class": "full-home-gym",
+    "goal-domains": "Workout;Nutrition",
+    "goal-targets": "Build strength and improve sleep",
+    "goal-priority-order": "Workout, Nutrition, Supplements",
+    "exercise-safety": "no",
+    "phq2": "no",
+    "apnea": "no",
+}
+
+
+class _CareReviewBackend:
+    """A recording converse backend for the care-agent review E2E (0 live API).
+
+    Records each `converse` request into `self.calls`; answers a curation request (the
+    `rx-interaction-curation` task marker) with a scripted class proposal and any other request
+    with a clarifying question. Distinguishing by request CONTENT (not call index) mirrors a real
+    model and keeps the re-trigger assertion order-independent.
+    """
+
+    def __init__(self, *, question="What is your top training priority this cycle?",
+                 rx_class="cyp3a4-pgp", confident=True):
+        self.question = question
+        self.rx_class = rx_class
+        self.confident = confident
+        self.calls = []
+
+    def converse(self, messages):
+        self.calls.append(messages)
+        if "rx-interaction-curation" in json.dumps(messages):
+            return {"reply": "Please confirm these interaction classes.",
+                    "extraction": [{"rx-interaction-class": self.rx_class,
+                                    "confident": self.confident}]}
+        return {"reply": self.question, "extraction": []}
+
+
+def _server_with_care_review(tmp_path, backend, *, key_resolver=_resolving_key):
+    """Server over tmp roots + a recording converse client + (by default) a key that RESOLVES."""
+    from scripts.model.client import ModelClient
+
+    srv = serve_server.build_server(
+        0, store_root=tmp_path / "store", dna_root=tmp_path / "dna",
+        scaffold_root=tmp_path / "scaffold", client=ModelClient(backend=backend),
+        key_resolver=key_resolver,
+    )
+    return srv, srv.server_address[1]
+
+
+def _clarifying_requests(backend):
+    return [c for c in backend.calls if "care-clarifying-review" in json.dumps(c)]
+
+
+def _curation_requests(backend):
+    return [c for c in backend.calls if "rx-interaction-curation" in json.dumps(c)]
+
+
+def test_final_save_fires_care_review_questions_in_response(tmp_path):
+    """AC-1 (E2E): a complete-profile final save with a key fires the review + delivers questions."""
+    backend = _CareReviewBackend()
+    srv, port = _server_with_care_review(tmp_path, backend)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_fields(port, dict(_CARE_FORM_FIELDS))
+        assert status == 200, f"final-save POST returned {status}, expected 200"
+        data = json.loads(body)
+        assert data.get("deferred") is False, f"a keyed complete-profile save deferred: {data}"
+        assert len(data["questions"]) >= 1, "the final-save response carried no clarifying question"
+        assert len(_clarifying_requests(backend)) == 1, "the review did not record ONE clarifying request"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_final_save_no_key_defers_zero_spend(tmp_path):
+    """AC-5 (E2E): a complete-profile final save with NO resolvable key makes 0 model calls."""
+    backend = _CareReviewBackend()
+    srv, port = _server_with_care_review(tmp_path, backend, key_resolver=_unavailable_key)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_fields(port, dict(_CARE_FORM_FIELDS))
+        assert status == 200, f"keyless final-save POST returned {status}, expected 200"
+        assert backend.calls == [], "a keyless final save made a model call (0-spend breach)"
+        # Degrades to the existing app-shell HTML re-render — NOT a fabricated question payload.
+        assert SPA_NAV_MARKER in body, "the keyless final save is not the honest HTML re-render"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_material_my_info_edit_retriggers_review(tmp_path):
+    """AC-6: a SECOND /upload form-capture (a med / safety edit, profile staying complete) re-fires."""
+    backend = _CareReviewBackend()
+    srv, port = _server_with_care_review(tmp_path, backend)
+    _serve_in_thread(srv)
+    try:
+        first = dict(_CARE_FORM_FIELDS)
+        first["rx-interaction-classes"] = "atorvastatin 20mg"  # a raw med -> record-only scaffold
+        status, _ = _post_fields(port, first)
+        assert status == 200, f"first final-save POST returned {status}, expected 200"
+        # A material My-Info edit: change a safety answer + a med (the profile stays complete).
+        edit = {"apnea": "no", "rx-interaction-classes": "atorvastatin 20mg; metformin 500mg"}
+        status, _ = _post_fields(port, edit)
+        assert status == 200, f"material-edit POST returned {status}, expected 200"
+        assert len(_clarifying_requests(backend)) >= 2, (
+            "the material edit did not re-fire the clarifying review (fires only on the "
+            "incomplete->complete edge?)"
+        )
+        assert len(_curation_requests(backend)) >= 2, "the material edit did not re-curate the meds"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_care_review_adds_no_route_no_new_client(tmp_path):
+    """AC-7: no 8th route, no second ModelClient / SDK import — the review reuses self.client."""
+    care_src = (REPO_ROOT / "scripts" / "serve" / "care_review.py").read_text()
+    server_src = (REPO_ROOT / "scripts" / "serve" / "server.py").read_text()
+    # care_review constructs no client and imports no SDK / outbound HTTP client.
+    assert "ModelClient(" not in care_src, "care_review constructs a second ModelClient"
+    assert "anthropic" not in care_src, "care_review imports the model-client SDK"
+    # server.py's ONLY ModelClient construction stays the pre-existing _do_chat fallback (count 1).
+    assert server_src.count("ModelClient(") == 1, "the T8 server hunk added a second ModelClient construction"
+    # No 8th route: the route literal set is byte-unchanged (5 `self.path == "/..."` branches).
+    assert 'self.path == "/care-review"' not in server_src, "T8 added a /care-review route"
+    assert server_src.count('self.path == "/') == 5, "the route-table branch count changed (an 8th route?)"
+    assert '_LOOPBACK = "127.0.0.1"' in server_src, "the loopback bind literal changed"
+    # An unknown POST still 404s (the route table is unchanged).
+    srv, port = _server_with_care_review(tmp_path, _CareReviewBackend())
+    _serve_in_thread(srv)
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("POST", "/not-a-route", body=b"", headers={"Content-Type": "application/json"})
+        unk = conn.getresponse()
+        unk.read()
+        conn.close()
+        assert unk.status == 404, f"an unknown POST returned {unk.status}, expected 404"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_final_save_response_drives_care_assistant_loading_bar_and_status(tmp_path):
+    """Spec File Manifest app_view.html / OQ-4 (tied to AC-1): the loading bar + status under the card.
+
+    (a) STRUCTURAL reuse proof — the served SPA carries the `.chat-progress` status element + the
+        `.bar`/`.spin` loading-bar surface in the Care-Assistant card region (present on the tree,
+        0 new app_view.html markup). (b) BEHAVIORAL wiring — the care-review final-save response
+        carries a `progress`/status field (the "what it is doing" text) alongside the >= 1 clarifying
+        chat turn, in the per-turn-receipt shape `_progressUpdate` consumes (FAILING-CAPABLE:
+        removing the status field reds (b)).
+    """
+    backend = _CareReviewBackend()
+    srv, port = _server_with_care_review(tmp_path, backend)
+    _serve_in_thread(srv)
+    try:
+        # (b) BEHAVIORAL: the final-save response carries a progress/status field + a clarifying turn.
+        status, body = _post_fields(port, dict(_CARE_FORM_FIELDS))
+        assert status == 200
+        data = json.loads(body)
+        assert data["questions"], "the care-review response carried no clarifying chat turn"
+        assert data["progress"] and data["progress"].get("status"), (
+            "the care-review final-save response carries no progress/status field"
+        )
+        # (a) STRUCTURAL: the served SPA carries the loading-bar/status reuse surface under the card.
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("GET", "/")
+        spa = conn.getresponse().read().decode("utf-8")
+        conn.close()
+        assert "chat-progress" in spa and "Care Assistant" in spa, "the Care-Assistant status surface is absent"
+        assert 'class="bar"' in spa and "spin" in spa, "the loading-bar surface is absent under the card"
+    finally:
+        srv.shutdown()
+        srv.server_close()

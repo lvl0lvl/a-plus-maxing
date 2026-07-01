@@ -1,0 +1,230 @@
+"""Care-agent review-on-final-save + de-associated meds curation (ADR-0033-0035-T8).
+
+The SECOND named model-egress surface this ADR set adds (after T2's de-associated demographic
+facts): the care-agent review fired at the intake unlock transition. It has TWO legs, BOTH
+crown-jewel load-bearing (NFR-1):
+
+1. The clarifying-review leg — `review` builds the DE-IDENTIFIED `router.summarize` profile (the
+   same summary the planner consumes, 0-raw-PII by the router 8j6 gate) and makes ONE
+   `client.converse` call carrying ONLY that de-id profile — 0 full-DOB, 0 raw drug string, 0
+   legal name — to produce >= 1 Care-Assistant clarifying question.
+2. The de-associated meds-curation leg — a DISTINCT, meds-only `converse` request built by this
+   module's OWN builder (NOT `chat._model_messages`, the 0-store-content intake-turn builder): it
+   carries the operator's raw drug NAMES (the record-only meds T1 routes to the gitignored
+   scaffold) but 0 operator-identity token + 0 name<->med linkage, and proposes the de-identified
+   `rx-interaction-classes` CLASS token. Confirm-when-unsure: an uncertain proposal writes 0
+   `rx-interaction-classes` store items until the operator confirms (`confirm_curation`); only a
+   confident/confirmed CLASS token — never a raw drug string — persists as the planner input.
+
+The review REUSES the injected `ModelClient` (`client`) — it constructs no second `ModelClient`,
+imports no model-client SDK, opens no outbound HTTP client. With no resolvable key
+(`key_available=False`) it degrades HONESTLY: 0 model call, an honest deferred state, never a
+silent empty or a fabricated question.
+
+DEFERRED (documented, NOT run here): the operator-present LIVE care-agent run — a real no-train
+key + real spend, end-to-end through final-save -> de-id review -> questions-in-thread + meds
+curation — is ADR-0035 OQ-1, operator-gated. The tests exercise this module with a recording mock
+backend injected at the ADR-0015 model-client backend seam, at 0 live spend.
+"""
+
+import datetime
+import json
+from pathlib import Path
+
+from scripts.model.client import ModelCallError
+from scripts.plan import router
+from scripts.serve.capture import DEFAULT_SCAFFOLD_ROOT
+from scripts.store import store
+
+# The record-only medication FORM field T1 routes into the gitignored operator-record scaffold
+# (capture.py: deliberately absent from WIRED_TOKENS, so the untrusted raw drug free-text lands
+# record-only, never the model-bound token). The curation reads the raw drug names from here.
+_RX_MED_FIELD = "rx-interaction-classes"
+
+
+def review(store_read, *, client, key_available, store_root=None,
+           scaffold_root=None, identity_config=None):
+    """Run the care-agent review over a complete profile; return the review receipt.
+
+    Args:
+        store_read (Callable): The instance-root-bound `store.read` partial (the
+            `router.summarize` caller contract) the de-id profile is derived from.
+        client: The REUSED `ModelClient` (exposing `converse(messages)`); constructed by the
+            caller, never here.
+        key_available (bool): Whether a no-train key resolves — the `_key_available()` bool. False
+            -> the honest 0-spend deferred state (no model call).
+        store_root (str | Path, optional): The store root the CONFIRMED class token writes into.
+        scaffold_root (str | Path, optional): The gitignored operator-record root the curation
+            reads the record-only raw meds from.
+        identity_config (str | Path, optional): The operator-identity token config threaded into
+            `router.summarize`'s 8j6 PII gate.
+
+    Returns:
+        (dict) The review receipt: `questions` (>= 1 clarifying question on a keyed complete
+        profile), `curation` (the proposed/confirmed `rx-interaction-classes` state + a confirm
+        flag, or None when no med is recorded), `progress` (the "what it is doing" status the
+        existing `.chat-progress`/`.bar` surface renders), and `deferred` (True with a `reason` on
+        `key_available=False` or a failed model call).
+    """
+    if not key_available:
+        return _deferred("no-train key not connected; care review deferred (0 model spend)")
+    if identity_config is not None:
+        summary = router.summarize(store_read, identity_config=identity_config)
+    else:
+        summary = router.summarize(store_read)
+    try:
+        reply = client.converse(_clarifying_messages(summary))
+        curation = _curate_meds(client, scaffold_root, store_root)
+    except ModelCallError as exc:
+        # Fail-closed (NFR-2): a failed model call never fabricates a question or a fact and never
+        # writes a store item — surface the failure honestly, mirroring chat._degraded_turn.
+        return _deferred(str(exc))
+    return {
+        "deferred": False,
+        "questions": [reply["reply"]],
+        "reply": reply["reply"],
+        "curation": curation,
+        "progress": _progress("Reviewing your intake and preparing clarifying questions"),
+    }
+
+
+def confirm_curation(class_tokens, *, store_root=None):
+    """Persist the operator-CONFIRMED `rx-interaction-classes` class tokens (the confirm write).
+
+    The follow-up to an uncertain curation: only after the operator confirms does the de-identified
+    class token persist as the planner input. Names/de-dupes/normalizes the class tokens and writes
+    the single `;`-joined scalar through the UNCHANGED `store.append`.
+
+    Args:
+        class_tokens (iterable[str]): The confirmed de-identified interaction-class tokens.
+        store_root (str | Path, optional): The store root to write into.
+
+    Returns:
+        (dict) `{"confirmed": [tokens]}` — the persisted class tokens (empty when none).
+    """
+    tokens = _normalize_classes(class_tokens)
+    if not tokens:
+        return {"confirmed": []}
+    _persist_classes(tokens, store_root)
+    return {"confirmed": tokens}
+
+
+def _clarifying_messages(summary):
+    """Build the clarifying-review converse request from the de-id summary ONLY (leg 1).
+
+    A care_review-LOCAL builder — NOT `chat._model_messages` (the 0-store-content intake-turn
+    builder). Carries ONLY the de-identified `summarize` profile, 0 raw scaffold content.
+    """
+    context = {"task": "care-clarifying-review", "profile": summary}
+    return [{"role": "user", "content": json.dumps(context, sort_keys=True)}]
+
+
+def _curation_messages(medications):
+    """Build the DISTINCT meds-curation converse request from drug NAMES only (leg 2).
+
+    A care_review-LOCAL builder (NOT `chat._model_messages`). Carries the operator's raw drug
+    names to classify — and NOTHING else: no operator-identity token, no name<->med linkage (the
+    caller reads only the record-only med field, never the operator's other fields).
+    """
+    context = {"task": "rx-interaction-curation", "medications": sorted(medications)}
+    return [{"role": "user", "content": json.dumps(context, sort_keys=True)}]
+
+
+def _curate_meds(client, scaffold_root, store_root):
+    """The de-associated meds-curation leg: propose the de-id class token, confirm-when-unsure.
+
+    Returns None when no medication is recorded (no curation request is made). Otherwise it makes
+    the DISTINCT curation `converse` call over the drug names and reads the class proposal: a
+    confident proposal persists the de-identified class token; an uncertain one writes 0 and
+    surfaces a confirm question (the ADR-0035 confirm-when-unsure default).
+    """
+    medications = _scaffold_meds(scaffold_root)
+    if not medications:
+        return None
+    result = client.converse(_curation_messages(medications))
+    proposals = [p for p in (result.get("extraction") or []) if isinstance(p, dict)]
+    proposed = _normalize_classes(
+        str(p.get("rx-interaction-class", "")) for p in proposals
+    )
+    all_confident = bool(proposals) and all(p.get("confident") for p in proposals)
+    if all_confident and proposed:
+        _persist_classes(proposed, store_root)
+        return {"proposed_classes": proposed, "confirmed": True, "confirm_question": None}
+    return {
+        "proposed_classes": proposed,
+        "confirmed": False,
+        "confirm_question": _confirm_question(proposed),
+    }
+
+
+def _scaffold_meds(scaffold_root):
+    """Read the record-only raw drug names from the gitignored operator-record scaffold (T1).
+
+    Each capture writes one `capture-<stamp>.json` `{field: value}` file; the record-only med
+    field is `rx-interaction-classes` (the raw drug free-text). Reads ONLY that field — never the
+    operator's other captured fields — so the curation request cannot carry operator identity.
+    """
+    root = Path(scaffold_root) if scaffold_root is not None else DEFAULT_SCAFFOLD_ROOT
+    if not root.exists():
+        return []
+    medications = []
+    for path in sorted(root.glob("capture-*.json")):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        value = data.get(_RX_MED_FIELD)
+        if isinstance(value, str) and value.strip():
+            medications.append(value.strip())
+    return medications
+
+
+def _normalize_classes(tokens):
+    """Sort, dedupe, lowercase, and drop-empty a set of interaction-class tokens."""
+    return sorted({tok.strip().lower() for tok in tokens if tok and tok.strip()})
+
+
+def _persist_classes(class_tokens, store_root):
+    """Write the de-identified `rx-interaction-classes` scalar via the UNCHANGED store.append."""
+    token = ";".join(_normalize_classes(class_tokens))
+    if not token:
+        return
+    root = store_root if store_root is not None else store.DEFAULT_ROOT
+    reading = {
+        "item": router.RX_INTERACTION_CLASS_FIELD,
+        "timepoint": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "source": "care-review",
+        "value": token,
+    }
+    store.append(router.RX_INTERACTION_CLASS_FIELD, reading, root=root)
+
+
+def _confirm_question(proposed):
+    """The confirm-when-unsure question surfaced for an uncertain classification (0 auto-write)."""
+    if proposed:
+        return (
+            "I could not classify your medications with confidence. Please confirm whether these "
+            f"interaction classes apply before I record them: {', '.join(proposed)}."
+        )
+    return (
+        "I could not classify your medications with confidence. Please confirm your medication "
+        "interaction classes before I record them."
+    )
+
+
+def _deferred(reason):
+    """The honest deferred state: 0 model call, 0 fabricated question, an explicit reason."""
+    return {
+        "deferred": True,
+        "reason": reason,
+        "questions": [],
+        "curation": None,
+        "progress": _progress("Care review deferred — no model call made"),
+    }
+
+
+def _progress(status):
+    """The 'what it is doing' status the existing `.chat-progress`/`.bar` + `_progressUpdate` surface renders."""
+    return {"status": status, "intake_complete": False, "target_domain": None}
