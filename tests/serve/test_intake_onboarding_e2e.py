@@ -544,7 +544,14 @@ def test_probe_crown_jewel_raw_pii_profile_zero_crossing_dispatch_and_model_requ
         "the identity probe could not count an injected identity token — it is vacuous"
     )
 
-    # (b) the full DOB + the PHQ-2 raw answer: 0 in the payload + EVERY request.
+    # (b) the full DOB + the PHQ-2 raw answer: 0 in the payload + EVERY request. BOUNDARY NOTE: the
+    #     full DOB is captured (as the named-excluded `date-of-birth` source) then DERIVED to the age
+    #     — so its absence here guards the DISPATCH/de-id boundary. The PHQ-2 raw answer, by contrast,
+    #     is DROPPED at capture (the safety region persists only the de-identified `safety-screen::phq2`
+    #     / `referral::phq2` markers — the raw free-text is retained in NEITHER the store nor the
+    #     scaffold), so its absence here guards the CAPTURE-RETENTION boundary (it can never reach the
+    #     dispatch boundary because it never persists); this sub-assertion reds a capture-retention
+    #     regression, not a dispatch-boundary one.
     for surface_name, surface_text in (("dispatch payload", payload_text),
                                        ("all model requests", all_requests_text)):
         assert "1986-03-14" not in surface_text, f"the full DOB crossed into the {surface_name}"
@@ -584,14 +591,18 @@ def test_probe_sec_f1_my_info_edit_path_zero_raw_crossing_behavioral(tmp_path):
     curation seam, covered by the AC-3 crown-jewel + AC-5).
     """
     idcfg = _identity_config(tmp_path / "meta")
-    # Initial intake unlocks.
+    # Initial intake unlocks; the initial DOB `1986-04-12` derives age 40.
     backend = _RecordingCareBackend()
     srv, port = _build(tmp_path, backend=backend, key_resolver=lambda: None, identity_config=idcfg)
     _serve_in_thread(srv)
     try:
-        assert _post_fields(port, _required_fields())[0] == 200
+        assert _post_fields(port, _required_fields(**{"date-of-birth": "1986-04-12"}))[0] == 200
+        # Snapshot the de-associated age BEFORE the edit so the post-edit assertion below can prove
+        # the edit was APPLIED, not silently no-op'd (locking out the vacuity the `.isdigit()`-only
+        # check allowed — a no-op edit leaves the initial digit age in place and would pass).
+        age_before = router.summarize(_reader(tmp_path), identity_config=idcfg)["training-age-band"]
         backend.calls.clear()  # isolate the re-fired requests from the initial intake's.
-        # Drive the CHANGED full DOB through the My-Info edit `/upload` re-submit.
+        # Drive the CHANGED full DOB `1990-07-22` (age 35) through the My-Info edit `/upload` re-submit.
         assert _post_fields(port, {"date-of-birth": "1990-07-22"})[0] == 200
     finally:
         srv.shutdown()
@@ -607,10 +618,18 @@ def test_probe_sec_f1_my_info_edit_path_zero_raw_crossing_behavioral(tmp_path):
     assert "1990-07-22" not in refired_text, (
         "the My-Info edit changed-DOB crossed into a re-fired model request (SEC-F1 behavioral breach)"
     )
-    # The changed DOB DID re-derive the age (the edit re-ran through the de-id path, not a no-op).
-    assert str(payload.get("training-age-band", "")).isdigit(), (
-        "the My-Info edit did not re-derive the de-associated age through the capture path"
+    # NON-VACUITY LOCK: the edit ACTUALLY took effect — the re-derived age CHANGED (40 → 35). Without
+    # this, a no-op-edit regression (the `/upload` DOB edit silently dropped) would leave the initial
+    # age in place and the changed-DOB "0-crossing" above would pass VACUOUSLY (the value was never
+    # captured, so of course it never crosses). Asserting the age changed proves the raw DOB genuinely
+    # flowed THROUGH the edit → capture → de-id path, so the 0-crossing is a real no-bypass proof.
+    age_after = str(payload.get("training-age-band", ""))
+    assert age_after.isdigit(), "the My-Info edit did not re-derive the de-associated age through the capture path"
+    assert age_after != str(age_before), (
+        f"the My-Info DOB edit did NOT re-derive the age ({age_before!r} unchanged) — the edit no-op'd, "
+        f"so the changed-DOB 0-crossing above is VACUOUS (a no-bypass regression could hide here)"
     )
+    assert age_after == "35", f"the 1990-07-22 edit derived age {age_after!r}, expected 35"
 
 
 def test_probe_safety_positive_answer_referral_flag_never_a_plan_input(tmp_path):
