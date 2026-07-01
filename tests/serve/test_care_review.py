@@ -29,7 +29,9 @@ import functools
 import json
 from pathlib import Path
 
-from scripts.model.client import ModelClient
+import pytest
+
+from scripts.model.client import ModelCallError, ModelClient
 from scripts.plan import router
 from scripts.guard import pii_scan
 from scripts.serve import capture
@@ -351,3 +353,193 @@ def test_confirm_when_unsure_writes_zero_unconfirmed_class(tmp_path):
     care_review.confirm_curation(["cyp3a4-pgp"], store_root=store_root)
     confirmed = store.read("rx-interaction-classes", root=store_root)
     assert confirmed and confirmed[-1]["value"] == "cyp3a4-pgp", "the confirmed token did not persist"
+
+
+# --------------------------------------------------------------------------- #
+# Tier-3 FIX-2 — the curation reads the LATEST capture only, not the union of all
+# history (bounds spend + recovers from a prior dated med's permanent-defer trap).
+# --------------------------------------------------------------------------- #
+
+
+def _write_capture(scaffold_root, stamp, value):
+    """Write one record-only `capture-<stamp>.json` med file with an explicit ordering stamp."""
+    root = Path(scaffold_root)
+    root.mkdir(parents=True, exist_ok=True)
+    (root / f"capture-{stamp}.json").write_text(
+        json.dumps({"rx-interaction-classes": value}) + "\n"
+    )
+
+
+def test_curation_reads_latest_capture_only_not_the_union(tmp_path):
+    """FIX-2: a superseding capture REPLACES the prior meds — the curation never unions history.
+
+    Two record-only captures land in the scaffold (an OLD `atorvastatin`, a NEWER `metformin`).
+    The review re-fires on every complete-profile save, so unioning would re-classify the whole
+    history each time (repeated spend + duplicate store writes). The curation must carry ONLY the
+    latest capture's meds.
+
+    RED-capable: the pre-fix `_scaffold_meds` globbed ALL captures and unioned them — the
+    curation request would carry BOTH drug names, reddening the `atorvastatin`-absent assertion.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    _seed_full(store_root)
+    _write_capture(scaffold_root, "2026-06-01T00-00-00", "atorvastatin 20mg")
+    _write_capture(scaffold_root, "2026-06-02T00-00-00", "metformin 500mg")
+    backend = _CareBackend(confident=True)
+    care_review.review(
+        _reader(store_root), client=ModelClient(backend=backend), key_available=True,
+        store_root=store_root, scaffold_root=scaffold_root, identity_config=_identity_config(tmp_path),
+    )
+    curation_text = json.dumps(
+        [c for c in backend.calls if "rx-interaction-curation" in json.dumps(c)][0]
+    )
+    assert "metformin" in curation_text, "the latest capture's med did not reach the curation"
+    assert "atorvastatin" not in curation_text, (
+        "an OLD capture's med reached the curation — the curation unioned history (spend + drop)"
+    )
+
+
+def test_clean_latest_capture_recovers_from_a_prior_dated_med_defer(tmp_path):
+    """FIX-2: a clean LATEST capture curates normally even after a prior DATED med (recovery).
+
+    A dated med (`atorvastatin since 2020-01-15`) trips `_DATE_LIKE` and defers the curation. Under
+    the pre-fix union `_scaffold_meds`, EVERY future review re-read that old dated file and deferred
+    forever (no recovery). Reading the LATEST capture only lets a later clean capture curate.
+
+    RED-capable: the pre-fix union carries the dated OLD value into `_med_value_has_identity`, which
+    defers — reddening the `confirmed`/persisted assertions.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    _seed_full(store_root)
+    _write_capture(scaffold_root, "2026-06-01T00-00-00", "atorvastatin since 2020-01-15")
+    _write_capture(scaffold_root, "2026-06-02T00-00-00", "atorvastatin 20mg")
+    backend = _CareBackend(confident=True)
+    result = care_review.review(
+        _reader(store_root), client=ModelClient(backend=backend), key_available=True,
+        store_root=store_root, scaffold_root=scaffold_root, identity_config=_identity_config(tmp_path),
+    )
+    assert result["curation"]["confirmed"] is True, (
+        "a clean latest capture did not recover from a prior dated med's defer trap"
+    )
+    assert store.read("rx-interaction-classes", root=store_root), "the recovered curation persisted no token"
+
+
+# --------------------------------------------------------------------------- #
+# Tier-3 FIX-3 — a leg-2 curation failure preserves the already-paid-for leg-1
+# clarifying questions (never discards them via a total-deferred receipt).
+# --------------------------------------------------------------------------- #
+
+
+class _Leg2FailBackend:
+    """A backend that answers leg-1 (clarifying) but RAISES ModelCallError on leg-2 (curation)."""
+
+    def __init__(self):
+        self.calls = []
+
+    def converse(self, messages):
+        self.calls.append(messages)
+        if "rx-interaction-curation" in json.dumps(messages):
+            raise ModelCallError("curation backend unavailable")
+        return {"reply": "What is your top training priority this cycle?", "extraction": []}
+
+
+def test_leg2_failure_preserves_leg1_questions_with_deferred_curation(tmp_path):
+    """FIX-3: leg-1 succeeds + leg-2 raises -> keep the leg-1 questions AND a deferred curation.
+
+    The pre-fix `review` ran both legs inside ONE try/except, so a leg-2 `ModelCallError` returned
+    `_deferred(...)` with `questions: []` — discarding the already-paid-for leg-1 clarifying reply.
+    The receipt must carry the leg-1 questions and a deferred-curation sub-state instead.
+
+    RED-capable: the pre-fix single-try `review` returns an empty-questions total-deferred receipt
+    — reddening the non-empty-questions + not-total-deferred assertions.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    _seed_full(store_root)
+    _seed_scaffold_med(store_root, scaffold_root, value="atorvastatin 20mg")
+    backend = _Leg2FailBackend()
+    result = care_review.review(
+        _reader(store_root), client=ModelClient(backend=backend), key_available=True,
+        store_root=store_root, scaffold_root=scaffold_root, identity_config=_identity_config(tmp_path),
+    )
+    # The paid-for leg-1 question survives (the whole review is NOT total-deferred).
+    assert result["deferred"] is False, "a leg-2 failure wrongly total-deferred the whole review"
+    assert result["questions"], "the leg-1 clarifying questions were discarded on a leg-2 failure"
+    # The curation carries a deferred sub-state with an honest reason.
+    assert result["curation"]["deferred"] is True and result["curation"].get("reason"), (
+        "a leg-2 failure did not surface a deferred-curation sub-state"
+    )
+    # No rx-interaction-classes token was written by the failed curation.
+    assert store.read("rx-interaction-classes", root=store_root) == [], (
+        "a failed leg-2 curation wrote a class token"
+    )
+    # The curation converse call WAS attempted (proving leg-1 ran first and the failure is leg-2).
+    assert any("rx-interaction-curation" in json.dumps(c) for c in backend.calls), (
+        "the curation leg was never attempted — the test does not exercise the leg-2 failure path"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Tier-3 FIX-4 — the `_DATE_LIKE` DOB backstop, ISOLATED (a bare DOB in a med value
+# with NO name/email/phone still defers). The compound-poison test never lets
+# `_DATE_LIKE` determine the outcome; this does.
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("dated, clean", [
+    ("atorvastatin 20mg 1986-04-12", "atorvastatin 20mg"),      # ISO YYYY-MM-DD
+    ("metformin 04/12/1986", "metformin 500mg"),                # slashed D/M/Y
+])
+def test_bare_dob_in_med_value_defers_isolating_date_like(dated, clean, tmp_path):
+    """FIX-4: a DATE-ONLY med value (no name/email/phone) defers the curation — `_DATE_LIKE` alone.
+
+    The existing fail-closed test uses a COMPOUND poison (name+email+DOB) where name+email already
+    trip `pii_scan` `hits > 0`, so `_DATE_LIKE` never determines the outcome. This seeds a med value
+    whose ONLY identity signal is a date (`pii_scan.scan_text_full` reads 0, proven below), so the
+    defer is attributable to `_DATE_LIKE` alone. Parametrized over the ISO + slashed branches.
+
+    RED-capable: drop the `or bool(_DATE_LIKE.search(value))` clause and the dated value scans 0,
+    the curation proceeds (a converse call + a class-token write) — reddening BOTH assertions. The
+    companion clean value (no date) proves the date is the SOLE trigger: it curates normally.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    _seed_full(store_root)
+    idcfg = _identity_config(tmp_path)
+    # Pre-condition: the dated value's ONLY identity signal is the date (pii_scan reads 0).
+    assert pii_scan.scan_text_full(dated, token_config=idcfg) == 0, (
+        f"the dated med {dated!r} carries a pii_scan hit — _DATE_LIKE is not the sole trigger"
+    )
+    _seed_scaffold_med(store_root, scaffold_root, value=dated)
+    backend = _CareBackend(confident=True)
+    result = care_review.review(
+        _reader(store_root), client=ModelClient(backend=backend), key_available=True,
+        store_root=store_root, scaffold_root=scaffold_root, identity_config=idcfg,
+    )
+    # The date alone deferred the curation: 0 curation converse call, 0 class-token write.
+    assert [c for c in backend.calls if "rx-interaction-curation" in json.dumps(c)] == [], (
+        f"a bare-DOB med value {dated!r} egressed a curation request (_DATE_LIKE did not defer)"
+    )
+    assert result["curation"]["deferred"] is True, "the bare-DOB med value did not defer the curation"
+    assert store.read("rx-interaction-classes", root=store_root) == [], (
+        "a bare-DOB med value wrote a class token (must defer)"
+    )
+
+    # Companion: the SAME med value WITHOUT the date curates normally (date is the sole trigger).
+    clean_store = tmp_path / "clean-store"
+    clean_scaffold = tmp_path / "clean-scaffold"
+    _seed_full(clean_store)
+    _seed_scaffold_med(clean_store, clean_scaffold, value=clean)
+    clean_backend = _CareBackend(confident=True)
+    clean_result = care_review.review(
+        _reader(clean_store), client=ModelClient(backend=clean_backend), key_available=True,
+        store_root=clean_store, scaffold_root=clean_scaffold, identity_config=idcfg,
+    )
+    assert clean_result["curation"]["confirmed"] is True, (
+        f"the clean med {clean!r} (no date) did not curate — date is not the sole trigger"
+    )
+    assert any("rx-interaction-curation" in json.dumps(c) for c in clean_backend.calls), (
+        "the clean companion made no curation call"
+    )

@@ -83,11 +83,23 @@ def review(store_read, *, client, key_available, store_root=None,
         summary = router.summarize(store_read)
     try:
         reply = client.converse(_clarifying_messages(summary))
+    except ModelCallError as exc:
+        # Leg 1 failed before any clarifying question was produced — nothing paid-for to keep.
+        # Fail-closed (NFR-2): surface honestly, mirroring chat._degraded_turn.
+        return _deferred(str(exc))
+    try:
         curation = _curate_meds(client, scaffold_root, store_root, identity_config)
     except ModelCallError as exc:
-        # Fail-closed (NFR-2): a failed model call never fabricates a question or a fact and never
-        # writes a store item — surface the failure honestly, mirroring chat._degraded_turn.
-        return _deferred(str(exc))
+        # Leg 2 failed AFTER leg 1 already produced (and paid for) its clarifying question. Keep
+        # the leg-1 questions and surface a deferred-curation SUB-state — never discard the paid
+        # leg-1 reply by returning a total-deferred receipt with empty questions.
+        curation = {
+            "deferred": True,
+            "reason": str(exc),
+            "proposed_classes": [],
+            "confirmed": False,
+            "confirm_question": None,
+        }
     return {
         "deferred": False,
         "questions": [reply["reply"]],
@@ -186,27 +198,34 @@ def _curate_meds(client, scaffold_root, store_root, identity_config):
 
 
 def _scaffold_meds(scaffold_root):
-    """Read the record-only raw drug names from the gitignored operator-record scaffold (T1).
+    """Read the record-only raw drug names from the LATEST operator-record capture (T1).
 
     Each capture writes one `capture-<stamp>.json` `{field: value}` file; the record-only med
-    field is `rx-interaction-classes` (the raw drug free-text). Reads ONLY that field — never the
-    operator's other captured fields — so the curation request cannot carry operator identity.
+    field is `rx-interaction-classes` (the raw drug free-text). Reads ONLY the LATEST capture's
+    med field (the newest by the timestamp-sorted name) — never the union of all history: the
+    review re-fires on every complete-profile save, so a union would re-classify the whole
+    history each time (repeated spend + duplicate store writes) AND trap the curation forever if
+    one HISTORICAL value carried a date the `_DATE_LIKE` gate defers on. Latest-only bounds spend
+    to the current med state and lets a later clean capture recover from a prior dated one. Reads
+    ONLY the med field — never the operator's other captured fields — so the curation request
+    cannot carry operator identity.
     """
     root = Path(scaffold_root) if scaffold_root is not None else DEFAULT_SCAFFOLD_ROOT
     if not root.exists():
         return []
-    medications = []
-    for path in sorted(root.glob("capture-*.json")):
-        try:
-            data = json.loads(path.read_text())
-        except (OSError, ValueError):
-            continue
-        if not isinstance(data, dict):
-            continue
-        value = data.get(_RX_MED_FIELD)
-        if isinstance(value, str) and value.strip():
-            medications.append(value.strip())
-    return medications
+    captures = sorted(root.glob("capture-*.json"))
+    if not captures:
+        return []
+    try:
+        data = json.loads(captures[-1].read_text())
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    value = data.get(_RX_MED_FIELD)
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
 
 
 def _med_value_has_identity(value, identity_config):

@@ -406,11 +406,19 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
             record_only[name] = value
 
     if allergy_values:
-        # ONE combined hard-limits reading (dedupe-collision-safe): two allergies captured
-        # together share a timepoint but land in a single reading, never dropping one.
-        store.append("hard-limits", _reading("hard-limits", "; ".join(allergy_values)),
-                     root=store_root)
-        written_tokens.append("hard-limits")
+        combined = "; ".join(allergy_values)
+        if _value_has_pii(combined, identity_config):
+            # The allergy branch writes the model-bound `hard-limits` token, but — unlike every
+            # sibling free-text token (the `_FREE_TEXT_TOKENS` branch) — it was UNSCANNED: a
+            # PII-bearing allergy value ("shellfish — call Dr. Ng at operator@example.com")
+            # would reach the model-bound token guarded only by `summarize`'s capped backstop.
+            # Run the SAME uncapped full-value scan and divert record-only on a hit.
+            record_only["allergies"] = combined
+        else:
+            # ONE combined hard-limits reading (dedupe-collision-safe): two allergies captured
+            # together share a timepoint but land in a single reading, never dropping one.
+            store.append("hard-limits", _reading("hard-limits", combined), root=store_root)
+            written_tokens.append("hard-limits")
 
     if record_only:
         _write_scaffold(scaffold, record_only)

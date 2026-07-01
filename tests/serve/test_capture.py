@@ -1291,12 +1291,49 @@ def test_safety_marker_value_is_deidentified_not_raw_answer(tmp_path):
     assert "XYZ" not in str(marker[-1]["value"]), "the raw answer leaked into the marker value"
 
 
-def test_allergies_route_to_hard_limits(tmp_path):
-    """AC-4: food and drug allergies route to the existing `hard-limits` token.
+def _rendered_allergy_field_names():
+    """Extract the allergy input `name=`s from the ACTUAL rendered wizard markup.
 
-    Failing-capable: with the allergy region absent the fields fall to record-only and
-    `hard-limits` carries neither value.
+    Grounds the capture contract against the served design (`app_shell.render`) rather than
+    hard-coded field names — a future markup rename (e.g. back to `drug-allergies`) reds the
+    placement assertion below, catching the capture<->form contract break at its source.
     """
+    import re
+
+    from vault.design.templates import app_shell
+
+    html = app_shell.render()
+    return re.findall(
+        r"<label>[^<]*[Aa]llerg[^<]*</label>\s*<input[^>]*\bname=['\"]([^'\"]+)['\"]", html,
+    )
+
+
+def test_allergies_route_to_hard_limits(tmp_path):
+    """AC-4: the rendered allergy fields route to the existing `hard-limits` token.
+
+    De-tautologized (Tier-3 FIX-1): asserts PLACEMENT against the ACTUAL rendered wizard
+    field names — every allergy input the served markup emits must be a `_ALLERGY_FIELDS`
+    member (else the capture branch never sees it and the value silently falls record-only,
+    the drug-allergy hard-contraindication never reaching the planner). Then round-trips
+    those SAME field names through the capture seam into `hard-limits`.
+
+    Failing-capable: rename an allergy input in the markup (or drop a field name from
+    `_ALLERGY_FIELDS`) and the membership assertion reds; with the allergy region absent
+    the round-trip fields fall to record-only and `hard-limits` carries neither value.
+    """
+    rendered = _rendered_allergy_field_names()
+    assert rendered, "no allergy inputs found in the rendered wizard markup"
+    for name in rendered:
+        assert name in capture._ALLERGY_FIELDS, (
+            f"the rendered allergy input {name!r} is not a _ALLERGY_FIELDS member — the "
+            f"capture<->form contract is broken (it would fall record-only, never hard-limits)"
+        )
+    # Both allergy classes are wired (a rename that dropped one would shrink this set).
+    assert set(rendered) == set(capture._ALLERGY_FIELDS), (
+        f"rendered allergy fields {sorted(rendered)} != _ALLERGY_FIELDS "
+        f"{sorted(capture._ALLERGY_FIELDS)}"
+    )
+
     store_root = tmp_path / "store"
     capture.persist_capture(
         {"food-allergy": "shellfish", "drug-allergy": "penicillin"},
@@ -1305,6 +1342,40 @@ def test_allergies_route_to_hard_limits(tmp_path):
     values = " ".join(str(r["value"]) for r in store.read("hard-limits", root=store_root))
     assert "shellfish" in values, "the food allergy did not route to hard-limits"
     assert "penicillin" in values, "the drug allergy did not route to hard-limits"
+
+
+def test_pii_bearing_allergy_value_diverts_record_only(tmp_path):
+    """FIX-1 (Security): a PII-bearing allergy value diverts record-only, never `hard-limits`.
+
+    The allergy branch writes the model-bound `hard-limits` token, but — unlike every sibling
+    free-text token — it was UNSCANNED. An allergy value carrying operator contact PII (an
+    email) must be caught by the SAME uncapped `_value_has_pii` gate and routed record-only
+    to the gitignored scaffold, never reaching the model-bound `hard-limits` token.
+
+    Failing-capable: drop the `_value_has_pii` check in the allergy branch and the email
+    lands in the `hard-limits` store item, reddening the empty-read assertion.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    capture.persist_capture(
+        {"drug-allergy": "penicillin — reaction notes, reach me at operator@example.com"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Negative (load-bearing): the PII-bearing allergy never reached the model-bound token.
+    assert store.read("hard-limits", root=store_root) == [], (
+        "a PII-bearing allergy value reached the model-bound hard-limits token"
+    )
+    # Positive: it landed record-only in the gitignored scaffold instead.
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert "operator@example.com" in scaffold_text, "the PII allergy value did not route record-only"
+
+    # The gate is selective: a clean allergy value still lands in hard-limits.
+    capture.persist_capture(
+        {"food-allergy": "shellfish"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    hl = " ".join(str(r["value"]) for r in store.read("hard-limits", root=store_root))
+    assert "shellfish" in hl, "a clean allergy value did not land in hard-limits"
 
 
 def test_drug_allergy_not_in_rx_interaction_classes(tmp_path):
