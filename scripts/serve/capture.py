@@ -137,6 +137,49 @@ _CHAT_RAW_SOURCE_FIELDS = {
     "training-detail": "raw-training-detail-free-text",
 }
 
+# --- ADR-0033-0035-T3: the intake safety/allergy routing region ------------------- #
+# The three intake safety screens (ADR-0034 crown-jewel), each mapping a safety-screen
+# FORM FIELD NAME (the pinned T3<->T4 contract) to its de-identified SCREEN name.
+# Capturing a screen ALWAYS writes the `safety-screen::<screen>` answered marker (the
+# gate's PRESENCE signal, written regardless of the answer); a POSITIVE answer ALSO
+# writes the `referral::<screen>` flag (the safety-bypass falsification — a positive
+# answer never silently drops its referral). The marker/flag values are DE-IDENTIFIED
+# positivity signals, NEVER the raw free-text answer, and NO `safety-screen::*` /
+# `referral::*` item is a SUMMARY_FIELD_SET member — so `router.summarize` never reads
+# them and `dispatch` rejects them if injected (the never-a-plan-input crown jewel). The
+# `::` item-name shape mirrors the frozen `dvq::queue` precedent (queue_schema.py).
+_SAFETY_SCREEN_FIELDS = {
+    "exercise-safety": "exercise-safety",
+    "phq2": "phq2",
+    "apnea": "apnea",
+}
+
+# Recognized NEGATIVE answers (answered, no referral). Any other answer — including an
+# unrecognized one — is POSITIVE and raises the referral flag (the ADR-0034
+# asymmetric-downside posture: an ambiguous safety answer fails safe to a referral).
+_SAFETY_NEGATIVE_ANSWERS = frozenset({"no", "none", "not-at-all", "negative", "never", "0"})
+
+# Food/drug allergy FORM FIELD NAMES -> the EXISTING de-identified `hard-limits` token (a
+# hard contraindication), NEVER the liaison-curated `rx-interaction-classes` (a drug
+# allergy is a hard limit, not a drug-interaction class). Accumulated and written as ONE
+# combined `hard-limits` reading so two allergies captured together cannot dedupe-collide
+# on a shared timepoint (the S41 same-timepoint contraindication-drop pattern, `pka`).
+_ALLERGY_FIELDS = ("food-allergy", "drug-allergy")
+
+
+def _safety_answer_is_positive(value):
+    """Whether a safety-screen answer raises a referral (the asymmetric-downside default).
+
+    Args:
+        value (str): The submitted safety-screen answer.
+
+    Returns:
+        (bool) False for a recognized negative answer (no/none/not-at-all/…) — the
+        answered marker is still written; True otherwise (a symptom, an elevated PHQ-2, a
+        positive apnea, OR an unrecognized answer — fail-safe to a referral).
+    """
+    return value.strip().lower() not in _SAFETY_NEGATIVE_ANSWERS
+
 # Server-side enumerated value sets for the bounded wired fields (Wave-B FIX-B). The
 # markup enforces these client-side (a `<select>` / a fixed chip set), but a crafted
 # POST can write any string into the token — so the server re-validates here BEFORE
@@ -290,6 +333,7 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
 
     written_tokens = []
     record_only = {}
+    allergy_values = []  # T3: accumulated -> one combined hard-limits write after the loop
     for name, value in fields.items():
         if value is None or (isinstance(value, str) and not value.strip()):
             continue  # an unfilled field carries nothing to route
@@ -334,11 +378,39 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
             raw_item = _CHAT_RAW_SOURCE_FIELDS[name]
             store.append(raw_item, _reading(raw_item, value), root=store_root)
             written_tokens.append(raw_item)
+        elif name in _SAFETY_SCREEN_FIELDS:
+            # ADR-0033-0035-T3 crown-jewel: the safety-screen answered marker (ALWAYS, the
+            # gate's presence signal) + the referral flag (POSITIVE answers only). Both are
+            # de-identified positivity signals, never the raw answer; NO `safety-screen::*`/
+            # `referral::*` item is a SUMMARY_FIELD_SET member, so summarize never reads
+            # them and dispatch rejects them if injected.
+            screen = _SAFETY_SCREEN_FIELDS[name]
+            positive = _safety_answer_is_positive(value)
+            marker = f"safety-screen::{screen}"
+            store.append(marker, _reading(marker, "positive" if positive else "negative"),
+                         root=store_root)
+            written_tokens.append(marker)
+            if positive:
+                flag = f"referral::{screen}"
+                store.append(flag, _reading(flag, "referral"), root=store_root)
+                written_tokens.append(flag)
+        elif name in _ALLERGY_FIELDS:
+            # A food/drug allergy -> the EXISTING hard-limits token (a hard contraindication),
+            # NEVER rx-interaction-classes. Accumulated; written as ONE combined reading
+            # after the loop (dedupe-collision-safe on a shared timepoint).
+            allergy_values.append(value)
         else:
             # Everything else is record-only: it has no de-identified field-set consumer
             # today (Step-3 training detail, all Step-4 nutrition, the raw Step-5 stack).
             # -> the gitignored scaffold, honestly labeled. NEVER a field-set store item.
             record_only[name] = value
+
+    if allergy_values:
+        # ONE combined hard-limits reading (dedupe-collision-safe): two allergies captured
+        # together share a timepoint but land in a single reading, never dropping one.
+        store.append("hard-limits", _reading("hard-limits", "; ".join(allergy_values)),
+                     root=store_root)
+        written_tokens.append("hard-limits")
 
     if record_only:
         _write_scaffold(scaffold, record_only)

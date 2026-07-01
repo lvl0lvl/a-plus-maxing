@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 from scripts.guard import pii_scan
-from scripts.plan.router import SUMMARY_FIELD_SET, summarize
+from scripts.plan.router import SUMMARY_FIELD_SET, dispatch, summarize
 from scripts.serve import capture
 from scripts.store import store
 
@@ -1196,3 +1196,286 @@ def test_editable_re_capture_re_runs_same_path_no_direct_band_write(tmp_path):
     assert store.read("dietary-pattern-class", root=store_root) == [], (
         "the band token was written directly (must be derived, not stored)"
     )
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T3 — Cycle 1: the safety-signal routing region. Each of the three
+# safety screens (exercise-safety / PHQ-2 / apnea) writes a `safety-screen::<screen>`
+# answered marker REGARDLESS of the answer (the gate's presence signal) + a
+# `referral::<screen>` flag on a POSITIVE answer ONLY (the safety-bypass falsification);
+# food/drug allergies route to the existing `hard-limits` token, never
+# `rx-interaction-classes`. All fixture-driven over a tmp store root; 0 live spend.
+# --------------------------------------------------------------------------- #
+
+# (form field name, screen name, a POSITIVE answer value, a NEGATIVE answer value). The
+# field/answer values are the pinned T3<->T4 contract; a POSITIVE answer raises the
+# referral flag, a NEGATIVE writes only the answered marker.
+_SAFETY_SCREEN_CASES = [
+    ("exercise-safety", "exercise-safety", "chest-pain", "none"),
+    ("phq2", "phq2", "nearly-every-day", "not-at-all"),
+    ("apnea", "apnea", "yes", "no"),
+]
+
+
+@pytest.mark.parametrize("field, screen, positive, negative", _SAFETY_SCREEN_CASES)
+def test_safety_screens_write_answered_markers(field, screen, positive, negative, tmp_path):
+    """AC-1: each safety screen writes its `safety-screen::<screen>` answered marker
+    REGARDLESS of the answer value (the gate's presence signal).
+
+    Failing-capable: with the safety region absent the field falls to the record-only
+    `else`, no marker is written, and `store.read(<marker>)` is empty.
+    """
+    for value in (positive, negative):
+        store_root = tmp_path / f"store-{screen}-{value}"
+        capture.persist_capture(
+            {field: value}, root=store_root, scaffold_root=tmp_path / "scaffold",
+            identity_config=_ABSENT_IDENTITY,
+        )
+        assert store.read(f"safety-screen::{screen}", root=store_root), (
+            f"{field!r}={value!r} did not write the safety-screen::{screen} answered marker"
+        )
+
+
+@pytest.mark.parametrize("field, screen, positive, negative", _SAFETY_SCREEN_CASES)
+def test_positive_safety_answer_writes_referral_flag(field, screen, positive, negative, tmp_path):
+    """AC-2 positive: a POSITIVE safety answer writes a `referral::<screen>` flag.
+
+    Failing-capable: a no-op route (never writes the flag) reds this positive case.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {field: positive}, root=store_root, scaffold_root=tmp_path / "scaffold",
+        identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read(f"referral::{screen}", root=store_root), (
+        f"a positive {field!r} answer did not write the referral::{screen} flag"
+    )
+
+
+@pytest.mark.parametrize("field, screen, positive, negative", _SAFETY_SCREEN_CASES)
+def test_negative_safety_answer_writes_no_referral_flag(field, screen, positive, negative, tmp_path):
+    """AC-2 negative: a NEGATIVE safety answer writes NO referral flag (only the marker).
+
+    Failing-capable: an always-write route reds this negative case — the flag trips ONLY
+    on a positive answer.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {field: negative}, root=store_root, scaffold_root=tmp_path / "scaffold",
+        identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read(f"referral::{screen}", root=store_root) == [], (
+        f"a negative {field!r} answer wrongly wrote the referral::{screen} flag"
+    )
+    # The answered marker IS still written (the presence signal, regardless of answer).
+    assert store.read(f"safety-screen::{screen}", root=store_root), (
+        f"a negative {field!r} answer did not write the safety-screen::{screen} marker"
+    )
+
+
+def test_safety_marker_value_is_deidentified_not_raw_answer(tmp_path):
+    """AC-1/crown-jewel: the marker stores a de-identified positivity signal, never the
+    raw free-text answer (no raw PHQ-2/symptom text reaches a `safety-screen::*` item).
+
+    Failing-capable: a route echoing the raw answer into the marker leaks the raw token.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"exercise-safety": "chest-pain-climbing-stairs-XYZ"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    marker = store.read("safety-screen::exercise-safety", root=store_root)
+    assert marker and marker[-1]["value"] in ("positive", "negative"), (
+        "the safety marker did not store a de-identified positivity signal"
+    )
+    assert "XYZ" not in str(marker[-1]["value"]), "the raw answer leaked into the marker value"
+
+
+def test_allergies_route_to_hard_limits(tmp_path):
+    """AC-4: food and drug allergies route to the existing `hard-limits` token.
+
+    Failing-capable: with the allergy region absent the fields fall to record-only and
+    `hard-limits` carries neither value.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"food-allergy": "shellfish", "drug-allergy": "penicillin"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    values = " ".join(str(r["value"]) for r in store.read("hard-limits", root=store_root))
+    assert "shellfish" in values, "the food allergy did not route to hard-limits"
+    assert "penicillin" in values, "the drug allergy did not route to hard-limits"
+
+
+def test_drug_allergy_not_in_rx_interaction_classes(tmp_path):
+    """AC-4: a drug allergy never routes into the liaison-curated `rx-interaction-classes`.
+
+    A drug allergy is a hard contraindication (-> `hard-limits`), not a drug-interaction
+    class. Failing-capable: a mis-route into `rx-interaction-classes` reds the empty read.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"drug-allergy": "penicillin"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read("rx-interaction-classes", root=store_root) == [], (
+        "a drug allergy wrongly routed into the model-bound rx-interaction-classes token"
+    )
+    # It DID land in hard-limits (the pinned route).
+    values = " ".join(str(r["value"]) for r in store.read("hard-limits", root=store_root))
+    assert "penicillin" in values, "the drug allergy did not route to hard-limits"
+
+
+def test_positive_exercise_safety_records_contraindication_marker_and_referral(tmp_path):
+    """AC-5: a POSITIVE exercise-safety answer records BOTH the
+    `safety-screen::exercise-safety` contraindication marker (recorded so the deferred
+    clinician-clearance-grant path can gate on it) AND the `referral::exercise-safety` flag.
+
+    Failing-capable: no marker / no flag reds each assertion.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"exercise-safety": "chest-pain"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    marker = store.read("safety-screen::exercise-safety", root=store_root)
+    assert marker and marker[-1]["value"] == "positive", (
+        "the exercise-safety contraindication marker was not recorded"
+    )
+    assert store.read("referral::exercise-safety", root=store_root), (
+        "the exercise-safety referral flag was not written on a positive answer"
+    )
+
+
+# --- ADR-0033-0035-T3 STORE-ADVERSARIAL battery (pka, docs/checklists/store-adversarial-tests.md).
+# The safety-marker / referral-flag / hard-limits writes land in scripts/store/ via the
+# UNCHANGED store.append, so the four required categories apply to T3's new streams. ---
+
+
+def test_safety_streams_do_not_cross_read(tmp_path):
+    """STORE-ADVERSARIAL #1 (cross-stream namespace isolation): a read for one safety
+    marker / referral flag / hard-limits never returns another stream's value.
+
+    A positive exercise-safety + negative phq2/apnea + a food allergy captured together:
+    the exercise-safety flag is present, phq2/apnea flags are absent, and the allergy is
+    in `hard-limits` and in NO safety-screen/referral stream (the S41 fabricated-cross-read
+    pattern). Failing-capable: a shared bare item name would cross-read.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"exercise-safety": "chest-pain", "phq2": "not-at-all", "apnea": "no",
+         "food-allergy": "shellfish"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read("referral::exercise-safety", root=store_root), "positive es did not flag"
+    assert store.read("referral::phq2", root=store_root) == [], "negative phq2 wrongly flagged"
+    assert store.read("referral::apnea", root=store_root) == [], "negative apnea wrongly flagged"
+    hard_limits = " ".join(str(r["value"]) for r in store.read("hard-limits", root=store_root))
+    assert "shellfish" in hard_limits, "the allergy did not land in hard-limits"
+    for stream in ("safety-screen::exercise-safety", "referral::exercise-safety",
+                   "safety-screen::phq2", "safety-screen::apnea"):
+        vals = " ".join(str(r["value"]) for r in store.read(stream, root=store_root))
+        assert "shellfish" not in vals, f"the allergy cross-contaminated {stream!r}"
+
+
+def test_safety_marker_same_timepoint_dedupe_and_distinct_screens_both_persist(tmp_path):
+    """STORE-ADVERSARIAL #2/#3 (same-key dedupe boundary / distinct-stream no-drop): a
+    second write at an existing `(item, timepoint, source)` is dropped (value excluded from
+    the dedupe key), but two DISTINCT screen markers sharing a timepoint BOTH persist — the
+    exact S41 same-timepoint contraindication-drop this checklist exists to prevent.
+
+    Failing-capable: widen the dedupe key to include `value` and the same-key re-write
+    persists (len == 2); drop the `::`-namespaced item distinctness and the distinct-screen
+    marker is clobbered.
+    """
+    import datetime
+
+    store_root = tmp_path / "store"
+    ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    # Same item + timepoint + source, DIFFERENT value -> second dropped (dedupe excludes value).
+    store.append("safety-screen::apnea",
+                 {"item": "safety-screen::apnea", "timepoint": ts, "source": "intake", "value": "negative"},
+                 root=store_root)
+    store.append("safety-screen::apnea",
+                 {"item": "safety-screen::apnea", "timepoint": ts, "source": "intake", "value": "positive"},
+                 root=store_root)
+    apnea = store.read("safety-screen::apnea", root=store_root)
+    assert len(apnea) == 1, "a same-key re-write was not deduped (dedupe key must exclude value)"
+    assert apnea[0]["value"] == "negative", "the dedupe dropped the FIRST write, not the second"
+    # A DISTINCT screen marker at the SAME timepoint -> BOTH persist (distinct `::` items).
+    store.append("safety-screen::exercise-safety",
+                 {"item": "safety-screen::exercise-safety", "timepoint": ts, "source": "intake", "value": "positive"},
+                 root=store_root)
+    assert store.read("safety-screen::exercise-safety", root=store_root), (
+        "a distinct screen marker sharing a timepoint was dropped (the S41 contraindication-drop)"
+    )
+    assert store.read("safety-screen::apnea", root=store_root), "the apnea marker was clobbered"
+
+
+def test_safety_markers_use_namespaced_prefix_not_bare_names(tmp_path):
+    """STORE-ADVERSARIAL #4 (mutation / cross-stream namespacing): the markers write under
+    the `safety-screen::` / `referral::` namespace, never a bare token that could collide
+    with a field-set stream.
+
+    Failing-capable (mutation): drop the `safety-screen::`/`referral::` prefix and a bare
+    un-namespaced item is written, reddening the bare-read + prefix assertions.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"exercise-safety": "chest-pain"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read("safety-screen::exercise-safety", root=store_root)
+    assert store.read("referral::exercise-safety", root=store_root)
+    # No bare un-namespaced safety item was written (the prefix keeps them field-set-disjoint).
+    assert store.read("exercise-safety", root=store_root) == [], (
+        "a bare un-namespaced safety item was written (the :: namespace prevents collision)"
+    )
+    for item in store.items(root=store_root):
+        assert item.startswith("safety-screen::") or item.startswith("referral::"), (
+            f"a non-namespaced safety item {item!r} was written"
+        )
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T3 — Cycle 2: the crown-jewel never-a-plan-input probe. No
+# `safety-screen::*` / `referral::*` marker is a SUMMARY_FIELD_SET member, so summarize
+# never reads them AND dispatch's whitelist rejects one injected into a payload. By guard
+# EXECUTION over the FROZEN summarize/dispatch, not a substring grep.
+# --------------------------------------------------------------------------- #
+
+
+def test_safety_markers_absent_from_summarize(tmp_path):
+    """AC-3 crown-jewel: no `safety-screen::*` / `referral::*` key appears in `summarize`
+    output — the markers are not SUMMARY_FIELD_SET members, so summarize's
+    `for field in SUMMARY_FIELD_SET` loop structurally never reads them.
+
+    RED-capable: reds if a marker were ever made a SUMMARY_FIELD_SET member (a future
+    field-set regression).
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"exercise-safety": "chest-pain", "phq2": "nearly-every-day", "apnea": "yes"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    # The markers + a flag ARE in the store (the probe is over real capture output)...
+    assert store.read("safety-screen::exercise-safety", root=store_root)
+    assert store.read("referral::exercise-safety", root=store_root)
+    # ...but NONE reaches the plan summary.
+    summary = _summary(store_root)
+    leaked = [k for k in summary if k.startswith("safety-screen::") or k.startswith("referral::")]
+    assert not leaked, f"a safety marker reached the plan summary: {leaked}"
+
+
+def test_dispatch_rejects_injected_safety_screen_field():
+    """AC-3 crown-jewel: `dispatch` RAISES the out-of-field-set ValueError on a payload
+    carrying an injected `safety-screen::*` field (the whitelist rejects the complement).
+
+    RED-capable: reds if the marker were whitelisted into SUMMARY_FIELD_SET.
+    """
+    complete = {field: "" for field in SUMMARY_FIELD_SET}
+    dispatch(complete)  # negative control: a complete valid summary does NOT raise
+    injected = dict(complete)
+    injected["safety-screen::exercise-safety"] = "positive"
+    with pytest.raises(ValueError, match="out-of-field-set"):
+        dispatch(injected)
