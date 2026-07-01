@@ -144,6 +144,34 @@ def _server_with_roots(tmp_path):
     return srv, srv.server_address[1]
 
 
+# The ten directly-captured elements the ADR-0033-0035-T6 first-run completeness gate requires
+# present for `generate.run('app')` to serve the UNLOCKED platform shell (where the Upload
+# Documents doc-cards live, inside `#screen-team`). The seven profile tokens: `date-of-birth`
+# -> `training-age-band`, `bodyweight-kg` -> `bodyweight-band`, and five PII-free pass-through
+# tokens; plus the three `safety-screen::*` answered markers. An UPLOAD does not complete a
+# profile, so a POST re-render whose store lacks these serves the locked Create-Profile body.
+_COMPLETE_PROFILE = {
+    "date-of-birth": "1986-04-12",
+    "bodyweight-kg": "82",
+    "sex-for-dosing": "male",
+    "equipment-access-class": "full-home-gym",
+    "goal-domains": "Workout;Nutrition",
+    "goal-targets": "Build strength and improve sleep",
+    "goal-priority-order": "Workout, Nutrition, Supplements",
+    "safety-screen::exercise-safety": "no",
+    "safety-screen::phq2": "no",
+    "safety-screen::apnea": "no",
+}
+
+
+def _seed_complete_profile(root, *, timepoint="2026-06-01T00:00:00+00:00", source="intake"):
+    """Seed the ten required elements so the POST re-render unlocks the platform shell (T6 gate)."""
+    for item, value in _COMPLETE_PROFILE.items():
+        store.append(
+            item, {"item": item, "timepoint": timepoint, "source": source, "value": value}, root=root,
+        )
+
+
 def _field_part(name, value):
     """Build one multipart NON-FILE form-field part (no filename= -> staged in `fields`)."""
     out = bytearray()
@@ -302,6 +330,9 @@ def test_post_export_xml_lands_readings_and_rerenders(tmp_path):
     is the re-rendered wizard reflecting the new load-state (the wearable card now shows
     the loaded count, not "Not linked").
     """
+    # Seed a complete profile so the POST re-render unlocks the platform shell where the Upload
+    # doc-cards live (post-T6 gate); an incomplete store would serve the locked Create-Profile body.
+    _seed_complete_profile(tmp_path / "store")
     srv, port = _server_with_roots(tmp_path)
     _serve_in_thread(srv)
     try:
@@ -363,6 +394,12 @@ def test_post_dna_zip_lands_via_dna_land_and_rerenders(tmp_path):
     appears under the DNA root, the store stays empty (DNA is not a time-series
     reading), and the response re-renders the wizard with the DNA card loaded.
     """
+    # Seed a complete profile so the POST re-render unlocks the platform shell where the DNA
+    # doc-card renders (post-T6 gate). Snapshot the store immediately AFTER seeding / BEFORE the
+    # DNA upload: the "DNA contributes zero time-series readings" invariant is now asserted against
+    # this seeded baseline, since unlocking requires store data and global emptiness no longer holds.
+    _seed_complete_profile(tmp_path / "store")
+    store_before_dna = store.read_all(tmp_path / "store")
     srv, port = _server_with_roots(tmp_path)
     _serve_in_thread(srv)
     try:
@@ -371,7 +408,14 @@ def test_post_dna_zip_lands_via_dna_land_and_rerenders(tmp_path):
 
         landed = list((tmp_path / "dna").glob("*.txt"))
         assert landed and landed[0].name == "genome_v5.txt", "the DNA zip did not land via dna.land"
-        assert store.read_all(tmp_path / "store") == [], "the DNA zip wrongly wrote into the time-series store"
+        # TRUE intent (rewritten from the pre-T6 `== []`): the DNA zip lands ONLY as a file under
+        # dna_root and writes NO time-series reading — the store is byte-identical to the pre-upload
+        # profile baseline. RED-capable: a DNA upload that wrote a reading would add an element to
+        # read_all, so `after != store_before_dna` and this equality reds (the same failure the old
+        # `== []` caught, re-expressed against the non-empty seeded baseline).
+        assert store.read_all(tmp_path / "store") == store_before_dna, (
+            "the DNA zip wrongly wrote a time-series reading into the store (it must land only as a dropzone file)"
+        )
 
         assert SPA_NAV_MARKER in body, "response is not the re-rendered SPA served body"
         assert "genome_v5.txt" in body, "the re-rendered wizard does not reflect the landed DNA file"
@@ -616,6 +660,9 @@ def test_post_dual_upload_export_and_dna_both_land(tmp_path):
     and the re-render reflects both. The realistic dual-upload coexistence case the
     server-loop iterates over every staged file part.
     """
+    # Seed a complete profile so the POST re-render unlocks the platform shell where the Upload
+    # doc-cards live (post-T6 gate); an incomplete store would serve the locked Create-Profile body.
+    _seed_complete_profile(tmp_path / "store")
     srv, port = _server_with_roots(tmp_path)
     _serve_in_thread(srv)
     try:

@@ -14,8 +14,10 @@ document-card icons are `_DOC_ICONS` below.
 import datetime as _datetime
 import html as _html
 import pathlib
+import re as _re
 
 from scripts.ingest import status as ingest_status
+from scripts.plan.router import summarize
 
 _VIEW = pathlib.Path(__file__).with_name("app_view.html")
 
@@ -41,6 +43,25 @@ _LOADED = "<span style='color:var(--good);font-weight:600'>✓ loaded</span>"
 _DEMOGRAPHIC_SELECTS = ("sex-for-dosing", "equipment-access-class")
 _DEMOGRAPHIC_DOB = "date-of-birth"
 _DEMOGRAPHIC_WEIGHT = "bodyweight-kg"
+
+# The first-run completeness gate (ADR-0033 Decision / OQ-2 / ST-04). The served body is
+# CONDITIONAL on `_intake_complete`: the SEVEN directly-captured required `summarize` tokens
+# are all CONDITIONALLY set (omitted from the summary when their source reading is absent), so
+# keying on their PRESENCE naturally EXCLUDES the always-set tokens — `rx-interaction-classes`
+# (filled only post-unlock by the ADR-0035 review; requiring it would deadlock the gate, ST-04)
+# and the always-set derived bands. The three `safety-screen::*` answered markers are scanned
+# from the flat read model directly (they are not SUMMARY_FIELD_SET members).
+_REQUIRED_TOKENS = (
+    "training-age-band", "sex-for-dosing", "bodyweight-band", "equipment-access-class",
+    "goal-domains", "goal-targets", "goal-priority-order",
+)
+_REQUIRED_SAFETY_MARKERS = (
+    "safety-screen::exercise-safety", "safety-screen::phq2", "safety-screen::apnea",
+)
+# The four platform `.screen` sections stripped from the served body when the profile is
+# INCOMPLETE — markup-level absence (not a CSS hide), so 0 platform surface is reachable on
+# first run. The Create-Profile `#screen-wizard`/`#screen-equipment` sections are preserved.
+_PLATFORM_SCREENS = ("screen-dashboard", "screen-plan", "screen-team", "screen-profile")
 
 
 def _esc(value):
@@ -268,6 +289,50 @@ def _prefill_form(html, store_read):
     )
 
 
+def _intake_complete(store_read):
+    """Whether the first-run profile is complete enough to unlock the platform surfaces.
+
+    A pure function of the store-derived state, re-read each render — NOT a stored boolean, a
+    turn-count, or a model flag, and explicitly NOT `chat.plan_next_turn(...).intake_complete`
+    (which is vacuously True at zero domain coverage). `store_read` is the FLAT reading list
+    `store.read_all` returns; it is ADAPTED into the per-item callable `summarize` contracts (a
+    closure filtering the flat list by item name). True iff all seven required tokens are PRESENT
+    keys in the summary AND the three safety-screen answered markers are in the flat list. Does
+    NOT require `rx-interaction-classes` or any always-set token, and does NOT swallow
+    `summarize`'s fail-closed `ValueError` (fail-loud at the boundary).
+    """
+    rows = store_read if isinstance(store_read, list) else []
+    summary = summarize(lambda item: [r for r in rows if isinstance(r, dict) and r.get("item") == item])
+    if not all(token in summary for token in _REQUIRED_TOKENS):
+        return False
+    present = {r.get("item") for r in rows if isinstance(r, dict)}
+    return all(marker in present for marker in _REQUIRED_SAFETY_MARKERS)
+
+
+def _mark_screen_active(html, screen_id):
+    """Mark ONE `.screen` section active server-side (the first render decides the open surface)."""
+    return html.replace(
+        f'<section class="screen" id="{screen_id}">',
+        f'<section class="screen active" id="{screen_id}">',
+        1,
+    )
+
+
+def _lock_to_create_profile(html):
+    """The INCOMPLETE-profile body: strip the four platform `.screen` sections and open the wizard.
+
+    Removes the dashboard/plan/team/profile sections at the markup level (their `id="screen-*"` and
+    the `data-tab="generate"` tab go with them), leaving the Create-Profile `#screen-wizard`/
+    `#screen-equipment` surface, and marks the wizard active so first run opens on it.
+    """
+    for screen_id in _PLATFORM_SCREENS:
+        html = _re.sub(
+            rf'<section class="screen" id="{screen_id}">.*?</section>',
+            "", html, count=1, flags=_re.DOTALL,
+        )
+    return _mark_screen_active(html, "screen-wizard")
+
+
 def render(store_read=None, *, status=None, _today=None):
     """Return the inline-asset SPA shell HTML with the Upload doc-cards at the live load-state.
 
@@ -298,4 +363,7 @@ def render(store_read=None, *, status=None, _today=None):
         .replace("<!--DOC_CARDS-->", _doc_cards(status))
         .replace("<!--PLAN_ZONE-->", _plan_zone(store_read, today))
     )
-    return _prefill_form(html, store_read)
+    html = _prefill_form(html, store_read)
+    if _intake_complete(store_read):
+        return _mark_screen_active(html, "screen-team")
+    return _lock_to_create_profile(html)

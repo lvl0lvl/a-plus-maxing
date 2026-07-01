@@ -60,7 +60,15 @@ _FABRICATED = (
 
 
 def _emit_app(tmp_path):
-    """Drive the real generate.run('app') into tmp roots; return the written Path."""
+    """Drive the real generate.run('app') into tmp roots; return the written Path.
+
+    Post-T6 GET `/` is completeness-gated (`_intake_complete`): a complete profile serves the full
+    platform shell, an incomplete one the Create-Profile-only surface. The emit probes here assert
+    the ONBOARDED (unlocked) surface, so the store is seeded completeness-complete; the DNA/labs
+    dropzones stay empty (the honest not-linked ingestion state is unchanged). The first-run LOCKED
+    body is covered by the ADR-0033-0035-T6 gate cases.
+    """
+    _seed_complete_profile(tmp_path / "store")
     return generate.run(
         "app",
         _root=tmp_path / "store",
@@ -71,8 +79,14 @@ def _emit_app(tmp_path):
 
 
 def _spa_html():
-    """Render the SPA HTML string standalone (empty store -> honest awaiting states)."""
-    return app_shell.render([])
+    """Render the SPA HTML for an ONBOARDED operator (complete profile -> the unlocked full shell).
+
+    Post-T6 the served body is completeness-gated; the platform-surface cases assert against the
+    unlocked full shell, so this renders a completeness-complete store (docs/plan stay empty -> the
+    honest awaiting states are unchanged). The first-run LOCKED Create-Profile body is covered by
+    the ADR-0033-0035-T6 gate cases.
+    """
+    return app_shell.render(_complete_profile_readings())
 
 
 # --------------------------------------------------------------------------- #
@@ -432,7 +446,9 @@ def test_doc_cards_render_loaded_labs_card_with_escaped_filename():
         "dna": {"loaded": False, "files": []},
         "labs": {"loaded": True, "files": ["cmp_<panel>.pdf", "lipids.csv"]},
     }
-    html = app_shell.render([], status=status)
+    # the doc cards live in the platform shell (`#screen-team`), so render an ONBOARDED profile
+    # to unlock it (post-T6 the locked first-run body carries no doc cards).
+    html = app_shell.render(_complete_profile_readings(), status=status)
     assert "✓ loaded" in html, "the labs-loaded card shows no loaded marker"
     assert "cmp_&lt;panel&gt;.pdf" in html, "the loaded labs card does not name the escaped filename"
     assert "lipids.csv" in html, "the loaded labs card does not name the second landed file"
@@ -805,6 +821,9 @@ def test_plan_zone_escapes_injected_exercise_name(tmp_path):
         "workout", {"exercises": [{"name": payload, "sets": 3}]},
         "2026-06-18", "personal-trainer", tmp_path,
     )
+    # unlock the platform shell (the Plan zone lives in `#screen-plan`) so the recorded plan renders
+    # post-T6; the completeness seed is orthogonal to the plan reading under test.
+    _seed_complete_profile(tmp_path)
     html = app_shell.render(store.read_all(tmp_path), _today=datetime.date(2026, 6, 18))
 
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html, "the injected exercise name is not HTML-escaped"
@@ -887,13 +906,10 @@ def test_demographic_form_prefills_each_saved_value(tmp_path):
     field renders blank/default or the banner is absent.
     """
     root = tmp_path / "store"
-    _seed_demographics(root, {
-        "date-of-birth": "1986-04-12",
-        "sex-for-dosing": "male",
-        "bodyweight-kg": "82",
-        "equipment-access-class": "full-home-gym",
-        "goal-domains": "Workout;Nutrition",  # chat-only field: no form surface, not pre-filled
-    })
+    # seed the completeness-complete profile (its default values ARE the asserted demographics) so
+    # the render unlocks the platform shell where the pre-filled My-Info form lives (post-T6 gate).
+    # `goal-domains` is seeded (a chat-only field with no form surface -> not pre-filled as an option).
+    _seed_complete_profile(root)
     html = app_shell.render(store.read_all(root))
     assert "name='date-of-birth' value='1986-04-12'>" in html, "the full-date birthdate is not pre-filled"
     assert "name='bodyweight-kg' value='82'" in html, "the bodyweight-kg number is not pre-filled"
@@ -914,19 +930,25 @@ def test_prefill_tracks_the_saved_weight_and_resolves_latest(tmp_path):
     value is pre-filled and the stale one is not. Failing-capable: reds if the fill is fixed, ignores
     the saved value, or pre-fills the older reading.
     """
+    # seed the completing required set AROUND the varied `bodyweight-kg` so the render unlocks the
+    # platform shell where the pre-filled My-Info form lives (post-T6 gate); the weight itself is the
+    # test's own varying series.
     root_a = tmp_path / "a"
+    _seed_complete_profile(root_a, exclude=("bodyweight-kg",))
     _seed_demographics(root_a, {"bodyweight-kg": "90"})
     html_a = app_shell.render(store.read_all(root_a))
     assert "name='bodyweight-kg' value='90'" in html_a, "the saved 90 weight is not pre-filled"
     assert "name='bodyweight-kg' value='60'" not in html_a, "a different (unsaved) weight was pre-filled"
 
     root_b = tmp_path / "b"
+    _seed_complete_profile(root_b, exclude=("bodyweight-kg",))
     _seed_demographics(root_b, {"bodyweight-kg": "60"})
     html_b = app_shell.render(store.read_all(root_b))
     assert "name='bodyweight-kg' value='60'" in html_b, "the saved 60 weight is not pre-filled"
     assert "name='bodyweight-kg' value='90'" not in html_b, "a different (unsaved) weight was pre-filled"
 
     root_c = tmp_path / "c"
+    _seed_complete_profile(root_c, exclude=("bodyweight-kg",))
     _seed_demographics(root_c, {"bodyweight-kg": "60"}, timepoint="2026-05-01T00:00:00+00:00")
     _seed_demographics(root_c, {"bodyweight-kg": "90"}, timepoint="2026-06-01T00:00:00+00:00")
     html_c = app_shell.render(store.read_all(root_c))
@@ -935,23 +957,24 @@ def test_prefill_tracks_the_saved_weight_and_resolves_latest(tmp_path):
 
 
 def test_demographic_form_blank_default_on_empty_store():
-    """PREFILL-3 (HONEST-EMPTY): an empty store renders the amended form blank/default with no banner.
+    """PREFILL-3 (HONEST-EMPTY): an empty store renders the first-run Create-Profile form blank, no banner.
 
-    With no saved readings, no demographic <select> carries a `selected` option, the amended date
-    + `bodyweight-kg` number inputs carry no `value=` attribute, and the saved-state banner is
-    absent — the form is honest blank, no fabricated pre-fill. Failing-capable: reds if any option
-    is pre-selected, an input gains a value, or the banner renders on an empty store.
+    Post-T6 an empty store is the first-run LOCKED body (the Create-Profile `#screen-wizard`), so the
+    honest-empty assertion is scoped to the wizard demographic step: no saved-state banner, the amended
+    date + `bodyweight-kg` number inputs carry no `value=` attribute, and the `sex-for-dosing` select
+    carries no `selected` option — honest blank, no fabricated pre-fill. Failing-capable: reds if the
+    banner renders, an input gains a value, or the select pre-selects an option on an empty store.
     """
-    html = _spa_html()  # app_shell.render([])
+    html = app_shell.render([])  # the first-run LOCKED Create-Profile body
     assert "data-prefill='saved'" not in html, "the saved-state banner renders on an empty store"
-    assert "name='date-of-birth'>" in html, "the amended date input is not blank/default"
-    assert "value='" not in _panel_build_html(html).split("name='bodyweight-kg'", 1)[1][:40], (
-        "the bodyweight-kg number carries a value on an empty store"
+    wiz = _wizard_html(html)
+    assert "name='date-of-birth'>" in wiz, "the wizard date input is not blank/default"
+    assert "value='" not in wiz.split("name='bodyweight-kg'", 1)[1][:40], (
+        "the wizard bodyweight-kg number carries a value on an empty store"
     )
-    for name in ("sex-for-dosing", "equipment-access-class"):
-        assert "selected" not in _select_block(html, name), (
-            f"the {name} select pre-selects an option on an empty store"
-        )
+    assert "selected" not in _select_block(wiz, "sex-for-dosing"), (
+        "the wizard sex-for-dosing select pre-selects an option on an empty store"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -990,7 +1013,9 @@ def test_prefill_consumer_integrity_no_silent_noop(tmp_path):
     (keep targeting the year-text literal) and the prefill no-ops -> the `value=` assertion reds.
     """
     root = tmp_path / "store"
-    _seed_demographics(root, {"date-of-birth": "1986-04-12", "bodyweight-kg": "82"})
+    # seed the completeness-complete profile (defaults include DOB 1986-04-12 + weight 82) so the
+    # render unlocks the platform shell where the pre-filled My-Info form lives (post-T6 gate).
+    _seed_complete_profile(root)
     html = app_shell.render(store.read_all(root))
     # the prefill hits the AMENDED targets (the rework wired the new replace literals)
     assert "name='date-of-birth' value='1986-04-12'>" in html, "the amended date input was not pre-filled"
@@ -1131,7 +1156,7 @@ def test_wizard_and_doc_cards_use_generic_render_state_driven_source_labels():
         "dna": {"loaded": False, "files": []},
         "labs": {"loaded": False, "files": []},
     }
-    loaded = app_shell.render([], status=status)
+    loaded = app_shell.render(_complete_profile_readings(), status=status)
     assert "Wearable export · detected: Garmin" in loaded, "the wearable title does not track the loaded source (render-state-driven)"
     assert "Wearable export (Apple Health)" not in loaded, "the loaded wearable card still hardcodes 'Apple Health'"
     # (c) the upload-status copy no longer singles out one operator source
@@ -1339,3 +1364,165 @@ def test_equip_screen_keeps_spa_inline_asset_clean(tmp_path):
     emitted = path.read_text()
     assert 'id="screen-equipment"' in emitted, "the emitted SPA carries no `#screen-equipment` equipment screen"
     assert "<script src" not in emitted, "the equipment screen added an off-file <script src> reference"
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T6 — the first-run completeness GATE + the platform-unlock render
+# BRANCH inside `app_shell.render`: an INCOMPLETE profile hard-gates GET `/` to the
+# Create-Profile-only surface (0 platform surfaces served); a COMPLETE profile opens
+# the full shell on Chat-with-Team with the My-Info `data-tab="build"` slot active.
+# The verdict is STORE-GROUNDED — a pure function of the store-derived `summarize`
+# tokens + the three safety-screen markers, re-read each render — NOT a stored flag,
+# NOT a turn-count, and NOT `chat.plan_next_turn(...).intake_complete` (vacuously True
+# at zero coverage). Fixture-driven, 0 live spend (the rendered-SPA string).
+# --------------------------------------------------------------------------- #
+
+from scripts.serve.chat import plan_next_turn
+
+# The seven directly-captured required-token SOURCES (item-name -> a PII-free stated
+# value) whose PRESENCE `summarize` keys the required tokens on: `date-of-birth` ->
+# `training-age-band`, `bodyweight-kg` -> `bodyweight-band`, and the five pass-through
+# tokens read from a store item of their own name.
+_COMPLETE_PROFILE_VALUES = {
+    "date-of-birth": "1986-04-12",          # -> training-age-band
+    "bodyweight-kg": "82",                   # -> bodyweight-band (post-T2 deriver)
+    "sex-for-dosing": "male",
+    "equipment-access-class": "full-home-gym",
+    "goal-domains": "Workout;Nutrition",
+    "goal-targets": "Build strength and improve sleep",
+    "goal-priority-order": "Workout, Nutrition, Supplements",
+}
+# The three safety-screen ANSWERED markers the gate also requires present (any answer
+# value; "no" is a recognized negative answer -> answered, no referral).
+_SAFETY_MARKER_VALUES = {
+    "safety-screen::exercise-safety": "no",
+    "safety-screen::phq2": "no",
+    "safety-screen::apnea": "no",
+}
+# The ten required elements the unlock predicate is True iff ALL are present.
+_REQUIRED_ITEMS = tuple(_COMPLETE_PROFILE_VALUES) + tuple(_SAFETY_MARKER_VALUES)
+
+
+def _complete_profile_readings(timepoint="2026-06-01T00:00:00+00:00", source="intake"):
+    """A flat reading list (the `store.read_all` shape) complete on the ten required elements."""
+    return [
+        {"item": item, "timepoint": timepoint, "source": source, "value": value}
+        for item, value in {**_COMPLETE_PROFILE_VALUES, **_SAFETY_MARKER_VALUES}.items()
+    ]
+
+
+def _seed_complete_profile(root, *, exclude=(), **kwargs):
+    """Seed the ten required elements into a store `root` (the `generate.run('app')` read path).
+
+    `exclude` drops named items so a caller can seed the completing set AROUND a token it varies
+    itself (e.g. a prefill case seeding its own `bodyweight-kg` series).
+    """
+    values = {k: v for k, v in {**_COMPLETE_PROFILE_VALUES, **_SAFETY_MARKER_VALUES}.items()
+              if k not in exclude}
+    _seed_demographics(root, values, **kwargs)
+
+
+def _flat_adapter(rows):
+    """The flat-list -> per-item callable adapter `summarize` contracts (mirrors the predicate's)."""
+    return lambda item: [r for r in rows if r.get("item") == item]
+
+
+def test_incomplete_store_serves_create_profile_only_no_platform_surfaces():
+    """AC-1 (HIDDEN-UNTIL-COMPLETE, gate-bypass falsification): an incomplete profile serves ONLY
+    the Create-Profile surface — 0 platform-surface markers in the served body.
+
+    Both an EMPTY store and a PARTIAL store (complete minus one required element) render the locked
+    Create-Profile body: 0 of `id="screen-dashboard"` / `id="screen-plan"` / `id="screen-team"` /
+    the `data-tab="generate"` tab (markup-level absence, not a CSS hide), AND the `#screen-wizard`
+    Create-Profile surface is present. RED-first: the unconditional render serves every platform
+    surface on an empty store.
+    """
+    partial = [r for r in _complete_profile_readings() if r["item"] != "goal-priority-order"]
+    for label, store_read in (("empty", []), ("partial", partial)):
+        html = app_shell.render(store_read)
+        for marker in ('id="screen-dashboard"', 'id="screen-plan"', 'id="screen-team"', 'data-tab="generate"'):
+            assert marker not in html, f"the {label} (locked) body leaks the platform surface {marker!r}"
+        assert 'id="screen-wizard"' in html, f"the {label} (locked) body drops the Create-Profile wizard surface"
+
+
+def test_required_predicate_is_the_directly_captured_set_toggle_flips_lock_unlock():
+    """AC-2 (the REQUIRED predicate = the directly-captured set): the complete profile UNLOCKS; removing
+    ANY one of the ten required elements re-LOCKS — keyed on `summarize` token presence + the markers.
+
+    The fixture is GROUNDED against the real deriver (non-tautological): `summarize` over the complete
+    flat-list adapter carries all seven required tokens. Then a table over each of the ten required
+    elements seeds complete-MINUS-that-one and asserts the render re-locks (0 platform surfaces). RED-
+    first: with no predicate, the unconditional render never re-locks on removal.
+    """
+    complete = _complete_profile_readings()
+    # grounding: the fixture drives the ACTUAL summarize, not a hand-asserted token set
+    summary = summarize(_flat_adapter(complete))
+    required_tokens = ("training-age-band", "sex-for-dosing", "bodyweight-band",
+                       "equipment-access-class", "goal-domains", "goal-targets", "goal-priority-order")
+    missing = [t for t in required_tokens if t not in summary]
+    assert not missing, f"the complete fixture does not ground all seven required tokens: {missing}"
+
+    assert 'id="screen-team"' in app_shell.render(complete), "the complete profile did not unlock the full shell"
+    for item in _REQUIRED_ITEMS:
+        minus = [r for r in complete if r["item"] != item]
+        html = app_shell.render(minus)
+        assert 'id="screen-team"' not in html, f"removing the required element {item!r} did not re-lock the gate"
+        assert 'id="screen-wizard"' in html, f"the re-locked body (minus {item!r}) drops the Create-Profile surface"
+
+
+def test_predicate_excludes_post_unlock_rx_interaction_classes_no_deadlock():
+    """AC-3 (EXCLUDES post-unlock tokens, ST-04 deadlock-avoidance): a profile complete on the seven
+    required tokens + three markers UNLOCKS with `rx-interaction-classes` EMPTY.
+
+    `rx-interaction-classes` is filled only AFTER unlock (the ADR-0035 review), so requiring it would
+    DEADLOCK the gate. The complete fixture carries no medication state -> `summarize` sets
+    `rx-interaction-classes` to its always-set empty `""`; the profile still unlocks. Failing-capable:
+    a predicate requiring `rx-interaction-classes` keeps this fixture LOCKED (the deadlock) and reds the
+    unlock assertion. RED-first control: an empty store stays locked (the gate is real, not vacuous).
+    """
+    complete = _complete_profile_readings()  # no rx readings
+    summary = summarize(_flat_adapter(complete))
+    assert summary.get("rx-interaction-classes") == "", "the fixture is not the no-medication empty-rx state"
+    assert 'id="screen-team"' in app_shell.render(complete), (
+        "a profile complete on the required set with EMPTY rx-interaction-classes did not unlock (ST-04 deadlock)"
+    )
+    assert 'id="screen-team"' not in app_shell.render([]), (
+        "the gate does not lock an empty store — the predicate is not the store-grounded required-set function"
+    )
+
+
+def test_predicate_is_store_grounded_not_intake_complete():
+    """AC-4 (STORE-GROUNDED, unlock-without-data falsification): a 0-coverage store reads INCOMPLETE
+    through the predicate even though `chat.plan_next_turn(...).intake_complete` is vacuously True.
+
+    A 0-coverage store (no covered chat domains) yields `intake_complete == True` (the loop terminates
+    with no open domain — the real vacuous-True hazard, asserted here). The unlock predicate is NOT
+    `intake_complete`: it is the store-grounded `summarize`-token + safety-marker function, so the same
+    0-coverage store serves the LOCKED Create-Profile body. RED-first: with no predicate, the empty
+    store renders the full shell.
+    """
+    intent = plan_next_turn(summarize(_flat_adapter([])), covered_domains=set(), declined_domains=set())
+    assert intent.intake_complete is True, "the vacuous-True intake_complete control is not real"
+    html = app_shell.render([])
+    assert 'id="screen-team"' not in html, (
+        "a 0-coverage store unlocked — the predicate is wired to the vacuously-True intake_complete, not the store"
+    )
+    assert 'id="screen-wizard"' in html, "the store-grounded lock body drops the Create-Profile surface"
+
+
+def test_unlock_target_opens_chat_with_team_my_info_slot():
+    """AC-5 (UNLOCK TARGET by stable slot id, QA-F1): the unlocked render opens on Chat-with-Team with
+    the My-Info `data-tab="build"` slot default-active — asserted by the STABLE SLOT id, never a label.
+
+    The complete profile serves the full shell with EXACTLY one active `.screen` = `screen-team`
+    (server-side) and the default-active right-panel `ws-tab` is the My-Info SLOT `data-tab="build"`.
+    RED-first screen half: the unconditional render marks no `.screen` active server-side. The tab-slot
+    half is the standing-green lock (`data-tab="build"` carries `ws-tab active` statically). The "My
+    Info" LABEL assertion is T7's at W5 (the live slot label is still "Build Plan").
+    """
+    html = app_shell.render(_complete_profile_readings())
+    active = re.findall(r'<section class="screen active" id="([^"]+)"', html)
+    assert active == ["screen-team"], f"the unlocked body's active `.screen` set is {active}, expected exactly [screen-team]"
+    assert '<button class="ws-tab active" data-tab="build">' in html, (
+        "the My-Info workspace-tab SLOT `data-tab=\"build\"` is not the default-active tab in the unlocked body"
+    )
