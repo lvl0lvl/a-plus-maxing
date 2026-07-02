@@ -913,7 +913,10 @@ def test_demographic_form_prefills_each_saved_value(tmp_path):
     _seed_complete_profile(root)
     html = app_shell.render(store.read_all(root))
     assert "name='date-of-birth' value='1986-04-12'>" in html, "the full-date birthdate is not pre-filled"
-    assert "name='bodyweight-kg' value='82'" in html, "the bodyweight-kg number is not pre-filled"
+    # My-Info displays the operator's unit (pounds); the store is canonical kg, so 82 kg -> 181 lb,
+    # with the lbs option selected so the number and its unit label agree (the "108 lbs" bug fix).
+    assert "name='bodyweight-kg' value='181'" in html, "the bodyweight-kg number is not pre-filled as pounds"
+    assert "value='lbs' selected" in html, "the weight unit label does not match the displayed pounds value"
     assert "<option value='male' selected>" in html, "sex-for-dosing not pre-selected"
     assert "<option value='full-home-gym' selected>" in html, "equipment-access-class not pre-selected"
     assert "data-prefill='saved'" in html and "✓ Saved" in html, "no saved-state banner on the pre-filled form"
@@ -938,23 +941,23 @@ def test_prefill_tracks_the_saved_weight_and_resolves_latest(tmp_path):
     _seed_complete_profile(root_a, exclude=("bodyweight-kg",))
     _seed_demographics(root_a, {"bodyweight-kg": "90"})
     html_a = app_shell.render(store.read_all(root_a))
-    assert "name='bodyweight-kg' value='90'" in html_a, "the saved 90 weight is not pre-filled"
-    assert "name='bodyweight-kg' value='60'" not in html_a, "a different (unsaved) weight was pre-filled"
+    assert "name='bodyweight-kg' value='198'" in html_a, "the saved 90 kg (198 lb) weight is not pre-filled"
+    assert "name='bodyweight-kg' value='132'" not in html_a, "a different (unsaved) weight was pre-filled"
 
     root_b = tmp_path / "b"
     _seed_complete_profile(root_b, exclude=("bodyweight-kg",))
     _seed_demographics(root_b, {"bodyweight-kg": "60"})
     html_b = app_shell.render(store.read_all(root_b))
-    assert "name='bodyweight-kg' value='60'" in html_b, "the saved 60 weight is not pre-filled"
-    assert "name='bodyweight-kg' value='90'" not in html_b, "a different (unsaved) weight was pre-filled"
+    assert "name='bodyweight-kg' value='132'" in html_b, "the saved 60 kg (132 lb) weight is not pre-filled"
+    assert "name='bodyweight-kg' value='198'" not in html_b, "a different (unsaved) weight was pre-filled"
 
     root_c = tmp_path / "c"
     _seed_complete_profile(root_c, exclude=("bodyweight-kg",))
     _seed_demographics(root_c, {"bodyweight-kg": "60"}, timepoint="2026-05-01T00:00:00+00:00")
     _seed_demographics(root_c, {"bodyweight-kg": "90"}, timepoint="2026-06-01T00:00:00+00:00")
     html_c = app_shell.render(store.read_all(root_c))
-    assert "name='bodyweight-kg' value='90'" in html_c, "the latest reading is not pre-filled"
-    assert "name='bodyweight-kg' value='60'" not in html_c, "the stale (older) reading was pre-filled"
+    assert "name='bodyweight-kg' value='198'" in html_c, "the latest reading (90 kg = 198 lb) is not pre-filled"
+    assert "name='bodyweight-kg' value='132'" not in html_c, "the stale (older) reading was pre-filled"
 
 
 def test_demographic_form_blank_default_on_empty_store():
@@ -1020,7 +1023,7 @@ def test_prefill_consumer_integrity_no_silent_noop(tmp_path):
     html = app_shell.render(store.read_all(root))
     # the prefill hits the AMENDED targets (the rework wired the new replace literals)
     assert "name='date-of-birth' value='1986-04-12'>" in html, "the amended date input was not pre-filled"
-    assert "name='bodyweight-kg' value='82'" in html, "the amended bodyweight-kg number was not pre-filled"
+    assert "name='bodyweight-kg' value='181'" in html, "the amended bodyweight-kg number was not pre-filled as pounds (82 kg = 181 lb)"
     assert "data-prefill='saved'" in html and "✓ Saved" in html, "no saved-state banner on the pre-filled form"
     # the RETIRED targets are GONE — a stale replace cannot pass vacuously
     assert 'placeholder="e.g. 1986"' not in html, "the retired year-text replace target still renders"
@@ -1866,3 +1869,20 @@ def test_wizard_doc_cards_reflect_loaded_state_not_static_link():
     fresh = app_shell.render([])
     assert "genotypes loaded" not in fresh, "a fresh store wrongly shows a loaded DNA card"
     assert "23andMe or AncestryDNA raw export" in fresh, "the fresh-store DNA card lost its '+ Link' affordance"
+
+
+def test_myinfo_weight_shows_pounds_not_mislabeled_kg(tmp_path):
+    """Regression (operator report): My-Info shows the weight in POUNDS with a matching lbs label.
+
+    The store is canonical kg; the bug rendered the kg number under the default 'lbs' label, so a
+    108 kg / 238 lb operator saw "108 lbs". The fix converts kg -> lb for display AND selects the
+    lbs option so the number and its unit agree. Failing-capable: reds if the raw kg value shows or
+    the lbs option is not selected.
+    """
+    root = tmp_path / "store"
+    _seed_complete_profile(root, exclude=("bodyweight-kg",))
+    _seed_demographics(root, {"bodyweight-kg": "108"})
+    html = app_shell.render(store.read_all(root))
+    assert "name='bodyweight-kg' value='238'" in html, "My-Info did not show the weight in pounds (108 kg = 238 lb)"
+    assert "name='bodyweight-kg' value='108'" not in html, "My-Info showed the raw kg value (the mislabel bug)"
+    assert "value='lbs' selected" in html, "the lbs unit is not selected to match the pounds value"

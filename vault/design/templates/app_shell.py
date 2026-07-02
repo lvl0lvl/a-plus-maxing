@@ -340,9 +340,20 @@ def _prefill_form(html, store_read):
 
     weight = saved.get(_DEMOGRAPHIC_WEIGHT)
     if weight is not None:
+        # The store is canonical kg; the operator's unit is pounds. Convert kg -> lb for the
+        # My-Info display AND select the lbs unit, so the number and its label agree — the bug
+        # was the kg value shown under the default 'lbs' label (e.g. "108 lbs" for a 108 kg /
+        # 238 lb operator). A faithful conversion, never a fabricated value; a non-numeric value
+        # falls back to as-is under kg (no conversion).
+        try:
+            display = str(round(float(weight) / 0.453592))
+            unit_opt = "<option value='lbs'>lbs</option>"
+            html = html.replace(unit_opt, "<option value='lbs' selected>lbs</option>", 1)
+        except (ValueError, TypeError):
+            display = _esc(weight)
         html = html.replace(
             "name='bodyweight-kg' placeholder=\"Weight\"",
-            f"name='bodyweight-kg' value='{_esc(weight)}' placeholder=\"Weight\"",
+            f"name='bodyweight-kg' value='{display}' placeholder=\"Weight\"",
             1,
         )
 
