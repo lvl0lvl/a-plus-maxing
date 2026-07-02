@@ -290,9 +290,13 @@ def _confirm_question(proposed):
             "I could not classify your medications with confidence. Please confirm whether these "
             f"interaction classes apply before I record them: {', '.join(proposed)}."
         )
+    # No classes were proposed — do NOT ask the operator to "confirm classes" that do not exist. State
+    # honestly that nothing was auto-recorded and that the medications will be reviewed (the client
+    # renders this WITHOUT a confirm button, since there is nothing to confirm).
     return (
-        "I could not classify your medications with confidence. Please confirm your medication "
-        "interaction classes before I record them."
+        "I could not automatically classify your medications into interaction classes, so I have not "
+        "recorded anything — they'll be reviewed as part of your plan. There's nothing for you to "
+        "confirm right now; you can add detail about them in chat if you'd like."
     )
 
 

@@ -1527,19 +1527,24 @@ function wizKeySave(btn){
   if(cur && !cur.confirmed && cur.confirm_question){
     botMsg(cur.confirm_question);
     var classes=cur.proposed_classes||[];
-    var row=document.createElement('div'); row.className='msg bot';
-    var yes=document.createElement('button'); yes.className='btn primary'; yes.textContent='Confirm'; yes.style.marginRight='8px';
-    var no=document.createElement('button'); no.className='btn ghost'; no.textContent='Not now';
-    yes.addEventListener('click',function(){ yes.disabled=true; no.disabled=true;
-      fetch('/confirm-curation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({classes:classes})})
-        .then(function(r){return r.json();}).then(function(d){
-          sysMsg((d&&d.confirmed&&d.confirmed.length)?('Recorded '+d.confirmed.join(', ')+' for your plan.'):'Nothing was recorded.');
-          thread.scrollTop=thread.scrollHeight;
-        }).catch(function(){ sysMsg('Could not record that — you can revisit it in chat.'); });
-    });
-    no.addEventListener('click',function(){ yes.disabled=true; no.disabled=true;
-      sysMsg('Okay — nothing recorded. You can revisit this in chat.'); });
-    row.appendChild(yes); row.appendChild(no); thread.appendChild(row);
+    // ONLY offer a Confirm/Not-now choice when there are actually proposed classes to confirm. When
+    // the model returned no confident classification, `proposed_classes` is empty — a "Confirm"
+    // button there records nothing and reads as "asked me to confirm, but showed nothing" (the bug).
+    if(classes.length){
+      var row=document.createElement('div'); row.className='msg bot';
+      var yes=document.createElement('button'); yes.className='btn primary'; yes.textContent='Confirm'; yes.style.marginRight='8px';
+      var no=document.createElement('button'); no.className='btn ghost'; no.textContent='Not now';
+      yes.addEventListener('click',function(){ yes.disabled=true; no.disabled=true;
+        fetch('/confirm-curation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({classes:classes})})
+          .then(function(r){return r.json();}).then(function(d){
+            sysMsg((d&&d.confirmed&&d.confirmed.length)?('Recorded '+d.confirmed.join(', ')+' for your plan.'):'Nothing was recorded.');
+            thread.scrollTop=thread.scrollHeight;
+          }).catch(function(){ sysMsg('Could not record that — you can revisit it in chat.'); });
+      });
+      no.addEventListener('click',function(){ yes.disabled=true; no.disabled=true;
+        sysMsg('Okay — nothing recorded. You can revisit this in chat.'); });
+      row.appendChild(yes); row.appendChild(no); thread.appendChild(row);
+    }
   }
   thread.scrollTop=thread.scrollHeight;
   // The questions live in the Care Assistant thread — bring the operator there to see them.

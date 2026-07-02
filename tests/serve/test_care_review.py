@@ -543,3 +543,24 @@ def test_bare_dob_in_med_value_defers_isolating_date_like(dated, clean, tmp_path
     assert any("rx-interaction-curation" in json.dumps(c) for c in clean_backend.calls), (
         "the clean companion made no curation call"
     )
+
+
+def test_confirm_question_with_no_proposed_classes_does_not_ask_to_confirm_nothing():
+    """When the model proposed 0 classes, the message does NOT ask the operator to 'confirm classes'.
+
+    A confirm-when-unsure prompt with an EMPTY proposed set previously read "Please confirm your
+    medication interaction classes before I record them" while showing nothing — the operator saw a
+    confirm prompt with nothing to confirm. The empty-proposed message must instead state honestly that
+    nothing was recorded, with no imperative to confirm a non-existent class list.
+    """
+    from scripts.serve import care_review
+    msg = care_review._confirm_question([])
+    assert "Please confirm your medication interaction classes" not in msg, (
+        "the empty-proposed message still asks the operator to confirm classes that do not exist"
+    )
+    assert "not recorded anything" in msg or "nothing" in msg.lower(), (
+        "the empty-proposed message does not honestly state that nothing was recorded"
+    )
+    # the non-empty case still asks to confirm the actual proposed classes.
+    with_classes = care_review._confirm_question(["androgen", "cyp3a4"])
+    assert "androgen" in with_classes and "cyp3a4" in with_classes, "the proposed classes are not surfaced to confirm"
