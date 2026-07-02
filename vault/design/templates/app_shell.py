@@ -401,6 +401,56 @@ def _lock_to_create_profile(html):
     return _mark_screen_active(html, "screen-wizard")
 
 
+# The wizard fields the Create-Profile flow can pre-fill from an already-populated store, so an
+# operator who ingested data in a prior session (DNA/wearable/partial demographics) does NOT re-type
+# what the store already holds. Keyed by the store item; the wizard input carries the same name.
+_WIZARD_PREFILL_ITEMS = ("date-of-birth", "sex-for-dosing", "equipment-access-class", "goal-domains")
+
+
+def _wizard_prefill_script(store_read):
+    """Emit a `window.__aplusSaved` script with the store values the wizard can pre-fill (client-side).
+
+    The locked Create-Profile wizard is NOT server-side pre-filled (its inputs are static markup); the
+    client reads this blob on load and populates the matching wizard fields when there is no in-progress
+    draft, so an operator who already has demographics/goals in the store re-enters only what is genuinely
+    missing. The values are the operator's own (a local DOB, de-identified class tokens) rendered back over
+    loopback — the same posture as `_prefill_form`. `</` is escaped so a value can never break the tag.
+    """
+    import json
+
+    rows = store_read if isinstance(store_read, list) else []
+    saved = _latest_values(rows, _WIZARD_PREFILL_ITEMS)
+    blob = json.dumps(saved).replace("</", "<\\/")
+    return f"<script>window.__aplusSaved={blob};</script>"
+
+
+def _wizard_loaded_note(status, store_read):
+    """A Documents-step note naming the data already loaded, so the wizard does not look empty.
+
+    An operator who ingested DNA/wearable/labs in a prior session should SEE that the app holds it —
+    not a wall of empty "+ Link" cards. Reports names/counts only (never a raw reading value), from the
+    live load-state + the genotype-reading count in the store. Empty string when nothing is loaded.
+    """
+    rows = store_read if isinstance(store_read, list) else []
+    parts = []
+    dna = status.get("dna", {}) if isinstance(status, dict) else {}
+    genotype_ct = sum(1 for r in rows if isinstance(r, dict)
+                      and _re.search(r"\brs\d|\bi\d{6}", str(r.get("item", ""))))
+    if genotype_ct:
+        parts.append(f"{genotype_ct} genotypes")
+    elif dna.get("loaded"):
+        parts.append("DNA")
+    if status.get("wearable", {}).get("loaded") if isinstance(status, dict) else False:
+        parts.append("wearable data")
+    if status.get("labs", {}).get("loaded") if isinstance(status, dict) else False:
+        parts.append("labs")
+    if not parts:
+        return ""
+    return ("<div class='note' style='margin-bottom:11px'>"
+            f"<b>✓ Already loaded:</b> {_esc(', '.join(parts))}. You don't need to re-add these — "
+            "link any additional documents below, or manage them later in My Info.</div>")
+
+
 def render(store_read=None, *, status=None, _today=None):
     """Return the inline-asset SPA shell HTML with the Upload doc-cards at the live load-state.
 
@@ -431,6 +481,8 @@ def render(store_read=None, *, status=None, _today=None):
         .replace("<!--DOC_CARDS-->", _doc_cards(status))
         .replace("<!--PLAN_ZONE-->", _plan_zone(store_read, today))
         .replace("<!--REFERRAL_ZONE-->", _referral_zone(store_read))
+        .replace("<!--SAVED_PROFILE-->", _wizard_prefill_script(store_read))
+        .replace("<!--WIZARD_LOADED_NOTE-->", _wizard_loaded_note(status, store_read))
     )
     html = _prefill_form(html, store_read)
     if _intake_complete(store_read):

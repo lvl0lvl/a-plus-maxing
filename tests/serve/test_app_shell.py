@@ -1759,3 +1759,70 @@ def test_t10_referral_zone_honest_empty_when_no_flags(tmp_path):
     assert "<!--REFERRAL_ZONE-->" not in panel, "the referral-zone placeholder was left unsubstituted"
     for label in app_shell._REFERRAL_LABELS.values():
         assert label not in panel, f"an unflagged doctor-visit referral label {label!r} surfaced on a clean profile"
+
+
+# --------------------------------------------------------------------------- #
+# S104 follow-on — the Create-Profile wizard recognizes data ALREADY in the store
+# (bead xwbe operator feedback: "don't you have that already?"): pre-fill the wizard
+# from the store + name the already-loaded data + wire the (previously dead) doc upload.
+# --------------------------------------------------------------------------- #
+
+
+def _r(item, value, tp="2026-06-01T00:00:00+00:00"):
+    """One flat store reading (the `store.read_all` shape)."""
+    return {"item": item, "timepoint": tp, "source": "intake", "value": value}
+
+
+def test_wizard_prefills_saved_profile_from_populated_store():
+    """A partial store injects `window.__aplusSaved` so the wizard pre-fills what's already saved.
+
+    An operator who ingested demographics/goals in a prior session should NOT re-enter them. Render
+    over a PARTIAL store (sex + equipment + goal-domains, no safety markers → still locked) injects a
+    `window.__aplusSaved` blob carrying those values for the client to pre-fill. Failing-capable: with
+    the prefill unwired the blob is absent/empty.
+    """
+    import json
+    rows = [_r("sex-for-dosing", "male"), _r("equipment-access-class", "full-home-gym"),
+            _r("goal-domains", "Workout;Nutrition")]
+    html = app_shell.render(rows)
+    assert 'id="screen-wizard"' in html, "the partial-profile body is not the locked Create-Profile wizard"
+    m = re.search(r"window\.__aplusSaved=(\{.*?\});", html)
+    assert m, "the wizard-prefill script (window.__aplusSaved) is not injected"
+    saved = json.loads(m.group(1))
+    assert saved.get("sex-for-dosing") == "male", f"prefill missing sex-for-dosing: {saved}"
+    assert saved.get("equipment-access-class") == "full-home-gym", f"prefill missing equipment: {saved}"
+    assert saved.get("goal-domains") == "Workout;Nutrition", f"prefill missing goal-domains: {saved}"
+
+
+def test_wizard_prefill_is_empty_on_a_fresh_store():
+    """A fresh store injects an EMPTY prefill blob (no fabricated data) — the non-tautology control."""
+    import json
+    m = re.search(r"window\.__aplusSaved=(\{.*?\});", app_shell.render([]))
+    assert m and json.loads(m.group(1)) == {}, "a fresh store should inject an empty prefill blob"
+
+
+def test_wizard_loaded_note_names_already_ingested_data():
+    """The Documents step names data already in the store (genotypes) so the wizard is not empty-looking.
+
+    A store carrying genotype readings renders an "Already loaded" note counting them; a fresh store
+    renders no such note (answer-gated, not a constant).
+    """
+    rows = [_r("ACTN3 rs1815739", "CT"), _r("FTO rs9939609", "AA")]
+    html = app_shell.render(rows)
+    assert "Already loaded" in html and "2 genotypes" in html, "the loaded-data note does not name the ingested genotypes"
+    assert "Already loaded" not in app_shell.render([]), "a fresh store should show no loaded-data note"
+
+
+def test_wizard_documents_upload_is_wired_on_the_locked_body():
+    """The wizard's "+ Link"/dropzone are wired to a file input present on the LOCKED body.
+
+    The My-Info uploader + review panel live in `#screen-team`, which the first-run lock strips — so
+    the wizard's document links were dead. This asserts the locked body carries `#wiz-filepick` and
+    wires `#screen-wizard .doc .link` / `#wiz-drop` to it. Failing-capable: reds if the wizard uploader
+    is absent or unwired.
+    """
+    html = app_shell.render([])  # the locked first-run body
+    assert 'id="wiz-filepick"' in html, "the wizard has no file input (the docs upload is dead on first run)"
+    assert "#screen-wizard .doc .link" in html and "wiz-drop" in html, (
+        "the wizard doc cards/dropzone are not wired to the wizard uploader"
+    )

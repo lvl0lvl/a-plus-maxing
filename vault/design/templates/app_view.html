@@ -734,11 +734,14 @@ select.inp{cursor:pointer}
               <div class="sub">Link what you have. Everything is parsed locally on your device.</div>
               <div class="card" style="margin-top:18px">
                 <div class="note">Supported exports — wearables (Apple Health, Garmin, Whoop, Oura, Fitbit), labs (PDF or CSV), and DNA (23andMe, AncestryDNA). Each file is <b>parsed locally</b> on your device and never uploaded.</div>
+                <!--WIZARD_LOADED_NOTE-->
                 <div class="doc" style="margin-top:11px"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12h4l2 6 4-14 2 8h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><div class="m"><div class="t">Wearable export</div><div class="d">Activity, sleep &amp; vitals — parsed locally</div></div><div class="st"><span class="link">+ Link</span></div></div>
                 <div class="doc"><svg class="ic" viewBox="0 0 24 24"><path d="M6 2h7l5 5v15H6z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 2v5h5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><div class="m"><div class="t">Labs &amp; bloodwork</div><div class="d">PDF or CSV of a recent panel</div></div><div class="st"><span class="link">+ Link</span></div></div>
                 <div class="doc"><svg class="ic" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 8h6M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.6"/></svg><div class="m"><div class="t">Medical history</div><div class="d">Visit summaries, prior plans, records</div></div><div class="st"><span class="link">+ Link</span></div></div>
                 <div class="doc"><svg class="ic" viewBox="0 0 24 24"><path d="M8 3c0 5 8 6 8 9s-8 4-8 9M16 3c0 5-8 6-8 9s8 4 8 9" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><div class="m"><div class="t">DNA</div><div class="d">23andMe or AncestryDNA raw export</div></div><div class="st"><span class="link">+ Link</span></div></div>
-                <div class="drop" style="margin-top:10px">Drop files here or click to browse — labs, history, wearable exports, prior plans. Parsed locally.</div>
+                <div class="drop" id="wiz-drop" style="margin-top:10px">Drop files here or click to browse — labs, history, wearable exports, prior plans. Parsed locally.</div>
+                <input type="file" id="wiz-filepick" style="display:none">
+                <div id="wiz-doc-status" class="upload-status" style="display:none;margin-top:10px"></div>
               </div>
               <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
             </div>
@@ -748,7 +751,7 @@ select.inp{cursor:pointer}
               <div class="card" style="margin-top:18px">
                 <div class="keystate">
                   <div class="klab">Before you save</div>
-                  <div style="margin-bottom:10px"><span class="pill muted">No key saved</span></div>
+                  <div style="margin-bottom:10px"><span class="pill muted" id="wiz-key-pill">No key saved</span></div>
                   <div class="field"><label>Anthropic API key</label><input class="inp" id="wiz-key" type="password" placeholder="sk-ant-…" autocomplete="off"></div>
                   <div style="margin-top:12px;display:flex;align-items:center;gap:12px"><button type="button" class="btn primary" onclick="wizKeySave(this)">Save key</button><span id="wiz-key-msg" style="font-size:12.5px;color:var(--muted)"></span></div>
                 </div>
@@ -831,6 +834,7 @@ select.inp{cursor:pointer}
 </div>
 
 
+<!--SAVED_PROFILE-->
 <script>
 const SPECIALISTS = [
   {id:'care',  name:'Care Assistant',       role:'Your guide across the whole plan', status:'active', icon:'sparkles',      color:'#4A55E8', bg:'#EEF0FE'},
@@ -1398,10 +1402,10 @@ function wizKeySave(btn){
     try{ s.setItem(KEY, JSON.stringify(data)); }catch(e){}
   }
   function restoreDraft(){
-    var s=LS(); if(!s) return;
-    var raw=s.getItem(KEY); if(!raw) return;
-    var data; try{ data=JSON.parse(raw); }catch(e){ return; }
-    if(!data) return;
+    var s=LS(); if(!s) return false;
+    var raw=s.getItem(KEY); if(!raw) return false;
+    var data; try{ data=JSON.parse(raw); }catch(e){ return false; }
+    if(!data) return false;
     Object.keys(data.fields||{}).forEach(function(name){
       if(name==='__weight_unit'){ var wu=document.getElementById('wiz-weight-unit'); if(wu) wu.value=data.fields[name]; return; }
       var el=document.querySelector('#wsteps [name="'+name+'"], #screen-equipment [name="'+name+'"]');
@@ -1417,13 +1421,43 @@ function wizKeySave(btn){
     (data.on||[]).forEach(function(i){ if(labels[i]) labels[i].classList.add('on'); });
     var eq=document.getElementById('equip-access-class'); if(eq && typeof onEquipAccess==='function') onEquipAccess(eq);
     if(data.step && typeof window.gotoStep==='function'){ window.gotoStep(parseInt(data.step,10)); }
+    return true;
+  }
+  // Pre-fill the wizard from data ALREADY in the operator's store (injected server-side as
+  // window.__aplusSaved) when there is no in-progress draft — so an operator who ingested data in a
+  // prior session re-enters only what is genuinely missing, not their whole profile again.
+  function prefillFromSaved(){
+    var saved=window.__aplusSaved; if(!saved || typeof saved!=='object') return;
+    ['date-of-birth','sex-for-dosing','equipment-access-class'].forEach(function(name){
+      if(!saved[name]) return;
+      var el=document.querySelector('#wsteps [name="'+name+'"], #screen-equipment [name="'+name+'"]');
+      if(el && el.type!=='checkbox') el.value=saved[name];
+    });
+    var domains=String(saved['goal-domains']||'').split(';').map(function(x){return x.trim().toLowerCase();}).filter(Boolean);
+    if(domains.length){
+      document.querySelectorAll('#wsteps .wstep[data-step="2"] .opts .opt').forEach(function(l){
+        if(domains.indexOf((l.textContent||'').trim().toLowerCase())!==-1) l.classList.add('on');
+      });
+    }
+    var eq=document.getElementById('equip-access-class'); if(eq && typeof onEquipAccess==='function') onEquipAccess(eq);
+  }
+  // Reflect an already-connected API key on the wizard's step-9 (the operator connected it in a prior
+  // session — don't ask again). Reports presence only (never the value), via the same /settings/key check.
+  function reflectKeyState(){
+    try{ fetch('/settings/key').then(function(r){return r.json();}).then(function(d){
+      if(d&&d.connected){
+        var m=document.getElementById('wiz-key-msg'); if(m){ m.style.color='var(--good)'; m.textContent='✓ Already connected — you can skip this step.'; }
+        var p=document.getElementById('wiz-key-pill'); if(p){ p.className='pill good'; p.textContent='Key connected'; }
+      }
+    }).catch(function(){}); }catch(e){}
   }
   window._wizClearDraft=function(){ var s=LS(); if(s){ try{ s.removeItem(KEY); }catch(e){} } };
   // The locked first-run body has the wizard but not the platform screens; the unlocked body has
   // both. Only restore/save on the locked body (a real wizard to fill); clear the draft once unlocked.
   var unlocked=!!document.getElementById('screen-team');
   if(document.getElementById('wsteps') && !unlocked){
-    restoreDraft();
+    if(!restoreDraft()){ prefillFromSaved(); }  // an in-progress draft wins over the store pre-fill
+    reflectKeyState();
     var onEdit=function(e){ if(e.target.closest && e.target.closest('#wsteps, #screen-equipment')) saveDraft(); };
     document.addEventListener('input', onEdit);
     document.addEventListener('change', onEdit);
@@ -1431,6 +1465,39 @@ function wizKeySave(btn){
   } else if(unlocked){
     window._wizClearDraft();
   }
+})();
+
+/* Create-Profile Documents step: a decoupled uploader so the wizard's "+ Link" cards + dropzone
+   actually work (the My-Info uploader + its review panel live in #screen-team, which the first-run
+   lock strips — so on the wizard those links were dead). A recognized-format file lands via the
+   unchanged /upload seam; an unrecognized format that needs the extract-review flow is directed to
+   My-Info (the review panel is a post-unlock surface). Optional — intake completes without any doc. */
+(function(){
+  var fp=document.getElementById('wiz-filepick'); if(!fp) return;
+  var st=document.getElementById('wiz-doc-status');
+  function setSt(cls,msg){ if(st){ st.className='upload-status '+cls; st.style.display='flex'; st.textContent=msg; } }
+  function wizUp(f){
+    if(!f) return;
+    setSt('info','Linking '+f.name+' — parsed locally…');
+    var fd=new FormData(); fd.append('document',f,f.name);
+    fetch('/upload',{method:'POST',body:fd}).then(function(r){
+      var ct=r.headers.get('content-type')||'';
+      if(ct.indexOf('application/json')!==-1){
+        return r.json().then(function(d){
+          if(d&&d.readings&&d.readings.length){ setSt('info','We found readings in '+f.name+'. Finish setup, then review and confirm them in My Info → Documents.'); }
+          else { setSt('warn','We couldn\'t read new data from '+f.name+' — check it\'s a supported export (wearable, labs PDF/CSV, or DNA).'); }
+        });
+      }
+      return r.text().then(function(){ setSt('ok','✓ Linked '+f.name+' — it\'s in your store.'); });
+    }).catch(function(){ setSt('warn','Upload failed — please try again.'); });
+  }
+  fp.addEventListener('change', function(){ wizUp(fp.files&&fp.files[0]); fp.value=''; });
+  document.addEventListener('click', function(e){
+    if(e.target.closest && (e.target.closest('#screen-wizard .doc .link') || e.target.closest('#wiz-drop'))){ e.preventDefault(); fp.click(); }
+  });
+  var drop=document.getElementById('wiz-drop');
+  if(drop){ drop.addEventListener('dragover',function(e){e.preventDefault();});
+    drop.addEventListener('drop',function(e){e.preventDefault(); wizUp(e.dataTransfer.files&&e.dataTransfer.files[0]);}); }
 })();
 
 /* Care-review surfacing: after a profile save flips the gate, the /upload care-review receipt is
