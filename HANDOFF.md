@@ -3,7 +3,7 @@ title: Session Handoff
 type: note
 owner: Walter McGivney
 created: 2026-05-16
-last_reviewed: 2026-06-29
+last_reviewed: 2026-07-01
 status: active
 depends_on: []
 superseded_by: null
