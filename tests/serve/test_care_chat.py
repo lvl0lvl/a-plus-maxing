@@ -104,17 +104,51 @@ def test_respond_fails_closed_on_model_error(tmp_path):
     assert receipt.get("reply") is None and receipt.get("degraded") is True, "a failed care turn did not fail closed"
 
 
-def test_respond_captures_nothing_no_store_write(tmp_path):
-    """The care conversation writes NOTHING to the store (a conversation, not an intake turn).
+def test_respond_captures_a_proposed_fact_through_the_gate(tmp_path):
+    """A care-agent-proposed fact is WRITTEN to the store through the de-identification gate.
 
-    v1 is conversational — persisting answers to structured store items is a documented follow-on.
-    Proves `respond` adds no store write (the operator's raw answer is not silently captured/mis-routed).
+    The care agent proposes a fact in its `extraction` (here a wired goal token); `respond` routes it
+    through the SAME `extract.persist_extraction` -> `capture.persist_capture` gate the intake chat uses,
+    so it lands in the store and the receipt reports it. Failing-capable: without the store-write wiring
+    the fact never lands.
     """
     root = tmp_path / "store"
+    scaffold = tmp_path / "scaffold"
     _seed(root)
-    before = store.read_all(root)
-    care_chat.respond("my shoulder hurts on the left side", [], client=_RecordingBackend(), store_root=root)
-    assert store.read_all(root) == before, "the care conversation wrote to the store (v1 should capture nothing)"
+
+    class _FactBackend:
+        def converse(self, messages):
+            return {"reply": "Noted — I've set your priority order.",
+                    "extraction": {"goal-priority-order": "recovery then strength"}}
+
+    receipt = care_chat.respond("prioritize recovery then strength", [], client=_FactBackend(),
+                                store_root=root, scaffold_root=scaffold)
+    assert "goal-priority-order" in receipt["receipt"]["store"], f"the proposed fact did not land: {receipt}"
+    landed = [r["value"] for r in store.read("goal-priority-order", root=root)]
+    assert "recovery then strength" in landed, "the care agent's fact was not written to the store"
+
+
+def test_respond_raw_value_under_a_wired_token_routes_record_only_not_the_model_bound_item(tmp_path):
+    """Crown-jewel: a raw value the care agent proposes under a wired token is gated, not trusted.
+
+    The care agent must not be able to write a raw operator string straight into a model-bound token —
+    the gate routes it by data class. A raw drug string proposed under `rx-interaction-classes` (the
+    liaison-curated token, deliberately NOT wired) routes record-only, never the store token. Proves the
+    care store-write rides the SAME gate, adding no trust-the-model path.
+    """
+    root = tmp_path / "store"
+    scaffold = tmp_path / "scaffold"
+    _seed(root)
+
+    class _RawDrugBackend:
+        def converse(self, messages):
+            return {"reply": "ok", "extraction": {"rx-interaction-classes": "atorvastatin 20mg"}}
+
+    care_chat.respond("I take atorvastatin", [], client=_RawDrugBackend(),
+                      store_root=root, scaffold_root=scaffold)
+    assert store.read("rx-interaction-classes", root=root) == [], (
+        "a raw drug string the care agent proposed landed in the model-bound token (gate bypassed)"
+    )
 
 
 def test_respond_tolerates_a_malformed_conversation_entry(tmp_path):
@@ -179,3 +213,41 @@ def test_care_chat_route_answers_with_the_reply(tmp_path):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_care_context_presents_weight_in_both_units_with_the_operator_preference(tmp_path):
+    """The care context carries the weight in BOTH units (lb + kg) + the operator's chosen unit.
+
+    The operator's complaint: they picked pounds but the assistant talked kg. The de-id summary carries
+    `bodyweight-band` in kg; the care context now ALSO carries `operator_weight` in both units and
+    `operator_weight_unit` (the captured preference), so the assistant leads with the operator's unit.
+    Failing-capable: without this the context is kg-only.
+    """
+    import json as _json
+    root = tmp_path / "store"
+    scaffold = tmp_path / "scaffold"
+    scaffold.mkdir(parents=True, exist_ok=True)
+    store.append("bodyweight-kg", {"item": "bodyweight-kg", "timepoint": "2026-06-01T00:00:00+00:00",
+                                   "source": "intake", "value": "108"}, root=root)
+    (scaffold / "capture-2026-06-01T00-00-00.json").write_text(_json.dumps({"bodyweight-unit": "lbs"}))
+    backend = _RecordingBackend()
+    care_chat.respond("hi", [], client=backend, store_root=root, scaffold_root=scaffold)
+    ctx = json.loads(backend.calls[0][0]["content"])
+    assert ctx.get("operator_weight") == "238 lb (108 kg)", f"weight not presented in both units: {ctx.get('operator_weight')}"
+    assert ctx.get("operator_weight_unit") == "pounds", f"the operator's unit preference is not carried: {ctx}"
+
+
+def test_care_context_weight_both_units_even_without_a_captured_preference(tmp_path):
+    """Even with NO captured unit preference (older intake), the context still carries BOTH units.
+
+    So an operator whose intake predates the unit-capture still gets pounds in the assistant's context
+    (their existing case), not kg-only — the preference just isn't asserted.
+    """
+    root = tmp_path / "store"
+    store.append("bodyweight-kg", {"item": "bodyweight-kg", "timepoint": "2026-06-01T00:00:00+00:00",
+                                   "source": "intake", "value": "108"}, root=root)
+    backend = _RecordingBackend()
+    care_chat.respond("hi", [], client=backend, store_root=root, scaffold_root=tmp_path / "no-scaffold")
+    ctx = json.loads(backend.calls[0][0]["content"])
+    assert ctx.get("operator_weight") == "238 lb (108 kg)", "the weight is not presented in both units without a preference"
+    assert "operator_weight_unit" not in ctx, "a preference was asserted when none was captured"

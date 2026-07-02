@@ -413,8 +413,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             turn_text = body.get("turn", "")
             conversation = body.get("conversation", [])
             receipt = care_chat.respond(
-                turn_text, conversation, client=client,
-                store_root=self.store_root, identity_config=self.identity_config,
+                turn_text, conversation, client=client, store_root=self.store_root,
+                scaffold_root=self.scaffold_root, identity_config=self.identity_config,
             )
         except Exception:
             # Thread survival (mirrors _do_chat): a malformed body / a dispatch exception must NOT drop

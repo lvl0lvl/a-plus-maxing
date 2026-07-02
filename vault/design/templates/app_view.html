@@ -1320,10 +1320,12 @@ function wizKeySave(btn){
       var s=l.getAttribute('data-safety'), v=l.getAttribute('data-val')||'';
       if(safety[s]===undefined || !isNeg(v)) safety[s]=v; });
     Object.keys(safety).forEach(function(s){ data[s]=safety[s]; });
-    // Body weight -> kg (capture stores the kg-normalized number; the unit select is client-side only).
+    // Body weight -> kg (capture stores the kg-normalized number). ALSO record the operator's chosen
+    // unit (record-only) so the assistant/plan can talk weight in the operator's unit, not kg-only.
     var w=document.querySelector('#wsteps [name="bodyweight-kg"]');
     if(w && data['bodyweight-kg']){
       var unit=w.parentElement?w.parentElement.querySelector('select'):null;
+      if(unit && unit.value){ data['bodyweight-unit']=unit.value; }
       if(unit && unit.value==='lbs'){ var kg=parseFloat(data['bodyweight-kg']);
         if(!isNaN(kg)) data['bodyweight-kg']=String(Math.round(kg*0.453592)); }
     }
