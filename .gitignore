@@ -36,3 +36,4 @@ coordination/
 .claude/scheduled_tasks.lock
 .impeccable/
 prototype/
+vault/conversations/

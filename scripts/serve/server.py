@@ -148,6 +148,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         if path == "/settings/key":
             self._key_status()
             return
+        if path == "/conversation":
+            self._do_get_conversation()
+            return
         if path != "/":
             self.send_error(404)
             return
@@ -288,6 +291,17 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         # below is the honest 0-spend degrade.
         review_response = self._maybe_care_review(store_root, scaffold_root, identity_config, fields)
         if review_response is not None:
+            # Persist the care-review OPENING questions to the conversation vault so a later reload
+            # restores the full conversation (the questions + the operator's replies), not only the
+            # replies. A recording failure must not drop the response (the review already succeeded).
+            try:
+                from scripts.serve import conversation_store
+                for question in (review_response.get("questions") or []):
+                    if question:
+                        conversation_store.record_turn("care", "assistant", question,
+                                                       root=self._conversation_root())
+            except Exception:
+                pass
             self._write_json(200, review_response)
             return
 
@@ -403,7 +417,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         import json
 
         from scripts.model.client import ModelClient
-        from scripts.serve import care_chat
+        from scripts.serve import care_chat, conversation_store
 
         client = self.client if self.client is not None else ModelClient()
         try:
@@ -412,16 +426,59 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             body = json.loads(raw.decode("utf-8")) if raw else {}
             turn_text = body.get("turn", "")
             conversation = body.get("conversation", [])
+            thread = body.get("thread") or "care"
             receipt = care_chat.respond(
                 turn_text, conversation, client=client, store_root=self.store_root,
                 scaffold_root=self.scaffold_root, identity_config=self.identity_config,
             )
+            # Persist the turn pair to the gitignored conversation vault so the conversation survives a
+            # reload (restored via GET /conversation) — the operator never redoes it. A recording failure
+            # must NOT drop the request thread (the reply already succeeded), so it is caught below.
+            conv_root = self._conversation_root()
+            try:
+                conversation_store.record_turn(thread, "user", turn_text, root=conv_root)
+                if receipt.get("reply"):
+                    conversation_store.record_turn(thread, "assistant", receipt["reply"], root=conv_root)
+            except Exception:
+                pass
         except Exception:
             # Thread survival (mirrors _do_chat): a malformed body / a dispatch exception must NOT drop
             # the request thread. Answer a degraded response, never a fabricated reply.
             self._write_json(400, {"reply": None, "degraded": True, "reason": "bad request"})
             return
         self._write_json(200, receipt)
+
+    def _conversation_root(self):
+        """The conversation vault root for this instance — `<store_root parent>/conversations`.
+
+        Derives from `store_root` so a test/scratch store (`APLUS_DATA_ROOT`) keeps its conversations
+        alongside it; None `store_root` (production) -> `conversation_store`'s `vault/conversations/`
+        default. The vault is gitignored (PII on-device only, the scaffold posture).
+        """
+        if self.store_root is None:
+            return None
+        from pathlib import Path
+
+        return Path(self.store_root).parent / "conversations"
+
+    def _do_get_conversation(self):
+        """Answer GET `/conversation?thread=<id>` with the stored conversation turns (the reload restore).
+
+        Reads the thread's conversation from the gitignored conversation vault and returns
+        `{"turns": [{"role", "content"}, ...]}` so the SPA can restore a prior conversation on load
+        (the operator never redoes it). An unknown/absent thread returns an empty list. Read-only.
+        """
+        from urllib.parse import parse_qs, urlparse
+
+        from scripts.serve import conversation_store
+
+        query = parse_qs(urlparse(self.path).query)
+        thread = (query.get("thread") or ["care"])[0]
+        try:
+            turns = conversation_store.read_turns(thread, root=self._conversation_root())
+        except Exception:
+            turns = []
+        self._write_json(200, {"turns": turns})
 
     def _do_confirm_extraction(self):
         """Land the operator-confirmed extracted readings via the unchanged sink.

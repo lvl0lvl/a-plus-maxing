@@ -392,7 +392,7 @@ def test_chat_composer_fetches_chat_renders_reply_and_intake_progress():
 def test_spa_fetch_targets_are_all_same_origin_loopback():
     """AC-6 (fetch-leg): every fetch target is a same-origin loopback path (0 non-loopback class)."""
     html = _spa_html()
-    targets = re.findall(r"fetch\(\s*['\"]([^'\"]+)['\"]", html)
+    targets = [t.split("?", 1)[0] for t in re.findall(r"fetch\(\s*['\"]([^'\"]+)['\"]", html)]
     assert targets, "the SPA makes no fetch call (the chat composer is not wired)"
     for t in targets:
         assert t.startswith("/") and not t.startswith("//") and "://" not in t, (
@@ -412,7 +412,7 @@ def test_spa_fetch_targets_are_all_same_origin_loopback():
     # tokens persist through the unchanged on-device store sink (never a raw drug string, never
     # off-machine) — the same LOCAL class as /confirm-extraction, adding no new egress class.
     assert set(targets) <= {"/chat", "/care-chat", "/upload", "/settings/key", "/confirm-extraction",
-                            "/generate-plan", "/confirm-curation"}, (
+                            "/generate-plan", "/confirm-curation", "/conversation"}, (
         f"the SPA fetches a path beyond the known loopback routes "
         f"(/chat + /upload + /settings/key + /confirm-extraction + /generate-plan + /confirm-curation): "
         f"{sorted(set(targets))}"
@@ -1047,7 +1047,7 @@ _GENERIC_SOURCES = ("Apple Health", "Garmin", "Whoop", "Oura", "Fitbit", "23andM
 
 # Every same-origin loopback path the SPA may fetch/POST to (no new route — ADR-0033).
 _KNOWN_LOOPBACK = {"/chat", "/care-chat", "/upload", "/settings/key", "/confirm-extraction",
-                   "/generate-plan", "/confirm-curation"}
+                   "/generate-plan", "/confirm-curation", "/conversation"}
 
 
 def _wizard_html(html):
@@ -1127,7 +1127,7 @@ def test_wizard_documents_and_key_reuse_existing_seams_with_key_affordance():
     assert "fetch('/upload'" in html, "the existing /upload flow the wizard Documents step reuses is gone"
     assert "fetch('/confirm-extraction'" in html, "the existing /confirm-extraction flow is gone"
     assert "/settings/key" in html, "the existing /settings/key flow the wizard key step reuses is gone"
-    targets = set(re.findall(r"fetch\(\s*['\"]([^'\"]+)['\"]", html))
+    targets = {t.split("?", 1)[0] for t in re.findall(r"fetch\(\s*['\"]([^'\"]+)['\"]", html)}
     assert targets and targets <= _KNOWN_LOOPBACK, f"the wizard added a fetch path beyond the known set: {sorted(targets - _KNOWN_LOOPBACK)}"
     wiz = _wizard_html(html)
     assert "keymask" in wiz, "the wizard key step carries no masked key affordance"

@@ -977,8 +977,11 @@ function _chatSend(composer){
  _conv[cid].push({role:'user',content:txt}); ta.value=''; thread.scrollTop=thread.scrollHeight;
  // The Care-with-Team thread is the POST-unlock care conversation (profile-aware, carries the
  // clarifying questions) -> /care-chat; the pre-unlock intake elicitation stays on /chat.
- var endpoint=(cid==='team-chat')?'/care-chat':'/chat';
- fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turn:txt,conversation:_conv[cid]})})
+ var isCare=(cid==='team-chat');
+ var endpoint=isCare?'/care-chat':'/chat';
+ var payload={turn:txt,conversation:_conv[cid]};
+ if(isCare) payload.thread=activeSpec;  // the conversation vault thread (per specialist)
+ fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
   .then(function(r){return r.json();})
   .then(function(d){var b=document.createElement('div'); b.className='msg bot';
     if(d&&d.reply){ b.textContent=d.reply; _conv[cid].push({role:'assistant',content:d.reply}); }
@@ -1518,14 +1521,28 @@ function wizKeySave(btn){
    stashed and the shell reloads; render the clarifying questions + the confirm-when-unsure meds
    curation into the Care Assistant thread (HIGH-1: the receipt was previously read as HTML and dropped). */
 (function(){
+  var thread=document.querySelector('#team-chat .chat-thread'); if(!thread) return;  // unlocked body only
+  function botMsg(text){ var b=document.createElement('div'); b.className='msg bot'; b.textContent=text; thread.appendChild(b); }
+  function sysMsg(text){ var b=document.createElement('div'); b.className='msg sys'; b.textContent=text; thread.appendChild(b); }
   var raw=null; try{ raw=sessionStorage.getItem('aplus_care_review'); }catch(e){}
-  if(!raw) return;
+  if(!raw){
+    // NO care-review receipt -> a normal load: RESTORE the stored conversation from the vault so the
+    // operator never redoes it (persisted per turn via /care-chat). Renders the turns + seeds _conv.
+    fetch('/conversation?thread=care').then(function(r){return r.json();}).then(function(d){
+      var turns=(d&&d.turns)||[]; if(!turns.length) return;
+      _conv['team-chat']=[];
+      turns.forEach(function(t){
+        var b=document.createElement('div'); b.className='msg '+(t.role==='user'?'me':'bot'); b.textContent=t.content; thread.appendChild(b);
+        _conv['team-chat'].push({role:t.role,content:t.content});
+      });
+      thread.scrollTop=thread.scrollHeight;
+    }).catch(function(){});
+    return;
+  }
+  // FIRST unlock: surface the one-time care-review receipt (questions + curation) + seed _conv.
   try{ sessionStorage.removeItem('aplus_care_review'); }catch(e){}
   var receipt; try{ receipt=JSON.parse(raw); }catch(e){ return; }
   if(!receipt || receipt.deferred) return;  // no key / a failed call -> honest degrade, nothing to surface
-  var thread=document.querySelector('#team-chat .chat-thread'); if(!thread) return;
-  function botMsg(text){ var b=document.createElement('div'); b.className='msg bot'; b.textContent=text; thread.appendChild(b); }
-  function sysMsg(text){ var b=document.createElement('div'); b.className='msg sys'; b.textContent=text; thread.appendChild(b); }
   var questions=receipt.questions||(receipt.reply?[receipt.reply]:[]);
   // Seed the care conversation with the clarifying questions as assistant turns, so when the operator
   // replies the /care-chat model sees its own questions + the profile and continues coherently (rather

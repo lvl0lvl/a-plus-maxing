@@ -272,3 +272,49 @@ def test_care_context_labels_chronological_age_and_glossarizes_the_token(tmp_pat
     assert "training-age-band" in glossary and "chronological age" in glossary["training-age-band"], (
         f"the training-age-band token is not glossed as chronological age: {glossary}"
     )
+
+
+def test_care_chat_persists_turn_and_get_conversation_restores(tmp_path):
+    """A /care-chat turn is persisted to the conversation vault and GET /conversation restores it.
+
+    The persistence + restore that makes conversations survive a reload (the operator never redoes
+    them): a /care-chat POST records the operator turn + the assistant reply into a gitignored
+    conversation file (sibling of the store), and GET /conversation?thread=care returns those turns.
+    """
+    import http.client
+    import threading
+
+    from scripts.model.client import ModelClient
+    from scripts.serve import server as serve_server
+
+    class _Backend:
+        def converse(self, messages):
+            return {"reply": "Noted — tell me more.", "extraction": []}
+
+    _seed(tmp_path / "store")
+    srv = serve_server.build_server(
+        0, store_root=tmp_path / "store", dna_root=tmp_path / "dna",
+        scaffold_root=tmp_path / "scaffold", client=ModelClient(backend=_Backend()),
+    )
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("POST", "/care-chat",
+                     body=json.dumps({"turn": "my left shoulder hurts", "conversation": [], "thread": "care"}).encode(),
+                     headers={"Content-Type": "application/json"})
+        conn.getresponse().read()
+        conn.close()
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("GET", "/conversation?thread=care")
+        data = json.loads(conn.getresponse().read().decode())
+        conn.close()
+        turns = data["turns"]
+        assert {"role": "user", "content": "my left shoulder hurts"} in turns, f"the operator turn was not restored: {turns}"
+        assert any(t["role"] == "assistant" and t["content"] == "Noted — tell me more." for t in turns), (
+            f"the assistant reply was not restored: {turns}"
+        )
+    finally:
+        srv.shutdown()
+        srv.server_close()
+    assert (tmp_path / "conversations" / "care.md").exists(), "the conversation was not written to the gitignored vault"
