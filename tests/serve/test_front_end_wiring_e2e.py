@@ -239,6 +239,8 @@ def test_markup_carries_the_wiring_contract(tmp_path):
     assert "!data[r[0]] && !saved[r[0]]" in locked, "submitProfile does not honor fields already in the store (forces needless re-entry)"
     assert "_wizClearDraft" in locked, "the draft is not cleared once the profile completes"
     assert "if(classes.length){" in locked, "the meds-curation Confirm button is not gated on there being classes to confirm"
+    assert "(cid==='team-chat')?'/care-chat':'/chat'" in locked, "the Care Assistant thread is not routed to the profile-aware /care-chat"
+    assert "_conv['team-chat'].push({role:'assistant'" in locked, "the care-review questions are not seeded into the care conversation"
 
 
 def test_ui_driven_markup_gather_flips_gate_and_unlocks(tmp_path):

@@ -1992,14 +1992,17 @@ def test_care_review_adds_no_route_no_new_client(tmp_path):
     # care_review constructs no client and imports no SDK / outbound HTTP client.
     assert "ModelClient(" not in care_src, "care_review constructs a second ModelClient"
     assert "anthropic" not in care_src, "care_review imports the model-client SDK"
-    # server.py's ONLY ModelClient construction stays the pre-existing _do_chat fallback (count 1).
-    assert server_src.count("ModelClient(") == 1, "the T8 server hunk added a second ModelClient construction"
+    # server.py's ModelClient constructions are the per-route lazy fallbacks only (no-client-injected
+    # default): `_do_chat` + `_do_care_chat` = 2. Both are the same `self.client or ModelClient()` shape
+    # (the SDK import + key resolve stay lazy inside the backend); T8's care-review adds none.
+    assert server_src.count("ModelClient(") == 2, "an unexpected ModelClient construction was added to server.py"
     # T8 (care-review) added NO route — it fires inside the existing /upload final-save path. The
-    # POST route branches match on `self.path == "/..."`: /chat, /settings/key, /confirm-extraction,
-    # /confirm-curation (T10), /generate-plan = 5. (do_GET now matches on a query-stripped local `path`
-    # so a cache-bust `/?v=2` URL serves the app rather than 404 — it no longer uses `self.path ==`.)
+    # POST route branches match on `self.path == "/..."`: /chat, /care-chat, /settings/key,
+    # /confirm-extraction, /confirm-curation (T10), /generate-plan = 6. (/care-chat is the post-unlock
+    # profile-aware Care Assistant conversation; do_GET matches on a query-stripped local `path` so a
+    # cache-bust `/?v=2` URL serves the app rather than 404 — it does not use `self.path ==`.)
     assert 'self.path == "/care-review"' not in server_src, "T8 added a /care-review route"
-    assert server_src.count('self.path == "/') == 5, "the POST route-table branch count changed unexpectedly"
+    assert server_src.count('self.path == "/') == 6, "the POST route-table branch count changed unexpectedly"
     assert '_LOOPBACK = "127.0.0.1"' in server_src, "the loopback bind literal changed"
     # An unknown POST still 404s (the route table is unchanged).
     srv, port = _server_with_care_review(tmp_path, _CareReviewBackend())

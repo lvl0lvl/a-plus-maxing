@@ -975,7 +975,10 @@ function _chatSend(composer){
  var host=wrap.closest('[id]'), cid=host?host.id:'chat'; _conv[cid]=_conv[cid]||[];
  var me=document.createElement('div'); me.className='msg me'; me.textContent=txt; thread.appendChild(me);
  _conv[cid].push({role:'user',content:txt}); ta.value=''; thread.scrollTop=thread.scrollHeight;
- fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turn:txt,conversation:_conv[cid]})})
+ // The Care-with-Team thread is the POST-unlock care conversation (profile-aware, carries the
+ // clarifying questions) -> /care-chat; the pre-unlock intake elicitation stays on /chat.
+ var endpoint=(cid==='team-chat')?'/care-chat':'/chat';
+ fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turn:txt,conversation:_conv[cid]})})
   .then(function(r){return r.json();})
   .then(function(d){var b=document.createElement('div'); b.className='msg bot';
     if(d&&d.reply){ b.textContent=d.reply; _conv[cid].push({role:'assistant',content:d.reply}); }
@@ -1522,7 +1525,11 @@ function wizKeySave(btn){
   function botMsg(text){ var b=document.createElement('div'); b.className='msg bot'; b.textContent=text; thread.appendChild(b); }
   function sysMsg(text){ var b=document.createElement('div'); b.className='msg sys'; b.textContent=text; thread.appendChild(b); }
   var questions=receipt.questions||(receipt.reply?[receipt.reply]:[]);
-  questions.forEach(function(q){ if(q) botMsg(q); });
+  // Seed the care conversation with the clarifying questions as assistant turns, so when the operator
+  // replies the /care-chat model sees its own questions + the profile and continues coherently (rather
+  // than the reply hitting a context-free chat — the disconnect the operator hit).
+  _conv['team-chat']=_conv['team-chat']||[];
+  questions.forEach(function(q){ if(q){ botMsg(q); _conv['team-chat'].push({role:'assistant',content:q}); } });
   var cur=receipt.curation;
   if(cur && !cur.confirmed && cur.confirm_question){
     botMsg(cur.confirm_question);

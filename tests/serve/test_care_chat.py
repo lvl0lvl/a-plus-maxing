@@ -1,0 +1,181 @@
+"""Profile-aware Care Assistant conversation tests (the continuous post-unlock care chat).
+
+`care_chat.respond` is the POST-unlock care conversation — distinct from `chat.dispatch_turn` (the
+pre-unlock intake elicitation, which carries only the de-identified gap-set and extracts facts). It
+re-reads the de-identified `router.summarize` profile server-side each turn and carries it as context
+so the Care Assistant reasons over the operator's full (de-identified) profile and the conversation
+stays coherent (the care-review clarifying questions are the opening turns). ONE `converse` call over
+the no-train lane; 0 raw PII in the profile context; fail-closed on a failed call.
+
+MOCK/FIXTURE-tested at 0 live spend: a recording mock backend records the converse payload; the store
+is a tmp root. No live API, no key, no non-loopback socket.
+"""
+
+import functools
+import json
+
+import pytest
+
+from scripts.model.client import ModelCallError
+from scripts.plan import router
+from scripts.serve import care_chat
+from scripts.store import store
+
+
+class _RecordingBackend:
+    """A converse backend that records the payload and returns a scripted reply."""
+
+    def __init__(self, *, reply="Got it — tell me more about the shoulder.", raise_error=False):
+        self.reply = reply
+        self.raise_error = raise_error
+        self.calls = []
+
+    def converse(self, messages):
+        self.calls.append(messages)
+        if self.raise_error:
+            raise ModelCallError("model down")
+        return {"reply": self.reply, "extraction": []}
+
+
+def _seed(root):
+    """Seed a small de-identifiable profile into a tmp store (drives router.summarize)."""
+    for item, value in (("sex-for-dosing", "male"), ("equipment-access-class", "full-home-gym"),
+                        ("goal-domains", "Workout;Nutrition"), ("date-of-birth", "1970")):
+        store.append(item, {"item": item, "timepoint": "2026-06-01T00:00:00+00:00",
+                            "source": "intake", "value": value}, root=root)
+
+
+def _reader(root):
+    return functools.partial(store.read, root=root)
+
+
+def test_respond_carries_the_de_id_profile_plus_conversation_plus_turn(tmp_path):
+    """The care turn's payload = the de-identified profile context + the conversation + the turn.
+
+    `respond` re-reads `router.summarize` server-side and builds a converse payload whose first turn
+    carries the FULL de-identified profile (not the intake gap-set), followed by the prior conversation
+    and the current operator turn. Proves the Care Assistant reasons over the profile AND has the
+    conversation continuity (the opening clarifying questions ride in `conversation`).
+    """
+    root = tmp_path / "store"
+    _seed(root)
+    backend = _RecordingBackend()
+    conversation = [{"role": "assistant", "content": "Is 55 your age or your training years?"}]
+    receipt = care_chat.respond("It's my age.", conversation, client=backend, store_root=root)
+    assert receipt["reply"] == backend.reply, "the care turn did not return the model reply"
+    assert len(backend.calls) == 1, "the care turn did not make exactly one converse call"
+    payload = backend.calls[0]
+    # First turn = the de-identified profile context.
+    first = json.loads(payload[0]["content"])
+    assert first.get("task") == "care-conversation", "the first turn is not the care-conversation profile context"
+    assert first["profile"] == router.summarize(_reader(root)), "the context profile is not the server-derived de-id summary"
+    # The prior conversation (the opening question) + the current turn are present, in order.
+    contents = [t["content"] for t in payload]
+    assert "Is 55 your age or your training years?" in contents, "the opening question is not carried in the conversation"
+    assert payload[-1]["content"] == "It's my age.", "the current operator turn is not the last message"
+    # Every entry is API-valid (role in {user, assistant}, string content).
+    for t in payload:
+        assert t["role"] in ("user", "assistant") and isinstance(t["content"], str)
+
+
+def test_respond_profile_context_carries_no_raw_pii(tmp_path):
+    """The profile context is the de-identified summary — 0 raw DOB / raw values on the wire.
+
+    A store with a full-date DOB derives an AGE token (never the date string); the care payload's
+    profile context must carry the de-identified token, not the raw date. Proves the care conversation
+    rides the same de-id boundary as leg-1 of the care review.
+    """
+    root = tmp_path / "store"
+    store.append("date-of-birth", {"item": "date-of-birth", "timepoint": "2026-06-01T00:00:00+00:00",
+                                   "source": "intake", "value": "1986-03-14"}, root=root)
+    _seed(root)
+    backend = _RecordingBackend()
+    care_chat.respond("hi", [], client=backend, store_root=root)
+    wire = json.dumps(backend.calls[0])
+    assert "1986-03-14" not in wire, "the raw DOB crossed into the care-conversation payload (de-id breach)"
+
+
+def test_respond_fails_closed_on_model_error(tmp_path):
+    """A failed/empty model call returns an honest degraded reply — no fabrication."""
+    root = tmp_path / "store"
+    _seed(root)
+    backend = _RecordingBackend(raise_error=True)
+    receipt = care_chat.respond("hi", [], client=backend, store_root=root)
+    assert receipt.get("reply") is None and receipt.get("degraded") is True, "a failed care turn did not fail closed"
+
+
+def test_respond_captures_nothing_no_store_write(tmp_path):
+    """The care conversation writes NOTHING to the store (a conversation, not an intake turn).
+
+    v1 is conversational — persisting answers to structured store items is a documented follow-on.
+    Proves `respond` adds no store write (the operator's raw answer is not silently captured/mis-routed).
+    """
+    root = tmp_path / "store"
+    _seed(root)
+    before = store.read_all(root)
+    care_chat.respond("my shoulder hurts on the left side", [], client=_RecordingBackend(), store_root=root)
+    assert store.read_all(root) == before, "the care conversation wrote to the store (v1 should capture nothing)"
+
+
+def test_respond_tolerates_a_malformed_conversation_entry(tmp_path):
+    """A malformed conversation entry is skipped, not char-splatted into the payload (thread survival)."""
+    root = tmp_path / "store"
+    _seed(root)
+    backend = _RecordingBackend()
+    care_chat.respond("hi", [{"bad": "shape"}, "not-a-dict", {"role": "user", "content": "real"}],
+                      client=backend, store_root=root)
+    contents = [t["content"] for t in backend.calls[0]]
+    assert "real" in contents, "a well-formed prior turn was dropped"
+    assert "not-a-dict" not in contents, "a malformed entry was char-splatted into the payload"
+
+
+def test_care_chat_route_answers_with_the_reply(tmp_path):
+    """POST /care-chat answers with the Care Assistant reply (route wiring + thread survival).
+
+    Drives the production `build_server` over tmp roots with an injected mock backend: a POST /care-chat
+    turn returns the model reply as JSON; a malformed body degrades (never a dropped thread); an unknown
+    POST still 404s. 0 live spend (mock backend, no key).
+    """
+    import http.client
+    import threading
+
+    from scripts.model.client import ModelClient
+    from scripts.serve import server as serve_server
+
+    class _Backend:
+        def converse(self, messages):
+            self.messages = messages
+            return {"reply": "Thanks — I've noted your shoulder is left-side. What movements aggravate it?",
+                    "extraction": []}
+
+    backend = _Backend()
+    _seed(tmp_path / "store")
+    srv = serve_server.build_server(
+        0, store_root=tmp_path / "store", dna_root=tmp_path / "dna",
+        scaffold_root=tmp_path / "scaffold", client=ModelClient(backend=backend),
+    )
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("POST", "/care-chat",
+                     body=json.dumps({"turn": "my left shoulder hurts",
+                                      "conversation": [{"role": "assistant", "content": "Tell me about the shoulder."}]}).encode(),
+                     headers={"Content-Type": "application/json"})
+        resp = conn.getresponse()
+        data = json.loads(resp.read().decode())
+        conn.close()
+        assert resp.status == 200 and data["reply"].startswith("Thanks"), f"/care-chat did not answer: {data}"
+        # the payload carried the de-id profile context + the opening question.
+        wire = json.dumps(backend.messages)
+        assert "care-conversation" in wire and "Tell me about the shoulder." in wire, "the care payload dropped the profile/opening"
+        # a malformed body degrades, never drops the thread.
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("POST", "/care-chat", body=b"not json{{{", headers={"Content-Type": "application/json"})
+        bad = conn.getresponse()
+        bad_body = json.loads(bad.read().decode())
+        conn.close()
+        assert bad.status != 200 and bad_body.get("degraded") is True, "a malformed care-chat body was not degraded"
+    finally:
+        srv.shutdown()
+        srv.server_close()

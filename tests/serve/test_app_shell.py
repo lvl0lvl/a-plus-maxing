@@ -376,7 +376,11 @@ def test_chat_composer_fetches_chat_renders_reply_and_intake_progress():
     reading the intake-progress signal.
     """
     html = _spa_html()
-    assert "fetch('/chat'" in html, "the chat composer JS does not fetch the /chat route"
+    # The composer POSTs to the chat lane via an endpoint variable: the pre-unlock intake elicitation
+    # stays on /chat; the post-unlock Care-with-Team thread routes to the profile-aware /care-chat.
+    assert "fetch(endpoint" in html and "'/care-chat':'/chat'" in html, (
+        "the chat composer JS does not POST to the /chat (intake) or /care-chat (care) lane"
+    )
     assert "turn:txt" in html, "the /chat POST body does not carry the typed turn"
     assert "d.reply" in html, "the chat JS does not consume the assistant reply"
     assert "chat-thread" in html, "no thread container the assistant reply mounts into"
@@ -407,7 +411,7 @@ def test_spa_fetch_targets_are_all_same_origin_loopback():
     # is likewise a LOCAL same-origin POST: the operator-confirmed de-identified interaction-class
     # tokens persist through the unchanged on-device store sink (never a raw drug string, never
     # off-machine) — the same LOCAL class as /confirm-extraction, adding no new egress class.
-    assert set(targets) <= {"/chat", "/upload", "/settings/key", "/confirm-extraction",
+    assert set(targets) <= {"/chat", "/care-chat", "/upload", "/settings/key", "/confirm-extraction",
                             "/generate-plan", "/confirm-curation"}, (
         f"the SPA fetches a path beyond the known loopback routes "
         f"(/chat + /upload + /settings/key + /confirm-extraction + /generate-plan + /confirm-curation): "
@@ -1042,8 +1046,8 @@ _WIZARD_STEP_HEADINGS = (
 _GENERIC_SOURCES = ("Apple Health", "Garmin", "Whoop", "Oura", "Fitbit", "23andMe", "AncestryDNA")
 
 # Every same-origin loopback path the SPA may fetch/POST to (no new route — ADR-0033).
-_KNOWN_LOOPBACK = {"/chat", "/upload", "/settings/key", "/confirm-extraction", "/generate-plan",
-                   "/confirm-curation"}
+_KNOWN_LOOPBACK = {"/chat", "/care-chat", "/upload", "/settings/key", "/confirm-extraction",
+                   "/generate-plan", "/confirm-curation"}
 
 
 def _wizard_html(html):

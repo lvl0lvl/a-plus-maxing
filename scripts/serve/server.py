@@ -14,7 +14,7 @@ the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`) -> re-render t
 shell via `generate.run('app')` reflecting the new load-state. The server serves NO
 generated dashboard/report artifact live (ADR-0013 Falsification 3); the route table
 is {GET `/`, GET `/settings/key`, POST `/upload`, POST `/chat`, POST `/settings/key`,
-POST `/confirm-extraction`, POST `/confirm-curation`, POST `/generate-plan`}. POST `/confirm-extraction`
+POST `/care-chat`, POST `/confirm-extraction`, POST `/confirm-curation`, POST `/generate-plan`}. POST `/confirm-extraction`
 (ADR-0030-T3) lands ONLY the operator-confirmed subset of an unrecognized-format
 upload's extracted readings through the UNCHANGED sink — the `/upload` handler surfaces
 those readings and lands 0. POST `/generate-plan` authors + records a plan for each
@@ -108,9 +108,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     POST `/upload` stages the multipart body, routes the staged file into the unchanged
     `ingest.run`/`dna.land` seam, and re-renders the app shell reflecting the new
     load-state. Any other POST 404s — the route table is {GET `/`, GET `/settings/key`,
-    POST `/upload`, POST `/chat`, POST `/settings/key`, POST `/confirm-extraction`,
-    POST `/confirm-curation`, POST `/generate-plan`}, never a directory listing or an
-    artifact-serving route.
+    POST `/upload`, POST `/chat`, POST `/care-chat`, POST `/settings/key`,
+    POST `/confirm-extraction`, POST `/confirm-curation`, POST `/generate-plan`}, never a
+    directory listing or an artifact-serving route.
 
     Attributes:
         store_root: The time-series store root the POST handler ingests into and
@@ -156,6 +156,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/chat":
             self._do_chat()
+            return
+        if self.path == "/care-chat":
+            self._do_care_chat()
             return
         if self.path == "/settings/key":
             self._save_key()
@@ -383,6 +386,40 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                 "progress": None, "degraded": True, "degrade_to": "form",
                 "reason": "bad request",
             })
+            return
+        self._write_json(200, receipt)
+
+    def _do_care_chat(self):
+        """Run one POST `/care-chat` turn: the profile-aware Care Assistant conversation.
+
+        The POST-unlock care conversation (distinct from `/chat`'s pre-unlock intake elicitation):
+        reads a JSON turn body (`{"turn", "conversation"?}`) and runs `care_chat.respond`, which
+        re-reads the de-identified `router.summarize` profile server-side and carries it as context so
+        the assistant reasons over the whole profile and the conversation (incl. the care-review opening
+        questions the client carries back) stays coherent. The ONE outbound model call is the respond's
+        `client.converse`. A malformed body or a dispatch/model exception is CAUGHT and answered with a
+        degraded response — the request thread is never dropped (mirroring `_do_chat`).
+        """
+        import json
+
+        from scripts.model.client import ModelClient
+        from scripts.serve import care_chat
+
+        client = self.client if self.client is not None else ModelClient()
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length) if length else b""
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+            turn_text = body.get("turn", "")
+            conversation = body.get("conversation", [])
+            receipt = care_chat.respond(
+                turn_text, conversation, client=client,
+                store_root=self.store_root, identity_config=self.identity_config,
+            )
+        except Exception:
+            # Thread survival (mirrors _do_chat): a malformed body / a dispatch exception must NOT drop
+            # the request thread. Answer a degraded response, never a fabricated reply.
+            self._write_json(400, {"reply": None, "degraded": True, "reason": "bad request"})
             return
         self._write_json(200, receipt)
 
