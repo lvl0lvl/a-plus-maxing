@@ -23,6 +23,10 @@ from scripts.store import biomarker_meta
 SUMMARY_FIELD_SET = (
     # operator-profile (de-identified)
     "training-age-band",
+    # coarse training-EXPERIENCE band (years lifting) — DISTINCT from `training-age-band`
+    # (chronological age) and `training-volume-band` (weekly volume). Derived from the
+    # named-excluded `raw-training-experience` local source; only the band crosses (NFR-1).
+    "training-experience-band",
     "sex-for-dosing",
     "bodyweight-band",
     "equipment-access-class",
@@ -66,6 +70,10 @@ EXCLUDED_RAW_PII = (
     # tripwire pins it out of the field set and the dispatch whitelist rejects it; only the
     # de-associated current-weight+trend `bodyweight-band` token crosses (the crown jewel).
     "bodyweight-kg",
+    # the operator's stated years-of-training-experience local source — named-excluded so
+    # the exact number stays local (shown in My-Info) and only the coarse
+    # `training-experience-band` crosses to the planner (via `_experience_band`).
+    "raw-training-experience",
     "government-id",
     # contact
     "email-address",
@@ -129,6 +137,9 @@ _RAW_TO_FIELD = {
     "raw-supplement-free-text": "supplement-stack-class",
     "raw-peptide-free-text": "peptide-use-class",
     "raw-training-detail-free-text": "training-volume-band",
+    # demographic years-of-training-experience -> coarse experience band (mirrors
+    # `date-of-birth -> training-age-band`: the raw number stays local, the band crosses).
+    "raw-training-experience": "training-experience-band",
 }
 
 
@@ -347,6 +358,33 @@ def _age_band(readings):
     if dob > today:
         return "age-unknown"
     return str(today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day)))
+
+
+def _experience_band(readings):
+    """Derive the coarse training-experience band from the locally-stored years-of-training.
+
+    The operator's stated years of training experience is a demographic raw source kept LOCAL
+    (the crown jewel, NFR-1): only this coarse band crosses to the no-train planner, never the
+    exact number. Bands the latest numeric reading into novice / early-intermediate /
+    intermediate / advanced / veteran; no reading (a fresh operator) or a non-numeric value
+    emits the `unspecified` no-signal default, so this field's ALWAYS-SET membership never
+    trips dispatch's partial-summary raise.
+    """
+    values = [n for r in readings if (n := biomarker_meta.to_number(r["value"])) is not None]
+    if not values:
+        # No stated experience (or a non-numeric value) -> the shared ALWAYS-SET no-signal
+        # sentinel the other always-set derivers use, so a fresh operator reads consistently.
+        return _NOT_DISCUSSED
+    years = values[-1]
+    if years < 1:
+        return "novice"
+    if years < 3:
+        return "early-intermediate"
+    if years < 5:
+        return "intermediate"
+    if years <= 10:
+        return "advanced"
+    return "veteran"
 
 
 def _bodyweight_trend(readings):
@@ -592,6 +630,7 @@ def _training_volume_band(readings):
 # token sourced from the demographic equipment selection, not a postal-address derivation.
 _FIELD_DERIVATION = {
     "training-age-band": _age_band,
+    "training-experience-band": _experience_band,
     "bodyweight-band": _bodyweight_trend,
     "active-issue-class": _issue_class,
     # chat-sourced rich-domain coarse band/class derivers (ADR-0019-T1).
@@ -614,6 +653,10 @@ _ALWAYS_SET_DERIVED = (
     "supplement-stack-class",
     "peptide-use-class",
     "training-volume-band",
+    # demographic: ALWAYS set so an operator who has not stated training experience (every
+    # operator onboarded before this field existed) gets the `unspecified` default rather
+    # than an absent field that would trip dispatch's partial-summary raise.
+    "training-experience-band",
 )
 
 # §5b change-control tripwire (Finding 4-2): every raw source item must be a

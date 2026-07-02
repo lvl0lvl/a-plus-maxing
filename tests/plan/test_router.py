@@ -33,6 +33,7 @@ def _expected_age(iso_dob):
 # no token was added or removed (byte-identical field set).
 _PINNED_FIELD_SET = (
     "training-age-band",
+    "training-experience-band",
     "sex-for-dosing",
     "bodyweight-band",
     "equipment-access-class",
@@ -2038,3 +2039,25 @@ def test_age_and_weight_conditional_omitted_when_absent():
     assert "bodyweight-band" not in summary  # RED today: pass-through would include the stale item
     # A complete clean summary (both sources present) dispatches without a partial raise.
     router.dispatch(router.summarize(_clean_store_read()))
+
+
+def test_experience_band_bands_years_and_defaults_to_sentinel():
+    """`_experience_band` bands stated years and emits the shared no-signal sentinel when absent.
+
+    Bands the latest numeric years into the coarse experience class the planner reads; a fresh
+    operator (no reading) or a non-numeric value emits `_NOT_DISCUSSED` — the same ALWAYS-SET
+    sentinel the other always-set derivers use, so `training-experience-band`'s membership never
+    trips dispatch's partial-summary raise.
+    """
+    band = lambda y: router._experience_band([{"value": str(y)}])
+    assert band(0.5) == "novice"
+    assert band(2) == "early-intermediate"
+    assert band(4) == "intermediate"
+    assert band(8) == "advanced"
+    assert band(25) == "veteran"
+    # no reading / non-numeric -> the shared always-set sentinel (never a fabricated band)
+    assert router._experience_band([]) == router._NOT_DISCUSSED
+    assert router._experience_band([{"value": "lots"}]) == router._NOT_DISCUSSED
+    # it is a registered ALWAYS-SET derived field (present for a fresh operator)
+    assert "training-experience-band" in router._ALWAYS_SET_DERIVED
+    assert "training-experience-band" in router.SUMMARY_FIELD_SET

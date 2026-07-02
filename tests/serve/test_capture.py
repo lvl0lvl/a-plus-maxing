@@ -1550,3 +1550,32 @@ def test_dispatch_rejects_injected_safety_screen_field():
     injected["safety-screen::exercise-safety"] = "positive"
     with pytest.raises(ValueError, match="out-of-field-set"):
         dispatch(injected)
+
+
+def test_training_experience_routes_raw_local_band_crosses(tmp_path):
+    """The wizard training-experience number writes the RAW local source, never the band token.
+
+    Crown-jewel (NFR-1): the operator's exact years land under the named-excluded
+    `raw-training-experience` local item (shown in My-Info); the coarse `training-experience-band`
+    the planner reads is DERIVED by `summarize`, never written by capture directly. Failing-capable:
+    if capture wrote the band token directly, the `== []` band-absent assertion reds.
+    """
+    import functools
+
+    from scripts.plan import router
+    from scripts.serve import capture
+    from scripts.store import store
+
+    receipt = capture.persist_capture({"training-experience": "25"}, root=tmp_path,
+                                       scaffold_root=tmp_path / "sc")
+    # the raw source landed local; the band token was NOT written directly
+    assert [r["value"] for r in store.read("raw-training-experience", root=tmp_path)] == ["25"]
+    assert store.read("training-experience-band", root=tmp_path) == [], "capture wrote the band token directly (crown-jewel breach)"
+    assert "raw-training-experience" in receipt["store"]
+    # only the DERIVED band crosses; the raw number never enters the summary
+    summary = router.summarize(functools.partial(store.read, root=tmp_path))
+    assert summary["training-experience-band"] == "veteran"
+    assert "25" not in str(summary.get("training-experience-band")), "the exact number leaked into the crossing token"
+    # the raw source is named-excluded (the dispatch whitelist would reject it)
+    assert "raw-training-experience" in router.EXCLUDED_RAW_PII
+    assert "raw-training-experience" not in router.SUMMARY_FIELD_SET

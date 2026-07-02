@@ -122,6 +122,14 @@ _DOB_FIELD = "date-of-birth"
 # lbs/kg unit conversion is T4's client-side affordance).
 _WEIGHT_FIELD = "bodyweight-kg"
 
+# The training-experience number form field -> the RAW `raw-training-experience` local item
+# `summarize` de-identifies into the coarse `training-experience-band` (via `_experience_band`).
+# Mirrors `_DOB_FIELD`/`_WEIGHT_FIELD`: the field writes the named-excluded raw source (the
+# operator's exact years, kept local + shown in My-Info), NEVER the band token directly (only
+# the coarse band crosses to the planner — the crown jewel).
+_EXPERIENCE_FIELD = "training-experience"
+_EXPERIENCE_RAW_ITEM = "raw-training-experience"
+
 # The chat-sourced rich-domain free-text form fields (ADR-0019-T1) -> their NAMED-EXCLUDED
 # raw source store items, which `summarize` de-identifies into the coarse band/class tokens
 # (`dietary-pattern-class` / `supplement-stack-class` / `peptide-use-class` /
@@ -369,6 +377,13 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
             # named-excluded raw PII (the dashboard chart's local feed, OQ-5 ADR-0034).
             store.append(_WEIGHT_FIELD, _reading(_WEIGHT_FIELD, value), root=store_root)
             written_tokens.append(_WEIGHT_FIELD)
+        elif name == _EXPERIENCE_FIELD:
+            # The training-experience number -> the RAW `raw-training-experience` local item
+            # summarize de-identifies into the coarse `training-experience-band` (via
+            # `_experience_band`). NEVER the band directly — the exact years are named-excluded
+            # (kept local + shown in My-Info; only the coarse band crosses to the planner).
+            store.append(_EXPERIENCE_RAW_ITEM, _reading(_EXPERIENCE_RAW_ITEM, value), root=store_root)
+            written_tokens.append(_EXPERIENCE_RAW_ITEM)
         elif name in _CHAT_RAW_SOURCE_FIELDS:
             # A chat-sourced rich-domain free-text (nutrition/supplement/peptide/training
             # detail) -> its NAMED-EXCLUDED raw source item, which summarize de-identifies

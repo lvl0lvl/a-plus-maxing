@@ -112,6 +112,7 @@ _PHQ2_RAW_ANSWER = "felt hopeless nearly every day for weeks"
 # catches. (The recipe prose said "18 members"; the live tuple is 17 — the mechanism is pinned here.)
 _PINNED_SUMMARY_FIELD_SET = (
     "training-age-band",
+    "training-experience-band",
     "sex-for-dosing",
     "bodyweight-band",
     "equipment-access-class",

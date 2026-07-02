@@ -404,7 +404,8 @@ def _lock_to_create_profile(html):
 # The wizard fields the Create-Profile flow can pre-fill from an already-populated store, so an
 # operator who ingested data in a prior session (DNA/wearable/partial demographics) does NOT re-type
 # what the store already holds. Keyed by the store item; the wizard input carries the same name.
-_WIZARD_PREFILL_ITEMS = ("date-of-birth", "sex-for-dosing", "equipment-access-class", "goal-domains")
+_WIZARD_PREFILL_ITEMS = ("date-of-birth", "sex-for-dosing", "equipment-access-class", "goal-domains",
+                         "raw-training-experience")
 
 
 def _wizard_prefill_script(store_read):
@@ -420,6 +421,10 @@ def _wizard_prefill_script(store_read):
 
     rows = store_read if isinstance(store_read, list) else []
     saved = _latest_values(rows, _WIZARD_PREFILL_ITEMS)
+    # The store item is `raw-training-experience` (named-excluded raw source), but the wizard input
+    # is `name='training-experience'`; the client fills by input name, so re-key it to match.
+    if "raw-training-experience" in saved:
+        saved["training-experience"] = saved.pop("raw-training-experience")
     blob = json.dumps(saved).replace("</", "<\\/")
     return f"<script>window.__aplusSaved={blob};</script>"
 
