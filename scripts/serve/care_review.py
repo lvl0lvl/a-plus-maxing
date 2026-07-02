@@ -112,20 +112,40 @@ def review(store_read, *, client, key_available, store_root=None,
     }
 
 
-def confirm_curation(class_tokens, *, store_root=None):
+def confirm_curation(class_tokens, *, store_root=None, identity_config=None):
     """Persist the operator-CONFIRMED `rx-interaction-classes` class tokens (the confirm write).
 
     The follow-up to an uncertain curation: only after the operator confirms does the de-identified
     class token persist as the planner input. Names/de-dupes/normalizes the class tokens and writes
     the single `;`-joined scalar through the UNCHANGED `store.append`.
 
+    Crown-jewel value gate (symmetric with the auto-persist `_curate_meds` path): `rx-interaction-classes`
+    is a model-bound `SUMMARY_FIELD_SET` token whose only downstream backstop is `summarize`'s 8j6
+    `pii_scan.scan_text`, which carries NO date detector. So this confirm write-back runs the SAME
+    `_med_value_has_identity` gate (`pii_scan.scan_text_full` + the `_DATE_LIKE` DOB backstop) that
+    `_curate_meds` runs before any value crosses: if ANY submitted token carries operator identity/contact
+    or a DOB-shaped date, the WHOLE batch defers (persists nothing) — fail-closed, no leaky prefix. This
+    matters because `confirm_curation` is network-reachable (POST `/confirm-curation`): the legitimate UI
+    only ever posts the model's de-identified class proposals, but a crafted loopback POST must not land a
+    raw DOB the planner would then consume.
+
     Args:
         class_tokens (iterable[str]): The confirmed de-identified interaction-class tokens.
         store_root (str | Path, optional): The store root to write into.
+        identity_config (str | Path, optional): The operator-identity token config threaded into the
+            value gate (the same seam the route passes `self.identity_config` through); None falls
+            through to `pii_scan`'s default (the `_DATE_LIKE` DOB backstop applies regardless).
 
     Returns:
-        (dict) `{"confirmed": [tokens]}` — the persisted class tokens (empty when none).
+        (dict) `{"confirmed": [tokens]}` on success; `{"confirmed": [], "deferred": True, "reason": ...}`
+        when a token carried identity/DOB (nothing persists) or when there is nothing to persist.
     """
+    raw = [str(tok) for tok in class_tokens if tok and str(tok).strip()]
+    if any(_med_value_has_identity(tok, identity_config) for tok in raw):
+        # Fail-closed (mirrors _curate_meds): 0 persist, an honest deferred state — never a leaky prefix.
+        return {"confirmed": [], "deferred": True,
+                "reason": ("a confirmed interaction class carried personal details (a name, date of "
+                           "birth, email, phone, or address); nothing was recorded")}
     tokens = _normalize_classes(class_tokens)
     if not tokens:
         return {"confirmed": []}

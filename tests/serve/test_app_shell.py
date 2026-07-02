@@ -403,10 +403,15 @@ def test_spa_fetch_targets_are_all_same_origin_loopback():
     # summary through the no-train author (the SAME off-machine class as /chat, never a new
     # one) and records locally. The off-machine egress set is still the no-train author lane
     # (the per-target loopback assertion above is the egress guard, byte-unchanged; the
-    # enumerated set grows by the one authorized in-app route).
-    assert set(targets) <= {"/chat", "/upload", "/settings/key", "/confirm-extraction", "/generate-plan"}, (
+    # enumerated set grows by the one authorized in-app route). /confirm-curation (ADR-0033-0035-T10)
+    # is likewise a LOCAL same-origin POST: the operator-confirmed de-identified interaction-class
+    # tokens persist through the unchanged on-device store sink (never a raw drug string, never
+    # off-machine) — the same LOCAL class as /confirm-extraction, adding no new egress class.
+    assert set(targets) <= {"/chat", "/upload", "/settings/key", "/confirm-extraction",
+                            "/generate-plan", "/confirm-curation"}, (
         f"the SPA fetches a path beyond the known loopback routes "
-        f"(/chat + /upload + /settings/key + /confirm-extraction + /generate-plan): {sorted(set(targets))}"
+        f"(/chat + /upload + /settings/key + /confirm-extraction + /generate-plan + /confirm-curation): "
+        f"{sorted(set(targets))}"
     )
 
 
@@ -1037,7 +1042,8 @@ _WIZARD_STEP_HEADINGS = (
 _GENERIC_SOURCES = ("Apple Health", "Garmin", "Whoop", "Oura", "Fitbit", "23andMe", "AncestryDNA")
 
 # Every same-origin loopback path the SPA may fetch/POST to (no new route — ADR-0033).
-_KNOWN_LOOPBACK = {"/chat", "/upload", "/settings/key", "/confirm-extraction", "/generate-plan"}
+_KNOWN_LOOPBACK = {"/chat", "/upload", "/settings/key", "/confirm-extraction", "/generate-plan",
+                   "/confirm-curation"}
 
 
 def _wizard_html(html):
@@ -1705,3 +1711,51 @@ def test_t7_unlocked_shell_passes_inline_asset_gate(tmp_path):
     path = _emit_app(tmp_path)
     assert isinstance(path, Path) and path.exists(), "the unlocked shell did not emit (an off-file asset in T7's markup?)"
     assert 'class="gen-roster"' in path.read_text(), "the emitted unlocked body carries no Generate roster"
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T3/T10 — the referral.collate production consumer: the positive
+# safety-screen flags render in the My-Info doctor-visit display (bead xwbe HIGH-4).
+# `referral.collate` had no production caller; the unlocked My-Info panel is its
+# consumer. Fixture-driven over `_complete_profile_readings()` (+ referral rows).
+# --------------------------------------------------------------------------- #
+
+
+def _with_referral(*screens):
+    """A complete-profile flat reading list PLUS a positive `referral::<screen>` flag per screen."""
+    rows = list(_complete_profile_readings())
+    for screen in screens:
+        rows.append({"item": f"referral::{screen}", "timepoint": "2026-06-01T00:00:00+00:00",
+                     "source": "intake", "value": "referral"})
+    return rows
+
+
+def test_t10_referral_flags_render_in_my_info_doctor_visit(tmp_path):
+    """T10/AC4: a positive safety-screen referral flag renders in the My-Info doctor-visit display.
+
+    A complete profile carrying `referral::phq2` + `referral::apnea` (the capture-written positive
+    flags) renders the unlocked My-Info panel with a doctor-visit section naming the flagged screens
+    (the human labels), and the `<!--REFERRAL_ZONE-->` placeholder is substituted (0 raw comment left).
+    Failing-capable: with `referral.collate` unwired the flags never surface (the labels are absent).
+    """
+    panel = _panel_build_html(app_shell.render(_with_referral("phq2", "apnea")))
+    assert "<!--REFERRAL_ZONE-->" not in panel, "the referral-zone placeholder was left unsubstituted"
+    assert app_shell._REFERRAL_LABELS["phq2"] in panel, "the flagged PHQ-2 referral is not surfaced in My-Info"
+    assert app_shell._REFERRAL_LABELS["apnea"] in panel, "the flagged apnea referral is not surfaced in My-Info"
+    # A screen NOT flagged (exercise-safety) is absent — the display is answer-gated, not a constant.
+    assert app_shell._REFERRAL_LABELS["exercise-safety"] not in panel, (
+        "an unflagged screen surfaced a referral (the display is not answer-gated)"
+    )
+
+
+def test_t10_referral_zone_honest_empty_when_no_flags(tmp_path):
+    """T10/AC4 (honest-empty, non-tautological): no positive flags → an honest no-referral state.
+
+    A complete profile with 0 `referral::*` flags renders the doctor-visit section in an honest
+    "nothing flagged" state — none of the three screen labels appear. Proves the positive-flag case
+    above is answer-gated (the section is not a constant that always lists every screen).
+    """
+    panel = _panel_build_html(app_shell.render(_complete_profile_readings()))
+    assert "<!--REFERRAL_ZONE-->" not in panel, "the referral-zone placeholder was left unsubstituted"
+    for label in app_shell._REFERRAL_LABELS.values():
+        assert label not in panel, f"an unflagged doctor-visit referral label {label!r} surfaced on a clean profile"

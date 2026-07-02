@@ -223,6 +223,47 @@ def _plan_zone(store_read, today):
     return "".join(cards)
 
 
+# The human labels for the three intake safety screens whose positive referral flags surface in
+# the My-Info doctor-visit display (ADR-0033-0035-T3/T10). Keyed by the pinned `referral.collate`
+# screen name; the value is the de-identified display label (never the raw operator answer).
+_REFERRAL_LABELS = {
+    "exercise-safety": "Exercise safety — chest pain, dizziness, or breathlessness on exertion",
+    "phq2": "Mood check (PHQ-2)",
+    "apnea": "Possible sleep apnea",
+}
+
+
+def _referral_zone(store_read):
+    """Render the intake safety-screen referral flags for the My-Info doctor-visit display.
+
+    The T3 production consumer of `referral.collate` (which had no caller until T10): each positive
+    `referral::<screen>` flag written at capture becomes a doctor-visit line naming the screen (the
+    de-identified human label, NEVER the raw answer); with 0 flags the section shows an honest
+    "nothing flagged" state. The flags are never a plan input — this is a read-only display over the
+    de-identified positivity signals, mirroring `referral.collate`'s caller contract.
+
+    Args:
+        store_read (list): The flat cross-item reading list (`store.read_all` shape); adapted into
+            the per-item callable `referral.collate` expects.
+
+    Returns:
+        (str) The doctor-visit referral markup (a flagged list, or the honest no-referral note).
+    """
+    from scripts.serve import referral
+
+    rows = store_read if isinstance(store_read, list) else []
+    flagged = referral.collate(
+        lambda item: [r for r in rows if isinstance(r, dict) and r.get("item") == item]
+    )
+    if not flagged:
+        return ("<div class='note'>Nothing from your intake screens was flagged for your "
+                "doctor visit.</div>")
+    items = "".join(f"<li>{_esc(_REFERRAL_LABELS.get(screen, screen))}</li>" for screen in flagged)
+    return (f"<div class='note'>These intake answers are flagged to raise with your doctor — "
+            f"they never enter your plan.</div>"
+            f"<ul style='margin:8px 0 0;padding-left:18px;line-height:1.6'>{items}</ul>")
+
+
 def _latest_values(store_read, names):
     """The latest-by-timepoint stored value for each of `names`, from the flat store read.
 
@@ -389,6 +430,7 @@ def render(store_read=None, *, status=None, _today=None):
         _VIEW.read_text(encoding="utf-8")
         .replace("<!--DOC_CARDS-->", _doc_cards(status))
         .replace("<!--PLAN_ZONE-->", _plan_zone(store_read, today))
+        .replace("<!--REFERRAL_ZONE-->", _referral_zone(store_read))
     )
     html = _prefill_form(html, store_read)
     if _intake_complete(store_read):

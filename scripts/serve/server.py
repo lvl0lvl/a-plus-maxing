@@ -14,7 +14,7 @@ the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`) -> re-render t
 shell via `generate.run('app')` reflecting the new load-state. The server serves NO
 generated dashboard/report artifact live (ADR-0013 Falsification 3); the route table
 is {GET `/`, GET `/settings/key`, POST `/upload`, POST `/chat`, POST `/settings/key`,
-POST `/confirm-extraction`, POST `/generate-plan`}. POST `/confirm-extraction`
+POST `/confirm-extraction`, POST `/confirm-curation`, POST `/generate-plan`}. POST `/confirm-extraction`
 (ADR-0030-T3) lands ONLY the operator-confirmed subset of an unrecognized-format
 upload's extracted readings through the UNCHANGED sink — the `/upload` handler surfaces
 those readings and lands 0. POST `/generate-plan` authors + records a plan for each
@@ -109,7 +109,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     `ingest.run`/`dna.land` seam, and re-renders the app shell reflecting the new
     load-state. Any other POST 404s — the route table is {GET `/`, GET `/settings/key`,
     POST `/upload`, POST `/chat`, POST `/settings/key`, POST `/confirm-extraction`,
-    POST `/generate-plan`}, never a directory listing or an artifact-serving route.
+    POST `/confirm-curation`, POST `/generate-plan`}, never a directory listing or an
+    artifact-serving route.
 
     Attributes:
         store_root: The time-series store root the POST handler ingests into and
@@ -157,6 +158,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/confirm-extraction":
             self._do_confirm_extraction()
+            return
+        if self.path == "/confirm-curation":
+            self._do_confirm_curation()
             return
         if self.path == "/generate-plan":
             self._do_generate_plan()
@@ -428,6 +432,64 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._write_json(400, {"landed": [], "degraded": True, "reason": "bad request"})
             return
         self._write_json(200, {"landed": receipt["store"]})
+
+    def _do_confirm_curation(self):
+        """Persist the operator-CONFIRMED meds-curation class tokens (the confirm-when-unsure write-back).
+
+        Reads a JSON body carrying the operator-confirmed de-identified interaction-class tokens
+        (`{"classes": [...]}`) and persists ONLY those through `care_review.confirm_curation` — a
+        CALLER of the UNCHANGED `store.append` sink (no second sink/gate/key; the operator-confirm
+        IS the gate, the SAME disposes-after-gate shape as `_do_confirm_extraction`). This is the
+        write-back the leg-2 confirm-when-unsure surface needs: an uncertain curation writes 0
+        `rx-interaction-classes` until the operator confirms via this route. Only de-identified
+        CLASS tokens cross here — never a raw drug string (the front-end posts the proposed classes).
+
+        Requires `Content-Type: application/json` (a cross-site CORS-simple `text/plain` POST is
+        rejected 415 BEFORE the body is parsed — the same CSRF gate `_save_key`/`_do_confirm_extraction`
+        apply). An over-ceiling Content-Length is refused 413 BEFORE the body is read (bounded memory).
+        A malformed body is CAUGHT and answered with a degraded JSON response — the request thread is
+        never dropped (mirroring `_do_confirm_extraction`), and no class token persists on a bad body.
+        """
+        import json
+
+        from scripts.serve import care_review
+
+        # CSRF gate (mirrors `_do_confirm_extraction`): require application/json so a cross-site
+        # "simple" request (text/plain, no CORS preflight) cannot drive this class-write route.
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"confirmed": [], "error": "unsupported content-type"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._write_json(400, {"confirmed": [], "degraded": True, "reason": "bad request"})
+            return
+        if length > _CONFIRM_MAX_BYTES:
+            self._write_json(413, {"confirmed": [], "error": "too large"})
+            return
+        try:
+            raw = self.rfile.read(length) if length else b""
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+            classes = body["classes"]
+            if not isinstance(classes, list):
+                raise ValueError("confirm-curation: classes must be a list")
+            # Thread the instance identity_config into the value gate (the same H-2 seam /upload
+            # threads into persist_capture): a token carrying operator identity/DOB defers the whole
+            # batch fail-closed, so a crafted loopback POST cannot land raw PII into the planner token.
+            receipt = care_review.confirm_curation(
+                classes, store_root=self.store_root, identity_config=self.identity_config
+            )
+        except Exception:
+            # Thread survival: a malformed body / a fail-loud persist must NOT kill the request
+            # thread. Answer a degraded response, never a dropped connection — and never a
+            # fabricated or half-written class token.
+            self._write_json(400, {"confirmed": [], "degraded": True, "reason": "bad request"})
+            return
+        # Forward the confirm receipt (its `deferred`/`reason` on an identity-bearing batch is honest
+        # surfacing, not an error — the request succeeded, nothing was persisted).
+        self._write_json(200, {"confirmed": receipt["confirmed"],
+                               **({k: receipt[k] for k in ("deferred", "reason") if k in receipt})})
 
     def _do_generate_plan(self):
         """Author + reconcile + record a plan for the plan domains over stored data; answer JSON.

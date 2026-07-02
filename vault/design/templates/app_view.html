@@ -555,6 +555,10 @@ select.inp{cursor:pointer}
                 <div class="field"><label for='equipment-access-class'>Access</label><select class="inp" id='equipment-access-class' name='equipment-access-class' disabled><option value=''>Select…</option><option value='full-home-gym'>Full home gym</option><option value='commercial-gym'>Commercial gym</option><option value='minimal-equipment'>Minimal equipment</option><option value='bodyweight-only'>Bodyweight only</option></select></div>
               </div>
             </form>
+            <div style="margin-bottom:6px">
+              <div class="seclab">Flagged for your doctor visit</div>
+              <div id="referral-zone"><!--REFERRAL_ZONE--></div>
+            </div>
             <div class="seclab">Documents</div>
             <div id="upload-status" class="upload-status"></div>
             <input type="file" id="filepick" style="display:none">
@@ -647,7 +651,7 @@ select.inp{cursor:pointer}
                 <div class="field"><label>Birthdate</label><input class="inp" type='date' name='date-of-birth'><div class="note">Your exact age is computed from this; your full birth date stays on your machine — only your age is used.</div></div>
                 <div class="field" style="margin-top:11px"><label>Sex (for dosing)</label><select class="inp" name='sex-for-dosing'><option value=''>Select…</option><option value='male'>Male</option><option value='female'>Female</option></select></div>
                 <div class="field" style="margin-top:11px"><label>Race &amp; ethnicity <span style="color:var(--faint);font-weight:500">(optional)</span></label><select class="inp" name='race-ethnicity'><option value=''>Select…</option><option>White / Caucasian</option><option>Black / African American</option><option>Hispanic / Latino</option><option>East Asian</option><option>South Asian</option><option>Middle Eastern</option><option>Native American</option><option>Pacific Islander</option><option>Mixed</option><option>Prefer not to say</option></select><div class="note">Kept on your device for dosing and research population-matching — never sent to the planner. Sensitive, so it is optional.</div></div>
-                <div class="field" style="margin-top:11px"><label>Body weight</label><div style="display:flex;gap:10px"><input class="inp" type='number' name='bodyweight-kg' placeholder="Weight" style="flex:1"><select class="inp" aria-label="Weight unit" style="width:92px;flex:none"><option value='lbs'>lbs</option><option value='kg'>kg</option></select></div><div class="note">Logged over time so your plan can track weight-change progress.</div></div>
+                <div class="field" style="margin-top:11px"><label>Body weight</label><div style="display:flex;gap:10px"><input class="inp" type='number' name='bodyweight-kg' placeholder="Weight" style="flex:1"><select class="inp" aria-label="Weight unit" style="width:92px;flex:none"><option value='' selected>Unit</option><option value='lbs'>lbs</option><option value='kg'>kg</option></select></div><div class="note">Logged over time so your plan can track weight-change progress.</div></div>
                 <div class="field" style="margin-top:11px"><label>Occupation</label><input class="inp" name='occupation' placeholder="What do you do?"></div>
               </div>
               <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()" style="visibility:hidden">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
@@ -674,7 +678,7 @@ select.inp{cursor:pointer}
               <div class="sub">Sets your training-volume baseline — and screens for anything that should pause hard training.</div>
               <div class="card" style="margin-top:18px">
                 <div class="field"><label>Your training, in your words</label><textarea class="inp" name='training-detail' style="min-height:80px;resize:vertical" placeholder="Days per week, session length, what you train…"></textarea></div>
-                <div class="qcard"><div class="q">During exercise, do you ever have chest pain, dizziness, or shortness of breath?</div><div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>No</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label></div><div class="note warn"><b>Safety screen.</b> A <b>Yes</b> pauses hard-training recommendations and flags a doctor visit before your plan includes heavy load.</div></div>
+                <div class="qcard"><div class="q">During exercise, do you ever have chest pain, dizziness, or shortness of breath?</div><div class="opts"><label class="opt radio" data-safety="exercise-safety" data-val="no" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>No</label><label class="opt radio" data-safety="exercise-safety" data-val="yes" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label></div><div class="note warn"><b>Safety screen.</b> A <b>Yes</b> pauses hard-training recommendations and flags a doctor visit before your plan includes heavy load.</div></div>
                 <div class="field" style="margin-top:11px"><label>Anything we should train around (injury, surgery)?</label><input class="inp" name='train-around' placeholder="e.g. left shoulder impingement"></div>
               </div>
               <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
@@ -715,10 +719,10 @@ select.inp{cursor:pointer}
               <div class="card" style="margin-top:18px">
                 <div class="seclab" style="margin-top:0">Sleep</div>
                 <div class="field"><label>Average hours of sleep</label><input class="inp" name='sleep-hours' style="max-width:140px" placeholder="e.g. 7"></div>
-                <div class="qcard"><div class="q">Has anyone told you that you snore loudly or stop breathing while asleep?</div><div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>No</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label></div><div class="note warn"><b>Screening.</b> A <b>Yes</b> flags a sleep-apnea conversation for your doctor visit — never a plan input.</div></div>
+                <div class="qcard"><div class="q">Has anyone told you that you snore loudly or stop breathing while asleep?</div><div class="opts"><label class="opt radio" data-safety="apnea" data-val="no" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>No</label><label class="opt radio" data-safety="apnea" data-val="yes" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label></div><div class="note warn"><b>Screening.</b> A <b>Yes</b> flags a sleep-apnea conversation for your doctor visit — never a plan input.</div></div>
                 <div class="seclab">Stress &amp; mood</div>
                 <div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Low stress</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Moderate</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>High</label></div>
-                <div class="qcard"><div class="q">Over the last 2 weeks — little interest or pleasure in doing things?</div><div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Not at all</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Several days</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>More than half</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Nearly every day</label></div><div class="q" style="margin-top:13px">Over the last 2 weeks — feeling down, depressed, or hopeless?</div><div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Not at all</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Several days</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>More than half</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Nearly every day</label></div><div class="note">A brief, gentle mood check (PHQ-2). Your answers route to a <b>private referral signal</b>, never into your plan.</div></div>
+                <div class="qcard"><div class="q">Over the last 2 weeks — little interest or pleasure in doing things?</div><div class="opts"><label class="opt radio" data-safety="phq2" data-val="not-at-all" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Not at all</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Several days</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>More than half</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Nearly every day</label></div><div class="q" style="margin-top:13px">Over the last 2 weeks — feeling down, depressed, or hopeless?</div><div class="opts"><label class="opt radio" data-safety="phq2" data-val="not-at-all" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Not at all</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Several days</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>More than half</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Nearly every day</label></div><div class="note">A brief, gentle mood check (PHQ-2). Your answers route to a <b>private referral signal</b>, never into your plan.</div></div>
                 <div class="seclab">Substance use</div>
                 <div class="field"><label>Smoker</label><div class="opts" style="margin-top:0"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Former</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Never</label></div><div class="field" style="margin-top:10px;margin-left:14px;padding-left:13px;border-left:2px solid var(--line)"><label>How many years since you quit? <span style="color:var(--faint);font-weight:500">(if Former)</span></label><div style="display:flex;gap:9px;align-items:center"><input type="number" class="inp" name='smoker-quit-years' style="max-width:120px" placeholder="years"><span style="font-size:13px;color:var(--ink2)">years</span></div></div></div>
                 <div class="field" style="margin-top:11px"><label>Alcohol</label><select class="inp" name='alcohol-frequency'><option value=''>Select…</option><option>None</option><option>Rarely (a few times a year)</option><option>Monthly (1–3/mo)</option><option>Weekly (1–3/wk)</option><option>Most days (4+/wk)</option></select></div>
@@ -745,8 +749,8 @@ select.inp{cursor:pointer}
                 <div class="keystate">
                   <div class="klab">Before you save</div>
                   <div style="margin-bottom:10px"><span class="pill muted">No key saved</span></div>
-                  <div class="field"><label>Anthropic API key</label><input class="inp" type="password" placeholder="sk-ant-…"></div>
-                  <div style="margin-top:12px"><button type="button" class="btn primary">Save key</button></div>
+                  <div class="field"><label>Anthropic API key</label><input class="inp" id="wiz-key" type="password" placeholder="sk-ant-…" autocomplete="off"></div>
+                  <div style="margin-top:12px;display:flex;align-items:center;gap:12px"><button type="button" class="btn primary" onclick="wizKeySave(this)">Save key</button><span id="wiz-key-msg" style="font-size:12.5px;color:var(--muted)"></span></div>
                 </div>
                 <div class="keystate">
                   <div class="klab">After you save</div>
@@ -754,7 +758,7 @@ select.inp{cursor:pointer}
                   <div style="display:flex;align-items:center;gap:13px;margin-top:12px"><button type="button" class="btn ghost">Replace key</button><span style="font-size:13px;font-weight:600;color:var(--good);display:inline-flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>✓ Saved to keychain · stored, never shown again</span></div>
                 </div>
               </div>
-              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; review →</button></div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="show('equipment')">Save &amp; review →</button></div>
             </div>
           </div>
         </div>
@@ -818,7 +822,8 @@ select.inp{cursor:pointer}
             <div class="note" style="margin-top:14px">This becomes your training-equipment baseline.</div>
           </div>
           <div id="equip-bw-note" style="display:none"><div class="note" style="margin-top:16px">No equipment needed — we'll program bodyweight-only.</div></div>
-          <div class="wform-foot"><button type="button" class="btn ghost" onclick="show('wizard')">← Back</button><button type="button" class="btn primary" onclick="show('review')">Save &amp; continue →</button></div>
+          <div id="wiz-submit-note" class="note warn" style="display:none;margin-top:14px"></div>
+          <div class="wform-foot"><button type="button" class="btn ghost" onclick="show('wizard')">← Back</button><button type="button" class="btn primary" onclick="submitProfile(this)">Save &amp; continue →</button></div>
         </div>
       </div>
     </section>
@@ -863,13 +868,17 @@ function renderCalendar(){
 
 const dotFor = st => `<span class="dot ${st}"></span>`;
 
-// side-nav specialist roster
-document.getElementById('team-list').innerHTML = SPECIALISTS.map(s =>
+// side-nav specialist roster (guarded: the LOCKED first-run body strips #screen-team, so the roster
+// hosts are absent — an unguarded .innerHTML there threw and killed the wizard script before its nav
+// handlers were defined, so a first-run operator could not advance the wizard at all).
+var _teamList=document.getElementById('team-list');
+if(_teamList) _teamList.innerHTML = SPECIALISTS.map(s =>
   `<div class="spec" data-spec="${s.id}" onclick="pickSpec('${s.id}')">${tile(s)}<span class="name">${s.name}</span>${dotFor(s.status)}</div>`).join('');
 
 // dashboard care-team summary (skip Care Assistant)
 function statusPill(st){const m={active:['Active','#1FB5A6','#1FB5A6','#E8F7F4'],pending:['Pending','#E8A23B','#9A6A1F','#FBF1E0'],idle:['Idle','#9AA1B4','#9AA1B4','#F5F7FB']}[st];return `<span class="spill" style="background:${m[3]};color:${m[2]}"><span class="sdot" style="background:${m[1]}"></span>${m[0]}</span>`;}
-document.getElementById('dash-team').innerHTML = SPECIALISTS.slice(1).map(s =>
+var _dashTeam=document.getElementById('dash-team');
+if(_dashTeam) _dashTeam.innerHTML = SPECIALISTS.slice(1).map(s =>
   `<div class="speccard">${tile(s)}<div class="sinfo"><div class="sname">${s.name}</div><div class="ssub">${s.role}</div></div>${statusPill(s.status)}</div>`).join('');
 // only fill the placeholder specialist grid when the awaiting-plan state is present; when the
 // server has substituted <!--PLAN_ZONE--> with real recorded plans, the data-awaiting='plan'
@@ -898,11 +907,12 @@ function chatHTML(s, greeting){
 // team screen (workspace): switchable specialist chat — the Care Assistant is the default
 let activeSpec = 'care';
 function renderTeamChat(){
+  var host=document.getElementById('team-chat'); if(!host) return;  // absent on the LOCKED first-run body
   const s = byId(activeSpec);
   const greet = s.id==='care'
     ? "I'm your Care Assistant — ask me anything, or pick a specialist on the left for a deeper dive."
     : `You're now talking with your ${s.name}. ${s.role}. How can I help?`;
-  document.getElementById('team-chat').innerHTML = chatHTML(s, greet);
+  host.innerHTML = chatHTML(s, greet);
   icons();
 }
 function pickSpec(id){
@@ -915,13 +925,19 @@ function pickSpec(id){
 // hash routing
 function go(screen){ location.hash = screen; }
 function show(screen){
+  // Resolve the target screen; fall back only to a screen that EXISTS in this body. On the
+  // first-run LOCKED body the platform screens (incl. screen-dashboard) are stripped, so the
+  // old unconditional `screen-dashboard` fallback resolved to null and threw on `.classList`.
+  const el = document.getElementById('screen-'+screen)
+    || document.getElementById('screen-dashboard')
+    || document.getElementById('screen-wizard');
+  if(!el) return;
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  const el = document.getElementById('screen-'+screen);
-  (el||document.getElementById('screen-dashboard')).classList.add('active');
+  el.classList.add('active');
   document.querySelectorAll('.navitem').forEach(n=>n.classList.toggle('active', n.dataset.screen===screen));
   if(screen==='team'){ document.querySelectorAll('.spec').forEach(e=>e.classList.toggle('active', e.dataset.spec===activeSpec)); }
   if(screen==='profile'){ _pfKeyStatus(); }
-  document.querySelector('.content').scrollTop = 0;
+  var content=document.querySelector('.content'); if(content) content.scrollTop = 0;
 }
 document.querySelectorAll('.navitem').forEach(n=> n.addEventListener('click', ()=> go(n.dataset.screen)));
 window.addEventListener('hashchange', ()=> show((location.hash||'#dashboard').slice(1)));
@@ -1250,5 +1266,148 @@ function onEquipAccess(sel){
   if(detail){ detail.style.display = bw ? 'none' : ''; }
   if(note){ note.style.display = bw ? '' : 'none'; }
 }
+
+/* Single-select radio behaviour for a safety-screen question: pick one, clear its siblings. */
+function pickOne(el){
+  var group = el.parentElement;
+  if(group){ group.querySelectorAll('.opt.radio').forEach(function(o){ if(o!==el) o.classList.remove('on'); }); }
+  el.classList.add('on');
+}
+
+/* Create-Profile wizard step 9: save the Anthropic key so the care review can fire on submit. */
+function wizKeySave(btn){
+  var inp=document.getElementById('wiz-key'), msg=document.getElementById('wiz-key-msg');
+  var key=(inp&&inp.value||'').trim();
+  if(!key){ if(msg) msg.textContent='Enter your key first.'; return; }
+  if(msg) msg.textContent='Saving…';
+  fetch('/settings/key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key:key})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d&&d.ok){ if(inp) inp.value=''; if(msg) msg.textContent='Saved to your keychain.'; }
+      else { if(msg) msg.textContent='Could not save the key — check it and try again.'; }
+    }).catch(function(){ if(msg) msg.textContent='Could not reach the app to save the key.'; });
+}
+
+/* Create-Profile submit: gather every wizard + equipment field, POST the completed profile to the
+   EXISTING /upload capture seam (flips the server-side completeness gate), then reload into the
+   unlocked shell. A JSON care-review receipt (key connected) is stashed for post-reload surfacing. */
+(function(){
+  var NEG=['no','none','not-at-all','negative','never','0'];
+  function isNeg(v){ return NEG.indexOf(String(v||'').trim().toLowerCase())!==-1; }
+  function collect(){
+    var data={};
+    // Every named control across the 9 wizard steps + the equipment screen (the T4↔T1 field contract).
+    document.querySelectorAll('#wsteps [name], #screen-equipment [name]').forEach(function(el){
+      var name=el.getAttribute('name'); if(!name) return;
+      if(el.type==='checkbox'){ if(!el.checked) return;
+        data[name]=data[name]?(data[name]+';'+el.value):el.value; return; }
+      var v=(el.value||'').trim(); if(v) data[name]=v;
+    });
+    // goal-domains: the checked domain chips in step 2 (multi-select), ;-joined.
+    var domains=[];
+    document.querySelectorAll('#wsteps .wstep[data-step="2"] .opts .opt.on').forEach(function(l){
+      var t=(l.textContent||'').trim(); if(t) domains.push(t); });
+    if(domains.length) data['goal-domains']=domains.join(';');
+    // Safety screens: the selected radio's data-val per screen (a positive answer dominates across a
+    // multi-question screen like PHQ-2, so an elevated answer is never masked by a negative one).
+    var safety={};
+    document.querySelectorAll('#wsteps .opt.radio.on[data-safety]').forEach(function(l){
+      var s=l.getAttribute('data-safety'), v=l.getAttribute('data-val')||'';
+      if(safety[s]===undefined || !isNeg(v)) safety[s]=v; });
+    Object.keys(safety).forEach(function(s){ data[s]=safety[s]; });
+    // Body weight -> kg (capture stores the kg-normalized number; the unit select is client-side only).
+    var w=document.querySelector('#wsteps [name="bodyweight-kg"]');
+    if(w && data['bodyweight-kg']){
+      var unit=w.parentElement?w.parentElement.querySelector('select'):null;
+      if(unit && unit.value==='lbs'){ var kg=parseFloat(data['bodyweight-kg']);
+        if(!isNaN(kg)) data['bodyweight-kg']=String(Math.round(kg*0.453592)); }
+    }
+    return data;
+  }
+  var REQUIRED=[['date-of-birth','Birthdate'],['sex-for-dosing','Sex (for dosing)'],
+    ['bodyweight-kg','Body weight'],['goal-domains','at least one goal domain'],
+    ['goal-targets','Goal targets'],['goal-priority-order','Goal priority order'],
+    ['equipment-access-class','Equipment access'],['exercise-safety','the exercise-safety screen'],
+    ['phq2','the mood (PHQ-2) screen'],['apnea','the sleep-apnea screen']];
+  window.submitProfile=function(btn){
+    var data=collect();
+    var note=document.getElementById('wiz-submit-note');
+    var missing=REQUIRED.filter(function(r){ return !data[r[0]]; }).map(function(r){ return r[1]; });
+    // The weight unit must be an EXPLICIT choice (the select defaults to no unit) so a metric
+    // entry is never silently converted as lbs — a wrong unit derives the wrong weight band.
+    var wsel=document.querySelector('#wsteps [name="bodyweight-kg"]');
+    var usel=wsel&&wsel.parentElement?wsel.parentElement.querySelector('select'):null;
+    if(data['bodyweight-kg'] && usel && !usel.value){ missing.push('a weight unit (kg or lbs)'); }
+    if(missing.length){
+      if(note){ note.style.display='block'; note.textContent='Please complete before continuing: '+missing.join(', ')+'.'; }
+      return;
+    }
+    if(note) note.style.display='none';
+    var fd=new FormData(); Object.keys(data).forEach(function(k){ fd.append(k,data[k]); });
+    var lbl=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+    fetch('/upload',{method:'POST',body:fd}).then(function(r){
+      var ct=r.headers.get('content-type')||'';
+      if(ct.indexOf('application/json')!==-1){
+        // A JSON care-review receipt only fires on a COMPLETE profile (the gate flipped) — stash it
+        // so the unlocked shell surfaces the questions, and signal unlocked.
+        return r.json().then(function(d){
+          try{ sessionStorage.setItem('aplus_care_review', JSON.stringify(d)); }catch(e){}
+          return {unlocked:true};
+        });
+      }
+      // An HTML re-render is EITHER the unlocked shell (complete, no key) OR the still-locked wizard
+      // (a required field was diverted server-side — e.g. PII typed into a goal field routes
+      // record-only, so the gate never flips). Discriminate on the unlock marker so a blind reload
+      // never drops the operator onto a blank locked wizard with their data lost + no explanation.
+      // NOTE the split marker literal: the contiguous string is built at runtime so the source does
+      // not embed the platform-surface marker (the render-gate tests assert that marker is ABSENT
+      // from the locked body, and the inline script ships in both bodies).
+      return r.text().then(function(html){ return {unlocked: html.indexOf('id="screen-'+'team"')!==-1}; });
+    }).then(function(res){
+      if(res&&res.unlocked){ location.reload(); return; }  // the gate flipped — reload the unlocked shell
+      if(btn){ btn.disabled=false; btn.textContent=lbl; }
+      if(note){ note.style.display='block'; note.textContent='Some entries could not be saved. Please remove any personal details (a name, phone, email, or address) from your goal and free-text fields, then continue again.'; }
+    }).catch(function(){
+      if(btn){ btn.disabled=false; btn.textContent=lbl; }
+      if(note){ note.style.display='block'; note.textContent='Could not save your profile — please try again.'; }
+    });
+  };
+})();
+
+/* Care-review surfacing: after a profile save flips the gate, the /upload care-review receipt is
+   stashed and the shell reloads; render the clarifying questions + the confirm-when-unsure meds
+   curation into the Care Assistant thread (HIGH-1: the receipt was previously read as HTML and dropped). */
+(function(){
+  var raw=null; try{ raw=sessionStorage.getItem('aplus_care_review'); }catch(e){}
+  if(!raw) return;
+  try{ sessionStorage.removeItem('aplus_care_review'); }catch(e){}
+  var receipt; try{ receipt=JSON.parse(raw); }catch(e){ return; }
+  if(!receipt || receipt.deferred) return;  // no key / a failed call -> honest degrade, nothing to surface
+  var thread=document.querySelector('#team-chat .chat-thread'); if(!thread) return;
+  function botMsg(text){ var b=document.createElement('div'); b.className='msg bot'; b.textContent=text; thread.appendChild(b); }
+  function sysMsg(text){ var b=document.createElement('div'); b.className='msg sys'; b.textContent=text; thread.appendChild(b); }
+  var questions=receipt.questions||(receipt.reply?[receipt.reply]:[]);
+  questions.forEach(function(q){ if(q) botMsg(q); });
+  var cur=receipt.curation;
+  if(cur && !cur.confirmed && cur.confirm_question){
+    botMsg(cur.confirm_question);
+    var classes=cur.proposed_classes||[];
+    var row=document.createElement('div'); row.className='msg bot';
+    var yes=document.createElement('button'); yes.className='btn primary'; yes.textContent='Confirm'; yes.style.marginRight='8px';
+    var no=document.createElement('button'); no.className='btn ghost'; no.textContent='Not now';
+    yes.addEventListener('click',function(){ yes.disabled=true; no.disabled=true;
+      fetch('/confirm-curation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({classes:classes})})
+        .then(function(r){return r.json();}).then(function(d){
+          sysMsg((d&&d.confirmed&&d.confirmed.length)?('Recorded '+d.confirmed.join(', ')+' for your plan.'):'Nothing was recorded.');
+          thread.scrollTop=thread.scrollHeight;
+        }).catch(function(){ sysMsg('Could not record that — you can revisit it in chat.'); });
+    });
+    no.addEventListener('click',function(){ yes.disabled=true; no.disabled=true;
+      sysMsg('Okay — nothing recorded. You can revisit this in chat.'); });
+    row.appendChild(yes); row.appendChild(no); thread.appendChild(row);
+  }
+  thread.scrollTop=thread.scrollHeight;
+  // The questions live in the Care Assistant thread — bring the operator there to see them.
+  if(questions.length || (cur && cur.confirm_question)){ try{ go('team'); }catch(e){} }
+})();
 </script>
 </body></html>
