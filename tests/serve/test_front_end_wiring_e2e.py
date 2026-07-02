@@ -339,3 +339,27 @@ def test_ui_driven_completion_returns_care_review_receipt_json(tmp_path):
     assert receipt.get("questions"), "the care-review receipt carries no clarifying question for the UI to render"
     assert "curation" in receipt, "the care-review receipt carries no meds-curation state"
     assert backend.calls, "the recording mock backend received no care-review call (path not exercised)"
+
+
+def test_served_page_is_no_store_so_a_refresh_never_serves_stale_js(tmp_path):
+    """Root-cause fix (operator report): GET / carries `Cache-Control: no-store`.
+
+    The served page IS the app (a single inline-asset document regenerated per GET). Without a cache
+    directive the stdlib server let the browser serve a STALE cached copy on refresh — old JS (so the
+    wizard's localStorage autosave never ran and typed work was lost) and old markup (no pre-fill / no
+    already-loaded note). `no-store` forces every load/refresh to fetch the current document.
+    Failing-capable: drop the header and this reds.
+    """
+    srv, port = _build(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("GET", "/")
+        resp = conn.getresponse()
+        resp.read()
+        cache = resp.getheader("Cache-Control")
+        conn.close()
+        assert cache == "no-store", f"GET / did not send Cache-Control: no-store (got {cache!r}) — a refresh can serve stale JS"
+    finally:
+        srv.shutdown()
+        srv.server_close()

@@ -698,15 +698,25 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
     def _write_html(self, status, html):
-        """Write an HTTP response with the HTML body (the single response-write site)."""
+        """Write an HTTP response with the HTML body (the single response-write site).
+
+        `Cache-Control: no-store` is REQUIRED, not cosmetic: the served page IS the app (a single
+        inline-asset document regenerated fresh on every GET). Without it the stdlib server sends no
+        cache directives, so the browser is free to serve a STALE cached copy on refresh — running old
+        JavaScript (so the wizard's localStorage autosave never runs and typed work is lost on reload)
+        and old markup (no pre-fill / no already-loaded note). The operator saw exactly that. no-store
+        forces every load/refresh to fetch the current document so a code update is never masked.
+        """
         body = html.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 

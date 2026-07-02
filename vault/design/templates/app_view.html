@@ -1255,6 +1255,7 @@ function renderGenerate(){
     document.querySelectorAll('#stepper .step-item').forEach(function(it){ it.classList.toggle('active', it.getAttribute('data-go')===String(n)); });
     var bar=document.getElementById('wiz-bar'); if(bar){ bar.style.width=Math.round(n/steps.length*100)+'%'; }
     var pct=document.getElementById('wiz-pct'); if(pct){ pct.textContent='Step '+n+' of '+steps.length; }
+    if(window._wizSaveDraft){ window._wizSaveDraft(); }  // force a save on every screen advance (per-screen save)
   }
   function current(){ var a=document.querySelector('#wsteps .wstep.active'); return a?parseInt(a.getAttribute('data-step'),10):1; }
   window.gotoStep=function(n){ setStep(n); };
@@ -1342,7 +1343,8 @@ function wizKeySave(btn){
     var usel=wsel&&wsel.parentElement?wsel.parentElement.querySelector('select'):null;
     if(data['bodyweight-kg'] && usel && !usel.value){ missing.push('a weight unit (kg or lbs)'); }
     if(missing.length){
-      if(note){ note.style.display='block'; note.textContent='Please complete before continuing: '+missing.join(', ')+'.'; }
+      if(note){ note.style.display='block'; note.textContent='Please complete before continuing: '+missing.join(', ')+'.';
+        try{ note.scrollIntoView({block:'center', behavior:'smooth'}); }catch(e){ note.scrollIntoView(); } }
       return;
     }
     if(note) note.style.display='none';
@@ -1452,6 +1454,7 @@ function wizKeySave(btn){
     }).catch(function(){}); }catch(e){}
   }
   window._wizClearDraft=function(){ var s=LS(); if(s){ try{ s.removeItem(KEY); }catch(e){} } };
+  window._wizSaveDraft=saveDraft;  // exposed so step navigation can force a save on every screen advance
   // The locked first-run body has the wizard but not the platform screens; the unlocked body has
   // both. Only restore/save on the locked body (a real wizard to fill); clear the draft once unlocked.
   var unlocked=!!document.getElementById('screen-team');
@@ -1462,6 +1465,10 @@ function wizKeySave(btn){
     document.addEventListener('input', onEdit);
     document.addEventListener('change', onEdit);
     document.addEventListener('click', function(e){ if(e.target.closest && e.target.closest('#wsteps .opt, #screen-equipment .opt')) saveDraft(); });
+    // Belt-and-suspenders: persist the current state when the page is being unloaded (refresh, close,
+    // navigate away) so no in-flight keystroke is lost even if its input event was missed.
+    window.addEventListener('beforeunload', saveDraft);
+    window.addEventListener('pagehide', saveDraft);
   } else if(unlocked){
     window._wizClearDraft();
   }
