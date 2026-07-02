@@ -73,7 +73,21 @@ def _weight_unit_preference(scaffold_root):
     return {"lbs": "pounds", "kg": "kilograms"}.get(unit)
 
 
-def _care_messages(summary, conversation, turn_text, *, weight_display=None, weight_pref=None):
+def _age_display(summary):
+    """The operator's CHRONOLOGICAL age from the (legacy-misnamed) `training-age-band` token, or None.
+
+    `training-age-band` holds the exact chronological age in years derived from the operator's birth
+    year — NOT lifting experience, despite the token name. The name misled the assistant into asking
+    whether 55 was age or training years; presenting it clearly as the operator's age removes that.
+    """
+    band = summary.get("training-age-band")
+    if band is None:
+        return None
+    age = str(band).split(";")[0].strip()
+    return f"{age} years" if age else None
+
+
+def _care_messages(summary, conversation, turn_text, *, weight_display=None, weight_pref=None, age_display=None):
     """Build the care-conversation converse payload: de-id profile context + conversation + turn.
 
     Mirrors `chat._model_messages`'s API-valid shape (every entry role ∈ {user, assistant}, string
@@ -88,6 +102,13 @@ def _care_messages(summary, conversation, turn_text, *, weight_display=None, wei
         context["operator_weight"] = weight_display
     if weight_pref:
         context["operator_weight_unit"] = weight_pref
+    if age_display:
+        context["operator_age"] = age_display
+        # The profile token `training-age-band` is a LEGACY NAME that holds chronological age, not
+        # lifting experience — state it so the assistant does not re-ask age-vs-training-years.
+        context["profile_glossary"] = {
+            "training-age-band": "the operator's chronological age in years (NOT training experience)"
+        }
     messages = [{"role": "user", "content": json.dumps(context, sort_keys=True)}]
     if isinstance(conversation, list):
         for turn in conversation:
@@ -135,6 +156,7 @@ def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=N
         summary, conversation, turn_text,
         weight_display=_weight_display(summary),
         weight_pref=_weight_unit_preference(scaffold_root),
+        age_display=_age_display(summary),
     )
     try:
         result = client.converse(messages)

@@ -251,3 +251,24 @@ def test_care_context_weight_both_units_even_without_a_captured_preference(tmp_p
     ctx = json.loads(backend.calls[0][0]["content"])
     assert ctx.get("operator_weight") == "238 lb (108 kg)", "the weight is not presented in both units without a preference"
     assert "operator_weight_unit" not in ctx, "a preference was asserted when none was captured"
+
+
+def test_care_context_labels_chronological_age_and_glossarizes_the_token(tmp_path):
+    """The care context presents the operator's age clearly + a glossary that `training-age-band` is age.
+
+    `training-age-band` holds chronological age but its NAME implies training experience — which made
+    the assistant re-ask "age or training years?". The context now carries `operator_age` + a
+    `profile_glossary` clarifying the token, so the assistant leads with the operator's age and does not
+    confuse it with lifting experience. Failing-capable: without the labeling the context is token-only.
+    """
+    root = tmp_path / "store"
+    store.append("date-of-birth", {"item": "date-of-birth", "timepoint": "2026-06-01T00:00:00+00:00",
+                                   "source": "intake", "value": "1970"}, root=root)
+    backend = _RecordingBackend()
+    care_chat.respond("hi", [], client=backend, store_root=root)
+    ctx = json.loads(backend.calls[0][0]["content"])
+    assert ctx.get("operator_age") and "years" in ctx["operator_age"], f"the age is not clearly labeled: {ctx.get('operator_age')}"
+    glossary = ctx.get("profile_glossary", {})
+    assert "training-age-band" in glossary and "chronological age" in glossary["training-age-band"], (
+        f"the training-age-band token is not glossed as chronological age: {glossary}"
+    )
