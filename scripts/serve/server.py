@@ -141,10 +141,14 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     key_store = None
 
     def do_GET(self):
-        if self.path == "/settings/key":
+        # Match on the PATH only, ignoring any `?query`/`#fragment`. A query string must not 404 the
+        # app: it is the operator's cache-bust escape hatch — `/?v=2` is a URL the browser has never
+        # cached, so it is guaranteed a fresh fetch when a stale copy of `/` is stuck in cache.
+        path = self.path.split("?", 1)[0].split("#", 1)[0]
+        if path == "/settings/key":
             self._key_status()
             return
-        if self.path != "/":
+        if path != "/":
             self.send_error(404)
             return
         self._write_html(200, _render_intake(store_root=self.store_root, dna_root=self.dna_root))

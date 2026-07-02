@@ -363,3 +363,33 @@ def test_served_page_is_no_store_so_a_refresh_never_serves_stale_js(tmp_path):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_query_string_serves_the_app_as_a_cache_bust_url(tmp_path):
+    """GET `/?v=2` serves the app (a cache-bust escape hatch), not a 404.
+
+    A stale cached copy of `/` can survive a hard refresh; a URL the browser has never seen (`/?v=2`)
+    is a guaranteed fresh fetch. The handler must match on the PATH only (ignoring the query), so a
+    query string does not 404 the app — while a real non-root path still 404s. Failing-capable: the
+    old exact `self.path != "/"` check reds the 200 assertion here.
+    """
+    srv, port = _build(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("GET", "/?v=2")
+        resp = conn.getresponse()
+        body = resp.read().decode("utf-8")
+        conn.close()
+        assert resp.status == 200, f"GET /?v=2 returned {resp.status} (cache-bust URL 404s)"
+        assert _WIZARD_MARKER in body, "GET /?v=2 did not serve the app body"
+        # a real non-root path still 404s (the query tolerance is scoped to `/`).
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("GET", "/nope")
+        r2 = conn.getresponse()
+        r2.read()
+        conn.close()
+        assert r2.status == 404, f"GET /nope returned {r2.status}, expected 404"
+    finally:
+        srv.shutdown()
+        srv.server_close()

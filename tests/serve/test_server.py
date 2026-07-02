@@ -1995,10 +1995,11 @@ def test_care_review_adds_no_route_no_new_client(tmp_path):
     # server.py's ONLY ModelClient construction stays the pre-existing _do_chat fallback (count 1).
     assert server_src.count("ModelClient(") == 1, "the T8 server hunk added a second ModelClient construction"
     # T8 (care-review) added NO route — it fires inside the existing /upload final-save path. The
-    # `self.path == "/..."` branch count is 6 as of T10 (ADR-0033-0035): the 6th is /confirm-curation,
-    # the meds-curation confirm-when-unsure write-back (a distinct, later task); T8 itself adds none.
+    # POST route branches match on `self.path == "/..."`: /chat, /settings/key, /confirm-extraction,
+    # /confirm-curation (T10), /generate-plan = 5. (do_GET now matches on a query-stripped local `path`
+    # so a cache-bust `/?v=2` URL serves the app rather than 404 — it no longer uses `self.path ==`.)
     assert 'self.path == "/care-review"' not in server_src, "T8 added a /care-review route"
-    assert server_src.count('self.path == "/') == 6, "the route-table branch count changed unexpectedly"
+    assert server_src.count('self.path == "/') == 5, "the POST route-table branch count changed unexpectedly"
     assert '_LOOPBACK = "127.0.0.1"' in server_src, "the loopback bind literal changed"
     # An unknown POST still 404s (the route table is unchanged).
     srv, port = _server_with_care_review(tmp_path, _CareReviewBackend())
