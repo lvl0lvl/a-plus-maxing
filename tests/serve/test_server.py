@@ -2051,3 +2051,43 @@ def test_final_save_response_drives_care_assistant_loading_bar_and_status(tmp_pa
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_data_root_env_var_serves_a_scratch_store_for_testing(tmp_path, monkeypatch):
+    """`APLUS_DATA_ROOT` threads scratch store/dna/scaffold roots into build_server (safe testing).
+
+    Set the env var and `main` serves against a throwaway store under that base instead of the real
+    `vault/`, so the intake/plan flow can be tested repeatedly without touching the operator's data.
+    Unset -> no roots (the production `vault/` defaults). Asserted via a spy `build` that captures the
+    kwargs and aborts before the serve loop (binds no socket, makes no live call).
+    """
+    from scripts.serve import __main__ as entry
+
+    # unset -> no roots override (production defaults)
+    monkeypatch.delenv("APLUS_DATA_ROOT", raising=False)
+    assert entry._data_roots() == {}, "an unset APLUS_DATA_ROOT should yield no roots override"
+
+    # set -> derived scratch roots under the base
+    monkeypatch.setenv("APLUS_DATA_ROOT", str(tmp_path / "scratch"))
+    roots = entry._data_roots()
+    assert roots["store_root"] == tmp_path / "scratch" / "store", f"store_root not under the base: {roots}"
+    assert roots["dna_root"] == tmp_path / "scratch" / "dna" and roots["scaffold_root"] == tmp_path / "scratch" / "scaffold"
+
+    captured = {}
+
+    class _Abort(Exception):
+        pass
+
+    def _spy_build(port, *, client=None, **kwargs):
+        captured.update(kwargs)
+        raise _Abort
+
+    try:
+        entry.main(build=_spy_build)
+    except _Abort:
+        pass
+    else:
+        raise AssertionError("main did not call build (the spy never aborted)")
+    assert captured.get("store_root") == tmp_path / "scratch" / "store", (
+        "main did not thread the APLUS_DATA_ROOT scratch store into build_server"
+    )

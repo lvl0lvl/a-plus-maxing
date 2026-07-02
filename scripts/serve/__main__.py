@@ -17,6 +17,26 @@ from scripts.model.client import ModelClient
 from scripts.serve import server as serve_server
 
 
+def _data_roots():
+    """Optional scratch-store roots for testing, from the `APLUS_DATA_ROOT` env var (non-destructive).
+
+    Set `APLUS_DATA_ROOT=/tmp/aplus-test` to serve the intake/plan flow against a THROWAWAY
+    store/dna/scaffold under that base instead of the real `vault/` — so the whole flow (wizard ->
+    intake -> unlock -> care review -> care chat -> plan) can be tested repeatedly, and reset by
+    deleting the dir, WITHOUT touching the operator's real data. Unset -> the production `vault/`
+    defaults (`build_server`'s None roots). To test the RETURNING-operator flow, first copy the real
+    store in: `cp -R vault/store $APLUS_DATA_ROOT/store`.
+    """
+    import os
+    from pathlib import Path
+
+    base = os.environ.get("APLUS_DATA_ROOT")
+    if not base:
+        return {}
+    root = Path(base)
+    return {"store_root": root / "store", "dna_root": root / "dna", "scaffold_root": root / "scaffold"}
+
+
 def main(argv=None, *, build=serve_server.build_server, client_factory=ModelClient):
     """Build the loopback server on the default port and serve until stopped.
 
@@ -45,8 +65,9 @@ def main(argv=None, *, build=serve_server.build_server, client_factory=ModelClie
         (int) 0 on a clean operator-stop.
     """
     port = serve_server.DEFAULT_PORT
+    roots = _data_roots()  # optional scratch-store override for safe, repeatable testing
     try:
-        srv = build(port, client=client_factory())
+        srv = build(port, client=client_factory(), **roots)
     except OSError as exc:
         raise SystemExit(
             f"Port {port} is already in use ({exc}); the intake server did not start. "
@@ -56,6 +77,9 @@ def main(argv=None, *, build=serve_server.build_server, client_factory=ModelClie
 
     host, bound_port = srv.server_address
     print(f"Serving the intake wizard at http://{host}:{bound_port}/  (Ctrl-C to stop)")
+    if roots:
+        print(f"  TEST MODE — serving against a scratch store at {roots['store_root'].parent} "
+              f"(your real vault/ is untouched; delete that dir to start fresh)")
 
     stop = threading.Event()
     signal.signal(signal.SIGINT, lambda *_: stop.set())
