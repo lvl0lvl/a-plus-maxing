@@ -630,6 +630,7 @@ select.inp{cursor:pointer}
         <div class="ghp"><div class="bar"><i id="wiz-bar" style="width:11%"></i></div><span class="pct" id="wiz-pct">Step 1 of 9</span></div>
       </header>
       <div class="gate-body">
+        <!--WELCOME_BACK-->
         <div class="wizard">
           <nav class="stepper" id="stepper">
             <div class="sttl">Profile setup</div>
@@ -1336,7 +1337,11 @@ function wizKeySave(btn){
   window.submitProfile=function(btn){
     var data=collect();
     var note=document.getElementById('wiz-submit-note');
-    var missing=REQUIRED.filter(function(r){ return !data[r[0]]; }).map(function(r){ return r[1]; });
+    // A required field is satisfied by EITHER a filled form field OR a value ALREADY in the operator's
+    // store (window.__aplusSaved) — a blank form field is skipped by capture, so the stored value
+    // stands (e.g. a year-only birthdate that can't populate the date input still satisfies the gate).
+    var saved=window.__aplusSaved||{};
+    var missing=REQUIRED.filter(function(r){ return !data[r[0]] && !saved[r[0]]; }).map(function(r){ return r[1]; });
     // The weight unit must be an EXPLICIT choice (the select defaults to no unit) so a metric
     // entry is never silently converted as lbs — a wrong unit derives the wrong weight band.
     var wsel=document.querySelector('#wsteps [name="bodyweight-kg"]');

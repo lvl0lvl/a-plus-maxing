@@ -424,6 +424,45 @@ def _wizard_prefill_script(store_read):
     return f"<script>window.__aplusSaved={blob};</script>"
 
 
+def _welcome_back_banner(store_read):
+    """A wizard banner for a RETURNING operator: names what's restored + what's genuinely still needed.
+
+    When the store already holds demographics/goals (a prior session), a returning operator lands on a
+    mostly-blank Step 1 (a year-only birthdate cannot populate the date input; there is no stored weight)
+    and reasonably reads it as "nothing came back". This banner states plainly what was restored (sex /
+    equipment / goals / birth year — the store DOES have them) and what still needs entering (body weight,
+    goal targets/priority, the safety screens — the required tokens the store lacks). Empty for a fresh
+    operator (nothing saved). Derived from the store, names/flags only — never a raw value.
+    """
+    rows = store_read if isinstance(store_read, list) else []
+    saved = _latest_values(rows, _WIZARD_PREFILL_ITEMS)
+    if not saved:
+        return ""  # a fresh operator — no returning-operator banner
+    names = {"sex-for-dosing": "sex", "equipment-access-class": "equipment access", "goal-domains": "goals"}
+    restored = [names[k] for k in ("sex-for-dosing", "equipment-access-class", "goal-domains") if saved.get(k)]
+    dob = saved.get("date-of-birth")
+    if dob:
+        restored.append("birth year" if _re.fullmatch(r"\d{4}", str(dob)) else "birthdate")
+    summary = summarize(lambda item: [r for r in rows if isinstance(r, dict) and r.get("item") == item])
+    present = {r.get("item") for r in rows if isinstance(r, dict)}
+    need = []
+    if "bodyweight-band" not in summary:
+        need.append("body weight")
+    if "goal-targets" not in summary:
+        need.append("goal targets")
+    if "goal-priority-order" not in summary:
+        need.append("goal priority order")
+    if not all(m in present for m in _REQUIRED_SAFETY_MARKERS):
+        need.append("the safety screens")
+    parts = []
+    if restored:
+        parts.append(f"<b>Restored from your saved data:</b> {_esc(', '.join(restored))}.")
+    if need:
+        parts.append(f"<b>Still needed:</b> {_esc(', '.join(need))} — the rest is already on file.")
+    return ("<div class='card' style='margin:0 0 16px;background:var(--good-bg);border-color:var(--good)'>"
+            f"<div style='font-size:13px;line-height:1.55'>Welcome back — {' '.join(parts)}</div></div>")
+
+
 def _wizard_loaded_note(status, store_read):
     """A Documents-step note naming the data already loaded, so the wizard does not look empty.
 
@@ -483,6 +522,7 @@ def render(store_read=None, *, status=None, _today=None):
         .replace("<!--REFERRAL_ZONE-->", _referral_zone(store_read))
         .replace("<!--SAVED_PROFILE-->", _wizard_prefill_script(store_read))
         .replace("<!--WIZARD_LOADED_NOTE-->", _wizard_loaded_note(status, store_read))
+        .replace("<!--WELCOME_BACK-->", _welcome_back_banner(store_read))
     )
     html = _prefill_form(html, store_read)
     if _intake_complete(store_read):

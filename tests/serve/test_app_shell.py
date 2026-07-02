@@ -1826,3 +1826,22 @@ def test_wizard_documents_upload_is_wired_on_the_locked_body():
     assert "#screen-wizard .doc .link" in html and "wiz-drop" in html, (
         "the wizard doc cards/dropzone are not wired to the wizard uploader"
     )
+
+
+def test_welcome_back_banner_names_restored_and_still_needed():
+    """A returning operator's wizard banner names what's restored from the store + what's still needed.
+
+    A store with sex/equipment/goals + a YEAR-ONLY birthdate renders a "Welcome back" banner listing
+    those as restored (the year-only DOB as "birth year") and the absent required tokens (body weight,
+    goal targets/priority, safety screens) as still-needed. A fresh store shows no banner. Failing-
+    capable: the returning operator otherwise lands on a near-blank Step 1 and reads it as data-lost.
+    """
+    rows = [_r("sex-for-dosing", "male"), _r("equipment-access-class", "full-home-gym"),
+            _r("goal-domains", "Workout;Nutrition"), _r("date-of-birth", "1970")]
+    html = app_shell.render(rows)
+    assert "Welcome back" in html, "no returning-operator banner for a populated store"
+    assert "Restored from your saved data" in html and "birth year" in html, "the banner does not name the restored data"
+    assert "Still needed" in html and "body weight" in html and "the safety screens" in html, (
+        "the banner does not name the genuinely-missing required fields"
+    )
+    assert "Welcome back" not in app_shell.render([]), "a fresh store wrongly shows the returning-operator banner"
