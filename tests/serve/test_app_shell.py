@@ -1845,3 +1845,20 @@ def test_welcome_back_banner_names_restored_and_still_needed():
         "the banner does not name the genuinely-missing required fields"
     )
     assert "Welcome back" not in app_shell.render([]), "a fresh store wrongly shows the returning-operator banner"
+
+
+def test_wizard_doc_cards_reflect_loaded_state_not_static_link():
+    """The Documents-step cards show '✓ loaded' for data already in the store — not a static '+ Link'.
+
+    The wizard's four document cards were hardcoded '+ Link' markup that contradicted the 'Already
+    loaded' note (a returning operator with genotypes still saw every card as empty). This renders them
+    load-state-aware: a store with genotypes shows the DNA card as loaded with its count; a fresh store
+    keeps the honest '+ Link' affordance. Failing-capable: the old static cards red the loaded assertion.
+    """
+    rows = [_r("ACTN3 rs1815739", "CT"), _r("FTO rs9939609", "AA")]
+    html = app_shell.render(rows)
+    assert "2 genotypes loaded" in html, "the wizard DNA card does not reflect the loaded genotypes"
+    assert app_shell._LOADED in html, "no card renders the '✓ loaded' state for the ingested data"
+    fresh = app_shell.render([])
+    assert "genotypes loaded" not in fresh, "a fresh store wrongly shows a loaded DNA card"
+    assert "23andMe or AncestryDNA raw export" in fresh, "the fresh-store DNA card lost its '+ Link' affordance"

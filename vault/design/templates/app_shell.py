@@ -490,6 +490,36 @@ def _wizard_loaded_note(status, store_read):
             "link any additional documents below, or manage them later in My Info.</div>")
 
 
+def _wizard_doc_cards(status, store_read):
+    """The Documents-step cards rendered load-state-aware: a class already in the store shows '✓ loaded'.
+
+    The wizard's four document cards were STATIC '+ Link' markup that contradicted the 'Already loaded'
+    note above them (a returning operator with 117 genotypes still saw every card as empty '+ Link').
+    This renders them from the live load-state — wearable and DNA (by genotype count) and labs flip to
+    '✓ loaded'; an unloaded class keeps the '+ Link' affordance the wizard uploader wires. Names/counts
+    only, never a raw reading value (mirrors `_doc_cards`).
+    """
+    rows = store_read if isinstance(store_read, list) else []
+    genotype_ct = sum(1 for r in rows if isinstance(r, dict)
+                      and _re.search(r"\brs\d|\bi\d{6}", str(r.get("item", ""))))
+    we = status.get("wearable", {}) if isinstance(status, dict) else {}
+    labs = status.get("labs", {}) if isinstance(status, dict) else {}
+    wearable = _doc_card(
+        "wearable", "Wearable export",
+        "Activity, sleep &amp; vitals — loaded" if we.get("loaded") else "Activity, sleep &amp; vitals — parsed locally",
+        _LOADED if we.get("loaded") else _LINK)
+    labs_card = _doc_card(
+        "labs", "Labs &amp; bloodwork",
+        _esc(", ".join(labs["files"])) if labs.get("files") else ("loaded" if labs.get("loaded") else "PDF or CSV of a recent panel"),
+        _LOADED if labs.get("loaded") else _LINK)
+    medical = _doc_card("medical", "Medical history", "Visit summaries, prior plans, records", _LINK)
+    dna = _doc_card(
+        "dna", "DNA",
+        f"{genotype_ct} genotypes loaded" if genotype_ct else "23andMe or AncestryDNA raw export",
+        _LOADED if genotype_ct else _LINK)
+    return wearable + labs_card + medical + dna
+
+
 def render(store_read=None, *, status=None, _today=None):
     """Return the inline-asset SPA shell HTML with the Upload doc-cards at the live load-state.
 
@@ -523,6 +553,7 @@ def render(store_read=None, *, status=None, _today=None):
         .replace("<!--SAVED_PROFILE-->", _wizard_prefill_script(store_read))
         .replace("<!--WIZARD_LOADED_NOTE-->", _wizard_loaded_note(status, store_read))
         .replace("<!--WELCOME_BACK-->", _welcome_back_banner(store_read))
+        .replace("<!--WIZARD_DOC_CARDS-->", _wizard_doc_cards(status, store_read))
     )
     html = _prefill_form(html, store_read)
     if _intake_complete(store_read):
