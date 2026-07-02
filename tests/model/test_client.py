@@ -1787,3 +1787,33 @@ def test_good_author_fixture_validates_against_live_workout_schema():
     from scripts.model.client import _author_output_schema
 
     jsonschema.validate(_good_author_fixture(), _author_output_schema("workout"))
+
+
+def test_model_failure_category_maps_by_type_and_never_leaks():
+    """A suppressed converse failure yields a PII-safe, category-specific operator message.
+
+    SEC-01: `_model_failure_category` reads ONLY the exception TYPE and returns a hardcoded
+    per-category message — an auth failure reads differently from a transient one (so the operator
+    knows whether to fix the key or just resend), and a secret in the exception's own message NEVER
+    rides along. Failing-capable: reds if a category collapses to the generic default or the secret
+    leaks into the operator-facing string.
+    """
+    anthropic = pytest.importorskip("anthropic")
+    httpx = pytest.importorskip("httpx")
+    from scripts.model.client import _model_failure_category
+
+    req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    r = lambda code: httpx.Response(code, request=req)
+    secret = "LEAKMARKER-fake-key-plus-raw-operator-PII"
+    auth = _model_failure_category(anthropic.AuthenticationError(secret, response=r(401), body=None))
+    rate = _model_failure_category(anthropic.RateLimitError(secret, response=r(429), body=None))
+    over = _model_failure_category(anthropic.InternalServerError(secret, response=r(500), body=None))
+    timeout = _model_failure_category(anthropic.APITimeoutError(request=req))
+    # each category is distinct + actionable (auth -> fix key; the rest -> transient, resend)
+    assert "key" in auth.lower(), auth
+    assert "rate limit" in rate.lower() or "busy" in rate.lower(), rate
+    assert "resend" in over.lower() and "resend" in timeout.lower()
+    assert len({auth, rate, over, timeout}) == 4, "categories collapsed into a non-specific message"
+    # SEC-01: the exception's own text (key / raw PII) never appears in the operator-facing string
+    for msg in (auth, rate, over, timeout):
+        assert secret not in msg, "the suppressed exception text leaked into the operator-facing string"
