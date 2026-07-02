@@ -22,7 +22,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);-webkit-font-
 .topbar .navitem{width:auto;padding:8px 14px;font-size:13.5px}
 .content{flex:1;min-height:0;overflow:auto}
 .screen{padding:28px 34px}
-#screen-team.screen{padding:0;max-width:none;margin:0}
+#screen-team.screen{padding:0;max-width:none;margin:0;height:100%;min-height:0}
 
 /* ---------- (legacy side-nav classes, reused for the workspace specialist column) ---------- */
 .nav{background:var(--sheet);border-right:1px solid var(--line);padding:22px 14px;display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh;overflow:auto}
@@ -165,7 +165,7 @@ select.inp{cursor:pointer}
 .app.specmin .ws-specs .spec{width:46px;height:42px;padding:0;justify-content:center;gap:0}
 .app.specmin .ws-specs .spec .name,.app.specmin .ws-specs .spec .dot{display:none}
 /* center: chat */
-.ws-chat{min-width:0;display:flex;flex-direction:column}
+.ws-chat{min-width:0;min-height:0;display:flex;flex-direction:column}
 .ws-chat #team-chat{flex:1;min-height:0;display:flex}
 .ws-chat .chatwrap{flex:1;min-height:0}
 .ws-chat .chat-thread{flex:1;max-height:none;min-height:0}
@@ -182,8 +182,12 @@ select.inp{cursor:pointer}
 .ws-docs .doc{padding:11px 12px;gap:10px;margin-bottom:8px}
 .ws-docs .doc .d{font-size:11px;white-space:normal;line-height:1.35}
 .ws-side .seclab{font-size:12px;margin:16px 0 9px}
-.chat-thread{padding:20px;display:flex;flex-direction:column;justify-content:flex-end;gap:12px;min-height:230px;max-height:440px;overflow:auto;background:#E4E8F1}
-.msg{max-width:78%;font-size:13.5px;line-height:1.55;padding:11px 14px;border-radius:14px}
+.chat-thread{padding:20px;display:flex;flex-direction:column;gap:12px;min-height:230px;max-height:440px;overflow:auto;background:#E4E8F1}
+/* Bottom-pin a SHORT conversation without justify-content:flex-end — which, with overflow, spills
+   long threads off the (clipped, unscrollable) top. margin-top:auto pins when there's free space
+   and collapses when the thread overflows, so a long thread scrolls normally to the newest message. */
+.chat-thread>:first-child{margin-top:auto}
+.msg{flex:none;max-width:78%;font-size:13.5px;line-height:1.55;padding:11px 14px;border-radius:14px}
 .msg.bot{background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(16,20,38,.06);color:var(--ink);border-bottom-left-radius:4px;align-self:flex-start}
 .msg.me{align-self:flex-end;background:var(--accent);border:1px solid var(--accent-deep);color:#fff;border-bottom-right-radius:4px}
 .msg.sys{align-self:center;background:transparent;border:none;box-shadow:none;color:var(--muted);font-size:11.5px;text-align:center;max-width:90%;padding:2px 0}
