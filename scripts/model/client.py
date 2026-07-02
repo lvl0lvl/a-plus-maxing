@@ -638,6 +638,13 @@ class _ClaudeNoTrainBackend:
                     max_tokens=2048,
                     system=system,
                     messages=messages,
+                    # Prompt caching (ADR-0016 no-train lane): the stable prefix re-sent every turn —
+                    # the constant `system` + the de-identified profile context + the prior conversation
+                    # turns — is cached and read at ~0.1x input cost on the next turn (Opus-4.8 caches a
+                    # >=4096-token prefix; shorter prefixes silently don't cache, which is harmless). This
+                    # is why the full conversation is re-sent each turn without paying full price for it;
+                    # the stateless API requires the history, caching makes the repeat cheap.
+                    cache_control={"type": "ephemeral"},
                 )
                 return _parse_converse_turn(response)
             except Exception:  # bounded: try again until the attempt ceiling
