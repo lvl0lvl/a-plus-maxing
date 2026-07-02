@@ -651,7 +651,7 @@ select.inp{cursor:pointer}
                 <div class="field"><label>Birthdate</label><input class="inp" type='date' name='date-of-birth'><div class="note">Your exact age is computed from this; your full birth date stays on your machine — only your age is used.</div></div>
                 <div class="field" style="margin-top:11px"><label>Sex (for dosing)</label><select class="inp" name='sex-for-dosing'><option value=''>Select…</option><option value='male'>Male</option><option value='female'>Female</option></select></div>
                 <div class="field" style="margin-top:11px"><label>Race &amp; ethnicity <span style="color:var(--faint);font-weight:500">(optional)</span></label><select class="inp" name='race-ethnicity'><option value=''>Select…</option><option>White / Caucasian</option><option>Black / African American</option><option>Hispanic / Latino</option><option>East Asian</option><option>South Asian</option><option>Middle Eastern</option><option>Native American</option><option>Pacific Islander</option><option>Mixed</option><option>Prefer not to say</option></select><div class="note">Kept on your device for dosing and research population-matching — never sent to the planner. Sensitive, so it is optional.</div></div>
-                <div class="field" style="margin-top:11px"><label>Body weight</label><div style="display:flex;gap:10px"><input class="inp" type='number' name='bodyweight-kg' placeholder="Weight" style="flex:1"><select class="inp" aria-label="Weight unit" style="width:92px;flex:none"><option value='' selected>Unit</option><option value='lbs'>lbs</option><option value='kg'>kg</option></select></div><div class="note">Logged over time so your plan can track weight-change progress.</div></div>
+                <div class="field" style="margin-top:11px"><label>Body weight</label><div style="display:flex;gap:10px"><input class="inp" type='number' name='bodyweight-kg' placeholder="Weight" style="flex:1"><select class="inp" id="wiz-weight-unit" aria-label="Weight unit" style="width:92px;flex:none"><option value='' selected>Unit</option><option value='lbs'>lbs</option><option value='kg'>kg</option></select></div><div class="note">Logged over time so your plan can track weight-change progress.</div></div>
                 <div class="field" style="margin-top:11px"><label>Occupation</label><input class="inp" name='occupation' placeholder="What do you do?"></div>
               </div>
               <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()" style="visibility:hidden">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
@@ -1363,7 +1363,7 @@ function wizKeySave(btn){
       // from the locked body, and the inline script ships in both bodies).
       return r.text().then(function(html){ return {unlocked: html.indexOf('id="screen-'+'team"')!==-1}; });
     }).then(function(res){
-      if(res&&res.unlocked){ location.reload(); return; }  // the gate flipped — reload the unlocked shell
+      if(res&&res.unlocked){ if(window._wizClearDraft){ window._wizClearDraft(); } location.reload(); return; }  // gate flipped — clear the draft, reload the unlocked shell
       if(btn){ btn.disabled=false; btn.textContent=lbl; }
       if(note){ note.style.display='block'; note.textContent='Some entries could not be saved. Please remove any personal details (a name, phone, email, or address) from your goal and free-text fields, then continue again.'; }
     }).catch(function(){
@@ -1371,6 +1371,66 @@ function wizKeySave(btn){
       if(note){ note.style.display='block'; note.textContent='Could not save your profile — please try again.'; }
     });
   };
+})();
+
+/* Create-Profile draft autosave: persist every wizard + equipment entry to localStorage as the
+   operator fills it in, and restore it on load while the profile is still incomplete — so a refresh
+   or a closed tab never loses typed work (the wizard steps are NOT store-prefilled, so without this
+   a reload shows a blank wizard). Nothing reaches the store until the final Save & continue; the
+   draft is cleared once the profile completes (this reload lands the unlocked shell, which has the
+   platform screens). Local to the operator's own browser — the same on-device posture as the store. */
+(function(){
+  var KEY='aplus_wizard_draft_v1';
+  var SCOPE='#wsteps [name], #screen-equipment [name]';
+  function LS(){ try{ return window.localStorage; }catch(e){ return null; } }
+  function optLabels(){ return Array.prototype.slice.call(document.querySelectorAll('#wsteps .opt, #screen-equipment .opt')); }
+  function activeStep(){ var a=document.querySelector('#wsteps .wstep.active'); return a?a.getAttribute('data-step'):null; }
+  function saveDraft(){
+    var s=LS(); if(!s) return;
+    var data={fields:{}, checks:{}, on:[], step:activeStep()};
+    document.querySelectorAll(SCOPE).forEach(function(el){
+      var name=el.getAttribute('name'); if(!name) return;
+      if(el.type==='checkbox'){ if(el.checked){ (data.checks[name]=data.checks[name]||[]).push(el.value); } return; }
+      var v=(el.value||''); if(v) data.fields[name]=v;
+    });
+    var wu=document.getElementById('wiz-weight-unit'); if(wu && wu.value) data.fields['__weight_unit']=wu.value;
+    optLabels().forEach(function(l,i){ if(l.classList.contains('on')) data.on.push(i); });
+    try{ s.setItem(KEY, JSON.stringify(data)); }catch(e){}
+  }
+  function restoreDraft(){
+    var s=LS(); if(!s) return;
+    var raw=s.getItem(KEY); if(!raw) return;
+    var data; try{ data=JSON.parse(raw); }catch(e){ return; }
+    if(!data) return;
+    Object.keys(data.fields||{}).forEach(function(name){
+      if(name==='__weight_unit'){ var wu=document.getElementById('wiz-weight-unit'); if(wu) wu.value=data.fields[name]; return; }
+      var el=document.querySelector('#wsteps [name="'+name+'"], #screen-equipment [name="'+name+'"]');
+      if(el && el.type!=='checkbox') el.value=data.fields[name];
+    });
+    Object.keys(data.checks||{}).forEach(function(name){
+      var vals=data.checks[name]||[];
+      document.querySelectorAll('#wsteps [name="'+name+'"], #screen-equipment [name="'+name+'"]').forEach(function(el){
+        if(el.type==='checkbox' && vals.indexOf(el.value)!==-1) el.checked=true;
+      });
+    });
+    var labels=optLabels();
+    (data.on||[]).forEach(function(i){ if(labels[i]) labels[i].classList.add('on'); });
+    var eq=document.getElementById('equip-access-class'); if(eq && typeof onEquipAccess==='function') onEquipAccess(eq);
+    if(data.step && typeof window.gotoStep==='function'){ window.gotoStep(parseInt(data.step,10)); }
+  }
+  window._wizClearDraft=function(){ var s=LS(); if(s){ try{ s.removeItem(KEY); }catch(e){} } };
+  // The locked first-run body has the wizard but not the platform screens; the unlocked body has
+  // both. Only restore/save on the locked body (a real wizard to fill); clear the draft once unlocked.
+  var unlocked=!!document.getElementById('screen-team');
+  if(document.getElementById('wsteps') && !unlocked){
+    restoreDraft();
+    var onEdit=function(e){ if(e.target.closest && e.target.closest('#wsteps, #screen-equipment')) saveDraft(); };
+    document.addEventListener('input', onEdit);
+    document.addEventListener('change', onEdit);
+    document.addEventListener('click', function(e){ if(e.target.closest && e.target.closest('#wsteps .opt, #screen-equipment .opt')) saveDraft(); });
+  } else if(unlocked){
+    window._wizClearDraft();
+  }
 })();
 
 /* Care-review surfacing: after a profile save flips the gate, the /upload care-review receipt is

@@ -233,6 +233,10 @@ def test_markup_carries_the_wiring_contract(tmp_path):
         "the weight-unit select still defaults to a unit (silent lbs conversion risk, Finding 2)"
     )
     assert "a weight unit (kg or lbs)" in locked, "submitProfile does not require an explicit weight unit"
+    # Draft autosave: the locked wizard persists entries to localStorage and restores them on load
+    # (a refresh mid-wizard never loses typed work; the store is written only on the final submit).
+    assert "aplus_wizard_draft_v1" in locked, "the Create-Profile draft autosave (localStorage) is not wired"
+    assert "_wizClearDraft" in locked, "the draft is not cleared once the profile completes"
 
 
 def test_ui_driven_markup_gather_flips_gate_and_unlocks(tmp_path):
