@@ -125,6 +125,27 @@ def test_horizons_peptides_untracked(tmp_path):
     assert "workout" in domains
 
 
+# --- Tier-3 review (HIGH): NO_PLAN_TODAY is skipped, never crashes ---
+
+
+def test_horizons_no_plan_today_absent_no_crash(tmp_path):
+    """A plan dated D1 read at D2 (a stale plan) yields NO tracking horizon, no crash.
+
+    ``resolve_plan`` returns ``NO_PLAN_TODAY`` (plan=None) for a domain whose
+    latest plan is not dated the render date. ``domain_horizons`` must skip it
+    alongside ``NO_PLAN`` — surfacing a stale plan_date misleads the ADR-0038-T3
+    classifier. Mutation check: guarding only on ``NO_PLAN`` (the pre-fix code)
+    raises ``TypeError`` inside ``plan_extras(None)`` — this test reds.
+    """
+    plan_schema.record_plan("workout", _workout_plan(), "2026-06-10", "coach", tmp_path)
+    # Read the render date TEN days after the recorded plan -> NO_PLAN_TODAY:
+    view = horizons.domain_horizons(tmp_path, "2026-06-20")
+    assert [h["domain"] for h in view] == []
+    # A same-date plan still surfaces (the skip is not a blanket drop):
+    same_date = horizons.domain_horizons(tmp_path, "2026-06-10")
+    assert [h["domain"] for h in same_date] == ["workout"]
+
+
 # --- AC-4 (Risk): open-ended goal degrades to rolling cycles, no fabricated date ---
 
 
@@ -177,3 +198,108 @@ def test_horizons_writes_no_new_store_stream(tmp_path):
     assert "store.correct" not in src
     for forbidden in ("plan-arc::", "horizon::", "periodization::"):
         assert forbidden not in src
+    # Egress guard (Architect breaks-if): the frozen-glob carve-out's behavioral
+    # guard also covers model-send / network-egress — the read layer names no
+    # author/de-id/model-send symbol and no network transport. Mutation check:
+    # adding a `converse`/`requests`/`socket` call to horizons.py reds this.
+    for egress in ("converse", "author", "deidentify", "deid_in",
+                   "client.", "requests", "urllib", "socket", "ModelClient"):
+        assert egress not in src, f"horizons.py names an egress symbol {egress!r}"
+
+
+# --- ADR-0038-T2 Cycle 1: enrichment convention rides the D2 open-on-extras seam ---
+
+
+def test_horizon_extras_enriched_plan_validates(tmp_path):
+    """A plan::<domain> value carrying the horizon extras validates (AC-1).
+
+    The three-key horizon-extra convention rides the ADR-0010 D2 open-on-extras
+    seam — the keys are permitted by omission from every domain's required/optional
+    dict, so record_plan raises nothing and the read-back carries them unaltered.
+    """
+    plan = _workout_plan()
+    phase_key, intent_key, expect_key = horizons.HORIZON_EXTRAS
+    plan[phase_key] = "accumulation"
+    plan[intent_key] = "build base volume"
+    plan[expect_key] = "3 sessions this week"
+    plan_schema.record_plan("workout", plan, "2026-06-10", "coach", tmp_path)
+    resolved = plan_schema.read_plan("workout", "2026-06-10", tmp_path)
+    assert resolved["state"] is None
+    assert resolved["plan"][intent_key] == "build base volume"
+
+
+def test_horizon_flat_plan_still_validates(tmp_path):
+    """A flat plan::<domain> value WITHOUT the extras still validates (AC-2).
+
+    The graceful floor: enrichment is optional, so a plan carrying none of the
+    horizon-extra keys validates through record_plan exactly as before.
+    """
+    plan = _workout_plan()
+    assert not any(key in plan for key in horizons.HORIZON_EXTRAS)
+    plan_schema.record_plan("workout", plan, "2026-06-10", "coach", tmp_path)
+    resolved = plan_schema.read_plan("workout", "2026-06-10", tmp_path)
+    assert resolved["state"] is None
+    assert resolved["plan"] == plan
+
+
+def test_horizon_typo_extra_ignored(tmp_path):
+    """A typo'd horizon key still validates and is not a recognized extra (AC-5).
+
+    The standing D2 tradeoff: an unknown extra (``weak_intent``) is permitted and
+    ignored, never rejected — it is absent from the horizon-extra convention.
+    """
+    plan = _workout_plan()
+    plan["weak_intent"] = "typo, not a real horizon key"
+    assert "weak_intent" not in horizons.HORIZON_EXTRAS
+    plan_schema.record_plan("workout", plan, "2026-06-10", "coach", tmp_path)
+    resolved = plan_schema.read_plan("workout", "2026-06-10", tmp_path)
+    assert resolved["state"] is None
+
+
+# --- ADR-0038-T2 Cycle 2: read the extras back into the horizon view ---
+
+
+def test_horizon_extras_read_back(tmp_path):
+    """The read-back accessor surfaces the horizon extras off a resolved plan (AC-4).
+
+    Given a resolved plan::<domain> value, ``plan_extras`` returns exactly the
+    horizon-extra keys present — the read-back the week/month framing consumes.
+    An unknown key (the typo) is not a horizon extra, so it is not surfaced.
+    """
+    plan = _workout_plan()
+    plan["phase"] = "accumulation"
+    plan["week_intent"] = "build base volume"
+    plan["weak_intent"] = "typo — not a horizon extra"
+    plan_schema.record_plan("workout", plan, "2026-06-10", "coach", tmp_path)
+    resolved = plan_schema.read_plan("workout", "2026-06-10", tmp_path)
+    extras = horizons.plan_extras(resolved["plan"])
+    assert extras == {"phase": "accumulation", "week_intent": "build base volume"}
+
+
+def test_horizon_extras_surface_in_domain_view(tmp_path):
+    """A seeded enriched plan surfaces its week_intent in the horizon view (AC-4).
+
+    The domain-horizon composition reads the extras off the resolved plan value
+    (the T1 read layer, no new store read) into an ``extras`` framing key.
+    """
+    plan = _workout_plan()
+    plan["week_intent"] = "build base volume"
+    plan_schema.record_plan("workout", plan, "2026-06-10", "coach", tmp_path)
+    view = horizons.domain_horizons(tmp_path, "2026-06-10")
+    workout = next(h for h in view if h["domain"] == "workout")
+    assert workout["extras"]["week_intent"] == "build base volume"
+
+
+def test_horizon_extras_flat_plan_empty(tmp_path):
+    """A resolved plan with no extras yields an empty framing, never a raise (AC-2 floor).
+
+    The graceful floor consistent with the flat-plan validation: the read-back
+    tolerates a plan carrying no horizon-extra keys.
+    """
+    plan = _workout_plan()
+    plan_schema.record_plan("workout", plan, "2026-06-10", "coach", tmp_path)
+    resolved = plan_schema.read_plan("workout", "2026-06-10", tmp_path)
+    assert horizons.plan_extras(resolved["plan"]) == {}
+    view = horizons.domain_horizons(tmp_path, "2026-06-10")
+    workout = next(h for h in view if h["domain"] == "workout")
+    assert workout["extras"] == {}

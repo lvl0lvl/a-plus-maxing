@@ -32,9 +32,9 @@ crown-jewel `deid_in` boundary before any specialist dispatch.
 import datetime
 import functools
 
-from scripts.plan import plan_orchestrator
+from scripts.plan import plan_orchestrator, router
 from scripts.plan.gate_dispatch import compose_gate_dispatch
-from scripts.store import store
+from scripts.store import biomarker_meta, plan_schema, store
 
 # The judge role slug the loop dispatches the QUALITY gate through the unified subscription seam.
 _JUDGE_ROLE = "quality-judge"
@@ -111,3 +111,142 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None):
         raw_intake, deid_client, dispatch, store_read, root,
         plan_date=plan_date, gate_dispatch=gate_producer,
     )
+
+
+# --- ADR-0036-T2: the shared debounce gate + three-trigger convergence ----------------
+#
+# The three real trigger surfaces — a wearable/lab `biomarker::` write-event (route.py /
+# confirm.py), the weekly cadence tick, and a care-chat free-text capture (care_chat.py) —
+# converge on the ONE debounced entry `signal`, so no trigger reaches `regenerate` un-debounced.
+# A whole-plan front-door re-gen is materially more expensive than a per-domain patch
+# (ADR-0036 Consequences-Negative-1), so a re-gen fires only when the pinned min-interval has
+# elapsed AND the `biomarker::` window carries a sustained directional signal. Every trigger kind —
+# the free-text one included — is bound by the SAME 7-day min-interval floor; the derived date-only
+# state cannot represent a finer per-trigger (sub-day) free-text clock without a new store stream,
+# which ADR-0038 forbids, so the free-text trigger carries no independent sub-day bound. The debounce
+# state introduces ZERO new store stream (OQ-5): the
+# last-re-gen date is DERIVED from the dated `plan::` history via `plan_schema.resolve_plan`, and
+# the window is a query over the existing `biomarker::` series via the router trend feed — no
+# `loop::`/`debounce::`/`regen-marker::` item, no `store.append` of a marker.
+
+# The trigger labels the three surfaces pass into the single debounced entry.
+CADENCE_TRIGGER = "cadence"
+DATA_EVENT_TRIGGER = "biomarker-write"
+FREE_TEXT_TRIGGER = "free-text"
+
+# Pinned debounce parameters (ADR-0036 OQ-1) — fixed module constants, not runtime defaults.
+# The weekly floor between ANY two re-gens (aligns with the weekly cadence trigger, bounds the
+# whole-plan re-gen cost, Consequences-Negative-1); derived from the dated `plan::` history.
+MIN_REGEN_INTERVAL_DAYS = 7
+# The sustained window's minimum readings — REUSES the existing honest-absence n>=3 guardrail
+# (`biomarker_meta.PROJECTION_MIN_TIMEPOINTS`), one constant with one home, never a second literal.
+SUSTAINED_WINDOW_MIN_READINGS = biomarker_meta.PROJECTION_MIN_TIMEPOINTS
+# The >= n readings must span at least this many days to count as sustained (not a same-day cluster).
+SUSTAINED_WINDOW_SPAN_DAYS = 7
+# The directional-consistency bar: a qualifying stream's per-stream registered-polarity trend
+# (`router._trend_token`) must be one of these — a real directional signal, not `flat`.
+SUSTAINED_TREND_DIRECTIONS = ("improving", "regressing")
+
+
+def _date_of(timepoint):
+    """The calendar date of a store timepoint (a date-only or a full-ISO string)."""
+    return datetime.date.fromisoformat(str(timepoint).split("T", 1)[0])
+
+
+def _last_regen_date(store_read, on_date):
+    """The latest on-file `plan::` date across `PLAN_DOMAINS` — the derived last-re-gen date, or None.
+
+    Reads each domain's `plan::<domain>` series through `plan_schema.resolve_plan` (the dated read):
+    a domain with a plan resolves to its plan date, the max of which is the last time ANY plan was
+    generated. Zero on-file plans resolve to None (no prior re-gen to debounce against).
+    """
+    dates = []
+    for domain in plan_schema.PLAN_DOMAINS:
+        resolved = plan_schema.resolve_plan(store_read(f"plan::{domain}"), on_date)
+        if resolved["plan_date"] is not None:
+            dates.append(resolved["plan_date"])
+    return max(dates) if dates else None
+
+
+def _sustained_signal(store_read):
+    """Whether a SINGLE `biomarker::` stream carries a sustained directional signal.
+
+    Both conjuncts are tied to the SAME stream over its SAME recent window (the trailing
+    `SUSTAINED_WINDOW_MIN_READINGS` readings): a stream qualifies only when, over that recent window,
+    it (a) carries >= `SUSTAINED_WINDOW_MIN_READINGS` distinct timepoints spanning >=
+    `SUSTAINED_WINDOW_SPAN_DAYS` (a sustained series, never a single reading, a same-day cluster, or an
+    ancient anchor + a recent pair) AND (b) shows a directional trend (`router._trend_token` over that
+    one stream is one of `SUSTAINED_TREND_DIRECTIONS`, not `flat`). Worst-wins reduces over the
+    per-stream verdicts — the gate fires only when some ONE stream satisfies BOTH over its own recent
+    window, so a directional blip in one stream can never borrow a flat long series in another (the
+    cross-stream false-fire). A single new reading fails (a) — the debounce holds.
+    """
+    for stream in router._POLARITY_FEED:
+        readings = store_read(stream)
+        dates = sorted({_date_of(r["timepoint"]) for r in readings})
+        if len(dates) < SUSTAINED_WINDOW_MIN_READINGS:
+            continue
+        recent = dates[-SUSTAINED_WINDOW_MIN_READINGS:]
+        if (recent[-1] - recent[0]).days < SUSTAINED_WINDOW_SPAN_DAYS:
+            continue
+        if router._trend_token(readings) in SUSTAINED_TREND_DIRECTIONS:
+            return True
+    return False
+
+
+def _should_regenerate(store_read, *, on_date):
+    """Whether the shared debounce gate passes — pure over the derived read state.
+
+    True only when the min-interval has elapsed since the derived last-re-gen date AND the
+    `biomarker::` window carries a sustained directional signal. The gate is trigger-agnostic: every
+    trigger kind (the free-text one included) is bound by the SAME 7-day min-interval floor — the
+    derived date-only state cannot express a finer sub-day free-text clock without a new store stream
+    (ADR-0038 forbids one), so there is no independent free-text bound. Reads state — never writes.
+    """
+    last = _last_regen_date(store_read, on_date)
+    if last is not None:
+        elapsed_days = (_date_of(on_date) - _date_of(last)).days
+        if elapsed_days < MIN_REGEN_INTERVAL_DAYS:
+            return False
+    return _sustained_signal(store_read)
+
+
+def signal(root, *, trigger, dispatch=None, deid_client=None, plan_date=None):
+    """The ONE debounced entry every trigger kind calls; re-generate only when the gate passes.
+
+    Runs the shared debounce predicate over DERIVED state (last-re-gen date from the dated `plan::`
+    history; sustained-signal window over the `biomarker::` series). On pass it invokes T1's
+    `regenerate(...)` exactly once and returns its re-gen receipt — it NEVER bypasses `regenerate`
+    (the T1 front-door binding stays the sole path to the driver) and NEVER writes a store record.
+    On a cadence trigger with no window signal it returns a hold+prompt payload (a `log_prompt` flag,
+    0 new plans). On a debounced drop (inside window / inside min interval) it returns a no-op receipt
+    with 0 new plans. The production server->trigger-site threading
+    of the loop `dispatch`/`deid_client` seams is ADR-0036-T4; absent seams, a gate-pass is a no-op
+    (`seams-unwired`) rather than a bare re-gen — the trigger sites notify additively either way.
+
+    Args:
+        root (str | Path): The store root the derived state is read from and the re-gen records into.
+        trigger (str): The trigger label — `CADENCE_TRIGGER`, `DATA_EVENT_TRIGGER`, or
+            `FREE_TEXT_TRIGGER`.
+        dispatch (Callable, optional): The unified subscription-agent dispatch seam forwarded to
+            `regenerate` on a gate-pass. None at a not-yet-wired production trigger site.
+        deid_client (optional): The de-id model client forwarded to `regenerate`. None as above.
+        plan_date (str, optional): The plans' YYYY-MM-DD date. None -> today's ISO date.
+
+    Returns:
+        (dict) The `regenerate` result on a gate-pass with seams present, else a no-op / hold+prompt
+        receipt: `{"regenerated": bool, "log_prompt": bool, "trigger": str, "reason": str}`.
+    """
+    plan_date = plan_date or datetime.date.today().isoformat()
+    root = root if root is not None else store.DEFAULT_ROOT
+    store_read = functools.partial(store.read, root=root)
+    if _should_regenerate(store_read, on_date=plan_date):
+        if dispatch is not None and deid_client is not None:
+            return regenerate(root, dispatch=dispatch, deid_client=deid_client,
+                              plan_date=plan_date, trigger=trigger)
+        return {"regenerated": False, "log_prompt": False, "trigger": trigger,
+                "reason": "seams-unwired"}
+    if trigger == CADENCE_TRIGGER and not _sustained_signal(store_read):
+        return {"regenerated": False, "log_prompt": True, "trigger": trigger,
+                "reason": "absent-signal-hold"}
+    return {"regenerated": False, "log_prompt": False, "trigger": trigger, "reason": "debounced"}

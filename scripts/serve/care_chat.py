@@ -27,6 +27,7 @@ is the model's job (runtime, the same as the intake extractor); this module supp
 
 import functools
 import json
+import logging
 
 from scripts.model.client import ModelCallError
 from scripts.plan import router
@@ -236,7 +237,8 @@ def _care_messages(profile, conversation, turn_text, *, weight_display=None, wei
     return messages
 
 
-def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=None, identity_config=None):
+def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=None, identity_config=None,
+            loop_dispatch=None, loop_deid_client=None):
     """Run one Care Assistant conversation turn over the operator's FULL profile; reply + gated capture.
 
     Re-reads the operator's full care profile server-side (`_care_profile`: identity-safe demographics /
@@ -285,4 +287,18 @@ def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=N
         result.get("extraction"), turn_text, root=store_root,
         scaffold_root=scaffold_root, identity_config=identity_config,
     )
+    # A free-text capture completion: notify the plan loop's ONE debounced entry (ADR-0036-T2). Fires
+    # only on this non-degraded branch (skipped on the fail-closed `ModelCallError` degrade above).
+    # The notify carries only the derived trigger label — never the raw `turn_text` (the finding-C
+    # boundary; the debounce reads DERIVED store state). Loop seams threaded by the caller; production
+    # server->site threading is ADR-0036-T4. Additive — the `{"reply", "receipt"}` return is unchanged.
+    from scripts.serve import plan_loop
+    try:
+        plan_loop.signal(store_root, trigger=plan_loop.FREE_TEXT_TRIGGER,
+                         dispatch=loop_dispatch, deid_client=loop_deid_client)
+    except Exception:
+        # Fail-open: the loop notify is additive — a derivation/re-gen raise must never break the
+        # primary care-chat reply (the capture already persisted; the `{"reply", "receipt"}` return
+        # is the contract).
+        logging.exception("plan-loop signal failed after care-chat capture (additive; reply unaffected)")
     return {"reply": result.get("reply"), "receipt": receipt}

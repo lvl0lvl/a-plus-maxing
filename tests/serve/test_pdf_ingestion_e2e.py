@@ -106,7 +106,7 @@ _FROZEN_ENGINE_PATHS = (
     *sorted(
         str(p.relative_to(REPO_ROOT))
         for p in (REPO_ROOT / "scripts" / "plan").glob("*.py")
-        if p.name != "router.py"  # additive seam — guarded by test_router_additive_only_from_fork
+        if p.name not in ("router.py", "horizons.py")  # router.py (de-id summary spine) guarded by test_router_additive_only_from_fork; horizons.py is a NEW post-ADR-0032 read-layer feature module (ADR-0038-T1..T3), NOT crown-jewel spine — its invariants (single progress site, no new store stream, peptides-untracked, no fabricated deadline) are guarded by tests/plan/test_horizons.py, which catches the insertion-shaped regressions a numstat additive-guard would miss. Architect ruling, feature/dyn-loop-w2.
     ),
 )
 

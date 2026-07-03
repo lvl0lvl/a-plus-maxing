@@ -14,6 +14,33 @@ reads are local file I/O; 0 model-bound send.
 
 from scripts.store import calendar_schema, goal_schema, plan_schema
 
+# ADR-0038 D2 enrichment: these three keys ride the ADR-0010 D2 open-on-extras
+# seam on ``plan::<domain>`` values — permitted by omission from every domain's
+# required/optional dict in ``plan_schema`` (no schema declaration, no new store
+# stream). ADR-0038-T3 reads ``week_expectation`` off these values as the
+# declared per-week expectation.
+HORIZON_EXTRAS = ("phase", "week_intent", "week_expectation")
+
+
+def plan_extras(plan):
+    """Read the horizon extras off a resolved ``plan::<domain>`` value.
+
+    The read-back for the week/month framing: given a resolved plan value,
+    return only the ``HORIZON_EXTRAS`` keys present. A plan carrying none of
+    them — or a falsy/None plan (an absent-plan resolve) — yields an empty dict
+    (the graceful floor), never a raise. Adds no store read; the value is the
+    one the T1 read layer already resolved.
+
+    Args:
+        plan (dict): A resolved plan value (``read_plan(...)["plan"]``).
+
+    Returns:
+        (dict) The subset of `HORIZON_EXTRAS` keys carried by `plan`.
+    """
+    if not plan:
+        return {}
+    return {key: plan[key] for key in HORIZON_EXTRAS if key in plan}
+
 
 def read_horizon(slug, root):
     """Read one goal's milestone horizon, or None when the goal is absent.
@@ -70,24 +97,33 @@ def next_cadence(root, on_date):
 def domain_horizons(root, on_date):
     """Read per-domain tracking horizons for the tracked plan domains only.
 
-    A domain surfaces a tracking horizon only when it has a stored plan AND is a
-    ``plan_schema.TRACKED_DOMAINS`` member — ``peptides`` is a plan domain but not
-    a tracked one, so it yields no cadence and no tracking horizon.
+    A domain surfaces a tracking horizon only when it has a plan dated the render
+    date AND is a ``plan_schema.TRACKED_DOMAINS`` member — ``peptides`` is a plan
+    domain but not a tracked one, so it yields no cadence and no tracking horizon.
+    Both non-None ``resolve_plan`` states are skipped: ``NO_PLAN`` (no plan on
+    file) and ``NO_PLAN_TODAY`` (a stale plan not dated the render date — surfacing
+    its plan_date would mislead the ADR-0038-T3 week/month classifier).
 
     Args:
         root (str | Path): The store root.
         on_date (str): The render date, YYYY-MM-DD.
 
     Returns:
-        (list) One `{domain, plan_date}` dict per tracked domain with a plan on
-        file, in `plan_schema.PLAN_DOMAINS` order.
+        (list) One `{domain, plan_date, extras}` dict per tracked domain with a
+        current (render-date) plan on file, in `plan_schema.PLAN_DOMAINS` order.
+        `extras` carries the `HORIZON_EXTRAS` keys enriched onto the plan value
+        (empty when absent).
     """
     horizons = []
     for domain in plan_schema.PLAN_DOMAINS:
         resolved = plan_schema.read_plan(domain, on_date, root)
-        if resolved["state"] == plan_schema.NO_PLAN:
+        if resolved["state"] is not None:
             continue
         if domain not in plan_schema.TRACKED_DOMAINS:
             continue
-        horizons.append({"domain": domain, "plan_date": resolved["plan_date"]})
+        horizons.append({
+            "domain": domain,
+            "plan_date": resolved["plan_date"],
+            "extras": plan_extras(resolved["plan"]),
+        })
     return horizons
