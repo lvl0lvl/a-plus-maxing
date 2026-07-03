@@ -125,6 +125,27 @@ def test_horizons_peptides_untracked(tmp_path):
     assert "workout" in domains
 
 
+# --- Tier-3 review (HIGH): NO_PLAN_TODAY is skipped, never crashes ---
+
+
+def test_horizons_no_plan_today_absent_no_crash(tmp_path):
+    """A plan dated D1 read at D2 (a stale plan) yields NO tracking horizon, no crash.
+
+    ``resolve_plan`` returns ``NO_PLAN_TODAY`` (plan=None) for a domain whose
+    latest plan is not dated the render date. ``domain_horizons`` must skip it
+    alongside ``NO_PLAN`` — surfacing a stale plan_date misleads the ADR-0038-T3
+    classifier. Mutation check: guarding only on ``NO_PLAN`` (the pre-fix code)
+    raises ``TypeError`` inside ``plan_extras(None)`` — this test reds.
+    """
+    plan_schema.record_plan("workout", _workout_plan(), "2026-06-10", "coach", tmp_path)
+    # Read the render date TEN days after the recorded plan -> NO_PLAN_TODAY:
+    view = horizons.domain_horizons(tmp_path, "2026-06-20")
+    assert [h["domain"] for h in view] == []
+    # A same-date plan still surfaces (the skip is not a blanket drop):
+    same_date = horizons.domain_horizons(tmp_path, "2026-06-10")
+    assert [h["domain"] for h in same_date] == ["workout"]
+
+
 # --- AC-4 (Risk): open-ended goal degrades to rolling cycles, no fabricated date ---
 
 
@@ -177,6 +198,13 @@ def test_horizons_writes_no_new_store_stream(tmp_path):
     assert "store.correct" not in src
     for forbidden in ("plan-arc::", "horizon::", "periodization::"):
         assert forbidden not in src
+    # Egress guard (Architect breaks-if): the frozen-glob carve-out's behavioral
+    # guard also covers model-send / network-egress — the read layer names no
+    # author/de-id/model-send symbol and no network transport. Mutation check:
+    # adding a `converse`/`requests`/`socket` call to horizons.py reds this.
+    for egress in ("converse", "author", "deidentify", "deid_in",
+                   "client.", "requests", "urllib", "socket", "ModelClient"):
+        assert egress not in src, f"horizons.py names an egress symbol {egress!r}"
 
 
 # --- ADR-0038-T2 Cycle 1: enrichment convention rides the D2 open-on-extras seam ---

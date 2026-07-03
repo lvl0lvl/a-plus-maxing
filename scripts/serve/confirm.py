@@ -24,6 +24,8 @@ valid+invalid batch lands NOTHING (no valid-prefix-lands-then-raises partial). A
 non-conformant reading raises `ValueError` before any reading is written.
 """
 
+import logging
+
 from scripts.ingest import ingest
 from scripts.serve import biomarker_mirror
 from scripts.store import store
@@ -80,6 +82,12 @@ def land_confirmed(readings, *, root, loop_dispatch=None, loop_deid_client=None)
     # Additive side-effect — the debounce gate decides whether a re-gen fires; the `{"store": landed}`
     # receipt is unchanged. Loop seams threaded by the caller (production wiring is ADR-0036-T4).
     from scripts.serve import plan_loop
-    plan_loop.signal(store_root, trigger=plan_loop.DATA_EVENT_TRIGGER,
-                     dispatch=loop_dispatch, deid_client=loop_deid_client)
+    try:
+        plan_loop.signal(store_root, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                         dispatch=loop_dispatch, deid_client=loop_deid_client)
+    except Exception:
+        # Fail-open: the loop notify is additive — a derivation/re-gen raise must never break the
+        # primary land (the confirmed readings already landed; the `{"store": landed}` receipt is
+        # the contract).
+        logging.exception("plan-loop signal failed after confirmed land (additive; land unaffected)")
     return {"store": landed}

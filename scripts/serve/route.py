@@ -33,6 +33,7 @@ bytes reach ONLY the on-device subprocess) and chunk-structured via `extract_chu
 signal. Every OTHER unrecognized format keeps the ADR-0030 raw-content path byte-unchanged.
 """
 
+import logging
 import mimetypes
 import zipfile
 from pathlib import Path
@@ -170,8 +171,13 @@ def route_upload(staged_path, *, client=None, root=None, dna_root=None,
         # is unchanged. The loop seams are threaded by the trigger's caller (production server->site
         # threading is ADR-0036-T4); absent them the notify is a debounced no-op, never a bare re-gen.
         from scripts.serve import plan_loop
-        plan_loop.signal(store_root, trigger=plan_loop.DATA_EVENT_TRIGGER,
-                         dispatch=loop_dispatch, deid_client=loop_deid_client)
+        try:
+            plan_loop.signal(store_root, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                             dispatch=loop_dispatch, deid_client=loop_deid_client)
+        except Exception:
+            # Fail-open: the loop notify is additive — a derivation/re-gen raise must never break the
+            # primary land (the readings already landed; the source return is the contract).
+            logging.exception("plan-loop signal failed after wearable land (additive; land unaffected)")
     return source
 
 

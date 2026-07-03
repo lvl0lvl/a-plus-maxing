@@ -120,8 +120,11 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None):
 # converge on the ONE debounced entry `signal`, so no trigger reaches `regenerate` un-debounced.
 # A whole-plan front-door re-gen is materially more expensive than a per-domain patch
 # (ADR-0036 Consequences-Negative-1), so a re-gen fires only when the pinned min-interval has
-# elapsed AND the `biomarker::` window carries a sustained directional signal; a free-text trigger
-# is additionally rate-limited. The debounce state introduces ZERO new store stream (OQ-5): the
+# elapsed AND the `biomarker::` window carries a sustained directional signal. Every trigger kind —
+# the free-text one included — is bound by the SAME 7-day min-interval floor; the derived date-only
+# state cannot represent a finer per-trigger (sub-day) free-text clock without a new store stream,
+# which ADR-0038 forbids, so the free-text trigger carries no independent sub-day bound. The debounce
+# state introduces ZERO new store stream (OQ-5): the
 # last-re-gen date is DERIVED from the dated `plan::` history via `plan_schema.resolve_plan`, and
 # the window is a query over the existing `biomarker::` series via the router trend feed — no
 # `loop::`/`debounce::`/`regen-marker::` item, no `store.append` of a marker.
@@ -140,11 +143,9 @@ MIN_REGEN_INTERVAL_DAYS = 7
 SUSTAINED_WINDOW_MIN_READINGS = biomarker_meta.PROJECTION_MIN_TIMEPOINTS
 # The >= n readings must span at least this many days to count as sustained (not a same-day cluster).
 SUSTAINED_WINDOW_SPAN_DAYS = 7
-# The directional-consistency bar: the window's worst-wins registered-polarity trend
-# (`router._recent_trend_direction`) must be one of these — a real directional signal, not `flat`.
+# The directional-consistency bar: a qualifying stream's per-stream registered-polarity trend
+# (`router._trend_token`) must be one of these — a real directional signal, not `flat`.
 SUSTAINED_TREND_DIRECTIONS = ("improving", "regressing")
-# The additional bound on the care-chat trigger: at most one free-text re-gen per this many hours.
-FREE_TEXT_RATE_LIMIT_HOURS = 24
 
 
 def _date_of(timepoint):
@@ -168,37 +169,44 @@ def _last_regen_date(store_read, on_date):
 
 
 def _sustained_signal(store_read):
-    """Whether the `biomarker::` window carries a sustained directional signal.
+    """Whether a SINGLE `biomarker::` stream carries a sustained directional signal.
 
-    Two conjuncts: (a) the worst-wins registered-polarity trend over the feed is directional (one of
-    `SUSTAINED_TREND_DIRECTIONS`, not `flat`), reusing `router._recent_trend_direction` — no parallel
-    trend derivation; and (b) at least one feed stream carries >= `SUSTAINED_WINDOW_MIN_READINGS`
-    distinct timepoints spanning >= `SUSTAINED_WINDOW_SPAN_DAYS` (a sustained series, never a single
-    reading or a same-day cluster). A single new reading fails both — the debounce holds.
+    Both conjuncts are tied to the SAME stream over its SAME recent window (the trailing
+    `SUSTAINED_WINDOW_MIN_READINGS` readings): a stream qualifies only when, over that recent window,
+    it (a) carries >= `SUSTAINED_WINDOW_MIN_READINGS` distinct timepoints spanning >=
+    `SUSTAINED_WINDOW_SPAN_DAYS` (a sustained series, never a single reading, a same-day cluster, or an
+    ancient anchor + a recent pair) AND (b) shows a directional trend (`router._trend_token` over that
+    one stream is one of `SUSTAINED_TREND_DIRECTIONS`, not `flat`). Worst-wins reduces over the
+    per-stream verdicts — the gate fires only when some ONE stream satisfies BOTH over its own recent
+    window, so a directional blip in one stream can never borrow a flat long series in another (the
+    cross-stream false-fire). A single new reading fails (a) — the debounce holds.
     """
-    if router._recent_trend_direction(store_read) not in SUSTAINED_TREND_DIRECTIONS:
-        return False
     for stream in router._POLARITY_FEED:
-        dates = sorted({_date_of(r["timepoint"]) for r in store_read(stream)})
-        if (len(dates) >= SUSTAINED_WINDOW_MIN_READINGS
-                and (dates[-1] - dates[0]).days >= SUSTAINED_WINDOW_SPAN_DAYS):
+        readings = store_read(stream)
+        dates = sorted({_date_of(r["timepoint"]) for r in readings})
+        if len(dates) < SUSTAINED_WINDOW_MIN_READINGS:
+            continue
+        recent = dates[-SUSTAINED_WINDOW_MIN_READINGS:]
+        if (recent[-1] - recent[0]).days < SUSTAINED_WINDOW_SPAN_DAYS:
+            continue
+        if router._trend_token(readings) in SUSTAINED_TREND_DIRECTIONS:
             return True
     return False
 
 
-def _should_regenerate(store_read, *, trigger, on_date):
-    """Whether a trigger passes the shared debounce gate — pure over the derived read state.
+def _should_regenerate(store_read, *, on_date):
+    """Whether the shared debounce gate passes — pure over the derived read state.
 
     True only when the min-interval has elapsed since the derived last-re-gen date AND the
-    `biomarker::` window carries a sustained directional signal; a `free-text` trigger ALSO enforces
-    the 24h free-text rate limit against the same derived last-re-gen date. Reads state — never writes.
+    `biomarker::` window carries a sustained directional signal. The gate is trigger-agnostic: every
+    trigger kind (the free-text one included) is bound by the SAME 7-day min-interval floor — the
+    derived date-only state cannot express a finer sub-day free-text clock without a new store stream
+    (ADR-0038 forbids one), so there is no independent free-text bound. Reads state — never writes.
     """
     last = _last_regen_date(store_read, on_date)
     if last is not None:
         elapsed_days = (_date_of(on_date) - _date_of(last)).days
         if elapsed_days < MIN_REGEN_INTERVAL_DAYS:
-            return False
-        if trigger == FREE_TEXT_TRIGGER and elapsed_days * 24 < FREE_TEXT_RATE_LIMIT_HOURS:
             return False
     return _sustained_signal(store_read)
 
@@ -211,8 +219,8 @@ def signal(root, *, trigger, dispatch=None, deid_client=None, plan_date=None):
     `regenerate(...)` exactly once and returns its re-gen receipt — it NEVER bypasses `regenerate`
     (the T1 front-door binding stays the sole path to the driver) and NEVER writes a store record.
     On a cadence trigger with no window signal it returns a hold+prompt payload (a `log_prompt` flag,
-    0 new plans). On a debounced drop (inside window / inside min interval / over the free-text rate
-    limit) it returns a no-op receipt with 0 new plans. The production server->trigger-site threading
+    0 new plans). On a debounced drop (inside window / inside min interval) it returns a no-op receipt
+    with 0 new plans. The production server->trigger-site threading
     of the loop `dispatch`/`deid_client` seams is ADR-0036-T4; absent seams, a gate-pass is a no-op
     (`seams-unwired`) rather than a bare re-gen — the trigger sites notify additively either way.
 
@@ -232,7 +240,7 @@ def signal(root, *, trigger, dispatch=None, deid_client=None, plan_date=None):
     plan_date = plan_date or datetime.date.today().isoformat()
     root = root if root is not None else store.DEFAULT_ROOT
     store_read = functools.partial(store.read, root=root)
-    if _should_regenerate(store_read, trigger=trigger, on_date=plan_date):
+    if _should_regenerate(store_read, on_date=plan_date):
         if dispatch is not None and deid_client is not None:
             return regenerate(root, dispatch=dispatch, deid_client=deid_client,
                               plan_date=plan_date, trigger=trigger)

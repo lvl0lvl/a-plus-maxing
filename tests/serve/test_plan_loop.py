@@ -622,7 +622,9 @@ def test_debounce_parameters_are_pinned_constants():
     assert plan_loop.SUSTAINED_WINDOW_MIN_READINGS == 3
     assert plan_loop.SUSTAINED_WINDOW_MIN_READINGS == biomarker_meta.PROJECTION_MIN_TIMEPOINTS
     assert plan_loop.SUSTAINED_TREND_DIRECTIONS == ("improving", "regressing")
-    assert plan_loop.FREE_TEXT_RATE_LIMIT_HOURS == 24
+    # The dead sub-day free-text rate limit was removed (Tier-3 FIX 3): the free-text trigger has no
+    # independent bound — it obeys the 7-day min-interval floor like every other trigger.
+    assert not hasattr(plan_loop, "FREE_TEXT_RATE_LIMIT_HOURS")
 
 
 # --- Cycle 1 AC-5: no new store stream (derived state) -------------------------------
@@ -754,3 +756,110 @@ def test_cross_kind_triggers_within_window_dedupe(tmp_path):
 
     today = datetime.date.today().isoformat()
     assert _new_dated_sets(root, today) == 1, "cross-kind triggers produced != 1 re-gen (dedupe broken)"
+
+
+# =====================================================================================
+# Tier-3 review fixes: cross-stream debounce, dead free-text bound, signal isolation ---
+# =====================================================================================
+
+
+def test_debounce_no_cross_stream_false_fire(tmp_path):
+    # FIX 2 (HIGH, store-adversarial cross-stream): the direction conjunct and the sustained-length
+    # conjunct must be satisfied by the SAME stream. A directional-but-SHORT stream (`hrv` rising over
+    # a 2-reading blip) ALONGSIDE an unrelated long FLAT stream (`alt`, 3 readings over 15 days) must
+    # NOT re-generate — no single stream carries both a directional trend AND the sustained length.
+    # Pre-fix (worst-wins direction over one stream + any-stream length over another) fires → RED.
+    from scripts.serve import plan_loop
+
+    root = tmp_path / "store"
+    _seed_store(root)
+    # NO prior plan -> min-interval is vacuously satisfied (last=None); the gate reduces to the signal.
+    _seed_biomarker(root, "hrv", [40, 60], ("2026-06-14", "2026-06-16"))   # directional, but 2 readings
+    _seed_biomarker(root, "alt", [30, 30, 30], _SUSTAINED_DATES)           # 3 readings/15 days, FLAT
+    store_read = __import__("functools").partial(store.read, root=root)
+
+    assert plan_loop._sustained_signal(store_read) is False, (
+        "a directional blip in hrv borrowed alt's flat long series (cross-stream false-fire)"
+    )
+    assert plan_loop._should_regenerate(store_read, on_date=_T2_ON_DATE) is False
+
+    # E2E through the debounced entry: 0 new dated plan sets (the store-adversarial cross-stream case).
+    plan_loop.signal(root, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                     dispatch=_LoopDispatch(_clean_authors()),
+                     deid_client=_FixedDeidClient(_deid_summary()), plan_date=_T2_ON_DATE)
+    assert _new_dated_sets(root, _T2_ON_DATE) == 0, "cross-stream signal re-generated (debounce broke)"
+
+
+def test_single_stream_sustained_still_fires(tmp_path):
+    # FIX 2 (positive control): a SINGLE stream that alone carries BOTH conjuncts (hrv rising over 3
+    # readings / 15 days) still fires — the tightened gate did not become a blanket drop.
+    from scripts.serve import plan_loop
+
+    root = _sustained_root(tmp_path, "one-stream")  # hrv [40,50,60] over _SUSTAINED_DATES, old prior plan
+    store_read = __import__("functools").partial(store.read, root=root)
+    assert plan_loop._sustained_signal(store_read) is True
+    plan_loop.signal(root, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                     dispatch=_LoopDispatch(_clean_authors()),
+                     deid_client=_FixedDeidClient(_deid_summary()), plan_date=_T2_ON_DATE)
+    assert _new_dated_sets(root, _T2_ON_DATE) == 1
+
+
+def test_free_text_trigger_obeys_seven_day_floor(tmp_path):
+    # FIX 3 (MEDIUM): the free-text trigger has NO independent sub-day bound — it obeys the SAME 7-day
+    # min-interval floor as every trigger. A prior plan 3 days back blocks a free-text re-gen (the
+    # 7-day floor, not a phantom 24h clock); a prior plan 17 days back lets it fire on a sustained
+    # signal. The removed dead constant is asserted gone in test_debounce_parameters_are_pinned_constants.
+    from scripts.serve import plan_loop
+
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+
+    # (a) 3 days since last re-gen (< 7): blocked by the min-interval floor even with a sustained signal.
+    inside = tmp_path / "inside"
+    _seed_store(inside)
+    _seed_prior_plan(inside, "2026-06-15")  # 3 days before _T2_ON_DATE
+    _seed_biomarker(inside, "hrv", [40, 50, 60], _SUSTAINED_DATES)
+    plan_loop.signal(inside, trigger=plan_loop.FREE_TEXT_TRIGGER,
+                     dispatch=dispatch, deid_client=deid_client, plan_date=_T2_ON_DATE)
+    assert _new_dated_sets(inside, _T2_ON_DATE) == 0, "free-text re-gen fired inside the 7-day floor"
+
+    # (b) 17 days since last re-gen (>= 7) + sustained signal: the free-text trigger fires.
+    outside = _sustained_root(tmp_path, "outside")  # old prior plan @ 2026-06-01 + sustained hrv
+    plan_loop.signal(outside, trigger=plan_loop.FREE_TEXT_TRIGGER,
+                     dispatch=dispatch, deid_client=deid_client, plan_date=_T2_ON_DATE)
+    assert _new_dated_sets(outside, _T2_ON_DATE) == 1, "free-text re-gen did not fire past the 7-day floor"
+
+
+def test_signal_raise_does_not_break_primary_handlers(tmp_path, monkeypatch):
+    # FIX 4 (Security MEDIUM-1 / bug Finding 4): a raising loop `signal` must NEVER break a primary
+    # handler's response — the loop notify is additive (the data already landed). Each of the three
+    # trigger sites (route / confirm / care_chat) wraps `signal` fail-open. Pre-fix (no try/except) the
+    # raise propagates out of the primary handler -> RED.
+    from scripts.serve import care_chat, confirm, plan_loop, route
+    from tests.serve.test_care_chat import _RecordingBackend, _seed
+    from tests.serve.test_route import _write_healthkit_xml
+
+    def boom(*a, **k):
+        raise RuntimeError("plan-loop signal blew up")
+
+    monkeypatch.setattr(plan_loop, "signal", boom)
+    root = tmp_path / "store"
+    _seed_store(root)
+    _seed(root)  # care-profile fields for care_chat.respond
+
+    # route.route_upload — the wearable land still returns its source unaffected.
+    staged = tmp_path / "export.xml"
+    _write_healthkit_xml(staged, day="2026-05-01", value="55")
+    source = route.route_upload(staged, root=root, dna_root=tmp_path / "dna")
+    assert source == "healthkit", "route_upload did not return normally despite a raising signal"
+
+    # confirm.land_confirmed — the confirmed land still returns its receipt unaffected.
+    receipt = confirm.land_confirmed(
+        [{"item": "ferritin", "timepoint": "2026-05-01", "source": "labs", "value": "120"}],
+        root=root,
+    )
+    assert receipt == {"store": ["ferritin"]}, "land_confirmed did not return its receipt"
+
+    # care_chat.respond — the care-chat reply still returns unaffected.
+    result = care_chat.respond("I slept 5 hours", [], client=_RecordingBackend(), store_root=root)
+    assert "reply" in result and "receipt" in result, "care_chat.respond did not return its reply"

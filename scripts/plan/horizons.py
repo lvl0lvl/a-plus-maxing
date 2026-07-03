@@ -27,8 +27,9 @@ def plan_extras(plan):
 
     The read-back for the week/month framing: given a resolved plan value,
     return only the ``HORIZON_EXTRAS`` keys present. A plan carrying none of
-    them yields an empty dict (the graceful floor) — never a raise. Adds no
-    store read; the value is the one the T1 read layer already resolved.
+    them — or a falsy/None plan (an absent-plan resolve) — yields an empty dict
+    (the graceful floor), never a raise. Adds no store read; the value is the
+    one the T1 read layer already resolved.
 
     Args:
         plan (dict): A resolved plan value (``read_plan(...)["plan"]``).
@@ -36,6 +37,8 @@ def plan_extras(plan):
     Returns:
         (dict) The subset of `HORIZON_EXTRAS` keys carried by `plan`.
     """
+    if not plan:
+        return {}
     return {key: plan[key] for key in HORIZON_EXTRAS if key in plan}
 
 
@@ -94,9 +97,12 @@ def next_cadence(root, on_date):
 def domain_horizons(root, on_date):
     """Read per-domain tracking horizons for the tracked plan domains only.
 
-    A domain surfaces a tracking horizon only when it has a stored plan AND is a
-    ``plan_schema.TRACKED_DOMAINS`` member — ``peptides`` is a plan domain but not
-    a tracked one, so it yields no cadence and no tracking horizon.
+    A domain surfaces a tracking horizon only when it has a plan dated the render
+    date AND is a ``plan_schema.TRACKED_DOMAINS`` member — ``peptides`` is a plan
+    domain but not a tracked one, so it yields no cadence and no tracking horizon.
+    Both non-None ``resolve_plan`` states are skipped: ``NO_PLAN`` (no plan on
+    file) and ``NO_PLAN_TODAY`` (a stale plan not dated the render date — surfacing
+    its plan_date would mislead the ADR-0038-T3 week/month classifier).
 
     Args:
         root (str | Path): The store root.
@@ -104,13 +110,14 @@ def domain_horizons(root, on_date):
 
     Returns:
         (list) One `{domain, plan_date, extras}` dict per tracked domain with a
-        plan on file, in `plan_schema.PLAN_DOMAINS` order. `extras` carries the
-        `HORIZON_EXTRAS` keys enriched onto the plan value (empty when absent).
+        current (render-date) plan on file, in `plan_schema.PLAN_DOMAINS` order.
+        `extras` carries the `HORIZON_EXTRAS` keys enriched onto the plan value
+        (empty when absent).
     """
     horizons = []
     for domain in plan_schema.PLAN_DOMAINS:
         resolved = plan_schema.read_plan(domain, on_date, root)
-        if resolved["state"] == plan_schema.NO_PLAN:
+        if resolved["state"] is not None:
             continue
         if domain not in plan_schema.TRACKED_DOMAINS:
             continue

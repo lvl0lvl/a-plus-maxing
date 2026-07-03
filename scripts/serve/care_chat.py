@@ -27,6 +27,7 @@ is the model's job (runtime, the same as the intake extractor); this module supp
 
 import functools
 import json
+import logging
 
 from scripts.model.client import ModelCallError
 from scripts.plan import router
@@ -292,6 +293,12 @@ def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=N
     # boundary; the debounce reads DERIVED store state). Loop seams threaded by the caller; production
     # server->site threading is ADR-0036-T4. Additive — the `{"reply", "receipt"}` return is unchanged.
     from scripts.serve import plan_loop
-    plan_loop.signal(store_root, trigger=plan_loop.FREE_TEXT_TRIGGER,
-                     dispatch=loop_dispatch, deid_client=loop_deid_client)
+    try:
+        plan_loop.signal(store_root, trigger=plan_loop.FREE_TEXT_TRIGGER,
+                         dispatch=loop_dispatch, deid_client=loop_deid_client)
+    except Exception:
+        # Fail-open: the loop notify is additive — a derivation/re-gen raise must never break the
+        # primary care-chat reply (the capture already persisted; the `{"reply", "receipt"}` return
+        # is the contract).
+        logging.exception("plan-loop signal failed after care-chat capture (additive; reply unaffected)")
     return {"reply": result.get("reply"), "receipt": receipt}
