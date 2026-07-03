@@ -1,17 +1,21 @@
 """Profile-aware Care Assistant conversation (the continuous post-unlock care chat).
 
-Distinct from `chat.dispatch_turn` (the PRE-unlock intake elicitation, which carries only the
-de-identified gap-set and extracts facts). This is the POST-unlock care conversation: it re-reads the
-de-identified `router.summarize` profile server-side each turn and carries it as context, so the Care
-Assistant reasons over the operator's FULL (de-identified) profile and the conversation stays coherent
-— the care-review clarifying questions are the conversation's opening turns, carried back in
-`conversation`, so a reply continues them instead of restarting.
+Distinct from `chat.dispatch_turn` (the PRE-unlock intake elicitation). This is the POST-unlock care
+conversation, and it is the operator's OWN private agent: it re-reads the operator's FULL profile
+server-side each turn (`_care_profile`) — the operator's actual peptide / supplement / diet / training
+/ injury detail, plus demographics / goals / genetics — so it reasons over the real specifics, not
+coarse bands. The care-review clarifying questions are the conversation's opening turns, carried back
+in `conversation`, so a reply continues them instead of restarting.
 
-Boundary (ADR-0016): ONE `converse` call over the no-train lane, carrying the de-identified profile
-(0 raw PII — `router.summarize` de-identifies) + the live conversation (the operator's own words, the
-SAME egress class `chat.dispatch_turn` already sends over the no-train lane) + the current turn, and
-NOTHING else. The profile is SERVER-derived each turn (the client never supplies it), so a client
-cannot inject a forged profile.
+Privacy boundary (operator-directed): the de-identification line is the care -> SPECIALIST / plan
+hand-off (`router.dispatch`), NOT the operator -> care-agent link. The care agent is private, so it
+sees the operator's real health detail; only PURE IDENTITY stays stripped (legal name, exact DOB,
+contact, address) — `_care_profile` is built on `router.summarize`, which is identity-safe by
+construction (disjoint from the named-excluded identity PII), then enriched with the raw health
+free-text. The one `converse` call carries this profile + the live conversation (the operator's own
+words, already the no-train egress class) + the current turn. The profile is SERVER-derived each turn
+(the client never supplies it), so a client cannot inject a forged profile. The plan/specialist path
+(`summarize` -> `dispatch`) stays de-identified — unchanged.
 
 Store-write: the care agent WRITES the facts the operator states back to the store through the EXACT
 SAME gated path the intake chat uses — `extract.persist_extraction` -> `capture.persist_capture` — so a
@@ -87,17 +91,58 @@ def _age_display(summary):
     return f"{age} years" if age else None
 
 
-def _care_messages(summary, conversation, turn_text, *, weight_display=None, weight_pref=None, age_display=None):
-    """Build the care-conversation converse payload: de-id profile context + conversation + turn.
+# The operator's raw intake health free-text, mapped to a clear care-facing label. These are the
+# named-excluded raw sources `summarize` collapses to coarse bands FOR THE SPECIALIST hand-off; the
+# care agent is the operator's OWN agent, so it reads the SPECIFICS the operator entered — the
+# peptides, supplement, diet, training, and injury detail — not the vague bands.
+_CARE_HEALTH_DETAIL = {
+    "nutrition": "raw-nutrition-free-text",
+    "supplements": "raw-supplement-free-text",
+    "peptides": "raw-peptide-free-text",
+    "training": "raw-training-detail-free-text",
+    "injuries": "raw-symptom-free-text",
+}
+
+
+def _care_profile(store_read, *, identity_config=None):
+    """The FULL care-facing profile: the identity-safe summary PLUS the operator's raw health detail.
+
+    The de-identification boundary is the care -> SPECIALIST / plan hand-off (`router.dispatch`), NOT
+    the operator -> care-agent link. The care agent is the operator's OWN private agent, so it reads
+    the operator's ACTUAL detail — the peptide / supplement / diet / training / injury free-text they
+    entered at intake — instead of the coarse specialist-facing bands. Built ON TOP of
+    `router.summarize`, which is identity-safe BY CONSTRUCTION (its output is disjoint from the
+    named-excluded identity PII — legal name, exact DOB, contact, address never appear; only the
+    derived age / weight / sex / equipment / goals / genetics / rx-classes do), then ENRICHED with the
+    raw health free-text under `health_detail`. So the agent sees the operator's real specifics while
+    pure identity stays stripped, and the specialist/plan path stays de-identified.
+    """
+    if identity_config is not None:
+        profile = dict(router.summarize(store_read, identity_config=identity_config))
+    else:
+        profile = dict(router.summarize(store_read))
+    detail = {}
+    for label, item in _CARE_HEALTH_DETAIL.items():
+        rows = store_read(item)
+        if rows and rows[-1].get("value"):
+            detail[label] = rows[-1]["value"]
+    if detail:
+        profile["health_detail"] = detail
+    return profile
+
+
+def _care_messages(profile, conversation, turn_text, *, weight_display=None, weight_pref=None, age_display=None):
+    """Build the care-conversation converse payload: the operator's FULL profile + conversation + turn.
 
     Mirrors `chat._model_messages`'s API-valid shape (every entry role ∈ {user, assistant}, string
-    content) but the index-0 context is the FULL de-identified profile (`router.summarize`) rather than
-    the intake gap-set — so the Care Assistant reasons over the whole profile. The optional
-    `weight_display` (both units) + `weight_pref` (the operator's chosen unit) are added so the
-    assistant talks weight in the operator's unit, not kg-only. A malformed conversation entry (not a
-    `{role, content}` dict) is SKIPPED, never char-splatted into the payload.
+    content) but the index-0 context is the operator's FULL care profile (`_care_profile`: the
+    identity-safe demographics/goals/genetics + the raw `health_detail`) — so the Care Assistant
+    reasons over the operator's actual specifics, not coarse bands. The optional `weight_display` (both
+    units) + `weight_pref` (the operator's chosen unit) are added so the assistant talks weight in the
+    operator's unit, not kg-only. A malformed conversation entry (not a `{role, content}` dict) is
+    SKIPPED, never char-splatted into the payload.
     """
-    context = {"task": "care-conversation", "profile": summary}
+    context = {"task": "care-conversation", "profile": profile}
     if weight_display:
         context["operator_weight"] = weight_display
     if weight_pref:
@@ -119,10 +164,11 @@ def _care_messages(summary, conversation, turn_text, *, weight_display=None, wei
 
 
 def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=None, identity_config=None):
-    """Run one Care Assistant conversation turn over the de-identified profile; reply + gated capture.
+    """Run one Care Assistant conversation turn over the operator's FULL profile; reply + gated capture.
 
-    Re-reads the de-identified `router.summarize` profile server-side (server-authoritative — the client
-    never supplies the profile), builds the converse payload (profile context + conversation + turn),
+    Re-reads the operator's full care profile server-side (`_care_profile`: identity-safe demographics /
+    goals / genetics + the raw health detail; server-authoritative — the client never supplies it),
+    builds the converse payload (profile context + conversation + turn),
     makes the ONE no-train model call, and returns `{"reply", "receipt"}`. The care agent WRITES the
     facts it extracted from the operator's turn through the SAME gate the intake chat uses
     (`extract.persist_extraction` -> `capture.persist_capture`): a proposed fact is de-identified by its
@@ -148,15 +194,12 @@ def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=N
         fail-closed `{"reply": None, "receipt": empty, "degraded": True, "reason": ...}` on a failure.
     """
     store_read = functools.partial(store.read, root=store_root) if store_root is not None else store.read
-    if identity_config is not None:
-        summary = router.summarize(store_read, identity_config=identity_config)
-    else:
-        summary = router.summarize(store_read)
+    profile = _care_profile(store_read, identity_config=identity_config)
     messages = _care_messages(
-        summary, conversation, turn_text,
-        weight_display=_weight_display(summary),
+        profile, conversation, turn_text,
+        weight_display=_weight_display(profile),
         weight_pref=_weight_unit_preference(scaffold_root),
-        age_display=_age_display(summary),
+        age_display=_age_display(profile),
     )
     try:
         result = client.converse(messages)

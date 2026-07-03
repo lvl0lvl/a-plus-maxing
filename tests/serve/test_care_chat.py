@@ -318,3 +318,43 @@ def test_care_chat_persists_turn_and_get_conversation_restores(tmp_path):
         srv.shutdown()
         srv.server_close()
     assert (tmp_path / "conversations" / "care.md").exists(), "the conversation was not written to the gitignored vault"
+
+
+def test_care_profile_carries_raw_health_detail_and_strips_pure_identity(tmp_path):
+    """The care agent reads the operator's RAW health detail, with pure identity stripped.
+
+    The operator -> care-agent link is private (the de-identification line is the care -> specialist
+    hand-off), so the care profile carries the operator's ACTUAL peptide/supplement/diet/training/injury
+    free-text — not the coarse specialist-facing bands — while legal name / exact DOB / contact / address
+    stay absent (built on the identity-safe `router.summarize`, which never emits them; the DERIVED age
+    still crosses). Failing-capable: reds if the detail is collapsed to a band, or if an identity item
+    (raw name / raw DOB) appears in the profile.
+    """
+    import functools
+    import json
+
+    from scripts.serve import care_chat
+    from scripts.store import store
+
+    root = tmp_path / "store"
+    tp = "2026-07-02T00:00:00+00:00"
+    for item, value in [
+        ("raw-peptide-free-text", "retatrutide 2mg/week titrating to 5mg, Glow stack"),
+        ("raw-nutrition-free-text", "paleo, high protein"),
+        ("raw-symptom-free-text", "left shoulder impingement, overhead press limited"),
+        ("date-of-birth", "1971-03-04"),
+        ("legal-name", "Jane Q Operator"),
+    ]:
+        store.append(item, {"item": item, "timepoint": tp, "source": "intake", "value": value}, root=root)
+
+    profile = care_chat._care_profile(functools.partial(store.read, root=root))
+    # the operator's real specifics reach the agent (not a coarse band)
+    assert "retatrutide" in profile["health_detail"]["peptides"]
+    assert "paleo" in profile["health_detail"]["nutrition"]
+    assert "impingement" in profile["health_detail"]["injuries"]
+    # pure identity is stripped: no legal name, no raw birth date anywhere in the profile
+    blob = json.dumps(profile).lower()
+    assert "jane q operator" not in blob, "the operator's legal name leaked into the care profile"
+    assert "1971-03-04" not in blob, "the operator's raw birth date leaked into the care profile"
+    # but the DERIVED age (from the DOB) still crosses — the agent knows the operator is 55
+    assert profile.get("training-age-band"), "the derived age should still be present for the agent"
