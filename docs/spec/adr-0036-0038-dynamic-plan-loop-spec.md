@@ -213,7 +213,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 6. **Idempotent per `(plan, date)`:** firing the pass twice for the same `(plan, date)` produces no duplicate/stale tailored section (reusing `_preserve_prior_content`, [maintained.py:180](../../scripts/generate/maintained.py)) — count of duplicate tailored sections == 0.
 7. `.venv/bin/python -m pytest tests/plan/test_tailoring.py` passes against fixtures (0 live calls, 0 real operator PII in the test tree).
 **Risk Mitigations:** ADR-0037 finding D (shadow-prescribe a held domain) — AC-2. ADR-0037 §4 (presentation failure fail-open) — AC-3. ADR-0036 constraint (idempotent per `(plan, date)`, fail-safe) — AC-3 + AC-5 + AC-6. ADR-0021/0025 (artifact-only, no second writer) — AC-4.
-**Dependencies:** ADR-0036-T1, ADR-0036-T3, ADR-0036-T4 (T3 orders the shared `scripts/serve/plan_loop.py` write — the tailoring pass attaches at T3's post-record re-emit hook, after T4's post-promote seam)
+**Dependencies:** ADR-0036-T1, ADR-0036-T3, ADR-0036-T4 (T3 orders the shared `scripts/serve/plan_loop.py` write; the tailoring pass attaches at ADR-0036-T4's post-promote seam — T4 AC-4 establishes the pass-through hook this task fills)
 
 ---
 
@@ -267,7 +267,7 @@ ADR-0038-T1 --> ADR-0038-T2      (the extras-seam enrichment layers on the goal/
 ADR-0038-T1 --> ADR-0038-T3      (the date-range/classifier consume the goal read + cadence)
 ADR-0038-T2 --> ADR-0038-T3      (the date-range query reads the D2-enriched plan values + week_expectation)
 ADR-0036-T1 --> ADR-0037-T1      (tailoring runs after the driver records/promotes the plan)
-ADR-0036-T3 --> ADR-0037-T1      (serialize the shared plan_loop.py writers: the tailoring pass attaches at T3's post-record re-emit hook)
+ADR-0036-T3 --> ADR-0037-T1      (serialize the shared plan_loop.py writers; the tailoring pass fills ADR-0036-T4's post-promote pass-through seam)
 ADR-0036-T4 --> ADR-0037-T1      (tailoring fills the post-promote hook seam T4 established)
 ADR-0037-T1 --> ADR-0037-T2      (dosing-reject + interaction screen extend the pass)
 ADR-0037-T1 --> ADR-0037-T3      (the tripwire/wire-scan audit the pass's egress)
