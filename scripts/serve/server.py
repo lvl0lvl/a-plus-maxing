@@ -139,6 +139,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     client = None
     key_resolver = None
     key_store = None
+    loop_dispatch = None
+    loop_deid_client = None
 
     def do_GET(self):
         # Match on the PATH only, ignoring any `?query`/`#fragment`. A query string must not 404 the
@@ -174,6 +176,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/generate-plan":
             self._do_generate_plan()
+            return
+        if self.path == "/plan-loop":
+            self._do_plan_loop()
             return
         if self.path != "/upload":
             self.send_error(404)
@@ -697,6 +702,32 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._write_json(200, {"need_key": False, "results": {}, "plan_html": None,
                                    "degraded": True, "reason": "could not generate plan"})
 
+    def _do_plan_loop(self):
+        """Fire one automated plan-evolution loop tick through the full-composition front door; answer JSON.
+
+        The cadence/manual loop trigger (ADR-0036-T1). It drives `plan_loop.regenerate` with the
+        instance loop `dispatch` + `deid_client` seams (mirroring the injectable `self.client`
+        pattern so the fixture E2E runs at 0 live spend) over `self.store_root` — binding the trigger
+        to `run_orchestrated` -> `plan_driver.drive` -> the composed `gate_dispatch` + the five
+        `orchestrate` cross-domain holds. It is DISTINCT from `_do_generate_plan` and does NOT call
+        it: the loop path never reaches the screened-only route (the anti-degradation guard). The run
+        result is answered as JSON.
+
+        Thread survival (mirrors `_do_chat` / `_do_generate_plan`): a malformed state / an unexpected
+        exception answers an honest degraded JSON, never a dropped request thread.
+        """
+        from scripts.serve import plan_loop
+        from scripts.store import store
+
+        store_root = self.store_root if self.store_root is not None else store.DEFAULT_ROOT
+        try:
+            result = plan_loop.regenerate(
+                store_root, dispatch=self.loop_dispatch, deid_client=self.loop_deid_client,
+            )
+            self._write_json(200, result)
+        except Exception:
+            self._write_json(200, {"results": {}, "degraded": True, "reason": "could not run plan loop"})
+
     def _key_available(self):
         """Whether a no-train key resolves at runtime — the Profile 'connected' availability check.
 
@@ -823,7 +854,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
 
 
 def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
-                 identity_config=None, client=None, key_resolver=None, key_store=None):
+                 identity_config=None, client=None, key_resolver=None, key_store=None,
+                 loop_dispatch=None, loop_deid_client=None):
     """Construct the loopback-bound intake server on `port`.
 
     The POST `/upload` handler ingests file uploads into `store_root`/`dna_root`,
@@ -859,6 +891,8 @@ def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
                    {"store_root": store_root, "dna_root": dna_root,
                     "scaffold_root": scaffold_root, "identity_config": identity_config,
                     "client": client,
+                    "loop_deid_client": loop_deid_client,
+                    "loop_dispatch": staticmethod(loop_dispatch) if loop_dispatch is not None else None,
                     "key_resolver": staticmethod(key_resolver) if key_resolver is not None else None,
                     "key_store": staticmethod(key_store) if key_store is not None else None})
     return ThreadingHTTPServer((_LOOPBACK, port), handler)
