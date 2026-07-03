@@ -14,7 +14,7 @@ the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`) -> re-render t
 shell via `generate.run('app')` reflecting the new load-state. The server serves NO
 generated dashboard/report artifact live (ADR-0013 Falsification 3); the route table
 is {GET `/`, GET `/settings/key`, POST `/upload`, POST `/chat`, POST `/settings/key`,
-POST `/confirm-extraction`, POST `/generate-plan`}. POST `/confirm-extraction`
+POST `/care-chat`, POST `/confirm-extraction`, POST `/confirm-curation`, POST `/generate-plan`}. POST `/confirm-extraction`
 (ADR-0030-T3) lands ONLY the operator-confirmed subset of an unrecognized-format
 upload's extracted readings through the UNCHANGED sink — the `/upload` handler surfaces
 those readings and lands 0. POST `/generate-plan` authors + records a plan for each
@@ -108,8 +108,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     POST `/upload` stages the multipart body, routes the staged file into the unchanged
     `ingest.run`/`dna.land` seam, and re-renders the app shell reflecting the new
     load-state. Any other POST 404s — the route table is {GET `/`, GET `/settings/key`,
-    POST `/upload`, POST `/chat`, POST `/settings/key`, POST `/confirm-extraction`,
-    POST `/generate-plan`}, never a directory listing or an artifact-serving route.
+    POST `/upload`, POST `/chat`, POST `/care-chat`, POST `/settings/key`,
+    POST `/confirm-extraction`, POST `/confirm-curation`, POST `/generate-plan`}, never a
+    directory listing or an artifact-serving route.
 
     Attributes:
         store_root: The time-series store root the POST handler ingests into and
@@ -138,12 +139,21 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     client = None
     key_resolver = None
     key_store = None
+    loop_dispatch = None
+    loop_deid_client = None
 
     def do_GET(self):
-        if self.path == "/settings/key":
+        # Match on the PATH only, ignoring any `?query`/`#fragment`. A query string must not 404 the
+        # app: it is the operator's cache-bust escape hatch — `/?v=2` is a URL the browser has never
+        # cached, so it is guaranteed a fresh fetch when a stale copy of `/` is stuck in cache.
+        path = self.path.split("?", 1)[0].split("#", 1)[0]
+        if path == "/settings/key":
             self._key_status()
             return
-        if self.path != "/":
+        if path == "/conversation":
+            self._do_get_conversation()
+            return
+        if path != "/":
             self.send_error(404)
             return
         self._write_html(200, _render_intake(store_root=self.store_root, dna_root=self.dna_root))
@@ -152,14 +162,23 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/chat":
             self._do_chat()
             return
+        if self.path == "/care-chat":
+            self._do_care_chat()
+            return
         if self.path == "/settings/key":
             self._save_key()
             return
         if self.path == "/confirm-extraction":
             self._do_confirm_extraction()
             return
+        if self.path == "/confirm-curation":
+            self._do_confirm_curation()
+            return
         if self.path == "/generate-plan":
             self._do_generate_plan()
+            return
+        if self.path == "/plan-loop":
+            self._do_plan_loop()
             return
         if self.path != "/upload":
             self.send_error(404)
@@ -270,6 +289,27 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._write_json(200, {"readings": extracted, "partial": partial, "notes": notes})
             return
 
+        # ADR-0033-0035-T8: the final-save care-agent review. When this form-capture just
+        # completed the profile (T6's predicate) AND a usable no-train key + client are present,
+        # fire the review and deliver its clarifying questions + status in the response. With no
+        # key / no client / an incomplete profile it returns None and the existing HTML re-render
+        # below is the honest 0-spend degrade.
+        review_response = self._maybe_care_review(store_root, scaffold_root, identity_config, fields)
+        if review_response is not None:
+            # Persist the care-review OPENING questions to the conversation vault so a later reload
+            # restores the full conversation (the questions + the operator's replies), not only the
+            # replies. A recording failure must not drop the response (the review already succeeded).
+            try:
+                from scripts.serve import conversation_store
+                for question in (review_response.get("questions") or []):
+                    if question:
+                        conversation_store.record_turn("care", "assistant", question,
+                                                       root=self._conversation_root())
+            except Exception:
+                pass
+            self._write_json(200, review_response)
+            return
+
         # Re-render reflecting the new load-state (the store/dropzone were just written).
         # The re-render carries the wizard's Step-6 `/generate-plan` handoff state — the
         # server performs 0 in-app generation; Step 6 routes the operator to the agent path.
@@ -278,6 +318,45 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     def _413_too_large(self):
         """Write a 413 wizard re-render for an over-ceiling upload (no dropped connection)."""
         self._write_html(413, _render_intake(store_root=self.store_root, dna_root=self.dna_root))
+
+    def _maybe_care_review(self, store_root, scaffold_root, identity_config, fields):
+        """Fire the care-agent review after a complete-profile final save; return its receipt or None.
+
+        The ADR-0033-0035-T8 trigger. Returns the care-review JSON receipt (>= 1 clarifying question
+        + the meds-curation state + the "what it is doing" progress status the existing
+        `.chat-progress`/`.bar`/`_progressUpdate` surface renders) when a form-field capture just
+        completed the profile (T6's `app_shell._intake_complete` predicate) AND a usable no-train
+        key + injected client are present — the conservative complete-state superset that satisfies
+        both the AC1 final-save and the AC6 material-edit re-trigger with no edge-detection. Returns
+        None (the caller falls through to the existing app-shell HTML re-render) when no fields were
+        captured, the profile is incomplete, or no key/client is available (the AC5 honest 0-spend
+        degrade — the trigger short-circuits BEFORE any model call). The review REUSES the instance
+        `self.client` (no second model client) and the instance `_key_available` no-key predicate; a
+        review failure is caught and degrades to None so it never drops the request thread (mirrors
+        `_do_chat`).
+        """
+        if not fields or self.client is None or not self._key_available():
+            return None
+        import functools
+
+        from scripts.serve import care_review
+        from scripts.store import store
+        from vault.design.templates import app_shell
+
+        resolved_root = store_root if store_root is not None else store.DEFAULT_ROOT
+        try:
+            if not app_shell._intake_complete(store.read_all(resolved_root)):
+                return None
+            store_read = functools.partial(store.read, root=resolved_root)
+            return care_review.review(
+                store_read, client=self.client, key_available=True,
+                store_root=resolved_root, scaffold_root=scaffold_root,
+                identity_config=identity_config,
+            )
+        except Exception:
+            # Thread survival (mirrors _do_chat): a review failure never drops the request thread —
+            # fall through to the existing HTML re-render.
+            return None
 
     def _do_chat(self):
         """Run one POST `/chat` per-turn dispatch and write the JSON turn receipt.
@@ -329,6 +408,83 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         self._write_json(200, receipt)
 
+    def _do_care_chat(self):
+        """Run one POST `/care-chat` turn: the profile-aware Care Assistant conversation.
+
+        The POST-unlock care conversation (distinct from `/chat`'s pre-unlock intake elicitation):
+        reads a JSON turn body (`{"turn", "conversation"?}`) and runs `care_chat.respond`, which
+        re-reads the de-identified `router.summarize` profile server-side and carries it as context so
+        the assistant reasons over the whole profile and the conversation (incl. the care-review opening
+        questions the client carries back) stays coherent. The ONE outbound model call is the respond's
+        `client.converse`. A malformed body or a dispatch/model exception is CAUGHT and answered with a
+        degraded response — the request thread is never dropped (mirroring `_do_chat`).
+        """
+        import json
+
+        from scripts.model.client import ModelClient
+        from scripts.serve import care_chat, conversation_store
+
+        client = self.client if self.client is not None else ModelClient()
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length) if length else b""
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+            turn_text = body.get("turn", "")
+            conversation = body.get("conversation", [])
+            thread = body.get("thread") or "care"
+            receipt = care_chat.respond(
+                turn_text, conversation, client=client, store_root=self.store_root,
+                scaffold_root=self.scaffold_root, identity_config=self.identity_config,
+            )
+            # Persist the turn pair to the gitignored conversation vault so the conversation survives a
+            # reload (restored via GET /conversation) — the operator never redoes it. A recording failure
+            # must NOT drop the request thread (the reply already succeeded), so it is caught below.
+            conv_root = self._conversation_root()
+            try:
+                conversation_store.record_turn(thread, "user", turn_text, root=conv_root)
+                if receipt.get("reply"):
+                    conversation_store.record_turn(thread, "assistant", receipt["reply"], root=conv_root)
+            except Exception:
+                pass
+        except Exception:
+            # Thread survival (mirrors _do_chat): a malformed body / a dispatch exception must NOT drop
+            # the request thread. Answer a degraded response, never a fabricated reply.
+            self._write_json(400, {"reply": None, "degraded": True, "reason": "bad request"})
+            return
+        self._write_json(200, receipt)
+
+    def _conversation_root(self):
+        """The conversation vault root for this instance — `<store_root parent>/conversations`.
+
+        Derives from `store_root` so a test/scratch store (`APLUS_DATA_ROOT`) keeps its conversations
+        alongside it; None `store_root` (production) -> `conversation_store`'s `vault/conversations/`
+        default. The vault is gitignored (PII on-device only, the scaffold posture).
+        """
+        if self.store_root is None:
+            return None
+        from pathlib import Path
+
+        return Path(self.store_root).parent / "conversations"
+
+    def _do_get_conversation(self):
+        """Answer GET `/conversation?thread=<id>` with the stored conversation turns (the reload restore).
+
+        Reads the thread's conversation from the gitignored conversation vault and returns
+        `{"turns": [{"role", "content"}, ...]}` so the SPA can restore a prior conversation on load
+        (the operator never redoes it). An unknown/absent thread returns an empty list. Read-only.
+        """
+        from urllib.parse import parse_qs, urlparse
+
+        from scripts.serve import conversation_store
+
+        query = parse_qs(urlparse(self.path).query)
+        thread = (query.get("thread") or ["care"])[0]
+        try:
+            turns = conversation_store.read_turns(thread, root=self._conversation_root())
+        except Exception:
+            turns = []
+        self._write_json(200, {"turns": turns})
+
     def _do_confirm_extraction(self):
         """Land the operator-confirmed extracted readings via the unchanged sink.
 
@@ -379,6 +535,64 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._write_json(400, {"landed": [], "degraded": True, "reason": "bad request"})
             return
         self._write_json(200, {"landed": receipt["store"]})
+
+    def _do_confirm_curation(self):
+        """Persist the operator-CONFIRMED meds-curation class tokens (the confirm-when-unsure write-back).
+
+        Reads a JSON body carrying the operator-confirmed de-identified interaction-class tokens
+        (`{"classes": [...]}`) and persists ONLY those through `care_review.confirm_curation` — a
+        CALLER of the UNCHANGED `store.append` sink (no second sink/gate/key; the operator-confirm
+        IS the gate, the SAME disposes-after-gate shape as `_do_confirm_extraction`). This is the
+        write-back the leg-2 confirm-when-unsure surface needs: an uncertain curation writes 0
+        `rx-interaction-classes` until the operator confirms via this route. Only de-identified
+        CLASS tokens cross here — never a raw drug string (the front-end posts the proposed classes).
+
+        Requires `Content-Type: application/json` (a cross-site CORS-simple `text/plain` POST is
+        rejected 415 BEFORE the body is parsed — the same CSRF gate `_save_key`/`_do_confirm_extraction`
+        apply). An over-ceiling Content-Length is refused 413 BEFORE the body is read (bounded memory).
+        A malformed body is CAUGHT and answered with a degraded JSON response — the request thread is
+        never dropped (mirroring `_do_confirm_extraction`), and no class token persists on a bad body.
+        """
+        import json
+
+        from scripts.serve import care_review
+
+        # CSRF gate (mirrors `_do_confirm_extraction`): require application/json so a cross-site
+        # "simple" request (text/plain, no CORS preflight) cannot drive this class-write route.
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"confirmed": [], "error": "unsupported content-type"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._write_json(400, {"confirmed": [], "degraded": True, "reason": "bad request"})
+            return
+        if length > _CONFIRM_MAX_BYTES:
+            self._write_json(413, {"confirmed": [], "error": "too large"})
+            return
+        try:
+            raw = self.rfile.read(length) if length else b""
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+            classes = body["classes"]
+            if not isinstance(classes, list):
+                raise ValueError("confirm-curation: classes must be a list")
+            # Thread the instance identity_config into the value gate (the same H-2 seam /upload
+            # threads into persist_capture): a token carrying operator identity/DOB defers the whole
+            # batch fail-closed, so a crafted loopback POST cannot land raw PII into the planner token.
+            receipt = care_review.confirm_curation(
+                classes, store_root=self.store_root, identity_config=self.identity_config
+            )
+        except Exception:
+            # Thread survival: a malformed body / a fail-loud persist must NOT kill the request
+            # thread. Answer a degraded response, never a dropped connection — and never a
+            # fabricated or half-written class token.
+            self._write_json(400, {"confirmed": [], "degraded": True, "reason": "bad request"})
+            return
+        # Forward the confirm receipt (its `deferred`/`reason` on an identity-bearing batch is honest
+        # surfacing, not an error — the request succeeded, nothing was persisted).
+        self._write_json(200, {"confirmed": receipt["confirmed"],
+                               **({k: receipt[k] for k in ("deferred", "reason") if k in receipt})})
 
     def _do_generate_plan(self):
         """Author + reconcile + record a plan for the plan domains over stored data; answer JSON.
@@ -488,6 +702,44 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._write_json(200, {"need_key": False, "results": {}, "plan_html": None,
                                    "degraded": True, "reason": "could not generate plan"})
 
+    def _do_plan_loop(self):
+        """Fire one automated plan-evolution loop tick through the full-composition front door; answer JSON.
+
+        The cadence/manual loop trigger (ADR-0036-T1). It drives `plan_loop.regenerate` with the
+        instance loop `dispatch` + `deid_client` seams (mirroring the injectable `self.client`
+        pattern so the fixture E2E runs at 0 live spend) over `self.store_root` — binding the trigger
+        to `run_orchestrated` -> `plan_driver.drive` -> the composed `gate_dispatch` + the five
+        `orchestrate` cross-domain holds. It is DISTINCT from `_do_generate_plan` and does NOT call
+        it: the loop path never reaches the screened-only route (the anti-degradation guard). The run
+        result is answered as JSON.
+
+        CSRF gate (mirrors `_save_key` / `_do_generate_plan`): a non-`application/json` POST is
+        refused 415 BEFORE any work — a cross-site CORS-simple `text/plain` POST cannot drive the
+        highest-spend loop tick (every specialist + judge + lens dispatch) on the operator's key (a
+        genuine application/json cross-site POST forces a preflight the server never answers).
+
+        Thread survival (mirrors `_do_chat` / `_do_generate_plan`): a malformed state / an unexpected
+        exception answers an honest degraded JSON, never a dropped request thread.
+        """
+        from scripts.serve import plan_loop
+        from scripts.store import store
+
+        # CSRF gate (SEC): require application/json so a cross-site CORS-simple POST cannot drive the
+        # loop tick (forced spend across every specialist + judge + lens) — refuse before any work.
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"results": {}, "error": "unsupported content-type"})
+            return
+
+        store_root = self.store_root if self.store_root is not None else store.DEFAULT_ROOT
+        try:
+            result = plan_loop.regenerate(
+                store_root, dispatch=self.loop_dispatch, deid_client=self.loop_deid_client,
+            )
+            self._write_json(200, result)
+        except Exception:
+            self._write_json(200, {"results": {}, "degraded": True, "reason": "could not run plan loop"})
+
     def _key_available(self):
         """Whether a no-train key resolves at runtime — the Profile 'connected' availability check.
 
@@ -587,15 +839,25 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
     def _write_html(self, status, html):
-        """Write an HTTP response with the HTML body (the single response-write site)."""
+        """Write an HTTP response with the HTML body (the single response-write site).
+
+        `Cache-Control: no-store` is REQUIRED, not cosmetic: the served page IS the app (a single
+        inline-asset document regenerated fresh on every GET). Without it the stdlib server sends no
+        cache directives, so the browser is free to serve a STALE cached copy on refresh — running old
+        JavaScript (so the wizard's localStorage autosave never runs and typed work is lost on reload)
+        and old markup (no pre-fill / no already-loaded note). The operator saw exactly that. no-store
+        forces every load/refresh to fetch the current document so a code update is never masked.
+        """
         body = html.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
@@ -604,7 +866,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
 
 
 def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
-                 identity_config=None, client=None, key_resolver=None, key_store=None):
+                 identity_config=None, client=None, key_resolver=None, key_store=None,
+                 loop_dispatch=None, loop_deid_client=None):
     """Construct the loopback-bound intake server on `port`.
 
     The POST `/upload` handler ingests file uploads into `store_root`/`dna_root`,
@@ -640,6 +903,8 @@ def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
                    {"store_root": store_root, "dna_root": dna_root,
                     "scaffold_root": scaffold_root, "identity_config": identity_config,
                     "client": client,
+                    "loop_deid_client": loop_deid_client,
+                    "loop_dispatch": staticmethod(loop_dispatch) if loop_dispatch is not None else None,
                     "key_resolver": staticmethod(key_resolver) if key_resolver is not None else None,
                     "key_store": staticmethod(key_store) if key_store is not None else None})
     return ThreadingHTTPServer((_LOOPBACK, port), handler)

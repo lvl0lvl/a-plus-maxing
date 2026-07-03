@@ -27,6 +27,36 @@ operator/liaison CURATION step at the store layer per `router.py`, not serve-lay
 and the untrusted rx form field is captured record-only (Wave-B FIX-A) rather than wired
 into the model-bound item. The `router.summarize` 8j6 PII gate is the runtime backstop
 that fail-closes if raw PII ever reaches a field-set item.
+
+The comprehensive 9-step intake field->destination contract (ADR-0033-0035-T1). Every
+collected field routes to exactly ONE destination by its data class. The routing
+MACHINERY pre-exists (ADR-0014/0018/0019); this roster makes the full contract explicit
+so the capture regions T2/T3 extend over this same file stay legible. The three classes:
+
+- Rich-domain free-text -> named-excluded raw source -> coarse derived token. The four
+  `_CHAT_RAW_SOURCE_FIELDS` fields (`nutrition-detail` / `supplement-stack` /
+  `peptide-stack` / `training-detail`) write their `EXCLUDED_RAW_PII` raw source via the
+  UNCHANGED `store.append`; `router.summarize` then DERIVES the coarse `_ALWAYS_SET_DERIVED`
+  token (`dietary-pattern-class` / `supplement-stack-class` / `peptide-use-class` /
+  `training-volume-band`) -- the band token is NEVER written directly. These are fed by
+  bounded selects: the submitted OPTION VALUE must carry the deriver keyword
+  (`vegan`->`plant-based`, `5 days/week`->`high`, `none`->`none`, `BPC-157`->`peptide-in-use`),
+  so a high-frequency display ("5 or more days") must submit a digit-adjacent-unit VALUE,
+  never the literal display text (which derives the no-signal `moderate`).
+- Directly-wired -> own-name store item. Goals (`goal-domains` / `goal-targets` /
+  `goal-priority-order` / `hard-limits`) and demographics (`sex-for-dosing` /
+  `equipment-access-class`) write under their own `WIRED_TOKENS` name; the Step-1 birth-date
+  field writes the raw `date-of-birth` source `summarize` derives `training-age-band` (the
+  exact age) from, and the body-weight number writes the raw `bodyweight-kg` local series
+  `summarize` derives `bodyweight-band` (current weight + trend) from — never the age/band
+  token directly (OQ-5, ADR-0034).
+- Record-only -> the gitignored scaffold, NEVER a field-set store item. The raw
+  `rx-interaction-classes` med field (deliberately absent from `WIRED_TOKENS`) PLUS the
+  sensitive fields (race / ethnicity, occupation, sleep, stress, smoker, alcohol) fall to
+  the default record-only branch. The sensitive record-only roster is CLOSED -- no
+  recreational-substance field has dedicated routing here (a forward constraint on the T4
+  wizard markup: no such control); an unknown field of that class falls to the same generic
+  record-only branch as any other unrecognized field.
 """
 
 import datetime
@@ -54,12 +84,12 @@ WIRED_TOKENS = (
     "hard-limits",
     "recovery-status-band",
     # Step-1 demographics (ADR-0018-T1): bounded pass-through tokens written under their
-    # own name. `sex-for-dosing`/`equipment-access-class` are direct class selections;
-    # `bodyweight-band` is a coarse de-identified BAND (never raw kg). `training-age-band`
-    # is DELIBERATELY ABSENT — it is DERIVED from the named-excluded `date-of-birth` source
-    # the birth-year field writes (see `_DOB_FIELD`), never written directly.
+    # own name. `sex-for-dosing`/`equipment-access-class` are direct class selections.
+    # `training-age-band` + `bodyweight-band` are DELIBERATELY ABSENT — both are DERIVED
+    # (OQ-5, ADR-0034): from the named-excluded `date-of-birth` (see `_DOB_FIELD`) and the
+    # named-excluded `bodyweight-kg` local series (see `_WEIGHT_FIELD`) the Step-1 fields
+    # write, never a band/age token directly.
     "sex-for-dosing",
-    "bodyweight-band",
     "equipment-access-class",
 )
 # `rx-interaction-classes` is DELIBERATELY ABSENT from the wired set (Wave-B FIX-A).
@@ -77,11 +107,28 @@ WIRED_TOKENS = (
 _TRAIN_AROUND_FIELD = "train-around"
 _RAW_SYMPTOM_ITEM = "raw-symptom-free-text"
 
-# The Step-1 birth-year form field -> the RAW `date-of-birth` store item `summarize`
-# de-identifies into `training-age-band` via `_age_band` (born-decade band, raw year never
-# in the token). Mirrors the `_TRAIN_AROUND_FIELD -> _RAW_SYMPTOM_ITEM` special-case: the
-# field writes the named-excluded raw source, NEVER the `training-age-band` token directly.
+# The Step-1 birth-date form field -> the RAW `date-of-birth` store item `summarize`
+# de-identifies into `training-age-band` via `_age_band` (the exact age, the full DOB never
+# in the token; OQ-5). Mirrors the `_TRAIN_AROUND_FIELD -> _RAW_SYMPTOM_ITEM` special-case:
+# the field writes the named-excluded raw source, NEVER the `training-age-band` token directly.
 _DOB_FIELD = "date-of-birth"
+
+# The Step-1 body-weight number form field -> the RAW `bodyweight-kg` local time-series
+# `summarize` de-identifies into the current-weight+trend `bodyweight-band` token (via
+# `_bodyweight_trend`; the per-day history never in the token, OQ-5 ADR-0034). Mirrors
+# `_DOB_FIELD`: the field writes the named-excluded raw source (the dashboard chart's local
+# feed), NEVER the `bodyweight-band` token directly. The form field name == the store item
+# name (the simplest T2<->T4 coupling); capture receives the kg-normalized number (the
+# lbs/kg unit conversion is T4's client-side affordance).
+_WEIGHT_FIELD = "bodyweight-kg"
+
+# The training-experience number form field -> the RAW `raw-training-experience` local item
+# `summarize` de-identifies into the coarse `training-experience-band` (via `_experience_band`).
+# Mirrors `_DOB_FIELD`/`_WEIGHT_FIELD`: the field writes the named-excluded raw source (the
+# operator's exact years, kept local + shown in My-Info), NEVER the band token directly (only
+# the coarse band crosses to the planner — the crown jewel).
+_EXPERIENCE_FIELD = "training-experience"
+_EXPERIENCE_RAW_ITEM = "raw-training-experience"
 
 # The chat-sourced rich-domain free-text form fields (ADR-0019-T1) -> their NAMED-EXCLUDED
 # raw source store items, which `summarize` de-identifies into the coarse band/class tokens
@@ -98,6 +145,49 @@ _CHAT_RAW_SOURCE_FIELDS = {
     "training-detail": "raw-training-detail-free-text",
 }
 
+# --- ADR-0033-0035-T3: the intake safety/allergy routing region ------------------- #
+# The three intake safety screens (ADR-0034 crown-jewel), each mapping a safety-screen
+# FORM FIELD NAME (the pinned T3<->T4 contract) to its de-identified SCREEN name.
+# Capturing a screen ALWAYS writes the `safety-screen::<screen>` answered marker (the
+# gate's PRESENCE signal, written regardless of the answer); a POSITIVE answer ALSO
+# writes the `referral::<screen>` flag (the safety-bypass falsification — a positive
+# answer never silently drops its referral). The marker/flag values are DE-IDENTIFIED
+# positivity signals, NEVER the raw free-text answer, and NO `safety-screen::*` /
+# `referral::*` item is a SUMMARY_FIELD_SET member — so `router.summarize` never reads
+# them and `dispatch` rejects them if injected (the never-a-plan-input crown jewel). The
+# `::` item-name shape mirrors the frozen `dvq::queue` precedent (queue_schema.py).
+_SAFETY_SCREEN_FIELDS = {
+    "exercise-safety": "exercise-safety",
+    "phq2": "phq2",
+    "apnea": "apnea",
+}
+
+# Recognized NEGATIVE answers (answered, no referral). Any other answer — including an
+# unrecognized one — is POSITIVE and raises the referral flag (the ADR-0034
+# asymmetric-downside posture: an ambiguous safety answer fails safe to a referral).
+_SAFETY_NEGATIVE_ANSWERS = frozenset({"no", "none", "not-at-all", "negative", "never", "0"})
+
+# Food/drug allergy FORM FIELD NAMES -> the EXISTING de-identified `hard-limits` token (a
+# hard contraindication), NEVER the liaison-curated `rx-interaction-classes` (a drug
+# allergy is a hard limit, not a drug-interaction class). Accumulated and written as ONE
+# combined `hard-limits` reading so two allergies captured together cannot dedupe-collide
+# on a shared timepoint (the S41 same-timepoint contraindication-drop pattern, `pka`).
+_ALLERGY_FIELDS = ("food-allergy", "drug-allergy")
+
+
+def _safety_answer_is_positive(value):
+    """Whether a safety-screen answer raises a referral (the asymmetric-downside default).
+
+    Args:
+        value (str): The submitted safety-screen answer.
+
+    Returns:
+        (bool) False for a recognized negative answer (no/none/not-at-all/…) — the
+        answered marker is still written; True otherwise (a symptom, an elevated PHQ-2, a
+        positive apnea, OR an unrecognized answer — fail-safe to a referral).
+    """
+    return value.strip().lower() not in _SAFETY_NEGATIVE_ANSWERS
+
 # Server-side enumerated value sets for the bounded wired fields (Wave-B FIX-B). The
 # markup enforces these client-side (a `<select>` / a fixed chip set), but a crafted
 # POST can write any string into the token — so the server re-validates here BEFORE
@@ -108,12 +198,13 @@ _CHAT_RAW_SOURCE_FIELDS = {
 # so EVERY token must be in the enum for the whole value to be accepted.
 RECOVERY_STATUS_BANDS = ("low", "moderate", "high")
 GOAL_DOMAINS = ("Workout", "Nutrition", "Supplements", "Peptides")
-# Step-1 demographic bounded vocabularies (ADR-0018-T1). `intake.py` builds its Step-1
-# `<select>` options FROM these constants (AC-6 markup<->gate no-drift). All three are
-# de-identified classes: `sex-for-dosing` is the clinically-relevant dosing dimension;
-# `BODYWEIGHT_BANDS` are coarse ranges so no raw kg is ever stored; `EQUIPMENT_ACCESS_CLASSES`
-# is the operator's training-environment class (the authoritative source for the token,
-# replacing the removed postal-address inference).
+# Step-1 demographic bounded vocabularies (ADR-0018-T1). `sex-for-dosing` /
+# `EQUIPMENT_ACCESS_CLASSES` are de-identified classes the Step-1 `<select>`s and the
+# server-side gate share. `BODYWEIGHT_BANDS` is DE-WIRED from the live capture path (OQ-5,
+# ADR-0034: the body-weight number now routes to the named-excluded `bodyweight-kg` local
+# series via `_WEIGHT_FIELD`); the constant is RETAINED only because the superseded,
+# non-served legacy `vault/design/templates/intake.py` still imports it (full deletion +
+# intake.py retirement is bead `rod1`).
 SEX_OPTIONS = ("male", "female")
 BODYWEIGHT_BANDS = ("under-60kg", "60-70kg", "70-80kg", "80-90kg", "90-100kg", "over-100kg")
 EQUIPMENT_ACCESS_CLASSES = ("full-home-gym", "commercial-gym", "minimal-equipment", "bodyweight-only")
@@ -121,7 +212,6 @@ _BOUNDED_ENUMS = {
     "recovery-status-band": ({b.lower() for b in RECOVERY_STATUS_BANDS}, False),
     "goal-domains": ({d.lower() for d in GOAL_DOMAINS}, True),
     "sex-for-dosing": ({s.lower() for s in SEX_OPTIONS}, False),
-    "bodyweight-band": ({b.lower() for b in BODYWEIGHT_BANDS}, False),
     "equipment-access-class": ({e.lower() for e in EQUIPMENT_ACCESS_CLASSES}, False),
 }
 
@@ -251,6 +341,7 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
 
     written_tokens = []
     record_only = {}
+    allergy_values = []  # T3: accumulated -> one combined hard-limits write after the loop
     for name, value in fields.items():
         if value is None or (isinstance(value, str) and not value.strip()):
             continue  # an unfilled field carries nothing to route
@@ -274,11 +365,25 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
             store.append(_RAW_SYMPTOM_ITEM, _reading(_RAW_SYMPTOM_ITEM, value), root=store_root)
             written_tokens.append(_RAW_SYMPTOM_ITEM)
         elif name == _DOB_FIELD:
-            # The Step-1 birth year -> the RAW `date-of-birth` item summarize de-identifies
-            # into training-age-band (via `_age_band`, a born-decade band). NEVER
-            # training-age-band directly — the raw year is named-excluded raw PII.
+            # The Step-1 birth date -> the RAW `date-of-birth` item summarize de-identifies
+            # into training-age-band (via `_age_band`, the exact age). NEVER training-age-band
+            # directly — the full DOB is named-excluded raw PII (OQ-5).
             store.append(_DOB_FIELD, _reading(_DOB_FIELD, value), root=store_root)
             written_tokens.append(_DOB_FIELD)
+        elif name == _WEIGHT_FIELD:
+            # The Step-1 body-weight number -> the RAW `bodyweight-kg` local series summarize
+            # de-identifies into the current-weight+trend bodyweight-band token (via
+            # `_bodyweight_trend`). NEVER bodyweight-band directly — the per-day weight log is
+            # named-excluded raw PII (the dashboard chart's local feed, OQ-5 ADR-0034).
+            store.append(_WEIGHT_FIELD, _reading(_WEIGHT_FIELD, value), root=store_root)
+            written_tokens.append(_WEIGHT_FIELD)
+        elif name == _EXPERIENCE_FIELD:
+            # The training-experience number -> the RAW `raw-training-experience` local item
+            # summarize de-identifies into the coarse `training-experience-band` (via
+            # `_experience_band`). NEVER the band directly — the exact years are named-excluded
+            # (kept local + shown in My-Info; only the coarse band crosses to the planner).
+            store.append(_EXPERIENCE_RAW_ITEM, _reading(_EXPERIENCE_RAW_ITEM, value), root=store_root)
+            written_tokens.append(_EXPERIENCE_RAW_ITEM)
         elif name in _CHAT_RAW_SOURCE_FIELDS:
             # A chat-sourced rich-domain free-text (nutrition/supplement/peptide/training
             # detail) -> its NAMED-EXCLUDED raw source item, which summarize de-identifies
@@ -288,11 +393,47 @@ def persist_capture(fields, *, root=None, scaffold_root=None, identity_config=No
             raw_item = _CHAT_RAW_SOURCE_FIELDS[name]
             store.append(raw_item, _reading(raw_item, value), root=store_root)
             written_tokens.append(raw_item)
+        elif name in _SAFETY_SCREEN_FIELDS:
+            # ADR-0033-0035-T3 crown-jewel: the safety-screen answered marker (ALWAYS, the
+            # gate's presence signal) + the referral flag (POSITIVE answers only). Both are
+            # de-identified positivity signals, never the raw answer; NO `safety-screen::*`/
+            # `referral::*` item is a SUMMARY_FIELD_SET member, so summarize never reads
+            # them and dispatch rejects them if injected.
+            screen = _SAFETY_SCREEN_FIELDS[name]
+            positive = _safety_answer_is_positive(value)
+            marker = f"safety-screen::{screen}"
+            store.append(marker, _reading(marker, "positive" if positive else "negative"),
+                         root=store_root)
+            written_tokens.append(marker)
+            if positive:
+                flag = f"referral::{screen}"
+                store.append(flag, _reading(flag, "referral"), root=store_root)
+                written_tokens.append(flag)
+        elif name in _ALLERGY_FIELDS:
+            # A food/drug allergy -> the EXISTING hard-limits token (a hard contraindication),
+            # NEVER rx-interaction-classes. Accumulated; written as ONE combined reading
+            # after the loop (dedupe-collision-safe on a shared timepoint).
+            allergy_values.append(value)
         else:
             # Everything else is record-only: it has no de-identified field-set consumer
             # today (Step-3 training detail, all Step-4 nutrition, the raw Step-5 stack).
             # -> the gitignored scaffold, honestly labeled. NEVER a field-set store item.
             record_only[name] = value
+
+    if allergy_values:
+        combined = "; ".join(allergy_values)
+        if _value_has_pii(combined, identity_config):
+            # The allergy branch writes the model-bound `hard-limits` token, but — unlike every
+            # sibling free-text token (the `_FREE_TEXT_TOKENS` branch) — it was UNSCANNED: a
+            # PII-bearing allergy value ("shellfish — call Dr. Ng at operator@example.com")
+            # would reach the model-bound token guarded only by `summarize`'s capped backstop.
+            # Run the SAME uncapped full-value scan and divert record-only on a hit.
+            record_only["allergies"] = combined
+        else:
+            # ONE combined hard-limits reading (dedupe-collision-safe): two allergies captured
+            # together share a timepoint but land in a single reading, never dropping one.
+            store.append("hard-limits", _reading("hard-limits", combined), root=store_root)
+            written_tokens.append("hard-limits")
 
     if record_only:
         _write_scaffold(scaffold, record_only)

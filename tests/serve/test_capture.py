@@ -19,12 +19,13 @@ scaffold. Each gate carries its negative control proving it is failing-capable.
 """
 
 import functools
+import importlib
 import subprocess
 import sys
 from pathlib import Path
 
 from scripts.guard import pii_scan
-from scripts.plan.router import SUMMARY_FIELD_SET, summarize
+from scripts.plan.router import SUMMARY_FIELD_SET, dispatch, summarize
 from scripts.serve import capture
 from scripts.store import store
 
@@ -869,34 +870,98 @@ def test_chat_field_writes_raw_source_summarize_derives_band(
     )
 
 
-@pytest.mark.parametrize("bad_year", ["not-a-year", "86", "3026", "198"])
-def test_malformed_birth_year_through_capture_seam_bands_unknown(bad_year, tmp_path):
-    """BUG-2 + TEST-3: a malformed birth year through the capture seam derives
-    `age-band-unknown`, with the raw string nowhere in the emitted token.
+@pytest.mark.parametrize("bad_dob", ["not-a-date", "1986", "3026-01-01", "1986-13-40"])
+def test_malformed_dob_through_capture_seam_is_age_unknown(bad_dob, tmp_path):
+    """OQ-5 (TEST-3): a malformed/unparseable or future-dated full DOB through the capture
+    seam derives the `age-unknown` sentinel, with the raw string nowhere in the token.
 
-    The Step-1 birth-year field writes the RAW `date-of-birth` store item; `summarize`
-    de-identifies it via `_age_band`. A malformed/non-numeric/out-of-range year must band
-    `age-band-unknown` (post-BUG-2-fix) rather than garble into a fake born-decade, and
-    the raw string must not appear under the field-set token. Failing-capable: the pre-fix
-    `_age_band` garbled '86'->'born-860s', '3026'->'born-3020s', '198'->'born-1980s'.
+    The Step-1 birth-date field writes the RAW `date-of-birth` store item; `summarize`
+    de-identifies it via `_age_band` (repurposed to the exact-age deriver). A value that is
+    not a parseable past ISO date must derive `age-unknown` rather than crash or echo the raw
+    value. Failing-capable: an echoing deriver leaks the raw string into the token.
     """
     store_root = tmp_path / "store"
     capture.persist_capture(
-        {"date-of-birth": bad_year},
+        {"date-of-birth": bad_dob},
         root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
     )
-    # The raw year landed in the named-excluded raw source, never the band token directly.
-    assert store.read("date-of-birth", root=store_root), "the birth-year field wrote no raw source"
+    # The raw value landed in the named-excluded raw source, never the token directly.
+    assert store.read("date-of-birth", root=store_root), "the birth-date field wrote no raw source"
     assert store.read("training-age-band", root=store_root) == [], (
-        "the birth-year field wrongly wrote training-age-band directly (must be derived)"
+        "the birth-date field wrongly wrote training-age-band directly (must be derived)"
     )
     summary = _summary(store_root)
-    assert summary.get("training-age-band") == "age-band-unknown", (
-        f"a malformed birth year {bad_year!r} did not band age-band-unknown"
+    assert summary.get("training-age-band") == "age-unknown", (
+        f"a malformed DOB {bad_dob!r} did not derive the age-unknown sentinel"
     )
     # The raw malformed string appears nowhere in the emitted token.
-    assert bad_year not in str(summary.get("training-age-band", "")), (
-        f"the raw birth-year string {bad_year!r} leaked into the training-age-band token"
+    assert bad_dob not in str(summary.get("training-age-band", "")), (
+        f"the raw DOB string {bad_dob!r} leaked into the training-age-band token"
+    )
+
+
+def test_bodyweight_band_de_wired_weight_routes_to_kg_series(tmp_path):
+    """AC-8 (OQ-5): `bodyweight-band` is DE-WIRED; a captured weight routes to the local
+    `bodyweight-kg` series, and 0 `bodyweight-band` store item is written.
+
+    The band-consumer de-wire (bead `rod1`): `bodyweight-band` is out of `WIRED_TOKENS` +
+    `_BOUNDED_ENUMS`, but the `BODYWEIGHT_BANDS` constant is RETAINED (still imported by the
+    non-served legacy `intake.py`; full deletion is bead `rod1`). A captured `bodyweight-kg`
+    number writes a `bodyweight-kg` reading (the named-excluded local series) via the
+    UNCHANGED `store.append`; `import scripts.serve.capture` raises no AssertionError (the
+    `WIRED_TOKENS <= SUMMARY_FIELD_SET` tripwire holds after the removal).
+    """
+    assert "bodyweight-band" not in capture.WIRED_TOKENS
+    assert "bodyweight-band" not in capture._BOUNDED_ENUMS
+    # The de-wire-not-delete disposition: the constant is retained (legacy intake.py importer).
+    assert hasattr(capture, "BODYWEIGHT_BANDS")
+
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"bodyweight-kg": "82.0"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    # The weight number wrote the named-excluded local `bodyweight-kg` series...
+    kg = store.read("bodyweight-kg", root=store_root)
+    assert kg and kg[-1]["value"] == "82.0", "the weight number did not write the bodyweight-kg series"
+    # ...and 0 `bodyweight-band` store item (the de-wired token is never written directly).
+    assert store.read("bodyweight-band", root=store_root) == [], (
+        "a bodyweight-band store item was written (the token must be derived, not stored)"
+    )
+    # The load-time tripwire holds after the removal (no AssertionError at import).
+    importlib.reload(capture)
+
+
+def test_weight_capture_round_trips_to_bodyweight_band_token(tmp_path):
+    """AC-9 round-trip (cross-checks Cycle 1): a captured weight -> the local `bodyweight-kg`
+    series -> `summarize` derives the current-weight+trend `bodyweight-band` token.
+
+    Proves the capture->`bodyweight-kg`->deriver round-trip end-to-end over a tmp store.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"bodyweight-kg": "82.0"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    token = _summary(store_root).get("bodyweight-band")
+    assert token is not None, "summarize did not derive bodyweight-band from the bodyweight-kg series"
+    assert "82" in token, f"the current weight did not trace into the derived token: {token!r}"
+    # It is the DERIVED current-weight+trend scalar, not a coarse WIRED enum band.
+    assert token not in capture.BODYWEIGHT_BANDS, "bodyweight-band is a coarse WIRED band (de-wire incomplete)"
+
+
+def test_full_dob_captures_to_local_date_of_birth_item(tmp_path):
+    """OQ-5: a full ISO DOB captures to the named-excluded local `date-of-birth` item (pins
+    the raw source survives the amendment), and 0 `training-age-band` is written directly."""
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"date-of-birth": "1986-04-12"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    dob = store.read("date-of-birth", root=store_root)
+    assert dob and dob[-1]["value"] == "1986-04-12", "the full DOB did not write the date-of-birth item"
+    assert store.read("training-age-band", root=store_root) == [], (
+        "training-age-band was written directly (must be derived from the date-of-birth source)"
     )
 
 
@@ -911,3 +976,606 @@ def test_chat_fields_are_not_wired_tokens(tmp_path):
     for _field, raw_source, token, _v, _f, _b in _CHAT_CAPTURE_CASES:
         assert token not in capture.WIRED_TOKENS, token
         assert raw_source not in SUMMARY_FIELD_SET, raw_source
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T1 — the comprehensive intake field->destination contract.
+# T1 PINS the 9-step contract over the EXISTING capture routing (ADR-0014/0018/0019):
+# the four rich-domain fields carry REAL signal (not the absent-source default), the
+# OQ-1 select VALUE resolves to its deriver bucket, raw meds + sensitive fields route
+# record-only, and an edited re-capture re-runs the SAME raw-source path. The routing
+# pre-exists; each test pins it, failing-capable by its named mutation.
+# --------------------------------------------------------------------------- #
+
+# (field, bucket-keyword value, derived token, the deriver's no-signal default, expected).
+_T1_REAL_SIGNAL_CASES = [
+    ("nutrition-detail", "vegan", "dietary-pattern-class", "general-diet", "plant-based"),
+    ("supplement-stack", "creatine, whey", "supplement-stack-class", "none", "multi-supplement"),
+    ("peptide-stack", "BPC-157", "peptide-use-class", "none", "peptide-in-use"),
+    ("training-detail", "5 days/week", "training-volume-band", "moderate", "high"),
+]
+
+
+@pytest.mark.parametrize("field, value, token, no_signal_default, expected", _T1_REAL_SIGNAL_CASES)
+def test_rich_domain_field_carries_real_signal_vs_not_discussed_default(
+    field, value, token, no_signal_default, expected, tmp_path,
+):
+    """AC-1: a rich-domain capture lands REAL signal; a fresh store reads not-discussed.
+
+    A fresh store (no capture) reads the `not-discussed` absent-source sentinel for the
+    always-set token; after a bucket-keyword capture the token derives its real bucket
+    (not `not-discussed`, not the deriver's no-signal default) — the real-signal contrast
+    the existing round-trip test omits.
+
+    Failing-capable: drop the field's key from `capture._CHAT_RAW_SOURCE_FIELDS` and it
+    routes record-only, the token stays `not-discussed`, reddening the non-default assert.
+    """
+    store_root = tmp_path / "store"
+    # The real-signal CONTRAST: a fresh store reads the absent-source sentinel.
+    assert _summary(store_root).get(token) == "not-discussed", (
+        f"a fresh store did not read {token!r} as the not-discussed sentinel"
+    )
+    capture.persist_capture(
+        {field: value},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    derived = _summary(store_root).get(token)
+    assert derived == expected, (
+        f"{field!r}={value!r} derived {derived!r}, not the expected {expected!r}"
+    )
+    assert derived not in ("not-discussed", no_signal_default), (
+        f"{token!r} carried the no-signal value {derived!r}, not real signal"
+    )
+
+
+# (field, submitted select VALUE, derived token, expected bucket) — the OQ-1 pin. The
+# select OPTION VALUE (not the display text) carries the deriver keyword; the
+# `"5 days/week"`->high row encodes the crux that a "5 or more days" display must submit
+# a digit-adjacent-unit VALUE (a `"5 or more days"` literal derives `moderate`, not high).
+_T1_OQ1_VALUE_BUCKET_CASES = [
+    ("nutrition-detail", "vegan", "dietary-pattern-class", "plant-based"),
+    ("nutrition-detail", "keto", "dietary-pattern-class", "restricted"),
+    ("training-detail", "5 days/week", "training-volume-band", "high"),
+    ("training-detail", "2x", "training-volume-band", "low"),
+    ("supplement-stack", "none", "supplement-stack-class", "none"),
+    ("supplement-stack", "creatine, whey", "supplement-stack-class", "multi-supplement"),
+    ("peptide-stack", "none", "peptide-use-class", "none"),
+    ("peptide-stack", "BPC-157", "peptide-use-class", "peptide-in-use"),
+]
+
+
+@pytest.mark.parametrize("field, value, token, expected_bucket", _T1_OQ1_VALUE_BUCKET_CASES)
+def test_oq1_select_value_resolves_to_expected_deriver_bucket(
+    field, value, token, expected_bucket, tmp_path,
+):
+    """AC-2 (OQ-1): a bounded select VALUE resolves to its expected deriver bucket.
+
+    The pinned T1<->T4 format coupling: the select OPTION VALUE carries a deriver-matching
+    keyword through `persist_capture`->`summarize`. Each row's bucket is real signal (a
+    determinate class, never the `not-discussed` absent-source sentinel).
+
+    Failing-capable: a deriver-keyword change or a `_RAW_TO_FIELD` repoint reds the row.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {field: value},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    derived = _summary(store_root).get(token)
+    assert derived == expected_bucket, (
+        f"{field!r}={value!r} resolved to {derived!r}, not the expected {expected_bucket!r}"
+    )
+    assert derived != "not-discussed", (
+        f"{token!r} read the absent-source default, not the submitted select value"
+    )
+
+
+def test_comprehensive_capture_records_raw_meds_zero_rx_class_writes(tmp_path):
+    """AC-3: a comprehensive 9-step submission records raw meds, writes 0 rx-class tokens.
+
+    The crown-jewel negative at comprehensive-roster scale: a full submission (goals +
+    demographics + the four rich-domain fields + a raw `rx-interaction-classes` med field)
+    writes 0 `rx-interaction-classes` store items; the raw drug name lands record-only in
+    the gitignored scaffold and in NO field-set item, while the rich-domain tokens still
+    derive real signal.
+
+    Failing-capable: re-add `rx-interaction-classes` to `capture.WIRED_TOKENS` and the raw
+    drug name reaches the model-bound store item, reddening the empty-read assert.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    fields = {
+        "goal-domains": "Workout;Nutrition",
+        "recovery-status-band": "moderate",
+        "sex-for-dosing": "male",
+        "bodyweight-kg": "82.0",
+        "equipment-access-class": "full-home-gym",
+        "nutrition-detail": "vegan",
+        "supplement-stack": "creatine, whey",
+        "peptide-stack": "BPC-157",
+        "training-detail": "5 days/week",
+        "rx-interaction-classes": "warfarin 5mg; metformin 500mg",
+    }
+    capture.persist_capture(
+        fields, root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Crown jewel: 0 rx-interaction-classes store writes from persist_capture.
+    assert store.read("rx-interaction-classes", root=store_root) == [], (
+        "the rx form field wrote the model-bound store item (must route record-only)"
+    )
+    # The raw drug name landed in the gitignored scaffold receipt.
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert "warfarin" in scaffold_text, "the raw med field did not land in the gitignored scaffold"
+    # Negative (load-bearing): the drug name is in NO field-set store item.
+    for token in SUMMARY_FIELD_SET:
+        for reading in store.read(token, root=store_root):
+            assert "warfarin" not in str(reading["value"]), (
+                f"a raw drug name reached the {token!r} field-set store item"
+            )
+    # Real signal coexists with record-only meds: the four rich-domain tokens derive non-default.
+    summary = _summary(store_root)
+    assert summary.get("dietary-pattern-class") == "plant-based"
+    assert summary.get("supplement-stack-class") == "multi-supplement"
+    assert summary.get("peptide-use-class") == "peptide-in-use"
+    assert summary.get("training-volume-band") == "high"
+
+
+def test_sensitive_fields_route_record_only_no_cannabis(tmp_path):
+    """AC-4: race/occupation/sleep/stress/smoker/alcohol record-only; NO cannabis routing.
+
+    Each sensitive field routes to the gitignored scaffold receipt and writes 0 field-set
+    store tokens. A probe `cannabis` field lands record-only like any unrecognized field —
+    the contract carries NO cannabis-specific routing key/token in `capture.py`.
+
+    Failing-capable: wire any sensitive field into `capture.WIRED_TOKENS` and its value
+    reaches a field-set store item, reddening the 0-store-token assertion.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    sensitive = {
+        "race": "RACE-XYZ",
+        "ethnicity": "ETHNICITY-XYZ",
+        "occupation": "OCCUPATION-XYZ",
+        "sleep": "SLEEP-XYZ 6 hours",
+        "stress": "STRESS-XYZ high",
+        "smoker": "SMOKER-XYZ never",
+        "alcohol": "ALCOHOL-XYZ weekly",
+        "cannabis": "CANNABIS-XYZ probe",
+    }
+    receipt = capture.persist_capture(
+        sensitive, root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Each sensitive (and the probe) field name is recorded in the scaffold receipt.
+    for name in sensitive:
+        assert name in receipt["scaffold"], f"{name!r} did not route record-only to the scaffold"
+    # Negative (load-bearing): no sensitive value reaches ANY field-set store item.
+    markers = ("RACE-XYZ", "ETHNICITY-XYZ", "OCCUPATION-XYZ", "SLEEP-XYZ", "STRESS-XYZ",
+               "SMOKER-XYZ", "ALCOHOL-XYZ", "CANNABIS-XYZ")
+    for token in SUMMARY_FIELD_SET:
+        for reading in store.read(token, root=store_root):
+            v = str(reading["value"])
+            for marker in markers:
+                assert marker not in v, f"a sensitive value {marker!r} leaked into {token!r}"
+    # Negative (the no-cannabis contract): no cannabis-specific routing key/token exists.
+    assert "cannabis" not in capture.WIRED_TOKENS
+    assert "cannabis" not in capture._CHAT_RAW_SOURCE_FIELDS
+    assert "cannabis" not in capture._BOUNDED_ENUMS
+    capture_src = (REPO_ROOT / "scripts" / "serve" / "capture.py").read_text().lower()
+    assert "cannabis" not in capture_src, "a cannabis-specific key/token entered capture.py"
+
+
+def test_editable_re_capture_re_runs_same_path_no_direct_band_write(tmp_path):
+    """AC-5: an edited re-capture re-runs the raw-source path; the band is never written direct.
+
+    An edited rich-domain field re-submitted through `persist_capture` re-routes through its
+    raw-source item (append-only), `summarize` re-derives from the latest reading, and the
+    band token is never written directly (0 new write surface).
+
+    Failing-capable: a direct-band-write path would land a `dietary-pattern-class` store
+    item, reddening the 0-direct-write assertion.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    capture.persist_capture(
+        {"nutrition-detail": "omnivore"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    capture.persist_capture(
+        {"nutrition-detail": "vegan"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Both readings landed in the raw source (append-only), edited value last.
+    readings = store.read("raw-nutrition-free-text", root=store_root)
+    assert len(readings) == 2, f"re-capture did not append (got {len(readings)} readings)"
+    assert readings[-1]["value"] == "vegan", "the edited re-capture is not the latest reading"
+    # summarize re-derives from the latest (edited) reading.
+    assert _summary(store_root).get("dietary-pattern-class") == "plant-based", (
+        "summarize did not re-derive from the edited latest reading"
+    )
+    # The band token is NEVER written directly (0 new write surface).
+    assert store.read("dietary-pattern-class", root=store_root) == [], (
+        "the band token was written directly (must be derived, not stored)"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T3 — Cycle 1: the safety-signal routing region. Each of the three
+# safety screens (exercise-safety / PHQ-2 / apnea) writes a `safety-screen::<screen>`
+# answered marker REGARDLESS of the answer (the gate's presence signal) + a
+# `referral::<screen>` flag on a POSITIVE answer ONLY (the safety-bypass falsification);
+# food/drug allergies route to the existing `hard-limits` token, never
+# `rx-interaction-classes`. All fixture-driven over a tmp store root; 0 live spend.
+# --------------------------------------------------------------------------- #
+
+# (form field name, screen name, a POSITIVE answer value, a NEGATIVE answer value). The
+# field/answer values are the pinned T3<->T4 contract; a POSITIVE answer raises the
+# referral flag, a NEGATIVE writes only the answered marker.
+_SAFETY_SCREEN_CASES = [
+    ("exercise-safety", "exercise-safety", "chest-pain", "none"),
+    ("phq2", "phq2", "nearly-every-day", "not-at-all"),
+    ("apnea", "apnea", "yes", "no"),
+]
+
+
+@pytest.mark.parametrize("field, screen, positive, negative", _SAFETY_SCREEN_CASES)
+def test_safety_screens_write_answered_markers(field, screen, positive, negative, tmp_path):
+    """AC-1: each safety screen writes its `safety-screen::<screen>` answered marker
+    REGARDLESS of the answer value (the gate's presence signal).
+
+    Failing-capable: with the safety region absent the field falls to the record-only
+    `else`, no marker is written, and `store.read(<marker>)` is empty.
+    """
+    for value in (positive, negative):
+        store_root = tmp_path / f"store-{screen}-{value}"
+        capture.persist_capture(
+            {field: value}, root=store_root, scaffold_root=tmp_path / "scaffold",
+            identity_config=_ABSENT_IDENTITY,
+        )
+        assert store.read(f"safety-screen::{screen}", root=store_root), (
+            f"{field!r}={value!r} did not write the safety-screen::{screen} answered marker"
+        )
+
+
+@pytest.mark.parametrize("field, screen, positive, negative", _SAFETY_SCREEN_CASES)
+def test_positive_safety_answer_writes_referral_flag(field, screen, positive, negative, tmp_path):
+    """AC-2 positive: a POSITIVE safety answer writes a `referral::<screen>` flag.
+
+    Failing-capable: a no-op route (never writes the flag) reds this positive case.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {field: positive}, root=store_root, scaffold_root=tmp_path / "scaffold",
+        identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read(f"referral::{screen}", root=store_root), (
+        f"a positive {field!r} answer did not write the referral::{screen} flag"
+    )
+
+
+@pytest.mark.parametrize("field, screen, positive, negative", _SAFETY_SCREEN_CASES)
+def test_negative_safety_answer_writes_no_referral_flag(field, screen, positive, negative, tmp_path):
+    """AC-2 negative: a NEGATIVE safety answer writes NO referral flag (only the marker).
+
+    Failing-capable: an always-write route reds this negative case — the flag trips ONLY
+    on a positive answer.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {field: negative}, root=store_root, scaffold_root=tmp_path / "scaffold",
+        identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read(f"referral::{screen}", root=store_root) == [], (
+        f"a negative {field!r} answer wrongly wrote the referral::{screen} flag"
+    )
+    # The answered marker IS still written (the presence signal, regardless of answer).
+    assert store.read(f"safety-screen::{screen}", root=store_root), (
+        f"a negative {field!r} answer did not write the safety-screen::{screen} marker"
+    )
+
+
+def test_safety_marker_value_is_deidentified_not_raw_answer(tmp_path):
+    """AC-1/crown-jewel: the marker stores a de-identified positivity signal, never the
+    raw free-text answer (no raw PHQ-2/symptom text reaches a `safety-screen::*` item).
+
+    Failing-capable: a route echoing the raw answer into the marker leaks the raw token.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"exercise-safety": "chest-pain-climbing-stairs-XYZ"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    marker = store.read("safety-screen::exercise-safety", root=store_root)
+    assert marker and marker[-1]["value"] in ("positive", "negative"), (
+        "the safety marker did not store a de-identified positivity signal"
+    )
+    assert "XYZ" not in str(marker[-1]["value"]), "the raw answer leaked into the marker value"
+
+
+def _rendered_allergy_field_names():
+    """Extract the allergy input `name=`s from the ACTUAL rendered wizard markup.
+
+    Grounds the capture contract against the served design (`app_shell.render`) rather than
+    hard-coded field names — a future markup rename (e.g. back to `drug-allergies`) reds the
+    placement assertion below, catching the capture<->form contract break at its source.
+    """
+    import re
+
+    from vault.design.templates import app_shell
+
+    html = app_shell.render()
+    return re.findall(
+        r"<label>[^<]*[Aa]llerg[^<]*</label>\s*<input[^>]*\bname=['\"]([^'\"]+)['\"]", html,
+    )
+
+
+def test_allergies_route_to_hard_limits(tmp_path):
+    """AC-4: the rendered allergy fields route to the existing `hard-limits` token.
+
+    De-tautologized (Tier-3 FIX-1): asserts PLACEMENT against the ACTUAL rendered wizard
+    field names — every allergy input the served markup emits must be a `_ALLERGY_FIELDS`
+    member (else the capture branch never sees it and the value silently falls record-only,
+    the drug-allergy hard-contraindication never reaching the planner). Then round-trips
+    those SAME field names through the capture seam into `hard-limits`.
+
+    Failing-capable: rename an allergy input in the markup (or drop a field name from
+    `_ALLERGY_FIELDS`) and the membership assertion reds; with the allergy region absent
+    the round-trip fields fall to record-only and `hard-limits` carries neither value.
+    """
+    rendered = _rendered_allergy_field_names()
+    assert rendered, "no allergy inputs found in the rendered wizard markup"
+    for name in rendered:
+        assert name in capture._ALLERGY_FIELDS, (
+            f"the rendered allergy input {name!r} is not a _ALLERGY_FIELDS member — the "
+            f"capture<->form contract is broken (it would fall record-only, never hard-limits)"
+        )
+    # Both allergy classes are wired (a rename that dropped one would shrink this set).
+    assert set(rendered) == set(capture._ALLERGY_FIELDS), (
+        f"rendered allergy fields {sorted(rendered)} != _ALLERGY_FIELDS "
+        f"{sorted(capture._ALLERGY_FIELDS)}"
+    )
+
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"food-allergy": "shellfish", "drug-allergy": "penicillin"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    values = " ".join(str(r["value"]) for r in store.read("hard-limits", root=store_root))
+    assert "shellfish" in values, "the food allergy did not route to hard-limits"
+    assert "penicillin" in values, "the drug allergy did not route to hard-limits"
+
+
+def test_pii_bearing_allergy_value_diverts_record_only(tmp_path):
+    """FIX-1 (Security): a PII-bearing allergy value diverts record-only, never `hard-limits`.
+
+    The allergy branch writes the model-bound `hard-limits` token, but — unlike every sibling
+    free-text token — it was UNSCANNED. An allergy value carrying operator contact PII (an
+    email) must be caught by the SAME uncapped `_value_has_pii` gate and routed record-only
+    to the gitignored scaffold, never reaching the model-bound `hard-limits` token.
+
+    Failing-capable: drop the `_value_has_pii` check in the allergy branch and the email
+    lands in the `hard-limits` store item, reddening the empty-read assertion.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    capture.persist_capture(
+        {"drug-allergy": "penicillin — reaction notes, reach me at operator@example.com"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Negative (load-bearing): the PII-bearing allergy never reached the model-bound token.
+    assert store.read("hard-limits", root=store_root) == [], (
+        "a PII-bearing allergy value reached the model-bound hard-limits token"
+    )
+    # Positive: it landed record-only in the gitignored scaffold instead.
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert "operator@example.com" in scaffold_text, "the PII allergy value did not route record-only"
+
+    # The gate is selective: a clean allergy value still lands in hard-limits.
+    capture.persist_capture(
+        {"food-allergy": "shellfish"},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    hl = " ".join(str(r["value"]) for r in store.read("hard-limits", root=store_root))
+    assert "shellfish" in hl, "a clean allergy value did not land in hard-limits"
+
+
+def test_drug_allergy_not_in_rx_interaction_classes(tmp_path):
+    """AC-4: a drug allergy never routes into the liaison-curated `rx-interaction-classes`.
+
+    A drug allergy is a hard contraindication (-> `hard-limits`), not a drug-interaction
+    class. Failing-capable: a mis-route into `rx-interaction-classes` reds the empty read.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"drug-allergy": "penicillin"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read("rx-interaction-classes", root=store_root) == [], (
+        "a drug allergy wrongly routed into the model-bound rx-interaction-classes token"
+    )
+    # It DID land in hard-limits (the pinned route).
+    values = " ".join(str(r["value"]) for r in store.read("hard-limits", root=store_root))
+    assert "penicillin" in values, "the drug allergy did not route to hard-limits"
+
+
+def test_positive_exercise_safety_records_contraindication_marker_and_referral(tmp_path):
+    """AC-5: a POSITIVE exercise-safety answer records BOTH the
+    `safety-screen::exercise-safety` contraindication marker (recorded so the deferred
+    clinician-clearance-grant path can gate on it) AND the `referral::exercise-safety` flag.
+
+    Failing-capable: no marker / no flag reds each assertion.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"exercise-safety": "chest-pain"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    marker = store.read("safety-screen::exercise-safety", root=store_root)
+    assert marker and marker[-1]["value"] == "positive", (
+        "the exercise-safety contraindication marker was not recorded"
+    )
+    assert store.read("referral::exercise-safety", root=store_root), (
+        "the exercise-safety referral flag was not written on a positive answer"
+    )
+
+
+# --- ADR-0033-0035-T3 STORE-ADVERSARIAL battery (pka, docs/checklists/store-adversarial-tests.md).
+# The safety-marker / referral-flag / hard-limits writes land in scripts/store/ via the
+# UNCHANGED store.append, so the four required categories apply to T3's new streams. ---
+
+
+def test_safety_streams_do_not_cross_read(tmp_path):
+    """STORE-ADVERSARIAL #1 (cross-stream namespace isolation): a read for one safety
+    marker / referral flag / hard-limits never returns another stream's value.
+
+    A positive exercise-safety + negative phq2/apnea + a food allergy captured together:
+    the exercise-safety flag is present, phq2/apnea flags are absent, and the allergy is
+    in `hard-limits` and in NO safety-screen/referral stream (the S41 fabricated-cross-read
+    pattern). Failing-capable: a shared bare item name would cross-read.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"exercise-safety": "chest-pain", "phq2": "not-at-all", "apnea": "no",
+         "food-allergy": "shellfish"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read("referral::exercise-safety", root=store_root), "positive es did not flag"
+    assert store.read("referral::phq2", root=store_root) == [], "negative phq2 wrongly flagged"
+    assert store.read("referral::apnea", root=store_root) == [], "negative apnea wrongly flagged"
+    hard_limits = " ".join(str(r["value"]) for r in store.read("hard-limits", root=store_root))
+    assert "shellfish" in hard_limits, "the allergy did not land in hard-limits"
+    for stream in ("safety-screen::exercise-safety", "referral::exercise-safety",
+                   "safety-screen::phq2", "safety-screen::apnea"):
+        vals = " ".join(str(r["value"]) for r in store.read(stream, root=store_root))
+        assert "shellfish" not in vals, f"the allergy cross-contaminated {stream!r}"
+
+
+def test_safety_marker_same_timepoint_dedupe_and_distinct_screens_both_persist(tmp_path):
+    """STORE-ADVERSARIAL #2/#3 (same-key dedupe boundary / distinct-stream no-drop): a
+    second write at an existing `(item, timepoint, source)` is dropped (value excluded from
+    the dedupe key), but two DISTINCT screen markers sharing a timepoint BOTH persist — the
+    exact S41 same-timepoint contraindication-drop this checklist exists to prevent.
+
+    Failing-capable: widen the dedupe key to include `value` and the same-key re-write
+    persists (len == 2); drop the `::`-namespaced item distinctness and the distinct-screen
+    marker is clobbered.
+    """
+    import datetime
+
+    store_root = tmp_path / "store"
+    ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    # Same item + timepoint + source, DIFFERENT value -> second dropped (dedupe excludes value).
+    store.append("safety-screen::apnea",
+                 {"item": "safety-screen::apnea", "timepoint": ts, "source": "intake", "value": "negative"},
+                 root=store_root)
+    store.append("safety-screen::apnea",
+                 {"item": "safety-screen::apnea", "timepoint": ts, "source": "intake", "value": "positive"},
+                 root=store_root)
+    apnea = store.read("safety-screen::apnea", root=store_root)
+    assert len(apnea) == 1, "a same-key re-write was not deduped (dedupe key must exclude value)"
+    assert apnea[0]["value"] == "negative", "the dedupe dropped the FIRST write, not the second"
+    # A DISTINCT screen marker at the SAME timepoint -> BOTH persist (distinct `::` items).
+    store.append("safety-screen::exercise-safety",
+                 {"item": "safety-screen::exercise-safety", "timepoint": ts, "source": "intake", "value": "positive"},
+                 root=store_root)
+    assert store.read("safety-screen::exercise-safety", root=store_root), (
+        "a distinct screen marker sharing a timepoint was dropped (the S41 contraindication-drop)"
+    )
+    assert store.read("safety-screen::apnea", root=store_root), "the apnea marker was clobbered"
+
+
+def test_safety_markers_use_namespaced_prefix_not_bare_names(tmp_path):
+    """STORE-ADVERSARIAL #4 (mutation / cross-stream namespacing): the markers write under
+    the `safety-screen::` / `referral::` namespace, never a bare token that could collide
+    with a field-set stream.
+
+    Failing-capable (mutation): drop the `safety-screen::`/`referral::` prefix and a bare
+    un-namespaced item is written, reddening the bare-read + prefix assertions.
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"exercise-safety": "chest-pain"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    assert store.read("safety-screen::exercise-safety", root=store_root)
+    assert store.read("referral::exercise-safety", root=store_root)
+    # No bare un-namespaced safety item was written (the prefix keeps them field-set-disjoint).
+    assert store.read("exercise-safety", root=store_root) == [], (
+        "a bare un-namespaced safety item was written (the :: namespace prevents collision)"
+    )
+    for item in store.items(root=store_root):
+        assert item.startswith("safety-screen::") or item.startswith("referral::"), (
+            f"a non-namespaced safety item {item!r} was written"
+        )
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0033-0035-T3 — Cycle 2: the crown-jewel never-a-plan-input probe. No
+# `safety-screen::*` / `referral::*` marker is a SUMMARY_FIELD_SET member, so summarize
+# never reads them AND dispatch's whitelist rejects one injected into a payload. By guard
+# EXECUTION over the FROZEN summarize/dispatch, not a substring grep.
+# --------------------------------------------------------------------------- #
+
+
+def test_safety_markers_absent_from_summarize(tmp_path):
+    """AC-3 crown-jewel: no `safety-screen::*` / `referral::*` key appears in `summarize`
+    output — the markers are not SUMMARY_FIELD_SET members, so summarize's
+    `for field in SUMMARY_FIELD_SET` loop structurally never reads them.
+
+    RED-capable: reds if a marker were ever made a SUMMARY_FIELD_SET member (a future
+    field-set regression).
+    """
+    store_root = tmp_path / "store"
+    capture.persist_capture(
+        {"exercise-safety": "chest-pain", "phq2": "nearly-every-day", "apnea": "yes"},
+        root=store_root, scaffold_root=tmp_path / "scaffold", identity_config=_ABSENT_IDENTITY,
+    )
+    # The markers + a flag ARE in the store (the probe is over real capture output)...
+    assert store.read("safety-screen::exercise-safety", root=store_root)
+    assert store.read("referral::exercise-safety", root=store_root)
+    # ...but NONE reaches the plan summary.
+    summary = _summary(store_root)
+    leaked = [k for k in summary if k.startswith("safety-screen::") or k.startswith("referral::")]
+    assert not leaked, f"a safety marker reached the plan summary: {leaked}"
+
+
+def test_dispatch_rejects_injected_safety_screen_field():
+    """AC-3 crown-jewel: `dispatch` RAISES the out-of-field-set ValueError on a payload
+    carrying an injected `safety-screen::*` field (the whitelist rejects the complement).
+
+    RED-capable: reds if the marker were whitelisted into SUMMARY_FIELD_SET.
+    """
+    complete = {field: "" for field in SUMMARY_FIELD_SET}
+    dispatch(complete)  # negative control: a complete valid summary does NOT raise
+    injected = dict(complete)
+    injected["safety-screen::exercise-safety"] = "positive"
+    with pytest.raises(ValueError, match="out-of-field-set"):
+        dispatch(injected)
+
+
+def test_training_experience_routes_raw_local_band_crosses(tmp_path):
+    """The wizard training-experience number writes the RAW local source, never the band token.
+
+    Crown-jewel (NFR-1): the operator's exact years land under the named-excluded
+    `raw-training-experience` local item (shown in My-Info); the coarse `training-experience-band`
+    the planner reads is DERIVED by `summarize`, never written by capture directly. Failing-capable:
+    if capture wrote the band token directly, the `== []` band-absent assertion reds.
+    """
+    import functools
+
+    from scripts.plan import router
+    from scripts.serve import capture
+    from scripts.store import store
+
+    receipt = capture.persist_capture({"training-experience": "25"}, root=tmp_path,
+                                       scaffold_root=tmp_path / "sc")
+    # the raw source landed local; the band token was NOT written directly
+    assert [r["value"] for r in store.read("raw-training-experience", root=tmp_path)] == ["25"]
+    assert store.read("training-experience-band", root=tmp_path) == [], "capture wrote the band token directly (crown-jewel breach)"
+    assert "raw-training-experience" in receipt["store"]
+    # only the DERIVED band crosses; the raw number never enters the summary
+    summary = router.summarize(functools.partial(store.read, root=tmp_path))
+    assert summary["training-experience-band"] == "veteran"
+    assert "25" not in str(summary.get("training-experience-band")), "the exact number leaked into the crossing token"
+    # the raw source is named-excluded (the dispatch whitelist would reject it)
+    assert "raw-training-experience" in router.EXCLUDED_RAW_PII
+    assert "raw-training-experience" not in router.SUMMARY_FIELD_SET

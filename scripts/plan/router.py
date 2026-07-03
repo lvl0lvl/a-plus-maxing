@@ -23,6 +23,10 @@ from scripts.store import biomarker_meta
 SUMMARY_FIELD_SET = (
     # operator-profile (de-identified)
     "training-age-band",
+    # coarse training-EXPERIENCE band (years lifting) — DISTINCT from `training-age-band`
+    # (chronological age) and `training-volume-band` (weekly volume). Derived from the
+    # named-excluded `raw-training-experience` local source; only the band crosses (NFR-1).
+    "training-experience-band",
     "sex-for-dosing",
     "bodyweight-band",
     "equipment-access-class",
@@ -62,6 +66,14 @@ EXCLUDED_RAW_PII = (
     # identity
     "legal-name",
     "date-of-birth",
+    # OQ-5: the raw per-day `bodyweight-kg` time-series — named-excluded so the disjointness
+    # tripwire pins it out of the field set and the dispatch whitelist rejects it; only the
+    # de-associated current-weight+trend `bodyweight-band` token crosses (the crown jewel).
+    "bodyweight-kg",
+    # the operator's stated years-of-training-experience local source — named-excluded so
+    # the exact number stays local (shown in My-Info) and only the coarse
+    # `training-experience-band` crosses to the planner (via `_experience_band`).
+    "raw-training-experience",
     "government-id",
     # contact
     "email-address",
@@ -115,6 +127,9 @@ TRAIN_ELIGIBLE_LANE = "train-eligible"
 # just no longer a derivation source.
 _RAW_TO_FIELD = {
     "date-of-birth": "training-age-band",
+    # OQ-5: the local per-day `bodyweight-kg` series -> the de-associated current-weight
+    # +trend `bodyweight-band` token (the raw series stays local, feeds the dashboard chart).
+    "bodyweight-kg": "bodyweight-band",
     "raw-symptom-free-text": "active-issue-class",
     "clinical-notes": "active-issue-class",
     # chat-sourced rich-domain raw free-text -> coarse band/class (ADR-0019-T1).
@@ -122,6 +137,9 @@ _RAW_TO_FIELD = {
     "raw-supplement-free-text": "supplement-stack-class",
     "raw-peptide-free-text": "peptide-use-class",
     "raw-training-detail-free-text": "training-volume-band",
+    # demographic years-of-training-experience -> coarse experience band (mirrors
+    # `date-of-birth -> training-age-band`: the raw number stays local, the band crosses).
+    "raw-training-experience": "training-experience-band",
 }
 
 
@@ -322,22 +340,75 @@ _NOT_DISCUSSED = "not-discussed"
 
 
 def _age_band(readings):
-    """Bucket a raw date-of-birth into a coarse training-age band.
+    """Derive the exact integer age (years) from the locally-stored full date-of-birth.
 
-    Buckets by birth-decade (minimal sensible boundaries — the spike pins the
-    band SHAPE, not exact cutoffs); the raw date never appears in the token.
-    Requires EXACTLY 4 digits after stripping surrounding whitespace and a year
-    inside a sane range (1900..the current UTC year) — a malformed value ('86',
-    '198', a future year, a non-numeric string) bands `age-band-unknown` rather
-    than fabricating a born-decade.
+    Repurposes the demographic `training-age-band` deriver (ADR-0034 OQ-5): parses the
+    full ISO `YYYY-MM-DD` date-of-birth (the format T4's `<input type=date>` submits) and
+    emits the EXACT age in completed years relative to today's UTC date — the de-associated
+    scalar the no-train planner sees. The full birthdate NEVER appears in the token (the
+    crown jewel, NFR-1); an unparseable or future-dated value emits the `age-unknown`
+    sentinel rather than fabricating an age or echoing the raw date.
     """
     raw = str(readings[-1]["value"]).strip()
-    year = raw[:4]
-    if len(year) != 4 or not year.isdigit():
-        return "age-band-unknown"
-    if not 1900 <= int(year) <= datetime.now(timezone.utc).year:
-        return "age-band-unknown"
-    return f"born-{year[:3]}0s"
+    try:
+        dob = datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        return "age-unknown"
+    today = datetime.now(timezone.utc).date()
+    if dob > today:
+        return "age-unknown"
+    return str(today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day)))
+
+
+def _experience_band(readings):
+    """Derive the coarse training-experience band from the locally-stored years-of-training.
+
+    The operator's stated years of training experience is a demographic raw source kept LOCAL
+    (the crown jewel, NFR-1): only this coarse band crosses to the no-train planner, never the
+    exact number. Bands the latest numeric reading into novice / early-intermediate /
+    intermediate / advanced / veteran; no reading (a fresh operator) or a non-numeric value
+    emits the `unspecified` no-signal default, so this field's ALWAYS-SET membership never
+    trips dispatch's partial-summary raise.
+    """
+    values = [n for r in readings if (n := biomarker_meta.to_number(r["value"])) is not None]
+    if not values:
+        # No stated experience (or a non-numeric value) -> the shared ALWAYS-SET no-signal
+        # sentinel the other always-set derivers use, so a fresh operator reads consistently.
+        return _NOT_DISCUSSED
+    years = values[-1]
+    if years < 1:
+        return "novice"
+    if years < 3:
+        return "early-intermediate"
+    if years < 5:
+        return "intermediate"
+    if years <= 10:
+        return "advanced"
+    return "veteran"
+
+
+def _bodyweight_trend(readings):
+    """Derive the de-associated current-weight + coarse trend from the bodyweight series.
+
+    Repurposes `bodyweight-band` (ADR-0034 OQ-5): emits a scalar carrying the CURRENT
+    weight (the latest numeric reading) plus a coarse trend word (`up`/`down`/`flat`) from
+    the latest vs the prior numeric reading — the de-associated signal the no-train planner
+    sees. The per-day weight history NEVER enters the token (only the current value + the
+    trend word cross, the crown jewel NFR-1). An insufficient series (<2 numeric readings)
+    emits the current value + `flat` (no fabricated trend), mirroring `_trend_token`'s
+    no-signal floor.
+    """
+    values = [n for r in readings if (n := biomarker_meta.to_number(r["value"])) is not None]
+    if not values:
+        return "flat"  # no numeric signal — no false affirmative
+    current = values[-1]
+    if len(values) < 2 or values[-1] == values[-2]:
+        trend = "flat"
+    elif values[-1] > values[-2]:
+        trend = "up"
+    else:
+        trend = "down"
+    return f"{current:g};{trend}"
 
 
 def _trend_token(readings):
@@ -559,6 +630,8 @@ def _training_volume_band(readings):
 # token sourced from the demographic equipment selection, not a postal-address derivation.
 _FIELD_DERIVATION = {
     "training-age-band": _age_band,
+    "training-experience-band": _experience_band,
+    "bodyweight-band": _bodyweight_trend,
     "active-issue-class": _issue_class,
     # chat-sourced rich-domain coarse band/class derivers (ADR-0019-T1).
     "dietary-pattern-class": _dietary_pattern_class,
@@ -580,6 +653,10 @@ _ALWAYS_SET_DERIVED = (
     "supplement-stack-class",
     "peptide-use-class",
     "training-volume-band",
+    # demographic: ALWAYS set so an operator who has not stated training experience (every
+    # operator onboarded before this field existed) gets the `unspecified` default rather
+    # than an absent field that would trip dispatch's partial-summary raise.
+    "training-experience-band",
 )
 
 # §5b change-control tripwire (Finding 4-2): every raw source item must be a

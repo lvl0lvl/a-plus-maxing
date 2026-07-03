@@ -986,7 +986,7 @@ def test_converse_live_makes_no_live_call_without_the_sdk():
     [
         {"response_summary": None},  # failed: a null body
         {"response_summary": {}},  # empty: no reply/extraction
-        {"response_summary": {"reply": "hi"}},  # malformed: missing extraction
+        {"response_summary": {"extraction": []}},  # malformed: JSON body with no reply
         {"raise_exc": RuntimeError("sdk errored")},  # errored: the SDK raised
         {"raise_exc": subprocess.TimeoutExpired(cmd="model", timeout=30)},  # timed-out
     ],
@@ -1787,3 +1787,76 @@ def test_good_author_fixture_validates_against_live_workout_schema():
     from scripts.model.client import _author_output_schema
 
     jsonschema.validate(_good_author_fixture(), _author_output_schema("workout"))
+
+
+def test_model_failure_category_maps_by_type_and_never_leaks():
+    """A suppressed converse failure yields a PII-safe, category-specific operator message.
+
+    SEC-01: `_model_failure_category` reads ONLY the exception TYPE and returns a hardcoded
+    per-category message — an auth failure reads differently from a transient one (so the operator
+    knows whether to fix the key or just resend), and a secret in the exception's own message NEVER
+    rides along. Failing-capable: reds if a category collapses to the generic default or the secret
+    leaks into the operator-facing string.
+    """
+    anthropic = pytest.importorskip("anthropic")
+    httpx = pytest.importorskip("httpx")
+    from scripts.model.client import _model_failure_category
+
+    req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    r = lambda code: httpx.Response(code, request=req)
+    secret = "LEAKMARKER-fake-key-plus-raw-operator-PII"
+    auth = _model_failure_category(anthropic.AuthenticationError(secret, response=r(401), body=None))
+    rate = _model_failure_category(anthropic.RateLimitError(secret, response=r(429), body=None))
+    over = _model_failure_category(anthropic.InternalServerError(secret, response=r(500), body=None))
+    timeout = _model_failure_category(anthropic.APITimeoutError(request=req))
+    # each category is distinct + actionable (auth -> fix key; the rest -> transient, resend)
+    assert "key" in auth.lower(), auth
+    assert "rate limit" in rate.lower() or "busy" in rate.lower(), rate
+    assert "resend" in over.lower() and "resend" in timeout.lower()
+    assert len({auth, rate, over, timeout}) == 4, "categories collapsed into a non-specific message"
+    # SEC-01: the exception's own text (key / raw PII) never appears in the operator-facing string
+    for msg in (auth, rate, over, timeout):
+        assert secret not in msg, "the suppressed exception text leaked into the operator-facing string"
+
+
+def test_converse_parses_prose_reply_and_rejects_wrong_shape_json():
+    """A prose (non-JSON) model reply is surfaced verbatim; a wrong-shape JSON body fails closed.
+
+    In a continuous care conversation the model answers in PROSE, ignoring the JSON-envelope
+    instruction. The parse surfaces that prose as the reply (extraction empty) rather than raising a
+    JSONDecodeError — the exact crash that reached the operator as "the model call did not complete".
+    A body that IS JSON but lacks a reply (null / {} / other) still fails closed. Failing-capable:
+    reds if prose raises, a fence is not stripped, or a no-reply JSON body is accepted as a reply.
+    """
+    import pytest
+
+    from scripts.model.client import _parse_converse_turn
+
+    class _Block:
+        type = "text"
+
+        def __init__(self, t):
+            self.text = t
+
+    class _Resp:
+        def __init__(self, t):
+            self.content = [_Block(t)]
+
+    prose = "Yes, the chat is working — I've got your messages. Here's the plan..."
+    assert _parse_converse_turn(_Resp(prose)) == {"reply": prose, "extraction": []}
+    # a ```json-fenced valid envelope -> parsed, extraction preserved
+    assert _parse_converse_turn(_Resp('```json\n{"reply": "hi", "extraction": [{"x": 1}]}\n```')) == {
+        "reply": "hi", "extraction": [{"x": 1}],
+    }
+    # a reply without an extraction key -> accepted, extraction defaults to []
+    assert _parse_converse_turn(_Resp('{"reply": "ok"}')) == {"reply": "ok", "extraction": []}
+    # JSON but no reply (null / {} / other) -> fails closed (never a "null"/"{}" garbage reply)
+    for bad in ("null", "{}", '{"extraction": []}'):
+        with pytest.raises(ValueError):
+            _parse_converse_turn(_Resp(bad))
+
+    class _Empty:
+        content = []
+
+    with pytest.raises(ValueError):
+        _parse_converse_turn(_Empty())

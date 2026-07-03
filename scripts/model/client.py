@@ -210,34 +210,50 @@ def _converse_system_prompt():
     instruction; the shape gate is the downstream `_parse_converse_turn`.
     """
     return (
-        "You are conducting one intake turn. Respond with a single JSON object and nothing "
-        'else, shaped exactly as {"reply": <assistant reply text>, "extraction": [<zero or '
-        "more structured field proposals>]}. The reply is the text shown to the operator; the "
-        "extraction is the list of fields you inferred this turn (an empty list when none). "
-        "Emit no prose outside the JSON object."
+        "You are the operator's assistant for one turn. Reply naturally to the operator in `reply`. "
+        'In `extraction`, list ONLY the profile facts the operator STATED this turn, each as a '
+        '{"field": <field-token>, "value": <value>} object — use the EXACT field tokens (and their '
+        "allowed values) described in the context's `extractable_fields`, and an empty list when the "
+        "operator stated no new profile fact. Never invent a fact the operator did not state."
     )
 
 
 def _parse_converse_turn(response):
     """Parse the model response into the `{"reply", "extraction"}` turn mapping.
 
-    Reads the first `text` content block off the SDK envelope and decodes it as the JSON turn
-    object — the assistant reply text plus a structured extraction proposal. Returns the
-    parsed mapping (the raw conversation never flows through here); a non-text / non-JSON /
-    wrong-shape response raises, failing closed at the retry loop to `ModelCallError`. The
-    shape check mirrors the public `ModelClient.converse` validation (a dict with a truthy
-    `reply` and an `extraction` key), so a truthy-but-malformed body is rejected at the
-    backend, never returned as a partial turn.
+    A `{"reply", "extraction"}` JSON object (optionally wrapped in a ```json fence) is used as-is
+    — the intake path, where the model reliably emits the envelope. But in a continuous CARE
+    conversation the model naturally answers in PROSE, ignoring the JSON instruction; a prose
+    answer is a VALID assistant reply, so it is surfaced verbatim as `reply` with an empty
+    `extraction` rather than failing the turn closed (the JSONDecodeError that surfaced to the
+    operator as "the model call did not complete"). Genuine failures still fail closed to
+    `ModelCallError` at the retry loop: no text block at all, or a body that IS JSON but null /
+    empty / wrong-shape (a malformation, never surfaced as a "null"/"{}" garbage reply). The raw
+    conversation never flows through here (only the model's own reply text).
     """
     import json
+    import re
 
     text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), None)
     if text is None:
         raise ValueError("converse: model response carried no text block")
-    turn = json.loads(text)
-    if not isinstance(turn, dict) or not turn.get("reply") or "extraction" not in turn:
-        raise ValueError("converse: model response was not the {reply, extraction} shape")
-    return turn
+    body = text.strip()
+    fenced = re.match(r"^```(?:json)?\s*(.*?)\s*```$", body, re.DOTALL)
+    if fenced:
+        body = fenced.group(1).strip()
+    try:
+        turn = json.loads(body)
+    except (ValueError, TypeError):
+        # NOT JSON at all -> the model answered in PROSE (natural in a continuous care
+        # conversation). Surface it verbatim as the reply; the reply is the real assistant turn,
+        # and failing it closed would throw away a perfectly good answer.
+        return {"reply": text.strip(), "extraction": []}
+    # It parsed as JSON -> require the {reply, ...} shape with a truthy reply; `extraction` defaults
+    # to empty when omitted. A JSON body that is null / empty / wrong-shape is a genuine malformation
+    # and STILL fails closed (never a "null"/"{}" garbage reply).
+    if isinstance(turn, dict) and turn.get("reply"):
+        return {"reply": turn["reply"], "extraction": turn.get("extraction", [])}
+    raise ValueError("converse: model response was JSON but not the {reply, extraction} shape")
 
 
 # The de-id call's bounded retry ceiling — at most this many `messages.create` attempts
@@ -259,6 +275,58 @@ _CONVERSE_MAX_ATTEMPTS = 3
 # The per-call timeout (seconds) the converse SDK request runs under — a bounded wait, never
 # an indefinite block. Passed through `with_options(timeout=...)` at call time.
 _CONVERSE_TIMEOUT_SECONDS = 60.0
+
+# The structured-output schema the converse call FORCES (a reply string + a list of {field, value}
+# fact proposals). Forcing the shape is what makes the model reliably return the reply AND the facts
+# the operator stated, rather than drifting to prose. `extract_facts` normalizes the {field, value}
+# list to a `{token: value}` mapping; the capture gate then validates each against the field set /
+# bounded enums (a raw value under a wired token routes record-only). The WHICH-tokens roster is
+# supplied per-turn in the CONTEXT (the serve layer builds it), keeping this boundary generic.
+_CONVERSE_STRUCTURED_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "reply": {"type": "string"},
+        "extraction": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"field": {"type": "string"}, "value": {"type": "string"}},
+                "required": ["field", "value"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["reply", "extraction"],
+    "additionalProperties": False,
+}
+
+
+def _model_failure_category(exc):
+    """Map a suppressed model-call failure to a PII-SAFE operator-facing category message.
+
+    SEC-01 boundary: reads ONLY the exception's TYPE (a class — carries no PII) and returns a
+    HARDCODED message per category. It NEVER interpolates `str(exc)` / `repr(exc)`, which can carry
+    the raw conversation prompt or the resolved key. This lets the operator tell a transient glitch
+    (resend) from an auth problem (fix the key) without any raw/key leak — the same fail-closed
+    posture as the constant message it replaces, only category-specific.
+    """
+    try:
+        import anthropic
+    except Exception:
+        return "the model call did not complete — resend; if it persists, check Profile shows your key Connected"
+    if isinstance(exc, (anthropic.AuthenticationError, anthropic.PermissionDeniedError)):
+        return "your API key was rejected — open Profile and check it shows Connected"
+    if isinstance(exc, anthropic.RateLimitError):
+        return "the model service is busy right now (rate limit) — wait a few seconds and resend"
+    if isinstance(exc, anthropic.APITimeoutError):
+        return "the model took too long to respond — resend"
+    if isinstance(exc, anthropic.APIConnectionError):
+        return "could not reach the model service — check your connection and resend"
+    if isinstance(exc, anthropic.APIStatusError) and getattr(exc, "status_code", 0) >= 500:
+        return "the model service was briefly unavailable — resend in a moment"
+    if isinstance(exc, anthropic.BadRequestError):
+        return "the model rejected the request — your message was saved; if this repeats, tell me"
+    return "the model call did not complete — resend; if it keeps happening, check Profile shows your key Connected"
 
 # The extract call's bounded retry ceiling — at most this many `messages.create` attempts before
 # the failure propagates to the fail-closed raise (never an unbounded retry). The extract
@@ -631,6 +699,7 @@ class _ClaudeNoTrainBackend:
         """
         client = self._client()
         system = _converse_system_prompt()
+        last_exc = None
         for _ in range(_CONVERSE_MAX_ATTEMPTS):
             try:
                 response = client.with_options(timeout=_CONVERSE_TIMEOUT_SECONDS).messages.create(
@@ -638,18 +707,30 @@ class _ClaudeNoTrainBackend:
                     max_tokens=2048,
                     system=system,
                     messages=messages,
+                    # Prompt caching (ADR-0016 no-train lane): the stable prefix re-sent every turn —
+                    # the constant `system` + the de-identified profile context + the prior conversation
+                    # turns — is cached and read at ~0.1x input cost on the next turn (Opus-4.8 caches a
+                    # >=4096-token prefix; shorter prefixes silently don't cache, which is harmless). This
+                    # is why the full conversation is re-sent each turn without paying full price for it;
+                    # the stateless API requires the history, caching makes the repeat cheap.
+                    cache_control={"type": "ephemeral"},
+                    # Structured outputs FORCE the {reply, extraction:[{field,value}]} shape, so the
+                    # model reliably returns BOTH a reply AND the facts the operator stated — instead of
+                    # drifting to prose (which captured nothing and crashed the parse before the prose
+                    # fallback). This is what makes chat facts actually save (e.g. recovery-status-band).
+                    output_config={"format": {"type": "json_schema", "schema": _CONVERSE_STRUCTURED_SCHEMA}},
                 )
                 return _parse_converse_turn(response)
-            except Exception:  # bounded: try again until the attempt ceiling
-                pass
-        # SEC-01: a CONSTANT message — never interpolate the SDK exception (it can carry the
-        # raw conversation or the resolved key). `from None` INTENTIONALLY SUPPRESSES the
-        # `__cause__`/`__context__` chain: the raw SDK exception carries the raw conversation
-        # (the request) + the resolved key, which a caller's `logger.exception()` /
-        # `traceback.print_exc()` would render. At this PII/key boundary the chained cause's
-        # debuggability is not worth the latent raw/key leak (PUBLIC repo).
-        # Raised at the backend boundary so the raw SDK exception never escapes `converse`.
-        raise ModelCallError("converse call failed") from None
+            except Exception as exc:  # bounded: try again until the attempt ceiling
+                last_exc = exc
+        # SEC-01: a PII-SAFE category message chosen from the LAST exception's TYPE ONLY (never
+        # `str(exc)`, which can carry the raw conversation or the resolved key). `from None`
+        # INTENTIONALLY SUPPRESSES the `__cause__`/`__context__` chain: the raw SDK exception
+        # carries the raw conversation (the request) + the resolved key, which a caller's
+        # `logger.exception()` / `traceback.print_exc()` would render. The category (auth vs
+        # transient vs …) is derived from the class, so the operator learns whether to retry or
+        # fix the key without the raw/key leak. Raised at the backend boundary.
+        raise ModelCallError(_model_failure_category(last_exc)) from None
 
     def author(self, domain, summary):
         """Author a domain's recommendations against the no-train API (the live author call).

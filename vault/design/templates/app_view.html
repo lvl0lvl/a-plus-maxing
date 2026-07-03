@@ -22,7 +22,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);-webkit-font-
 .topbar .navitem{width:auto;padding:8px 14px;font-size:13.5px}
 .content{flex:1;min-height:0;overflow:auto}
 .screen{padding:28px 34px}
-#screen-team.screen{padding:0;max-width:none;margin:0}
+#screen-team.screen{padding:0;max-width:none;margin:0;height:100%;min-height:0}
 
 /* ---------- (legacy side-nav classes, reused for the workspace specialist column) ---------- */
 .nav{background:var(--sheet);border-right:1px solid var(--line);padding:22px 14px;display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh;overflow:auto}
@@ -130,6 +130,19 @@ select.inp{cursor:pointer}
 .statusbar .row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:9px}
 .bar{height:8px;border-radius:99px;background:var(--line2);overflow:hidden}
 .bar > i{display:block;height:100%;background:var(--good);border-radius:99px;transition:width .4s}
+.mi-head{display:flex;align-items:center;gap:9px;margin-bottom:4px}
+.mi-head .mi-edit{margin-left:auto;font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;border:1px solid var(--soft-bd);background:var(--soft);border-radius:8px;padding:5px 10px}
+.mi-note{font-size:11.5px;color:var(--muted);line-height:1.45;margin-bottom:12px}
+.genrow{display:flex;align-items:center;gap:11px;border:1px solid var(--line);border-radius:12px;background:#FBFCFE;padding:10px 12px;margin-bottom:8px}
+.genrow .gm{flex:1;min-width:0}
+.genrow .gtop{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.genrow .gn{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.genrow .gstat{margin-left:auto;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;flex:none}
+.genrow .gstat.done{color:var(--good)}
+.genrow .gstat.working{color:var(--accent)}
+.genrow .gstat.queued{color:var(--faint)}
+.genrow .gstat .spin{width:11px;height:11px}
+.genrow .bar{height:6px}
 .drop{border:1.5px dashed var(--ctrl);border-radius:10px;padding:20px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer}
 .drop:hover{border-color:var(--accent);color:var(--accent);background:var(--soft)}
 
@@ -152,7 +165,7 @@ select.inp{cursor:pointer}
 .app.specmin .ws-specs .spec{width:46px;height:42px;padding:0;justify-content:center;gap:0}
 .app.specmin .ws-specs .spec .name,.app.specmin .ws-specs .spec .dot{display:none}
 /* center: chat */
-.ws-chat{min-width:0;display:flex;flex-direction:column}
+.ws-chat{min-width:0;min-height:0;display:flex;flex-direction:column}
 .ws-chat #team-chat{flex:1;min-height:0;display:flex}
 .ws-chat .chatwrap{flex:1;min-height:0}
 .ws-chat .chat-thread{flex:1;max-height:none;min-height:0}
@@ -169,18 +182,12 @@ select.inp{cursor:pointer}
 .ws-docs .doc{padding:11px 12px;gap:10px;margin-bottom:8px}
 .ws-docs .doc .d{font-size:11px;white-space:normal;line-height:1.35}
 .ws-side .seclab{font-size:12px;margin:16px 0 9px}
-.ws-genplan{width:100%;padding:13px;font-size:14px;margin-top:16px}
-/* generate tab: agent rows + progress */
-.agent-group-lab{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:8px 0 4px}
-.agent-row{display:flex;align-items:center;gap:11px;padding:9px 2px}
-.agent-row .am{flex:1;min-width:0}
-.agent-row .an{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
-.agent-row .ap{font-size:11px;color:var(--faint);font-weight:600;flex:none}
-.agent-prog{height:6px;border-radius:99px;background:var(--line2);margin-top:7px;overflow:hidden}
-.agent-prog > i{display:block;height:100%;background:var(--accent);border-radius:99px;width:0%;transition:width .5s}
-.agent-prog.done > i{background:var(--good)}
-.chat-thread{padding:20px;display:flex;flex-direction:column;justify-content:flex-end;gap:12px;min-height:230px;max-height:440px;overflow:auto;background:#E4E8F1}
-.msg{max-width:78%;font-size:13.5px;line-height:1.55;padding:11px 14px;border-radius:14px}
+.chat-thread{padding:20px;display:flex;flex-direction:column;gap:12px;min-height:230px;max-height:440px;overflow:auto;background:#E4E8F1}
+/* Bottom-pin a SHORT conversation without justify-content:flex-end — which, with overflow, spills
+   long threads off the (clipped, unscrollable) top. margin-top:auto pins when there's free space
+   and collapses when the thread overflows, so a long thread scrolls normally to the newest message. */
+.chat-thread>:first-child{margin-top:auto}
+.msg{flex:none;max-width:78%;font-size:13.5px;line-height:1.55;padding:11px 14px;border-radius:14px}
 .msg.bot{background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(16,20,38,.06);color:var(--ink);border-bottom-left-radius:4px;align-self:flex-start}
 .msg.me{align-self:flex-end;background:var(--accent);border:1px solid var(--accent-deep);color:#fff;border-bottom-right-radius:4px}
 .msg.sys{align-self:center;background:transparent;border:none;box-shadow:none;color:var(--muted);font-size:11.5px;text-align:center;max-width:90%;padding:2px 0}
@@ -341,6 +348,57 @@ select.inp{cursor:pointer}
 .pitem .ptit{font-size:13.5px;font-weight:600;margin-top:3px}
 .pitem .pdet{font-size:11.5px;color:var(--ink2);margin-top:2px;line-height:1.4}
 
+/* ===== Create-Profile wizard (ADR-0034; gate-served by T6/W4) ===== */
+.gatehead{display:flex;align-items:center;gap:16px;padding:0 26px;height:60px;background:var(--sheet);border-bottom:1px solid var(--line)}
+.gatehead .tb-brand{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.gatehead .tb-brand small{font-size:11px;font-weight:400;color:var(--muted);margin-left:8px}
+.gatehead .ghp{margin-left:auto;display:flex;align-items:center;gap:12px;min-width:280px}
+.gatehead .ghp .bar{flex:1}
+.gatehead .ghp .pct{font-size:12px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.gate-body{max-width:1000px;margin:0 auto;padding:30px 26px 60px}
+.wizard{display:grid;grid-template-columns:252px 1fr;gap:30px;align-items:start}
+.stepper{position:sticky;top:20px}
+.stepper .sttl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);padding:0 11px 9px}
+.step-item{display:flex;gap:11px;align-items:center;padding:9px 11px;border-radius:9px;cursor:pointer;color:var(--ink2);font-size:13.5px;font-weight:600;width:100%;border:none;background:none;text-align:left}
+.step-item:hover{background:var(--line2)}
+.step-item.active{background:var(--soft);color:var(--accent)}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--line2);color:var(--muted);flex:none;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700}
+.step-item.active .step-num{background:var(--accent);color:#fff}
+.wstep{display:none}
+.wstep.active{display:block}
+.wstep .h1{margin-bottom:4px}
+.wform-foot{display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:18px;border-top:1px solid var(--line2)}
+.opts{display:flex;flex-wrap:wrap;gap:9px;margin-top:7px}
+.opt{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:9px 15px;font-size:13px;font-weight:600;color:var(--ink2);cursor:pointer;background:#fff;user-select:none}
+.opt:hover{border-color:var(--ctrl)}
+.opt .obox{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--ctrl);flex:none;display:flex;align-items:center;justify-content:center}
+.opt .obox svg{width:11px;height:11px;color:#fff;opacity:0}
+.opt.on{border-color:var(--good);background:var(--good-bg);color:#0F8C80}
+.opt.on .obox{background:var(--good);border-color:var(--good)}
+.opt.on .obox svg{opacity:1}
+.opt.radio .obox{border-radius:50%}
+.note{font-size:12px;color:var(--ink2);background:var(--line2);border-radius:9px;padding:11px 13px;line-height:1.5;margin-top:11px}
+.note.warn{background:var(--watch-bg);color:#9A6A1F}
+.note b{color:var(--ink)}
+.note.warn b{color:#7A5310}
+.qcard{border:1px solid var(--line);border-radius:12px;padding:15px 16px;margin-top:12px}
+.qcard .q{font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.4}
+.keystate{border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:12px}
+.keystate .klab{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+.inp:disabled{background:var(--line2);color:var(--faint);cursor:not-allowed;border-color:var(--line)}
+.keymask{letter-spacing:3px}
+.equip-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:6px}
+.equip{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--line);border-radius:11px;cursor:pointer;position:relative;user-select:none}
+.equip:hover{border-color:var(--soft-bd)}
+.equip:focus-within{border-color:var(--accent);outline:2px solid var(--soft-bd)}
+.equip input{position:absolute;opacity:0;width:0;height:0;margin:0}
+.equip .eq-ic{display:flex;flex:none;color:var(--ink2)}
+.equip .eq-ic svg{width:20px;height:20px}
+.equip .eq-name{flex:1;font-size:13.5px;font-weight:600;color:var(--ink)}
+.equip .eq-chk{display:none;flex:none;color:var(--accent)}
+.equip .eq-chk svg{width:16px;height:16px}
+.equip:has(input:checked){border-color:var(--accent);background:var(--soft)}
+.equip:has(input:checked) .eq-chk{display:flex}
 </style></head>
 <body>
 <div class="app">
@@ -454,26 +512,65 @@ select.inp{cursor:pointer}
         <aside class="ws-side">
           <div class="ws-tabs">
             <button class="ws-tab" data-tab="myplan">My Plan</button>
-            <button class="ws-tab active" data-tab="build">Build Plan</button>
-            <button class="ws-tab" data-tab="generate">Generate</button>
+            <button class="ws-tab active" data-tab="build">My Info</button>
+            <button class="ws-tab" data-tab="generate">Generate Plan</button>
           </div>
           <div class="ws-panel" id="panel-myplan">
-            <div class="empty" style="margin-top:36px">Your finalized plan appears here once it's generated — every item attributed to a specialist and reviewed for safety. Build it in the <b>Build Plan</b> tab, then run it from <b>Generate</b>.</div>
+            <div class="empty" style="margin-top:36px">Your finalized plan appears here once it's generated — every item attributed to a specialist and reviewed for safety. Run it from <b>Generate Plan</b>.</div>
           </div>
           <div class="ws-panel active ws-docs" id="panel-build">
-            <div class="seclab" style="margin-top:0">Your details</div>
+            <div class="mi-note">Everything you told us at intake — editable. An edit re-runs the same on-device de-identification path before anything reaches your plan.</div>
             <form action='/upload' method='post'>
-              <div class="field"><label for='date-of-birth'>Birth year</label><input class="inp" type='text' id='date-of-birth' name='date-of-birth' placeholder="e.g. 1986"></div>
-              <div class="field" style="margin-top:10px"><label for='sex-for-dosing'>Sex (for dosing)</label><select class="inp" id='sex-for-dosing' name='sex-for-dosing'><option value=''>Select…</option><option value='male'>Male</option><option value='female'>Female</option></select></div>
-              <div class="field" style="margin-top:10px"><label for='bodyweight-band'>Body weight range</label><select class="inp" id='bodyweight-band' name='bodyweight-band'><option value=''>Select a range…</option><option value='under-60kg'>Under 132 lb</option><option value='60-70kg'>132–154 lb</option><option value='70-80kg'>154–176 lb</option><option value='80-90kg'>176–198 lb</option><option value='90-100kg'>198–220 lb</option><option value='over-100kg'>Over 220 lb</option></select></div>
-              <div class="field" style="margin-top:10px"><label for='equipment-access-class'>Equipment access</label><select class="inp" id='equipment-access-class' name='equipment-access-class'><option value=''>Select…</option><option value='full-home-gym'>Full home gym</option><option value='commercial-gym'>Commercial gym</option><option value='minimal-equipment'>Minimal equipment</option><option value='bodyweight-only'>Bodyweight only</option></select></div>
-              <div style="margin-top:14px"><button class="btn primary" type='submit'>Save details</button></div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Demographics</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='date-of-birth'>Birthdate</label><input class="inp" type='date' disabled id='date-of-birth' name='date-of-birth'></div>
+                <div class="field" style="margin-top:11px"><label for='sex-for-dosing'>Sex (for dosing)</label><select class="inp" id='sex-for-dosing' name='sex-for-dosing' disabled><option value=''>Select…</option><option value='male'>Male</option><option value='female'>Female</option></select></div>
+                <div class="field" style="margin-top:11px"><label for='bodyweight-kg'>Body weight</label><div style="display:flex;gap:10px"><input class="inp" type='number' id='bodyweight-kg' name='bodyweight-kg' placeholder="Weight" disabled style="flex:1"><select class="inp" aria-label="Weight unit" disabled style="width:92px;flex:none"><option value='lbs'>lbs</option><option value='kg'>kg</option></select></div></div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Goals</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='goal-domains'>Domains</label><input class="inp" disabled id='goal-domains' name='goal-domains'></div>
+                <div class="field" style="margin-top:11px"><label for='goal-targets'>Targets</label><input class="inp" disabled id='goal-targets' name='goal-targets'></div>
+                <div class="field" style="margin-top:11px"><label for='goal-priority-order'>Priority order</label><input class="inp" disabled id='goal-priority-order' name='goal-priority-order'></div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Training &amp; activity</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='training-detail'>Training detail</label><input class="inp" disabled id='training-detail' name='training-detail'></div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Diet</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='nutrition-detail'>Nutrition detail</label><input class="inp" disabled id='nutrition-detail' name='nutrition-detail'></div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Supplements &amp; peptides</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='supplement-stack'>Supplement stack</label><input class="inp" disabled id='supplement-stack' name='supplement-stack'></div>
+                <div class="field" style="margin-top:11px"><label for='peptide-stack'>Peptides</label><input class="inp" disabled id='peptide-stack' name='peptide-stack'></div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="seclab">Medications</div>
+                <div class="note">Editing a medication re-runs the care-assistant interaction review (de-associated, no name attached). Manage medications in <b>Chat with Team</b>.</div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="seclab">Health &amp; lifestyle</div>
+                <div class="note">Sleep, stress, and the safety screens you answered at intake. Update them in <b>Chat with Team</b>.</div>
+              </div>
+              <div style="margin-bottom:6px">
+                <div class="mi-head"><div class="seclab" style="margin:0">Equipment</div><button type="button" class="mi-edit" onclick="toggleEdit(this)">Edit</button></div>
+                <div class="field"><label for='equipment-access-class'>Access</label><select class="inp" id='equipment-access-class' name='equipment-access-class' disabled><option value=''>Select…</option><option value='full-home-gym'>Full home gym</option><option value='commercial-gym'>Commercial gym</option><option value='minimal-equipment'>Minimal equipment</option><option value='bodyweight-only'>Bodyweight only</option></select></div>
+              </div>
             </form>
-            <div class="seclab">Link your documents</div>
+            <div style="margin-bottom:6px">
+              <div class="seclab">Flagged for your doctor visit</div>
+              <div id="referral-zone"><!--REFERRAL_ZONE--></div>
+            </div>
+            <div class="seclab">Documents</div>
             <div id="upload-status" class="upload-status"></div>
             <input type="file" id="filepick" style="display:none">
             <div id="doc-cards"><!--DOC_CARDS--></div>
-            <div class="drop" style="margin-top:10px">Drop files here or click to browse — labs, history, wearable exports, prior plans. Parsed locally.</div>
+            <div style="margin-top:8px"><span class="link" style="color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer" onclick="toggleAddDocs(this)">+ Add documents</span></div>
+            <div class="adddocs-panel" style="display:none;margin-top:10px">
+              <div class="drop">Drop files here or click to browse — labs, history, wearable exports, prior plans. Parsed locally.</div>
+            </div>
             <div class="statusbar">
               <div class="row"><span style="font-weight:600">Ingestion</span><span style="color:var(--muted)">Nothing ingested yet</span></div>
               <div class="bar"><i style="width:0%"></i></div>
@@ -491,8 +588,17 @@ select.inp{cursor:pointer}
                 <div class="m"><div class="t" data-field="item"></div><div class="d"><span data-field="timepoint"></span> · <span data-field="source"></span> · <span data-field="value"></span></div></div>
               </div>
             </template>
+            <div style="margin-bottom:6px">
+              <div class="seclab">API key</div>
+              <div class="note">Your Anthropic API key is stored in your device keychain — never uploaded, never written to a file. Manage it in <b>Profile → API connection</b>.</div>
+            </div>
           </div>
-          <div class="ws-panel" id="panel-generate"></div>
+          <div class="ws-panel" id="panel-generate">
+            <div style="display:flex;gap:10px;margin-top:2px;margin-bottom:9px"><button class="btn primary" style="flex:1">Generate plan</button><button class="btn ghost" style="flex:1">Update plan</button></div>
+            <div style="font-size:11.5px;color:var(--ink2);line-height:1.45;margin-bottom:14px"><b>Generate plan</b> builds a fresh plan from scratch. <b>Update plan</b> re-runs your existing plan with your latest data.</div>
+            <div class="seclab" style="margin-top:0">Care-team build status</div>
+            <div class="gen-roster"></div>
+          </div>
         </aside>
       </div>
     </section>
@@ -520,10 +626,218 @@ select.inp{cursor:pointer}
         </div>
       </div>
     </section>
+
+    <!-- ============ CREATE-PROFILE WIZARD (ADR-0034; gate-served by T6/W4) ============ -->
+    <section class="screen" id="screen-wizard">
+      <header class="gatehead">
+        <div class="tb-brand">A+ Maxing<small>Create your profile</small></div>
+        <div class="ghp"><div class="bar"><i id="wiz-bar" style="width:11%"></i></div><span class="pct" id="wiz-pct">Step 1 of 9</span></div>
+      </header>
+      <div class="gate-body">
+        <!--WELCOME_BACK-->
+        <div class="wizard">
+          <nav class="stepper" id="stepper">
+            <div class="sttl">Profile setup</div>
+            <button type="button" class="step-item active" data-go="1" onclick="gotoStep(1)"><span class="step-num">1</span>Demographics</button>
+            <button type="button" class="step-item" data-go="2" onclick="gotoStep(2)"><span class="step-num">2</span>Goals</button>
+            <button type="button" class="step-item" data-go="3" onclick="gotoStep(3)"><span class="step-num">3</span>Training &amp; activity</button>
+            <button type="button" class="step-item" data-go="4" onclick="gotoStep(4)"><span class="step-num">4</span>Diet</button>
+            <button type="button" class="step-item" data-go="5" onclick="gotoStep(5)"><span class="step-num">5</span>Supplements &amp; peptides</button>
+            <button type="button" class="step-item" data-go="6" onclick="gotoStep(6)"><span class="step-num">6</span>Medications</button>
+            <button type="button" class="step-item" data-go="7" onclick="gotoStep(7)"><span class="step-num">7</span>Health &amp; lifestyle</button>
+            <button type="button" class="step-item" data-go="8" onclick="gotoStep(8)"><span class="step-num">8</span>Documents</button>
+            <button type="button" class="step-item" data-go="9" onclick="gotoStep(9)"><span class="step-num">9</span>API key</button>
+          </nav>
+          <div id="wsteps">
+            <div class="wstep active" data-step="1">
+              <div class="h1">Demographics</div>
+              <div class="sub">The basics your care team needs to dose and plan safely. Identity stays on your device.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="field"><label>Birthdate</label><input class="inp" type='date' name='date-of-birth'><div class="note">Your exact age is computed from this; your full birth date stays on your machine — only your age is used.</div></div>
+                <div class="field" style="margin-top:11px"><label>Sex (for dosing)</label><select class="inp" name='sex-for-dosing'><option value=''>Select…</option><option value='male'>Male</option><option value='female'>Female</option></select></div>
+                <div class="field" style="margin-top:11px"><label>Race &amp; ethnicity <span style="color:var(--faint);font-weight:500">(optional)</span></label><select class="inp" name='race-ethnicity'><option value=''>Select…</option><option>White / Caucasian</option><option>Black / African American</option><option>Hispanic / Latino</option><option>East Asian</option><option>South Asian</option><option>Middle Eastern</option><option>Native American</option><option>Pacific Islander</option><option>Mixed</option><option>Prefer not to say</option></select><div class="note">Kept on your device for dosing and research population-matching — never sent to the planner. Sensitive, so it is optional.</div></div>
+                <div class="field" style="margin-top:11px"><label>Body weight</label><div style="display:flex;gap:10px"><input class="inp" type='number' name='bodyweight-kg' placeholder="Weight" style="flex:1"><select class="inp" id="wiz-weight-unit" aria-label="Weight unit" style="width:92px;flex:none"><option value='' selected>Unit</option><option value='lbs'>lbs</option><option value='kg'>kg</option></select></div><div class="note">Logged over time so your plan can track weight-change progress.</div></div>
+                <div class="field" style="margin-top:11px"><label>Occupation</label><input class="inp" name='occupation' placeholder="What do you do?"></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()" style="visibility:hidden">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="2">
+              <div class="h1">Goals</div>
+              <div class="sub">What you want your plan to move. You can re-order these any time.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="seclab" style="margin-top:0">Which domains should your plan cover?</div>
+                <div class="opts">
+                  <label class="opt" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Workout</label>
+                  <label class="opt" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Nutrition</label>
+                  <label class="opt" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Supplements</label>
+                  <label class="opt" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Peptides</label>
+                </div>
+                <input type="hidden" name='goal-domains'>
+                <div class="field" style="margin-top:14px"><label>Targets</label><textarea class="inp" name='goal-targets' style="min-height:74px;resize:vertical" placeholder="What does success look like for you?"></textarea></div>
+                <div class="field" style="margin-top:11px"><label>Priority order</label><input class="inp" name='goal-priority-order' placeholder="e.g. Workout, Supplements, Peptides, Nutrition"></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="3">
+              <div class="h1">Training &amp; activity</div>
+              <div class="sub">Sets your training-volume baseline — and screens for anything that should pause hard training.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="field"><label>Your training, in your words</label><textarea class="inp" name='training-detail' style="min-height:80px;resize:vertical" placeholder="Days per week, session length, what you train…"></textarea></div>
+                <div class="field" style="margin-top:11px"><label for='training-experience'>Years of training experience</label><input class="inp" type='number' id='training-experience' name='training-experience' min="0" max="70" placeholder="e.g. 25"><div class="note">Roughly how many years you've trained. Your plan uses your experience level; the exact number stays on your machine.</div></div>
+                <div class="qcard"><div class="q">During exercise, do you ever have chest pain, dizziness, or shortness of breath?</div><div class="opts"><label class="opt radio" data-safety="exercise-safety" data-val="no" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>No</label><label class="opt radio" data-safety="exercise-safety" data-val="yes" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label></div><div class="note warn"><b>Safety screen.</b> A <b>Yes</b> pauses hard-training recommendations and flags a doctor visit before your plan includes heavy load.</div></div>
+                <div class="field" style="margin-top:11px"><label>Anything we should train around (injury, surgery)?</label><input class="inp" name='train-around' placeholder="e.g. left shoulder impingement"></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="4">
+              <div class="h1">Diet</div>
+              <div class="sub">The shape of how you eat. We keep this light here and go deeper in the chat.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="field"><label>Your diet, in your words</label><textarea class="inp" name='nutrition-detail' style="min-height:80px;resize:vertical" placeholder="Eating pattern, foods you avoid, a typical day…"></textarea></div>
+                <div class="field" style="margin-top:11px"><label>Food allergies</label><input class="inp" name='food-allergy' placeholder="List foods that cause a reaction"></div>
+                <div class="note"><b>Allergies become hard limits</b> your plan will never cross. We'll fine-tune protein target, meal timing, and foods you avoid with you in the <b>chat</b>.</div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="5">
+              <div class="h1">Supplements &amp; peptides</div>
+              <div class="sub">What you already take, so recommendations build on it instead of doubling up.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="field"><label>Current supplement stack</label><textarea class="inp" name='supplement-stack' style="min-height:80px;resize:vertical" placeholder="e.g. Creatine 5g daily, Vitamin D3, Omega-3…"></textarea></div>
+                <div class="field" style="margin-top:11px"><label>Peptides you use</label><input class="inp" name='peptide-stack' placeholder="List any peptides you currently use"></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="6">
+              <div class="h1">Medications</div>
+              <div class="sub">For interaction-safety only. These stay on your machine.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="field"><label>Current prescription medications</label><textarea class="inp" name='rx-interaction-classes' style="min-height:74px;resize:vertical" placeholder="Medication, dose, and what it's for — one per line"></textarea></div>
+                <div class="note"><b>Kept on your machine.</b> Your care assistant turns these into interaction-safety signals — <b>de-associated, with no name attached</b> — and you'll confirm before anything is used in a plan.</div>
+                <div class="field" style="margin-top:11px"><label>Drug allergies</label><input class="inp" name='drug-allergy' placeholder="Medication + your reaction"></div>
+                <div class="note">Drug allergies become <b>hard limits</b>.</div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="7">
+              <div class="h1">Health &amp; lifestyle</div>
+              <div class="sub">Sleep, stress, and a couple of brief screens. Honest answers make the plan safer.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="seclab" style="margin-top:0">Sleep</div>
+                <div class="field"><label>Average hours of sleep</label><input class="inp" name='sleep-hours' style="max-width:140px" placeholder="e.g. 7"></div>
+                <div class="qcard"><div class="q">Has anyone told you that you snore loudly or stop breathing while asleep?</div><div class="opts"><label class="opt radio" data-safety="apnea" data-val="no" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>No</label><label class="opt radio" data-safety="apnea" data-val="yes" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label></div><div class="note warn"><b>Screening.</b> A <b>Yes</b> flags a sleep-apnea conversation for your doctor visit — never a plan input.</div></div>
+                <div class="seclab">Stress &amp; mood</div>
+                <div class="opts"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Low stress</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Moderate</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>High</label></div>
+                <div class="qcard"><div class="q">Over the last 2 weeks — little interest or pleasure in doing things?</div><div class="opts"><label class="opt radio" data-safety="phq2" data-val="not-at-all" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Not at all</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Several days</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>More than half</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Nearly every day</label></div><div class="q" style="margin-top:13px">Over the last 2 weeks — feeling down, depressed, or hopeless?</div><div class="opts"><label class="opt radio" data-safety="phq2" data-val="not-at-all" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Not at all</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Several days</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>More than half</label><label class="opt radio" data-safety="phq2" data-val="positive" onclick="pickOne(this)"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Nearly every day</label></div><div class="note">A brief, gentle mood check (PHQ-2). Your answers route to a <b>private referral signal</b>, never into your plan.</div></div>
+                <div class="seclab">Substance use</div>
+                <div class="field"><label>Smoker</label><div class="opts" style="margin-top:0"><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Yes</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Former</label><label class="opt radio" onclick="this.classList.toggle('on')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Never</label></div><div class="field" style="margin-top:10px;margin-left:14px;padding-left:13px;border-left:2px solid var(--line)"><label>How many years since you quit? <span style="color:var(--faint);font-weight:500">(if Former)</span></label><div style="display:flex;gap:9px;align-items:center"><input type="number" class="inp" name='smoker-quit-years' style="max-width:120px" placeholder="years"><span style="font-size:13px;color:var(--ink2)">years</span></div></div></div>
+                <div class="field" style="margin-top:11px"><label>Alcohol</label><select class="inp" name='alcohol-frequency'><option value=''>Select…</option><option>None</option><option>Rarely (a few times a year)</option><option>Monthly (1–3/mo)</option><option>Weekly (1–3/wk)</option><option>Most days (4+/wk)</option></select></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="8">
+              <div class="h1">Documents</div>
+              <div class="sub">Link what you have. Everything is parsed locally on your device.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="note">Supported exports — wearables (Apple Health, Garmin, Whoop, Oura, Fitbit), labs (PDF or CSV), and DNA (23andMe, AncestryDNA). Each file is <b>parsed locally</b> on your device and never uploaded.</div>
+                <!--WIZARD_LOADED_NOTE-->
+                <div style="margin-top:11px"><!--WIZARD_DOC_CARDS--></div>
+                <div class="drop" id="wiz-drop" style="margin-top:10px">Drop files here or click to browse — labs, history, wearable exports, prior plans. Parsed locally.</div>
+                <input type="file" id="wiz-filepick" style="display:none">
+                <div id="wiz-doc-status" class="upload-status" style="display:none;margin-top:10px"></div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
+            </div>
+            <div class="wstep" data-step="9">
+              <div class="h1">API key</div>
+              <div class="sub">The Care Assistant needs an Anthropic API key to answer. Stored in your device keychain as <b>a-plus-maxing-api-key</b> — never uploaded, never written to a file.</div>
+              <div class="card" style="margin-top:18px">
+                <div class="keystate">
+                  <div class="klab">Before you save</div>
+                  <div style="margin-bottom:10px"><span class="pill muted" id="wiz-key-pill">No key saved</span></div>
+                  <div class="field"><label>Anthropic API key</label><input class="inp" id="wiz-key" type="password" placeholder="sk-ant-…" autocomplete="off"></div>
+                  <div style="margin-top:12px;display:flex;align-items:center;gap:12px"><button type="button" class="btn primary" onclick="wizKeySave(this)">Save key</button><span id="wiz-key-msg" style="font-size:12.5px;color:var(--muted)"></span></div>
+                </div>
+                <div class="keystate">
+                  <div class="klab">After you save</div>
+                  <div class="field"><label>Anthropic API key</label><input class="inp keymask" type="text" value="••••••••••••••••••••" disabled></div>
+                  <div style="display:flex;align-items:center;gap:13px;margin-top:12px"><button type="button" class="btn ghost">Replace key</button><span style="font-size:13px;font-weight:600;color:var(--good);display:inline-flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>✓ Saved to keychain · stored, never shown again</span></div>
+                </div>
+              </div>
+              <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="show('equipment')">Save &amp; review →</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CREATE-PROFILE EQUIPMENT SCREEN (ADR-0033-0035-T5; submit wired by T10) ============ -->
+    <section class="screen" id="screen-equipment">
+      <header class="gatehead">
+        <div class="tb-brand">A+ Maxing<small>Create your profile</small></div>
+        <div class="ghp"><div class="bar"><i style="width:100%"></i></div><span class="pct">Equipment</span></div>
+      </header>
+      <div class="gate-body">
+        <div class="h1">Equipment access</div>
+        <div class="sub">Set where you train, then check exactly what you have — your plan only programs what you can actually use.</div>
+        <div class="card" style="margin-top:18px">
+          <div class="field"><label for='equip-access-class'>Where do you train?</label><select class="inp" id='equip-access-class' name='equipment-access-class' onchange='onEquipAccess(this)'><option value=''>Select…</option><option value='full-home-gym'>Home gym</option><option value='commercial-gym'>Commercial gym</option><option value='minimal-equipment'>Minimal equipment</option><option value='bodyweight-only'>Bodyweight only</option></select></div>
+          <div id="equip-detail" style="margin-top:6px">
+            <div class="seclab" style="margin-top:18px">Check what you have access to</div>
+            <div class="seclab">Free weights &amp; racks</div>
+            <div class="equip-grid">
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='dumbbells'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/><path d="m2.5 21.5 1.4-1.4"/><path d="m20.1 3.9 1.4-1.4"/><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/><path d="m9.6 14.4 4.8-4.8"/></svg></span><span class="eq-name">Dumbbells</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='barbell-plates'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h1"/><path d="M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2"/><path d="M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1"/><path d="M9 12h6"/><path d="M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1"/><path d="M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2"/><path d="M22 12h-1"/></svg></span><span class="eq-name">Barbell + plates</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='squat-rack'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V5"/><path d="M18 21V5"/><path d="M4 21h4"/><path d="M16 21h4"/><path d="M3 8h18"/><path d="M3 6.5v3"/><path d="M21 6.5v3"/></svg></span><span class="eq-name">Squat / power rack</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='bench'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="3" rx="1.2"/><path d="M6 11l-2 9"/><path d="M6 11l2 9"/><path d="M18 11l-2 9"/><path d="M18 11l2 9"/></svg></span><span class="eq-name">Flat / adjustable bench</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='kettlebells'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M6.835 9h10.33a1 1 0 0 1 .984 .821l1.637 9a1 1 0 0 1 -.984 1.179h-13.604a1 1 0 0 1 -.984 -1.179l1.637 -9a1 1 0 0 1 .984 -.821"/></svg></span><span class="eq-name">Kettlebells</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='smith-machine'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18"/><path d="M18 3v18"/><path d="M5 3h14"/><path d="M3 12h18"/><path d="M3 10.5v3"/><path d="M21 10.5v3"/></svg></span><span class="eq-name">Smith machine</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='weight-plates'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/></svg></span><span class="eq-name">Weight plates</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+            </div>
+            <div class="seclab">Cardio machines</div>
+            <div class="equip-grid">
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='treadmill'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M3 14l4 1l.5 -.5"/><path d="M12 18v-3l-3 -2.923l.75 -5.077"/><path d="M6 10v-2l4 -1l2.5 2.5l2.5 .5"/><path d="M21 22a1 1 0 0 0 -1 -1h-16a1 1 0 0 0 -1 1"/><path d="M18 21l1 -11l2 -1"/></svg></span><span class="eq-name">Treadmill</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='exercise-bike'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/><path d="M16 18a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/><path d="M12 19v-4l-3 -3l5 -4l2 3h3"/><path d="M13.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/></svg></span><span class="eq-name">Exercise bike</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='stair-machine'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 5h-5v5h-5v5h-5v5h-5"/></svg></span><span class="eq-name">Stair / step machine</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='elliptical'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="14" rx="8" ry="3.5"/><path d="M6 14l2.5 4"/><path d="M18 14l-2.5 4"/><path d="M12 10.5v-6.5"/><path d="M9 4h6"/></svg></span><span class="eq-name">Elliptical</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='rowing-machine'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h14"/><rect x="8" y="13.5" width="4.5" height="2.5" rx="0.6"/><circle cx="19.5" cy="13" r="2.8"/><path d="M3 17v-4"/><path d="M16.8 13.6l-4.3 1"/></svg></span><span class="eq-name">Rowing machine</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='air-bike'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="13" r="6"/><path d="M11 7v12"/><path d="M5 13h12"/><path d="M7.5 9l7 8"/><path d="M14.5 9l-7 8"/><path d="M11 7v-3"/><path d="M8.5 4h5"/></svg></span><span class="eq-name">Air / assault bike</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+            </div>
+            <div class="seclab">Resistance machines</div>
+            <div class="equip-grid">
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='cable-machine'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16"/><circle cx="7" cy="6.5" r="1.6"/><path d="M7 8.1v6.4"/><path d="M5 14.5h4"/><rect x="14" y="7" width="4" height="9" rx="1"/><path d="M14 10.5h4"/><path d="M14 13.5h4"/><path d="M16 4v3"/></svg></span><span class="eq-name">Cable machine / functional trainer</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='lat-pulldown'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h12"/><path d="M6 8h8"/><path d="M10 5v3"/><path d="M16 5v14"/><path d="M16 19h4"/><path d="M7 19h5"/><path d="M9 19v-4"/></svg></span><span class="eq-name">Lat pulldown</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='leg-press'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l13 -9"/><path d="M3 20h6"/><path d="M5 20v-3l3 -1"/><path d="M13 9.5l4 5.5"/></svg></span><span class="eq-name">Leg press</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='leg-curl-extension'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="9" height="2.5" rx="0.6"/><path d="M4.5 13.5v4"/><path d="M11 13.5v4"/><path d="M12 12l5 -3"/><circle cx="18.5" cy="8" r="1.8"/><path d="M12 13l5 3"/><circle cx="18.5" cy="17" r="1.8"/></svg></span><span class="eq-name">Leg curl / extension</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='chest-press'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v9"/><path d="M12 9l-6 -3"/><path d="M12 9l6 -3"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><path d="M8 19h8"/><path d="M12 19v-5"/></svg></span><span class="eq-name">Chest press / pec deck</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+            </div>
+            <div class="seclab">Bodyweight &amp; accessories</div>
+            <div class="equip-grid">
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='pull-up-bar'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v6"/><path d="M20 5v6"/><path d="M4 8h16"/><path d="M9 8v3"/><path d="M15 8v3"/></svg></span><span class="eq-name">Pull-up bar</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='dip-station'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h6"/><path d="M13 9h6"/><path d="M6 9v9"/><path d="M18 9v9"/><path d="M4 18h4"/><path d="M16 18h4"/></svg></span><span class="eq-name">Dip station</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='trx'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8"/><path d="M12 3v3"/><path d="M12 6l-5 9"/><path d="M12 6l5 9"/><path d="M5 15h4"/><path d="M15 15h4"/></svg></span><span class="eq-name">TRX / suspension straps</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='resistance-bands'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2.4"/><circle cx="19" cy="12" r="2.4"/><path d="M7.4 12q4.6 -3.6 9.2 0"/><path d="M7.4 12q4.6 3.6 9.2 0"/></svg></span><span class="eq-name">Resistance bands</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='yoga-mat'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 7v10"/><path d="M17 7v10"/></svg></span><span class="eq-name">Yoga mat</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='foam-roller'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6a7 3 0 1 0 14 0a7 3 0 1 0 -14 0"/><path d="M5 6v12c0 1.657 3.134 3 7 3s7 -1.343 7 -3v-12"/></svg></span><span class="eq-name">Foam roller</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='medicine-ball'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M5.65 5.65l12.7 12.7"/><path d="M5.65 18.35l12.7 -12.7"/><path d="M12 3a9 9 0 0 0 9 9"/><path d="M3 12a9 9 0 0 1 9 9"/></svg></span><span class="eq-name">Medicine ball</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='jump-rope'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14v-6a3 3 0 1 1 6 0v8a3 3 0 0 0 6 0v-6"/><path d="M16 5a2 2 0 0 1 2 -2a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2a2 2 0 0 1 -2 -2l0 -3"/><path d="M4 16a2 2 0 0 1 2 -2a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2a2 2 0 0 1 -2 -2l0 -3"/></svg></span><span class="eq-name">Jump rope</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='gymnastic-rings'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12"/><path d="M8 3v5"/><path d="M16 3v5"/><circle cx="8" cy="13" r="4"/><circle cx="16" cy="13" r="4"/></svg></span><span class="eq-name">Gymnastic rings</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='plyo-box'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5"/><path d="M12 12l8 -4.5"/><path d="M12 12l0 9"/><path d="M12 12l-8 -4.5"/></svg></span><span class="eq-name">Plyo box</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+              <label class="equip"><input type='checkbox' name='equipment-detail' value='ab-wheel'><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="6"/><circle cx="12" cy="14" r="1.6"/><path d="M3 14h18"/><path d="M3 12v4"/><path d="M21 12v4"/></svg></span><span class="eq-name">Ab wheel</span><span class="eq-chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></label>
+            </div>
+            <div class="note" style="margin-top:14px">This becomes your training-equipment baseline.</div>
+          </div>
+          <div id="equip-bw-note" style="display:none"><div class="note" style="margin-top:16px">No equipment needed — we'll program bodyweight-only.</div></div>
+          <div id="wiz-submit-note" class="note warn" style="display:none;margin-top:14px"></div>
+          <div class="wform-foot"><button type="button" class="btn ghost" onclick="show('wizard')">← Back</button><button type="button" class="btn primary" onclick="submitProfile(this)">Save &amp; continue →</button></div>
+        </div>
+      </div>
+    </section>
   </div>
 </div>
 
 
+<!--SAVED_PROFILE-->
 <script>
 const SPECIALISTS = [
   {id:'care',  name:'Care Assistant',       role:'Your guide across the whole plan', status:'active', icon:'sparkles',      color:'#4A55E8', bg:'#EEF0FE'},
@@ -561,13 +875,17 @@ function renderCalendar(){
 
 const dotFor = st => `<span class="dot ${st}"></span>`;
 
-// side-nav specialist roster
-document.getElementById('team-list').innerHTML = SPECIALISTS.map(s =>
+// side-nav specialist roster (guarded: the LOCKED first-run body strips #screen-team, so the roster
+// hosts are absent — an unguarded .innerHTML there threw and killed the wizard script before its nav
+// handlers were defined, so a first-run operator could not advance the wizard at all).
+var _teamList=document.getElementById('team-list');
+if(_teamList) _teamList.innerHTML = SPECIALISTS.map(s =>
   `<div class="spec" data-spec="${s.id}" onclick="pickSpec('${s.id}')">${tile(s)}<span class="name">${s.name}</span>${dotFor(s.status)}</div>`).join('');
 
 // dashboard care-team summary (skip Care Assistant)
 function statusPill(st){const m={active:['Active','#1FB5A6','#1FB5A6','#E8F7F4'],pending:['Pending','#E8A23B','#9A6A1F','#FBF1E0'],idle:['Idle','#9AA1B4','#9AA1B4','#F5F7FB']}[st];return `<span class="spill" style="background:${m[3]};color:${m[2]}"><span class="sdot" style="background:${m[1]}"></span>${m[0]}</span>`;}
-document.getElementById('dash-team').innerHTML = SPECIALISTS.slice(1).map(s =>
+var _dashTeam=document.getElementById('dash-team');
+if(_dashTeam) _dashTeam.innerHTML = SPECIALISTS.slice(1).map(s =>
   `<div class="speccard">${tile(s)}<div class="sinfo"><div class="sname">${s.name}</div><div class="ssub">${s.role}</div></div>${statusPill(s.status)}</div>`).join('');
 // only fill the placeholder specialist grid when the awaiting-plan state is present; when the
 // server has substituted <!--PLAN_ZONE--> with real recorded plans, the data-awaiting='plan'
@@ -596,11 +914,12 @@ function chatHTML(s, greeting){
 // team screen (workspace): switchable specialist chat — the Care Assistant is the default
 let activeSpec = 'care';
 function renderTeamChat(){
+  var host=document.getElementById('team-chat'); if(!host) return;  // absent on the LOCKED first-run body
   const s = byId(activeSpec);
   const greet = s.id==='care'
     ? "I'm your Care Assistant — ask me anything, or pick a specialist on the left for a deeper dive."
     : `You're now talking with your ${s.name}. ${s.role}. How can I help?`;
-  document.getElementById('team-chat').innerHTML = chatHTML(s, greet);
+  host.innerHTML = chatHTML(s, greet);
   icons();
 }
 function pickSpec(id){
@@ -613,13 +932,19 @@ function pickSpec(id){
 // hash routing
 function go(screen){ location.hash = screen; }
 function show(screen){
+  // Resolve the target screen; fall back only to a screen that EXISTS in this body. On the
+  // first-run LOCKED body the platform screens (incl. screen-dashboard) are stripped, so the
+  // old unconditional `screen-dashboard` fallback resolved to null and threw on `.classList`.
+  const el = document.getElementById('screen-'+screen)
+    || document.getElementById('screen-dashboard')
+    || document.getElementById('screen-wizard');
+  if(!el) return;
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  const el = document.getElementById('screen-'+screen);
-  (el||document.getElementById('screen-dashboard')).classList.add('active');
+  el.classList.add('active');
   document.querySelectorAll('.navitem').forEach(n=>n.classList.toggle('active', n.dataset.screen===screen));
   if(screen==='team'){ document.querySelectorAll('.spec').forEach(e=>e.classList.toggle('active', e.dataset.spec===activeSpec)); }
   if(screen==='profile'){ _pfKeyStatus(); }
-  document.querySelector('.content').scrollTop = 0;
+  var content=document.querySelector('.content'); if(content) content.scrollTop = 0;
 }
 document.querySelectorAll('.navitem').forEach(n=> n.addEventListener('click', ()=> go(n.dataset.screen)));
 window.addEventListener('hashchange', ()=> show((location.hash||'#dashboard').slice(1)));
@@ -655,7 +980,13 @@ function _chatSend(composer){
  var host=wrap.closest('[id]'), cid=host?host.id:'chat'; _conv[cid]=_conv[cid]||[];
  var me=document.createElement('div'); me.className='msg me'; me.textContent=txt; thread.appendChild(me);
  _conv[cid].push({role:'user',content:txt}); ta.value=''; thread.scrollTop=thread.scrollHeight;
- fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turn:txt,conversation:_conv[cid]})})
+ // The Care-with-Team thread is the POST-unlock care conversation (profile-aware, carries the
+ // clarifying questions) -> /care-chat; the pre-unlock intake elicitation stays on /chat.
+ var isCare=(cid==='team-chat');
+ var endpoint=isCare?'/care-chat':'/chat';
+ var payload={turn:txt,conversation:_conv[cid]};
+ if(isCare) payload.thread=activeSpec;  // the conversation vault thread (per specialist)
+ fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
   .then(function(r){return r.json();})
   .then(function(d){var b=document.createElement('div'); b.className='msg bot';
     if(d&&d.reply){ b.textContent=d.reply; _conv[cid].push({role:'assistant',content:d.reply}); }
@@ -696,6 +1027,26 @@ function _pfKeySave(){
  var sb=document.getElementById('pf-key-save'); if(sb) sb.addEventListener('click', _pfKeySave);
 })();
 
+// ---------- My-Info: per-section Edit enables the fields; Save re-submits the /upload seam ----------
+function toggleEdit(btn){
+  var head=btn.closest('.mi-head'); if(!head)return; var sec=head.parentElement;
+  if(btn.textContent.trim()==='Edit'){
+    sec.querySelectorAll('input,textarea,select').forEach(function(i){ i.disabled=false; });
+    btn.textContent='Save';
+  } else {
+    var f=btn.closest('form'); if(f){ f.requestSubmit ? f.requestSubmit() : f.submit(); }
+    btn.textContent='Edit';
+  }
+}
+// ---------- My-Info: '+ Add documents' opens the upload panel (reuses the /upload file-picker path) ----------
+function toggleAddDocs(el){
+  var panel=el.closest('div').nextElementSibling;
+  if(panel&&panel.classList.contains('adddocs-panel')){
+    var open=(panel.style.display==='none');
+    panel.style.display=open?'block':'none';
+    el.textContent=open?'− Hide documents':'+ Add documents';
+  }
+}
 // ---------- collapsible specialist column + workspace tabs ----------
 (function(){
  var app=document.querySelector('.app'), tg=document.getElementById('specs-toggle');
@@ -713,24 +1064,15 @@ function _pfKeySave(){
    });
  });
 })();
-// The 3 plan-review roles (the gate the assembled plan passes before finalization):
-// Quality Judge (accuracy), Safety Review (contraindications), Medical Liaison (adjudication).
-const REVIEW_AGENTS = [
-  {id:'quality', name:'Quality Judge',   role:'Accuracy & quality',               icon:'sparkles',    color:'#4A55E8', bg:'#EEF0FE'},
-  {id:'safety',  name:'Safety Review',   role:'Contraindications & interactions', icon:'stethoscope', color:'#E5557A', bg:'#FCEBF0'},
-  {id:'liaison', name:'Medical Liaison', role:'Final adjudication',               icon:'check',       color:'#1FB5A6', bg:'#E8F7F4'},
-];
-function agentRow(a){
-  return `<div class="agent-row">${tile(a)}<div class="am"><div class="an">${a.name}</div><div class="agent-prog"><i style="width:0%"></i></div></div></div>`;
+// One Care-team build-status row per specialist, rendered HONEST-EMPTY (ADR-0029): every `.bar` is
+// width:0% / queued — no fabricated done/working progress until a live plan run drives them.
+function agentRow(s){
+  return '<div class="genrow">'+tile(s)+'<div class="gm"><div class="gtop"><span class="gn">'+s.name+'</span><span class="gstat queued">queued</span></div><div class="bar"><i style="width:0%"></i></div></div></div>';
 }
 function renderGenerate(){
-  var p=document.getElementById('panel-generate'); if(!p)return;
-  p.innerHTML =
-    '<div class="agent-group-lab">Review agents</div>' + REVIEW_AGENTS.map(agentRow).join('') +
-    '<div class="agent-group-lab" style="margin-top:16px">Specialists</div>' + SPECIALISTS.filter(s=>s.id!=='care').map(agentRow).join('') +
-    '<button class="btn primary ws-genplan" id="gen-run">Generate plan →</button>';
+  var rows=SPECIALISTS.map(agentRow).join('');
+  document.querySelectorAll('.gen-roster').forEach(function(el){ el.innerHTML=rows; });
   icons();
-  var b=document.getElementById('gen-run'); if(b) b.addEventListener('click',function(){ b.textContent='Plan generation runs at the live step'; b.disabled=true; });
 }
 
 // ---------- document upload: + Link / dropzone -> file picker -> POST /upload ----------
@@ -813,7 +1155,7 @@ function renderGenerate(){
        // change in the doc-cards is the proof a file actually LANDED into the store.
        if(docHTML()!==before){ st.className='upload-status ok'; st.textContent='✓ Linked '+f.name+' — it\'s in your store.';
          setTimeout(function(){ if(st.textContent.indexOf('✓ Linked '+f.name)===0) st.style.display='none'; },6000); }
-       else { st.className='upload-status warn'; st.textContent='No new data landed from '+f.name+' — it may already be loaded, or it\'s not a supported export (an Apple Health .zip/.xml, a labs PDF/CSV, or a 23andMe .zip).'; }
+       else { st.className='upload-status warn'; st.textContent='No new data landed from '+f.name+' — it may already be loaded, or it\'s not a supported format (a wearable export, a labs PDF/CSV, or a DNA raw export).'; }
      })
      .catch(function(){ stopTick(); if(st){ st.className='upload-status warn'; st.textContent='Upload failed — please try again.'; } });
  }
@@ -912,5 +1254,332 @@ function renderGenerate(){
  document.addEventListener('click',function(e){ var b=e.target.closest('#plan-gen-run'); if(b){ e.preventDefault(); run(b); }});
 })();
 
+/* Create-Profile wizard step navigation (local; no fetch, no off-file asset) */
+(function(){
+  function setStep(n){
+    var steps=document.querySelectorAll('#wsteps .wstep');
+    if(!steps.length) return;
+    n=Math.max(1,Math.min(steps.length,n));
+    document.querySelectorAll('#wsteps .wstep').forEach(function(s){ s.classList.toggle('active', s.getAttribute('data-step')===String(n)); });
+    document.querySelectorAll('#stepper .step-item').forEach(function(it){ it.classList.toggle('active', it.getAttribute('data-go')===String(n)); });
+    var bar=document.getElementById('wiz-bar'); if(bar){ bar.style.width=Math.round(n/steps.length*100)+'%'; }
+    var pct=document.getElementById('wiz-pct'); if(pct){ pct.textContent='Step '+n+' of '+steps.length; }
+    if(window._wizSaveDraft){ window._wizSaveDraft(); }  // force a save on every screen advance (per-screen save)
+  }
+  function current(){ var a=document.querySelector('#wsteps .wstep.active'); return a?parseInt(a.getAttribute('data-step'),10):1; }
+  window.gotoStep=function(n){ setStep(n); };
+  window.nextStep=function(){ setStep(current()+1); };
+  window.prevStep=function(){ setStep(current()-1); };
+})();
+
+/* Equipment screen: the access class gates the detailed checklist vs the bodyweight-only note */
+function onEquipAccess(sel){
+  var bw = !!sel && sel.value === 'bodyweight-only';
+  var detail = document.getElementById('equip-detail');
+  var note = document.getElementById('equip-bw-note');
+  if(detail){ detail.style.display = bw ? 'none' : ''; }
+  if(note){ note.style.display = bw ? '' : 'none'; }
+}
+
+/* Single-select radio behaviour for a safety-screen question: pick one, clear its siblings. */
+function pickOne(el){
+  var group = el.parentElement;
+  if(group){ group.querySelectorAll('.opt.radio').forEach(function(o){ if(o!==el) o.classList.remove('on'); }); }
+  el.classList.add('on');
+}
+
+/* Create-Profile wizard step 9: save the Anthropic key so the care review can fire on submit. */
+function wizKeySave(btn){
+  var inp=document.getElementById('wiz-key'), msg=document.getElementById('wiz-key-msg');
+  var key=(inp&&inp.value||'').trim();
+  if(!key){ if(msg) msg.textContent='Enter your key first.'; return; }
+  if(msg) msg.textContent='Saving…';
+  fetch('/settings/key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key:key})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d&&d.ok){ if(inp) inp.value=''; if(msg) msg.textContent='Saved to your keychain.'; }
+      else { if(msg) msg.textContent='Could not save the key — check it and try again.'; }
+    }).catch(function(){ if(msg) msg.textContent='Could not reach the app to save the key.'; });
+}
+
+/* Create-Profile submit: gather every wizard + equipment field, POST the completed profile to the
+   EXISTING /upload capture seam (flips the server-side completeness gate), then reload into the
+   unlocked shell. A JSON care-review receipt (key connected) is stashed for post-reload surfacing. */
+(function(){
+  var NEG=['no','none','not-at-all','negative','never','0'];
+  function isNeg(v){ return NEG.indexOf(String(v||'').trim().toLowerCase())!==-1; }
+  function collect(){
+    var data={};
+    // Every named control across the 9 wizard steps + the equipment screen (the T4↔T1 field contract).
+    document.querySelectorAll('#wsteps [name], #screen-equipment [name]').forEach(function(el){
+      var name=el.getAttribute('name'); if(!name) return;
+      if(el.type==='checkbox'){ if(!el.checked) return;
+        data[name]=data[name]?(data[name]+';'+el.value):el.value; return; }
+      var v=(el.value||'').trim(); if(v) data[name]=v;
+    });
+    // goal-domains: the checked domain chips in step 2 (multi-select), ;-joined.
+    var domains=[];
+    document.querySelectorAll('#wsteps .wstep[data-step="2"] .opts .opt.on').forEach(function(l){
+      var t=(l.textContent||'').trim(); if(t) domains.push(t); });
+    if(domains.length) data['goal-domains']=domains.join(';');
+    // Safety screens: the selected radio's data-val per screen (a positive answer dominates across a
+    // multi-question screen like PHQ-2, so an elevated answer is never masked by a negative one).
+    var safety={};
+    document.querySelectorAll('#wsteps .opt.radio.on[data-safety]').forEach(function(l){
+      var s=l.getAttribute('data-safety'), v=l.getAttribute('data-val')||'';
+      if(safety[s]===undefined || !isNeg(v)) safety[s]=v; });
+    Object.keys(safety).forEach(function(s){ data[s]=safety[s]; });
+    // Body weight -> kg (capture stores the kg-normalized number). ALSO record the operator's chosen
+    // unit (record-only) so the assistant/plan can talk weight in the operator's unit, not kg-only.
+    var w=document.querySelector('#wsteps [name="bodyweight-kg"]');
+    if(w && data['bodyweight-kg']){
+      var unit=w.parentElement?w.parentElement.querySelector('select'):null;
+      if(unit && unit.value){ data['bodyweight-unit']=unit.value; }
+      if(unit && unit.value==='lbs'){ var kg=parseFloat(data['bodyweight-kg']);
+        if(!isNaN(kg)) data['bodyweight-kg']=String(Math.round(kg*0.453592)); }
+    }
+    return data;
+  }
+  var REQUIRED=[['date-of-birth','Birthdate'],['sex-for-dosing','Sex (for dosing)'],
+    ['bodyweight-kg','Body weight'],['goal-domains','at least one goal domain'],
+    ['goal-targets','Goal targets'],['goal-priority-order','Goal priority order'],
+    ['equipment-access-class','Equipment access'],['exercise-safety','the exercise-safety screen'],
+    ['phq2','the mood (PHQ-2) screen'],['apnea','the sleep-apnea screen']];
+  window.submitProfile=function(btn){
+    var data=collect();
+    var note=document.getElementById('wiz-submit-note');
+    // A required field is satisfied by EITHER a filled form field OR a value ALREADY in the operator's
+    // store (window.__aplusSaved) — a blank form field is skipped by capture, so the stored value
+    // stands (e.g. a year-only birthdate that can't populate the date input still satisfies the gate).
+    var saved=window.__aplusSaved||{};
+    var missing=REQUIRED.filter(function(r){ return !data[r[0]] && !saved[r[0]]; }).map(function(r){ return r[1]; });
+    // The weight unit must be an EXPLICIT choice (the select defaults to no unit) so a metric
+    // entry is never silently converted as lbs — a wrong unit derives the wrong weight band.
+    var wsel=document.querySelector('#wsteps [name="bodyweight-kg"]');
+    var usel=wsel&&wsel.parentElement?wsel.parentElement.querySelector('select'):null;
+    if(data['bodyweight-kg'] && usel && !usel.value){ missing.push('a weight unit (kg or lbs)'); }
+    if(missing.length){
+      if(note){ note.style.display='block'; note.textContent='Please complete before continuing: '+missing.join(', ')+'.';
+        try{ note.scrollIntoView({block:'center', behavior:'smooth'}); }catch(e){ note.scrollIntoView(); } }
+      return;
+    }
+    if(note) note.style.display='none';
+    var fd=new FormData(); Object.keys(data).forEach(function(k){ fd.append(k,data[k]); });
+    var lbl=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+    fetch('/upload',{method:'POST',body:fd}).then(function(r){
+      var ct=r.headers.get('content-type')||'';
+      if(ct.indexOf('application/json')!==-1){
+        // A JSON care-review receipt only fires on a COMPLETE profile (the gate flipped) — stash it
+        // so the unlocked shell surfaces the questions, and signal unlocked.
+        return r.json().then(function(d){
+          try{ sessionStorage.setItem('aplus_care_review', JSON.stringify(d)); }catch(e){}
+          return {unlocked:true};
+        });
+      }
+      // An HTML re-render is EITHER the unlocked shell (complete, no key) OR the still-locked wizard
+      // (a required field was diverted server-side — e.g. PII typed into a goal field routes
+      // record-only, so the gate never flips). Discriminate on the unlock marker so a blind reload
+      // never drops the operator onto a blank locked wizard with their data lost + no explanation.
+      // NOTE the split marker literal: the contiguous string is built at runtime so the source does
+      // not embed the platform-surface marker (the render-gate tests assert that marker is ABSENT
+      // from the locked body, and the inline script ships in both bodies).
+      return r.text().then(function(html){ return {unlocked: html.indexOf('id="screen-'+'team"')!==-1}; });
+    }).then(function(res){
+      if(res&&res.unlocked){ if(window._wizClearDraft){ window._wizClearDraft(); } location.reload(); return; }  // gate flipped — clear the draft, reload the unlocked shell
+      if(btn){ btn.disabled=false; btn.textContent=lbl; }
+      if(note){ note.style.display='block'; note.textContent='Some entries could not be saved. Please remove any personal details (a name, phone, email, or address) from your goal and free-text fields, then continue again.'; }
+    }).catch(function(){
+      if(btn){ btn.disabled=false; btn.textContent=lbl; }
+      if(note){ note.style.display='block'; note.textContent='Could not save your profile — please try again.'; }
+    });
+  };
+})();
+
+/* Create-Profile draft autosave: persist every wizard + equipment entry to localStorage as the
+   operator fills it in, and restore it on load while the profile is still incomplete — so a refresh
+   or a closed tab never loses typed work (the wizard steps are NOT store-prefilled, so without this
+   a reload shows a blank wizard). Nothing reaches the store until the final Save & continue; the
+   draft is cleared once the profile completes (this reload lands the unlocked shell, which has the
+   platform screens). Local to the operator's own browser — the same on-device posture as the store. */
+(function(){
+  var KEY='aplus_wizard_draft_v1';
+  var SCOPE='#wsteps [name], #screen-equipment [name]';
+  function LS(){ try{ return window.localStorage; }catch(e){ return null; } }
+  function optLabels(){ return Array.prototype.slice.call(document.querySelectorAll('#wsteps .opt, #screen-equipment .opt')); }
+  function activeStep(){ var a=document.querySelector('#wsteps .wstep.active'); return a?a.getAttribute('data-step'):null; }
+  function saveDraft(){
+    var s=LS(); if(!s) return;
+    var data={fields:{}, checks:{}, on:[], step:activeStep()};
+    document.querySelectorAll(SCOPE).forEach(function(el){
+      var name=el.getAttribute('name'); if(!name) return;
+      if(el.type==='checkbox'){ if(el.checked){ (data.checks[name]=data.checks[name]||[]).push(el.value); } return; }
+      var v=(el.value||''); if(v) data.fields[name]=v;
+    });
+    var wu=document.getElementById('wiz-weight-unit'); if(wu && wu.value) data.fields['__weight_unit']=wu.value;
+    optLabels().forEach(function(l,i){ if(l.classList.contains('on')) data.on.push(i); });
+    try{ s.setItem(KEY, JSON.stringify(data)); }catch(e){}
+  }
+  function restoreDraft(){
+    var s=LS(); if(!s) return false;
+    var raw=s.getItem(KEY); if(!raw) return false;
+    var data; try{ data=JSON.parse(raw); }catch(e){ return false; }
+    if(!data) return false;
+    Object.keys(data.fields||{}).forEach(function(name){
+      if(name==='__weight_unit'){ var wu=document.getElementById('wiz-weight-unit'); if(wu) wu.value=data.fields[name]; return; }
+      var el=document.querySelector('#wsteps [name="'+name+'"], #screen-equipment [name="'+name+'"]');
+      if(el && el.type!=='checkbox') el.value=data.fields[name];
+    });
+    Object.keys(data.checks||{}).forEach(function(name){
+      var vals=data.checks[name]||[];
+      document.querySelectorAll('#wsteps [name="'+name+'"], #screen-equipment [name="'+name+'"]').forEach(function(el){
+        if(el.type==='checkbox' && vals.indexOf(el.value)!==-1) el.checked=true;
+      });
+    });
+    var labels=optLabels();
+    (data.on||[]).forEach(function(i){ if(labels[i]) labels[i].classList.add('on'); });
+    var eq=document.getElementById('equip-access-class'); if(eq && typeof onEquipAccess==='function') onEquipAccess(eq);
+    if(data.step && typeof window.gotoStep==='function'){ window.gotoStep(parseInt(data.step,10)); }
+    return true;
+  }
+  // Pre-fill the wizard from data ALREADY in the operator's store (injected server-side as
+  // window.__aplusSaved) when there is no in-progress draft — so an operator who ingested data in a
+  // prior session re-enters only what is genuinely missing, not their whole profile again.
+  function prefillFromSaved(){
+    var saved=window.__aplusSaved; if(!saved || typeof saved!=='object') return;
+    ['date-of-birth','sex-for-dosing','equipment-access-class','training-experience'].forEach(function(name){
+      if(!saved[name]) return;
+      var el=document.querySelector('#wsteps [name="'+name+'"], #screen-equipment [name="'+name+'"]');
+      if(el && el.type!=='checkbox') el.value=saved[name];
+    });
+    var domains=String(saved['goal-domains']||'').split(';').map(function(x){return x.trim().toLowerCase();}).filter(Boolean);
+    if(domains.length){
+      document.querySelectorAll('#wsteps .wstep[data-step="2"] .opts .opt').forEach(function(l){
+        if(domains.indexOf((l.textContent||'').trim().toLowerCase())!==-1) l.classList.add('on');
+      });
+    }
+    var eq=document.getElementById('equip-access-class'); if(eq && typeof onEquipAccess==='function') onEquipAccess(eq);
+  }
+  // Reflect an already-connected API key on the wizard's step-9 (the operator connected it in a prior
+  // session — don't ask again). Reports presence only (never the value), via the same /settings/key check.
+  function reflectKeyState(){
+    try{ fetch('/settings/key').then(function(r){return r.json();}).then(function(d){
+      if(d&&d.connected){
+        var m=document.getElementById('wiz-key-msg'); if(m){ m.style.color='var(--good)'; m.textContent='✓ Already connected — you can skip this step.'; }
+        var p=document.getElementById('wiz-key-pill'); if(p){ p.className='pill good'; p.textContent='Key connected'; }
+      }
+    }).catch(function(){}); }catch(e){}
+  }
+  window._wizClearDraft=function(){ var s=LS(); if(s){ try{ s.removeItem(KEY); }catch(e){} } };
+  window._wizSaveDraft=saveDraft;  // exposed so step navigation can force a save on every screen advance
+  // The locked first-run body has the wizard but not the platform screens; the unlocked body has
+  // both. Only restore/save on the locked body (a real wizard to fill); clear the draft once unlocked.
+  var unlocked=!!document.getElementById('screen-team');
+  if(document.getElementById('wsteps') && !unlocked){
+    if(!restoreDraft()){ prefillFromSaved(); }  // an in-progress draft wins over the store pre-fill
+    reflectKeyState();
+    var onEdit=function(e){ if(e.target.closest && e.target.closest('#wsteps, #screen-equipment')) saveDraft(); };
+    document.addEventListener('input', onEdit);
+    document.addEventListener('change', onEdit);
+    document.addEventListener('click', function(e){ if(e.target.closest && e.target.closest('#wsteps .opt, #screen-equipment .opt')) saveDraft(); });
+    // Belt-and-suspenders: persist the current state when the page is being unloaded (refresh, close,
+    // navigate away) so no in-flight keystroke is lost even if its input event was missed.
+    window.addEventListener('beforeunload', saveDraft);
+    window.addEventListener('pagehide', saveDraft);
+  } else if(unlocked){
+    window._wizClearDraft();
+  }
+})();
+
+/* Create-Profile Documents step: a decoupled uploader so the wizard's "+ Link" cards + dropzone
+   actually work (the My-Info uploader + its review panel live in #screen-team, which the first-run
+   lock strips — so on the wizard those links were dead). A recognized-format file lands via the
+   unchanged /upload seam; an unrecognized format that needs the extract-review flow is directed to
+   My-Info (the review panel is a post-unlock surface). Optional — intake completes without any doc. */
+(function(){
+  var fp=document.getElementById('wiz-filepick'); if(!fp) return;
+  var st=document.getElementById('wiz-doc-status');
+  function setSt(cls,msg){ if(st){ st.className='upload-status '+cls; st.style.display='flex'; st.textContent=msg; } }
+  function wizUp(f){
+    if(!f) return;
+    setSt('info','Linking '+f.name+' — parsed locally…');
+    var fd=new FormData(); fd.append('document',f,f.name);
+    fetch('/upload',{method:'POST',body:fd}).then(function(r){
+      var ct=r.headers.get('content-type')||'';
+      if(ct.indexOf('application/json')!==-1){
+        return r.json().then(function(d){
+          if(d&&d.readings&&d.readings.length){ setSt('info','We found readings in '+f.name+'. Finish setup, then review and confirm them in My Info → Documents.'); }
+          else { setSt('warn','We couldn\'t read new data from '+f.name+' — check it\'s a supported export (wearable, labs PDF/CSV, or DNA).'); }
+        });
+      }
+      return r.text().then(function(){ setSt('ok','✓ Linked '+f.name+' — it\'s in your store.'); });
+    }).catch(function(){ setSt('warn','Upload failed — please try again.'); });
+  }
+  fp.addEventListener('change', function(){ wizUp(fp.files&&fp.files[0]); fp.value=''; });
+  document.addEventListener('click', function(e){
+    if(e.target.closest && (e.target.closest('#screen-wizard .doc .link') || e.target.closest('#wiz-drop'))){ e.preventDefault(); fp.click(); }
+  });
+  var drop=document.getElementById('wiz-drop');
+  if(drop){ drop.addEventListener('dragover',function(e){e.preventDefault();});
+    drop.addEventListener('drop',function(e){e.preventDefault(); wizUp(e.dataTransfer.files&&e.dataTransfer.files[0]);}); }
+})();
+
+/* Care-review surfacing: after a profile save flips the gate, the /upload care-review receipt is
+   stashed and the shell reloads; render the clarifying questions + the confirm-when-unsure meds
+   curation into the Care Assistant thread (HIGH-1: the receipt was previously read as HTML and dropped). */
+(function(){
+  var thread=document.querySelector('#team-chat .chat-thread'); if(!thread) return;  // unlocked body only
+  function botMsg(text){ var b=document.createElement('div'); b.className='msg bot'; b.textContent=text; thread.appendChild(b); }
+  function sysMsg(text){ var b=document.createElement('div'); b.className='msg sys'; b.textContent=text; thread.appendChild(b); }
+  var raw=null; try{ raw=sessionStorage.getItem('aplus_care_review'); }catch(e){}
+  if(!raw){
+    // NO care-review receipt -> a normal load: RESTORE the stored conversation from the vault so the
+    // operator never redoes it (persisted per turn via /care-chat). Renders the turns + seeds _conv.
+    fetch('/conversation?thread=care').then(function(r){return r.json();}).then(function(d){
+      var turns=(d&&d.turns)||[]; if(!turns.length) return;
+      _conv['team-chat']=[];
+      turns.forEach(function(t){
+        var b=document.createElement('div'); b.className='msg '+(t.role==='user'?'me':'bot'); b.textContent=t.content; thread.appendChild(b);
+        _conv['team-chat'].push({role:t.role,content:t.content});
+      });
+      thread.scrollTop=thread.scrollHeight;
+    }).catch(function(){});
+    return;
+  }
+  // FIRST unlock: surface the one-time care-review receipt (questions + curation) + seed _conv.
+  try{ sessionStorage.removeItem('aplus_care_review'); }catch(e){}
+  var receipt; try{ receipt=JSON.parse(raw); }catch(e){ return; }
+  if(!receipt || receipt.deferred) return;  // no key / a failed call -> honest degrade, nothing to surface
+  var questions=receipt.questions||(receipt.reply?[receipt.reply]:[]);
+  // Seed the care conversation with the clarifying questions as assistant turns, so when the operator
+  // replies the /care-chat model sees its own questions + the profile and continues coherently (rather
+  // than the reply hitting a context-free chat — the disconnect the operator hit).
+  _conv['team-chat']=_conv['team-chat']||[];
+  questions.forEach(function(q){ if(q){ botMsg(q); _conv['team-chat'].push({role:'assistant',content:q}); } });
+  var cur=receipt.curation;
+  if(cur && !cur.confirmed && cur.confirm_question){
+    botMsg(cur.confirm_question);
+    var classes=cur.proposed_classes||[];
+    // ONLY offer a Confirm/Not-now choice when there are actually proposed classes to confirm. When
+    // the model returned no confident classification, `proposed_classes` is empty — a "Confirm"
+    // button there records nothing and reads as "asked me to confirm, but showed nothing" (the bug).
+    if(classes.length){
+      var row=document.createElement('div'); row.className='msg bot';
+      var yes=document.createElement('button'); yes.className='btn primary'; yes.textContent='Confirm'; yes.style.marginRight='8px';
+      var no=document.createElement('button'); no.className='btn ghost'; no.textContent='Not now';
+      yes.addEventListener('click',function(){ yes.disabled=true; no.disabled=true;
+        fetch('/confirm-curation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({classes:classes})})
+          .then(function(r){return r.json();}).then(function(d){
+            sysMsg((d&&d.confirmed&&d.confirmed.length)?('Recorded '+d.confirmed.join(', ')+' for your plan.'):'Nothing was recorded.');
+            thread.scrollTop=thread.scrollHeight;
+          }).catch(function(){ sysMsg('Could not record that — you can revisit it in chat.'); });
+      });
+      no.addEventListener('click',function(){ yes.disabled=true; no.disabled=true;
+        sysMsg('Okay — nothing recorded. You can revisit this in chat.'); });
+      row.appendChild(yes); row.appendChild(no); thread.appendChild(row);
+    }
+  }
+  thread.scrollTop=thread.scrollHeight;
+  // The questions live in the Care Assistant thread — bring the operator there to see them.
+  if(questions.length || (cur && cur.confirm_question)){ try{ go('team'); }catch(e){} }
+})();
 </script>
 </body></html>

@@ -350,12 +350,14 @@ def test_extractor_widening_dedupe_to_include_value_breaks_collision(monkeypatch
 
 
 # =========================================================================== #
-# ADR-0018-T1 — the SAME four categories on the Step-1 DEMOGRAPHIC write paths.
-# The demographic capture (sex-for-dosing / bodyweight-band / equipment-access-class
-# pass-through tokens + the birth-year -> date-of-birth raw source) reuses
-# `persist_capture` -> `store.append` (0 forked store-write logic), so the battery proves
-# the demographic write paths inherit the store's collision/dedupe guarantees. The `pka`
-# MANDATE: all four categories on the NEW demographic write paths, category 4 observed RED.
+# ADR-0018-T1 (+ OQ-5 re-key, ADR-0033-0035-T2) — the SAME four categories on the Step-1
+# DEMOGRAPHIC write paths. The demographic capture (sex-for-dosing / equipment-access-class
+# pass-through tokens + the birth-date -> date-of-birth raw source + the body-weight number
+# -> bodyweight-kg local series) reuses `persist_capture` -> `store.append` (0 forked
+# store-write logic), so the battery proves the demographic write paths inherit the store's
+# collision/dedupe guarantees. `bodyweight-band` is DE-WIRED (OQ-5): the battery is re-keyed
+# onto the `bodyweight-kg` local series it now writes. The `pka` MANDATE: all four categories
+# on the demographic write paths, category 4 observed RED.
 # =========================================================================== #
 
 
@@ -372,36 +374,36 @@ def _persist(fields, store_root, scaffold_root):
 
 
 def test_demographic_write_to_one_token_never_cross_reads_as_another(tmp_path):
-    """Cat-1 (demographic): a write to `sex-for-dosing` never reads back as `bodyweight-band`.
+    """Cat-1 (demographic): a write to `sex-for-dosing` never reads back as `bodyweight-kg`.
 
-    Capture two DISTINCT demographic tokens with distinct values; each token's `store.read`
-    returns ONLY its own value — a read for token X never returns token Y's value. Uses the
-    REAL demographic token names (not a synthetic placeholder), so it proves the actual
-    write paths. Also asserts the birth-year `date-of-birth` raw source does not cross-read
-    as a demographic token.
+    Capture two DISTINCT demographic streams with distinct values; each stream's `store.read`
+    returns ONLY its own value — a read for stream X never returns stream Y's value. Uses the
+    REAL demographic stream names (not a synthetic placeholder), so it proves the actual write
+    paths, including the OQ-5 `bodyweight-kg` local series. Also asserts the `date-of-birth`
+    raw source does not cross-read as a demographic stream.
     """
     store_root = tmp_path / "store"
     _persist(
-        {"sex-for-dosing": "male", "bodyweight-band": "80-90kg",
-         "equipment-access-class": "full-home-gym", "date-of-birth": "1986"},
+        {"sex-for-dosing": "male", "bodyweight-kg": "82",
+         "equipment-access-class": "full-home-gym", "date-of-birth": "1986-04-12"},
         store_root, tmp_path / "scaffold",
     )
     sex = store.read("sex-for-dosing", root=store_root)
-    bw = store.read("bodyweight-band", root=store_root)
+    bw = store.read("bodyweight-kg", root=store_root)
     eq = store.read("equipment-access-class", root=store_root)
     dob = store.read("date-of-birth", root=store_root)
     assert len(sex) == 1 and sex[0]["value"] == "male"
-    assert len(bw) == 1 and bw[0]["value"] == "80-90kg"
+    assert len(bw) == 1 and bw[0]["value"] == "82"
     assert len(eq) == 1 and eq[0]["value"] == "full-home-gym"
-    assert len(dob) == 1 and dob[0]["value"] == "1986"
-    # Cross-read negatives: no token's value appears under another token's stream.
-    assert all("80-90kg" not in str(r["value"]) for r in sex), "bodyweight-band leaked into sex-for-dosing"
-    assert all("male" not in str(r["value"]) for r in bw), "sex-for-dosing leaked into bodyweight-band"
-    assert all("1986" not in str(r["value"]) for r in eq), "date-of-birth leaked into equipment-access-class"
-    # The raw date-of-birth source is its OWN stream, never a demographic token's.
-    for token in ("sex-for-dosing", "bodyweight-band", "equipment-access-class"):
-        assert all("1986" not in str(r["value"]) for r in store.read(token, root=store_root)), (
-            f"the raw date-of-birth value leaked into the {token!r} token stream"
+    assert len(dob) == 1 and dob[0]["value"] == "1986-04-12"
+    # Cross-read negatives: no stream's value appears under another stream.
+    assert all("82" not in str(r["value"]) for r in sex), "bodyweight-kg leaked into sex-for-dosing"
+    assert all("male" not in str(r["value"]) for r in bw), "sex-for-dosing leaked into bodyweight-kg"
+    assert all("1986-04-12" not in str(r["value"]) for r in eq), "date-of-birth leaked into equipment-access-class"
+    # The raw date-of-birth source is its OWN stream, never a demographic stream's.
+    for token in ("sex-for-dosing", "bodyweight-kg", "equipment-access-class"):
+        assert all("1986-04-12" not in str(r["value"]) for r in store.read(token, root=store_root)), (
+            f"the raw date-of-birth value leaked into the {token!r} stream"
         )
 
 
@@ -435,9 +437,9 @@ def test_identical_demographic_recapture_same_timepoint_is_idempotent(tmp_path, 
     """
     monkeypatch.setattr(capture, "_now", lambda: _ts())
     store_root = tmp_path / "store"
-    _persist({"bodyweight-band": "80-90kg"}, store_root, tmp_path / "scaffold")
-    _persist({"bodyweight-band": "80-90kg"}, store_root, tmp_path / "scaffold")  # identical re-capture
-    assert len(store.read("bodyweight-band", root=store_root)) == 1, (
+    _persist({"bodyweight-kg": "82"}, store_root, tmp_path / "scaffold")
+    _persist({"bodyweight-kg": "82"}, store_root, tmp_path / "scaffold")  # identical re-capture
+    assert len(store.read("bodyweight-kg", root=store_root)) == 1, (
         "an identical demographic re-capture duplicated the line"
     )
 
@@ -450,19 +452,19 @@ def test_identical_demographic_recapture_same_timepoint_is_idempotent(tmp_path, 
 def test_demographic_same_identity_different_value_collides_second_dropped(tmp_path, monkeypatch):
     """Cat-3 (demographic): same (item, timepoint, source) + a DIFFERENT value collides (second dropped).
 
-    Two `persist_capture` calls at the SAME pinned timepoint under the same demographic token
-    with DIFFERENT (both in-enum) values. `value` is EXCLUDED from the dedupe identity, so the
-    second write is DROPPED (a value correction is an explicit `store.correct`) and the first
-    stands. Uses two valid bodyweight bands so the bounded-enum gate is not the thing dropping
-    the write — the dedupe is.
+    Two `persist_capture` calls at the SAME pinned timepoint under the same demographic stream
+    with DIFFERENT values. `value` is EXCLUDED from the dedupe identity, so the second write is
+    DROPPED (a value correction is an explicit `store.correct`) and the first stands. The
+    `bodyweight-kg` series has NO bounded-enum gate (OQ-5 de-wire), so the dedupe is
+    unambiguously the sole drop mechanism — not an enum rejection.
     """
     monkeypatch.setattr(capture, "_now", lambda: _ts())
     store_root = tmp_path / "store"
-    _persist({"bodyweight-band": "80-90kg"}, store_root, tmp_path / "scaffold")
-    _persist({"bodyweight-band": "90-100kg"}, store_root, tmp_path / "scaffold")
-    readings = store.read("bodyweight-band", root=store_root)
+    _persist({"bodyweight-kg": "82"}, store_root, tmp_path / "scaffold")
+    _persist({"bodyweight-kg": "90"}, store_root, tmp_path / "scaffold")
+    readings = store.read("bodyweight-kg", root=store_root)
     assert len(readings) == 1, "a same-identity different-value second write was not dropped"
-    assert readings[0]["value"] == "80-90kg", "the second write wrongly overrode the first value"
+    assert readings[0]["value"] == "82", "the second write wrongly overrode the first value"
 
 
 def test_demographic_any_single_differing_identity_field_does_not_collide(tmp_path, monkeypatch):
@@ -518,9 +520,9 @@ def test_demographic_widening_dedupe_to_include_value_breaks_collision(monkeypat
     from pathlib import Path
     store_root = Path(tempfile.mkdtemp()) / "store"
     scaffold_root = Path(tempfile.mkdtemp()) / "scaffold"
-    _persist({"bodyweight-band": "80-90kg"}, store_root, scaffold_root)
-    _persist({"bodyweight-band": "90-100kg"}, store_root, scaffold_root)
-    readings = store.read("bodyweight-band", root=store_root)
+    _persist({"bodyweight-kg": "82"}, store_root, scaffold_root)
+    _persist({"bodyweight-kg": "90"}, store_root, scaffold_root)
+    readings = store.read("bodyweight-kg", root=store_root)
     assert len(readings) == 2, (
         "the dedupe-widening mutation did not change behavior — the demographic-path Cat-3 "
         "test is tautological (it would pass even with a broken dedupe key)"

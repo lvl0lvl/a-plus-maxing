@@ -91,16 +91,34 @@ def test_persist_extraction_routes_through_the_gate_not_a_direct_write(tmp_path)
 
 
 def test_non_dict_proposal_yields_empty_candidate_facts_dropped(tmp_path):
-    """AC-3/M-2: a non-dict proposal -> candidate_facts={}, dropped non-empty, writes nothing.
+    """AC-3/M-2: a genuinely unparseable proposal -> candidate_facts={}, dropped non-empty.
 
-    A non-dict `model_extraction_output` (a list, a string, None-as-not-failure) is
-    unparseable: the extractor returns `candidate_facts={}` with the input flagged in
-    `dropped`, does NOT raise into the request thread, and writes NOTHING.
+    A bare string or scalar `model_extraction_output` is unparseable (neither a `{token: value}`
+    mapping nor a `[{field, value}]` list): the extractor returns `candidate_facts={}` with the input
+    flagged in `dropped`, does NOT raise into the request thread, and writes NOTHING. (A LIST is now a
+    valid proposal shape — see `test_list_of_field_value_proposals_normalized`.)
     """
-    for bad in ([("goal-domains", "x")], "goal-domains=Workout", 42):
+    for bad in ("goal-domains=Workout", 42):
         result = extract.extract_facts(bad, turn_text="anything")
-        assert result.candidate_facts == {}, f"a non-dict proposal {bad!r} produced candidate_facts"
-        assert result.dropped, f"a non-dict proposal {bad!r} did not report a dropped reason"
+        assert result.candidate_facts == {}, f"an unparseable proposal {bad!r} produced candidate_facts"
+        assert result.dropped, f"an unparseable proposal {bad!r} did not report a dropped reason"
+
+
+def test_list_of_field_value_proposals_normalized(tmp_path):
+    """A `[{field, value}]` list (the structured-output shape) is normalized to captured facts.
+
+    The model returns `extraction` as a list of `{"field", "value"}` objects; previously the whole
+    list was dropped (`dropped: ['list']`), silently capturing nothing from chat. It is now normalized
+    to a `{token: value}` proposal and the well-formed facts are captured. Failing-capable: reds if the
+    list is dropped whole again.
+    """
+    result = extract.extract_facts(
+        [{"field": "recovery-status-band", "value": "high"},
+         {"field": "goal-priority-order", "value": "strength first"}],
+        turn_text="I recover well and my priority is strength",
+    )
+    assert result.candidate_facts == {"recovery-status-band": "high", "goal-priority-order": "strength first"}
+    assert result.dropped == [], f"a well-formed list-of-proposals reported drops: {result.dropped}"
 
 
 def test_non_dict_proposal_persist_writes_nothing(tmp_path):
@@ -113,7 +131,7 @@ def test_non_dict_proposal_persist_writes_nothing(tmp_path):
     store_root = tmp_path / "store"
     scaffold_root = tmp_path / "scaffold"
     receipt = extract.persist_extraction(
-        [("goal-domains", "Workout")],  # a non-dict proposal
+        "goal-domains=Workout",  # a genuinely unparseable (bare string) proposal
         turn_text="anything", root=store_root, scaffold_root=scaffold_root,
         identity_config=_ABSENT_IDENTITY,
     )

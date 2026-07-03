@@ -624,7 +624,11 @@ _FROZEN_ENGINE_PATHS = (
 # count (the `summarize` signature reflow + the removed redundant function-local
 # `import re`, QUAL1 = 2), while INSERTIONS stay unbounded.
 _ROUTER_ADDITIVE_PATH = "scripts/plan/router.py"
-_ROUTER_SANCTIONED_DELETIONS = 2
+# ADR-0033-0035-T2 / ADR-0034 OQ-5: the sanctioned _age_band born-decade→exact-age deriver-body
+# repurpose deletes 14 lines; the de-id spine (SUMMARY_FIELD_SET tuple + dispatch whitelist +
+# tripwires) is byte-frozen — verified by AC-7's scoped-diff. Re-calibrated 2→14 (as it was 2
+# for ADR-0032-T3), keeping the tight tripwire against a non-additive spine rewrite.
+_ROUTER_SANCTIONED_DELETIONS = 14
 
 
 def test_frozen_engine_byte_unchanged():

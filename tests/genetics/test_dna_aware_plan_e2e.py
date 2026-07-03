@@ -113,7 +113,10 @@ _CLEAN_RECORDS = (
     ("raw-lab-values", "ALT 30; AST 28", "lab"),
     ("raw-symptom-free-text", "tweaked back in January", "intake"),
     ("sex-for-dosing", "male", "intake"),
-    ("bodyweight-band", "80-90kg", "intake"),
+    # OQ-5 re-key: bodyweight-band is now DERIVED from the local `bodyweight-kg` series, so
+    # seed a `bodyweight-kg` reading (a single reading -> current + `flat`) — else `summarize`
+    # omits the now-derived token and `dispatch` raises "partial summary, missing".
+    ("bodyweight-kg", "82", "intake"),
     ("goal-domains", "strength;recovery", "intake"),
     ("goal-targets", "return to pre-Jan-2026 loading", "intake"),
     ("goal-priority-order", "recovery>strength", "intake"),

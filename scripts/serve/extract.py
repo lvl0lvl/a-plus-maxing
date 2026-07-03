@@ -33,6 +33,33 @@ from scripts.serve import capture
 _SCALAR_TYPES = (str, int, float, bool)
 
 
+def _normalize_proposal(output):
+    """Normalize a model extraction proposal into a `{token: value}` mapping, or None if unparseable.
+
+    Accepts the two shapes the model emits: a `{token: value}` dict (the historical shape), OR a LIST
+    of `{"field": <token>, "value": <value>}` proposal objects (the structured-output shape the care
+    turn now forces). The list form was previously dropped whole (`dropped: ['list']`) — the bug that
+    silently captured NOTHING from chat. List items are also tolerant of `token`/`name` in place of
+    `field`, and of a single-key `{token: value}` item. A bare string / scalar returns None (a genuine
+    non-proposal, still dropped). Never fabricates: an item without a resolvable token+value is skipped.
+    """
+    if isinstance(output, dict):
+        return output
+    if isinstance(output, list):
+        merged = {}
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            token = item.get("field") or item.get("token") or item.get("name")
+            if token is not None and "value" in item:
+                merged[str(token)] = item["value"]
+            elif len(item) == 1:
+                (only_key, only_value), = item.items()
+                merged[str(only_key)] = only_value
+        return merged
+    return None
+
+
 @dataclass
 class ExtractionResult:
     """The validated outcome of one model extraction proposal (NAMED CONTRACT, ADR-0017-T1).
@@ -80,17 +107,18 @@ def extract_facts(model_extraction_output, turn_text):
         # writes nothing downstream, never a fabricated fact — and marked failed so the
         # dispatch tells it apart from an empty-from-success.
         return ExtractionResult(failed=True)
-    if not isinstance(model_extraction_output, dict):
-        # Unparseable (a list, a string, a scalar): the whole proposal is dropped. Never
-        # coerce it into a fabricated fact — the extractor only validates a dict proposal.
+    normalized = _normalize_proposal(model_extraction_output)
+    if normalized is None:
+        # Genuinely unparseable (a bare string / scalar): the whole proposal is dropped. Never
+        # coerce it into a fabricated fact — the extractor only validates a mapping proposal.
         return ExtractionResult(dropped=[type(model_extraction_output).__name__])
 
     # `declined_domains` is a control key, not a captured fact — read it for the result
     # field and strip it from the proposal BEFORE the candidate loop, so its (list) value
     # never falls to the malformed-name branch and lands spuriously in `dropped`.
-    declined = model_extraction_output.get("declined_domains")
+    declined = normalized.get("declined_domains")
     declined_domains = set(declined) if isinstance(declined, (list, set, tuple)) else set()
-    proposal = {k: v for k, v in model_extraction_output.items() if k != "declined_domains"}
+    proposal = {k: v for k, v in normalized.items() if k != "declined_domains"}
 
     candidate_facts = {}
     dropped = []
