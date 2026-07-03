@@ -104,7 +104,38 @@ _CARE_HEALTH_DETAIL = {
 }
 
 
-def _care_profile(store_read, *, identity_config=None):
+def _scaffold_record(scaffold_root):
+    """Merge the operator's record-only scaffold captures into one `{field: latest value}` dict.
+
+    The gitignored scaffold holds record-only intake data the operator entered — MEDICATIONS
+    (`rx-interaction-classes`, deliberately routed record-only because raw drug names are never
+    de-identified for the specialist path), plus sleep, alcohol, smoker status, equipment detail,
+    race, occupation. NONE of it is pure identity (legal name / exact DOB / contact / address route
+    to the named-excluded store, not here), so the operator's OWN private care agent reads it. The
+    latest non-empty value wins per field across captures.
+    """
+    import json
+    from pathlib import Path
+
+    from scripts.serve.capture import DEFAULT_SCAFFOLD_ROOT
+
+    root = Path(scaffold_root) if scaffold_root is not None else DEFAULT_SCAFFOLD_ROOT
+    if not root.exists():
+        return {}
+    merged = {}
+    for path in sorted(root.glob("capture-*.json")):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if value:
+                    merged[key] = value
+    return merged
+
+
+def _care_profile(store_read, *, scaffold_root=None, identity_config=None):
     """The FULL care-facing profile: the identity-safe summary PLUS the operator's raw health detail.
 
     The de-identification boundary is the care -> SPECIALIST / plan hand-off (`router.dispatch`), NOT
@@ -128,6 +159,16 @@ def _care_profile(store_read, *, identity_config=None):
             detail[label] = rows[-1]["value"]
     if detail:
         profile["health_detail"] = detail
+    # Record-only scaffold data (medications + sleep/alcohol/smoker/equipment/race/occupation): the
+    # operator's OWN agent reads it — none of it is pure identity. Medications get an explicit label so
+    # the agent treats them as meds, not the (empty) de-identified `rx-interaction-classes` summary
+    # token; the rest is surfaced under `record` as additional profile context.
+    record = _scaffold_record(scaffold_root)
+    meds = record.pop("rx-interaction-classes", None)
+    if meds:
+        profile.setdefault("health_detail", {})["medications"] = meds
+    if record:
+        profile["record"] = record
     return profile
 
 
@@ -194,7 +235,7 @@ def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=N
         fail-closed `{"reply": None, "receipt": empty, "degraded": True, "reason": ...}` on a failure.
     """
     store_read = functools.partial(store.read, root=store_root) if store_root is not None else store.read
-    profile = _care_profile(store_read, identity_config=identity_config)
+    profile = _care_profile(store_read, scaffold_root=scaffold_root, identity_config=identity_config)
     messages = _care_messages(
         profile, conversation, turn_text,
         weight_display=_weight_display(profile),

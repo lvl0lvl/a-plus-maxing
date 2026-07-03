@@ -49,26 +49,30 @@ def _reader(root):
     return functools.partial(store.read, root=root)
 
 
-def test_respond_carries_the_de_id_profile_plus_conversation_plus_turn(tmp_path):
-    """The care turn's payload = the de-identified profile context + the conversation + the turn.
+def test_respond_carries_the_care_profile_plus_conversation_plus_turn(tmp_path):
+    """The care turn's payload = the operator's FULL care profile + the conversation + the turn.
 
-    `respond` re-reads `router.summarize` server-side and builds a converse payload whose first turn
-    carries the FULL de-identified profile (not the intake gap-set), followed by the prior conversation
-    and the current operator turn. Proves the Care Assistant reasons over the profile AND has the
-    conversation continuity (the opening clarifying questions ride in `conversation`).
+    `respond` re-reads the operator's full care profile server-side (`_care_profile`: identity-safe
+    demographics/goals/genetics + the raw health detail) and builds a converse payload whose first turn
+    carries it, followed by the prior conversation and the current operator turn. Proves the Care
+    Assistant reasons over the operator's real profile AND has the conversation continuity (the opening
+    clarifying questions ride in `conversation`).
     """
     root = tmp_path / "store"
     _seed(root)
+    scaffold = tmp_path / "scaffold"
     backend = _RecordingBackend()
     conversation = [{"role": "assistant", "content": "Is 55 your age or your training years?"}]
-    receipt = care_chat.respond("It's my age.", conversation, client=backend, store_root=root)
+    receipt = care_chat.respond("It's my age.", conversation, client=backend, store_root=root, scaffold_root=scaffold)
     assert receipt["reply"] == backend.reply, "the care turn did not return the model reply"
     assert len(backend.calls) == 1, "the care turn did not make exactly one converse call"
     payload = backend.calls[0]
-    # First turn = the de-identified profile context.
+    # First turn = the operator's full care profile context (server-derived, not client-supplied).
     first = json.loads(payload[0]["content"])
     assert first.get("task") == "care-conversation", "the first turn is not the care-conversation profile context"
-    assert first["profile"] == router.summarize(_reader(root)), "the context profile is not the server-derived de-id summary"
+    assert first["profile"] == care_chat._care_profile(_reader(root), scaffold_root=scaffold), (
+        "the context profile is not the server-derived full care profile"
+    )
     # The prior conversation (the opening question) + the current turn are present, in order.
     contents = [t["content"] for t in payload]
     assert "Is 55 your age or your training years?" in contents, "the opening question is not carried in the conversation"
@@ -79,11 +83,12 @@ def test_respond_carries_the_de_id_profile_plus_conversation_plus_turn(tmp_path)
 
 
 def test_respond_profile_context_carries_no_raw_pii(tmp_path):
-    """The profile context is the de-identified summary — 0 raw DOB / raw values on the wire.
+    """Pure IDENTITY stays stripped from the care profile — the raw DOB never crosses.
 
-    A store with a full-date DOB derives an AGE token (never the date string); the care payload's
-    profile context must carry the de-identified token, not the raw date. Proves the care conversation
-    rides the same de-id boundary as leg-1 of the care review.
+    The care agent carries the operator's raw HEALTH detail (that is the point), but pure identity is
+    still stripped: a store with a full-date DOB derives an AGE token (never the date string), so the
+    care payload carries the age, not the raw birth date. Proves the identity line holds even though
+    the health detail is intentionally raw.
     """
     root = tmp_path / "store"
     store.append("date-of-birth", {"item": "date-of-birth", "timepoint": "2026-06-01T00:00:00+00:00",
@@ -347,11 +352,22 @@ def test_care_profile_carries_raw_health_detail_and_strips_pure_identity(tmp_pat
     ]:
         store.append(item, {"item": item, "timepoint": tp, "source": "intake", "value": value}, root=root)
 
-    profile = care_chat._care_profile(functools.partial(store.read, root=root))
+    # medications are record-only in the scaffold (raw drug names never de-identified) — the operator's
+    # own agent still reads them; seed a scaffold capture carrying them.
+    scaffold = tmp_path / "scaffold"
+    scaffold.mkdir()
+    (scaffold / "capture-2026-07-02T00-00-00+00-00.json").write_text(
+        json.dumps({"rx-interaction-classes": "finasteride, testosterone, modafinil", "sleep-hours": "6.5"})
+    )
+
+    profile = care_chat._care_profile(functools.partial(store.read, root=root), scaffold_root=scaffold)
     # the operator's real specifics reach the agent (not a coarse band)
     assert "retatrutide" in profile["health_detail"]["peptides"]
     assert "paleo" in profile["health_detail"]["nutrition"]
     assert "impingement" in profile["health_detail"]["injuries"]
+    # medications (record-only scaffold) reach the agent, clearly labelled
+    assert "testosterone" in profile["health_detail"]["medications"]
+    assert profile["record"]["sleep-hours"] == "6.5"
     # pure identity is stripped: no legal name, no raw birth date anywhere in the profile
     blob = json.dumps(profile).lower()
     assert "jane q operator" not in blob, "the operator's legal name leaked into the care profile"
