@@ -33,6 +33,33 @@ from scripts.plan import router
 from scripts.serve import extract
 from scripts.store import store
 
+# The field tokens the care turn's structured `extraction` may use (mapped to a plain-language
+# description + allowed values). Supplied in the CONTEXT so the model knows WHICH facts to capture and
+# in what shape; `capture.persist_capture` re-validates every one server-side (a bounded value out of
+# its enum, or a raw value under a wired token, routes record-only — the model only PROPOSES). These
+# are the capture FORM-FIELD names `persist_capture` routes by. `recovery-status-band` is the field
+# the plan pipeline currently blocks on.
+_EXTRACTABLE_FIELDS = {
+    "recovery-status-band": "the operator's current recovery/readiness — EXACTLY one of: low, moderate, high",
+    "training-experience": "years of training experience (a whole number)",
+    "goal-priority-order": "the operator's stated ordering of goal priorities (free text)",
+    "goal-targets": "the operator's stated goal/outcome targets (free text)",
+    "hard-limits": "hard limits or things to strictly avoid (free text)",
+    "nutrition-detail": "diet / nutrition specifics the operator states (free text)",
+    "supplement-stack": "supplements + doses the operator states (free text)",
+    "peptide-stack": "peptides + doses the operator states (free text)",
+    "training-detail": "training split / days / volume specifics (free text)",
+    "train-around": "injuries or issues to train around (free text)",
+}
+
+# A standing context note so the agent knows the conversation is durable (it was answering "I can't
+# save" — false: the system auto-persists every turn to the conversation vault and restores it on
+# reload, so the earlier turns it sees ARE the full, permanent history).
+_PERSISTENCE_NOTE = (
+    "This conversation is automatically saved and restored when the operator reloads — the earlier "
+    "turns you are shown are the full, durable history, so never tell the operator you cannot save it."
+)
+
 
 def _weight_display(summary):
     """A human-readable weight in BOTH units from the de-id `bodyweight-band` kg value (or None).
@@ -183,7 +210,12 @@ def _care_messages(profile, conversation, turn_text, *, weight_display=None, wei
     operator's unit, not kg-only. A malformed conversation entry (not a `{role, content}` dict) is
     SKIPPED, never char-splatted into the payload.
     """
-    context = {"task": "care-conversation", "profile": profile}
+    context = {
+        "task": "care-conversation",
+        "profile": profile,
+        "extractable_fields": _EXTRACTABLE_FIELDS,
+        "notes": _PERSISTENCE_NOTE,
+    }
     if weight_display:
         context["operator_weight"] = weight_display
     if weight_pref:

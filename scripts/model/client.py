@@ -210,11 +210,11 @@ def _converse_system_prompt():
     instruction; the shape gate is the downstream `_parse_converse_turn`.
     """
     return (
-        "You are conducting one intake turn. Respond with a single JSON object and nothing "
-        'else, shaped exactly as {"reply": <assistant reply text>, "extraction": [<zero or '
-        "more structured field proposals>]}. The reply is the text shown to the operator; the "
-        "extraction is the list of fields you inferred this turn (an empty list when none). "
-        "Emit no prose outside the JSON object."
+        "You are the operator's assistant for one turn. Reply naturally to the operator in `reply`. "
+        'In `extraction`, list ONLY the profile facts the operator STATED this turn, each as a '
+        '{"field": <field-token>, "value": <value>} object — use the EXACT field tokens (and their '
+        "allowed values) described in the context's `extractable_fields`, and an empty list when the "
+        "operator stated no new profile fact. Never invent a fact the operator did not state."
     )
 
 
@@ -275,6 +275,30 @@ _CONVERSE_MAX_ATTEMPTS = 3
 # The per-call timeout (seconds) the converse SDK request runs under — a bounded wait, never
 # an indefinite block. Passed through `with_options(timeout=...)` at call time.
 _CONVERSE_TIMEOUT_SECONDS = 60.0
+
+# The structured-output schema the converse call FORCES (a reply string + a list of {field, value}
+# fact proposals). Forcing the shape is what makes the model reliably return the reply AND the facts
+# the operator stated, rather than drifting to prose. `extract_facts` normalizes the {field, value}
+# list to a `{token: value}` mapping; the capture gate then validates each against the field set /
+# bounded enums (a raw value under a wired token routes record-only). The WHICH-tokens roster is
+# supplied per-turn in the CONTEXT (the serve layer builds it), keeping this boundary generic.
+_CONVERSE_STRUCTURED_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "reply": {"type": "string"},
+        "extraction": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"field": {"type": "string"}, "value": {"type": "string"}},
+                "required": ["field", "value"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["reply", "extraction"],
+    "additionalProperties": False,
+}
 
 
 def _model_failure_category(exc):
@@ -690,6 +714,11 @@ class _ClaudeNoTrainBackend:
                     # is why the full conversation is re-sent each turn without paying full price for it;
                     # the stateless API requires the history, caching makes the repeat cheap.
                     cache_control={"type": "ephemeral"},
+                    # Structured outputs FORCE the {reply, extraction:[{field,value}]} shape, so the
+                    # model reliably returns BOTH a reply AND the facts the operator stated — instead of
+                    # drifting to prose (which captured nothing and crashed the parse before the prose
+                    # fallback). This is what makes chat facts actually save (e.g. recovery-status-band).
+                    output_config={"format": {"type": "json_schema", "schema": _CONVERSE_STRUCTURED_SCHEMA}},
                 )
                 return _parse_converse_turn(response)
             except Exception as exc:  # bounded: try again until the attempt ceiling
