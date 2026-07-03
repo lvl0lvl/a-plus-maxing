@@ -221,23 +221,39 @@ def _converse_system_prompt():
 def _parse_converse_turn(response):
     """Parse the model response into the `{"reply", "extraction"}` turn mapping.
 
-    Reads the first `text` content block off the SDK envelope and decodes it as the JSON turn
-    object — the assistant reply text plus a structured extraction proposal. Returns the
-    parsed mapping (the raw conversation never flows through here); a non-text / non-JSON /
-    wrong-shape response raises, failing closed at the retry loop to `ModelCallError`. The
-    shape check mirrors the public `ModelClient.converse` validation (a dict with a truthy
-    `reply` and an `extraction` key), so a truthy-but-malformed body is rejected at the
-    backend, never returned as a partial turn.
+    A `{"reply", "extraction"}` JSON object (optionally wrapped in a ```json fence) is used as-is
+    — the intake path, where the model reliably emits the envelope. But in a continuous CARE
+    conversation the model naturally answers in PROSE, ignoring the JSON instruction; a prose
+    answer is a VALID assistant reply, so it is surfaced verbatim as `reply` with an empty
+    `extraction` rather than failing the turn closed (the JSONDecodeError that surfaced to the
+    operator as "the model call did not complete"). Genuine failures still fail closed to
+    `ModelCallError` at the retry loop: no text block at all, or a body that IS JSON but null /
+    empty / wrong-shape (a malformation, never surfaced as a "null"/"{}" garbage reply). The raw
+    conversation never flows through here (only the model's own reply text).
     """
     import json
+    import re
 
     text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), None)
     if text is None:
         raise ValueError("converse: model response carried no text block")
-    turn = json.loads(text)
-    if not isinstance(turn, dict) or not turn.get("reply") or "extraction" not in turn:
-        raise ValueError("converse: model response was not the {reply, extraction} shape")
-    return turn
+    body = text.strip()
+    fenced = re.match(r"^```(?:json)?\s*(.*?)\s*```$", body, re.DOTALL)
+    if fenced:
+        body = fenced.group(1).strip()
+    try:
+        turn = json.loads(body)
+    except (ValueError, TypeError):
+        # NOT JSON at all -> the model answered in PROSE (natural in a continuous care
+        # conversation). Surface it verbatim as the reply; the reply is the real assistant turn,
+        # and failing it closed would throw away a perfectly good answer.
+        return {"reply": text.strip(), "extraction": []}
+    # It parsed as JSON -> require the {reply, ...} shape with a truthy reply; `extraction` defaults
+    # to empty when omitted. A JSON body that is null / empty / wrong-shape is a genuine malformation
+    # and STILL fails closed (never a "null"/"{}" garbage reply).
+    if isinstance(turn, dict) and turn.get("reply"):
+        return {"reply": turn["reply"], "extraction": turn.get("extraction", [])}
+    raise ValueError("converse: model response was JSON but not the {reply, extraction} shape")
 
 
 # The de-id call's bounded retry ceiling — at most this many `messages.create` attempts
