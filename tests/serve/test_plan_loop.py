@@ -139,11 +139,22 @@ def _serve_in_thread(srv):
 
 
 def _post_plan_loop(port):
-    """POST an (empty-body) tick to `/plan-loop`; return (status, parsed-JSON body)."""
+    """POST an (empty-body) application/json tick to `/plan-loop`; return (status, JSON body)."""
+    return _post_plan_loop_ctype(port, "application/json")
+
+
+def _post_plan_loop_ctype(port, content_type):
+    """POST an empty-body tick to `/plan-loop` with an explicit Content-Type; return (status, body).
+
+    `content_type` None omits the header entirely (the missing-content-type case).
+    """
     import json
 
+    headers = {"Content-Length": "0"}
+    if content_type is not None:
+        headers["Content-Type"] = content_type
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    conn.request("POST", "/plan-loop", body=b"", headers={"Content-Length": "0"})
+    conn.request("POST", "/plan-loop", body=b"", headers=headers)
     resp = conn.getresponse()
     raw = resp.read().decode("utf-8")
     conn.close()
@@ -415,6 +426,80 @@ def test_loop_makes_no_live_backend_call(tmp_path, monkeypatch):
         status, _ = _post_plan_loop(port)
         assert status == 200
         assert instantiations == [], "the loop path constructed a ModelClient (must use only injected mocks)"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+# --- SEC-1: CSRF content-type gate on /plan-loop --------------------------------
+
+
+def test_non_json_content_type_refused_before_regenerate(tmp_path, monkeypatch):
+    # SEC-1 (MUST FIX): a text/plain (CORS-simple) POST to /plan-loop is refused 415 BEFORE
+    # `regenerate` — a cross-site simple POST cannot drive the highest-spend loop tick (every
+    # specialist + judge + lens). A regenerate spy asserts the dispatch is NEVER reached, and 0
+    # plans are promoted. Turns RED if the gate is removed (regenerate would run → 200 + promotions).
+    from scripts.serve import plan_loop
+
+    calls = []
+    real_regen = plan_loop.regenerate
+
+    def spy_regen(*a, **k):
+        calls.append(1)
+        return real_regen(*a, **k)
+
+    monkeypatch.setattr(plan_loop, "regenerate", spy_regen)
+
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+    srv, port = _loop_server(tmp_path, dispatch, deid_client)
+    _serve_in_thread(srv)
+    try:
+        status, _ = _post_plan_loop_ctype(port, "text/plain")
+        assert status == 415, f"non-json POST returned {status}, expected 415"
+        assert calls == [], "regenerate was reached despite the non-json content-type (CSRF gate bypassed)"
+
+        today = datetime.date.today().isoformat()
+        root = tmp_path / "store"
+        for domain in plan_schema.PLAN_DOMAINS:
+            assert _plan_rows_today(root, domain, today) == [], (
+                f"a plan was promoted for {domain} despite the 415 refusal"
+            )
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+# --- degraded-fallback branch (QA coverage gap) ---------------------------------
+
+
+def test_regenerate_raises_returns_degraded(tmp_path, monkeypatch):
+    # SHOULD FIX (QA gap): an injected `regenerate` that raises makes the loop answer 200 +
+    # degraded=True + a reason (thread survival — never a dropped request), and promotes 0 plans.
+    # The broad `except Exception -> degraded` thread-survival branch was previously untested.
+    from scripts.serve import plan_loop
+
+    def boom(*a, **k):
+        raise RuntimeError("regenerate blew up")
+
+    monkeypatch.setattr(plan_loop, "regenerate", boom)
+
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+    srv, port = _loop_server(tmp_path, dispatch, deid_client)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_plan_loop(port)  # valid application/json
+        assert status == 200, f"degraded path returned {status}, expected 200"
+        assert body.get("degraded") is True, f"expected degraded=True, got {body}"
+        assert body.get("reason"), "the degraded response carried no reason"
+
+        today = datetime.date.today().isoformat()
+        root = tmp_path / "store"
+        for domain in plan_schema.PLAN_DOMAINS:
+            assert _plan_rows_today(root, domain, today) == [], (
+                f"a plan was promoted for {domain} despite the degraded-fallback branch"
+            )
     finally:
         srv.shutdown()
         srv.server_close()

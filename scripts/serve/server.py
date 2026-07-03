@@ -713,11 +713,23 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         it: the loop path never reaches the screened-only route (the anti-degradation guard). The run
         result is answered as JSON.
 
+        CSRF gate (mirrors `_save_key` / `_do_generate_plan`): a non-`application/json` POST is
+        refused 415 BEFORE any work — a cross-site CORS-simple `text/plain` POST cannot drive the
+        highest-spend loop tick (every specialist + judge + lens dispatch) on the operator's key (a
+        genuine application/json cross-site POST forces a preflight the server never answers).
+
         Thread survival (mirrors `_do_chat` / `_do_generate_plan`): a malformed state / an unexpected
         exception answers an honest degraded JSON, never a dropped request thread.
         """
         from scripts.serve import plan_loop
         from scripts.store import store
+
+        # CSRF gate (SEC): require application/json so a cross-site CORS-simple POST cannot drive the
+        # loop tick (forced spend across every specialist + judge + lens) — refuse before any work.
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"results": {}, "error": "unsupported content-type"})
+            return
 
         store_root = self.store_root if self.store_root is not None else store.DEFAULT_ROOT
         try:
