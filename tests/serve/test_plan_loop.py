@@ -36,7 +36,7 @@ from scripts.plan import plan_orchestrator
 from scripts.plan.plan_driver import SAFETY_BLOCKED
 from scripts.plan.safety_review import DEFAULT_LENSES
 from scripts.serve import server as serve_server
-from scripts.store import plan_schema, store
+from scripts.store import biomarker_meta, loop_schema, plan_schema, store
 
 from tests.plan.test_deid_in import _FixedDeidClient, _raw_intake
 from tests.plan.test_generate_plan import (
@@ -503,3 +503,254 @@ def test_regenerate_raises_returns_degraded(tmp_path, monkeypatch):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# =====================================================================================
+# ADR-0036-T2: shared debounce gate + three-trigger convergence (derived state) -------
+# =====================================================================================
+
+_T2_ON_DATE = "2026-06-18"
+_SUSTAINED_DATES = ("2026-06-01", "2026-06-08", "2026-06-16")  # 3 timepoints, 15-day span
+
+
+def _seed_prior_plan(root, plan_date):
+    """Record one prior plan (workout) dated `plan_date` — the derived last-re-gen anchor."""
+    plan_schema.record_plan(
+        "workout", {"exercises": [{"name": "Squat", "sets": 3}]},
+        plan_date, "personal-trainer", root,
+    )
+
+
+def _seed_biomarker(root, marker, values, dates):
+    """Seed a `biomarker::<marker>` series (one reading per value/date) via the frozen writer."""
+    for value, day in zip(values, dates):
+        loop_schema.record_biomarker(marker, f"{day}T00:00:00+00:00", value, root)
+
+
+def _new_dated_sets(root, plan_date):
+    """Count of NEW dated plan:: sets for `plan_date` (0 or 1 — one generation is one date)."""
+    return len({
+        r["timepoint"]
+        for domain in plan_schema.PLAN_DOMAINS
+        for r in store.read(f"plan::{domain}", root=root)
+        if r["timepoint"] == plan_date
+    })
+
+
+def _sustained_root(tmp_path, name):
+    """A tmp store seeded with operator state + an OLD prior plan + a sustained rising hrv series."""
+    root = tmp_path / name
+    _seed_store(root)
+    _seed_prior_plan(root, "2026-06-01")            # 17 days before the trigger date (>= 7)
+    _seed_biomarker(root, "hrv", [40, 50, 60], _SUSTAINED_DATES)  # rising hrv (up) -> improving
+    return root
+
+
+# --- Cycle 1 AC-1/AC-2: the single-vs-sustained falsifiable pair --------------------
+
+
+def test_debounce_single_reading_vs_sustained_pair(tmp_path):
+    # AC-1 + AC-2 (the load-bearing pair): a SINGLE new reading in the window produces 0 new dated
+    # plan sets; a SUSTAINED series (>= n across the span, directional) produces exactly 1. The two
+    # dispositions MUST differ, or the gate does not discriminate single from sustained.
+    from scripts.serve import plan_loop
+
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+
+    single = tmp_path / "single"
+    _seed_store(single)
+    _seed_biomarker(single, "hrv", [55], ("2026-06-16",))  # one reading — not sustained
+    plan_loop.signal(single, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                     dispatch=dispatch, deid_client=deid_client, plan_date=_T2_ON_DATE)
+    count_single = _new_dated_sets(single, _T2_ON_DATE)
+
+    sustained = _sustained_root(tmp_path, "sustained")
+    plan_loop.signal(sustained, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                     dispatch=dispatch, deid_client=deid_client, plan_date=_T2_ON_DATE)
+    count_sustained = _new_dated_sets(sustained, _T2_ON_DATE)
+
+    assert count_single == 0, "a single reading re-generated (the debounce did not hold)"
+    assert count_sustained == 1, "a sustained signal did NOT re-generate (the gate never fires)"
+    assert count_single != count_sustained, "the gate does not discriminate single from sustained"
+
+
+def test_debounce_recent_regen_blocks_min_interval(tmp_path):
+    # AC-1 (min-interval leg): a re-gen within the pinned interval blocks a fresh re-gen even with a
+    # sustained signal present — the whole-plan re-gen cost bound (Consequences-Negative-1).
+    from scripts.serve import plan_loop
+
+    root = tmp_path / "store"
+    _seed_store(root)
+    _seed_prior_plan(root, "2026-06-15")  # 3 days before the trigger date (< 7)
+    _seed_biomarker(root, "hrv", [40, 50, 60], _SUSTAINED_DATES)
+    plan_loop.signal(root, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                     dispatch=_LoopDispatch(_clean_authors()),
+                     deid_client=_FixedDeidClient(_deid_summary()), plan_date=_T2_ON_DATE)
+    assert _new_dated_sets(root, _T2_ON_DATE) == 0, "a re-gen fired inside the min interval"
+
+
+# --- Cycle 1 AC-3: absent-data hold + prompt ----------------------------------------
+
+
+def test_cadence_absent_signal_holds_and_prompts(tmp_path):
+    # AC-3: a cadence tick with NO new signal in the window holds and prompts (a log-prompt flag),
+    # never re-generates on nothing.
+    from scripts.serve import plan_loop
+
+    root = tmp_path / "store"
+    _seed_store(root)
+    _seed_prior_plan(root, "2026-06-01")  # min-interval satisfied; the HOLD is from absent signal
+    body = plan_loop.signal(root, trigger=plan_loop.CADENCE_TRIGGER,
+                            dispatch=_LoopDispatch(_clean_authors()),
+                            deid_client=_FixedDeidClient(_deid_summary()), plan_date=_T2_ON_DATE)
+    assert _new_dated_sets(root, _T2_ON_DATE) == 0, "the cadence tick re-generated on absent data"
+    assert body.get("log_prompt") is True, "the absent-data hold carried no log-prompt flag"
+
+
+# --- Cycle 1 AC-4: the debounce parameters are pinned module constants ---------------
+
+
+def test_debounce_parameters_are_pinned_constants():
+    # AC-4: every debounce parameter is a fixed module-level literal a deterministic test reads (not
+    # a runtime default / not env-derived). The sustained-window n REUSES the existing honest-absence
+    # guardrail — one constant, one home (no second n literal).
+    from scripts.serve import plan_loop
+
+    assert plan_loop.MIN_REGEN_INTERVAL_DAYS == 7
+    assert plan_loop.SUSTAINED_WINDOW_SPAN_DAYS == 7
+    assert plan_loop.SUSTAINED_WINDOW_MIN_READINGS == 3
+    assert plan_loop.SUSTAINED_WINDOW_MIN_READINGS == biomarker_meta.PROJECTION_MIN_TIMEPOINTS
+    assert plan_loop.SUSTAINED_TREND_DIRECTIONS == ("improving", "regressing")
+    assert plan_loop.FREE_TEXT_RATE_LIMIT_HOURS == 24
+
+
+# --- Cycle 1 AC-5: no new store stream (derived state) -------------------------------
+
+
+def test_debounce_writes_no_new_store_stream(tmp_path, monkeypatch):
+    # AC-5: the debounce state is DERIVED — a debounced no-op writes NOTHING, and a re-gen writes
+    # only the plan:: promote (0 loop::/debounce::/regen-marker:: id, 0 debounce-marker append). The
+    # last-re-gen date reads through plan_schema.resolve_plan (spied), never a stored marker.
+    from scripts.serve import plan_loop
+
+    real_append = store.append
+    appended = []
+
+    def spy_append(item, *a, **k):
+        appended.append(item)
+        return real_append(item, *a, **k)
+
+    # (a) a debounced no-op writes 0 store records at all
+    drop_root = tmp_path / "drop"
+    _seed_store(drop_root)
+    _seed_biomarker(drop_root, "hrv", [55], ("2026-06-16",))  # single reading -> debounced
+    monkeypatch.setattr(store, "append", spy_append)
+    plan_loop.signal(drop_root, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                     dispatch=_LoopDispatch(_clean_authors()),
+                     deid_client=_FixedDeidClient(_deid_summary()), plan_date=_T2_ON_DATE)
+    assert appended == [], f"a debounced no-op wrote store records: {appended}"
+
+    # (b) a re-gen writes only plan:: promotes — never a debounce/last-re-gen marker stream; and the
+    # last-re-gen date is read through resolve_plan (a derived read), not a stored marker.
+    monkeypatch.setattr(store, "append", real_append)  # real writer while seeding the regen root
+    regen_root = _sustained_root(tmp_path, "regen")
+    appended.clear()
+    resolve_calls = []
+    real_resolve = plan_schema.resolve_plan
+
+    def spy_resolve(*a, **k):
+        resolve_calls.append(1)
+        return real_resolve(*a, **k)
+
+    monkeypatch.setattr(plan_schema, "resolve_plan", spy_resolve)
+    monkeypatch.setattr(store, "append", spy_append)
+    plan_loop.signal(regen_root, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                     dispatch=_LoopDispatch(_clean_authors()),
+                     deid_client=_FixedDeidClient(_deid_summary()), plan_date=_T2_ON_DATE)
+    assert resolve_calls, "the debounce never read the last-re-gen date via plan_schema.resolve_plan"
+    assert any(i.startswith("plan::") for i in appended), "the re-gen promoted no plan:: rows"
+    for item in appended:
+        assert not item.startswith(("loop::", "debounce::", "regen-marker::")), (
+            f"the debounce persisted a new store stream {item!r} (state must be derived)"
+        )
+
+
+# --- Cycle 2 AC-6: three triggers converge on the one debounced entry ---------------
+
+
+def test_route_upload_notifies_the_debounced_entry(tmp_path, monkeypatch):
+    # AC-6: a wearable land reaches the ONE debounced entry with a data-event trigger (0 direct
+    # regenerate from the trigger site).
+    from scripts.serve import plan_loop, route
+    from tests.serve.test_route import _write_healthkit_xml
+
+    calls = []
+    monkeypatch.setattr(plan_loop, "signal", lambda root, **k: calls.append(k.get("trigger")))
+    staged = tmp_path / "export.xml"
+    _write_healthkit_xml(staged, day="2026-05-01", value="55")
+    route.route_upload(staged, root=tmp_path / "store", dna_root=tmp_path / "dna")
+    assert calls == [plan_loop.DATA_EVENT_TRIGGER], f"route_upload did not notify the entry: {calls}"
+
+
+def test_land_confirmed_notifies_the_debounced_entry(tmp_path, monkeypatch):
+    # AC-6: a confirmed-lab land reaches the ONE debounced entry with a data-event trigger.
+    from scripts.serve import confirm, plan_loop
+
+    calls = []
+    monkeypatch.setattr(plan_loop, "signal", lambda root, **k: calls.append(k.get("trigger")))
+    confirm.land_confirmed(
+        [{"item": "ferritin", "timepoint": "2026-05-01", "source": "labs", "value": "120"}],
+        root=tmp_path / "store",
+    )
+    assert calls == [plan_loop.DATA_EVENT_TRIGGER], f"land_confirmed did not notify: {calls}"
+
+
+def test_respond_notifies_on_capture_completion_only_derived_tokens(tmp_path, monkeypatch):
+    # AC-6: a care-chat capture completion reaches the ONE debounced entry with a free-text trigger,
+    # and the notify carries only the derived trigger label — never the raw turn text (finding-C).
+    # The fail-closed degraded branch does NOT notify.
+    from scripts.serve import care_chat, plan_loop
+    from tests.serve.test_care_chat import _RecordingBackend, _seed
+
+    root = tmp_path / "store"
+    _seed(root)
+    calls = []
+    monkeypatch.setattr(plan_loop, "signal", lambda r, **k: calls.append((k.get("trigger"), r, k)))
+    turn = "I slept 5 hours and my resting HR was 48"
+    care_chat.respond(turn, [], client=_RecordingBackend(), store_root=root)
+    assert [c[0] for c in calls] == [plan_loop.FREE_TEXT_TRIGGER], f"respond did not notify: {calls}"
+    assert turn not in repr(calls), "the free-text notify carried the raw turn text (finding-C boundary)"
+
+    calls.clear()
+    care_chat.respond(turn, [], client=_RecordingBackend(raise_error=True), store_root=root)
+    assert calls == [], "the fail-closed degraded branch notified the loop (must skip on degrade)"
+
+
+def test_cross_kind_triggers_within_window_dedupe(tmp_path):
+    # AC-6 (dedupe): two DIFFERENT-kind triggers inside the same window drive at most 1 re-gen — the
+    # shared gate drops the second (the first re-gen sets last-re-gen to today, inside the min
+    # interval for the second). Non-tautological: exactly one re-gen results, not zero.
+    from scripts.serve import care_chat, plan_loop, route
+    from tests.serve.test_care_chat import _RecordingBackend, _seed
+    from tests.serve.test_route import _write_healthkit_xml
+
+    root = tmp_path / "store"
+    _seed_store(root)
+    _seed(root)  # care-profile fields for router.summarize
+    _seed_prior_plan(root, "2026-06-01")  # old regen -> min-interval satisfied for trigger 1
+    _seed_biomarker(root, "hrv", [40, 50, 60], _SUSTAINED_DATES)
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+
+    # trigger 1 — a wearable data-event through route.route_upload -> re-gen
+    staged = tmp_path / "export.xml"
+    _write_healthkit_xml(staged, day="2026-06-17", value="61")
+    route.route_upload(staged, root=root, dna_root=tmp_path / "dna",
+                       loop_dispatch=dispatch, loop_deid_client=deid_client)
+    # trigger 2 — a care-chat free-text of a DIFFERENT kind, same window -> dropped by the gate
+    care_chat.respond("resting HR trending down", [], client=_RecordingBackend(),
+                      store_root=root, loop_dispatch=dispatch, loop_deid_client=deid_client)
+
+    today = datetime.date.today().isoformat()
+    assert _new_dated_sets(root, today) == 1, "cross-kind triggers produced != 1 re-gen (dedupe broken)"

@@ -99,7 +99,8 @@ def _zip_is_apple_health(zip_path):
         return True
 
 
-def route_upload(staged_path, *, client=None, root=None, dna_root=None):
+def route_upload(staged_path, *, client=None, root=None, dna_root=None,
+                 loop_dispatch=None, loop_deid_client=None):
     """Route a staged upload — a recognized format lands; an unrecognized format extracts.
 
     A RECOGNIZED format maps to a source — reusing the CLI's `_detect_source`/`_EXT_SOURCE`,
@@ -164,6 +165,13 @@ def route_upload(staged_path, *, client=None, root=None, dna_root=None):
         adapter = _CapturingAdapter(_adapter(source))
         ingest.run(adapter, path, root=store_root)
         biomarker_mirror.mirror_registered(adapter.captured, store_root)
+        # A `biomarker::` write-event: notify the plan loop's ONE debounced entry (ADR-0036-T2).
+        # Additive side-effect — the debounce gate decides whether a re-gen fires; the land return
+        # is unchanged. The loop seams are threaded by the trigger's caller (production server->site
+        # threading is ADR-0036-T4); absent them the notify is a debounced no-op, never a bare re-gen.
+        from scripts.serve import plan_loop
+        plan_loop.signal(store_root, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                         dispatch=loop_dispatch, deid_client=loop_deid_client)
     return source
 
 

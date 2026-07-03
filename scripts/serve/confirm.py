@@ -30,7 +30,7 @@ from scripts.store import store
 from scripts.store.keying import is_conformant
 
 
-def land_confirmed(readings, *, root):
+def land_confirmed(readings, *, root, loop_dispatch=None, loop_deid_client=None):
     """Land the operator-confirmed readings through the unchanged manual-entry sink.
 
     Validates the WHOLE batch first — every element must be a `dict` carrying every
@@ -76,4 +76,10 @@ def land_confirmed(readings, *, root):
     # land never populated it, so a lab value never trended -> never reached the plan). The ONE
     # mirror rule, shared with the wearable land path (route.route_upload).
     biomarker_mirror.mirror_registered(readings, store_root)
+    # A `biomarker::` write-event: notify the plan loop's ONE debounced entry (ADR-0036-T2).
+    # Additive side-effect — the debounce gate decides whether a re-gen fires; the `{"store": landed}`
+    # receipt is unchanged. Loop seams threaded by the caller (production wiring is ADR-0036-T4).
+    from scripts.serve import plan_loop
+    plan_loop.signal(store_root, trigger=plan_loop.DATA_EVENT_TRIGGER,
+                     dispatch=loop_dispatch, deid_client=loop_deid_client)
     return {"store": landed}
