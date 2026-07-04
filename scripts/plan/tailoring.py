@@ -24,7 +24,27 @@ import re
 
 from scripts.generate import maintained
 from scripts.model.client import ModelCallError
+from scripts.plan import router
 from scripts.store import plan_schema, store
+
+# The tailored-section keys the pass injects at the `reemit_maintained` boundary — one per
+# plan domain (the `tailored` dict is keyed by `plan_schema.PLAN_DOMAINS`). Named so the
+# load-time tripwire below can pin them out of the de-identified specialist summary.
+_TAILORING_SECTION_KEYS = frozenset(plan_schema.PLAN_DOMAINS)
+
+# Load-time disjointness tripwire — a defense-in-depth CHANGE-CONTROL guard (mirrors router.py's
+# `SUMMARY_FIELD_SET.isdisjoint(...)` change-control asserts and capture.py's
+# `WIRED_TOKENS <= SUMMARY_FIELD_SET` tripwire): NO tailoring section key may EVER become a
+# `router.SUMMARY_FIELD_SET` member. This is a NAMESPACE guard, not a live content-flow interceptor:
+# the pass never calls `summarize`/`dispatch`, its sole sink is `reemit_maintained`, and
+# `router.summarize` populates fields from its OWN `_RAW_TO_FIELD` mapping (never the tailoring
+# pass), so the current non-leak holds STRUCTURALLY. The tripwire pins that structure against a
+# FUTURE field-set edit: were a tailoring section key ever added to `SUMMARY_FIELD_SET`, a raw-reading
+# tailoring section and a de-identified planner token would collide under one name — reds at module load.
+assert set(_TAILORING_SECTION_KEYS).isdisjoint(set(router.SUMMARY_FIELD_SET)), (
+    "a tailoring section key is a router.SUMMARY_FIELD_SET member — tailoring (raw-reading) "
+    "content could cross the de-identification boundary as a planner token (crown jewel)"
+)
 
 # Map each plan domain to its raw `_care_profile.health_detail` label (the operator's own free-text).
 # `workout` reads the raw `training` detail; the compound + nutrition domains map by name.
