@@ -62,7 +62,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 ## Tasks
 
 ### ADR-0036-T1: Serve-Trigger → Driver Front-Door Binding + Anti-Degradation Guard (BUILD PREREQUISITE)
-**Status:** TODO
+**Status:** built (merged S105, PRs #277-283)
 **ADR Source:** ADR-0036, Decision ("Fired through the SERVE entry point — the full-composition front door (BUILD PREREQUISITE)": the loop invokes `run_orchestrated` → `plan_driver.drive` → composed `gate_dispatch` + `orchestrate.generate_plans`, NOT `_do_generate_plan`); OQ-3 (RESOLVED direction + build task); Validation confirmation #1 (loop fires through the serve entry point via the full-composition front door)
 **Files to create/modify:**
 - `scripts/serve/plan_loop.py` (Create) — a `regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None)` entry that drives the front door `run_orchestrated` ([plan_orchestrator.py:127](../../scripts/plan/plan_orchestrator.py)) — which enters the ONE shared `plan_driver.drive` ([plan_driver.py:144](../../scripts/plan/plan_driver.py)) running the composed `gate_dispatch` + the five `orchestrate` cross-domain holds — producing a NEW dated plan for ALL domains. It never imports or calls `_do_generate_plan` / a bare `orchestrate.generate_plans`.
@@ -82,7 +82,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 ---
 
 ### ADR-0036-T2: Debounce + Three-Trigger Convergence (Derived State, No New Store Stream)
-**Status:** TODO
+**Status:** built (merged S105, PRs #277-283)
 **ADR Source:** ADR-0036, Decision ("Trigger → one action"; "Debounce (mechanical)"; "Absent data → hold + prompt"); OQ-1 (concrete debounce parameters); OQ-2 (the three trigger surfaces converge on one driver call through one shared debounce gate); OQ-5 (debounce state derived from the dated `plan::` history + a `biomarker::` window query, no new stored stream)
 **Files to create/modify:**
 - `scripts/serve/plan_loop.py` (Modify) — add the shared debounce gate: a minimum re-generation interval (the last-re-gen date DERIVED from the dated `plan::` history via `plan_schema` read, [plan_schema.py:462](../../scripts/store/plan_schema.py)) PLUS a sustained-signal requirement (a window/threshold query over the `biomarker::` series, [biomarker_meta.py:45](../../scripts/store/biomarker_meta.py) / [router.py:326](../../scripts/plan/router.py)) — a second trigger inside the window is dropped; free-text is rate-limited; absent signal in the window → hold + prompt, never re-generate. All three trigger kinds pass through this one gate before the T1 `regenerate` call.
@@ -104,7 +104,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 ---
 
 ### ADR-0036-T3: Trend-Reaches-Regen (Finding B) + Mutation Control + Crown-Jewel Non-Egress Through the Serve Entry Point
-**Status:** TODO
+**Status:** built (merged S105, PRs #277-283)
 **ADR Source:** ADR-0036, Decision ("Re-summarize for free (finding B)"; "De-identified / derived tokens only (finding C)"); Validation falsification criteria (mutation control behind→de-load AND on-track→NOT; crown-jewel non-egress wire-scan; held-domain persistence)
 **Files to create/modify:**
 - `scripts/serve/plan_loop.py` (Modify) — ensure the re-gen path re-summarizes the current store (`router.summarize`, [router.py:707](../../scripts/plan/router.py)) so `recent-trend-direction` ([router.py:464](../../scripts/plan/router.py)) is re-derived from the `biomarker::` feed with no bridge to `plan-track::`; the free-text trigger carries only the derived tokens the care-agent gate produced ([capture.py:80-99](../../scripts/serve/capture.py)).
@@ -123,7 +123,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 ---
 
 ### ADR-0036-T4: Re-Gen Rationale + Large-Change Confirmation + Post-Promote Tailoring/Adherence Seams
-**Status:** TODO
+**Status:** built (merged S105, PRs #277-283)
 **ADR Source:** ADR-0036, Decision ("Rationale + control": each re-gen records a plain-language "what changed and why"; large changes surface for confirmation; "Tailoring on an automated (non-operator) re-gen": the loop invokes the tailoring pass directly after `record_plan`); OQ-4 (large-change confirmation vs silent swap); OQ-5 (the `plan-track::` adherence bridge named as a separate, additional input)
 **Files to create/modify:**
 - `scripts/serve/plan_loop.py` (Modify) — after the front-door promote, (a) record a plain-language rationale string for the re-gen; (b) route a large-change re-gen (over the pinned change threshold) to the confirmation surface rather than a silent swap, reusing the `confirm.py` request-shape precedent ([confirm.py:33](../../scripts/serve/confirm.py)); (c) add the post-promote tailoring-hook seam (a pass-through call that ADR-0037-T1 fills — `promote → tailoring pass → reemit_maintained`); (d) read `resolve_plan_progress` ([track.py:81](../../scripts/plan/track.py)) as a SEPARATE, additional adherence input into the re-gen context (not the trigger's carrier).
@@ -143,7 +143,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 ---
 
 ### ADR-0038-T1: Horizon Reads Over goal_schema + calendar_schema (Single-Source Progress, Peptides Untracked, Open-Ended Degradation)
-**Status:** TODO
+**Status:** built (merged S105, PRs #277-283)
 **ADR Source:** ADR-0038, Decision #1 (milestone-progress = `goal_schema` derived percent), #2 (dated cadences = `calendar_schema`), #5 (peptides carries no cadence/tracking), #6 (open-ended goals degrade to rolling maintenance cycles)
 **Files to create/modify:**
 - `scripts/plan/horizons.py` (Create) — the read layer: `resolve_goal` ([goal_schema.py:189](../../scripts/store/goal_schema.py)) for the derived milestone percent (`_percent`, [goal_schema.py:122](../../scripts/store/goal_schema.py), the ONLY progress site), `resolve_events`/`read_events` ([calendar_schema.py:119,138](../../scripts/store/calendar_schema.py)) for the next dated cadence, the peptides-untracked guard (peptides ∉ `TRACKED_DOMAINS`, [plan_schema.py:50](../../scripts/store/plan_schema.py)), and the open-ended-goal rolling-cycle presentation (no fabricated deadline).
@@ -161,7 +161,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 ---
 
 ### ADR-0038-T2: ADR-0010 D2 Extras-Seam Enrichment on plan:: Values (Zero Schema Change)
-**Status:** TODO
+**Status:** built (merged S105, PRs #277-283)
 **ADR Source:** ADR-0038, Decision #3 (weekly/monthly framing = the ADR-0010 D2 "open on extras" seam — enrich the dated `plan::<domain>` values with horizon-extra keys, permitted by omission from the required/optional dicts); OQ-1 (the horizon-extra key set/naming)
 **Files to create/modify:**
 - `scripts/plan/horizons.py` (Modify) — define the horizon-extra key convention (`phase`, `week_intent`, `week_expectation`) written onto the dated `plan::<domain>` values, which `_check_fields` permits by omission ([plan_schema.py:113-139](../../scripts/store/plan_schema.py), docstring [plan_schema.py:116-118](../../scripts/store/plan_schema.py)); read the extras back for the week/month framing. No edit to `plan_schema.py`. [AMENDED 2026-07-03]: Modifying horizons.py trips the ADR-0032 EXTEND-NOT-REBUILD frozen glob. Sanctioned resolution: horizons.py carved out of the frozen glob in BOTH copies (test_route.py + test_pdf_ingestion_e2e.py) as a NEW post-ADR-0032 read-layer module, NOT crown-jewel spine — invariants guarded by tests/plan/test_horizons.py, not the byte-freeze. Architect ruling. Same carve-out covers T3's horizons.py modify.
@@ -179,7 +179,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 ---
 
 ### ADR-0038-T3: Date-Range Week/Month Query + Latest-in-Window Selection + Expectation-vs-Actual Classifier
-**Status:** TODO
+**Status:** built (merged S105, PRs #277-283)
 **ADR Source:** ADR-0038, Decision #4 ("this week's block / the month arc" = a date-range query over the dated plan history, not a second stored schedule); Consequences-Negative-3 (the loop densifies the history: select latest-in-window among multiple same-window plans); OQ-2 (window boundaries + same-window selection); OQ-3 (per-week expectation sourcing); ADR-0036 Validation (machine-comparable expectation vs actual → behind/on-track/ahead)
 **Files to create/modify:**
 - `scripts/plan/horizons.py` (Modify) — a date-range query over the dated `plan::<domain>` history (the same date semantics `resolve_plan` uses, [plan_schema.py:462-498](../../scripts/store/plan_schema.py), equality at [plan_schema.py:486](../../scripts/store/plan_schema.py)) widened to a 7-day / month window, with latest-in-window selection when the loop leaves multiple same-window dated plans; and a deterministic expectation-vs-actual classifier (declared per-week expectation via the D2 `week_expectation` extra vs the actual trend from the goal/`biomarker::` reads → behind/on-track/ahead, a pure comparison, no model call).
@@ -197,7 +197,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 ---
 
 ### ADR-0037-T1: Care-Lane Tailoring Pass — Placement, Emit-Gate, Degrade-to-Safe, Artifact-Only, Automated Invocation
-**Status:** TODO
+**Status:** built (merged S105, PRs #277-283)
 **ADR Source:** ADR-0037, Decision (§1 emit-gate on recorded, non-held domains; §4 presentation failure degrades to the un-tailored plan; artifact-only via `reemit_maintained`); ADR-0036 Decision ("Tailoring on an automated (non-operator) re-gen": the loop invokes the pass after `record_plan`, idempotent per `(plan, date)`, fail-safe to the un-tailored plan)
 **Files to create/modify:**
 - `scripts/plan/tailoring.py` (Create) — the pass: it emits a tailored section for a domain ONLY when `plan::<domain>` exists in the promoted store AND that domain was in NO hold set (`holds`/`conflict_held`/`rx_bpmh_held`, [orchestrate.py:365-367](../../scripts/plan/orchestrate.py); a held candidate carries `recorded: False, plan: None`, [orchestrate.py:459-463](../../scripts/plan/orchestrate.py)); the presentation is a model call, and on its failure/empty return the domain degrades to its un-tailored recorded plan (mirroring the care turn's `ModelCallError` posture, [care_chat.py:279-281](../../scripts/serve/care_chat.py)); it reads the operator's raw detail from the care lane (`_care_profile`, [care_chat.py:165](../../scripts/serve/care_chat.py)) and renders only through `reemit_maintained`.
@@ -218,7 +218,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 ---
 
 ### ADR-0037-T2: Dosing-Token Reject + Deterministic Fail-Closed Interaction Screen (Paired Control)
-**Status:** TODO
+**Status:** built (merged S105, PRs #277-283)
 **ADR Source:** ADR-0037, Decision (§2 dosing-token reject on compound-domain output; §3 a deterministic drug×supplement×peptide interaction screen built on ADR-0034's curated `rx-interaction-classes` + the existing BPMH/additive-AE lenses that FAILS CLOSED to "see your doctor", split off the presentation model call); OQ-2 (the dosing lexicon + the rule's sync with ADR-0034)
 **Files to create/modify:**
 - `scripts/plan/tailoring.py` (Modify) — scan a compound domain's (supplements/peptides) tailored output for a dosing token; on a hit REJECT (degrade the domain to its un-tailored recorded plan). Add the deterministic interaction rule: screen the operator's raw meds × raw supplements × raw peptides on `router.rx_interaction_class_set` ([router.py:198](../../scripts/plan/router.py)) + the BPMH/additive-AE lens logic ([orchestrate.py:168,262](../../scripts/plan/orchestrate.py)); on a match SURFACE "see your doctor" (never silently drop). The screen is deterministic code that does NOT ride the presentation model call.
@@ -236,7 +236,7 @@ Informing artifacts (downstream workers load on demand): the three source ADRs (
 ---
 
 ### ADR-0037-T3: Load-Time Tripwire + Crown-Jewel Wire-Scan Non-Egress + ADR-0001 Egress Amendment
-**Status:** TODO
+**Status:** built (merged S105, PRs #277-283)
 **ADR Source:** ADR-0037, Decision (§5 a load-time tripwire that no tailoring key is a `SUMMARY_FIELD_SET` member); Decision (the tailoring egress amends ADR-0001's list on the ADR-0016/0032/0035 discipline); Validation (wire-scan non-egress probe; load-time tripwire probe); OQ-3/RT-01 (the reinserted-name scan residual — a pre-ship check, not a re-block)
 **Files to create/modify:**
 - `scripts/plan/tailoring.py` (Modify) — add an import-time assert that no tailoring-artifact key is a `SUMMARY_FIELD_SET` member (mirroring `capture.WIRED_TOKENS ⊆ SUMMARY_FIELD_SET`, [capture.py:283-285](../../scripts/serve/capture.py); the router disjointness asserts, [router.py:667-668](../../scripts/plan/router.py)).
