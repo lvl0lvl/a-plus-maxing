@@ -91,3 +91,35 @@ def land_confirmed(readings, *, root, loop_dispatch=None, loop_deid_client=None)
         # the contract).
         logging.exception("plan-loop signal failed after confirmed land (additive; land unaffected)")
     return {"store": landed}
+
+
+def confirm_large_change(changed_domains, *, rationale):
+    """Emit an ADVISORY that a materially-large plan swap already occurred (ADR-0036-T4).
+
+    The plan loop calls this when a re-gen's change magnitude reaches the pinned threshold. The
+    re-gen has ALREADY recorded the new plan — the front-door promote inside `run_orchestrated`
+    (the ADR-0032-frozen record path) wrote it, and `plan_schema.resolve_plan` resolves that
+    just-written plan as the standing plan. This is therefore an ADVISORY for operator visibility,
+    NOT a hold and NOT a rollback: it names the changed domains + the rationale so the operator sees
+    that a majority-of-domains swap landed. Nothing here holds, reverts, or persists — the true
+    hold-until-confirm is the deferred follow-on ADR-0036-T4b. Mirrors `land_confirmed`'s
+    validate-then-act precedent: validates the request shape — a non-empty list of changed domain
+    tokens plus a non-empty rationale — and returns a thin advisory receipt. Adds NO store key, NO
+    second sink, NO dedupe identity.
+
+    Args:
+        changed_domains (list): The domain tokens whose standing plan the re-gen swapped.
+        rationale (str): The plain-language what-changed summary surfaced in the advisory.
+
+    Returns:
+        (dict) `{"large_change_advisory": [changed domain tokens], "rationale": str}` — a thin
+        advisory receipt of the swap that landed, mirroring `land_confirmed`'s receipt shape.
+    """
+    if (not isinstance(changed_domains, list) or not changed_domains
+            or not all(isinstance(domain, str) and domain for domain in changed_domains)):
+        raise ValueError(
+            "large-change advisory requires a non-empty list of changed domain tokens"
+        )
+    if not isinstance(rationale, str) or not rationale:
+        raise ValueError("large-change advisory requires a non-empty rationale")
+    return {"large_change_advisory": list(changed_domains), "rationale": rationale}
