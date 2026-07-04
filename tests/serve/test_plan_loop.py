@@ -52,10 +52,9 @@ from tests.plan.test_orchestrate import _SUPP_CONFLICT, _nutrition, _recon
 from tests.plan.test_plan_orchestrator import _deid_summary
 from tests.plan.test_quality_judge import _clean_scores
 
-# The judge role slug the loop's `_JudgeClient` adapter dispatches through the unified seam.
-# Coupled by literal to `plan_loop._JUDGE_ROLE` (the loop is a single subscription-agent dispatch:
-# ONE seam answers specialists, the quality judge, and each safety lens, routed by the first arg).
-_JUDGE_ROLE = "quality-judge"
+# The judge role slug the loop's `_JudgeClient` adapter dispatches through the unified seam — the ONE
+# shared `plan_loop.JUDGE_ROLE` constant (bead 3ge1 concern b), not a re-declared coupled literal.
+from scripts.serve.plan_loop import JUDGE_ROLE as _JUDGE_ROLE
 
 
 # --- the unified subscription-agent dispatch fixture (0 live spend) -------------

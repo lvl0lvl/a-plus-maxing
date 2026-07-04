@@ -37,7 +37,9 @@ from scripts.plan.gate_dispatch import compose_gate_dispatch
 from scripts.store import biomarker_meta, plan_schema, store
 
 # The judge role slug the loop dispatches the QUALITY gate through the unified subscription seam.
-_JUDGE_ROLE = "quality-judge"
+# PUBLIC + shared (bead 3ge1 concern b): the dispatch-seam consumers (T2/T3/T4 + the loop tests)
+# read this ONE constant instead of each re-declaring a coupled "quality-judge" literal.
+JUDGE_ROLE = "quality-judge"
 
 # The large-change advisory threshold (ADR-0036 OQ-4) — a fixed module constant a deterministic
 # test reads, NOT a runtime default. Same pinned-number convention as the T2 debounce constants
@@ -47,11 +49,42 @@ _JUDGE_ROLE = "quality-judge"
 LARGE_CHANGE_THRESHOLD_DOMAINS = 3
 
 
+def dispatch_route_collisions(specialists=None, judge=None, lenses=None):
+    """Names appearing in >=2 dispatch-seam route name-spaces — empty when the disjoint precondition holds.
+
+    The dispatch-seam routing precondition (bead 3ge1 concern b), surfaced where T2/T3/T4 read it: the
+    unified `dispatch(name, prompt, context)` seam routes `name` over THREE name-spaces — a
+    `plan_schema.PLAN_DOMAINS` specialist (returns its author envelope), `JUDGE_ROLE` (the quality
+    score map), or a `safety_review.DEFAULT_LENSES` lens (that lens's findings). A production dispatch
+    can route `name` unambiguously ONLY if the three are pairwise disjoint; any name shared across two
+    of them would shadow one route. This predicate returns the offending overlap (a frozenset) so a
+    consumer can assert the precondition holds — empty when it does. Defaults read the live rosters.
+
+    Args:
+        specialists (iterable, optional): The plan-domain specialist names; None -> `PLAN_DOMAINS`.
+        judge (str, optional): The quality-judge role slug; None -> `JUDGE_ROLE`.
+        lenses (iterable, optional): The safety-lens names; None -> `safety_review.DEFAULT_LENSES`.
+
+    Returns:
+        (frozenset) The names present in two or more of the three name-spaces (empty = disjoint).
+    """
+    from scripts.plan.safety_review import DEFAULT_LENSES
+
+    specialists = set(plan_schema.PLAN_DOMAINS if specialists is None else specialists)
+    judge_set = {JUDGE_ROLE if judge is None else judge}
+    lenses = set(DEFAULT_LENSES if lenses is None else lenses)
+    counts = {}
+    for space in (specialists, judge_set, lenses):
+        for name in space:
+            counts[name] = counts.get(name, 0) + 1
+    return frozenset(name for name, count in counts.items() if count >= 2)
+
+
 class _JudgeClient:
     """Adapt the unified subscription dispatch into the quality gate's `.judge(payload)` seam.
 
     The quality gate calls `judge_client.judge(payload)`; the loop's ONE dispatch seam answers every
-    agent class, so the judge is that seam addressed by `_JUDGE_ROLE`. This is the thin adapter that
+    agent class, so the judge is that seam addressed by `JUDGE_ROLE`. This is the thin adapter that
     lets `compose_gate_dispatch` bind the judge to the same subscription dispatch the specialists +
     lenses use.
 
@@ -64,7 +97,7 @@ class _JudgeClient:
 
     def judge(self, payload):
         """Return the per-dimension score map by dispatching the quality judge over the seam."""
-        return self.dispatch(_JUDGE_ROLE, "", payload)
+        return self.dispatch(JUDGE_ROLE, "", payload)
 
 
 def _read_raw_intake(root):
@@ -98,7 +131,7 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tai
         root (str | Path): The store root the plans + the queue are recorded into.
         dispatch (Callable): The unified subscription-agent dispatch seam,
             `dispatch(name, prompt, context)` — a plan-domain name returns that domain's author
-            envelope, `_JUDGE_ROLE` returns the quality score map, a safety-lens name returns that
+            envelope, `JUDGE_ROLE` returns the quality score map, a safety-lens name returns that
             lens's findings. A real subscription agent in production; a fixture mock in tests.
         deid_client: The injected de-id model client for the crown-jewel `deid_in` boundary (a real
             `ModelClient`, or a fixture mock).

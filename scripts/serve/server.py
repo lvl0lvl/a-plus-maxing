@@ -731,6 +731,16 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._write_json(415, {"results": {}, "error": "unsupported content-type"})
             return
 
+        # Honest degradation (bead 3ge1): the loop's A' aggregate dispatch is a subscription-session
+        # runtime the standalone `python -m scripts.serve` process does NOT host (ADR-0036
+        # Consequences), so production `main()` supplies no `loop_dispatch`/`loop_deid_client`. Answer
+        # a DISTINCT honest reason — never fabricate a dispatch, never the generic catch-all, never a
+        # confusing inner deid-call-failed shape from driving `regenerate` with absent seams.
+        if self.loop_dispatch is None or self.loop_deid_client is None:
+            self._write_json(200, {"results": {}, "degraded": True,
+                                   "reason": "loop-dispatch-unavailable"})
+            return
+
         store_root = self.store_root if self.store_root is not None else store.DEFAULT_ROOT
         try:
             result = plan_loop.regenerate(
