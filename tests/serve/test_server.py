@@ -1929,15 +1929,34 @@ def _post_upload_origin(port, filename, payload, *, origin):
 
 
 def test_is_cross_site_origin_unit():
-    """o2gj: the Origin predicate — present + non-loopback refuses; loopback / absent allows."""
+    """o2gj: the Origin predicate — present + non-loopback refuses; loopback / absent allows.
+
+    Locks the SECURITY-CRITICAL property: the loopback allowlist is EXACT-host-match, so a lookalike
+    host (`localhost.evil.com`, `127.0.0.1.evil.com`) REFUSES — a future refactor to a substring/suffix
+    check would silently reopen the CSRF hole, and these assertions catch it.
+    """
     from scripts.serve.server import _is_cross_site_origin
 
+    # cross-site: present + non-loopback -> refuse
     assert _is_cross_site_origin("http://evil.example.com") is True
     assert _is_cross_site_origin("https://attacker.test:8443") is True
+    # lookalike hosts must NOT be treated as loopback (exact-match, not suffix/substring):
+    #  - prefix lookalikes lock against a `"localhost" in host` substring refactor
+    assert _is_cross_site_origin("https://localhost.evil.com") is True
+    assert _is_cross_site_origin("http://127.0.0.1.evil.com") is True
+    #  - a suffix lookalike locks against a `host.endswith("localhost")` refactor
+    assert _is_cross_site_origin("http://evil.localhost") is True
+    # opaque / malformed Origin -> safe-default refuse (no parseable loopback host)
+    assert _is_cross_site_origin("null") is True          # sandboxed iframe / file:// / redirect
+    assert _is_cross_site_origin("not a url") is True      # malformed
+    # loopback (the operator's own served app) -> allow, port/scheme-agnostic
     assert _is_cross_site_origin("http://127.0.0.1:8765") is False
     assert _is_cross_site_origin("http://localhost:8765") is False
     assert _is_cross_site_origin("http://127.0.0.1") is False
-    assert _is_cross_site_origin(None) is False   # non-browser client (curl / the CLI)
+    assert _is_cross_site_origin("http://localhost") is False
+    assert _is_cross_site_origin("http://[::1]:8765") is False
+    # absent Origin (non-browser client — curl / the CLI) -> allow
+    assert _is_cross_site_origin(None) is False
     assert _is_cross_site_origin("") is False
 
 
@@ -1976,7 +1995,7 @@ def test_upload_allows_loopback_origin_reaches_extract(tmp_path):
     try:
         status, _ = _post_upload_origin(port, "labs.dat", b"unrecognized-bytes",
                                         origin="http://127.0.0.1:8765")
-        assert status != 403, f"a same-origin (loopback) /upload was wrongly refused {status}"
+        assert status == 200, f"a same-origin (loopback) /upload was wrongly refused {status}"
         assert recorder.extract_calls != [], "the loopback upload did not reach extract_readings — gate over-blocked"
     finally:
         srv.shutdown()
