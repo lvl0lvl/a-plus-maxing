@@ -373,6 +373,15 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         """
         import json
 
+        # CSRF gate (SEC / 55qg): require application/json so a cross-site CORS-simple POST cannot
+        # drive the converse spend on the operator's key — refuse before any work (mirrors
+        # `_do_generate_plan` / `_do_plan_loop` / `_save_key`; a genuine application/json cross-site
+        # POST forces a preflight the server never answers).
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"reply": None, "error": "unsupported content-type"})
+            return
+
         from scripts.model.client import ModelClient
         from scripts.serve import chat
 
@@ -420,6 +429,13 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         degraded response — the request thread is never dropped (mirroring `_do_chat`).
         """
         import json
+
+        # CSRF gate (SEC / 55qg): same forced-spend refusal as `_do_chat` — a non-application/json
+        # POST cannot drive `client.converse` on the operator's key. Refuse before any work.
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"reply": None, "error": "unsupported content-type"})
+            return
 
         from scripts.model.client import ModelClient
         from scripts.serve import care_chat, conversation_store

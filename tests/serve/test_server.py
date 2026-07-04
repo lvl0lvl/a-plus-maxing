@@ -1790,6 +1790,71 @@ def test_generate_plan_rejects_non_json_content_type_415(tmp_path):
         srv.server_close()
 
 
+# --- 55qg: CSRF content-type gate on the converse-spend chat routes ---
+
+
+class _ConverseRecorder:
+    """Records every `converse(messages)` call so a CSRF 415 can assert 0 forced spend was driven."""
+
+    def __init__(self):
+        self.calls = []
+
+    def converse(self, messages):
+        self.calls.append(messages)
+        return {"reply": "should-not-be-reached-on-a-415"}
+
+
+def _post_chat_route(port, path, *, content_type="application/json"):
+    """POST a real turn body to a chat route with an explicit Content-Type; return (status, body)."""
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
+    conn.request("POST", path, body=json.dumps({"turn": "hi"}).encode(),
+                 headers={"Content-Type": content_type})
+    resp = conn.getresponse()
+    text = resp.read().decode("utf-8")
+    conn.close()
+    return resp.status, text
+
+
+def test_chat_rejects_non_json_content_type_415(tmp_path):
+    """55qg (CSRF / forced-spend): a text/plain POST /chat is refused 415 — 0 converse spend.
+
+    `_do_chat` drives `client.converse` spend on the operator's key; like /generate-plan / /plan-loop /
+    /settings/key it MUST gate on Content-Type so a cross-site CORS-simple `text/plain` POST cannot force
+    converse spend. Failing-capable: drop the gate and the text/plain turn reaches `converse`.
+    """
+    recorder = _ConverseRecorder()
+    srv, port = _server_with_author(tmp_path, recorder)
+    _serve_in_thread(srv)
+    try:
+        status, _ = _post_chat_route(port, "/chat", content_type="text/plain")
+        assert status == 415, f"a text/plain /chat POST returned {status}, expected 415"
+        assert recorder.calls == [], "converse was reached despite the rejected content-type (forced spend)"
+        assert _still_alive(port), "the handler died after a rejected content-type POST"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_care_chat_rejects_non_json_content_type_415(tmp_path):
+    """55qg (CSRF / forced-spend): a text/plain POST /care-chat is refused 415 — 0 converse spend.
+
+    `_do_care_chat` drives `client.converse` on the operator's key with the same forced-spend exposure
+    as `_do_chat`; the same Content-Type gate applies. Failing-capable: drop the gate and the text/plain
+    turn reaches `converse`.
+    """
+    recorder = _ConverseRecorder()
+    srv, port = _server_with_author(tmp_path, recorder)
+    _serve_in_thread(srv)
+    try:
+        status, _ = _post_chat_route(port, "/care-chat", content_type="text/plain")
+        assert status == 415, f"a text/plain /care-chat POST returned {status}, expected 415"
+        assert recorder.calls == [], "converse was reached despite the rejected content-type (forced spend)"
+        assert _still_alive(port), "the handler died after a rejected content-type POST"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
 def test_generate_plan_holds_cross_domain_additive_ae_pair(tmp_path):
     """TEST1 (cross-domain safety): a supplement+peptide additive-AE pair is HELD, not both shipped.
 
