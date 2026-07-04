@@ -484,3 +484,67 @@ def test_assess_pace_absent_inputs_read_none(tmp_path):
         "workout", _enriched_workout_plan("cut"), "2026-06-15", "coach", tmp_path
     )
     assert horizons.assess_pace("workout", "weight", tmp_path, "2026-06-15") is None
+
+
+# --- Tier-3 review (HIGH): realized rate anchored on the observed window ---
+
+
+def test_assess_pace_rate_anchored_on_earliest_snapshot(tmp_path):
+    """Tier-3 (HIGH): the realized rate is measured over the observed span, not from baseline.
+
+    A goal already partway when snapshots begin: baseline=100, target=90, with
+    snapshots {06-01: current=91}, {06-15: current=90.5}. The realized rate over
+    the observed 2-week span is (90.5 - 91) / 2 = -0.25 kg/wk, which is BEHIND the
+    -0.4 kg/wk expectation. The pre-fix code measured (current - baseline) / span =
+    (90.5 - 100) / 2 = -4.75, flipping the verdict to AHEAD. Mutation check:
+    reverting to the baseline-anchored numerator turns this RED (reads "ahead").
+    """
+    goal = _goal(label="Weight", baseline=100, current=91, target=90, unit="kg")
+    goal_schema.record_goal("weight", goal, "2026-06-01", tmp_path)
+    goal_schema.record_goal("weight", {**goal, "current": 90.5}, "2026-06-15", tmp_path)
+    plan_schema.record_plan(
+        "workout", _enriched_workout_plan("cut", week_expectation=-0.4),
+        "2026-06-15", "coach", tmp_path,
+    )
+    # Rate is anchored on the earliest in-span snapshot's current (91), not baseline (100).
+    assert horizons.actual_weekly_rate("weight", tmp_path) == -0.25
+    assert horizons.assess_pace("workout", "weight", tmp_path, "2026-06-15") == "behind"
+
+
+# --- Tier-3 review (LOW): zero expectation is an undefined direction, not a verdict ---
+
+
+def test_assess_pace_zero_expectation_reads_none(tmp_path):
+    """Tier-3 (LOW): a zero week_expectation has no target direction -> None.
+
+    A literal 0 expectation carries no toward-target direction, so classify's
+    ``expectation >= 0`` default would read any nonzero actual as an arbitrary
+    verdict. The pace assessment declines to fabricate one and returns None.
+    Mutation check: dropping the zero guard makes this read "behind" (0 defaults
+    to +1 direction, and the -0.5 kg/wk actual reads behind a 0 slope).
+    """
+    goal = _goal(label="Weight", baseline=100, current=100, target=90, unit="kg")
+    goal_schema.record_goal("weight", goal, "2026-06-01", tmp_path)
+    goal_schema.record_goal("weight", {**goal, "current": 99}, "2026-06-15", tmp_path)
+    plan_schema.record_plan(
+        "workout", _enriched_workout_plan("hold", week_expectation=0),
+        "2026-06-15", "coach", tmp_path,
+    )
+    assert horizons.assess_pace("workout", "weight", tmp_path, "2026-06-15") is None
+
+
+# --- Tier-3 review (LOW): _in_window tolerates a full-ISO timepoint ---
+
+
+def test_in_window_tolerates_full_iso_timepoint(tmp_path):
+    """Tier-3 (LOW): a time-bearing timepoint parses to its date, never raises.
+
+    Schemas store date-only timepoints today, but ``_in_window`` mirrors
+    ``plan_loop._date_of``'s split-on-'T' guard so a full-ISO timepoint resolves
+    to its calendar date. Mutation check: dropping the ``.split("T", 1)[0]`` makes
+    ``date.fromisoformat`` raise on the time-bearing string.
+    """
+    # A time-bearing timepoint on the render date is in-window (its date governs).
+    assert horizons._in_window("2026-06-10T14:30:00", "2026-06-10", horizons.WEEK_SPAN_DAYS)
+    # The date component still governs: 7 days before the render date is out of the 7-day window.
+    assert not horizons._in_window("2026-06-03T00:00:00", "2026-06-10", horizons.WEEK_SPAN_DAYS)

@@ -125,7 +125,8 @@ def _in_window(timepoint, on_date, span_days):
     """
     end = datetime.date.fromisoformat(on_date)
     start = end - datetime.timedelta(days=span_days - 1)
-    return start <= datetime.date.fromisoformat(timepoint) <= end
+    point = datetime.date.fromisoformat(str(timepoint).split("T", 1)[0])
+    return start <= point <= end
 
 
 def window_block(domain, root, on_date, span_days):
@@ -220,34 +221,41 @@ def classify(expectation, actual):
 
 
 def actual_weekly_rate(slug, root):
-    """Derive a goal's realized per-week rate over its snapshot span, or None.
+    """Derive a goal's realized per-week rate over its observed snapshot span, or None.
 
-    Routes progress through ``goal_schema.resolve_goal`` (the single derived-
-    progress owner — this layer re-derives no percent) for the baseline→current
-    change, and sizes the elapsed span from the goal's earliest→latest snapshot
-    dates. A goal with no readable snapshot, or a single-snapshot goal (no
-    measurable span), yields None — honest absence, never a fabricated rate.
-    Reads only; writes nothing.
+    Measures the ``current`` reading's change across the SAME window the span is
+    sized over: the earliest in-span snapshot's ``current`` to the latest
+    snapshot's ``current``, divided by the elapsed weeks. Anchoring the numerator
+    on the earliest snapshot's reading — not the goal's fixed ``baseline`` — keeps
+    numerator and denominator over one window, so a goal already partway when
+    snapshots begin is not overstated (the two agree only when the earliest
+    snapshot's current equals baseline). Presence is still gated through
+    ``goal_schema.resolve_goal`` (the single derived-progress owner); a goal with
+    no readable snapshot, or a single-snapshot goal (no measurable span), yields
+    None — honest absence, never a fabricated rate. Reads only; writes nothing.
 
     Args:
         slug (str): The goal's stable identifier.
         root (str | Path): The store root.
 
     Returns:
-        (float | None) The realized per-week rate (current - baseline over the
-        snapshot span in weeks), or None when there is no multi-day span.
+        (float | None) The realized per-week rate (latest current - earliest
+        in-span current over the snapshot span in weeks), or None when there is
+        no multi-day span.
     """
     readings = store.read(f"goal::{slug}", root=root)
-    goal = goal_schema.resolve_goal(readings)
-    if goal is None:
+    if goal_schema.resolve_goal(readings) is None:
         return None
-    dates = sorted(r["timepoint"] for r in readings)
+    snapshots = sorted(readings, key=lambda r: r["timepoint"])
     span_days = (
-        datetime.date.fromisoformat(dates[-1]) - datetime.date.fromisoformat(dates[0])
+        datetime.date.fromisoformat(snapshots[-1]["timepoint"])
+        - datetime.date.fromisoformat(snapshots[0]["timepoint"])
     ).days
     if span_days <= 0:
         return None
-    return (goal["current"] - goal["baseline"]) / (span_days / 7)
+    start_val = snapshots[0]["value"]["current"]
+    end_val = snapshots[-1]["value"]["current"]
+    return (end_val - start_val) / (span_days / 7)
 
 
 def assess_pace(domain, slug, root, on_date):
@@ -256,8 +264,10 @@ def assess_pace(domain, slug, root, on_date):
     Sources the expectation from the this-week block's ``week_expectation`` D2
     extra (the date-range plan history) and the actual from ``actual_weekly_rate``
     (routed through ``goal_schema``), then feeds both into ``classify``. Returns
-    None when either input is absent — a non-numeric/absent expectation or a goal
-    with no measurable span — inventing no verdict. Reads only; writes no store item.
+    None when either input is absent — a non-numeric/absent expectation, a zero
+    expectation (an undefined target direction, not a maintenance verdict), or a
+    goal with no measurable span — inventing no verdict. Reads only; writes no
+    store item.
 
     Args:
         domain (str): A `plan_schema.PLAN_DOMAINS` member.
@@ -273,6 +283,8 @@ def assess_pace(domain, slug, root, on_date):
         return None
     expectation = block["extras"].get("week_expectation")
     if not isinstance(expectation, (int, float)) or isinstance(expectation, bool):
+        return None
+    if expectation == 0:
         return None
     actual = actual_weekly_rate(slug, root)
     if actual is None:
