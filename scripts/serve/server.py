@@ -718,6 +718,11 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         highest-spend loop tick (every specialist + judge + lens dispatch) on the operator's key (a
         genuine application/json cross-site POST forces a preflight the server never answers).
 
+        Seams-absent state (mirrors `_do_generate_plan`'s no-key early-return): when the loop
+        `dispatch`/`deid_client` seams are absent — the standalone-server posture, since production
+        `main()` supplies no subscription runtime (bead 3ge1) — answer a DISTINCT honest
+        `loop-dispatch-unavailable` degraded reason before any work, never the generic catch-all.
+
         Thread survival (mirrors `_do_chat` / `_do_generate_plan`): a malformed state / an unexpected
         exception answers an honest degraded JSON, never a dropped request thread.
         """
