@@ -589,3 +589,214 @@ def test_recorded_compound_plan_carries_no_ae_profile_no_tailoring_referral(tmp_
         "a tailoring-lane interaction referral fired on a production-recorded compound plan — the "
         "retired §3 screen was re-homed into the tailoring lane"
     )
+
+
+# ===============================================================================
+# Cycle 7 (ADR-0037-T3): load-time SUMMARY_FIELD_SET-disjointness tripwire (AC-1)
+# ===============================================================================
+
+# Re-run the EXACT load-time disjointness assert in a fresh interpreter AFTER mutating the
+# field set, to prove a tailoring section key masquerading as a summary field reds it. Mirrors
+# tests/plan/test_router.py's `_MISPLACEMENT_SUBPROCESS` change-control idiom.
+_TRIPWIRE_SUBPROCESS = """
+import sys
+from scripts.plan import router, tailoring
+{mutation}
+assert set(tailoring._TAILORING_SECTION_KEYS).isdisjoint(set(router.SUMMARY_FIELD_SET))
+print("tripwire-did-not-red")
+"""
+
+
+def _run_tripwire_subprocess(mutation):
+    """Run the load-time disjointness tripwire against a mutated field set in a fresh interpreter.
+
+    Returns the subprocess result; a faithful tripwire reds with a non-zero exit and an
+    AssertionError in stderr (never prints `tripwire-did-not-red`).
+    """
+    import subprocess
+    import sys
+
+    repo_root = Path(__file__).resolve().parents[2]
+    return subprocess.run(
+        [sys.executable, "-c", _TRIPWIRE_SUBPROCESS.format(mutation=mutation)],
+        cwd=repo_root, capture_output=True, text=True,
+    )
+
+
+def test_tailoring_section_keys_disjoint_from_summary_field_set():
+    # AC-1 (no-raise half): the module imported (its load-time tripwire ran clean), the tailoring
+    # section keys ARE the domains the pass emits at the reemit_maintained boundary (tied to the
+    # emitted set, not a hand-spelled copy), and they are disjoint from router.SUMMARY_FIELD_SET —
+    # so no tailoring key can cross the de-id boundary as a `summarize`/`dispatch` planner token.
+    from scripts.plan import router, tailoring
+
+    assert set(tailoring._TAILORING_SECTION_KEYS) == set(plan_schema.PLAN_DOMAINS)
+    assert set(tailoring._TAILORING_SECTION_KEYS).isdisjoint(set(router.SUMMARY_FIELD_SET))
+
+
+def test_tailoring_key_in_summary_field_set_reds_at_load():
+    # AC-1 (raise half): a tailoring section key placed INTO SUMMARY_FIELD_SET reds the load-time
+    # disjointness tripwire. Fail-capable — inject a REAL tailoring key into the field set, then
+    # re-run the EXACT tripwire expression; it raises AssertionError (never prints the sentinel).
+    result = _run_tripwire_subprocess(
+        "router.SUMMARY_FIELD_SET = router.SUMMARY_FIELD_SET + "
+        "(sorted(tailoring._TAILORING_SECTION_KEYS)[0],)"
+    )
+    assert result.returncode != 0, (
+        f"the disjointness tripwire did not red; stdout={result.stdout!r}"
+    )
+    assert "AssertionError" in result.stderr
+    assert "tripwire-did-not-red" not in result.stdout
+
+
+# ===============================================================================
+# Cycle 8 (ADR-0037-T3): crown-jewel wire-scan — 0 tailoring/raw content reaches
+# the de-id store streams OR the de-id dashboard render (AC-2, finding E), and the
+# tailored sections land ONLY in the gitignored artifact (AC-3).
+# ===============================================================================
+
+# A distinctive synthetic raw care-lane detail the tailoring path READS (fed via `health_detail`,
+# never persisted to the de-id store) — carrying a raw drug specific + the operator's legal name.
+# The wire-scan proves NEITHER reaches the store or the de-id dashboard. Deliberately dose-free so
+# the T2 compound-domain dosing-reject retains it (the artifact IS the positive control).
+WIRE_RAW_DETAIL = f"BPC-157 left-Achilles rehab for {SYNTH_NAME}"
+
+# The rendered tailoring-content markers `reemit_maintained` emits for a tailored section
+# (`scripts/generate/maintained._tailored_sections_html`). Their presence in a de-id surface
+# would BE the leak this wire-scan forbids.
+_TAILORING_CONTENT_MARKERS = ("care-tailored", "data-domain=", "PERSONALIZED-")
+
+
+def _tailoring_content_hits(payload):
+    """Count raw-PII (legal name + raw detail) + rendered-tailoring-content occurrences."""
+    hits = payload.count(SYNTH_NAME) + payload.count(WIRE_RAW_DETAIL)
+    hits += sum(payload.count(marker) for marker in _TAILORING_CONTENT_MARKERS)
+    return hits
+
+
+def _run_wire_scan_tailor(tmp_path):
+    """Seed a de-id plan + a biomarker, run the FULL tailoring path; return (artifact_text, store_root)."""
+    from scripts.plan import tailoring
+    from scripts.store import loop_schema
+
+    store_root = tmp_path / "store"
+    _seed_plan(store_root, "peptides", plan=_peptide_plan(), date=ON_DATE)
+    loop_schema.record_biomarker("ferritin", "2026-06-01T00:00:00+00:00", 52, root=store_root)
+    repo, out = _gitignored_out(tmp_path)
+    path = tailoring.tailor(
+        store_root, client=_EchoClient(),
+        care_profile_read=_care_profile_read(peptides=WIRE_RAW_DETAIL),
+        plan_date=ON_DATE, out_dir=out, _today=TODAY,
+        _profile_paths=_synth_profile(tmp_path), _repo_root=repo,
+    )
+    return Path(path).read_text(encoding="utf-8"), store_root
+
+
+def _deid_surfaces(store_root, tmp_path):
+    """Dump the two de-id surfaces the tailored output must never reach: the store streams
+    (`store.read_all`) + the de-id dashboard render (`render_views` over the seeded biomarker)."""
+    from scripts.generate import render_views
+    from scripts.store import store
+
+    store_dump = json.dumps(store.read_all(store_root))
+    pages = render_views.render_views(
+        store_root, biomarkers=("ferritin",), _out_dir=tmp_path / "dash")
+    dashboard_dump = "\n".join(p.read_text(encoding="utf-8") for p in pages)
+    return store_dump, dashboard_dump
+
+
+def test_ac2_wire_scan_no_tailoring_or_raw_content_in_deid_surfaces(tmp_path):
+    # AC-2 CROWN JEWEL: after the FULL tailoring path (incl. the T2 dosing-reject), 0 raw-PII
+    # (legal name + raw drug specific) AND 0 rendered-tailoring-content markers reach EITHER the
+    # de-id store streams OR the de-id dashboard render. The tailored (raw-reading) output's ONLY
+    # sink is the gitignored maintained artifact.
+    from scripts.store import store
+
+    artifact_text, store_root = _run_wire_scan_tailor(tmp_path)
+    # positive control: the content IS in the gitignored artifact (the test seeded real content).
+    assert _tailoring_content_hits(artifact_text) > 0, "the tailoring path emitted no content to scan"
+
+    store_dump, dashboard_dump = _deid_surfaces(store_root, tmp_path)
+    assert _tailoring_content_hits(store_dump) == 0, "tailoring/raw content leaked into a de-id store stream"
+    assert _tailoring_content_hits(dashboard_dump) == 0, "tailoring/raw content leaked into the de-id dashboard"
+
+    # finding E: no `plan-tailor::` (or any tailoring-owned) store stream was opened.
+    assert not any("tailor" in item for item in store.items(store_root)), (
+        "the tailoring pass opened a store stream (finding E — no raw store stream)"
+    )
+
+    # NON-TAUTOLOGY guard: injecting a tailoring marker into a de-id payload REDs the probe.
+    assert _tailoring_content_hits(store_dump + "<section class='care-tailored'>") > 0, (
+        "the wire-scan probe cannot detect injected tailoring content (tautological)"
+    )
+    assert _tailoring_content_hits(dashboard_dump + WIRE_RAW_DETAIL) > 0
+
+
+def test_ac3_tailored_sections_only_in_gitignored_artifact(tmp_path):
+    # AC-3: the tailored sections appear in the gitignored maintained artifact (>=1) and in 0
+    # tracked/committed render (the de-id dashboard payload).
+    artifact_text, store_root = _run_wire_scan_tailor(tmp_path)
+    assert artifact_text.count("data-domain='peptides'") >= 1, "no tailored section in the artifact"
+    _, dashboard_dump = _deid_surfaces(store_root, tmp_path)
+    assert dashboard_dump.count("data-domain") == 0, "a tailored section reached the de-id dashboard"
+    assert dashboard_dump.count("care-tailored") == 0, "a tailored section class reached the de-id dashboard"
+
+
+# ===============================================================================
+# Cycle 9 (ADR-0037-T3): ADR-0001 egress amendment (AC-4) + the reinserted-name
+# pre-ship commit/push PII scan (AC-5).
+# ===============================================================================
+
+
+def test_ac4_adr0001_records_tailoring_egress_carveout():
+    # AC-4: ADR-0001's egress list carries the ADR-0037 tailoring presentation carve-out entry
+    # AND the `amended-by` edge (finding F — named egress).
+    import re
+
+    doc = Path("docs/adr/ADR-0001-pii-trust-boundary-no-train-routing.md").read_text(encoding="utf-8")
+    m = re.search(r"ADR-0037[^\n|]*\|\s*amended-by\s*\|([^\n]*)", doc)
+    assert m, "ADR-0001 has no `amended-by` Related-Decisions row for ADR-0037"
+    row = m.group(1).lower()
+    assert "tailoring" in row, "the ADR-0037 row does not name the tailoring egress carve-out"
+    assert "gitignored" in row or "maintained artifact" in row, (
+        "the ADR-0037 row does not scope the tailored output to the gitignored maintained artifact"
+    )
+
+
+def _synth_identity_config(tmp_path):
+    """A gitignored SYNTHETIC operator-identity token file (`first|last`), the shape pii_scan loads."""
+    cfg = tmp_path / "operator-identity.txt"
+    cfg.write_text("Janet|Testperson\n", encoding="utf-8")
+    return cfg
+
+
+def test_ac5_reinserted_name_artifact_denied_by_pii_scan(tmp_path):
+    # AC-5 pre-ship (OQ-3 / RT-01): a maintained artifact carrying the REINSERTED operator NAME
+    # under vault/artifacts/generated/ is DENIED by the commit/push PII scan (`scan_scoped` over
+    # the data-bearing prefix + the identity tokens — the artifact path passed as `data_bearing`
+    # mirrors the hook's DATA_BEARING_PREFIXES classification of vault/artifacts/generated/).
+    # Paired control: a de-identified (initials-only) artifact under the SAME prefix PASSES. A scan
+    # that denies both or neither fails the gate.
+    from scripts.guard import pii_scan
+
+    # produce the REAL name-bearing artifact through the tailoring path (reinsert_out re-inserts
+    # the synthetic full name onto the confirmable-gitignored target).
+    name_text, _ = _run_wire_scan_tailor(tmp_path)
+    assert SYNTH_NAME in name_text, "the tailoring path did not re-insert the operator name (feature broken)"
+    name_art = tmp_path / "repo" / "vault" / "artifacts" / "generated" / "maintained.html"
+    assert name_art.exists()
+
+    # a de-identified counterpart under the SAME prefix (initials only — the reinserted name stripped).
+    clean_art = name_art.parent / "maintained-clean.html"
+    clean_art.write_text(name_text.replace(SYNTH_NAME, "Patient JQT"), encoding="utf-8")
+
+    identity_cfg = _synth_identity_config(tmp_path)
+    contact_cfg = tmp_path / "operator-contact.txt"  # empty synthetic contact config (no tokens)
+    contact_cfg.write_text("", encoding="utf-8")
+
+    denied = pii_scan.scan_scoped([str(name_art)], [str(name_art)],
+                                  contact_config=contact_cfg, identity_config=identity_cfg)
+    passed = pii_scan.scan_scoped([str(clean_art)], [str(clean_art)],
+                                  contact_config=contact_cfg, identity_config=identity_cfg)
+    assert denied > 0, "the reinserted-name artifact was NOT denied (scan-scope hole over the artifact prefix)"
+    assert passed == 0, "the de-identified artifact was wrongly denied (over-block)"
