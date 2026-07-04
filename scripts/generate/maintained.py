@@ -225,18 +225,47 @@ def _render_report(store_read, today, profile_paths):
         report._PROFILE_PATHS = saved
 
 
-def _assemble_maintained(store_read, root, on_date, today, profile_paths):
+def _tailored_sections_html(tailored_sections):
+    """Render the care-lane tailored per-domain sections into HTML, or "" when there are none.
+
+    The ADR-0037-T1 injection surface: a `{domain: tailored-text}` mapping (from the care-lane
+    tailoring pass) rendered as distinct `care-tailored` sections. Escaped (the tailored text is
+    model/operator content, never trusted HTML). Rendered in the FRESH body — outside the
+    `maintained-preserved` container — so a re-emit replaces rather than accretes it (idempotent).
+
+    Args:
+        tailored_sections (dict | None): domain -> the tailored section text, or None.
+
+    Returns:
+        (str) The concatenated tailored-section HTML, or "" when the mapping is empty.
+    """
+    if not tailored_sections:
+        return ""
+    blocks = []
+    for domain in sorted(tailored_sections):
+        blocks.append(
+            f"<section class='care-tailored' data-domain='{escape(domain)}'>"
+            f"<h2>Personalized: {escape(domain)}</h2>"
+            f"<div class='care-tailored-body'>{escape(str(tailored_sections[domain]))}</div>"
+            "</section>"
+        )
+    return "".join(blocks)
+
+
+def _assemble_maintained(store_read, root, on_date, today, profile_paths, tailored_sections=None):
     """Assemble the maintained HTML: the report render + the folded tracking section.
 
     A template-callable for `render.emit`: it renders the ADR-0004 report against `store_read`
     (the de-identified initials-only content, carrying the `Patient <initials>` header
     reinsert_out targets), appends the maintained module's OWN folded plan-vs-actual section,
-    and a preserved-content container the re-emit folds prior entries into.
+    the ADR-0037-T1 care-lane tailored sections (when present), and a preserved-content container
+    the re-emit folds prior entries into.
     """
     body = _render_report(store_read, today, profile_paths)
     fold = _fold_tracking_section(root, on_date)
+    tailored = _tailored_sections_html(tailored_sections)
     preserved = "<div class='maintained-preserved'></div><!--/maintained-preserved-->"
-    insert = fold + preserved
+    insert = tailored + fold + preserved
     if "</body>" in body:
         return body.replace("</body>", insert + "</body>", 1)
     return body + insert
@@ -251,6 +280,7 @@ def reemit_maintained(
     _repo_root=None,
     _target_override=None,
     _fail_after_render=False,
+    tailored_sections=None,
 ):
     """Re-emit the unified maintained-HTML artifact and return its path.
 
@@ -276,6 +306,10 @@ def reemit_maintained(
             escaping) target through the containment guard. Defaults to the in-dir artifact.
         _fail_after_render (bool, optional): Test-only fault-injection seam — raise after the
             render but before the atomic replace, to prove the artifact is never partial-state.
+        tailored_sections (dict, optional): The ADR-0037-T1 care-lane tailored-section injector —
+            a `{domain: tailored-text}` mapping injected into the assembled HTML via the existing
+            `_assemble_maintained` path. Defaults to None (unchanged pre-T1 behavior). Adds no store
+            key and no second writer; preserves the format-then-fill order and the realpath guard.
 
     Returns:
         (Path) The path of the maintained artifact written.
@@ -294,7 +328,8 @@ def reemit_maintained(
 
     # --- render FIRST (the content render; the budget/external-ref gate lives in render.emit) ---
     def _template(sr):
-        return _assemble_maintained(sr, store_root, on_date, today, _profile_paths)
+        return _assemble_maintained(
+            sr, store_root, on_date, today, _profile_paths, tailored_sections)
 
     _template.__name__ = "maintained"
     # Render into an auto-cleaned temp staging dir UNDER the (gitignored) out-dir, so the staging
