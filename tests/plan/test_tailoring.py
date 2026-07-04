@@ -595,30 +595,33 @@ def test_recorded_compound_plan_carries_no_ae_profile_no_tailoring_referral(tmp_
 # Cycle 7 (ADR-0037-T3): load-time SUMMARY_FIELD_SET-disjointness tripwire (AC-1)
 # ===============================================================================
 
-# Re-run the EXACT load-time disjointness assert in a fresh interpreter AFTER mutating the
-# field set, to prove a tailoring section key masquerading as a summary field reds it. Mirrors
-# tests/plan/test_router.py's `_MISPLACEMENT_SUBPROCESS` change-control idiom.
+# Poison the field set BEFORE importing tailoring, so the PRODUCTION module-load assert (the
+# `set(_TAILORING_SECTION_KEYS).isdisjoint(...)` at tailoring.py load) is what reds — not a
+# hand-copied expression re-typed in the subprocess. Deleting that assert must therefore make
+# this test go RED. Improves on tests/plan/test_router.py's `_MISPLACEMENT_SUBPROCESS`, which
+# re-executes a copy of the tripwire after import (its accepted limitation).
 _TRIPWIRE_SUBPROCESS = """
-import sys
-from scripts.plan import router, tailoring
-{mutation}
-assert set(tailoring._TAILORING_SECTION_KEYS).isdisjoint(set(router.SUMMARY_FIELD_SET))
+from scripts.plan import router
+router.SUMMARY_FIELD_SET = router.SUMMARY_FIELD_SET + ({injected!r},)
+import scripts.plan.tailoring   # module-load tripwire must RED HERE
 print("tripwire-did-not-red")
 """
 
 
-def _run_tripwire_subprocess(mutation):
-    """Run the load-time disjointness tripwire against a mutated field set in a fresh interpreter.
+def _run_tripwire_subprocess(injected):
+    """Run the tailoring module-load tripwire in a fresh interpreter with a poisoned field set.
 
-    Returns the subprocess result; a faithful tripwire reds with a non-zero exit and an
-    AssertionError in stderr (never prints `tripwire-did-not-red`).
+    Mutates `router.SUMMARY_FIELD_SET` to carry `injected` BEFORE importing tailoring, so the
+    production load-time assert (not a re-typed copy) is what fires. Returns the subprocess result;
+    a faithful tripwire reds with a non-zero exit and the production assert's custom crown-jewel
+    message in stderr (never prints `tripwire-did-not-red`).
     """
     import subprocess
     import sys
 
     repo_root = Path(__file__).resolve().parents[2]
     return subprocess.run(
-        [sys.executable, "-c", _TRIPWIRE_SUBPROCESS.format(mutation=mutation)],
+        [sys.executable, "-c", _TRIPWIRE_SUBPROCESS.format(injected=injected)],
         cwd=repo_root, capture_output=True, text=True,
     )
 
@@ -635,17 +638,20 @@ def test_tailoring_section_keys_disjoint_from_summary_field_set():
 
 
 def test_tailoring_key_in_summary_field_set_reds_at_load():
-    # AC-1 (raise half): a tailoring section key placed INTO SUMMARY_FIELD_SET reds the load-time
-    # disjointness tripwire. Fail-capable — inject a REAL tailoring key into the field set, then
-    # re-run the EXACT tripwire expression; it raises AssertionError (never prints the sentinel).
-    result = _run_tripwire_subprocess(
-        "router.SUMMARY_FIELD_SET = router.SUMMARY_FIELD_SET + "
-        "(sorted(tailoring._TAILORING_SECTION_KEYS)[0],)"
-    )
+    # AC-1 (raise half): a tailoring section key placed INTO SUMMARY_FIELD_SET reds the PRODUCTION
+    # module-load assert in tailoring.py — not a re-typed copy. Poison the field set with a REAL
+    # tailoring key BEFORE importing tailoring, then import it: the load-time assert raises, and its
+    # custom crown-jewel message reaches stderr. Binding to that message ties the pass to the
+    # production guard firing — deleting the assert makes this test go RED.
+    injected = sorted(plan_schema.PLAN_DOMAINS)[0]
+    result = _run_tripwire_subprocess(injected)
     assert result.returncode != 0, (
-        f"the disjointness tripwire did not red; stdout={result.stdout!r}"
+        f"the module-load disjointness tripwire did not red; stdout={result.stdout!r}"
     )
     assert "AssertionError" in result.stderr
+    assert "a tailoring section key is a router.SUMMARY_FIELD_SET member" in result.stderr, (
+        f"the RED did not come from tailoring.py's production load assert; stderr={result.stderr!r}"
+    )
     assert "tripwire-did-not-red" not in result.stdout
 
 
