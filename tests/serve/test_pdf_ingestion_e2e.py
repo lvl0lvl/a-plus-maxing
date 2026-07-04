@@ -106,7 +106,7 @@ _FROZEN_ENGINE_PATHS = (
     *sorted(
         str(p.relative_to(REPO_ROOT))
         for p in (REPO_ROOT / "scripts" / "plan").glob("*.py")
-        if p.name not in ("router.py", "horizons.py")  # router.py (de-id summary spine) guarded by test_router_additive_only_from_fork; horizons.py is a NEW post-ADR-0032 read-layer feature module (ADR-0038-T1..T3), NOT crown-jewel spine — its invariants (single progress site, no new store stream, peptides-untracked, no fabricated deadline) are guarded by tests/plan/test_horizons.py, which catches the insertion-shaped regressions a numstat additive-guard would miss. Architect ruling, feature/dyn-loop-w2.
+        if p.name not in ("router.py", "horizons.py", "tailoring.py")  # router.py (de-id summary spine) guarded by test_router_additive_only_from_fork; horizons.py is a NEW post-ADR-0032 read-layer feature module (ADR-0038-T1..T3), NOT crown-jewel spine — its invariants (single progress site, no new store stream, peptides-untracked, no fabricated deadline) are guarded by tests/plan/test_horizons.py, which catches the insertion-shaped regressions a numstat additive-guard would miss. Architect ruling, feature/dyn-loop-w2. tailoring.py (ADR-0037 care-lane tailoring) is a NEW post-ADR-0032 crown-jewel module (raw _care_profile egress + T2 safety gates), extended T1/T2/T3 so byte-freeze is impossible; it carries a DUAL risk shape with BOTH guarantors — its INSERTION-shape egress risk is guarded behaviorally by tests/plan/test_tailoring.py (T1 AC-4 static-scan; T3 AC-2/AC-3 wire-scan/artifact-only), its DELETION-shape safety-gate-removal risk by test_tailoring_additive_only_from_fork (PROSPECTIVE — vacuous until tailoring.py is on main, since a new-since-fork file reports 0 deletions vs the fork). Architect ruling, feature/dyn-loop-w5, 3rd carve-out.
     ),
 )
 
@@ -1038,4 +1038,41 @@ def test_router_additive_only_from_fork():
     assert deletions <= _ROUTER_SANCTIONED_DELETIONS, (
         f"router.py deleted {deletions} lines (> {_ROUTER_SANCTIONED_DELETIONS} sanctioned) "
         f"— a NON-ADDITIVE rewrite of the de-id summary spine (PF-S63-02 guard-loosening)"
+    )
+
+
+# HIST1 / PF-S63-02: tailoring.py (ADR-0037 care-lane tailoring) is excluded from the
+# byte-frozen set above because it is a NEW post-ADR-0032 crown-jewel module extended across
+# T1/T2/T3 — but a WHOLESALE exclusion would let a future NON-ADDITIVE rewrite that DELETES a
+# T2 safety gate pass CI silently. The additive-only guard below names that failure class:
+# DELETIONS are capped at 0, while INSERTIONS stay unbounded. It is PROSPECTIVE — a
+# new-since-fork file reports 0 deletions vs the fork, so the guard is vacuous until tailoring.py
+# is on main; within-branch protection is tests/plan/test_tailoring.py's behavioral gates' job.
+_TAILORING_ADDITIVE_PATH = "scripts/plan/tailoring.py"
+_TAILORING_SANCTIONED_DELETIONS = 0
+
+
+def test_tailoring_additive_only_from_fork():
+    """HIST1 / PF-S63-02: scripts/plan/tailoring.py changed ADDITIVELY ONLY from the fork.
+
+    PROSPECTIVE guard: tailoring.py is new-since-fork, so it reports 0 deletions vs the fork
+    and this test is vacuous until tailoring.py lands on main. Once on main, a NON-ADDITIVE
+    rewrite that DELETES a T2 safety gate pushes the deletion count over 0 and REDs this test.
+    Within-branch, the INSERTION-shape egress risk is the job of tests/plan/test_tailoring.py's
+    behavioral gates (T1 AC-4 static-scan; T3 AC-2/AC-3 wire-scan/artifact-only). INSERTIONS
+    are unbounded (additive extension is allowed).
+    """
+    fork_point = subprocess.run(
+        ["git", "merge-base", "HEAD", "origin/main"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    fields = subprocess.run(
+        ["git", "diff", "--numstat", fork_point, "--", _TAILORING_ADDITIVE_PATH],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    ).stdout.split()
+    # numstat row: "<insertions>\t<deletions>\t<path>"; absent row -> unchanged -> 0 deletions.
+    deletions = int(fields[1]) if fields else 0
+    assert deletions <= _TAILORING_SANCTIONED_DELETIONS, (
+        f"tailoring.py deleted {deletions} lines (> {_TAILORING_SANCTIONED_DELETIONS} sanctioned) "
+        f"— a NON-ADDITIVE rewrite removing a T2 safety gate (PF-S63-02 guard-loosening)"
     )

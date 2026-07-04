@@ -84,7 +84,7 @@ def _read_raw_intake(root):
     return {"operator_state": store.read_all(root)}
 
 
-def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None):
+def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tailor_client=None):
     """Drive the loop's re-gen through the full-composition front door and return the run result.
 
     Reads the current raw plan-intake for `root`, resolves `plan_date` to today's ISO date when
@@ -105,6 +105,10 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None):
         plan_date (str, optional): The plans' YYYY-MM-DD date. `None` -> today's ISO date.
         trigger (str, optional): The cadence/manual trigger label (carried for the downstream
             debounce/rationale seams; not consumed here).
+        tailor_client (optional): The care-lane presentation model client forwarded to the
+            ADR-0037-T1 tailoring pass on the automated post-promote seam. `None` (the not-yet-wired
+            production trigger site) leaves the seam a pass-through, mirroring the `signal`
+            seams-unwired posture — no tailoring, 0 model spend.
 
     Returns:
         (dict) The `run_orchestrated` result (recorded survivors + reconciliation + dvq_entries),
@@ -159,10 +163,11 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None):
         result["large_change"] = False
         result["large_change_advisory"] = None
     # AC-4: the post-promote tailoring-hook seam — fired exactly once per promoted re-gen with the
-    # promoted plan set + the render target (pass-through until ADR-0037-T1 fills it).
+    # promoted plan set + the render target. ADR-0037-T1 fills it: on a threaded `tailor_client` the
+    # care-lane tailoring pass runs once (else it stays a pass-through — the un-wired site).
     _post_promote_tailoring(
         {domain: result["results"][domain]["plan"] for domain in promoted},
-        root, adherence=adherence,
+        root, adherence=adherence, tailor_client=tailor_client, plan_date=plan_date,
     )
     return result
 
@@ -245,14 +250,17 @@ def _read_adherence(root, on_date):
             for domain in plan_schema.TRACKED_DOMAINS}
 
 
-def _post_promote_tailoring(promoted_plan, render_target, *, adherence=None):
-    """Post-promote tailoring-hook seam — PASS-THROUGH until ADR-0037-T1 (the interface contract).
+def _post_promote_tailoring(promoted_plan, render_target, *, adherence=None,
+                            tailor_client=None, plan_date=None, _tailor_seams=None):
+    """Post-promote tailoring-hook seam — runs the ADR-0037-T1 care-lane tailoring pass once.
 
     Fired EXACTLY ONCE per promoted re-gen, AFTER the front-door promote, with the promoted plan set
     plus the render target (`generate.maintained.reemit_maintained`'s root) — plus the separate
-    adherence input as a keyword extra. In THIS task it produces no tailored content and performs no
-    egress: it is the stable single-call seam ADR-0037-T1 fills with the care-lane tailoring pass
-    (promote -> tailoring pass -> reemit_maintained). Change-control (build-plan multi-agent flag):
+    adherence input as a keyword extra. When a `tailor_client` is threaded it dispatches the care-lane
+    tailoring pass (`tailoring.tailor`) once — the pass reads the operator's RAW `_care_profile`
+    detail and renders the tailored sections ONLY into the gitignored maintained artifact. Absent the
+    client (the not-yet-wired production trigger site) it stays a PASS-THROUGH, mirroring `signal`'s
+    seams-unwired posture — 0 tailoring, 0 model spend. Change-control (build-plan multi-agent flag):
     the call shape (promoted plan + render target, once per re-gen) is a cross-task contract — a
     later edit changing it triggers an Architect contract-update notice.
 
@@ -260,7 +268,23 @@ def _post_promote_tailoring(promoted_plan, render_target, *, adherence=None):
         promoted_plan (dict): domain -> the promoted plan value for each promoted domain.
         render_target (str | Path): The `reemit_maintained` root/artifact target.
         adherence (dict, optional): The separate plan-vs-actual adherence input (AC-5).
+        tailor_client (optional): The care-lane presentation model client. None -> pass-through.
+        plan_date (str, optional): The re-gen's YYYY-MM-DD date the tailoring emit-gate keys on.
+        _tailor_seams (dict, optional): Test-only seams forwarded to `tailoring.tailor` (the
+            gitignored `out_dir` / synthetic-identity / repo-root artifact seams). None in production.
     """
+    if tailor_client is None:
+        return None
+    from scripts.plan import tailoring
+    from scripts.serve import care_chat
+
+    care_profile_read = functools.partial(
+        care_chat._care_profile, functools.partial(store.read, root=render_target))
+    # Risk R-D: pass the promoted (recorded-and-not-held THIS re-gen) domain set so the tailoring
+    # emit-gate keys on the current hold set, not a stale same-date store row.
+    tailoring.tailor(render_target, client=tailor_client,
+                     care_profile_read=care_profile_read, plan_date=plan_date,
+                     promoted=set(promoted_plan), **(_tailor_seams or {}))
     return None
 
 
@@ -362,7 +386,7 @@ def _should_regenerate(store_read, *, on_date):
     return _sustained_signal(store_read)
 
 
-def signal(root, *, trigger, dispatch=None, deid_client=None, plan_date=None):
+def signal(root, *, trigger, dispatch=None, deid_client=None, plan_date=None, tailor_client=None):
     """The ONE debounced entry every trigger kind calls; re-generate only when the gate passes.
 
     Runs the shared debounce predicate over DERIVED state (last-re-gen date from the dated `plan::`
@@ -383,6 +407,8 @@ def signal(root, *, trigger, dispatch=None, deid_client=None, plan_date=None):
             `regenerate` on a gate-pass. None at a not-yet-wired production trigger site.
         deid_client (optional): The de-id model client forwarded to `regenerate`. None as above.
         plan_date (str, optional): The plans' YYYY-MM-DD date. None -> today's ISO date.
+        tailor_client (optional): The care-lane presentation model client forwarded to `regenerate`
+            for the ADR-0037-T1 post-promote tailoring pass. None at a not-yet-wired trigger site.
 
     Returns:
         (dict) The `regenerate` result on a gate-pass with seams present, else a no-op / hold+prompt
@@ -394,7 +420,7 @@ def signal(root, *, trigger, dispatch=None, deid_client=None, plan_date=None):
     if _should_regenerate(store_read, on_date=plan_date):
         if dispatch is not None and deid_client is not None:
             return regenerate(root, dispatch=dispatch, deid_client=deid_client,
-                              plan_date=plan_date, trigger=trigger)
+                              plan_date=plan_date, trigger=trigger, tailor_client=tailor_client)
         return {"regenerated": False, "log_prompt": False, "trigger": trigger,
                 "reason": "seams-unwired"}
     if trigger == CADENCE_TRIGGER and not _sustained_signal(store_read):
