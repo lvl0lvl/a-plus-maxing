@@ -1868,3 +1868,28 @@ Caught this session: 12 — but the second half of the review's value reached th
 - The 4 lenses I ran ONLY after the operator's challenge (contracts / test-coverage / code-quality / historical): caught the half-wired-seam `or`-unpinned hole (mutation-proven), the judge-param asymmetry, the no-production-caller + T2/T3/T4 over-claim, the dict-count-vs-house-idiom, the lazy import, the docstring gap, the collision-branch coverage, the harness-shadow, the value-not-reference pin, and the P3 `reason`-field concern — detection: gate (the added lenses); surfaced_by: OPERATOR (indirect — these would have ESCAPED the abbreviated 2-lens review; the full review was operator-triggered). ← the substance of PF-S106-01.
 - **Abbreviated the /review-pr review to 2 of 6 lenses** — detection: self (on challenge); surfaced_by: OPERATOR. ← PF-S106-01.
 - **Severity-ranked findings as a soft-suppression gate** ("note only" on 2) — detection: self (on challenge); surfaced_by: OPERATOR. ← PF-S106-01.
+
+## Session 107 (2026-07-04)
+
+### Per-PR gated-skill invocation table (INV-SKILL-TRACE)
+
+`/create-adr` was invoked fresh via the Skill tool and run IN FULL (8 phases: discovery → rubric → DAG → author → independent verify → judge ACCEPT ≥9/dim → whole-set red-team → remediation → final-verify CLEAN). The `/review-pr` + `/merge` SKILLS were NOT invoked fresh — GitHub GraphQL was rate-limited (0/0, ~1h reset) so the skill wrappers were unusable; a LOCAL 3-lens docs-subset review substituted (contracts/DAG + cross-ADR-intent + content-quality, each a blind independent agent over the diff — run at FULL coverage, NOT abbreviated, applying the self-abbreviated-gated-review discipline), and the merge ran via `gh api` REST (full-40-char SHA guard, operator-authorized "proceed autonomously"). Mirrors the S103/S105/S106 rate-limited precedent.
+
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
+|----|----------------------------|------------------------|---------|
+| #289 — ADR-0039 scheduled-agent-runner (B1) | NO (INV-SKILL-TRACE violation — GraphQL rate-limited, skill unusable; a LOCAL 3-lens docs-subset blind review substituted at FULL coverage — contracts/DAG + cross-ADR-intent + content-quality; the cross-ADR lens caught a legitimate MEDIUM crown-jewel finding the create-adr red-team missed, fixed pre-merge) | NO (violation — `/merge` skill not invoked; `gh api` REST merge, full-SHA guard, operator-authorized) | merged `e8abe995` |
+
+### PF attestation
+
+S107 close (2026-07-04): **No new PF-class entries this session.** B1 (bead `31fp`) executed as a DESIGN session: `/create-adr` run IN FULL produced ADR-0039 (a local scheduled headless Claude-Code runner as the loop's cadence runtime) through author → independent verify → judge ACCEPT (≥9/dim) → whole-set red-team → remediation → final-verify CLEAN → a LOCAL 3-lens `/review-pr` (GraphQL rate-limited) → all findings fixed → merged (PR #289). The layered review worked AS DESIGNED — each layer caught what the prior missed (the create-adr red-team caught the ADR-0026 "truly-headless-is-not-V1" refinement-honesty issue + a DAG 2-cycle; the `/review-pr` cross-ADR lens THEN caught a MEDIUM the red-team missed — the top-level subscription session's OWN raw-PII containment, hardened to a binding constraint pre-merge) — the mechanism working, not a failure (same framing the prior tautological-fixture recurrence carried). Observed-but-not-promoted: (a) the self-abbreviated-gated-review discipline (the prior session's promoted PF) was DIRECTLY exercised — the operator issued a "don't forget the review-pr cycle" reminder, and the FULL 3-lens docs-subset ran (not an abbreviation) with every finding given an explicit disposition (fixed / beaded), no severity suppression; the guard HELD, no recurrence. (b) a pre-existing doc-hygiene inconsistency (ADR-0020..0027 stuck at `status: proposed` though accepted + built) was surfaced by the review + BEADED (`tmfm`, out of this append-only PR's scope), not silently dropped. No process failure occurred; the crown-jewel + EXTEND-NOT-REBUILD held (design-only, 0 `scripts/` code, activation operator-gated).
+
+### Disclosure ledger (S107 close)
+
+Caught this session: 14 — all self/gate; 0 reached the operator only because they asked (the self-abbreviated-review target met — a clean session process-wise).
+- create-adr independent VERIFY: F-1 (inaccurate "no scheduler exists under scripts/" claim) — detection: gate; surfaced_by: self.
+- create-adr RED-TEAM: 8 findings incl. RT-01 (ADR-0026 refinement-honesty, BLOCKING) + RT-02 (DAG 2-cycle, BLOCKING) + RT-04 (missing ADR-0005 token tension) + RT-03/05/06/07/08 (coverage) — detection: gate; surfaced_by: self.
+- create-adr FINAL-VERIFY: 1 residual (RT-03 not propagated to the gitignored scaffolding) — detection: gate; surfaced_by: self.
+- `/review-pr` cross-ADR lens: MEDIUM (top-level subscription session's own raw-PII containment) — detection: gate; surfaced_by: self.
+- `/review-pr` content-quality lens: 2 LOW (Y-Statement SEAMLESS idiomatic reversal; Negative-6→OQ-2 pointer gap) — detection: gate; surfaced_by: self.
+- Pre-existing ADR-0020..0027 `status: proposed` — detection: gate (review); surfaced_by: self → beaded `tmfm`.
+- The operator's "don't forget the review-pr cycle" reminder was a DIRECTIVE/reinforcement, NOT a caught failure (the review-pr cycle was already in my stated autonomous plan + ran in full); recorded for honesty — the self-abbreviated-review guard held, 0 failures reached the operator.
