@@ -102,8 +102,21 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None):
     Returns:
         (dict) The `run_orchestrated` result (recorded survivors + reconciliation + dvq_entries),
         or its honest-no-plan / `SAFETY_BLOCKED` shape on a blocked/held run.
+
+    Notes:
+        Re-summarize per re-gen (ADR-0036-T3 finding B): `regenerate` re-reads the CURRENT store
+        on every call (`_read_raw_intake` below) and re-enters `run_orchestrated`, so the de-id
+        boundary re-derives `recent-trend-direction` from the LIVE `biomarker::` feed each re-gen
+        — no stale summary is reused and the trend rides `router.summarize`, never a plan-history
+        tracking-prefix bridge. Held-domain clearance is likewise re-derived by the `orchestrate` holds per re-gen
+        (never inherited). Crown-jewel non-egress (finding C): the loop hands `deid_in` the raw
+        intake and dispatches only the de-identified summary — a raw operator identifier / raw med
+        never reaches a specialist payload, and a free-text trigger carries only its derived label.
+        Pinned by `tests/serve/test_plan_loop_regen.py`.
     """
     plan_date = plan_date or datetime.date.today().isoformat()
+    # Finding B: re-read the CURRENT store every re-gen so the de-id re-summarize re-derives the
+    # trend from the live feed — never a cached/stale summary.
     raw_intake = _read_raw_intake(root)
     store_read = functools.partial(store.read, root=root)
     gate_producer = compose_gate_dispatch(_JudgeClient(dispatch), dispatch)
