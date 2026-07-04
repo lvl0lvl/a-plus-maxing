@@ -66,6 +66,13 @@ def main(argv=None, *, build=serve_server.build_server, client_factory=ModelClie
     """
     port = serve_server.DEFAULT_PORT
     roots = _data_roots()  # optional scratch-store override for safe, repeatable testing
+    # The loop dispatch obligation (bead 3ge1 / ADR-0036-T1 Tier-2): `build_server` accepts
+    # `loop_dispatch`/`loop_deid_client`, but this standalone entry deliberately passes NEITHER — the
+    # loop's A' aggregate dispatch (every specialist + judge + lens on the subscription session,
+    # ADR-0036 Consequences) has no runtime in a plain Python server process. Fabricating a dispatch
+    # here would either be a fake or would arm heavy no-train spend by default. So `/plan-loop`
+    # degrades honestly (`loop-dispatch-unavailable`); a genuinely-live loop is an agent-driven
+    # scheduled runner, a separate ADR-gated + operator-spend-gated build (NOT this entry point).
     try:
         srv = build(port, client=client_factory(), **roots)
     except OSError as exc:

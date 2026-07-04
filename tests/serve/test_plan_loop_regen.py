@@ -47,7 +47,8 @@ from tests.plan.test_orchestrate import _SUPP_CONFLICT, _nutrition, _recon
 from tests.plan.test_quality_judge import _clean_scores
 from tests.serve.test_care_chat import _RecordingBackend, _seed
 
-_JUDGE_ROLE = "quality-judge"
+# The shared `plan_loop.JUDGE_ROLE` constant (bead 3ge1 concern b), not a re-declared coupled literal.
+from scripts.serve.plan_loop import JUDGE_ROLE as _JUDGE_ROLE
 _ON_DATE = "2026-06-18"
 _SUSTAINED_DATES = ("2026-06-01", "2026-06-08", "2026-06-16")  # 3 readings, 15-day span
 _REGRESSING = (60, 50, 40)  # falling hrv -> worst-wins `regressing`
