@@ -39,6 +39,33 @@ _LOOPBACK = "127.0.0.1"
 # The default operator port for `python -m scripts.serve` (OQ-2 fail-loud names it).
 DEFAULT_PORT = 8765
 
+# Loopback origin hosts — a request whose `Origin` is one of these came from the operator's own
+# served app (same machine); any OTHER present Origin is a cross-site page (the CSRF vector).
+_LOOPBACK_ORIGIN_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def _is_cross_site_origin(origin):
+    """True when `origin` is present AND not a loopback origin — a browser cross-site request.
+
+    A browser attaches the `Origin` header to every cross-origin POST, so a present non-loopback
+    Origin is the CSRF vector. An ABSENT Origin (a non-browser client — curl / the CLI) or a
+    LOOPBACK Origin (the operator's own served app on 127.0.0.1/localhost) is NOT cross-site and is
+    allowed. Used to gate POST `/upload`, whose `multipart/form-data` content-type is itself a
+    CORS-simple type, so the `application/json` 415 gate the other POST routes use cannot cover it.
+
+    Args:
+        origin (str | None): The request's `Origin` header value.
+
+    Returns:
+        (bool) True to refuse (a browser cross-site POST), False to allow.
+    """
+    if not origin:
+        return False
+    from urllib.parse import urlparse
+
+    host = (urlparse(origin).hostname or "").lower()
+    return host not in _LOOPBACK_ORIGIN_HOSTS
+
 # The whole-request byte ceiling, rejected on Content-Length BEFORE the body is read
 # (HTTP 413) so a giant body never materializes in RAM. It sits a multipart-overhead
 # margin above the per-file ceiling so a real Apple-Health export (the file at the
@@ -182,6 +209,17 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         if self.path != "/upload":
             self.send_error(404)
+            return
+
+        # CSRF gate (SEC / o2gj): /upload requires `multipart/form-data` — itself a CORS-simple
+        # content-type — so the `application/json` 415 gate the other POST routes use CANNOT cover it.
+        # A cross-site `fetch(url, {mode:"no-cors", body:<FormData>})` sends multipart with no
+        # preflight, and an unrecognized-format file drives the metered `route.route_upload` ->
+        # `client.extract_readings` spend on the operator's key. Refuse a browser cross-site request (a
+        # present, non-loopback Origin) BEFORE any work — the same-origin served app and non-browser
+        # (no-Origin) clients pass; a browser always sends Origin on a cross-origin POST.
+        if _is_cross_site_origin(self.headers.get("Origin")):
+            self._write_json(403, {"error": "cross-site origin refused"})
             return
         import tempfile
 
