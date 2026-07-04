@@ -303,3 +303,184 @@ def test_horizon_extras_flat_plan_empty(tmp_path):
     view = horizons.domain_horizons(tmp_path, "2026-06-10")
     workout = next(h for h in view if h["domain"] == "workout")
     assert workout["extras"] == {}
+
+
+# --- ADR-0038-T3 Cycle 1: date-range week/month query + today-by-date-equality ---
+
+
+def _enriched_workout_plan(week_intent, week_expectation=None):
+    """A workout plan carrying the horizon week-framing extras."""
+    plan = _workout_plan()
+    plan["week_intent"] = week_intent
+    if week_expectation is not None:
+        plan["week_expectation"] = week_expectation
+    return plan
+
+
+def test_four_horizon_composition(tmp_path):
+    """AC-1: one render date yields today/week/month/milestone from one store.
+
+    Today's action is the date-equality plan, the week block and month arc are
+    the latest-in-window plans, the milestone is the goal's derived percent — all
+    from the seeded streams. Mutation check: a store scan after the read finds no
+    ``plan-arc::``/``horizon::``/``periodization::`` stream (0 new store keys).
+    """
+    goal_schema.record_goal("bench", _goal(current=250), "2026-06-10", tmp_path)
+    plan = _enriched_workout_plan("build base volume")
+    plan_schema.record_plan("workout", plan, "2026-06-10", "coach", tmp_path)
+    view = horizons.read_horizons("workout", "bench", tmp_path, "2026-06-10")
+    # Today's action: the render-date plan via date equality.
+    assert view["today"]["state"] is None
+    assert view["today"]["plan"] == plan
+    # This-week block + month arc: the same plan is in both trailing windows.
+    assert view["week"]["plan_date"] == "2026-06-10"
+    assert view["week"]["extras"]["week_intent"] == "build base volume"
+    assert view["month"]["plan_date"] == "2026-06-10"
+    # Milestone: the goal's derived percent, single-sourced through goal_schema.
+    assert view["milestone"]["milestone"]["percent"] == goal_schema._percent(225, 250, 275)
+    # 0 new store streams — only the seeded goal:: and plan:: items exist.
+    items = set(store.items(tmp_path))
+    assert items == {"goal::bench", "plan::workout"}
+    for forbidden in ("plan-arc::", "horizon::", "periodization::"):
+        assert not any(item.startswith(forbidden) for item in items)
+
+
+def test_latest_in_window_selection(tmp_path):
+    """AC-2 (Risk RT-09): two same-window dated plans select the latest as the block.
+
+    The ADR-0036 loop day-keys a new dated ``plan::<domain>`` on every trigger, so
+    multiple dated plans fall in one week window. The range query selects the
+    later-dated reading (max timepoint). Mutation check: selecting the earliest (or
+    any non-max) in-window reading turns this RED.
+    """
+    plan_schema.record_plan(
+        "workout", _enriched_workout_plan("early week"), "2026-06-05", "coach", tmp_path
+    )
+    plan_schema.record_plan(
+        "workout", _enriched_workout_plan("late week"), "2026-06-08", "coach", tmp_path
+    )
+    view = horizons.read_horizons("workout", "bench", tmp_path, "2026-06-10")
+    # Both plans are inside the 7-day trailing window [06-04, 06-10]; the later wins.
+    assert view["week"]["plan_date"] == "2026-06-08"
+    assert view["week"]["extras"]["week_intent"] == "late week"
+
+
+def test_window_boundary_inclusive(tmp_path):
+    """AC-2 boundary (OQ-2): the trailing window is inclusive of its far edge.
+
+    The week window is the 7 dates ending on (and including) the render date:
+    [render - 6, render]. A plan dated exactly render-6 is in-window; the same plan
+    read one day later (render-7) falls out and the block is absent. Pins the
+    boundary as a binary the test reads.
+    """
+    plan_schema.record_plan(
+        "workout", _enriched_workout_plan("edge"), "2026-06-04", "coach", tmp_path
+    )
+    # render 06-10: window [06-04, 06-10] — the plan sits on the far edge, in-window.
+    edge_in = horizons.read_horizons("workout", "bench", tmp_path, "2026-06-10")
+    assert edge_in["week"]["plan_date"] == "2026-06-04"
+    # render 06-11: window [06-05, 06-11] — the plan is now one day out, no block.
+    edge_out = horizons.read_horizons("workout", "bench", tmp_path, "2026-06-11")
+    assert edge_out["week"] is None
+
+
+def test_today_by_date_equality(tmp_path):
+    """AC-3 (Risk): the today slot resolves by strict date equality, never nearest.
+
+    With a plan dated yesterday and a plan dated the render date, the today slot
+    returns the render-date plan. With NO render-date plan, it reads
+    ``NO_PLAN_TODAY`` — never the yesterday plan. Mutation check: resolving today
+    to the nearest in-window reading turns the second assertion RED.
+    """
+    yesterday = _enriched_workout_plan("yesterday")
+    today = _enriched_workout_plan("today")
+    plan_schema.record_plan("workout", yesterday, "2026-06-09", "coach", tmp_path)
+    plan_schema.record_plan("workout", today, "2026-06-10", "coach", tmp_path)
+    view = horizons.read_horizons("workout", "bench", tmp_path, "2026-06-10")
+    assert view["today"]["state"] is None
+    assert view["today"]["plan"] == today
+    # Drop the render-date plan: only yesterday's is on file -> NO_PLAN_TODAY, never nearest.
+    fresh = tmp_path / "no-today"
+    plan_schema.record_plan("workout", yesterday, "2026-06-09", "coach", fresh)
+    no_today = horizons.read_horizons("workout", "bench", fresh, "2026-06-10")
+    assert no_today["today"]["state"] == plan_schema.NO_PLAN_TODAY
+    assert no_today["today"]["plan"] is None
+
+
+# --- ADR-0038-T3 Cycle 2: deterministic expectation-vs-actual classifier ---
+
+
+def test_expectation_vs_actual_classifier(tmp_path):
+    """AC-4 (Risk): the classifier is a pure deterministic expectation-vs-actual map.
+
+    A declared per-week expectation and an actual per-week rate map to a fixed
+    ``behind``/``on-track``/``ahead`` verdict by comparison of progress-toward-
+    target — direction-agnostic, so a downward weight goal (expectation -0.4) reads
+    -0.1 as behind and -0.5 as ahead. No model/presentation layer is invoked (a
+    pure arithmetic comparison; the module names no model-send symbol — the egress
+    guard in ``test_horizons_writes_no_new_store_stream`` covers that structurally).
+    Mutation check: swapping the < / > comparison, or dropping the direction
+    normalization, turns a pair RED.
+    """
+    # Downward (weight-loss) goal: expectation -0.4 kg/wk toward target.
+    assert horizons.classify(-0.4, -0.1) == "behind"
+    assert horizons.classify(-0.4, -0.4) == "on-track"
+    assert horizons.classify(-0.4, -0.5) == "ahead"
+    # Upward (gain) goal: expectation +0.4 toward target — same verdicts by direction.
+    assert horizons.classify(0.4, 0.1) == "behind"
+    assert horizons.classify(0.4, 0.4) == "on-track"
+    assert horizons.classify(0.4, 0.5) == "ahead"
+    # The three verdict tokens are a single fixed tuple the AC reads.
+    assert horizons.CLASSIFICATIONS == ("behind", "on-track", "ahead")
+
+
+def test_classifier_single_progress_site_no_new_stream(tmp_path):
+    """AC-5 (Risk): the pace assessment reads goal_schema + plan history, writes nothing.
+
+    The expectation is sourced from the this-week block's ``week_expectation`` D2
+    extra (the date-range plan history); the actual is the goal's realized weekly
+    rate via ``goal_schema.resolve_goal`` (the single derived-progress owner — this
+    layer re-derives no percent). The path writes no store item. Mutation check:
+    re-implementing the goal percent locally (``_percent`` in src) reds the source
+    guard; writing any stream reds the before==after scan.
+    """
+    # Goal: lose 10 (100 -> 90 target). Two snapshots 14 days apart -> -1 over 2 wk
+    # = -0.5 kg/wk realized (the actual). resolve_goal owns the derived progress.
+    goal = _goal(label="Weight", baseline=100, current=100, target=90, unit="kg")
+    goal_schema.record_goal("weight", goal, "2026-06-01", tmp_path)
+    goal_schema.record_goal(
+        "weight", {**goal, "current": 99}, "2026-06-15", tmp_path
+    )
+    # This-week plan declares a -0.4 kg/wk expectation (the D2 extra, numeric).
+    plan_schema.record_plan(
+        "workout", _enriched_workout_plan("cut", week_expectation=-0.4),
+        "2026-06-15", "coach", tmp_path,
+    )
+    before = set(store.items(tmp_path))
+    verdict = horizons.assess_pace("workout", "weight", tmp_path, "2026-06-15")
+    after = set(store.items(tmp_path))
+    # -0.5 actual beats the -0.4 expectation toward target -> ahead.
+    assert verdict == "ahead"
+    assert verdict in horizons.CLASSIFICATIONS
+    # No new store stream written by the assessment path.
+    assert after == before
+    assert after == {"goal::weight", "plan::workout"}
+    # Single progress site: routes through goal_schema, never a local percent.
+    src = _HORIZONS_SRC.read_text()
+    assert "_percent" not in src
+    assert "resolve_goal" in src
+
+
+def test_assess_pace_absent_inputs_read_none(tmp_path):
+    """AC-5 floor: absent expectation or actual yields None, never a fabricated verdict.
+
+    With no declared numeric ``week_expectation`` and/or no multi-week goal span,
+    the pace assessment is honest absence — it invents no rate and returns None.
+    """
+    # A plan with no numeric week_expectation and a single-snapshot goal (no span).
+    goal_schema.record_goal("weight", _goal(baseline=100, current=99, target=90),
+                            "2026-06-15", tmp_path)
+    plan_schema.record_plan(
+        "workout", _enriched_workout_plan("cut"), "2026-06-15", "coach", tmp_path
+    )
+    assert horizons.assess_pace("workout", "weight", tmp_path, "2026-06-15") is None
