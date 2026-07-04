@@ -1900,6 +1900,89 @@ def test_care_chat_rejects_non_json_content_type_415(tmp_path):
         srv.server_close()
 
 
+# --- o2gj: Origin CSRF gate on the /upload forced-spend (multipart is CORS-simple) ---
+
+
+class _ExtractRecorder:
+    """Records extract_readings calls so an /upload CSRF 403 can assert 0 forced extraction spend."""
+
+    def __init__(self):
+        self.extract_calls = []
+
+    def extract_readings(self, file_content, media_type):
+        self.extract_calls.append(media_type)
+        return []
+
+
+def _post_upload_origin(port, filename, payload, *, origin):
+    """POST a multipart /upload with an explicit Origin header (None omits it); return (status, body)."""
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    body = _multipart_upload(filename, payload)
+    headers = {"Content-Type": f"multipart/form-data; boundary={BOUNDARY}"}
+    if origin is not None:
+        headers["Origin"] = origin
+    conn.request("POST", "/upload", body=body, headers=headers)
+    resp = conn.getresponse()
+    text = resp.read().decode("utf-8")
+    conn.close()
+    return resp.status, text
+
+
+def test_is_cross_site_origin_unit():
+    """o2gj: the Origin predicate — present + non-loopback refuses; loopback / absent allows."""
+    from scripts.serve.server import _is_cross_site_origin
+
+    assert _is_cross_site_origin("http://evil.example.com") is True
+    assert _is_cross_site_origin("https://attacker.test:8443") is True
+    assert _is_cross_site_origin("http://127.0.0.1:8765") is False
+    assert _is_cross_site_origin("http://localhost:8765") is False
+    assert _is_cross_site_origin("http://127.0.0.1") is False
+    assert _is_cross_site_origin(None) is False   # non-browser client (curl / the CLI)
+    assert _is_cross_site_origin("") is False
+
+
+def test_upload_refuses_cross_site_origin_403(tmp_path):
+    """o2gj (CSRF / forced-spend): a cross-site-Origin /upload of an unrecognized file is 403 — 0 extract.
+
+    /upload's `multipart/form-data` content-type is CORS-simple (no content-type gate possible); an
+    unrecognized file drives `client.extract_readings` spend. A browser cross-site POST carries a
+    non-loopback Origin -> refuse 403 BEFORE route_upload. Failing-capable: drop the gate and the
+    cross-site upload reaches extract_readings.
+    """
+    recorder = _ExtractRecorder()
+    srv, port = _server_with_author(tmp_path, recorder)
+    _serve_in_thread(srv)
+    try:
+        status, _ = _post_upload_origin(port, "attack.dat", b"unrecognized-bytes",
+                                        origin="http://evil.example.com")
+        assert status == 403, f"a cross-site /upload returned {status}, expected 403"
+        assert recorder.extract_calls == [], "extract_readings was reached cross-site (forced spend)"
+        assert _still_alive(port), "the handler died after a cross-site refusal"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_upload_allows_loopback_origin_reaches_extract(tmp_path):
+    """o2gj: a same-origin (loopback) Origin is NOT refused — the gate does not over-block the served app.
+
+    A loopback-Origin upload of an unrecognized file passes the gate and reaches extract_readings
+    (the operator's own served app works). Non-tautological: an over-broad gate that refused loopback
+    would leave extract unreached.
+    """
+    recorder = _ExtractRecorder()
+    srv, port = _server_with_author(tmp_path, recorder)
+    _serve_in_thread(srv)
+    try:
+        status, _ = _post_upload_origin(port, "labs.dat", b"unrecognized-bytes",
+                                        origin="http://127.0.0.1:8765")
+        assert status != 403, f"a same-origin (loopback) /upload was wrongly refused {status}"
+        assert recorder.extract_calls != [], "the loopback upload did not reach extract_readings — gate over-blocked"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
 def test_generate_plan_holds_cross_domain_additive_ae_pair(tmp_path):
     """TEST1 (cross-domain safety): a supplement+peptide additive-AE pair is HELD, not both shipped.
 
