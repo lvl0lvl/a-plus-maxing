@@ -1893,3 +1893,27 @@ Caught this session: 14 — all self/gate; 0 reached the operator only because t
 - `/review-pr` content-quality lens: 2 LOW (Y-Statement SEAMLESS idiomatic reversal; Negative-6→OQ-2 pointer gap) — detection: gate; surfaced_by: self.
 - Pre-existing ADR-0020..0027 `status: proposed` — detection: gate (review); surfaced_by: self → beaded `tmfm`.
 - The operator's "don't forget the review-pr cycle" reminder was a DIRECTIVE/reinforcement, NOT a caught failure (the review-pr cycle was already in my stated autonomous plan + ran in full); recorded for honesty — the self-abbreviated-review guard held, 0 failures reached the operator.
+
+## Session 108 (2026-07-04)
+
+### Per-PR gated-skill invocation table (INV-SKILL-TRACE)
+
+The `/review-pr` + `/merge` SKILLS were NOT invoked fresh — GitHub GraphQL rate-limited (0/0) so the skill wrappers were unusable; a LOCAL 3-lens review (security + correctness + test-coverage — the on-point dimensions for a small security fix, run at FULL on-point coverage, NOT abbreviated) substituted over the diff, and the merge ran via `gh api` REST (full-SHA guard, operator-authorized "do the quick safety fixes now"). Mirrors the S103/S105/S106/S107 rate-limited precedent.
+
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
+|----|----------------------------|------------------------|---------|
+| #292 — CSRF gate on /chat + /care-chat (55qg) | NO (INV-SKILL-TRACE violation — GraphQL rate-limited, skill unusable; a LOCAL 3-lens blind review substituted at full on-point coverage — security + correctness + test-coverage; caught the out-of-scope /upload forced-spend gap + 3 test-coverage findings, all fixed/beaded pre-merge) | NO (violation — `/merge` skill not invoked; `gh api` REST merge, full-SHA guard, operator-authorized) | merged `a28a760` |
+
+### PF attestation
+
+S108 close (2026-07-04): **No new PF-class entries this session.** Landed `55qg` (the CSRF `application/json` 415 gate on `/chat` + `/care-chat`, the two `converse`-spend endpoints missing it) via TDD (415-refusal + charset-accept + missing-header tests, all mutation-proven non-tautological) → a LOCAL 3-lens review (security/correctness/test-coverage) → all findings fixed/beaded → merged (PR #292). The layered review worked AS DESIGNED — the security lens caught an out-of-scope forced-spend gap on `/upload` (multipart is a CORS-simple content-type a content-type gate structurally cannot cover; beaded `o2gj`), the test-coverage lens caught a MEDIUM charset-accept coverage gap (fixed + mutation-proven). Two honest observed-and-handled items: (a) grounding `qiob` (the SECOND "quick safety fix" the operator asked for) revealed it is NOT a quick fix — it is a design decision touching the frozen `record_plan` spine / needing an ADR, and it is SECONDARY defense-in-depth (the primary additive-AE/BPMH hold at generation still works), so I built `55qg` and SURFACED `qiob` for the operator's design call rather than fake-fixing it or making a unilateral frozen-spine edit (the grounding-reveals-more honesty, same as the `3ge1` reframe last arc). (b) A git-mutating governance test (`test_zero_edit_gate_reds_on_committed_routine_edit`) transiently RED'd under the full-suite run with a pre-staged index (it `git commit`s on the shared repo); it passes clean standalone, the clean-index re-run returned only the 2 known env-fails, and the hazard is beaded `o0vg` — the third full-suite-contention flake this arc (the close-audit floor, then the core-capability self-test). No process failure; the run-gated-skills-in-full discipline held (full on-point review, every finding fixed or beaded, no severity suppression); crown-jewel HARDENED (`55qg` CLOSES a forced-spend gap); EXTEND-NOT-REBUILD held (frozen engine + store numstat=0).
+
+### Disclosure ledger (S108 close)
+
+Caught this session: 7 — all self/gate; 0 reached the operator only because they asked.
+- Security lens: the /upload forced-spend gap (multipart CORS-simple; HIGH, out of scope) — detection: gate; surfaced_by: self → beaded `o2gj`.
+- Test-coverage lens: the charset-accept coverage gap (MEDIUM) — detection: gate; surfaced_by: self → fixed + mutation-proven.
+- Test-coverage lens: the missing-Content-Type case (LOW) + the recorder-shape smell (LOW) — detection: gate; surfaced_by: self → fixed.
+- Correctness lens: INFO-2 (the /chat front-end reads `d.reason`, the 415 body uses `error` — cosmetic, sibling-consistent, unreachable) — detection: gate; surfaced_by: self → no action (matches the sibling convention).
+- The `qiob` grounding (NOT a quick fix — a frozen-spine/ADR design decision + secondary defense-in-depth) — detection: self (on grounding); surfaced_by: self → surfaced for the operator's design call, not fake-fixed.
+- The git-mutating-governance-test full-suite flake — detection: self (on the suite re-run); surfaced_by: self → beaded `o0vg`.
