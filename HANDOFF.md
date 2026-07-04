@@ -3,7 +3,7 @@ title: Session Handoff
 type: note
 owner: Walter McGivney
 created: 2026-05-16
-last_reviewed: 2026-07-02
+last_reviewed: 2026-07-03
 status: active
 depends_on: []
 superseded_by: null
@@ -11,6 +11,28 @@ review_cadence: weekly
 ---
 
 # Session Handoff
+
+## Scope Contract — Session 105 (2026-07-02 → 2026-07-03)
+
+Goal: Build the dynamic, personalized, time-horizon plan loop the operator asked for (specialists' de-identified sections → care agent tailors with raw data → plan spans daily/weekly/monthly + evolves → dynamically re-adjusts on new data), through the full autonomous pipeline: Sequential Thinking → design → 6-agent adversarial review → ADR → Spec → Build Plan → Task Plan → Execute Plan, wave-by-wave with per-wave review-pr → merge → close → continue. (Operator-directed, AUTONOMOUS: "run it through the autonomous build pipeline… keep going until you finish the work"; the merge/close/open cadence is mine per the operator's explicit correction.)
+
+Acceptance criteria:
+- [x] AC1 (design vetted): 6-agent adversarial review hardened a v2 design; the loop RE-RUNS the full-composition front door (not per-domain adjust — safety parity), tailoring is a mechanically-gated named raw-egress carve-out rendered artifact-only, horizons compose over goal_schema/calendar_schema + the ADR-0010 extras seam. **PASS**
+- [x] AC2 (ADRs): ADR-0036 (loop) / 0037 (tailoring) / 0038 (horizons) authored → exhaustive verify → judge (≥9/10) → red-team → fix → clean re-verify; merged. **PASS**
+- [x] AC3 (spec + build-plan + 10 recipes): each verified + committed. **PASS**
+- [x] AC4 (execution): all 7 waves built via TDD recipes, each Tier-1 SE + Tier-2 (role-profile QA/Architect/Security on crown-jewel waves) + Tier-3 (adversarial bug/security) reviewed, real HIGH/CRITICAL defects caught + fixed pre-merge every deterministic wave (see PF-S105-01), 3 design contradictions Architect-adjudicated (large-change hold → advisory + T4b; 2 frozen-glob carve-outs; dormant interaction screen → RETIRE); merged waves 1-7 (PRs #277-283). **PASS**
+- [x] AC5 (verified): full suite 2261 passed / 2 known-env-fail (`test_bind`, `test_server` — port-bind/stdin, sandbox networking, pre-existing) / 7 skipped on `main`; frozen-glob guards green; crown-jewel non-egress verified per wave; 0 live spend. **PASS**
+
+Files I WILL touch: `scripts/serve/plan_loop.py` (new loop module) + `scripts/plan/horizons.py` + `scripts/plan/tailoring.py` (new feature modules, carved out of the frozen glob under Architect ruling) + the serve trigger sites (`route`/`confirm`/`care_chat`) + `scripts/serve/confirm.py` + `scripts/generate/maintained.py` + tests; the ADR/spec/build-plan/task-plan docs; `docs/adr/ADR-0001` (egress amendment) + the frozen-set test files (carve-outs); HANDOFF/PF/harvest by explicit path.
+Files I will NOT touch: the byte-frozen `scripts/plan/{orchestrate,pipeline,assemble,generate_plan,adjudicate,adjust,track}.py` + `scripts/store/*` + `router.SUMMARY_FIELD_SET`/`dispatch` (all held frozen — verified numstat=0 every wave); `main` (PR-only).
+NOT doing: the operator-present LIVE loop run (real key + spend — operator-gated); wiring the production `loop_dispatch`/`loop_deid_client` seams (deferred, beaded — the loop is inert-but-safe in production until the operator-gated live-wiring step).
+Invariants at risk: ADR-0001/0021/0032 (crown-jewel + EXTEND-NOT-REBUILD) — all held (loop re-enters the de-id front door; tailoring artifact-only; frozen engine spine byte-unchanged; the 2 new plan modules carved out with behavioral + prospective-additive guards + a glob-design ADR beaded).
+
+### S105 Scope Contract Evaluation (2026-07-03, volatile)
+
+All 5 ACs PASS. **Task drift — none** (the feature the operator asked for, built end-to-end; the merge/close/open cadence corrected mid-session per the operator). **Architecture drift — none** (crown-jewel held + verified every wave; EXTEND-NOT-REBUILD held — frozen spine numstat=0, the 2 new feature modules carved out under Architect ruling, not spine edits). **Vision drift — none** (`design/vision.md`'s "closes the loop — plan → act → measure → adjust" is now BUILT and wired end-to-end — this session realized the stated vision). The S105 per-PR skill-trace table (7 wave PRs; `/review-pr`+`/merge` skills NOT used — GitHub GraphQL rate-limited, LOCAL three-tier + `gh api` REST merge substituted), the PF attestation (PF-S105-01 promoted — tautological/happy-path fixtures mask deterministic-safety defects, rec=6), and the disclosure ledger (11 caught, all self/gate) live in `memory/process-failures.md` (`## Session 105`).
+
+**What's next (volatile):** the dynamic-plan-loop feature is COMPLETE on `main`. The terminal step is the operator-gated LIVE run (real key + spend). Beaded follow-ups: `qiob` (interaction-screen dormancy resolution — retired, or persist the class basis), `z2mh` (re-open the ADR-0032 frozen-glob deny-by-default design — 3rd carve-out + the non-hermetic frozen-test fix), `yvrs` (ADR-0036-T4b — the genuine large-change hold-until-confirm), the production `loop_dispatch` wiring (`3ge1`), `55qg` (CSRF gate on /chat + /care-chat), `cs58` (conversation summarization). Harden SE/QA test-authoring against PF-S105-01 via `/upgrade-agent`.
 
 ## Scope Contract — Session 104 (2026-07-02)
 
