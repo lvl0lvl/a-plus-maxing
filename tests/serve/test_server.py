@@ -1794,25 +1794,70 @@ def test_generate_plan_rejects_non_json_content_type_415(tmp_path):
 
 
 class _ConverseRecorder:
-    """Records every `converse(messages)` call so a CSRF 415 can assert 0 forced spend was driven."""
+    """A MINIMAL converse recorder: proves whether the gate REACHED converse, not the turn contract.
+
+    Records every `converse(messages)` call so a test can assert 0 forced spend (`calls == []`, the
+    gate refused) or that spend WAS reached (`calls != []`, the gate let a legit request through). The
+    returned dict is deliberately NOT a faithful converse shape — `dispatch_turn` needs a
+    `result["extraction"]` key, so on a REACHED /chat turn the handler catches the resulting KeyError
+    and degrades (400); that is fine, because the load-bearing signal is `.calls`, not the status.
+    """
 
     def __init__(self):
         self.calls = []
 
     def converse(self, messages):
         self.calls.append(messages)
-        return {"reply": "should-not-be-reached-on-a-415"}
+        return {"reply": "converse-was-reached"}
 
 
 def _post_chat_route(port, path, *, content_type="application/json"):
-    """POST a real turn body to a chat route with an explicit Content-Type; return (status, body)."""
+    """POST a real turn body to a chat route; return (status, body). `content_type=None` omits the header."""
+    headers = {}
+    if content_type is not None:
+        headers["Content-Type"] = content_type
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
-    conn.request("POST", path, body=json.dumps({"turn": "hi"}).encode(),
-                 headers={"Content-Type": content_type})
+    conn.request("POST", path, body=json.dumps({"turn": "hi"}).encode(), headers=headers)
     resp = conn.getresponse()
     text = resp.read().decode("utf-8")
     conn.close()
     return resp.status, text
+
+
+def test_chat_routes_accept_json_with_charset_param(tmp_path):
+    """55qg: the gate's `;`-split lets a real `application/json; charset=utf-8` client THROUGH.
+
+    Browsers/`fetch` send the charset parameter; the gate strips it (`.split(";",1)[0]`) so the legit
+    client is NOT 415'd. Guards against an over-broad regression (drop the `.split(";")`) that would
+    refuse valid JSON — the reject tests alone cannot catch that. Asserts converse WAS reached (the
+    gate passed), the load-bearing signal independent of the downstream turn shape.
+    """
+    for path in ("/chat", "/care-chat"):
+        recorder = _ConverseRecorder()
+        srv, port = _server_with_author(tmp_path, recorder)
+        _serve_in_thread(srv)
+        try:
+            status, _ = _post_chat_route(port, path, content_type="application/json; charset=utf-8")
+            assert status != 415, f"{path} 415'd a legit 'application/json; charset=utf-8' POST"
+            assert recorder.calls != [], f"{path} did not reach converse — the gate over-refused valid JSON"
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
+
+def test_chat_routes_reject_missing_content_type_415(tmp_path):
+    """55qg: a POST with NO Content-Type header (the `or ""` branch) is also refused 415, 0 spend."""
+    for path in ("/chat", "/care-chat"):
+        recorder = _ConverseRecorder()
+        srv, port = _server_with_author(tmp_path, recorder)
+        _serve_in_thread(srv)
+        try:
+            status, _ = _post_chat_route(port, path, content_type=None)
+            assert status == 415, f"{path} with no Content-Type returned {status}, expected 415"
+            assert recorder.calls == [], f"{path} reached converse despite a missing Content-Type"
+        finally:
+            srv.shutdown()
+            srv.server_close()
 
 
 def test_chat_rejects_non_json_content_type_415(tmp_path):
