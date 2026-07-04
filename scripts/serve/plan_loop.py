@@ -32,12 +32,18 @@ crown-jewel `deid_in` boundary before any specialist dispatch.
 import datetime
 import functools
 
-from scripts.plan import plan_orchestrator, router
+from scripts.plan import plan_orchestrator, router, track
 from scripts.plan.gate_dispatch import compose_gate_dispatch
 from scripts.store import biomarker_meta, plan_schema, store
 
 # The judge role slug the loop dispatches the QUALITY gate through the unified subscription seam.
 _JUDGE_ROLE = "quality-judge"
+
+# The large-change confirmation threshold (ADR-0036 OQ-4) — a fixed module constant a deterministic
+# test reads, NOT a runtime default. Same pinned-number convention as the T2 debounce constants
+# below. A re-gen replacing MORE than this many existing standing plans surfaces for operator
+# confirmation rather than a silent swap.
+LARGE_CHANGE_THRESHOLD_DOMAINS = 3
 
 
 class _JudgeClient:
@@ -120,10 +126,139 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None):
     raw_intake = _read_raw_intake(root)
     store_read = functools.partial(store.read, root=root)
     gate_producer = compose_gate_dispatch(_JudgeClient(dispatch), dispatch)
-    return plan_orchestrator.run_orchestrated(
+    result = plan_orchestrator.run_orchestrated(
         raw_intake, deid_client, dispatch, store_read, root,
         plan_date=plan_date, gate_dispatch=gate_producer,
     )
+    # Post-promote seams (ADR-0036-T4): the re-gen rationale, the large-change confirmation route,
+    # the pass-through tailoring-hook seam, and the separate adherence input. Only a run that
+    # actually PROMOTED has a standing plan to narrate, confirm, tailor, or thread adherence into —
+    # a blocked/halt run (SAFETY_BLOCKED / DEID_HALTED / cap) promoted nothing and passes straight
+    # through untouched.
+    promoted = _promoted_domains(result)
+    if not promoted:
+        return result
+    # AC-1: a non-empty plain-language what-changed rationale on every promoted re-gen.
+    result["rationale"] = _compose_rationale(promoted, trigger)
+    # AC-5: read adherence as a SEPARATE additional input, distinct from the trend (which the de-id
+    # boundary re-derives via router.summarize). Absent adherence never blocks the trend-driven
+    # re-gen — the re-gen already promoted.
+    adherence = _read_adherence(root, plan_date)
+    # AC-2/AC-3 (OQ-4): a re-gen replacing MORE existing standing plans than the pinned threshold
+    # surfaces for operator confirmation rather than swapping the standing plan silently; at/below
+    # the threshold it swaps with no prompt.
+    if _change_magnitude(store_read, result, promoted, plan_date) > LARGE_CHANGE_THRESHOLD_DOMAINS:
+        from scripts.serve import confirm
+        result["large_change"] = True
+        result["pending_confirmation"] = confirm.confirm_large_change(
+            promoted, rationale=result["rationale"])
+    else:
+        result["large_change"] = False
+        result["pending_confirmation"] = None
+    # AC-4: the post-promote tailoring-hook seam — fired exactly once per promoted re-gen with the
+    # promoted plan set + the render target (pass-through until ADR-0037-T1 fills it).
+    _post_promote_tailoring(
+        {domain: result["results"][domain]["plan"] for domain in promoted},
+        root, adherence=adherence,
+    )
+    return result
+
+
+def _promoted_domains(result):
+    """The domains this re-gen actually promoted (recorded a new plan for)."""
+    return [domain for domain, r in (result.get("results") or {}).items() if r.get("recorded")]
+
+
+def _compose_rationale(promoted, trigger):
+    """A non-empty plain-language sentence describing what this re-gen changed (AC-1).
+
+    Composed inline on the re-gen path (no helper module, no store key): names the trigger that
+    fired the re-gen and the domains whose plan it refreshed. The plan REASONING stays the
+    specialists' (runtime A) — this is a factual what-changed summary over the promoted set.
+
+    Args:
+        promoted (list): The domains this re-gen recorded a new plan for.
+        trigger (str | None): The cadence/manual trigger label; None -> "scheduled".
+
+    Returns:
+        (str) A non-empty what-changed sentence.
+    """
+    kind = trigger or "scheduled"
+    return f"Re-generated the plan ({kind} trigger); refreshed: {', '.join(sorted(promoted))}."
+
+
+def _prior_standing_plan(readings, plan_date):
+    """The plan value of the latest standing plan dated strictly BEFORE `plan_date`, or None."""
+    prior_dates = [r["timepoint"] for r in readings if r["timepoint"] < plan_date]
+    if not prior_dates:
+        return None
+    return plan_schema.resolve_plan(readings, max(prior_dates))["plan"]
+
+
+def _change_magnitude(store_read, result, promoted, plan_date):
+    """How many existing standing plans this re-gen replaces with different content (OQ-4 proxy).
+
+    For each promoted domain, compares the newly-promoted plan against the domain's prior standing
+    plan (the latest plan dated before `plan_date`). A domain with no prior standing plan is an
+    establish, not a swap-over-standing, so it does not count; a domain whose new plan matches its
+    prior standing plan is unchanged. The magnitude is the count of standing plans being replaced —
+    breadth of change across domains, the materiality proxy the large-change confirmation reads.
+
+    Args:
+        store_read (Callable): The instance-root-bound `store.read`.
+        result (dict): The `run_orchestrated` result (its `results` carries each domain's new plan).
+        promoted (list): The domains this re-gen promoted.
+        plan_date (str): The re-gen's YYYY-MM-DD date.
+
+    Returns:
+        (int) The count of promoted domains whose prior standing plan is being replaced.
+    """
+    changed = 0
+    for domain in promoted:
+        prior = _prior_standing_plan(store_read(f"plan::{domain}"), plan_date)
+        if prior is not None and result["results"][domain]["plan"] != prior:
+            changed += 1
+    return changed
+
+
+def _read_adherence(root, on_date):
+    """Read each tracked domain's plan-vs-actual progress as a SEPARATE adherence input (AC-5).
+
+    Threads `track.resolve_plan_progress` into the re-gen as an additional input DISTINCT from the
+    `recent-trend-direction` trend (which the de-id boundary re-derives via `router.summarize`, not a
+    plan-history bridge). A pure READ of the existing plan/tracking streams — it defines no store key
+    and appends nothing (ADR-0038 no-new-stream). Absent adherence is a value, not a block: a domain
+    with no tracking snapshot reads `has_tracking=False`, and because the trend already arrives via
+    `router.summarize`, the trend-driven re-gen ran unblocked regardless (OQ-5).
+
+    Args:
+        root (str | Path): The store root.
+        on_date (str): The re-gen's YYYY-MM-DD date.
+
+    Returns:
+        (dict) domain -> the `resolve_plan_progress` plan-vs-actual view for each tracked domain.
+    """
+    return {domain: track.resolve_plan_progress(domain, on_date, root)
+            for domain in plan_schema.TRACKED_DOMAINS}
+
+
+def _post_promote_tailoring(promoted_plan, render_target, *, adherence=None):
+    """Post-promote tailoring-hook seam — PASS-THROUGH until ADR-0037-T1 (the interface contract).
+
+    Fired EXACTLY ONCE per promoted re-gen, AFTER the front-door promote, with the promoted plan set
+    plus the render target (`generate.maintained.reemit_maintained`'s root) — plus the separate
+    adherence input as a keyword extra. In THIS task it produces no tailored content and performs no
+    egress: it is the stable single-call seam ADR-0037-T1 fills with the care-lane tailoring pass
+    (promote -> tailoring pass -> reemit_maintained). Change-control (build-plan multi-agent flag):
+    the call shape (promoted plan + render target, once per re-gen) is a cross-task contract — a
+    later edit changing it triggers an Architect contract-update notice.
+
+    Args:
+        promoted_plan (dict): domain -> the promoted plan value for each promoted domain.
+        render_target (str | Path): The `reemit_maintained` root/artifact target.
+        adherence (dict, optional): The separate plan-vs-actual adherence input (AC-5).
+    """
+    return None
 
 
 # --- ADR-0036-T2: the shared debounce gate + three-trigger convergence ----------------

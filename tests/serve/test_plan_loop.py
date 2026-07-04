@@ -863,3 +863,235 @@ def test_signal_raise_does_not_break_primary_handlers(tmp_path, monkeypatch):
     # care_chat.respond — the care-chat reply still returns unaffected.
     result = care_chat.respond("I slept 5 hours", [], client=_RecordingBackend(), store_root=root)
     assert "reply" in result and "receipt" in result, "care_chat.respond did not return its reply"
+
+
+# =====================================================================================
+# ADR-0036-T4: re-gen rationale + large-change confirmation + post-promote seams -------
+# =====================================================================================
+#
+# Cycle 1 — the operator-facing surface (rationale + large-change confirmation). The re-gen runs
+# through the REAL /plan-loop route (bound server + http.client POST), never a hand-configured
+# module call. "Change magnitude" is the count of EXISTING standing plans (dated before the re-gen
+# date) this re-gen replaces with different content — OQ-4's materiality proxy. A prior standing
+# plan is seeded at `_T4_PRIOR_DATE`; the re-gen writes today's rows, so the two never date-collide.
+
+_T4_PRIOR_DATE = "2026-06-01"  # a standing-plan date well before today's re-gen date
+
+
+def _differing_prior(domain):
+    """A schema-valid standing plan for `domain` that clearly differs from `_clean_authors()`'s output."""
+    return {
+        "workout": {"exercises": [{"name": "OldPress", "sets": 5}]},
+        "nutrition": {"calorie_goal": 1800, "macros": {"protein": 100, "carbs": 150, "fat": 50},
+                      "meals": [{"name": "OldMeal"}]},
+        "supplements": {"items": [{"name": "OldSupp", "dose": "1 g"}]},
+        "peptides": {"compound": "OldPep", "dose": "100 mcg", "route": "im"},
+    }[domain]
+
+
+def _seed_prior_standing(root, domains):
+    """Record a clearly-different prior standing plan (dated `_T4_PRIOR_DATE`) for each domain."""
+    for domain in domains:
+        plan_schema.record_plan(domain, _differing_prior(domain), _T4_PRIOR_DATE,
+                                "prior-specialist", root)
+
+
+# --- Cycle 1 AC-1: every re-gen returns a non-empty rationale -----------------------
+
+
+def test_regen_returns_nonempty_rationale(tmp_path):
+    # AC-1: every automated re-gen returns a non-empty plain-language rationale describing what changed.
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+    srv, port = _loop_server(tmp_path, dispatch, deid_client)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_plan_loop(port)
+        assert status == 200
+        assert isinstance(body.get("rationale"), str) and body["rationale"].strip(), (
+            f"the re-gen carried no non-empty rationale: {body.get('rationale')!r}"
+        )
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+# --- Cycle 1 AC-2/AC-3: large-vs-below-threshold pair + pinned threshold -------------
+
+
+def test_large_change_routes_to_confirmation_no_silent_swap(tmp_path, monkeypatch):
+    # AC-2 (large leg / 0 silent swaps): a re-gen replacing MORE than the pinned number of existing
+    # standing plans routes to the confirmation surface (confirm.confirm_large_change reached) and is
+    # held pending — it does NOT silently swap the standing plan. A silent swap leaves the confirm
+    # surface unreached -> RED.
+    from scripts.serve import confirm
+
+    calls = []
+    real_confirm = getattr(confirm, "confirm_large_change", None)
+
+    def spy_confirm(*a, **k):
+        calls.append(1)
+        return real_confirm(*a, **k) if real_confirm else {"awaiting_confirmation": list(a[0])}
+
+    monkeypatch.setattr(confirm, "confirm_large_change", spy_confirm, raising=False)
+
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+    srv, port = _loop_server(tmp_path, dispatch, deid_client)
+    _seed_prior_standing(tmp_path / "store", plan_schema.PLAN_DOMAINS)  # 4 replaced -> > threshold
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_plan_loop(port)
+        assert status == 200
+        assert calls == [1], "large change did not route to the confirmation surface (silent swap)"
+        assert body.get("large_change") is True, f"large change not flagged: {body.get('large_change')}"
+        assert body.get("pending_confirmation"), "no pending-confirmation receipt on the large change"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_below_threshold_change_swaps_without_prompt(tmp_path, monkeypatch):
+    # AC-2 (below-threshold leg): a re-gen replacing AT/BELOW the pinned number of standing plans swaps
+    # without a confirmation prompt — the confirm surface is NOT reached. Paired with the large leg:
+    # the two dispositions differ across the pinned threshold.
+    from scripts.serve import confirm
+
+    calls = []
+    monkeypatch.setattr(confirm, "confirm_large_change", lambda *a, **k: calls.append(1),
+                        raising=False)
+
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+    srv, port = _loop_server(tmp_path, dispatch, deid_client)
+    _seed_prior_standing(tmp_path / "store", ("workout", "nutrition"))  # 2 replaced -> <= threshold
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_plan_loop(port)
+        assert status == 200
+        assert calls == [], "a below-threshold change reached the confirmation prompt (spurious swap-guard)"
+        assert body.get("large_change") is False, f"below-threshold change mis-flagged: {body}"
+        assert body.get("pending_confirmation") is None, "a below-threshold change carried a pending receipt"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_large_change_threshold_is_pinned_constant():
+    # AC-3: the large-change threshold is a fixed module-level literal a deterministic test reads
+    # (not a runtime default / env-derived value).
+    from scripts.serve import plan_loop
+
+    assert plan_loop.LARGE_CHANGE_THRESHOLD_DOMAINS == 3
+
+
+# --- Cycle 2 AC-4: the post-promote tailoring-hook seam fires exactly once --------------
+
+
+def test_post_promote_tailoring_seam_fires_once(tmp_path, monkeypatch):
+    # AC-4: the post-promote tailoring-hook seam fires EXACTLY ONCE per re-gen with the promoted plan
+    # set + the render target (the reemit_maintained root). Pass-through until ADR-0037-T1 fills it —
+    # count of invocations per re-gen == 1.
+    from scripts.serve import plan_loop
+
+    calls = []
+
+    def spy_seam(promoted_plan, render_target, **kwargs):
+        calls.append((promoted_plan, render_target))
+
+    monkeypatch.setattr(plan_loop, "_post_promote_tailoring", spy_seam, raising=False)
+
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+    srv, port = _loop_server(tmp_path, dispatch, deid_client)
+    _serve_in_thread(srv)
+    try:
+        status, _ = _post_plan_loop(port)
+        assert status == 200
+        assert len(calls) == 1, f"the tailoring-hook seam fired {len(calls)} times, expected once per re-gen"
+        promoted_plan, render_target = calls[0]
+        assert set(promoted_plan) == set(plan_schema.PLAN_DOMAINS), (
+            f"the seam did not receive the promoted plan set: {sorted(promoted_plan)}"
+        )
+        assert str(render_target) == str(tmp_path / "store"), (
+            f"the seam did not receive the render target: {render_target!r}"
+        )
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+# --- Cycle 2 AC-5: adherence is a SEPARATE input; absent does not block the re-gen ------
+
+
+def test_adherence_read_separately_absent_does_not_block(tmp_path, monkeypatch):
+    # AC-5: the loop reads `resolve_plan_progress` as a SEPARATE adherence input (distinct from the
+    # `recent-trend-direction` trend, which the de-id boundary re-derives via router.summarize). With
+    # no tracking snapshots (`has_tracking=False`) the trend-driven re-gen STILL promotes plans —
+    # absent adherence never blocks it (OQ-5). Removing the adherence read leaves `seen` empty -> RED.
+    from scripts.plan import track
+
+    seen = []
+    real = track.resolve_plan_progress
+
+    def spy(domain, on_date, root):
+        progress = real(domain, on_date, root)
+        seen.append((domain, progress["has_tracking"]))
+        return progress
+
+    monkeypatch.setattr(track, "resolve_plan_progress", spy)
+
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+    srv, port = _loop_server(tmp_path, dispatch, deid_client)  # _seed_store: no plan-track:: rows
+    _serve_in_thread(srv)
+    try:
+        status, _ = _post_plan_loop(port)
+        assert status == 200
+        assert seen, "resolve_plan_progress was never read (adherence not threaded as a separate input)"
+        assert all(has_tracking is False for _, has_tracking in seen), (
+            f"expected has_tracking=False for every tracked domain: {seen}"
+        )
+        # the trend-driven re-gen still promoted plans despite absent adherence (OQ-5)
+        today = datetime.date.today().isoformat()
+        root = tmp_path / "store"
+        assert all(len(_plan_rows_today(root, d, today)) == 1 for d in plan_schema.PLAN_DOMAINS), (
+            "absent adherence blocked the trend-driven re-gen"
+        )
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+# --- Cycle 2 AC-6: the rationale/adherence/seam path introduces no new store stream -----
+
+
+def test_rationale_adherence_path_writes_no_new_stream(tmp_path, monkeypatch):
+    # AC-6: the rationale/adherence/seam path introduces 0 new `::`-prefixed store stream. A
+    # store.append spy over the re-gen (patched AFTER the operator-state seed, so it captures only the
+    # re-gen's writes) shows every appended item is a plan::/dvq:: promote (the T1 baseline) — no
+    # rationale::/adherence::/tailoring::/large-change:: stream.
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+    srv, port = _loop_server(tmp_path, dispatch, deid_client)
+
+    appended = []
+    real_append = store.append
+
+    def spy_append(item, *a, **k):
+        appended.append(item)
+        return real_append(item, *a, **k)
+
+    monkeypatch.setattr(store, "append", spy_append)  # patched after the seed -> only re-gen writes
+    _serve_in_thread(srv)
+    try:
+        status, _ = _post_plan_loop(port)
+        assert status == 200
+        assert appended, "the re-gen wrote nothing (a vacuous store-scan)"
+        for item in appended:
+            assert item.startswith(("plan::", "dvq::")), (
+                f"the rationale/adherence/seam path persisted a new store stream {item!r}"
+            )
+    finally:
+        srv.shutdown()
+        srv.server_close()

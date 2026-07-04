@@ -91,3 +91,32 @@ def land_confirmed(readings, *, root, loop_dispatch=None, loop_deid_client=None)
         # the contract).
         logging.exception("plan-loop signal failed after confirmed land (additive; land unaffected)")
     return {"store": landed}
+
+
+def confirm_large_change(pending, *, rationale):
+    """Surface a large re-gen for operator confirmation instead of a silent swap (ADR-0036-T4).
+
+    The plan loop routes a re-gen whose change magnitude exceeds the pinned threshold here rather
+    than swapping the standing plan silently (ADR-0036 OQ-4). Mirrors `land_confirmed`'s
+    validate-then-act precedent: validates the request shape — a non-empty list of changed domain
+    tokens plus a non-empty rationale — and returns a thin receipt of what awaits confirmation. It
+    adds NO store key, NO second sink, and NO dedupe identity: the operator-confirm surface holds
+    the pending change and NOTHING is persisted here, so the standing plan stays in place until the
+    operator confirms.
+
+    Args:
+        pending (list): The changed domain tokens the large re-gen would swap in.
+        rationale (str): The plain-language what-changed summary shown at the confirmation surface.
+
+    Returns:
+        (dict) `{"awaiting_confirmation": [changed domain tokens], "rationale": str}` — a thin
+        receipt of what is held pending, mirroring `land_confirmed`'s receipt shape.
+    """
+    if (not isinstance(pending, list) or not pending
+            or not all(isinstance(domain, str) and domain for domain in pending)):
+        raise ValueError(
+            "large-change confirmation requires a non-empty list of changed domain tokens"
+        )
+    if not isinstance(rationale, str) or not rationale:
+        raise ValueError("large-change confirmation requires a non-empty rationale")
+    return {"awaiting_confirmation": list(pending), "rationale": rationale}
