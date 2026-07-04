@@ -28,9 +28,19 @@ ON_DATE = "2026-06-24"
 
 # Raw care-lane specifics the operator entered — present in `_care_profile`'s `health_detail`,
 # ABSENT from the recorded (de-identified) plan. A tailored section referencing these proves the
-# pass read the raw detail (the designed personalization egress).
-RAW_PEPTIDE = "BPC-157 250mcg subq nightly protocol"
-RAW_SUPPLEMENT = "Creatine monohydrate 5g loading"
+# pass read the raw detail (the designed personalization egress). These carry a raw specific WITHOUT
+# a dose/route/frequency token — the ADR-0037-T2 compound-domain dosing-reject strips dose-bearing
+# tailored output, so the personalization egress is proven with a non-dosing specific.
+RAW_PEPTIDE = "BPC-157 for my left Achilles tendon repair"
+RAW_SUPPLEMENT = "Creatine monohydrate for post-workout recovery"
+
+# The dose-bearing counterpart (unit + route + frequency): a compound-domain tailored section that
+# re-presents THIS is prescribing an investigational compound (ADR-0037 finding D) -> rejected.
+RAW_PEPTIDE_DOSING = "BPC-157 250mcg subq nightly protocol"
+
+# The de-identified operator Rx-interaction-class field `_care_profile` carries (via `router.summarize`)
+# and the T2 interaction screen intersects against a compound's declared additive-AE classes.
+RX_CLASS_FIELD = "rx-interaction-classes"
 
 
 def _peptide_plan(compound="recorded-de-id-peptide"):
@@ -68,6 +78,23 @@ def _seed_plan(root, domain, *, plan, date=ON_DATE, specialist="specialist"):
 def _care_profile_read(**detail):
     """A care-profile reader (the `_care_profile` shape) carrying the raw `health_detail`."""
     return lambda: {"health_detail": dict(detail)}
+
+
+def _care_profile_read_rx(rx_classes, **detail):
+    """A care-profile reader carrying the de-identified `rx-interaction-classes` field + raw detail.
+
+    Mirrors `_care_profile`'s superset-of-`summarize` shape: the profile carries the operator's
+    present Rx-interaction classes (a `;`-joined scalar) the T2 interaction screen reads via
+    `router.rx_interaction_class_set`, alongside the raw `health_detail`.
+    """
+    return lambda: {RX_CLASS_FIELD: rx_classes, "health_detail": dict(detail)}
+
+
+def _peptide_plan_classes(classes, compound="recorded-de-id-peptide"):
+    """A recorded peptide plan declaring its additive-AE classes (the open-on-extras `ae_profile`)."""
+    plan = _peptide_plan(compound)
+    plan["ae_profile"] = {"additive_classes": list(classes)}
+    return plan
 
 
 class _EchoClient:
@@ -425,3 +452,139 @@ def test_post_promote_partial_degrade_per_domain(tmp_path):
     assert "PERSONALIZED-peptides" in text, "domain A did not personalize"
     assert "PERSONALIZED-supplements" not in text, "domain B emitted tailored content despite failing"
     assert "Creatine" in text, "domain B did not degrade to its un-tailored recorded plan"
+
+
+# ===============================================================================
+# Cycle 5: Dosing-token reject on a compound-domain tailored section (ADR-0037 finding D, AC-1)
+# ===============================================================================
+
+
+def test_dosing_token_in_compound_tailoring_rejects_to_untailored_plan(tmp_path):
+    # AC-1 POSITIVE control: a compound-domain (peptides) tailored section whose model output carries
+    # a dose/route/frequency token (echoed from a dose-bearing raw detail) is REJECTED — the domain
+    # degrades to its un-tailored recorded plan. Count of compound-domain TAILORED (model) sections
+    # carrying a dosing token == 0: the model marker is gone, the recorded plan is rendered instead.
+    text, _ = _run_tailor(
+        tmp_path,
+        client=_EchoClient(),
+        care_profile_read=_care_profile_read(peptides=RAW_PEPTIDE_DOSING),
+        seeds={"peptides": _peptide_plan()},
+    )
+    body = _care_tailored_body(text, "peptides")
+    assert body is not None, "no tailored section emitted for the recorded compound domain"
+    assert "PERSONALIZED-peptides" not in body, (
+        "a compound tailored section carrying a dosing token was NOT rejected (shadow-prescribe)"
+    )
+    assert RAW_PEPTIDE_DOSING not in body, "the dose-bearing tailored output was not stripped"
+    assert "recorded-de-id-peptide" in body, "the reject did not degrade to the un-tailored plan"
+
+
+def test_no_dosing_token_in_compound_tailoring_is_retained(tmp_path):
+    # AC-1 NEGATIVE control: a compound-domain tailored section WITHOUT a dosing token is KEPT — the
+    # reject is falsifiable, not blanket compound-domain suppression.
+    text, _ = _run_tailor(
+        tmp_path,
+        client=_EchoClient(),
+        care_profile_read=_care_profile_read(peptides=RAW_PEPTIDE),
+        seeds={"peptides": _peptide_plan()},
+    )
+    body = _care_tailored_body(text, "peptides")
+    assert "PERSONALIZED-peptides" in body, "a non-dosing compound tailored section was suppressed"
+    assert RAW_PEPTIDE in body, "the non-dosing raw specific was not personalized into the section"
+
+
+def test_dosing_token_reject_scoped_to_compound_domains(tmp_path):
+    # AC-1 scope: a NON-compound domain (workout) tailored section carrying a dosing-like token is NOT
+    # scanned/rejected — the reject is compound-domain-only (supplements / peptides).
+    text, _ = _run_tailor(
+        tmp_path,
+        client=_EchoClient(),
+        care_profile_read=_care_profile_read(training="deadlift 100kg 5x5 daily"),
+        seeds={"workout": {"exercises": [{"name": "deadlift", "sets": 5}]}},
+    )
+    body = _care_tailored_body(text, "workout")
+    assert body is not None, "no tailored section emitted for the workout domain"
+    assert "PERSONALIZED-workout" in body, "a non-compound domain was wrongly dosing-rejected"
+
+
+# ===============================================================================
+# Cycle 6: Deterministic fail-closed drug×compound interaction screen (ADR-0037 §3/§4, AC-2..AC-5)
+# ===============================================================================
+
+# A curated Rx-interaction class the operator's medication surface carries AND a compound declares.
+KNOWN_RX_CLASS = "bleeding-risk"
+# A curated class present on the operator's meds but NOT declared by the compound — the safe combo.
+SAFE_RX_CLASS = "cyp3a4-pgp"
+
+
+def test_interaction_screen_paired_control_fires_known_not_safe(tmp_path):
+    # AC-2 + AC-3 (paired control): the deterministic screen surfaces a "see your doctor" referral for
+    # a meds×compound class INTERSECTION (fires-on-known) AND surfaces none for a non-intersecting
+    # (safe) set (does-not-fire-on-safe). `fires_on_known == True AND fires_on_safe == False`; a rule
+    # firing on both / neither is a bug.
+    peptide = _peptide_plan_classes([KNOWN_RX_CLASS])
+
+    known_text, _ = _run_tailor(
+        tmp_path / "known",
+        client=_EchoClient(),
+        care_profile_read=_care_profile_read_rx(KNOWN_RX_CLASS, peptides=RAW_PEPTIDE),
+        seeds={"peptides": peptide},
+    )
+    safe_text, _ = _run_tailor(
+        tmp_path / "safe",
+        client=_EchoClient(),
+        care_profile_read=_care_profile_read_rx(SAFE_RX_CLASS, peptides=RAW_PEPTIDE),
+        seeds={"peptides": peptide},
+    )
+    fires_on_known = "see your doctor" in _care_tailored_body(known_text, "peptides").lower()
+    fires_on_safe = "see your doctor" in _care_tailored_body(safe_text, "peptides").lower()
+    assert fires_on_known and not fires_on_safe, (
+        f"paired control violated: fires_on_known={fires_on_known}, fires_on_safe={fires_on_safe}"
+    )
+    # the safe combo still tailors (no referral, but the section is not suppressed)
+    assert "PERSONALIZED-peptides" in _care_tailored_body(safe_text, "peptides")
+
+
+def test_interaction_screen_verdict_independent_of_presentation_call(tmp_path):
+    # AC-4: the screen is deterministic code SPLIT OFF the presentation model call. With the
+    # presentation injected to FAIL, the known-interaction referral verdict is UNCHANGED (present),
+    # and the safe verdict is UNCHANGED (absent) — the verdict tracks the deterministic screen, not
+    # the model return.
+    peptide = _peptide_plan_classes([KNOWN_RX_CLASS])
+
+    known_fail, _ = _run_tailor(
+        tmp_path / "kf",
+        client=_EchoClient(raise_error=True),
+        care_profile_read=_care_profile_read_rx(KNOWN_RX_CLASS, peptides=RAW_PEPTIDE),
+        seeds={"peptides": peptide},
+    )
+    safe_fail, _ = _run_tailor(
+        tmp_path / "sf",
+        client=_EchoClient(raise_error=True),
+        care_profile_read=_care_profile_read_rx(SAFE_RX_CLASS, peptides=RAW_PEPTIDE),
+        seeds={"peptides": peptide},
+    )
+    assert "see your doctor" in _care_tailored_body(known_fail, "peptides").lower(), (
+        "a failed presentation suppressed the deterministic interaction referral"
+    )
+    assert "see your doctor" not in _care_tailored_body(safe_fail, "peptides").lower(), (
+        "a failed presentation fabricated an interaction referral on a safe combo"
+    )
+
+
+def test_interaction_screen_fail_closed_on_suppressed_presentation(tmp_path):
+    # AC-5: fail-closed, never a silent drop — on a KNOWN interaction match with a SUPPRESSED (empty)
+    # presentation, the referral STILL surfaces (the domain degrades to the recorded plan, and the
+    # deterministic referral rides on top). A match always yields a surfaced referral.
+    text, _ = _run_tailor(
+        tmp_path,
+        client=_EchoClient(empty=True),
+        care_profile_read=_care_profile_read_rx(KNOWN_RX_CLASS, peptides=RAW_PEPTIDE),
+        seeds={"peptides": _peptide_plan_classes([KNOWN_RX_CLASS])},
+    )
+    body = _care_tailored_body(text, "peptides")
+    assert body is not None, "the run dropped the domain on a suppressed presentation"
+    assert "see your doctor" in body.lower(), (
+        "a suppressed presentation silently dropped the interaction referral (fail-open)"
+    )
+    assert "recorded-de-id-peptide" in body, "the suppressed presentation did not degrade to the plan"

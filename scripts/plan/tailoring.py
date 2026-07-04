@@ -20,9 +20,11 @@ and adds no second name-bearing writer: its only sink is `reemit_maintained`.
 import datetime
 import functools
 import json
+import re
 
 from scripts.generate import maintained
 from scripts.model.client import ModelCallError
+from scripts.plan import orchestrate, router
 from scripts.store import plan_schema, store
 
 # Map each plan domain to its raw `_care_profile.health_detail` label (the operator's own free-text).
@@ -33,6 +35,79 @@ _DETAIL_LABEL = {
     "supplements": "supplements",
     "peptides": "peptides",
 }
+
+# The compound domains the two deterministic T2 safety mechanics apply to. The dosing-reject and the
+# interaction screen both target the investigational-compound surface (supplements + peptides); the
+# non-compound domains (workout, nutrition) are neither scanned nor screened. One canonical definition.
+_COMPOUND_DOMAINS = ("supplements", "peptides")
+
+# Curated dosing-vocabulary lexicon (ADR-0037 finding D / OQ-2): the unit + administration-frequency
+# + route/titration KEYWORDS that denote a dose. A compound-domain TAILORED (model) section carrying
+# any of these is re-presenting a prescribing instruction for an investigational compound — rejected
+# (degraded to the specialist's safety-cleared recorded plan). A curated keyword set, never a model
+# call. Single-letter units (`g`/`kg`/`ml`/`cc`) are matched only adjacent to a number by
+# `_DOSING_NUMERIC_UNIT` to avoid firing on prose; the multi-char unit words are matched as tokens.
+_DOSING_WORD_TOKENS = frozenset({
+    "mg", "mcg", "ug", "µg", "iu", "milligram", "milligrams", "microgram", "micrograms",
+    "daily", "nightly", "weekly", "twice", "once", "bid", "tid", "qd", "qhs", "eod",
+    "subq", "subcutaneous", "subcutaneously", "intramuscular", "titrate", "titration", "taper",
+})
+_DOSING_NUMERIC_UNIT = re.compile(r"\d+\s*(?:mg|mcg|ug|µg|g|kg|ml|cc|iu)\b", re.IGNORECASE)
+_WORD = re.compile(r"[a-zµ]+")
+
+
+def _carries_dosing_token(text):
+    """Whether a tailored-output string carries a dosing / route / titration token (finding D).
+
+    A number adjacent to a mass/volume/activity unit (`250mg`, `5 g`, `100 iu`) or any curated
+    dosing keyword (`mcg`, `nightly`, `subq`, `titrate`, …) present as a word token. Curated
+    keyword scan — no model call.
+
+    Args:
+        text (str): The candidate tailored-section text.
+
+    Returns:
+        (bool) True when a dosing token is present.
+    """
+    if _DOSING_NUMERIC_UNIT.search(text):
+        return True
+    return any(word in _DOSING_WORD_TOKENS for word in _WORD.findall(text.lower()))
+
+
+def _interaction_referral(profile, domain, plan):
+    """The deterministic drug×compound interaction verdict for one compound domain (ADR-0037 §3).
+
+    Model-INDEPENDENT: intersects the operator's present Rx-interaction classes (read from the care
+    profile — a superset of `router.summarize`, carrying the de-identified `rx-interaction-classes`
+    field — via `router.rx_interaction_class_set`) with the compound's declared additive-AE classes
+    (`orchestrate._rx_bpmh_matched_classes` over the recorded plan's `ae_profile`), reusing the
+    reconciler's rx-BPMH class basis rather than forking a parallel vocabulary. Computed off the
+    store/profile, BEFORE and independent of the presentation model call. Fails CLOSED: a non-empty
+    intersection ALWAYS returns a surfaced "see your doctor" referral (never a silent drop).
+
+    Args:
+        profile (dict): The operator's care profile (`_care_profile` shape).
+        domain (str): The plan domain being tailored.
+        plan (dict): The recorded (de-identified) plan value for the domain.
+
+    Returns:
+        (str) The referral text on a class intersection, or `""` when clean / non-compound.
+    """
+    if domain not in _COMPOUND_DOMAINS:
+        return ""
+    operator_rx_classes = router.rx_interaction_class_set(profile)
+    if not operator_rx_classes:
+        return ""
+    ae_profile = plan.get("ae_profile") if isinstance(plan, dict) else None
+    candidate = {"domain": domain, "meta": {"ae_profile": ae_profile if isinstance(ae_profile, dict) else {}}}
+    matched = orchestrate._rx_bpmh_matched_classes(candidate, operator_rx_classes)
+    if not matched:
+        return ""
+    classes = ", ".join(sorted(matched))
+    return (
+        f"See your doctor before continuing {domain}: a medication-interaction class ({classes}) "
+        f"overlaps your current prescriptions."
+    )
 
 
 def _present(client, domain, plan, detail):
@@ -115,11 +190,25 @@ def tailor(root, *, client, care_profile_read, plan_date, promoted=None, out_dir
             continue
         plan = resolved["plan"]
         detail = health_detail.get(_DETAIL_LABEL.get(domain))
+        # Deterministic interaction screen (ADR-0037 §3/§4): computed off the store/profile, BEFORE
+        # and INDEPENDENT of the presentation call, so a failed/empty presentation can neither change
+        # the verdict nor suppress a fired referral (fail-closed). Separate from the presentation.
+        referral = _interaction_referral(profile, domain, plan)
         try:
             tailored[domain] = _present(client, domain, plan, detail)
         except ModelCallError:
             # Fail-safe: degrade THIS domain to its un-tailored, safety-cleared recorded plan.
             tailored[domain] = str(plan)
+        else:
+            # Dosing-token reject (ADR-0037 finding D): a compound-domain TAILORED (model) section
+            # must not re-present a dose/route/titration for an investigational compound. On a hit,
+            # REJECT — degrade through the SAME un-tailored recorded-plan branch as a model failure.
+            if domain in _COMPOUND_DOMAINS and _carries_dosing_token(tailored[domain]):
+                tailored[domain] = str(plan)
+        # Fail-closed: the referral surfaces regardless of presentation outcome (tailored, degraded,
+        # or dosing-rejected) — a match always yields a surfaced referral.
+        if referral:
+            tailored[domain] = f"{referral}\n\n{tailored[domain]}"
 
     render_today = _today if _today is not None else datetime.date.fromisoformat(plan_date)
     return maintained.reemit_maintained(
