@@ -28,9 +28,19 @@ ON_DATE = "2026-06-24"
 
 # Raw care-lane specifics the operator entered — present in `_care_profile`'s `health_detail`,
 # ABSENT from the recorded (de-identified) plan. A tailored section referencing these proves the
-# pass read the raw detail (the designed personalization egress).
-RAW_PEPTIDE = "BPC-157 250mcg subq nightly protocol"
-RAW_SUPPLEMENT = "Creatine monohydrate 5g loading"
+# pass read the raw detail (the designed personalization egress). These carry a raw specific WITHOUT
+# a dose/route/frequency token — the ADR-0037-T2 compound-domain dosing-reject strips dose-bearing
+# tailored output, so the personalization egress is proven with a non-dosing specific.
+RAW_PEPTIDE = "BPC-157 for my left Achilles tendon repair"
+RAW_SUPPLEMENT = "Creatine monohydrate for post-workout recovery"
+
+# The dose-bearing counterpart (unit + route + frequency): a compound-domain tailored section that
+# re-presents THIS is prescribing an investigational compound (ADR-0037 finding D) -> rejected.
+RAW_PEPTIDE_DOSING = "BPC-157 250mcg subq nightly protocol"
+
+# The de-identified operator Rx-interaction-class field `_care_profile` carries (via `router.summarize`)
+# and the T2 interaction screen intersects against a compound's declared additive-AE classes.
+RX_CLASS_FIELD = "rx-interaction-classes"
 
 
 def _peptide_plan(compound="recorded-de-id-peptide"):
@@ -68,6 +78,16 @@ def _seed_plan(root, domain, *, plan, date=ON_DATE, specialist="specialist"):
 def _care_profile_read(**detail):
     """A care-profile reader (the `_care_profile` shape) carrying the raw `health_detail`."""
     return lambda: {"health_detail": dict(detail)}
+
+
+def _care_profile_read_rx(rx_classes, **detail):
+    """A care-profile reader carrying the de-identified `rx-interaction-classes` field + raw detail.
+
+    Mirrors `_care_profile`'s superset-of-`summarize` shape: the profile carries the operator's
+    present Rx-interaction classes (a `;`-joined scalar) the T2 interaction screen reads via
+    `router.rx_interaction_class_set`, alongside the raw `health_detail`.
+    """
+    return lambda: {RX_CLASS_FIELD: rx_classes, "health_detail": dict(detail)}
 
 
 class _EchoClient:
@@ -425,3 +445,147 @@ def test_post_promote_partial_degrade_per_domain(tmp_path):
     assert "PERSONALIZED-peptides" in text, "domain A did not personalize"
     assert "PERSONALIZED-supplements" not in text, "domain B emitted tailored content despite failing"
     assert "Creatine" in text, "domain B did not degrade to its un-tailored recorded plan"
+
+
+# ===============================================================================
+# Cycle 5: Dosing-token reject on a compound-domain tailored section (ADR-0037 finding D, AC-1)
+# ===============================================================================
+
+
+def test_dosing_token_in_compound_tailoring_rejects_to_untailored_plan(tmp_path):
+    # AC-1 POSITIVE control: a compound-domain (peptides) tailored section whose model output carries
+    # a dose/route/frequency token (echoed from a dose-bearing raw detail) is REJECTED — the domain
+    # degrades to its un-tailored recorded plan. Count of compound-domain TAILORED (model) sections
+    # carrying a dosing token == 0: the model marker is gone, the recorded plan is rendered instead.
+    text, _ = _run_tailor(
+        tmp_path,
+        client=_EchoClient(),
+        care_profile_read=_care_profile_read(peptides=RAW_PEPTIDE_DOSING),
+        seeds={"peptides": _peptide_plan()},
+    )
+    body = _care_tailored_body(text, "peptides")
+    assert body is not None, "no tailored section emitted for the recorded compound domain"
+    assert "PERSONALIZED-peptides" not in body, (
+        "a compound tailored section carrying a dosing token was NOT rejected (shadow-prescribe)"
+    )
+    assert RAW_PEPTIDE_DOSING not in body, "the dose-bearing tailored output was not stripped"
+    assert "recorded-de-id-peptide" in body, "the reject did not degrade to the un-tailored plan"
+
+
+def test_no_dosing_token_in_compound_tailoring_is_retained(tmp_path):
+    # AC-1 NEGATIVE control: a compound-domain tailored section WITHOUT a dosing token is KEPT — the
+    # reject is falsifiable, not blanket compound-domain suppression.
+    text, _ = _run_tailor(
+        tmp_path,
+        client=_EchoClient(),
+        care_profile_read=_care_profile_read(peptides=RAW_PEPTIDE),
+        seeds={"peptides": _peptide_plan()},
+    )
+    body = _care_tailored_body(text, "peptides")
+    assert "PERSONALIZED-peptides" in body, "a non-dosing compound tailored section was suppressed"
+    assert RAW_PEPTIDE in body, "the non-dosing raw specific was not personalized into the section"
+
+
+def test_dosing_token_reject_scoped_to_compound_domains(tmp_path):
+    # AC-1 scope: a NON-compound domain (workout) tailored section carrying a dosing-like token is NOT
+    # scanned/rejected — the reject is compound-domain-only (supplements / peptides).
+    text, _ = _run_tailor(
+        tmp_path,
+        client=_EchoClient(),
+        care_profile_read=_care_profile_read(training="deadlift 100kg 5x5 daily"),
+        seeds={"workout": {"exercises": [{"name": "deadlift", "sets": 5}]}},
+    )
+    body = _care_tailored_body(text, "workout")
+    assert body is not None, "no tailored section emitted for the workout domain"
+    assert "PERSONALIZED-workout" in body, "a non-compound domain was wrongly dosing-rejected"
+
+
+# Findings 2/3 — dosing-token detector quality. RED cases: dose/frequency notation the prior lexicon
+# let through (`2x/day`, `q12h`, `2 tablets`, `b.i.d.`, `units`, `grams`, `per day`). Each MUST be
+# detected as a dosing token, or a compound tailored section could shadow-prescribe.
+@pytest.mark.parametrize("dosing_text", [
+    "inject 2x/day this week", "run it 3x/week", "250mcg/day protocol", "dose q12h as needed",
+    "every 8 hours for pain", "take 2 units", "5 grams post-workout", "add 1 gram",
+    "once per day", "swallow 2 tablets", "3 caps with food", "b.i.d. dosing",
+])
+def test_dosing_detector_catches_frequency_and_form_bypasses(dosing_text):
+    from scripts.plan.tailoring import _carries_dosing_token
+
+    assert _carries_dosing_token(dosing_text), (
+        f"a dose/frequency notation bypassed the dosing detector: {dosing_text!r}"
+    )
+
+
+# Negative controls: benign prose whose bare frequency adverbs (`once`/`daily`/`weekly`/`taper`)
+# tripped the prior lexicon. Each MUST NOT be flagged — the detector targets dose notation, not copy.
+@pytest.mark.parametrize("benign_text", [
+    "take this once your tendon heals", "fits your daily routine", "a weekly check-in call",
+    "ease back as you taper off training", "BPC-157 for your left Achilles tendon repair",
+    "review your progress every week this month",
+])
+def test_dosing_detector_ignores_benign_frequency_adverbs(benign_text):
+    from scripts.plan.tailoring import _carries_dosing_token
+
+    assert not _carries_dosing_token(benign_text), (
+        f"benign prose false-fired the dosing detector: {benign_text!r}"
+    )
+
+
+# ===============================================================================
+# Cycle 6: The drug×compound interaction gate lives at the RECONCILER, not the tailoring lane
+# (ADR-0037 §3 RETIRED — Architect binding ruling). The record-path production contract.
+# ===============================================================================
+
+# A curated Rx-interaction class the operator's medication surface carries AND a compound declares.
+KNOWN_RX_CLASS = "bleeding-risk"
+
+
+def test_recorded_compound_plan_carries_no_ae_profile_no_tailoring_referral(tmp_path):
+    # NON-TAUTOLOGICAL record-path contract: a compound plan produced through the PRODUCTION translate
+    # path (compute_plan -> record_plan) carries NO `ae_profile` — that field lives in the candidate
+    # `meta`, a sibling record_plan never writes — so tailoring emits NO "see your doctor" referral for
+    # it EVEN WHEN the operator's rx-interaction-classes intersect the compound's declared additive-AE
+    # classes. This encodes the true production behavior: the drug×compound interaction gate is the
+    # RECONCILER's primary BPMH screen (tests/plan/test_orchestrate.py), NOT the tailoring lane. The
+    # test FAILS if anyone re-homes an ae_profile-reading interaction screen into the tailoring lane
+    # (the retired §3), or makes the record path persist ae_profile to feed such a screen.
+    from scripts.plan import tailoring
+    from scripts.plan.generate_plan import compute_plan
+    from scripts.store import store
+    from tests.plan.test_generate_plan import _author, _peptide_rec, _seed_store
+
+    store_root = tmp_path / "store"
+    store_read = _seed_store(store_root)
+    envelope = {
+        **_author(_peptide_rec("BPC-157", "250 mcg", "subcutaneous"),
+                  specialist="peptide-specialist"),
+        "reconciliation": {"ae_profile": {"additive_classes": [KNOWN_RX_CLASS]}},
+    }
+    candidate = compute_plan("peptides", envelope, store_read)
+    # the compound genuinely DECLARES the interacting class — it rides in the candidate meta ...
+    assert candidate["meta"]["ae_profile"]["additive_classes"] == [KNOWN_RX_CLASS], (
+        "the author's declared additive-AE class did not reach the candidate meta"
+    )
+    plan_schema.record_plan(
+        "peptides", candidate["plan"], ON_DATE, candidate["specialist"], store_root)
+    # ... but the production record path persists ONLY the plan payload — no ae_profile lands, so the
+    # dormant §3 screen (reading `plan.get("ae_profile")`) could never fire in production.
+    recorded = plan_schema.resolve_plan(
+        store.read("plan::peptides", root=store_root), ON_DATE)["plan"]
+    assert "ae_profile" not in recorded, (
+        "the record path persisted ae_profile — the retired §3 screen's dormancy premise broke"
+    )
+
+    repo, out = _gitignored_out(tmp_path)
+    path = tailoring.tailor(
+        store_root, client=_EchoClient(),
+        care_profile_read=_care_profile_read_rx(KNOWN_RX_CLASS, peptides=RAW_PEPTIDE),
+        plan_date=ON_DATE, promoted={"peptides"},
+        out_dir=out, _today=TODAY, _profile_paths=_synth_profile(tmp_path), _repo_root=repo,
+    )
+    body = _care_tailored_body(Path(path).read_text(encoding="utf-8"), "peptides")
+    assert body is not None, "no tailored section emitted for the recorded compound domain"
+    assert "see your doctor" not in body.lower(), (
+        "a tailoring-lane interaction referral fired on a production-recorded compound plan — the "
+        "retired §3 screen was re-homed into the tailoring lane"
+    )

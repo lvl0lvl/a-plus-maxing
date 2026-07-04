@@ -20,6 +20,7 @@ and adds no second name-bearing writer: its only sink is `reemit_maintained`.
 import datetime
 import functools
 import json
+import re
 
 from scripts.generate import maintained
 from scripts.model.client import ModelCallError
@@ -33,6 +34,62 @@ _DETAIL_LABEL = {
     "supplements": "supplements",
     "peptides": "peptides",
 }
+
+# The compound domains the dosing-reject applies to. It targets the investigational-compound surface
+# (supplements + peptides); the non-compound domains (workout, nutrition) are not scanned. One
+# canonical definition.
+_COMPOUND_DOMAINS = ("supplements", "peptides")
+
+# Curated dosing-vocabulary lexicon (ADR-0037 finding D / OQ-2): the unit + administration-frequency
+# + route/titration KEYWORDS that denote a dose. A compound-domain TAILORED (model) section carrying
+# any of these is re-presenting a prescribing instruction for an investigational compound — rejected
+# (degraded to the specialist's safety-cleared recorded plan). A curated keyword set, never a model
+# call, and DELIBERATELY BOUNDED — it targets dose/route/frequency notation, not benign prose. The
+# bare frequency adverbs (`daily`/`nightly`/`weekly`/`once`/`twice`) are NOT tokens: they fire on
+# benign copy ("fits your daily routine", "weekly check-in"); frequency is detected only through the
+# explicit dosing-abbreviation tokens (`bid`/`qd`/…) and the numeric-frequency patterns below.
+# Single-letter units (`g`/`kg`/`ml`/`cc`) are matched only adjacent to a number by
+# `_DOSING_NUMERIC_UNIT`; the multi-char unit/route/abbreviation words are matched as tokens.
+_DOSING_WORD_TOKENS = frozenset({
+    "mg", "mcg", "ug", "µg", "iu", "milligram", "milligrams", "microgram", "micrograms",
+    "gram", "grams", "unit", "units", "bid", "tid", "qd", "qhs", "eod",
+    "subq", "subcutaneous", "subcutaneously", "intramuscular", "titrate", "titration",
+})
+_DOSING_NUMERIC_UNIT = re.compile(r"\d+\s*(?:mg|mcg|ug|µg|g|kg|ml|cc|iu)\b", re.IGNORECASE)
+# Numeric-frequency and count+form dose notation the bare word tokens can't reach: `2x/day`,
+# `3x/week`, `250mcg/day`, `q12h`, `every 8 hours`, `per day`, `2 tablets`, and dotted abbreviations
+# (`b.i.d.`) that `_WORD` splits on the dots.
+_DOSING_FREQ_FORM = re.compile(
+    r"""
+    \d+\s*x\s*[/ ]\s*(?:day|week|month)          # 2x/day, 3x/week
+  | \d+\s*/\s*(?:day|week|month)                 # 2/day, 250mcg/day slash-frequency
+  | q\d+h                                         # q12h
+  | every\s+\d+\s+hours?                          # every 8 hours
+  | per\s+(?:day|week|month)                      # per day
+  | \d+\s+(?:tablet|capsule|cap|pill|ml)s?\b      # 2 tablets, 3 caps
+  | b\.i\.d\.|t\.i\.d\.|q\.d\.|q\.h\.s\.|e\.o\.d\.  # dotted abbreviations
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+_WORD = re.compile(r"[a-zµ]+")
+
+
+def _carries_dosing_token(text):
+    """Whether a tailored-output string carries a dosing / route / titration token (finding D).
+
+    A number adjacent to a mass/volume/activity unit (`250mg`, `5 g`, `100 iu`), a numeric-frequency
+    or count+form notation (`2x/day`, `q12h`, `2 tablets`, `b.i.d.`), or any curated dosing keyword
+    (`mcg`, `subq`, `titrate`, …) present as a word token. Curated keyword scan — no model call.
+
+    Args:
+        text (str): The candidate tailored-section text.
+
+    Returns:
+        (bool) True when a dosing token is present.
+    """
+    if _DOSING_NUMERIC_UNIT.search(text) or _DOSING_FREQ_FORM.search(text):
+        return True
+    return any(word in _DOSING_WORD_TOKENS for word in _WORD.findall(text.lower()))
 
 
 def _present(client, domain, plan, detail):
@@ -120,6 +177,12 @@ def tailor(root, *, client, care_profile_read, plan_date, promoted=None, out_dir
         except ModelCallError:
             # Fail-safe: degrade THIS domain to its un-tailored, safety-cleared recorded plan.
             tailored[domain] = str(plan)
+        else:
+            # Dosing-token reject (ADR-0037 finding D): a compound-domain TAILORED (model) section
+            # must not re-present a dose/route/titration for an investigational compound. On a hit,
+            # REJECT — degrade through the SAME un-tailored recorded-plan branch as a model failure.
+            if domain in _COMPOUND_DOMAINS and _carries_dosing_token(tailored[domain]):
+                tailored[domain] = str(plan)
 
     render_today = _today if _today is not None else datetime.date.fromisoformat(plan_date)
     return maintained.reemit_maintained(
