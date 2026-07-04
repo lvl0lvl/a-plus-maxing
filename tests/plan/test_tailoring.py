@@ -78,9 +78,10 @@ class _EchoClient:
     empty-return degrade case).
     """
 
-    def __init__(self, *, raise_error=False, empty=False):
+    def __init__(self, *, raise_error=False, empty=False, whitespace=False):
         self.raise_error = raise_error
         self.empty = empty
+        self.whitespace = whitespace
         self.calls = []
 
     def converse(self, messages):
@@ -90,6 +91,8 @@ class _EchoClient:
         ctx = json.loads(messages[0]["content"])
         if self.empty:
             return {"reply": "", "extraction": []}
+        if self.whitespace:
+            return {"reply": "   \n\t ", "extraction": []}
         return {
             "reply": f"PERSONALIZED-{ctx['domain']}: keyed to {ctx.get('operator_detail')}.",
             "extraction": [],
@@ -202,6 +205,31 @@ def test_ac4_tailored_content_lands_only_in_gitignored_artifact(tmp_path):
 # ===============================================================================
 
 
+def _care_tailored_body(text, domain):
+    """Extract the inner text of the `care-tailored` body for `domain` (isolates it from the fold)."""
+    import re
+
+    m = re.search(
+        rf"data-domain='{domain}'.*?<div class='care-tailored-body'>(.*?)</div>", text, re.S)
+    return m.group(1) if m else None
+
+
+def test_whitespace_reply_degrades_to_untailored_plan(tmp_path):
+    # FIX 3: a whitespace-only presentation reply is empty in substance — it must degrade to the
+    # recorded plan, not emit a blank tailored body. Scoped to the care-tailored body so the
+    # tracking-fold's copy of the plan can't mask the assertion.
+    text, _ = _run_tailor(
+        tmp_path,
+        client=_EchoClient(whitespace=True),
+        care_profile_read=_care_profile_read(peptides=RAW_PEPTIDE),
+        seeds={"peptides": _peptide_plan()},
+    )
+    body = _care_tailored_body(text, "peptides")
+    assert body is not None, "no tailored section emitted for the recorded domain"
+    assert body.strip(), "a whitespace-only reply emitted a blank tailored body instead of degrading"
+    assert "recorded-de-id-peptide" in body, "the degrade did not render the un-tailored recorded plan"
+
+
 @pytest.mark.parametrize("bad_client", [_EchoClient(raise_error=True), _EchoClient(empty=True)])
 def test_ac3_presentation_failure_degrades_to_untailored_plan(tmp_path, bad_client):
     # AC-3 / Risk R-§4: an injected ModelCallError / empty return degrades THAT domain to its
@@ -296,3 +324,104 @@ def test_ac5_automated_regen_fires_tailoring_once(tmp_path, monkeypatch):
     promoted = [d for d, r in result["results"].items() if r.get("recorded")]
     assert promoted, "the re-gen promoted nothing — the AC-5 precondition (a promote) did not hold"
     assert len(calls) == 1, f"the automated re-gen fired tailoring {len(calls)} times, expected once"
+
+
+# ===============================================================================
+# Cycle 3: Emit-gate keys on THIS re-gen's hold set, not a store-date proxy (R-D / HIGH)
+# ===============================================================================
+
+
+def test_emit_gate_keys_on_promoted_holdset_not_store_date(tmp_path):
+    # Risk R-D (crown jewel): a same-date re-record can leave a HELD domain's prior-run plan dated
+    # THIS plan_date in the store. The store-date proxy (resolve_plan state is None) would then EMIT
+    # a tailored section for a domain THIS re-gen HELD — a shadow-prescribe. The emit-gate must key
+    # on the promoted (recorded-and-not-held THIS re-gen) set: a domain absent from `promoted` gets
+    # 0 tailored sections even though its store row is dated plan_date.
+    from scripts.plan import tailoring
+
+    store_root = tmp_path / "store"
+    # BOTH domains carry a plan dated plan_date (the store-date proxy would emit both).
+    _seed_plan(store_root, "peptides", plan=_peptide_plan(), date=ON_DATE)
+    _seed_plan(store_root, "supplements", plan=_supplement_plan(), date=ON_DATE)
+    repo, out = _gitignored_out(tmp_path)
+    # THIS re-gen HELD peptides (adverse data) and promoted only supplements.
+    path = tailoring.tailor(
+        store_root, client=_EchoClient(),
+        care_profile_read=_care_profile_read(peptides=RAW_PEPTIDE, supplements=RAW_SUPPLEMENT),
+        plan_date=ON_DATE, promoted={"supplements"},
+        out_dir=out, _today=TODAY, _profile_paths=_synth_profile(tmp_path), _repo_root=repo,
+    )
+    text = Path(path).read_text(encoding="utf-8")
+    assert "data-domain='peptides'" not in text, (
+        "a domain HELD this re-gen (absent from `promoted`) was shadow-tailored around the safety "
+        "composition on the strength of its stale same-date store row"
+    )
+    assert "data-domain='supplements'" in text, "the promoted domain failed to tailor"
+
+
+# ===============================================================================
+# Cycle 4: real loop->_care_profile->artifact wiring (Integration-Verification Mandate)
+# ===============================================================================
+
+
+def _seed_raw_detail(root, item, value, date=ON_DATE):
+    """Seed a raw care-lane free-text store row `_care_profile` reads into `health_detail`."""
+    from scripts.store import store
+
+    store.append(item, {"item": item, "timepoint": f"{date}T00:00:00+00:00",
+                        "source": "intake", "value": value}, root=root)
+
+
+def test_post_promote_real_wiring_personalizes_artifact(tmp_path):
+    # Integration-Verification Mandate: the AC-5 tests monkeypatch tailoring.tailor, so the real
+    # _post_promote_tailoring -> tailoring.tailor -> care_chat._care_profile -> reemit_maintained path
+    # never runs. Drive it end-to-end with NO monkeypatch of tailor and a REAL seeded store; assert a
+    # personalized section (keyed to the operator's raw detail) lands in the gitignored artifact.
+    from scripts.serve import plan_loop
+
+    store_root = tmp_path / "store"
+    _seed_plan(store_root, "peptides", plan=_peptide_plan(), date=ON_DATE)
+    _seed_raw_detail(store_root, "raw-peptide-free-text", RAW_PEPTIDE)
+    repo, out = _gitignored_out(tmp_path)
+    seams = {"out_dir": out, "_today": TODAY,
+             "_profile_paths": _synth_profile(tmp_path), "_repo_root": repo}
+    plan_loop._post_promote_tailoring(
+        {"peptides": _peptide_plan()}, store_root, plan_date=ON_DATE,
+        tailor_client=_EchoClient(), _tailor_seams=seams,
+    )
+    text = (out / "maintained.html").read_text(encoding="utf-8")
+    assert "data-domain='peptides'" in text, "the real wiring emitted no tailored section"
+    assert RAW_PEPTIDE in text, (
+        "the real care_profile_read did not thread the operator's raw detail into the artifact"
+    )
+
+
+def test_post_promote_partial_degrade_per_domain(tmp_path):
+    # The "degrade THIS domain only" claim: with two promoted domains and a client that fails for B
+    # only, A is personalized AND B is un-tailored (its recorded plan) in the SAME artifact.
+    from scripts.serve import plan_loop
+
+    class _PerDomainClient:
+        def converse(self, messages):
+            ctx = json.loads(messages[0]["content"])
+            if ctx["domain"] == "supplements":
+                raise ModelCallError("supplements presentation backend failed")
+            return {"reply": f"PERSONALIZED-{ctx['domain']}: keyed to {ctx.get('operator_detail')}.",
+                    "extraction": []}
+
+    store_root = tmp_path / "store"
+    _seed_plan(store_root, "peptides", plan=_peptide_plan(), date=ON_DATE)
+    _seed_plan(store_root, "supplements", plan=_supplement_plan(), date=ON_DATE)
+    _seed_raw_detail(store_root, "raw-peptide-free-text", RAW_PEPTIDE)
+    _seed_raw_detail(store_root, "raw-supplement-free-text", RAW_SUPPLEMENT)
+    repo, out = _gitignored_out(tmp_path)
+    seams = {"out_dir": out, "_today": TODAY,
+             "_profile_paths": _synth_profile(tmp_path), "_repo_root": repo}
+    plan_loop._post_promote_tailoring(
+        {"peptides": _peptide_plan(), "supplements": _supplement_plan()}, store_root,
+        plan_date=ON_DATE, tailor_client=_PerDomainClient(), _tailor_seams=seams,
+    )
+    text = (out / "maintained.html").read_text(encoding="utf-8")
+    assert "PERSONALIZED-peptides" in text, "domain A did not personalize"
+    assert "PERSONALIZED-supplements" not in text, "domain B emitted tailored content despite failing"
+    assert "Creatine" in text, "domain B did not degrade to its un-tailored recorded plan"

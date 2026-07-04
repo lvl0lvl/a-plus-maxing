@@ -251,7 +251,7 @@ def _read_adherence(root, on_date):
 
 
 def _post_promote_tailoring(promoted_plan, render_target, *, adherence=None,
-                            tailor_client=None, plan_date=None):
+                            tailor_client=None, plan_date=None, _tailor_seams=None):
     """Post-promote tailoring-hook seam — runs the ADR-0037-T1 care-lane tailoring pass once.
 
     Fired EXACTLY ONCE per promoted re-gen, AFTER the front-door promote, with the promoted plan set
@@ -270,6 +270,8 @@ def _post_promote_tailoring(promoted_plan, render_target, *, adherence=None,
         adherence (dict, optional): The separate plan-vs-actual adherence input (AC-5).
         tailor_client (optional): The care-lane presentation model client. None -> pass-through.
         plan_date (str, optional): The re-gen's YYYY-MM-DD date the tailoring emit-gate keys on.
+        _tailor_seams (dict, optional): Test-only seams forwarded to `tailoring.tailor` (the
+            gitignored `out_dir` / synthetic-identity / repo-root artifact seams). None in production.
     """
     if tailor_client is None:
         return None
@@ -278,8 +280,11 @@ def _post_promote_tailoring(promoted_plan, render_target, *, adherence=None,
 
     care_profile_read = functools.partial(
         care_chat._care_profile, functools.partial(store.read, root=render_target))
+    # Risk R-D: pass the promoted (recorded-and-not-held THIS re-gen) domain set so the tailoring
+    # emit-gate keys on the current hold set, not a stale same-date store row.
     tailoring.tailor(render_target, client=tailor_client,
-                     care_profile_read=care_profile_read, plan_date=plan_date)
+                     care_profile_read=care_profile_read, plan_date=plan_date,
+                     promoted=set(promoted_plan), **(_tailor_seams or {}))
     return None
 
 

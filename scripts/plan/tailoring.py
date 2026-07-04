@@ -60,18 +60,18 @@ def _present(client, domain, plan, detail):
     ]
     result = client.converse(messages)
     reply = result.get("reply") if isinstance(result, dict) else None
-    if not reply:
+    if not reply or not reply.strip():
         raise ModelCallError("care-tailoring: backend returned an empty presentation reply")
     return reply
 
 
-def tailor(root, *, client, care_profile_read, plan_date, out_dir=None,
+def tailor(root, *, client, care_profile_read, plan_date, promoted=None, out_dir=None,
            _today=None, _profile_paths=None, _repo_root=None, _target_override=None):
     """Emit a tailored maintained artifact for the recorded, non-held plans; return its path.
 
-    For each `plan_schema.PLAN_DOMAINS` domain, resolves the recorded `plan::<domain>` state for
-    `plan_date` (the emit-gate: a plan dated `plan_date` means recorded + non-held) and, for each
-    eligible domain, re-presents it against the operator's raw care-lane detail. A presentation
+    For each `plan_schema.PLAN_DOMAINS` domain, applies the emit-gate — the domain must be in THIS
+    re-gen's `promoted` (recorded-and-not-held) set AND resolve to a plan dated `plan_date` — then
+    re-presents each eligible domain against the operator's raw care-lane detail. A presentation
     failure degrades that domain to its un-tailored recorded plan (fail-safe). Renders ALL tailored
     sections ONLY through `reemit_maintained` — opens no store stream, defines no store key.
 
@@ -82,6 +82,10 @@ def tailor(root, *, client, care_profile_read, plan_date, out_dir=None,
         care_profile_read (Callable): A zero-arg reader returning the operator's full care profile
             (`care_chat._care_profile`'s shape: identity-safe demographics + raw `health_detail`).
         plan_date (str): The re-gen's YYYY-MM-DD date the emit-gate keys on.
+        promoted (set | dict, optional): THIS re-gen's recorded-and-not-held domain set (Risk R-D).
+            A domain absent from it is excluded even when its store row is dated `plan_date` — the
+            store-date read alone is a proxy that breaks on a same-date re-record. None (back-compat)
+            keys the gate on the store-date read only.
         out_dir (Path, optional): The gitignored artifacts root forwarded to `reemit_maintained`.
         _today (datetime.date, optional): Test-only render-date seam. Defaults to `plan_date`.
         _profile_paths (tuple, optional): Test-only synthetic-identity seam.
@@ -91,14 +95,20 @@ def tailor(root, *, client, care_profile_read, plan_date, out_dir=None,
     Returns:
         (Path) The maintained artifact path written.
     """
+    plan_date = plan_date or datetime.date.today().isoformat()
     store_read = functools.partial(store.read, root=root)
     profile = care_profile_read() or {}
     health_detail = profile.get("health_detail") or {}
 
     tailored = {}
     for domain in plan_schema.PLAN_DOMAINS:
+        # Emit-gate part 1 (Risk R-D): the domain must be in THIS re-gen's recorded-and-not-held
+        # set. A held domain is absent — excluded before the store read, so a stale same-date store
+        # row from a prior run can never shadow-tailor a domain the safety composition just held.
+        if promoted is not None and domain not in promoted:
+            continue
         resolved = plan_schema.resolve_plan(store_read(f"plan::{domain}"), plan_date)
-        # Emit-gate: only a plan RECORDED for this re-gen date (state is None). A held domain
+        # Emit-gate part 2: only a plan RECORDED for this re-gen date (state is None). A held domain
         # recorded nothing for the date; a domain with only a prior standing plan resolves to
         # NO_PLAN_TODAY. Both are excluded — reading the recorded state, not re-deriving safety.
         if resolved["state"] is not None:
