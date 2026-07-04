@@ -39,10 +39,11 @@ from scripts.store import biomarker_meta, plan_schema, store
 # The judge role slug the loop dispatches the QUALITY gate through the unified subscription seam.
 _JUDGE_ROLE = "quality-judge"
 
-# The large-change confirmation threshold (ADR-0036 OQ-4) — a fixed module constant a deterministic
+# The large-change advisory threshold (ADR-0036 OQ-4) — a fixed module constant a deterministic
 # test reads, NOT a runtime default. Same pinned-number convention as the T2 debounce constants
-# below. A re-gen replacing MORE than this many existing standing plans surfaces for operator
-# confirmation rather than a silent swap.
+# below. A re-gen replacing AT LEAST this many existing standing plans surfaces a large-change
+# ADVISORY (a visibility notice — the swap already landed; NOT a hold). At `3` with a closed
+# 4-domain universe the advisory fires on a 3-of-4 majority swap or a full 4-of-4 swap.
 LARGE_CHANGE_THRESHOLD_DOMAINS = 3
 
 
@@ -130,11 +131,10 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None):
         raw_intake, deid_client, dispatch, store_read, root,
         plan_date=plan_date, gate_dispatch=gate_producer,
     )
-    # Post-promote seams (ADR-0036-T4): the re-gen rationale, the large-change confirmation route,
-    # the pass-through tailoring-hook seam, and the separate adherence input. Only a run that
-    # actually PROMOTED has a standing plan to narrate, confirm, tailor, or thread adherence into —
-    # a blocked/halt run (SAFETY_BLOCKED / DEID_HALTED / cap) promoted nothing and passes straight
-    # through untouched.
+    # Post-promote seams (ADR-0036-T4): the re-gen rationale, the large-change ADVISORY notice, the
+    # pass-through tailoring-hook seam, and the separate adherence input. Only a run that actually
+    # PROMOTED has a standing plan to narrate, flag, tailor, or thread adherence into — a blocked/halt
+    # run (SAFETY_BLOCKED / DEID_HALTED / cap) promoted nothing and passes straight through untouched.
     promoted = _promoted_domains(result)
     if not promoted:
         return result
@@ -144,17 +144,20 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None):
     # boundary re-derives via router.summarize). Absent adherence never blocks the trend-driven
     # re-gen — the re-gen already promoted.
     adherence = _read_adherence(root, plan_date)
-    # AC-2/AC-3 (OQ-4): a re-gen replacing MORE existing standing plans than the pinned threshold
-    # surfaces for operator confirmation rather than swapping the standing plan silently; at/below
-    # the threshold it swaps with no prompt.
-    if _change_magnitude(store_read, result, promoted, plan_date) > LARGE_CHANGE_THRESHOLD_DOMAINS:
+    # AC-2/AC-3 (OQ-4): a re-gen that replaced at least the pinned number of existing standing plans
+    # surfaces a large-change ADVISORY (a notice, not a hold). The new plan is ALREADY the standing
+    # plan — the front-door promote inside `run_orchestrated` recorded it before this check runs — so
+    # this only NOTES that a materially-large swap landed (changed domains + rationale) for operator
+    # visibility. The true hold-until-confirm is the deferred follow-on ADR-0036-T4b. `>=` fires at 3
+    # OR 4 of the 4 domains: a majority-of-domains swap is material enough to surface.
+    if _change_magnitude(store_read, result, promoted, plan_date) >= LARGE_CHANGE_THRESHOLD_DOMAINS:
         from scripts.serve import confirm
         result["large_change"] = True
-        result["pending_confirmation"] = confirm.confirm_large_change(
+        result["large_change_advisory"] = confirm.confirm_large_change(
             promoted, rationale=result["rationale"])
     else:
         result["large_change"] = False
-        result["pending_confirmation"] = None
+        result["large_change_advisory"] = None
     # AC-4: the post-promote tailoring-hook seam — fired exactly once per promoted re-gen with the
     # promoted plan set + the render target (pass-through until ADR-0037-T1 fills it).
     _post_promote_tailoring(
@@ -202,7 +205,7 @@ def _change_magnitude(store_read, result, promoted, plan_date):
     plan (the latest plan dated before `plan_date`). A domain with no prior standing plan is an
     establish, not a swap-over-standing, so it does not count; a domain whose new plan matches its
     prior standing plan is unchanged. The magnitude is the count of standing plans being replaced —
-    breadth of change across domains, the materiality proxy the large-change confirmation reads.
+    breadth of change across domains, the materiality proxy the large-change advisory reads.
 
     Args:
         store_read (Callable): The instance-root-bound `store.read`.

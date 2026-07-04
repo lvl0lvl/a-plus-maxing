@@ -93,30 +93,33 @@ def land_confirmed(readings, *, root, loop_dispatch=None, loop_deid_client=None)
     return {"store": landed}
 
 
-def confirm_large_change(pending, *, rationale):
-    """Surface a large re-gen for operator confirmation instead of a silent swap (ADR-0036-T4).
+def confirm_large_change(changed_domains, *, rationale):
+    """Emit an ADVISORY that a materially-large plan swap already occurred (ADR-0036-T4).
 
-    The plan loop routes a re-gen whose change magnitude exceeds the pinned threshold here rather
-    than swapping the standing plan silently (ADR-0036 OQ-4). Mirrors `land_confirmed`'s
+    The plan loop calls this when a re-gen's change magnitude reaches the pinned threshold. The
+    re-gen has ALREADY recorded the new plan — the front-door promote inside `run_orchestrated`
+    (the ADR-0032-frozen record path) wrote it, and `plan_schema.resolve_plan` resolves that
+    just-written plan as the standing plan. This is therefore an ADVISORY for operator visibility,
+    NOT a hold and NOT a rollback: it names the changed domains + the rationale so the operator sees
+    that a majority-of-domains swap landed. Nothing here holds, reverts, or persists — the true
+    hold-until-confirm is the deferred follow-on ADR-0036-T4b. Mirrors `land_confirmed`'s
     validate-then-act precedent: validates the request shape — a non-empty list of changed domain
-    tokens plus a non-empty rationale — and returns a thin receipt of what awaits confirmation. It
-    adds NO store key, NO second sink, and NO dedupe identity: the operator-confirm surface holds
-    the pending change and NOTHING is persisted here, so the standing plan stays in place until the
-    operator confirms.
+    tokens plus a non-empty rationale — and returns a thin advisory receipt. Adds NO store key, NO
+    second sink, NO dedupe identity.
 
     Args:
-        pending (list): The changed domain tokens the large re-gen would swap in.
-        rationale (str): The plain-language what-changed summary shown at the confirmation surface.
+        changed_domains (list): The domain tokens whose standing plan the re-gen swapped.
+        rationale (str): The plain-language what-changed summary surfaced in the advisory.
 
     Returns:
-        (dict) `{"awaiting_confirmation": [changed domain tokens], "rationale": str}` — a thin
-        receipt of what is held pending, mirroring `land_confirmed`'s receipt shape.
+        (dict) `{"large_change_advisory": [changed domain tokens], "rationale": str}` — a thin
+        advisory receipt of the swap that landed, mirroring `land_confirmed`'s receipt shape.
     """
-    if (not isinstance(pending, list) or not pending
-            or not all(isinstance(domain, str) and domain for domain in pending)):
+    if (not isinstance(changed_domains, list) or not changed_domains
+            or not all(isinstance(domain, str) and domain for domain in changed_domains)):
         raise ValueError(
-            "large-change confirmation requires a non-empty list of changed domain tokens"
+            "large-change advisory requires a non-empty list of changed domain tokens"
         )
     if not isinstance(rationale, str) or not rationale:
-        raise ValueError("large-change confirmation requires a non-empty rationale")
-    return {"awaiting_confirmation": list(pending), "rationale": rationale}
+        raise ValueError("large-change advisory requires a non-empty rationale")
+    return {"large_change_advisory": list(changed_domains), "rationale": rationale}

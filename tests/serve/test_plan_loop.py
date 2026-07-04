@@ -919,59 +919,102 @@ def test_regen_returns_nonempty_rationale(tmp_path):
 # --- Cycle 1 AC-2/AC-3: large-vs-below-threshold pair + pinned threshold -------------
 
 
-def test_large_change_routes_to_confirmation_no_silent_swap(tmp_path, monkeypatch):
-    # AC-2 (large leg / 0 silent swaps): a re-gen replacing MORE than the pinned number of existing
-    # standing plans routes to the confirmation surface (confirm.confirm_large_change reached) and is
-    # held pending — it does NOT silently swap the standing plan. A silent swap leaves the confirm
-    # surface unreached -> RED.
+def test_large_change_surfaces_advisory_not_hold(tmp_path, monkeypatch):
+    # AC-2 (advisory leg): a re-gen that replaced at least the pinned number of existing standing
+    # plans surfaces a large-change ADVISORY — the flag, the rationale, and the changed-domain list.
+    # It is a visibility notice, NOT a hold: under the ADR-0036-T4 ruling the new plan is ALREADY the
+    # standing plan (the front-door promote recorded it before the magnitude check), so this test
+    # asserts the advisory is surfaced AND that the swap already landed. It does NOT assert a held
+    # standing plan — that behavior is the deferred ADR-0036-T4b, not built here.
     from scripts.serve import confirm
 
     calls = []
-    real_confirm = getattr(confirm, "confirm_large_change", None)
+    real_advisory = confirm.confirm_large_change
 
-    def spy_confirm(*a, **k):
+    def spy_advisory(*a, **k):
         calls.append(1)
-        return real_confirm(*a, **k) if real_confirm else {"awaiting_confirmation": list(a[0])}
+        return real_advisory(*a, **k)
 
-    monkeypatch.setattr(confirm, "confirm_large_change", spy_confirm, raising=False)
+    monkeypatch.setattr(confirm, "confirm_large_change", spy_advisory)
 
     dispatch = _LoopDispatch(_clean_authors())
     deid_client = _FixedDeidClient(_deid_summary())
     srv, port = _loop_server(tmp_path, dispatch, deid_client)
-    _seed_prior_standing(tmp_path / "store", plan_schema.PLAN_DOMAINS)  # 4 replaced -> > threshold
+    _seed_prior_standing(tmp_path / "store", plan_schema.PLAN_DOMAINS)  # 4 replaced -> >= threshold
     _serve_in_thread(srv)
     try:
         status, body = _post_plan_loop(port)
         assert status == 200
-        assert calls == [1], "large change did not route to the confirmation surface (silent swap)"
+        # The advisory is surfaced: flag + receipt (changed domains + rationale).
+        assert calls == [1], "large change did not emit the advisory"
         assert body.get("large_change") is True, f"large change not flagged: {body.get('large_change')}"
-        assert body.get("pending_confirmation"), "no pending-confirmation receipt on the large change"
+        advisory = body.get("large_change_advisory")
+        assert advisory, "no large-change advisory receipt on the large change"
+        assert advisory["large_change_advisory"], "advisory carried no changed-domain list"
+        assert isinstance(advisory["rationale"], str) and advisory["rationale"].strip(), (
+            f"advisory carried no rationale: {advisory.get('rationale')!r}"
+        )
+        # HONEST: the advisory is NOT a hold — the new plan is ALREADY the standing plan for today.
+        # The re-gen's front-door promote recorded it; the prior differing plan is no longer standing.
+        today = datetime.date.today().isoformat()
+        for domain in plan_schema.PLAN_DOMAINS:
+            standing = plan_schema.read_plan(domain, today, tmp_path / "store")
+            assert standing["plan_date"] == today, (
+                f"{domain}: the re-gen's plan is not standing for today (unexpected hold)"
+            )
+            assert standing["plan"] != _differing_prior(domain), (
+                f"{domain}: the prior plan is still standing (the swap did not land)"
+            )
     finally:
         srv.shutdown()
         srv.server_close()
 
 
-def test_below_threshold_change_swaps_without_prompt(tmp_path, monkeypatch):
-    # AC-2 (below-threshold leg): a re-gen replacing AT/BELOW the pinned number of standing plans swaps
-    # without a confirmation prompt — the confirm surface is NOT reached. Paired with the large leg:
-    # the two dispositions differ across the pinned threshold.
+def test_below_threshold_change_no_advisory(tmp_path, monkeypatch):
+    # AC-2 (below-threshold leg / FIX-2 boundary low side): a re-gen replacing 2 of 4 standing plans
+    # is below the `>= 3` bar — no advisory. Paired with the 3-of-4 case: the two dispositions differ
+    # across the pinned threshold.
     from scripts.serve import confirm
 
     calls = []
-    monkeypatch.setattr(confirm, "confirm_large_change", lambda *a, **k: calls.append(1),
-                        raising=False)
+    monkeypatch.setattr(confirm, "confirm_large_change", lambda *a, **k: calls.append(1))
 
     dispatch = _LoopDispatch(_clean_authors())
     deid_client = _FixedDeidClient(_deid_summary())
     srv, port = _loop_server(tmp_path, dispatch, deid_client)
-    _seed_prior_standing(tmp_path / "store", ("workout", "nutrition"))  # 2 replaced -> <= threshold
+    _seed_prior_standing(tmp_path / "store", ("workout", "nutrition"))  # 2 replaced -> below `>= 3`
     _serve_in_thread(srv)
     try:
         status, body = _post_plan_loop(port)
         assert status == 200
-        assert calls == [], "a below-threshold change reached the confirmation prompt (spurious swap-guard)"
+        assert calls == [], "a below-threshold change emitted a spurious advisory"
         assert body.get("large_change") is False, f"below-threshold change mis-flagged: {body}"
-        assert body.get("pending_confirmation") is None, "a below-threshold change carried a pending receipt"
+        assert body.get("large_change_advisory") is None, "a below-threshold change carried an advisory"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_three_of_four_domains_fires_advisory(tmp_path, monkeypatch):
+    # FIX-2 boundary (high side): exactly 3 of 4 domains changed reaches the `>= 3` bar and fires the
+    # advisory. Pins the amended `>=` gate — under the old `> 3` a 3-of-4 majority swap surfaced
+    # nothing; a 2-of-4 change (test_below_threshold_change_no_advisory) stays below.
+    from scripts.serve import confirm
+
+    calls = []
+    monkeypatch.setattr(confirm, "confirm_large_change", lambda *a, **k: calls.append(1)
+                        or {"large_change_advisory": list(a[0]), "rationale": "x"})
+
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+    srv, port = _loop_server(tmp_path, dispatch, deid_client)
+    _seed_prior_standing(tmp_path / "store", ("workout", "nutrition", "supplements"))  # 3 -> == bar
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_plan_loop(port)
+        assert status == 200
+        assert calls == [1], "a 3-of-4 majority swap did not fire the advisory (off-by-one at the bar)"
+        assert body.get("large_change") is True, f"3-of-4 change not flagged: {body}"
     finally:
         srv.shutdown()
         srv.server_close()
