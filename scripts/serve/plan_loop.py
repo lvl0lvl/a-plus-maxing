@@ -34,7 +34,7 @@ import functools
 
 from scripts.plan import plan_orchestrator, router, safety_review, track
 from scripts.plan.gate_dispatch import compose_gate_dispatch
-from scripts.store import biomarker_meta, plan_schema, store
+from scripts.store import biomarker_meta, plan_confirm, plan_schema, store
 
 # The judge role slug the loop dispatches the QUALITY gate through the unified subscription seam.
 # PUBLIC + shared (bead 3ge1 concern b): the `_JudgeClient` adapter + the loop tests read this ONE
@@ -197,18 +197,30 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tai
     # visibility. The true hold-until-confirm is the deferred follow-on ADR-0036-T4b. `>=` fires at 3
     # OR 4 of the 4 domains: a majority-of-domains swap is material enough to surface.
     if _change_magnitude(store_read, result, promoted, plan_date) >= LARGE_CHANGE_THRESHOLD_DOMAINS:
+        # ADR-0040 hold: the whole materially-large swap is held as a unit (OQ-3). Write a `pending`
+        # pointer for EVERY promoted domain (not just the content-changed subset) BEFORE this function
+        # returns, so a single-process caller can never observe the swap as standing — T2's readers
+        # (read_plan / window_block / tailoring) then drop the held reading (NO_PLAN_TODAY end-to-end).
+        for domain in promoted:
+            plan_confirm.mark_pending(domain, plan_date, root)
+        held = set(promoted)
         from scripts.serve import confirm
         result["large_change"] = True
         result["large_change_advisory"] = confirm.confirm_large_change(
             promoted, rationale=result["rationale"])
     else:
+        held = set()
         result["large_change"] = False
         result["large_change_advisory"] = None
     # AC-4: the post-promote tailoring-hook seam — fired exactly once per promoted re-gen with the
     # promoted plan set + the render target. ADR-0037-T1 fills it: on a threaded `tailor_client` the
     # care-lane tailoring pass runs once (else it stays a pass-through — the un-wired site).
+    # ADR-0040 deferred-tailoring seam: a HELD domain is excluded from the seam's promoted_plan so it
+    # is never tailored/egressed during the hold (on a full large-change hold this narrows to {}). A
+    # below-threshold re-gen has an empty held set, so the full promoted set reaches the seam unchanged.
+    # T4's confirm fires the deferred tailoring once for the now-confirmed domain.
     _post_promote_tailoring(
-        {domain: result["results"][domain]["plan"] for domain in promoted},
+        {domain: result["results"][domain]["plan"] for domain in promoted if domain not in held},
         root, adherence=adherence, tailor_client=tailor_client, plan_date=plan_date,
     )
     return result
