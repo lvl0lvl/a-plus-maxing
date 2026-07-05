@@ -14,7 +14,7 @@ reads are local file I/O; 0 model-bound send.
 
 import datetime
 
-from scripts.store import calendar_schema, goal_schema, plan_schema, store
+from scripts.store import calendar_schema, goal_schema, plan_confirm, plan_schema, store
 
 # Trailing window spans in days, anchored on (and inclusive of) the render date
 # (OQ-2 boundary decision): a window is the `span` dates [on_date - (span-1),
@@ -150,7 +150,9 @@ def window_block(domain, root, on_date, span_days):
         `HORIZON_EXTRAS` week-framing off the block value); or None when no plan
         falls in the window.
     """
-    readings = store.read(f"plan::{domain}", root=root)
+    readings = plan_confirm.filter_confirmed(
+        store.read(f"plan::{domain}", root=root), domain, root
+    )
     in_window = [r for r in readings if _in_window(r["timepoint"], on_date, span_days)]
     if not in_window:
         return None
