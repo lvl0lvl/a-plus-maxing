@@ -1049,7 +1049,12 @@ def test_router_additive_only_from_fork():
 # new-since-fork file reports 0 deletions vs the fork, so the guard is vacuous until tailoring.py
 # is on main; within-branch protection is tests/plan/test_tailoring.py's behavioral gates' job.
 _TAILORING_ADDITIVE_PATH = "scripts/plan/tailoring.py"
-_TAILORING_SANCTIONED_DELETIONS = 0
+# ADR-0040-T2 (sanctioned): the tailor emit-gate wraps its `resolve_plan(store_read(...))` in
+# `plan_confirm.filter_confirmed(...)` so a held domain is skipped — a modify-to-ADD-a-gate edit
+# (import line + the resolve line) that numstat scores as 2 deletions. Verified safety-adding, not
+# gate-removing; the deletion cap is raised to the exact sanctioned count. A larger non-additive
+# rewrite (>2 deletions) still reds. Behavioral protection is tests/plan/test_tailoring.py's job.
+_TAILORING_SANCTIONED_DELETIONS = 2
 
 
 def test_tailoring_additive_only_from_fork():
