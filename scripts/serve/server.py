@@ -682,15 +682,15 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         # "simple" request (text/plain / no header, no CORS preflight) cannot flip a confirm pointer.
         ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
         if ctype != "application/json":
-            self._write_json(415, {"confirmed": None, "error": "unsupported content-type"})
+            self._write_json(415, {"domain": None, "decision": None, "error": "unsupported content-type"})
             return
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
-            self._write_json(400, {"confirmed": None, "degraded": True, "reason": "bad request"})
+            self._write_json(400, {"domain": None, "decision": None, "degraded": True, "reason": "bad request"})
             return
         if length > _CONFIRM_MAX_BYTES:
-            self._write_json(413, {"confirmed": None, "error": "too large"})
+            self._write_json(413, {"domain": None, "decision": None, "error": "too large"})
             return
         try:
             raw = self.rfile.read(length) if length else b""
@@ -703,7 +703,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             # Thread survival: a malformed / missing-field body — or the act's fail-loud ValueError on
             # a present-but-invalid decision token — answers a degraded 400, never a dropped thread and
             # never a partial pointer flip.
-            self._write_json(400, {"confirmed": None, "degraded": True, "reason": "bad request"})
+            self._write_json(400, {"domain": None, "decision": None, "degraded": True, "reason": "bad request"})
             return
         self._write_json(200, {"domain": receipt["domain"], "decision": receipt["decision"]})
 

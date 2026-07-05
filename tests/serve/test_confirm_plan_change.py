@@ -400,11 +400,17 @@ def test_route_bad_decision_token_400_unflipped(tmp_path):
     try:
         root = tmp_path / "store"
         _seed_pending(root, "workout", TODAY_STR)
-        status, _ = _post(port, "/confirm-plan-change",
+        status, resp = _post(port, "/confirm-plan-change",
                           {"domain": "workout", "plan_date": TODAY_STR, "decision": "approved"})
         assert status == 400, f"a bad decision token returned {status}, expected 400"
         assert plan_confirm.decision_for("workout", TODAY_STR, root) == plan_confirm.DECISION_PENDING, (
             "a present-but-invalid decision token flipped the pointer (default-allow leak)"
+        )
+        # The error body echoes the route's OWN {domain, decision} shape (the 200 success shape), not
+        # the sibling-copied `confirmed` key. Failing-capable: the old `{"confirmed": None}` body reds.
+        assert "confirmed" not in resp, f"the error body carries the sibling-copied 'confirmed' key: {resp}"
+        assert resp.get("domain", "MISSING") is None and resp.get("decision", "MISSING") is None, (
+            f"the error body does not echo the route's domain/decision shape: {resp}"
         )
     finally:
         srv.shutdown()
@@ -426,10 +432,15 @@ def test_route_text_plain_and_no_ctype_415_no_flip(tmp_path):
         _seed_pending(root, "workout", TODAY_STR)  # a 415 never flips, so one seed covers both cases
         body = {"domain": "workout", "plan_date": TODAY_STR, "decision": "confirmed"}
         for ctype in ("text/plain", None):
-            status, _ = _post(port, "/confirm-plan-change", body, content_type=ctype)
+            status, resp = _post(port, "/confirm-plan-change", body, content_type=ctype)
             assert status == 415, f"content-type {ctype!r} returned {status}, expected 415"
             assert plan_confirm.decision_for("workout", TODAY_STR, root) == plan_confirm.DECISION_PENDING, (
                 f"a {ctype!r} confirm flipped the pointer (the CSRF gate was bypassed)"
+            )
+            # The 415 body echoes the route's OWN {domain, decision} shape, not the sibling `confirmed`.
+            assert "confirmed" not in resp, f"the 415 body carries the sibling-copied 'confirmed' key: {resp}"
+            assert resp.get("domain", "MISSING") is None and resp.get("decision", "MISSING") is None, (
+                f"the 415 body does not echo the route's domain/decision shape: {resp}"
             )
     finally:
         srv.shutdown()

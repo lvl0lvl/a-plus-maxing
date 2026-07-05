@@ -95,26 +95,25 @@ def land_confirmed(readings, *, root, loop_dispatch=None, loop_deid_client=None)
 
 
 def confirm_large_change(changed_domains, *, rationale):
-    """Emit an ADVISORY that a materially-large plan swap already occurred (ADR-0036-T4).
+    """Build the operator confirm-PROMPT payload for a materially-large plan swap (ADR-0036-T4 → ADR-0040).
 
-    The plan loop calls this when a re-gen's change magnitude reaches the pinned threshold. The
-    re-gen has ALREADY recorded the new plan — the front-door promote inside `run_orchestrated`
-    (the ADR-0032-frozen record path) wrote it, and `plan_schema.resolve_plan` resolves that
-    just-written plan as the standing plan. This is therefore an ADVISORY for operator visibility,
-    NOT a hold and NOT a rollback: it names the changed domains + the rationale so the operator sees
-    that a majority-of-domains swap landed. Nothing here holds, reverts, or persists — the true
-    hold-until-confirm is the deferred follow-on ADR-0036-T4b. Mirrors `land_confirmed`'s
-    validate-then-act precedent: validates the request shape — a non-empty list of changed domain
-    tokens plus a non-empty rationale — and returns a thin advisory receipt. Adds NO store key, NO
-    second sink, NO dedupe identity.
+    The plan loop calls this when a re-gen's change magnitude reaches the pinned threshold. Under
+    ADR-0040 that swap is HELD: `plan_loop.regenerate` marks every promoted domain `pending` before it
+    returns, so the read-side skip (T2) resolves the held re-gen `NO_PLAN_TODAY` — it does NOT stand and
+    is not tailored/egressed until an explicit operator confirm (`confirm_plan_change`). This function
+    neither holds nor releases; it names the changed domains + the rationale so the OQ-5 confirm UX can
+    PROMPT the operator to confirm or decline the held swap — the returned dict is that prompt payload,
+    no longer a "swap-already-landed" notice. Mirrors `land_confirmed`'s validate-then-act precedent:
+    validates the request shape — a non-empty list of changed domain tokens plus a non-empty rationale —
+    and returns a thin prompt receipt. Adds NO store key, NO second sink, NO dedupe identity.
 
     Args:
-        changed_domains (list): The domain tokens whose standing plan the re-gen swapped.
-        rationale (str): The plain-language what-changed summary surfaced in the advisory.
+        changed_domains (list): The domain tokens whose standing plan the held re-gen swaps.
+        rationale (str): The plain-language what-changed summary surfaced in the confirm prompt.
 
     Returns:
         (dict) `{"large_change_advisory": [changed domain tokens], "rationale": str}` — a thin
-        advisory receipt of the swap that landed, mirroring `land_confirmed`'s receipt shape.
+        confirm-prompt receipt of the held swap, mirroring `land_confirmed`'s receipt shape.
     """
     if (not isinstance(changed_domains, list) or not changed_domains
             or not all(isinstance(domain, str) and domain for domain in changed_domains)):
@@ -160,7 +159,10 @@ def confirm_plan_change(domain, plan_date, decision, *, root, tailor_client=None
 
     Raises:
         ValueError: An unknown domain, a malformed `plan_date`, or a decision token outside
-            {"confirmed", "declined"}.
+            {"confirmed", "declined"} — validated fail-loud before any act. Also PROPAGATES the
+            `ValueError` `plan_confirm.set_decision` raises when no pointer is stored for
+            `(domain, plan_date)` (a forged / stale confirm of a never-marked date); the serve
+            route degrades that to a 400, but a future OQ-5 programmatic caller sees it raise.
     """
     if domain not in plan_schema.PLAN_DOMAINS:
         raise ValueError(f"confirm-plan-change: unknown domain {domain!r}")

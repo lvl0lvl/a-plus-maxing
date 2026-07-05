@@ -23,8 +23,10 @@ only). Fixed dates keep the window/interval arithmetic deterministic.
     tailored artifact section is emitted for a held domain (HARD-AC, Decision §4);
   - AC-5: the byte-unchanged debounce COUNTS the held re-gen (no pending-over-pending storm), proven
     non-tautological by a mutation repointing `_last_regen_date` at `read_plan` (AR-003);
-  - AC-6: the frozen-spine glob is numstat=0, `_last_regen_date`/`_prior_standing_plan`/
-    `_change_magnitude` are byte-unchanged, and the only changed top-level def is `regenerate`.
+  - AC-6 [AMENDED 2026-07-05, 6-lens review]: the frozen-spine glob is numstat=0, `_last_regen_date`/
+    `_prior_standing_plan` are byte-unchanged; the changed top-level defs are `regenerate`,
+    `_change_magnitude` (materiality now filters via filter_confirmed — the HIGH fix), and
+    `_post_promote_tailoring` (docstring records the T4 confirm-time caller).
 """
 
 import ast
@@ -261,6 +263,73 @@ def test_large_regen_gates_held_from_tailoring_seam(tmp_path, monkeypatch):
         assert f"data-domain='{domain}'" not in text, f"held {domain} was shadow-tailored/egressed"
 
 
+# --- FIX 1 (6-lens review, HIGH) + FIX 6 (OQ-6 supersede): materiality vs the last STANDING plan --
+
+POST_INTERVAL_DATE = "2026-06-26"  # 8 days after PLAN_DATE (> MIN_REGEN_INTERVAL_DAYS)
+
+
+def test_regen_re_deriving_held_content_is_held_again(tmp_path):
+    # FIX 1 (HIGH): a held large re-gen (never confirmed) must NOT be the materiality baseline.
+    # Setup: 4 differing prior standing plans @ _T4_PRIOR_DATE stand (no pointer); a large re-gen @
+    # PLAN_DATE is HELD (every domain pending, never confirmed). A fresh re-gen @ POST_INTERVAL_DATE
+    # re-derives the SAME content the held re-gen produced. Because _change_magnitude filters the prior
+    # readings through filter_confirmed, the held PLAN_DATE reading is dropped and materiality is
+    # measured vs the STANDING _T4_PRIOR_DATE plan (still differing) -> material -> HELD AGAIN.
+    # MUTATION-PROOF: revert _change_magnitude to read raw and _prior_standing_plan picks the held
+    # PLAN_DATE reading; the re-derived content reads 0 change, falls below threshold, and STANDS
+    # unheld -> the asserts below go RED.
+    root = tmp_path / "store"
+    _large_regen(root)  # 4 differing priors stand; the PLAN_DATE re-gen is held (all domains pending)
+    for domain in plan_schema.PLAN_DOMAINS:
+        assert plan_confirm.decision_for(domain, PLAN_DATE, root) == plan_confirm.DECISION_PENDING, (
+            f"{domain}: precondition failed — the PLAN_DATE re-gen is not held"
+        )
+
+    # A fresh re-gen re-derives the SAME content (same _clean_authors) at a later date, via the T1
+    # front door directly (regenerate never debounces; the debounce is signal's, tested separately).
+    result = plan_loop.regenerate(
+        root,
+        dispatch=_LoopDispatch(_clean_authors()),
+        deid_client=_FixedDeidClient(_deid_summary()),
+        plan_date=POST_INTERVAL_DATE,
+    )
+    assert set(_promoted(result)) == set(plan_schema.PLAN_DOMAINS), f"the re-gen did not promote: {result}"
+
+    # The re-derived re-gen is HELD AGAIN — materiality read the STANDING prior, not the never-confirmed one.
+    for domain in plan_schema.PLAN_DOMAINS:
+        assert plan_confirm.decision_for(domain, POST_INTERVAL_DATE, root) == plan_confirm.DECISION_PENDING, (
+            f"{domain}: the re-derived re-gen was not held (materiality read the never-confirmed baseline)"
+        )
+        standing = plan_schema.read_plan(domain, POST_INTERVAL_DATE, root)
+        assert standing["state"] == plan_schema.NO_PLAN_TODAY, f"{domain}: a never-confirmed re-gen stood: {standing}"
+        assert standing["plan"] is None, f"{domain}: a held/walk-back plan surfaced: {standing['plan']}"
+
+
+def test_post_interval_regen_supersedes_pending_pointer(tmp_path):
+    # FIX 6 (OQ-6, spec T3 AC-5 final clause): a re-gen that CLEARS the min-interval over a still-
+    # `pending` domain SUPERSEDES the prior pending pointer with a FRESH mark_pending at the new date.
+    # Two _large_regen calls > MIN_REGEN_INTERVAL_DAYS apart; the domains are still pending from the
+    # first (never confirmed). The new-date pointer is a fresh PENDING and the new-date re-gen holds;
+    # the prior pending pointer is untouched (proving a fresh mark at the new date, not a reuse).
+    root = tmp_path / "store"
+    _large_regen(root)  # first held re-gen @ PLAN_DATE
+    assert (plan_loop._date_of(POST_INTERVAL_DATE) - plan_loop._date_of(PLAN_DATE)).days > \
+        plan_loop.MIN_REGEN_INTERVAL_DAYS, "POST_INTERVAL_DATE must clear the min-interval"
+
+    _large_regen(root, plan_date=POST_INTERVAL_DATE)  # second held re-gen; domains still pending from the first
+
+    for domain in plan_schema.PLAN_DOMAINS:
+        assert plan_confirm.decision_for(domain, POST_INTERVAL_DATE, root) == plan_confirm.DECISION_PENDING, (
+            f"{domain}: no fresh pending pointer at the superseding date (OQ-6 supersede)"
+        )
+        assert plan_confirm.decision_for(domain, PLAN_DATE, root) == plan_confirm.DECISION_PENDING, (
+            f"{domain}: the prior pending pointer changed (supersede must be a fresh mark at the new date)"
+        )
+        standing = plan_schema.read_plan(domain, POST_INTERVAL_DATE, root)
+        assert standing["state"] == plan_schema.NO_PLAN_TODAY, f"{domain}: the superseding re-gen stood: {standing}"
+        assert standing["plan"] is None
+
+
 # --- AC-6: frozen-spine numstat=0 + only `regenerate` changed -----------------------
 
 
@@ -297,12 +366,18 @@ def test_frozen_spine_and_only_regenerate_changed():
         capture_output=True, text=True, cwd=repo, check=True,
     ).stdout)
 
+    # [AMENDED 2026-07-05, 6-lens review] `regenerate` (the hold layer), `_change_magnitude` (the
+    # materiality baseline now filters via filter_confirmed — the HIGH fix + its `root` call-site
+    # change), and `_post_promote_tailoring` (docstring records the T4 confirm-time second caller) are
+    # the ONLY changed defs. `_last_regen_date` (the debounce) and `_prior_standing_plan` stay
+    # byte-unchanged.
+    changed_defs = ("regenerate", "_change_magnitude", "_post_promote_tailoring")
     for name, src in origin.items():
-        if name == "regenerate":
+        if name in changed_defs:
             continue
         assert current.get(name) == src, f"{name} changed vs origin/main (must be byte-unchanged)"
-    for helper in ("_last_regen_date", "_prior_standing_plan", "_change_magnitude",
-                   "_post_promote_tailoring"):
+    for helper in ("_last_regen_date", "_prior_standing_plan"):
         assert current[helper] == origin[helper], f"{helper} is not byte-unchanged"
-    # sanity (not vacuous): `regenerate` DID change — the additive hold layer landed there.
-    assert current["regenerate"] != origin["regenerate"], "regenerate did not change (hold not built)"
+    # sanity (not vacuous): each changed def DID change vs origin/main.
+    for name in changed_defs:
+        assert current[name] != origin[name], f"{name} did not change (fix not applied)"

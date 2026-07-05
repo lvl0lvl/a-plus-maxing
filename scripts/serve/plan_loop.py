@@ -42,11 +42,12 @@ from scripts.store import biomarker_meta, plan_confirm, plan_schema, store
 # dispatch-seam consumers (T2/T3/T4) read it too when the production dispatch is wired.
 JUDGE_ROLE = "quality-judge"
 
-# The large-change advisory threshold (ADR-0036 OQ-4) — a fixed module constant a deterministic
-# test reads, NOT a runtime default. Same pinned-number convention as the T2 debounce constants
-# below. A re-gen replacing AT LEAST this many existing standing plans surfaces a large-change
-# ADVISORY (a visibility notice — the swap already landed; NOT a hold). At `3` with a closed
-# 4-domain universe the advisory fires on a 3-of-4 majority swap or a full 4-of-4 swap.
+# The large-change HOLD threshold (ADR-0036 OQ-4 → ADR-0040) — a fixed module constant a
+# deterministic test reads, NOT a runtime default. Same pinned-number convention as the T2 debounce
+# constants below. A re-gen replacing AT LEAST this many existing STANDING plans is a materially-large
+# swap: ADR-0040 HOLDS it `pending` (it does NOT stand and is not tailored/egressed) until an explicit
+# operator confirm. At `3` with a closed 4-domain universe the hold fires on a 3-of-4 majority swap or
+# a full 4-of-4 swap.
 LARGE_CHANGE_THRESHOLD_DOMAINS = 3
 
 
@@ -190,13 +191,16 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tai
     # boundary re-derives via router.summarize). Absent adherence never blocks the trend-driven
     # re-gen — the re-gen already promoted.
     adherence = _read_adherence(root, plan_date)
-    # AC-2/AC-3 (OQ-4): a re-gen that replaced at least the pinned number of existing standing plans
-    # surfaces a large-change ADVISORY (a notice, not a hold). The new plan is ALREADY the standing
-    # plan — the front-door promote inside `run_orchestrated` recorded it before this check runs — so
-    # this only NOTES that a materially-large swap landed (changed domains + rationale) for operator
-    # visibility. The true hold-until-confirm is the deferred follow-on ADR-0036-T4b. `>=` fires at 3
-    # OR 4 of the 4 domains: a majority-of-domains swap is material enough to surface.
-    if _change_magnitude(store_read, result, promoted, plan_date) >= LARGE_CHANGE_THRESHOLD_DOMAINS:
+    # AC-2/AC-3 (OQ-4 → ADR-0040): a re-gen that replaced at least the pinned number of existing
+    # STANDING plans is a materially-large swap. ADR-0040 HOLDS it: the new plan was RECORDED by the
+    # front-door promote inside `run_orchestrated`, but it does NOT stand — the hold branch below marks
+    # every promoted domain `pending` before this function returns, so the read-side skip (T2) resolves
+    # it `NO_PLAN_TODAY` until an explicit operator confirm. The `large_change_advisory` dict is now the
+    # confirm-PROMPT payload (not a swap-already-landed notice). Materiality is measured against the last
+    # STANDING (confirmed / no-pointer) plan — `_change_magnitude` filters the prior readings through
+    # `filter_confirmed`, so a never-confirmed held re-gen is not the baseline. `>=` fires at 3 OR 4 of
+    # the 4 domains: a majority-of-domains swap is material enough to hold.
+    if _change_magnitude(store_read, result, promoted, plan_date, root) >= LARGE_CHANGE_THRESHOLD_DOMAINS:
         # ADR-0040 hold: the whole materially-large swap is held as a unit (OQ-3). Write a `pending`
         # pointer for EVERY promoted domain (not just the content-changed subset) BEFORE this function
         # returns, so a single-process caller can never observe the swap as standing — T2's readers
@@ -257,27 +261,33 @@ def _prior_standing_plan(readings, plan_date):
     return plan_schema.resolve_plan(readings, max(prior_dates))["plan"]
 
 
-def _change_magnitude(store_read, result, promoted, plan_date):
-    """How many existing standing plans this re-gen replaces with different content (OQ-4 proxy).
+def _change_magnitude(store_read, result, promoted, plan_date, root):
+    """How many existing STANDING plans this re-gen replaces with different content (OQ-4 proxy).
 
-    For each promoted domain, compares the newly-promoted plan against the domain's prior standing
-    plan (the latest plan dated before `plan_date`). A domain with no prior standing plan is an
-    establish, not a swap-over-standing, so it does not count; a domain whose new plan matches its
-    prior standing plan is unchanged. The magnitude is the count of standing plans being replaced —
-    breadth of change across domains, the materiality proxy the large-change advisory reads.
+    For each promoted domain, compares the newly-promoted plan against the domain's prior STANDING
+    plan (the latest CONFIRMED / no-pointer plan dated before `plan_date`). The prior readings are
+    pre-filtered through `plan_confirm.filter_confirmed`, so a never-confirmed HELD re-gen (a
+    `pending` pointer) is NOT the materiality baseline — without this a held large swap that a later
+    re-gen re-derives identically would read 0 change and stand unheld (6-lens review, HIGH). A
+    domain with no prior standing plan is an establish, not a swap-over-standing, so it does not
+    count; a domain whose new plan matches its prior standing plan is unchanged. The magnitude is the
+    count of standing plans being replaced — breadth of change across domains, the materiality proxy
+    the large-change hold reads.
 
     Args:
         store_read (Callable): The instance-root-bound `store.read`.
         result (dict): The `run_orchestrated` result (its `results` carries each domain's new plan).
         promoted (list): The domains this re-gen promoted.
         plan_date (str): The re-gen's YYYY-MM-DD date.
+        root (str | Path): The store root, forwarded to `filter_confirmed` for the pointer lookup.
 
     Returns:
         (int) The count of promoted domains whose prior standing plan is being replaced.
     """
     changed = 0
     for domain in promoted:
-        prior = _prior_standing_plan(store_read(f"plan::{domain}"), plan_date)
+        confirmed = plan_confirm.filter_confirmed(store_read(f"plan::{domain}"), domain, root)
+        prior = _prior_standing_plan(confirmed, plan_date)
         if prior is not None and result["results"][domain]["plan"] != prior:
             changed += 1
     return changed
@@ -308,15 +318,19 @@ def _post_promote_tailoring(promoted_plan, render_target, *, adherence=None,
                             tailor_client=None, plan_date=None, _tailor_seams=None):
     """Post-promote tailoring-hook seam — runs the ADR-0037-T1 care-lane tailoring pass once.
 
-    Fired EXACTLY ONCE per promoted re-gen, AFTER the front-door promote, with the promoted plan set
+    Fired per RELEASE of a promoted plan, AFTER the front-door promote, with the plan set to render
     plus the render target (`generate.maintained.reemit_maintained`'s root) — plus the separate
-    adherence input as a keyword extra. When a `tailor_client` is threaded it dispatches the care-lane
-    tailoring pass (`tailoring.tailor`) once — the pass reads the operator's RAW `_care_profile`
-    detail and renders the tailored sections ONLY into the gitignored maintained artifact. Absent the
-    client (the not-yet-wired production trigger site) it stays a PASS-THROUGH, mirroring `signal`'s
-    seams-unwired posture — 0 tailoring, 0 model spend. Change-control (build-plan multi-agent flag):
-    the call shape (promoted plan + render target, once per re-gen) is a cross-task contract — a
-    later edit changing it triggers an Architect contract-update notice.
+    adherence input as a keyword extra. TWO callers fire it (ADR-0040-T4): (1) `regenerate` once per
+    re-gen AT re-gen time, over the promoted-and-NOT-held domains (a held domain is excluded so it is
+    never tailored/egressed during the hold); (2) `confirm.confirm_plan_change` once per operator
+    confirm, over the UNION of every currently-confirmed held domain for that `plan_date` (the deferred
+    tailoring the hold withheld, fired on the pending->confirmed transition). When a `tailor_client` is
+    threaded it dispatches the care-lane tailoring pass (`tailoring.tailor`) once — the pass reads the
+    operator's RAW `_care_profile` detail and renders the tailored sections ONLY into the gitignored
+    maintained artifact. Absent the client (the not-yet-wired production trigger site) it stays a
+    PASS-THROUGH, mirroring `signal`'s seams-unwired posture — 0 tailoring, 0 model spend.
+    Change-control (build-plan multi-agent flag): the call shape (plan set + render target) is a
+    cross-task contract — a later edit changing it triggers an Architect contract-update notice.
 
     Args:
         promoted_plan (dict): domain -> the promoted plan value for each promoted domain.
