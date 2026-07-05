@@ -24,11 +24,12 @@ valid+invalid batch lands NOTHING (no valid-prefix-lands-then-raises partial). A
 non-conformant reading raises `ValueError` before any reading is written.
 """
 
+import datetime
 import logging
 
 from scripts.ingest import ingest
 from scripts.serve import biomarker_mirror
-from scripts.store import store
+from scripts.store import plan_confirm, plan_schema, store
 from scripts.store.keying import is_conformant
 
 
@@ -123,3 +124,84 @@ def confirm_large_change(changed_domains, *, rationale):
     if not isinstance(rationale, str) or not rationale:
         raise ValueError("large-change advisory requires a non-empty rationale")
     return {"large_change_advisory": list(changed_domains), "rationale": rationale}
+
+
+def confirm_plan_change(domain, plan_date, decision, *, root, tailor_client=None):
+    """Apply the operator's explicit confirm/decline of a held large plan re-gen (ADR-0040-T4).
+
+    The terminal release act of the large-change HOLD, mirroring `land_confirmed`'s
+    validate-then-act shape. Validates the request shape fail-loud BEFORE any act — `domain`
+    is a `plan_schema.PLAN_DOMAINS` member, `plan_date` is a real YYYY-MM-DD string, and
+    `decision` is enum-validated against T1's `plan_confirm.DECISION_CONFIRMED` /
+    `DECISION_DECLINED` (a present-but-invalid token like `"approved"` raises `ValueError`,
+    NO default-allow `else`, so an unvalidated token can never flip the pointer to confirmed
+    and egress a tailored section). On an in-window `confirmed` (`plan_date >= today`) it flips
+    the `pending` pointer via `plan_confirm.set_decision` — but ONLY on the pending->`confirmed`
+    TRANSITION (a repeat confirm of an already-`confirmed` domain short-circuits to a no-op, so
+    the metered tailoring fires at most once), then fires the deferred `plan_loop`
+    `_post_promote_tailoring` seam ONCE over the UNION of every currently-`confirmed` held domain
+    for that `plan_date` (the fresh replace-not-accrete render would otherwise clobber a prior
+    confirmed domain's section). On `declined` — OR a late confirm where `plan_date < today` — it
+    GC's the stale pending to `declined` and fires no tailoring, so no unconfirmed re-gen ever
+    stands. Resolves a `None` root to `store.DEFAULT_ROOT` (the operator-entry build's None
+    store_root). Adds no store key / second sink / dedupe identity — the pointer write is T1's
+    `set_decision` via the unchanged `store.correct`.
+
+    Args:
+        domain (str): The plan domain (a `plan_schema.PLAN_DOMAINS` member).
+        plan_date (str): The held plan's YYYY-MM-DD date.
+        decision (str): `"confirmed"` or `"declined"`.
+        root (str | Path | None): The store root; None resolves to `store.DEFAULT_ROOT`.
+        tailor_client (optional): The care-lane presentation client; None keeps the tailoring
+            seam a pass-through (0 spend).
+
+    Returns:
+        (dict) `{"domain": str, "decision": str}` — a thin receipt of the resulting decision.
+
+    Raises:
+        ValueError: An unknown domain, a malformed `plan_date`, or a decision token outside
+            {"confirmed", "declined"}.
+    """
+    if domain not in plan_schema.PLAN_DOMAINS:
+        raise ValueError(f"confirm-plan-change: unknown domain {domain!r}")
+    try:
+        plan_day = datetime.date.fromisoformat(plan_date)
+    except (TypeError, ValueError):
+        raise ValueError(f"confirm-plan-change: plan_date must be YYYY-MM-DD, got {plan_date!r}")
+    if decision not in (plan_confirm.DECISION_CONFIRMED, plan_confirm.DECISION_DECLINED):
+        raise ValueError(
+            f"confirm-plan-change: decision must be "
+            f"{plan_confirm.DECISION_CONFIRMED!r} | {plan_confirm.DECISION_DECLINED!r}, "
+            f"got {decision!r}"
+        )
+    store_root = root if root is not None else store.DEFAULT_ROOT
+
+    # Decline, or a late confirm (plan_date < today): GC the stale pending to declined and fire NO
+    # tailoring — the held reading never stands (AC-3 fail-closed + AC-4 late-confirm refusal).
+    if decision == plan_confirm.DECISION_DECLINED or plan_day < datetime.date.today():
+        plan_confirm.set_decision(domain, plan_date, plan_confirm.DECISION_DECLINED, store_root)
+        return {"domain": domain, "decision": plan_confirm.DECISION_DECLINED}
+
+    # An in-window confirm: fire the metered tailoring ONLY on the pending->confirmed transition, so
+    # a repeat confirm of an already-confirmed domain is a no-op (converse-count == 1 across confirms).
+    if plan_confirm.decision_for(domain, plan_date, store_root) == plan_confirm.DECISION_CONFIRMED:
+        return {"domain": domain, "decision": plan_confirm.DECISION_CONFIRMED}
+    plan_confirm.set_decision(domain, plan_date, plan_confirm.DECISION_CONFIRMED, store_root)
+
+    # Re-render the fresh (replace-not-accrete) care-lane tailored block over the UNION of every
+    # currently-confirmed held domain for this plan_date, so a per-domain confirm never clobbers a
+    # prior confirmed domain's section (Architect F2). The flip above MUST precede this fire — the
+    # tailoring emit-gate applies `filter_confirmed`, so a still-pending domain would be dropped.
+    confirmed_union = {
+        confirmed_domain: plan_schema.read_plan(confirmed_domain, plan_date, store_root)["plan"]
+        for confirmed_domain in plan_schema.PLAN_DOMAINS
+        if plan_confirm.decision_for(confirmed_domain, plan_date, store_root)
+        == plan_confirm.DECISION_CONFIRMED
+    }
+    # Lazy function-scope import: the confirm.py -> plan_loop edge reverses plan_loop's own lazy
+    # plan_loop -> confirm edge (`regenerate`), so a module-level import would cycle (Architect F3).
+    from scripts.serve import plan_loop
+    plan_loop._post_promote_tailoring(
+        confirmed_union, store_root, tailor_client=tailor_client, plan_date=plan_date
+    )
+    return {"domain": domain, "decision": plan_confirm.DECISION_CONFIRMED}

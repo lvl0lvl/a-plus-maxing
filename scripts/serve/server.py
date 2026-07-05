@@ -14,7 +14,8 @@ the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`) -> re-render t
 shell via `generate.run('app')` reflecting the new load-state. The server serves NO
 generated dashboard/report artifact live (ADR-0013 Falsification 3); the route table
 is {GET `/`, GET `/settings/key`, POST `/upload`, POST `/chat`, POST `/settings/key`,
-POST `/care-chat`, POST `/confirm-extraction`, POST `/confirm-curation`, POST `/generate-plan`}. POST `/confirm-extraction`
+POST `/care-chat`, POST `/confirm-extraction`, POST `/confirm-curation`,
+POST `/confirm-plan-change`, POST `/generate-plan`}. POST `/confirm-extraction`
 (ADR-0030-T3) lands ONLY the operator-confirmed subset of an unrecognized-format
 upload's extracted readings through the UNCHANGED sink — the `/upload` handler surfaces
 those readings and lands 0. POST `/generate-plan` authors + records a plan for each
@@ -136,8 +137,8 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     `ingest.run`/`dna.land` seam, and re-renders the app shell reflecting the new
     load-state. Any other POST 404s — the route table is {GET `/`, GET `/settings/key`,
     POST `/upload`, POST `/chat`, POST `/care-chat`, POST `/settings/key`,
-    POST `/confirm-extraction`, POST `/confirm-curation`, POST `/generate-plan`}, never a
-    directory listing or an artifact-serving route.
+    POST `/confirm-extraction`, POST `/confirm-curation`, POST `/confirm-plan-change`,
+    POST `/generate-plan`}, never a directory listing or an artifact-serving route.
 
     Attributes:
         store_root: The time-series store root the POST handler ingests into and
@@ -168,6 +169,11 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     key_store = None
     loop_dispatch = None
     loop_deid_client = None
+    # The care-lane presentation client the POST /confirm-plan-change act fires the deferred
+    # tailoring seam through (ADR-0040-T4). None at the un-wired production site keeps the seam a
+    # pass-through (0 spend); the deferred OQ-5 confirm UX wires it through this class-attr seam,
+    # mirroring `loop_dispatch`/`identity_config`.
+    tailor_client = None
 
     def do_GET(self):
         # Match on the PATH only, ignoring any `?query`/`#fragment`. A query string must not 404 the
@@ -200,6 +206,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/confirm-curation":
             self._do_confirm_curation()
+            return
+        if self.path == "/confirm-plan-change":
+            self._do_confirm_plan_change()
             return
         if self.path == "/generate-plan":
             self._do_generate_plan()
@@ -647,6 +656,56 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         # surfacing, not an error — the request succeeded, nothing was persisted).
         self._write_json(200, {"confirmed": receipt["confirmed"],
                                **({k: receipt[k] for k in ("deferred", "reason") if k in receipt})})
+
+    def _do_confirm_plan_change(self):
+        """Apply the operator's explicit confirm/decline of a held large plan re-gen (ADR-0040-T4).
+
+        Reads a JSON body `{"domain","plan_date","decision"}` and applies it through
+        `confirm.confirm_plan_change` — flipping the T1 `plan-confirm::` pointer (and, on a confirm,
+        firing the deferred care-lane tailoring seam through the instance `tailor_client`). This is
+        the operator-facing RELEASE act of the ADR-0040 large-change hold — the stable contract the
+        deferred OQ-5 confirm UX calls.
+
+        Requires `Content-Type: application/json` (a cross-site CORS-simple `text/plain` / no-header
+        POST is refused 415 BEFORE the body is parsed — the same CSRF gate `_do_confirm_extraction`
+        applies, so a forged cross-site POST cannot flip an operator's confirm pointer). An over-
+        ceiling Content-Length is refused 413 BEFORE the body is read (bounded memory). A malformed
+        body, a missing field, or a present-but-invalid `decision` token (the act's fail-loud
+        `ValueError`) is CAUGHT and answered with a degraded 400 JSON — the request thread is never
+        dropped (mirroring `_do_confirm_extraction`), and the pointer is never partially flipped.
+        """
+        import json
+
+        from scripts.serve import confirm
+
+        # CSRF gate (mirrors `_do_confirm_extraction`): require application/json so a cross-site
+        # "simple" request (text/plain / no header, no CORS preflight) cannot flip a confirm pointer.
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"confirmed": None, "error": "unsupported content-type"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._write_json(400, {"confirmed": None, "degraded": True, "reason": "bad request"})
+            return
+        if length > _CONFIRM_MAX_BYTES:
+            self._write_json(413, {"confirmed": None, "error": "too large"})
+            return
+        try:
+            raw = self.rfile.read(length) if length else b""
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+            receipt = confirm.confirm_plan_change(
+                body["domain"], body["plan_date"], body["decision"],
+                root=self.store_root, tailor_client=self.tailor_client,
+            )
+        except Exception:
+            # Thread survival: a malformed / missing-field body — or the act's fail-loud ValueError on
+            # a present-but-invalid decision token — answers a degraded 400, never a dropped thread and
+            # never a partial pointer flip.
+            self._write_json(400, {"confirmed": None, "degraded": True, "reason": "bad request"})
+            return
+        self._write_json(200, {"domain": receipt["domain"], "decision": receipt["decision"]})
 
     def _do_generate_plan(self):
         """Author + reconcile + record a plan for the plan domains over stored data; answer JSON.
