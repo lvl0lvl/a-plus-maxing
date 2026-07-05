@@ -1917,3 +1917,28 @@ Caught this session: 7 — all self/gate; 0 reached the operator only because th
 - Correctness lens: INFO-2 (the /chat front-end reads `d.reason`, the 415 body uses `error` — cosmetic, sibling-consistent, unreachable) — detection: gate; surfaced_by: self → no action (matches the sibling convention).
 - The `qiob` grounding (NOT a quick fix — a frozen-spine/ADR design decision + secondary defense-in-depth) — detection: self (on grounding); surfaced_by: self → surfaced for the operator's design call, not fake-fixed.
 - The git-mutating-governance-test full-suite flake — detection: self (on the suite re-run); surfaced_by: self → beaded `o0vg`.
+
+## Session 109 (2026-07-04)
+
+### Per-PR gated-skill invocation table (INV-SKILL-TRACE)
+
+A continuous authorized autonomous build loop (operator: "Create the needed ADRs, run the full build pipeline… Run the autonomous build loop until you have everything"). `/create-adr` was invoked fresh via the Skill tool and run IN FULL for ADR-0040 (author → verify → judge ACCEPT ≥9/dim → whole-set red-team → remediation → final-verify CLEAN). The `/review-pr` + `/merge` SKILLS were NOT invoked fresh — GitHub GraphQL rate-limited (0/0) so the skill wrappers were unusable; a LOCAL blind review substituted per PR (3 on-point lenses each, at FULL coverage, not abbreviated), and merges ran via `gh api` REST (full-SHA guard, operator-authorized). Mirrors the S103/S105-S108 rate-limited precedent. `qiob` closed with no PR (already resolved on `main` by S105's `0c62b73`).
+
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
+|----|----------------------------|------------------------|---------|
+| #294 — Origin CSRF gate on /upload (o2gj) | NO (INV-SKILL-TRACE violation — GraphQL rate-limited; LOCAL 3-lens blind review — security/correctness/test-coverage; caught + fixed 2 MEDIUM coverage-locks, exact-match property mutation-locked) | NO (violation — `gh api` REST merge, full-SHA guard) | merged `1644ced` |
+| #295 — ADR-0040 large-change hold-until-confirm (yvrs design) | NO (violation — rate-limited; LOCAL 3-lens blind review — contracts/historical/content-quality; caught + fixed 2 MEDIUM precision fixes) | NO (violation — REST merge, full-SHA guard) | merged `ca259fd` |
+
+### PF attestation
+
+S109 close (2026-07-04): **No new PF-class entries this session.** A continuous autonomous build-loop session under the operator's "run until you have everything" directive: closed `qiob` (already resolved on `main` — the dormant interaction screen was retired S105; grounding caught it before redundant work), built + merged `o2gj` (the `/upload` Origin CSRF gate completing the spend-surface hardening 55qg started), and authored + merged the `yvrs`/ADR-0040 DESIGN (the true large-change hold) through the full `/create-adr` pipeline + a 3-lens `/review-pr`. The layered review worked AS DESIGNED throughout: the o2gj security lens's out-of-scope `/upload` finding was itself the seed for o2gj; the o2gj test-coverage lens caught 2 MEDIUM coverage-locks (the exact-match loopback property, mutation-locked against substring+suffix bypass refactors); the ADR-0040 create-adr RED-TEAM caught 3 BLOCKING mechanism-precision holes (NO_PLAN_TODAY-not-walk-back; the COMPLETE standing-plan reader set must skip the pointer — incl. the horizon `window_block` direct scan the naive design missed; debounce-COUNTS-vs-resolver-SKIPS to prevent a pending-over-pending spend storm), all fixed pre-merge; the ADR-0040 `/review-pr` caught 2 more MEDIUM precision fixes (a load-bearing alt-label typo; the conditional-amendment framing). Every finding fixed or beaded, no severity suppression — the run-gated-skills-in-full + everything-gets-fixed disciplines held. Observed-but-not-promoted: the recurring full-suite-contention flakes (the git-mutating governance test, S108-beaded `o0vg`) did not recur this session (the ADR work was docs-only). Crown-jewel HARDENED (o2gj closed a forced-spend gap; ADR-0040 designs a fail-closed hold that keeps the frozen record spine byte-unchanged); EXTEND-NOT-REBUILD held. The BUILD phase (ADR-0040 + ADR-0039 spec→execute + the hardening beads) is the checkpointed continuation, NOT abandoned — a capacity boundary, not a stop.
+
+### Disclosure ledger (S109 close)
+
+Caught this session: 13 — all self/gate; 0 reached the operator only because they asked.
+- o2gj security lens: the `/upload` forced-spend gap (multipart CORS-simple) — detection: gate; surfaced_by: self → this bead's origin (from the 55qg review).
+- o2gj test-coverage lens: the exact-match-loopback coverage-lock gap (MEDIUM) + null/malformed pin (MEDIUM) — detection: gate; surfaced_by: self → fixed + mutation-locked (substring AND suffix refactors).
+- ADR-0040 red-team: 3 BLOCKING (AR-001 NO_PLAN_TODAY semantics; AR-002 incomplete standing-plan reader set / horizon window_block hole; AR-003 debounce-vs-resolver conflation → spend storm) + 5 non-blocking — detection: gate; surfaced_by: self → all fixed.
+- ADR-0040 /review-pr: CQ-1 alt-label typo (MEDIUM) + CQ-2 conditional-amendment framing (MEDIUM) + 3 LOW — detection: gate; surfaced_by: self → fixed.
+- `qiob` already-resolved (grounding caught it before redundant build work) — detection: self (on grounding); surfaced_by: self → closed as superseded.
+- The full-suite-contention flake class (o0vg) — did not recur (docs-only ADR work); noted.
