@@ -734,17 +734,22 @@ def _fork_point():
 
 
 def test_probe_extend_not_rebuild_frozen_set_numstat_zero():
-    """AC-6 (EXTEND-NOT-REBUILD): the 7 frozen plan-engine files + scripts/store/*.py — numstat 0.
+    """AC-6 (EXTEND-NOT-REBUILD): the 7 frozen plan-engine files + the frozen store spine — numstat 0.
 
     `git diff --numstat <fork-point> --` over the 7 byte-frozen `scripts/plan/*` engine files
-    (orchestrate/pipeline/assemble/generate_plan/adjudicate/adjust/track) + every `scripts/store/*.py`
-    emits 0 rows — the intake/onboarding slice RIDES the unchanged inner engine + store, it
-    re-authors none. Falsifiable: a transient edit to any frozen file emits a row. Mirrors
+    (orchestrate/pipeline/assemble/generate_plan/adjudicate/adjust/track) + the authoritative frozen
+    store spine (`scripts/store/keying.py` + `scripts/store/store.py`, ADR-0032:107) emits 0 rows —
+    the intake/onboarding slice RIDES the unchanged inner engine + store, it re-authors none.
+    Falsifiable: a transient edit to any frozen file emits a row. Mirrors
     `tests/serve/test_route.py::test_frozen_engine_byte_unchanged`.
+
+    Reconciled for ADR-0040 (large-change hold): the former whole-`scripts/store/*.py` glob is
+    narrowed to the authoritative frozen store spine — it over-reached ADR-0032:107 and forbade the
+    ADR-0040-sanctioned additive store surface (`scripts/store/plan_confirm.py`, the bounded
+    `plan-confirm::` stream OQ-1 amending ADR-0038; and `read_plan`'s AR-007 read-side skip in
+    `plan_schema.py`). keying.py + store.py stay byte-frozen.
     """
-    store_paths = sorted(
-        str(p.relative_to(REPO_ROOT)) for p in (REPO_ROOT / "scripts" / "store").glob("*.py")
-    )
+    store_paths = ("scripts/store/keying.py", "scripts/store/store.py")
     frozen = (*_FROZEN_ENGINE_PATHS, *store_paths)
     rows = subprocess.run(
         ["git", "diff", "--numstat", _fork_point(), "--", *frozen],
