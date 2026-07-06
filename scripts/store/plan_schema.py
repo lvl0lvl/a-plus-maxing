@@ -39,7 +39,7 @@ Writers raise only ValueError; readers never raise on absence.
 import datetime
 import re
 
-from scripts.store import store
+from scripts.store import plan_confirm, store
 from scripts.store.loop_schema import _content_tag, _reading
 
 NO_PLAN = "no-plan"
@@ -514,7 +514,10 @@ def read_plan(domain, on_date, root):
     """
     if domain not in PLAN_DOMAINS:
         raise ValueError(f"unknown plan domain {domain!r}; known: {PLAN_DOMAINS}")
-    return resolve_plan(store.read(f"{_PREFIX_PLAN}{domain}", root=root), on_date)
+    readings = plan_confirm.filter_confirmed(
+        store.read(f"{_PREFIX_PLAN}{domain}", root=root), domain, root
+    )
+    return resolve_plan(readings, on_date)
 
 
 def resolve_tracking(readings, on_date):

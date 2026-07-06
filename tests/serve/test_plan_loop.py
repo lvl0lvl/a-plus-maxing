@@ -36,7 +36,7 @@ from scripts.plan import plan_orchestrator
 from scripts.plan.plan_driver import SAFETY_BLOCKED
 from scripts.plan.safety_review import DEFAULT_LENSES
 from scripts.serve import server as serve_server
-from scripts.store import biomarker_meta, loop_schema, plan_schema, store
+from scripts.store import biomarker_meta, loop_schema, plan_confirm, plan_schema, store
 
 from tests.plan.test_deid_in import _FixedDeidClient, _raw_intake
 from tests.plan.test_generate_plan import (
@@ -918,13 +918,14 @@ def test_regen_returns_nonempty_rationale(tmp_path):
 # --- Cycle 1 AC-2/AC-3: large-vs-below-threshold pair + pinned threshold -------------
 
 
-def test_large_change_surfaces_advisory_not_hold(tmp_path, monkeypatch):
+def test_large_change_surfaces_advisory_and_holds(tmp_path, monkeypatch):
     # AC-2 (advisory leg): a re-gen that replaced at least the pinned number of existing standing
     # plans surfaces a large-change ADVISORY — the flag, the rationale, and the changed-domain list.
-    # It is a visibility notice, NOT a hold: under the ADR-0036-T4 ruling the new plan is ALREADY the
-    # standing plan (the front-door promote recorded it before the magnitude check), so this test
-    # asserts the advisory is surfaced AND that the swap already landed. It does NOT assert a held
-    # standing plan — that behavior is the deferred ADR-0036-T4b, not built here.
+    # ADR-0040 (this file's T3) reconciled the earlier stopgap: the advisory is now paired with a
+    # true HOLD — the materially-large swap is marked `pending` and read_plan skips it, so it is
+    # recorded in the raw store but does NOT stand until confirm. The advisory-surfacing assertions
+    # are kept (T4 repurposes the advisory as the confirm-prompt payload); the stale "swap already
+    # landed standing" assertions are replaced with the true-hold assertions below.
     from scripts.serve import confirm
 
     calls = []
@@ -953,16 +954,20 @@ def test_large_change_surfaces_advisory_not_hold(tmp_path, monkeypatch):
         assert isinstance(advisory["rationale"], str) and advisory["rationale"].strip(), (
             f"advisory carried no rationale: {advisory.get('rationale')!r}"
         )
-        # HONEST: the advisory is NOT a hold — the new plan is ALREADY the standing plan for today.
-        # The re-gen's front-door promote recorded it; the prior differing plan is no longer standing.
+        # TRUE HOLD (ADR-0040-T3): the unconfirmed materially-large swap is recorded in the raw store
+        # yet read_plan HOLDS it — today resolves to NO_PLAN_TODAY (never the held swap, never a
+        # walk-back to the prior confirmed plan). T4 flips the pending pointer to land the swap.
         today = datetime.date.today().isoformat()
         for domain in plan_schema.PLAN_DOMAINS:
             standing = plan_schema.read_plan(domain, today, tmp_path / "store")
-            assert standing["plan_date"] == today, (
-                f"{domain}: the re-gen's plan is not standing for today (unexpected hold)"
+            assert standing["state"] == plan_schema.NO_PLAN_TODAY, (
+                f"{domain}: the unconfirmed large swap stood instead of holding"
             )
-            assert standing["plan"] != _differing_prior(domain), (
-                f"{domain}: the prior plan is still standing (the swap did not land)"
+            assert standing["plan"] is None, (
+                f"{domain}: a held/walk-back plan surfaced: {standing['plan']}"
+            )
+            assert standing["plan_date"] != today, (
+                f"{domain}: the held date stood (no hold applied)"
             )
     finally:
         srv.shutdown()
@@ -989,6 +994,19 @@ def test_below_threshold_change_no_advisory(tmp_path, monkeypatch):
         assert calls == [], "a below-threshold change emitted a spurious advisory"
         assert body.get("large_change") is False, f"below-threshold change mis-flagged: {body}"
         assert body.get("large_change_advisory") is None, "a below-threshold change carried an advisory"
+        # The below-threshold re-gen STANDS: each promoted domain's new plan resolves today
+        # (state None, plan present) with 0 pending pointer — a false-hold that marks every
+        # promoted domain pending would red both legs.
+        today = datetime.date.today().isoformat()
+        root = tmp_path / "store"
+        for domain in plan_schema.PLAN_DOMAINS:
+            standing = plan_schema.read_plan(domain, today, root)
+            assert standing["state"] is None and standing["plan"] is not None, (
+                f"{domain}: the below-threshold small change did not stand: {standing}"
+            )
+            assert plan_confirm.decision_for(domain, today, root) is None, (
+                f"{domain}: a below-threshold change wrote a pending confirm pointer"
+            )
     finally:
         srv.shutdown()
         srv.server_close()

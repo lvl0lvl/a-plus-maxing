@@ -1206,6 +1206,8 @@ def render(store_read, _today=None):
             goal_readings[item[len("goal::"):]] = readings
         elif item == "calendar::events":
             events_by_date = calendar_schema.resolve_events(readings)
+        elif item.startswith("plan-confirm::"):
+            pass  # ADR-0040 confirmation-pointer control stream — not rendered
         elif "::" in item:
             prefix = item.split("::", 1)[0] + "::"
             raise KeyError(

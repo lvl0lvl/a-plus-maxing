@@ -25,7 +25,7 @@ import re
 from scripts.generate import maintained
 from scripts.model.client import ModelCallError
 from scripts.plan import router
-from scripts.store import plan_schema, store
+from scripts.store import plan_confirm, plan_schema, store
 
 # The tailored-section keys the pass injects at the `reemit_maintained` boundary — one per
 # plan domain (the `tailored` dict is keyed by `plan_schema.PLAN_DOMAINS`). Named so the
@@ -184,7 +184,8 @@ def tailor(root, *, client, care_profile_read, plan_date, promoted=None, out_dir
         # row from a prior run can never shadow-tailor a domain the safety composition just held.
         if promoted is not None and domain not in promoted:
             continue
-        resolved = plan_schema.resolve_plan(store_read(f"plan::{domain}"), plan_date)
+        readings = plan_confirm.filter_confirmed(store_read(f"plan::{domain}"), domain, root)
+        resolved = plan_schema.resolve_plan(readings, plan_date)
         # Emit-gate part 2: only a plan RECORDED for this re-gen date (state is None). A held domain
         # recorded nothing for the date; a domain with only a prior standing plan resolves to
         # NO_PLAN_TODAY. Both are excluded — reading the recorded state, not re-deriving safety.

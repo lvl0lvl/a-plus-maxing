@@ -595,13 +595,20 @@ def test_probe_honest_no_match_research_gap_and_excluded_never_crossed(tmp_path)
 
 
 def test_probe_extend_not_rebuild_frozen_set_numstat_zero():
-    """AC-5 (EXTEND-NOT-REBUILD): the frozen engine + store set is byte-unchanged from the fork.
+    """AC-5 (EXTEND-NOT-REBUILD): the frozen engine + store spine is byte-unchanged from the fork.
 
-    `git diff --numstat <fork-point>` over the nine frozen files + the `scripts/store/*` glob
-    emits 0 rows — T5 is a Create-only test binding the existing spine; router.py is T3's
-    sanctioned additive seam, not in the frozen set. Mirrors
+    `git diff --numstat <fork-point>` over the nine frozen files (`_FROZEN_SET`: the 7 plan-engine
+    files + `scripts/store/keying.py` + `scripts/store/store.py`) emits 0 rows — the authoritative
+    ADR-0032 frozen surface (ADR-0032 Decision "Extend-not-rebuild"). router.py is T3's sanctioned
+    additive seam, not in the frozen set. Mirrors
     tests/serve/test_route.py::test_frozen_engine_byte_unchanged; failing-capable: a transient
     edit to any frozen file emits a row.
+
+    Reconciled for ADR-0040 (large-change hold): the former whole-`scripts/store/*` over-freeze
+    is dropped — it over-reached ADR-0032:107 (which names keying.py + store.py, not the whole
+    dir) and forbade the ADR-0040-sanctioned additive store surface (the bounded `plan-confirm::`
+    stream `scripts/store/plan_confirm.py`, OQ-1 amending ADR-0038; and `read_plan`'s AR-007
+    read-side skip in `plan_schema.py`). `_FROZEN_SET` still byte-freezes the record spine.
     """
     fork_point = subprocess.run(
         ["git", "merge-base", "HEAD", "origin/main"],
@@ -614,10 +621,3 @@ def test_probe_extend_not_rebuild_frozen_set_numstat_zero():
     ).stdout
     changed = [line for line in rows.splitlines() if line.strip()]
     assert changed == [], f"a frozen engine/store file was edited (EXTEND-NOT-REBUILD broken): {changed}"
-
-    store_rows = subprocess.run(
-        ["git", "diff", "--numstat", fork_point, "--", "scripts/store/*"],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
-    ).stdout
-    store_changed = [line for line in store_rows.splitlines() if line.strip()]
-    assert store_changed == [], f"a scripts/store/* file was edited: {store_changed}"

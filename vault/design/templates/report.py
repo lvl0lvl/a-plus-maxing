@@ -687,6 +687,8 @@ def render(store_read, _today=None):
             answered_watchouts.add(item[len("watch-out::"):])
         elif item.startswith("feedback::"):
             pass  # page-2 table only
+        elif item.startswith("plan-confirm::"):
+            pass  # ADR-0040 confirmation-pointer control stream — not rendered
         elif "::" in item:
             prefix = item.split("::", 1)[0] + "::"
             raise KeyError(
