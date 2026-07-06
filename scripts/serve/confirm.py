@@ -22,6 +22,17 @@ precedent): the whole batch is validated against the SHARED conformance check
 (`keying.is_conformant` — REUSED, never a second key) BEFORE the first land, so a mixed
 valid+invalid batch lands NOTHING (no valid-prefix-lands-then-raises partial). A
 non-conformant reading raises `ValueError` before any reading is written.
+
+Large-change hold acts (ADR-0040): `confirm_large_change(changed_domains, rationale)`
+builds the operator confirm-PROMPT payload for a materially-large plan swap the loop has
+HELD — it names the changed domains + the rationale, neither holding nor releasing.
+`confirm_plan_change(domain, plan_date, decision, root)` is the terminal release act:
+it applies the operator's explicit confirm/decline of a held re-gen — flipping the
+`plan-confirm::` pointer via `plan_confirm.set_decision` and firing the deferred
+`_post_promote_tailoring` seam ONCE over the union of confirmed held domains on a
+pending->confirmed transition, or GC'ing a stale pending to `declined` (with no tailoring)
+on a decline or a late confirm. Same validate-then-act shape as `land_confirmed`; adds no
+store key, second sink, or dedupe identity.
 """
 
 import datetime

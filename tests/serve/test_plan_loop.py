@@ -36,7 +36,7 @@ from scripts.plan import plan_orchestrator
 from scripts.plan.plan_driver import SAFETY_BLOCKED
 from scripts.plan.safety_review import DEFAULT_LENSES
 from scripts.serve import server as serve_server
-from scripts.store import biomarker_meta, loop_schema, plan_schema, store
+from scripts.store import biomarker_meta, loop_schema, plan_confirm, plan_schema, store
 
 from tests.plan.test_deid_in import _FixedDeidClient, _raw_intake
 from tests.plan.test_generate_plan import (
@@ -994,6 +994,19 @@ def test_below_threshold_change_no_advisory(tmp_path, monkeypatch):
         assert calls == [], "a below-threshold change emitted a spurious advisory"
         assert body.get("large_change") is False, f"below-threshold change mis-flagged: {body}"
         assert body.get("large_change_advisory") is None, "a below-threshold change carried an advisory"
+        # The below-threshold re-gen STANDS: each promoted domain's new plan resolves today
+        # (state None, plan present) with 0 pending pointer — a false-hold that marks every
+        # promoted domain pending would red both legs.
+        today = datetime.date.today().isoformat()
+        root = tmp_path / "store"
+        for domain in plan_schema.PLAN_DOMAINS:
+            standing = plan_schema.read_plan(domain, today, root)
+            assert standing["state"] is None and standing["plan"] is not None, (
+                f"{domain}: the below-threshold small change did not stand: {standing}"
+            )
+            assert plan_confirm.decision_for(domain, today, root) is None, (
+                f"{domain}: a below-threshold change wrote a pending confirm pointer"
+            )
     finally:
         srv.shutdown()
         srv.server_close()
