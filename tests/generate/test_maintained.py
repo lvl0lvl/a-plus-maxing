@@ -23,7 +23,7 @@ import pytest
 
 from scripts.generate import maintained
 from scripts.plan import reinsert_out, track
-from scripts.store import plan_schema, store
+from scripts.store import plan_confirm, plan_schema, store
 from vault.design.templates import report
 
 SYNTH_NAME = "Janet Q Testperson"
@@ -665,3 +665,36 @@ def test_bug03_staging_dir_does_not_accrete_across_reemits(tmp_path):
     assert entries == ["maintained.html"], f"the out-dir accreted non-artifact entries: {entries}"
     staging = [n for n in entries if n.startswith(".staging")]
     assert staging == [], f"a staging dir accreted across re-emits: {staging}"
+
+
+# --- held (un-confirmed) plan filtering (bead a-plus-maxing-zsre, ADR-0040 render side) ---
+
+
+def test_held_supplements_plan_absent_from_report_regimen(tmp_path):
+    """A HELD (pending-pointer) supplements plan does NOT render in the maintained artifact's
+    page-1 report regimen; a co-seeded non-held peptides plan still renders there. RED before
+    the fix (bead a-plus-maxing-zsre): `maintained -> report.render` resolved raw `plan::`
+    readings without `plan_confirm.filter_confirmed`, so the held plan leaked in as the standing
+    regimen. The assertion targets the page-1 `fs-rowname` regimen row (NOT the page-2 verbatim
+    audit dump, which str()s the raw value and is a separate, intentional listing surface)."""
+    repo, out = _gitignored_out(tmp_path)
+    store_root = tmp_path / "store"
+    plan_schema.record_plan(
+        "supplements", {"items": [{"name": "Creatine", "dose": "5 g"}]},
+        ON_DATE, "supplement-specialist", store_root)
+    plan_confirm.mark_pending("supplements", ON_DATE, store_root)
+    plan_schema.record_plan(
+        "peptides", {"compound": "bpc-157", "dose": "250 mcg", "route": "subq"},
+        ON_DATE, "peptide-specialist", store_root)
+
+    path = maintained.reemit_maintained(
+        root=store_root, _out_dir=out, _today=TODAY,
+        _profile_paths=_synth_profile(tmp_path), _repo_root=repo,
+    )
+    art = Path(path).read_text(encoding="utf-8")
+    assert "<span class='fs-rowname'>Creatine" not in art, (
+        "a HELD supplements plan leaked into the report regimen"
+    )
+    assert "<span class='fs-rowname'>bpc-157" in art, (
+        "the non-held peptides plan must still render in the regimen"
+    )

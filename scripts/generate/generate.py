@@ -84,17 +84,20 @@ def run(artifact_name, *, _root=None, _out_dir=None, _today=None, _dna_root=None
         labs_root = _labs_root if _labs_root is not None else _DEFAULT_LABS_ROOT
         ingestion_status = ingest_status.resolve(store_read, dna_root=dna_root, labs_root=labs_root)
 
+        # The app shell resolves the Plan-screen plans against the confirm-pointer stream, so it
+        # needs the store root; the intake wizard renders no plans and takes no `_root` (a-plus-maxing-zsre).
+        app_root = {"_root": root} if artifact_name == "app" else {}
+
         def status_seamed(store_read):
-            return template.render(store_read, status=ingestion_status, _today=_today)
+            return template.render(store_read, status=ingestion_status, _today=_today, **app_root)
 
         status_seamed.__name__ = template.__name__
         return render.emit(status_seamed, store_read, _out_dir=_out_dir)
 
-    if _today is None:
-        return render.emit(template, store_read, _out_dir=_out_dir)
-
     def seamed(store_read):
-        return template.render(store_read, _today=_today)
+        # Thread the store root so the dashboard / handout / report render paths drop HELD
+        # (un-confirmed) `plan::` readings via `plan_confirm.filter_confirmed` (a-plus-maxing-zsre).
+        return template.render(store_read, _today=_today, _root=root)
 
     # Keep emit's module-derived output filename (e.g. `dashboard.html`).
     seamed.__name__ = template.__name__

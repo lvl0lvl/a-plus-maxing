@@ -191,21 +191,28 @@ def _plan_item_lines(domain, plan):
     return lines
 
 
-def _plan_zone(store_read, today):
+def _plan_zone(store_read, today, root=None):
     """Read each domain's recorded plan for `today` and render the Plan-screen body.
 
     `store_read` is the flat reading list `store.read_all` returns; the domain's plan readings are
     filtered out by item name and resolved with `plan_schema.resolve_plan` (the same resolution the
     dashboard plan zone uses). Renders one card per domain with a plan recorded for today; with no
     plan in any domain, returns the unchanged honest awaiting state.
+
+    `root` is the store root; when present, each domain's `plan::` readings are passed through
+    `plan_confirm.filter_confirmed` so a HELD (un-confirmed pending-pointer) plan is dropped before
+    resolution (never rendered as the standing plan — bead a-plus-maxing-zsre). When `root` is None
+    (a direct template-seam render with no store root) no filtering runs.
     """
-    from scripts.store import plan_schema
+    from scripts.store import plan_confirm, plan_schema
 
     rows = store_read if isinstance(store_read, list) else []
     cards = []
     for domain, label in _PLAN_LABELS:
         item = f"{plan_schema._PREFIX_PLAN}{domain}"
         readings = [r for r in rows if isinstance(r, dict) and r.get("item") == item]
+        if root is not None:
+            readings = plan_confirm.filter_confirmed(readings, domain, root)
         resolved = plan_schema.resolve_plan(readings, today)
         plan = resolved.get("plan")
         lines = _plan_item_lines(domain, plan) if plan is not None else []
@@ -536,7 +543,7 @@ def _wizard_doc_cards(status, store_read):
     return wearable + labs_card + medical + dna
 
 
-def render(store_read=None, *, status=None, _today=None):
+def render(store_read=None, *, status=None, _today=None, _root=None):
     """Return the inline-asset SPA shell HTML with the Upload doc-cards at the live load-state.
 
     The design is `app_view.html` (passes render.emit's off-file guard); three surfaces are
@@ -553,6 +560,9 @@ def render(store_read=None, *, status=None, _today=None):
             by `generate.run('app')`. None falls back to a store-only default.
         _today (date, optional): The render date driving the Plan screen's plan-for-today
             resolution (`_plan_zone`); defaults to today's date.
+        _root (str | Path, optional): The store root, threaded by `generate.run('app')` so the
+            Plan screen drops HELD (un-confirmed) plans via `plan_confirm.filter_confirmed`
+            (bead a-plus-maxing-zsre). None (a direct template-seam render) runs no confirm filter.
 
     Returns:
         (str) The full self-contained SPA HTML document.
@@ -564,7 +574,7 @@ def render(store_read=None, *, status=None, _today=None):
     html = (
         _VIEW.read_text(encoding="utf-8")
         .replace("<!--DOC_CARDS-->", _doc_cards(status))
-        .replace("<!--PLAN_ZONE-->", _plan_zone(store_read, today))
+        .replace("<!--PLAN_ZONE-->", _plan_zone(store_read, today, _root))
         .replace("<!--REFERRAL_ZONE-->", _referral_zone(store_read))
         .replace("<!--SAVED_PROFILE-->", _wizard_prefill_script(store_read))
         .replace("<!--WIZARD_LOADED_NOTE-->", _wizard_loaded_note(status, store_read))

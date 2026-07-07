@@ -34,7 +34,7 @@ and extended with the face sheet's own page rules. A template is a callable
 import datetime
 from pathlib import Path
 
-from scripts.store import biomarker_meta, plan_schema
+from scripts.store import biomarker_meta, plan_confirm, plan_schema
 from scripts.store.loop_schema import derive_watchout_questions, panel_pending
 from vault.design.templates import component_set as cs
 
@@ -644,13 +644,18 @@ def _detail_page(by_item):
     return f"<div class='fs-page2'>{head}{sections}</div>"
 
 
-def render(store_read, _today=None):
+def render(store_read, _today=None, _root=None):
     """Assemble the Physician Face Sheet HTML from the shared component set.
 
     Args:
         store_read (list): The store read model passed through by render.emit.
         _today (datetime.date, optional): Test-only date seam (the prepared
             date, plan resolution, and footer); defaults to the current date.
+        _root (str | Path, optional): The store root, threaded by `generate.run`
+            and `maintained.reemit_maintained` so the regimen/asks sections drop
+            HELD (un-confirmed) `plan::` readings via
+            `plan_confirm.filter_confirmed` (bead a-plus-maxing-zsre). None (a
+            direct template-seam render) runs no confirm filter.
 
     Returns:
         (str) The assembled face-sheet HTML (single document, inline styling,
@@ -678,7 +683,12 @@ def render(store_read, _today=None):
             # Only the regimen/asks consumers' domains; workout/nutrition
             # plans render page-2 verbatim only (via by_item).
             if domain in ("supplements", "peptides"):
-                plan_readings[domain] = readings
+                # Drop HELD (un-confirmed) readings before the regimen/asks
+                # sections resolve them as the standing plan (a-plus-maxing-zsre).
+                plan_readings[domain] = (
+                    plan_confirm.filter_confirmed(readings, domain, _root)
+                    if _root is not None else readings
+                )
         elif item.startswith("plan-track::"):
             pass  # page-2 verbatim table only
         elif item.startswith("panel::"):

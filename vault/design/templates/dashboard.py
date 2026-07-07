@@ -63,6 +63,7 @@ from scripts.store import (
     care_team_rollup,
     goal_schema,
     loop_schema,
+    plan_confirm,
     plan_schema,
 )
 from vault.design.templates import component_set as cs
@@ -1149,13 +1150,19 @@ def _goals_zone(goal_readings):
     return cs.zone("Goals & Progress", body, subtitle="Where each goal stands.")
 
 
-def render(store_read, _today=None):
+def render(store_read, _today=None, _root=None):
     """Assemble the 7-zone type-routed dashboard HTML from the shared component set.
 
     Args:
         store_read (list): The store read model passed through by render.emit.
         _today (datetime.date, optional): Test-only calendar seam; defaults to
             the current date.
+        _root (str | Path, optional): The store root, threaded by `generate.run`
+            so each domain's `plan::` readings are passed through
+            `plan_confirm.filter_confirmed` — a HELD (un-confirmed) plan is
+            dropped before resolution, never rendered as today's card (bead
+            a-plus-maxing-zsre). None (a direct template-seam render) runs no
+            confirm filter.
 
     Returns:
         (str) The assembled dashboard HTML (single document, inline styling).
@@ -1201,7 +1208,12 @@ def render(store_read, _today=None):
                     f"unrouted plan:: domain {domain!r}: routing for a new "
                     f"stream type is added deliberately, never by silent fallthrough"
                 )
-            plan_readings[domain] = readings
+            # Drop HELD (un-confirmed pending-pointer) readings before the card
+            # resolves — a held plan must never render as today's plan (a-plus-maxing-zsre).
+            plan_readings[domain] = (
+                plan_confirm.filter_confirmed(readings, domain, _root)
+                if _root is not None else readings
+            )
         elif item.startswith("goal::"):
             goal_readings[item[len("goal::"):]] = readings
         elif item == "calendar::events":
