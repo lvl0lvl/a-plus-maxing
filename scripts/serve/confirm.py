@@ -37,11 +37,35 @@ store key, second sink, or dedupe identity.
 
 import datetime
 import logging
+import threading
 
 from scripts.ingest import ingest
 from scripts.serve import biomarker_mirror
 from scripts.store import plan_confirm, plan_schema, store
 from scripts.store.keying import is_conformant
+
+# Per-store-root serialization of the `confirm_plan_change` critical section.
+# `ThreadingHTTPServer` dispatches concurrent confirms on separate threads in ONE process, so two
+# confirms of the same held `(domain, plan_date)` could both pass the pending->confirmed transition
+# check before either flips (TOCTOU) and double-fire the metered tailoring pass, and concurrent
+# different-domain confirms could race the confirmed-union build. The grain is the ROOT, not
+# `(domain, plan_date)`: the union reads EVERY confirmed domain for the root, so a per-key lock would
+# not serialize the cross-domain union race. `threading.Lock` (not `fcntl.flock`) is the right tool —
+# the contention is intra-process threads, not cross-process. The registry is keyed by `str(root)`;
+# `ThreadingHTTPServer` passes one fixed `store_root` to every handler thread, so every concurrent
+# confirm resolves the same lock.
+_confirm_locks = {}
+_confirm_locks_guard = threading.Lock()
+
+
+def _confirm_lock_for(root):
+    """Return the process-wide `threading.Lock` serializing confirms for one store root."""
+    key = str(root)
+    with _confirm_locks_guard:
+        lock = _confirm_locks.get(key)
+        if lock is None:
+            lock = _confirm_locks[key] = threading.Lock()
+    return lock
 
 
 def land_confirmed(readings, *, root, loop_dispatch=None, loop_deid_client=None):
@@ -189,32 +213,38 @@ def confirm_plan_change(domain, plan_date, decision, *, root, tailor_client=None
         )
     store_root = root if root is not None else store.DEFAULT_ROOT
 
-    # Decline, or a late confirm (plan_date < today): GC the stale pending to declined and fire NO
-    # tailoring — the held reading never stands (AC-3 fail-closed + AC-4 late-confirm refusal).
-    if decision == plan_confirm.DECISION_DECLINED or plan_day < datetime.date.today():
-        plan_confirm.set_decision(domain, plan_date, plan_confirm.DECISION_DECLINED, store_root)
-        return {"domain": domain, "decision": plan_confirm.DECISION_DECLINED}
+    # Serialize the whole check->flip->union->fire critical section per store root against the
+    # ThreadingHTTPServer TOCTOU double-spend: the 2nd concurrent same-(domain, plan_date) confirm now
+    # sees the 1st's flip and short-circuits (0 second fire), and concurrent different-domain confirms
+    # serialize so the union build never races another domain's flip. Early `return`s release the lock.
+    with _confirm_lock_for(store_root):
+        # Decline, or a late confirm (plan_date < today): GC the stale pending to declined and fire NO
+        # tailoring — the held reading never stands (AC-3 fail-closed + AC-4 late-confirm refusal).
+        if decision == plan_confirm.DECISION_DECLINED or plan_day < datetime.date.today():
+            plan_confirm.set_decision(domain, plan_date, plan_confirm.DECISION_DECLINED, store_root)
+            return {"domain": domain, "decision": plan_confirm.DECISION_DECLINED}
 
-    # An in-window confirm: fire the metered tailoring ONLY on the pending->confirmed transition, so
-    # a repeat confirm of an already-confirmed domain is a no-op (converse-count == 1 across confirms).
-    if plan_confirm.decision_for(domain, plan_date, store_root) == plan_confirm.DECISION_CONFIRMED:
+        # An in-window confirm: fire the metered tailoring ONLY on the pending->confirmed transition,
+        # so a repeat confirm of an already-confirmed domain is a no-op (converse-count == 1 across
+        # confirms).
+        if plan_confirm.decision_for(domain, plan_date, store_root) == plan_confirm.DECISION_CONFIRMED:
+            return {"domain": domain, "decision": plan_confirm.DECISION_CONFIRMED}
+        plan_confirm.set_decision(domain, plan_date, plan_confirm.DECISION_CONFIRMED, store_root)
+
+        # Re-render the fresh (replace-not-accrete) care-lane tailored block over the UNION of every
+        # currently-confirmed held domain for this plan_date, so a per-domain confirm never clobbers a
+        # prior confirmed domain's section (Architect F2). The flip above MUST precede this fire — the
+        # tailoring emit-gate applies `filter_confirmed`, so a still-pending domain would be dropped.
+        confirmed_union = {
+            confirmed_domain: plan_schema.read_plan(confirmed_domain, plan_date, store_root)["plan"]
+            for confirmed_domain in plan_schema.PLAN_DOMAINS
+            if plan_confirm.decision_for(confirmed_domain, plan_date, store_root)
+            == plan_confirm.DECISION_CONFIRMED
+        }
+        # Lazy function-scope import: the confirm.py -> plan_loop edge reverses plan_loop's own lazy
+        # plan_loop -> confirm edge (`regenerate`), so a module-level import would cycle (Architect F3).
+        from scripts.serve import plan_loop
+        plan_loop._post_promote_tailoring(
+            confirmed_union, store_root, tailor_client=tailor_client, plan_date=plan_date
+        )
         return {"domain": domain, "decision": plan_confirm.DECISION_CONFIRMED}
-    plan_confirm.set_decision(domain, plan_date, plan_confirm.DECISION_CONFIRMED, store_root)
-
-    # Re-render the fresh (replace-not-accrete) care-lane tailored block over the UNION of every
-    # currently-confirmed held domain for this plan_date, so a per-domain confirm never clobbers a
-    # prior confirmed domain's section (Architect F2). The flip above MUST precede this fire — the
-    # tailoring emit-gate applies `filter_confirmed`, so a still-pending domain would be dropped.
-    confirmed_union = {
-        confirmed_domain: plan_schema.read_plan(confirmed_domain, plan_date, store_root)["plan"]
-        for confirmed_domain in plan_schema.PLAN_DOMAINS
-        if plan_confirm.decision_for(confirmed_domain, plan_date, store_root)
-        == plan_confirm.DECISION_CONFIRMED
-    }
-    # Lazy function-scope import: the confirm.py -> plan_loop edge reverses plan_loop's own lazy
-    # plan_loop -> confirm edge (`regenerate`), so a module-level import would cycle (Architect F3).
-    from scripts.serve import plan_loop
-    plan_loop._post_promote_tailoring(
-        confirmed_union, store_root, tailor_client=tailor_client, plan_date=plan_date
-    )
-    return {"domain": domain, "decision": plan_confirm.DECISION_CONFIRMED}

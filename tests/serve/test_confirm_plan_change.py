@@ -271,6 +271,171 @@ def test_per_domain_confirm_retains_both_tailored_sections(tmp_path, monkeypatch
 
 
 # --------------------------------------------------------------------------- #
+# Concurrency — TOCTOU double-spend under ThreadingHTTPServer (bead hgnt, P2)
+# --------------------------------------------------------------------------- #
+
+
+def _counting_seam(fires, fires_guard):
+    """A `_post_promote_tailoring` stand-in that only COUNTS fires (0 render, 0 converse).
+
+    Each fire = one metered care-lane converse in production, so the fire count IS the
+    double-spend observable. Records `set(promoted_plan)` under a lock (the two request threads
+    call it concurrently); never forwards to the real seam, so no `tailoring.tailor` / model call.
+    """
+    def seam(promoted_plan, render_target, *, tailor_client=None, plan_date=None, **kwargs):
+        with fires_guard:
+            fires.append(set(promoted_plan))
+        return None
+    return seam
+
+
+def _barrier_on_first_decision_for(monkeypatch, barrier):
+    """Rendezvous BOTH confirm threads on their FIRST `decision_for` (the L200 transition check).
+
+    Nothing calls `decision_for` before the transition check, so each thread's first call IS that
+    check — barriering there guarantees both threads read `pending` before EITHER calls
+    `set_decision` (the exact TOCTOU window). Subsequent `decision_for` calls (the union build, any
+    `read_plan`-internal resolve) pass straight through. Returns the un-patched `decision_for` so the
+    test's own final state read bypasses the barrier. The barrier wait carries a timeout so the
+    lock-serialized (fixed) path cannot deadlock: only one thread is ever inside the critical
+    section, so its lone wait times out and it proceeds; the other thread is still lock-blocked.
+    """
+    real_decision_for = plan_confirm.decision_for
+    checked = set()
+    checked_guard = threading.Lock()
+
+    def barriered(domain, plan_date, root):
+        result = real_decision_for(domain, plan_date, root)
+        tid = threading.get_ident()
+        with checked_guard:
+            first = tid not in checked
+            checked.add(tid)
+        if first:
+            try:
+                barrier.wait(timeout=2.0)
+            except threading.BrokenBarrierError:
+                pass  # the fixed path: the solo thread times out and proceeds alone (no deadlock)
+        return result
+
+    monkeypatch.setattr(plan_confirm, "decision_for", barriered)
+    return real_decision_for
+
+
+def test_concurrent_same_domain_confirm_tailors_exactly_once(tmp_path, monkeypatch):
+    """TOCTOU double-spend (bead hgnt): two concurrent same-(domain, plan_date) confirms tailor ONCE.
+
+    `ThreadingHTTPServer` dispatches concurrent confirms on separate threads in ONE process. Two
+    confirms of the SAME held `(domain, plan_date)` can both pass the pending->confirmed TRANSITION
+    check (both read `pending`) BEFORE either flips, so both flip and both fire the metered
+    `_post_promote_tailoring` seam -> a DOUBLE converse (defeats ADR-0040 AC-2 converse-count == 1).
+    A `Barrier(2)` on each thread's first `decision_for` FORCES that interleave deterministically; a
+    counting seam records each fire. Failing-capable: WITHOUT the per-root lock both threads fire
+    (2). WITH it the second thread short-circuits on the flipped pointer (1).
+    """
+    root = tmp_path / "store"
+    _seed_pending(root, "workout", TODAY_STR)
+
+    fires, fires_guard = [], threading.Lock()
+    monkeypatch.setattr(plan_loop, "_post_promote_tailoring", _counting_seam(fires, fires_guard))
+    real_decision_for = _barrier_on_first_decision_for(monkeypatch, threading.Barrier(2))
+
+    errors = []
+
+    def worker():
+        try:
+            confirm.confirm_plan_change(
+                "workout", TODAY_STR, "confirmed", root=root, tailor_client=_EchoClient())
+        except Exception as exc:  # a worker raise -> surfaced as a test failure in the main thread
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert not any(thread.is_alive() for thread in threads), "a confirm worker hung (deadlock?)"
+    assert errors == [], f"a confirm worker raised: {errors!r}"
+    assert real_decision_for("workout", TODAY_STR, root) == plan_confirm.DECISION_CONFIRMED
+    assert len(fires) == 1, (
+        f"the metered tailoring seam fired {len(fires)}x for two concurrent same-domain confirms "
+        f"(TOCTOU double-spend); expected exactly 1"
+    )
+
+
+def test_concurrent_cross_domain_confirm_no_union_clobber(tmp_path, monkeypatch):
+    """TOCTOU union clobber (bead hgnt, AC-6b): concurrent different-domain confirms keep BOTH sections.
+
+    The confirmed-union build reads EVERY confirmed domain, so two concurrent confirms of DIFFERENT
+    domains race it: a confirm can build its union BEFORE the other's flip is visible yet fire the
+    fresh (replace-not-accrete) render LAST, clobbering the other domain's just-confirmed section.
+    Role-keyed ordering gates force exactly that tail deterministically — the leader (workout) builds a
+    stale `{workout}` union, the follower (nutrition) then flips + fires the full union, and the
+    leader's stale fire lands LAST. Failing-capable: WITHOUT the per-root lock the last fire carries
+    only `{workout}` (nutrition clobbered); WITH it the two confirms serialize so the last fire carries
+    the full `{workout, nutrition}` union. The gate waits carry a timeout so the lock-serialized path
+    (where the follower is lock-blocked and can never fire) cannot deadlock.
+    """
+    root = tmp_path / "store"
+    _seed_pending(root, "workout", TODAY_STR)
+    _seed_pending(root, "nutrition", TODAY_STR)
+
+    fires, fires_guard = [], threading.Lock()
+    leader_built, follower_fired = threading.Event(), threading.Event()
+
+    real_set_decision = plan_confirm.set_decision
+
+    def gated_set_decision(domain, plan_date, decision, root):
+        # The follower flips only AFTER the leader has built its (deliberately stale) union, so the
+        # leader's union never sees nutrition. The leader flips immediately.
+        if threading.current_thread().name == "follower":
+            leader_built.wait(timeout=2.0)
+        return real_set_decision(domain, plan_date, decision, root)
+
+    def ordering_seam(promoted_plan, render_target, *, tailor_client=None, plan_date=None, **kwargs):
+        domains = set(promoted_plan)
+        if threading.current_thread().name == "leader":
+            leader_built.set()               # the leader's union (L208-213) is already built
+            follower_fired.wait(timeout=2.0)  # hold the leader's stale fire until the follower fired
+            with fires_guard:
+                fires.append(domains)
+        else:
+            with fires_guard:
+                fires.append(domains)
+            follower_fired.set()
+        return None
+
+    monkeypatch.setattr(plan_confirm, "set_decision", gated_set_decision)
+    monkeypatch.setattr(plan_loop, "_post_promote_tailoring", ordering_seam)
+
+    errors = []
+
+    def worker(domain):
+        try:
+            confirm.confirm_plan_change(
+                domain, TODAY_STR, "confirmed", root=root, tailor_client=_EchoClient())
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [
+        threading.Thread(target=worker, args=("workout",), name="leader"),
+        threading.Thread(target=worker, args=("nutrition",), name="follower"),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert not any(thread.is_alive() for thread in threads), "a confirm worker hung (deadlock?)"
+    assert errors == [], f"a confirm worker raised: {errors!r}"
+    assert len(fires) == 2, f"expected one fire per domain confirm, got {fires!r}"
+    assert fires[-1] == {"workout", "nutrition"}, (
+        f"the last tailoring fire carried a stale union {fires[-1]!r}, clobbering the other confirmed "
+        f"domain's section (TOCTOU union race); expected the full {{workout, nutrition}} union"
+    )
+
+
+# --------------------------------------------------------------------------- #
 # Cycle 2 — the POST /confirm-plan-change serve route (CSRF/415 + 413 + enum + dispatch)
 # --------------------------------------------------------------------------- #
 
