@@ -78,7 +78,16 @@ export RUN_ALL_TESTS_EXCLUDE_REASON="${CLOSE_AUDIT_FLOOR_EXCLUDE_REASON:-no reas
 
 # Floors are injectable (CLOSE_AUDIT_FLOORS, newline list) so the negative test
 # can drive a failing / missing floor without disabling the block (F7/TEST-001).
-DEFAULT_FLOORS="${REPO_ROOT}/toolkit/tests/run-all-tests.sh
+# The toolkit floor runs through the a-plus wrapper toolkit-floor.sh (bead 23q5),
+# NOT the vendored run-all-tests.sh directly: the vendored runner ignores
+# RUN_ALL_TESTS_EXCLUDE, so CLOSE_AUDIT_FLOOR_EXCLUDE could not reach it. The
+# wrapper applies the SAME loud + stale-guarded exclusion the a-plus floor uses,
+# seeding the ONE tracked library-tree-scoped red (test-roster-select.sh, bead
+# ffit — roster-select.sh itself works in a-plus), so a bare close is NATIVELY
+# green while every OTHER toolkit test still REDs the floor (F-007 intact). Both
+# floors now honor CLOSE_AUDIT_FLOOR_EXCLUDE identically. When ffit lands upstream
+# + a-plus re-pulls, the wrapper's stale-guard forces the exclusion's removal.
+DEFAULT_FLOORS="${SELF_DIR}/tests/toolkit-floor.sh
 ${SELF_DIR}/tests/run-all-tests.sh"
 FLOORS="${CLOSE_AUDIT_FLOORS:-$DEFAULT_FLOORS}"
 
