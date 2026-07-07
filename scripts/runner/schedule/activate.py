@@ -21,9 +21,12 @@ the BUILT `plan_loop._should_regenerate` (a catch-up tick within `MIN_REGEN_INTE
 This module re-declares no loop constant and imports no loop internals — its whole import surface is
 the standard library.
 
-`active_entry_count()` (and `status()`, which wraps it) reads the REAL scheduler registration for the
-runner label — the real `crontab -l` for the label's marker line, plus the real `launchctl list`
-registration when launchd is available. The same real-state counter is reused by the AC-8
+`active_entry_count()` (and `status()`, which wraps it) reads the REAL scheduler state on the branch
+`enable()` installs to — the installed `~/Library/LaunchAgents/<label>.plist` file presence when
+launchd is available, else the `crontab -l` marker line — never a fixture-HOME dir listing. The
+launchd read is a plain filesystem check (reliable, never hangs; the file is the persistent install
+launchd loads at login), and every crontab/launchctl subprocess is timeout-bounded so a TCC-blocked
+write fails fast rather than hanging. The same real-state counter is reused by the AC-8
 anti-implicit-activation guard, so a fresh label reads 0 and an armed label reads >=1 off REAL state.
 """
 
@@ -40,6 +43,12 @@ RUNNER_LABEL = "com.aplusmaxing.cadence-runner"
 SCHEDULE_DIR = Path(__file__).resolve().parent
 PLIST_TEMPLATE = SCHEDULE_DIR / "cadence-runner.plist.template"
 CRONTAB_TEMPLATE = SCHEDULE_DIR / "cadence-runner.crontab.template"
+
+# Every crontab/launchctl subprocess is bounded so a TCC-blocked write (a non-interactive
+# subagent / CI / fresh-clone context where `crontab -` waits on a Full-Disk-Access prompt that
+# never appears) raises `subprocess.TimeoutExpired` FAST (fail-loud) instead of hanging the process
+# — a hang is strictly worse than a fast error (no signal + blocks the mandatory baseline/close gate).
+_SCHED_TIMEOUT_S = 10
 
 
 def _repo_root():
@@ -111,19 +120,21 @@ def _render_crontab_line(label):
 
 def _read_crontab():
     """The current user crontab as `(had_crontab, text)` — `(False, "")` when none is installed."""
-    proc = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    proc = subprocess.run(["crontab", "-l"], capture_output=True, text=True, timeout=_SCHED_TIMEOUT_S)
     if proc.returncode != 0:
         return (False, "")
     return (True, proc.stdout)
 
 
 def _write_crontab(text):
-    """Install `text` as the user crontab (empty/whitespace -> remove the crontab entirely)."""
-    if text.strip():
-        subprocess.run(["crontab", "-"], input=text if text.endswith("\n") else text + "\n",
-                       text=True, check=True)
-    else:
-        subprocess.run(["crontab", "-r"], capture_output=True, text=True)
+    """Install `text` as the user crontab (a `crontab -` write). Callers decide empty-vs-remove."""
+    subprocess.run(["crontab", "-"], input=text if text.endswith("\n") else text + "\n",
+                   text=True, check=True, timeout=_SCHED_TIMEOUT_S)
+
+
+def _remove_crontab():
+    """Remove the user crontab entirely (`crontab -r`) — only when nothing else remains."""
+    subprocess.run(["crontab", "-r"], capture_output=True, text=True, timeout=_SCHED_TIMEOUT_S)
 
 
 def _install_cron(label):
@@ -138,29 +149,55 @@ def _install_cron(label):
 
 
 def _remove_cron(label):
-    """Strip the label's cron line from the user crontab; idempotent (no-op when absent)."""
+    """Strip the label's cron line from the user crontab; idempotent (no-op when absent).
+
+    Preserves ALL residual content: when any non-runner line remains (INCLUDING comments and blank
+    lines) the crontab is rebuilt from the kept lines via `crontab -`; `crontab -r` (wiping the whole
+    crontab) is used ONLY when the runner line was genuinely the sole line — so the kill-switch never
+    nukes an operator's unrelated crontab entries (Security LOW-2).
+    """
     had, text = _read_crontab()
     if not had:
         return
     marker = _crontab_marker(label)
-    kept = [line for line in text.splitlines() if not line.rstrip().endswith(marker)]
-    if len(kept) != len(text.splitlines()):
-        _write_crontab("\n".join(kept))
+    lines = text.splitlines()
+    kept = [line for line in lines if not line.rstrip().endswith(marker)]
+    if len(kept) == len(lines):
+        return  # the runner line was not present — idempotent no-op
+    if kept:
+        _write_crontab("\n".join(kept) + "\n")
+    else:
+        _remove_crontab()
+
+
+def _launchctl(args):
+    """Best-effort `launchctl <args>` — timeout-bounded; a headless / absent launchctl is non-fatal.
+
+    The `~/Library/LaunchAgents/<label>.plist` FILE is the authoritative install (launchd loads it at
+    login); `launchctl load`/`unload` is a best-effort IMMEDIATE-(de)activation convenience whose
+    failure in a headless / no-GUI / non-darwin context (rc != 0, `TimeoutExpired`, or a missing
+    binary) must NOT fail `enable()`/`disable()` — the file write/unlink is the real state. Motivation
+    stated per the no-defensive-programming policy: the install is the file, launchctl is a convenience.
+    """
+    try:
+        subprocess.run(["launchctl", *args], capture_output=True, text=True, timeout=_SCHED_TIMEOUT_S)
+    except (subprocess.SubprocessError, OSError):
+        pass
 
 
 def _install_launchd(label, rendered):
-    """Install + load the rendered plist as a `~/Library/LaunchAgents` agent."""
+    """Install the rendered plist as a `~/Library/LaunchAgents` agent (file = authoritative install)."""
     installed = _installed_plist_path(label)
     installed.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(rendered, installed)
-    subprocess.run(["launchctl", "load", str(installed)], capture_output=True, text=True)
+    _launchctl(["load", str(installed)])
 
 
 def _remove_launchd(label):
-    """Unload + remove the label's installed launchd agent; idempotent (no-op when absent)."""
+    """Remove the label's installed launchd agent file; idempotent (no-op when absent)."""
     installed = _installed_plist_path(label)
     if installed.exists():
-        subprocess.run(["launchctl", "unload", str(installed)], capture_output=True, text=True)
+        _launchctl(["unload", str(installed)])
         installed.unlink()
 
 
@@ -174,17 +211,23 @@ def _crontab_entry_count(label):
 
 
 def _launchd_entry_count(label):
-    """1 when the label is a loaded launchd registration, else 0 (real `launchctl list` read)."""
-    proc = subprocess.run(["launchctl", "list", label], capture_output=True, text=True)
-    return 1 if proc.returncode == 0 else 0
+    """1 when the runner is installed as a launchd agent, else 0.
+
+    Reads the REAL install-location file presence (`~/Library/LaunchAgents/<label>.plist`) — the
+    persistent "armed" state launchd loads at login — NOT `launchctl list` (which needs an immediate
+    load that fails in a headless context) and NOT a fixture-HOME dir listing. A plain filesystem read:
+    reliable, never hangs.
+    """
+    return 1 if _installed_plist_path(label).exists() else 0
 
 
 def active_entry_count(label=RUNNER_LABEL):
-    """The count of REAL scheduler registrations for the runner label.
+    """The count of REAL scheduler registrations for the runner label, on the ACTIVE branch.
 
-    Reads real state — the `crontab -l` marker lines plus, when launchd is available, the
-    `launchctl list` registration — never a fixture-HOME dir listing. A fresh label reads 0; an
-    `enable()`d label reads >=1. Reused by `status()` and the AC-8 anti-implicit-activation guard.
+    Reads real state on the branch `enable()` installs to — the launchd install-file presence when
+    launchd is available, else the `crontab -l` marker lines — never a fixture-HOME dir listing. A
+    fresh label reads 0; an `enable()`d label reads >=1. The single resolution path reused by
+    `status()` and the AC-8 anti-implicit-activation guard.
 
     Args:
         label (str, optional): The runner label to count registrations for.
@@ -192,10 +235,9 @@ def active_entry_count(label=RUNNER_LABEL):
     Returns:
         (int) The number of real scheduler entries registered for the label.
     """
-    count = _crontab_entry_count(label)
     if _launchd_available():
-        count += _launchd_entry_count(label)
-    return count
+        return _launchd_entry_count(label)
+    return _crontab_entry_count(label)
 
 
 def status(label=RUNNER_LABEL):
@@ -272,18 +314,19 @@ def enable(label=RUNNER_LABEL):
 
 
 def disable(label=RUNNER_LABEL):
-    """The kill-switch: disarm the runner label everywhere and remove the rendered instance.
+    """The kill-switch: disarm the runner label on the ACTIVE branch + remove the rendered instance.
 
-    Strips the label's `crontab` line, unloads + removes its launchd agent when launchd is available,
-    and removes the rendered instance plist. Idempotent — disabling an already-disabled label is a
-    no-op.
+    Symmetric with `enable()`: removes the label's launchd agent file when launchd is available, else
+    strips its `crontab` line (the residual-safe `_remove_cron`), then removes the rendered instance
+    plist. Idempotent — disabling an already-disabled label is a no-op.
 
     Args:
         label (str, optional): The runner label to disarm.
     """
-    _remove_cron(label)
     if _launchd_available():
         _remove_launchd(label)
+    else:
+        _remove_cron(label)
     rendered = _rendered_plist_path(label)
     if rendered.exists():
         rendered.unlink()
