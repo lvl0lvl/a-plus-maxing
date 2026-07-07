@@ -1,0 +1,13 @@
+{
+  "name": "pen-harness",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Quarantined node/Playwright runtime for the §6.4 seam crawl (and §6.3 res-3, task #45). The static bash+python gates stay node-free; this dependency lives here only.",
+  "bin": {
+    "pen-harness": "./pen-harness.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.49.1"
+  }
+}

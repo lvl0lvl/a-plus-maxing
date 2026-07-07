@@ -93,12 +93,13 @@ fi
 # consistency-audit.sh (which are per-HARVEST / pre-release, library-wide — NOT per
 # session close) and excluded *-scan / *-gate members. The default roster below is
 # the single canonical per-close blocking set; it must match Discipline 1 step 7.
-#   IN  (per-close, blocking): rotation-stamp-audit, stale-hash-audit, pf-attestation-audit
+#   IN  (per-close, blocking): rotation-stamp-audit, stale-hash-audit, pf-attestation-audit,
+#                              hygiene-audit, watchdog (no-args==poll: an open/STALLED agent FAILs the close, ADR-0005)
 #   OUT (advisory):            falsification-scan.sh — warnings only, never blocks; run separately
 #   OUT (distinct close step): harvest-gate.sh — needs session args (--pf/--harvest/--beads)
 #   OUT (per-harvest/release): parity-audit.sh, consistency-audit.sh — library-wide cadence (Discipline 11)
 # Override the roster per project via $CLOSE_AUDIT_SCRIPTS or positional args.
-DEFAULT_ROSTER="rotation-stamp-audit.sh stale-hash-audit.sh pf-attestation-audit.sh"
+DEFAULT_ROSTER="rotation-stamp-audit.sh stale-hash-audit.sh pf-attestation-audit.sh hygiene-audit.sh watchdog.sh"
 SCRIPTS=()
 if [ "${#EXPLICIT_SCRIPTS[@]}" -gt 0 ]; then
   SCRIPTS=("${EXPLICIT_SCRIPTS[@]}")
@@ -136,6 +137,35 @@ if [ "${#SCRIPTS[@]}" -eq 0 ]; then
   # No constituents to run is itself a couldn't-verify state: fail-closed.
   skipped "no constituent audit scripts found in ${SCRIPTS_DIR} — nothing to attest"
   verdict
+fi
+
+# --- Step 0: prove the audits can still FAIL before trusting them to PASS (F-007) ---
+# BUG-3 (W1-3, 2026-07-02): close-audit runs the negative-test suite FIRST, before
+# any constituent audit. Six framework doc sites (Discipline 1 step 7, Discipline
+# 5, Discipline 6, Orchestrator spec, toolkit README, playbook) state it does — but
+# it never did, leaving the load-bearing F-007 protection unwired: an audit that
+# silently lost its ability to go RED on bad input would still grant a GREEN here.
+# Now the suite runs first; a suite FAILURE blocks the close BEFORE the audits run.
+# Recursion guard: run-all-tests.sh exports CLOSE_AUDIT_SKIP_SUITE=1, so a close-audit
+# invoked BY a test (test-close-audit.sh) does not re-enter the suite. The suite path
+# is overridable via $CLOSE_AUDIT_SUITE (the negative test points it at trivial fakes).
+SUITE="${CLOSE_AUDIT_SUITE:-$SELF_DIR/../tests/run-all-tests.sh}"
+if [ "${CLOSE_AUDIT_SKIP_SUITE:-0}" = "1" ]; then
+  warn "suite-first step SKIPPED (CLOSE_AUDIT_SKIP_SUITE=1) — expected only for a close-audit invoked from within the test suite"
+elif [ ! -f "$SUITE" ]; then
+  emit "FATAL: negative-test suite not found at ${SUITE} — cannot prove the audits still FAIL on bad input (F-007)"
+  skipped "negative-test suite could not run: ${SUITE}"
+  verdict
+else
+  emit "running negative-test suite first: ${SUITE}"
+  suite_rc=0
+  bash "$SUITE" >/dev/null 2>&1 || suite_rc=$?
+  if [ "$suite_rc" -eq 0 ]; then
+    emit "  negative-test suite: PASS (every audit proven to still go RED on bad input — F-007)"
+  else
+    fail "negative-test suite FAILED (exit ${suite_rc}) — an audit can no longer prove it FAILs on bad input; close BLOCKED before the audits run (F-007)"
+    verdict
+  fi
 fi
 
 # --- run each constituent ----------------------------------------------------

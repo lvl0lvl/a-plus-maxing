@@ -57,6 +57,18 @@
 
 set -uo pipefail
 
+# Dep preflight (bead skills_library-kfi): under `pipefail` a missing grep/sed/tr
+# makes every matcher pipeline return non-zero, which reads as "not our concern"
+# → silent ALLOW. A gate whose matcher cannot run must fail CLOSED instead
+# (F-008): exit 2 is a PreToolUse blocking error in hook mode and FATAL in test
+# mode. `command -v` is a bash builtin, so the preflight itself needs none of the
+# tools it checks.
+for _dep in grep sed tr; do
+  command -v "$_dep" >/dev/null 2>&1 && continue
+  echo "block-commit-main: DENY — required tool '$_dep' not found on PATH; the matcher cannot run (fail-closed, F-008)" >&2
+  exit 2
+done
+
 PROTECTED_BRANCHES="${PROTECTED_BRANCHES:-main master}"
 TESTMODE="${BLOCK_COMMIT_MAIN_TESTMODE:-0}"
 
@@ -104,11 +116,56 @@ EOF
 # flags, and ends on space / separator / EOL.
 COMMIT_MATCHER_RE='(^|[;&|] *)([A-Za-z_][A-Za-z0-9_]*=[^ ;&|]* +)*([^ ;&|]*/)?git +([^|&;]*[[:space:]])?commit( |[;&|]|$)'
 
+# strip_transparent_wrappers (bead skills_library-4jx) — remove a leading
+# TRANSPARENT-EXEC wrapper and its own options/args at every command position
+# (start, or after ; & |), repeatedly, so a command a shell would run AS the gated
+# operation is seen as such. Wrappers stripped: command exec nohup builtin time env
+# sudo doas nice ionice setsid stdbuf unbuffer caffeinate timeout xargs — each runs
+# its argument as a command. After the wrapper, a run of its own leading tokens is
+# consumed: -flags, NAME=val assignments, bare numeric/duration scalars (timeout's
+# `5`, nice's `10`), and a value-taking `-u`/`-C`/`-g` flag with its separated
+# argument (env -u NAME, env -C dir, sudo -u user). The command is the first token
+# that is none of those, so `timeout 5 git commit` / `nice -n 10 git commit` /
+# `env -u X git commit` all reduce to `git commit`; `env FOO=bar ./deploy.sh` and
+# `sudo -u git commit` (runs `commit` as user git) correctly do NOT. Only exec-
+# transparent words strip (echo/printf/`environment`/`commander`/`timeouty` do not —
+# the trailing space anchors the whole word), preserving every `echo git commit`
+# must-NOT-block case. Done as a pre-pass, not a matcher-regex change: BSD grep
+# mis-handles a second starred/alternated prefix group at the separator anchor.
+# IRREDUCIBLE CEILING (a text pre-pass cannot close these — beaded, not claimed):
+# re-quoting wrappers `bash -c "git commit"` / `sh -c` / `script -c`; token
+# obfuscation `\git` / `"git" commit` / `g\it`; `env -S "git commit"` (recombines a
+# quoted string). The gate is a discipline floor (ADR-0002: attested-not-proven,
+# rubber-stampable), not an adversarial control; the commit side has the git-native
+# pre-commit backstop, the PR side needs server-side branch protection (ADR-0002 OQ-3).
+strip_transparent_wrappers() {  # $1 = normalized command; $2 = value-flag class
+                                # (default uCg); echoes wrappers removed
+  local s="$1" prev cls="${2:-uCg}"
+  while :; do
+    prev="$s"
+    s="$(printf '%s' "$s" | sed -E 's/(^|[;&|][[:space:]]*)(command|exec|nohup|builtin|time|env|sudo|doas|nice|ionice|setsid|stdbuf|unbuffer|caffeinate|timeout|xargs)([[:space:]]+(-['"$cls"'][[:space:]]+[^ ;&|]+|-[^ ;&|]*|[A-Za-z_][A-Za-z0-9_]*=[^ ;&|]*|[0-9][^ ;&|]*))*[[:space:]]+/\1/g')"
+    [ "$s" = "$prev" ] && break
+  done
+  printf '%s' "$s"
+}
+
 is_git_commit() {  # $1 = raw command; 0 if a git commit invocation, else 1
-  local norm
+  local norm folded
   norm=$(printf '%s' "$1" | tr '\n' ';' | tr -s '[:space:]' ' ')
   norm="${norm#" "}"; norm="${norm%" "}"
-  printf '%s' "$norm" | grep -qE "$COMMIT_MATCHER_RE"
+  # Pass 1 — exact (the pre-pif behavior, byte-preserved): the -[uCg] value-flag
+  # class consumes `env -C dir` / `sudo -u user` correctly while leaving a
+  # lowercase `-c` generic (setsid's -c takes NO argument — consuming a value
+  # there would false-ALLOW `setsid -c git commit`).
+  printf '%s' "$(strip_transparent_wrappers "$norm")" | grep -qE "$COMMIT_MATCHER_RE" && return 0
+  # Pass 2 — case-folded (bead skills_library-pif): on a case-insensitive FS
+  # `GIT commit` / `TIMEOUT 5 git commit` execute exactly like their lowercase
+  # forms, but pass 1 reads them as not-a-commit → un-gated commit on a protected
+  # branch (executed triage C3). Folding lowercases `-C` too, so this pass widens
+  # the value-flag class to -[ucg]. OR-semantics make the fold purely ADDITIVE:
+  # it can only over-MATCH (fail-closed friction), never lose a pass-1 catch.
+  folded="$(printf '%s' "$norm" | tr '[:upper:]' '[:lower:]')"
+  printf '%s' "$(strip_transparent_wrappers "$folded" ucg)" | grep -qE "$COMMIT_MATCHER_RE"
 }
 
 # ── target-repo resolution (BUG-4) ────────────────────────────────────────────

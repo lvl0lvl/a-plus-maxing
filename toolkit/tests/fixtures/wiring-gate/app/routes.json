@@ -1,0 +1,9 @@
+[
+  "POST /api/auth/login",
+  "POST /api/auth/register",
+  "POST /api/auth/verify",
+  "POST /api/auth/resend",
+  "POST /api/auth/2sv/verify",
+  "POST /api/auth/reset/request",
+  "POST /api/auth/reset/confirm"
+]

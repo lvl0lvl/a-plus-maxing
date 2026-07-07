@@ -1,0 +1,4 @@
+{
+  "account": ["id", "email", "name", "password_hash", "status", "created_at"],
+  "session": ["id", "account_id", "token", "expires_at"]
+}

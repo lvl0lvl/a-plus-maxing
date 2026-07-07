@@ -1,0 +1,19 @@
+{
+  "format": "wiring-results-v0",
+  "waves": {
+    "1": "closed",
+    "2": "open"
+  },
+  "rows": [
+    { "screen": "screen/_shell", "wireId": "home", "wave": 1 },
+    { "screen": "screen/_shell", "wireId": "back", "wave": 1 },
+    { "screen": "screen/list", "wireId": "search", "wave": 1 },
+    { "screen": "screen/list", "wireId": "incident-row", "wave": 1 },
+    { "screen": "screen/list", "wireId": "open-filters", "wave": 1 },
+    { "screen": "screen/list", "wireId": "apply-filter", "wave": 1 },
+    { "screen": "screen/list", "wireId": "open-detail", "wave": 1 },
+    { "screen": "screen/detail", "wireId": "status-note", "wave": 1 },
+    { "screen": "screen/detail", "wireId": "refresh", "wave": 1 },
+    { "screen": "screen/detail", "wireId": "retry", "wave": 1 }
+  ]
+}

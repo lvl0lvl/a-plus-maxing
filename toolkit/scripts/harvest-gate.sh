@@ -38,11 +38,29 @@
 #   harvest-gate.sh --pf <process-failures.md> --harvest <harvest.jsonl> \
 #                   --beads <issues.jsonl> [--session N]
 #   --session N   restrict the PF scan to the "Session N" section. Default: the
-#                 last/current session section found in the PF log.
+#                 last/current session section found in the PF log. Projects whose
+#                 PF log has NO "Session N" headings (e.g. a date-keyed log) simply
+#                 omit --session: the whole file is scanned as one block.
+#
+# ENV OVERRIDES (so non-numbered-session / date-keyed projects can gate honestly):
+#   HARVEST_PF_ID_PATTERN   grep -oE alternation for the failure-id shapes to gate.
+#       Default: (FAIL-[A-Z0-9]+-[0-9]+|PF-S[0-9]+-[0-9]+)
+#       A date-keyed project sets e.g. (FAIL-[A-Z0-9]+-[0-9]+|PF-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+).
+#   HARVEST_SESSION_PATTERN awk ERE for a session heading line (used to slice the
+#       --session block). Default: [Ss]ession[ \t]+[0-9]+
+#
+#   WHY THIS MATTERS (cross-deployment finding CF-1, F-008): the id pattern was
+#   hardwired to the numbered-session scheme. A date-keyed PF log (ids like
+#   PF-2026-06-04-03, no "Session N" headings) matched ZERO ids, so the gate took
+#   its "nothing to gate" branch and PASSed (exit 0) WITHOUT enforcing anything — a
+#   vacuous pass / false-green, the exact disease this gate exists to prevent. The
+#   empty-id branch now distinguishes "genuinely clean" from "couldn't gate this
+#   id scheme" and fails CLOSED (skipped -> FATAL) on the latter (see below).
 #
 # EXIT: 0 PASS (every PF failure captured in all 3 layers) / 1 FAIL (a failure
 #       missing from a layer, or a malformed harvest line) / 2 FATAL (bad args /
-#       unreadable input — a check that cannot run does not pass).
+#       unreadable input, OR the PF block carries failure-id-shaped tokens the
+#       active id pattern cannot match — a check that cannot run does not pass).
 #
 # Portable across BSD (macOS bash 3.2) and GNU. Dependency-free: no jq/python.
 
@@ -84,6 +102,11 @@ for f in "$PF" "$HARVEST" "$BEADS"; do
   [ -f "$f" ] || { emit "FATAL: input not found / not a file: $f"; exit 2; }
   [ -r "$f" ] || { emit "FATAL: input not readable: $f"; exit 2; }
 done
+
+# --- configurable id / session patterns (CF-1) -------------------------------
+# Defaults preserve the historical numbered-session behavior exactly.
+HARVEST_PF_ID_PATTERN="${HARVEST_PF_ID_PATTERN:-(FAIL-[A-Z0-9]+-[0-9]+|PF-S[0-9]+-[0-9]+)}"
+HARVEST_SESSION_PATTERN="${HARVEST_SESSION_PATTERN:-[Ss]ession[ \t]+[0-9]+}"
 
 # --- helpers -----------------------------------------------------------------
 
@@ -130,14 +153,14 @@ json_well_formed() {
 # the next session heading. Otherwise take the LAST session heading onward (the
 # current session). Headings are markdown lines mentioning "Session <n>".
 extract_session_block() {
-  awk -v want="$SESSION" '
-    function is_heading(l) { return (l ~ /[Ss]ession[ \t]+[0-9]+/) }
+  awk -v want="$SESSION" -v hpat="$HARVEST_SESSION_PATTERN" '
+    function is_heading(l) { return (l ~ hpat) }
     {
       lines[NR] = $0
       if (is_heading($0)) {
         n = $0
-        # extract the first integer after "session"
-        match($0, /[Ss]ession[ \t]+[0-9]+/)
+        # extract the first integer in the matched session heading
+        match($0, hpat)
         s = substr($0, RSTART, RLENGTH)
         gsub(/[^0-9]/, "", s)
         hnum[++hc] = s
@@ -209,18 +232,74 @@ harvest_has() {
 }
 
 # --- 2. for each PF failure id in the session, require all 3 layers ----------
-# PF failure ids look like FAIL-<PROJECT>-<NNN> or PF-S<n>-<nn>. We extract any
-# token matching those shapes from the current-session block.
+# PF failure ids match HARVEST_PF_ID_PATTERN (default FAIL-<PROJECT>-<NNN> or
+# PF-S<n>-<nn>). We extract any token matching that shape from the current-session
+# block — but ONLY from this-session DECLARATION context, not from prior-failure
+# references.
 SESSION_BLOCK="$(extract_session_block)"
 
+# BUG-4 (CF-1 over-extraction, a-plus #8): the PF template carries a
+# `Recurrence: <prior-ids>` field, and a "No new PF" close may attest a prior id.
+# Greping EVERY id token in the block then false-FAILs: the gate demands a harvest
+# record + bead for a failure that is NOT this session's. So ids that occur ONLY on a
+# prior/recurrence-reference line are dropped; an id that also appears on a
+# non-reference (declaration) line is kept (the `grep -Ev` below realizes this set
+# logic — a declaration line survives the filter, so its id is still extracted).
+#
+# BUG-6 (W1-5, 2026-07-02): the prior REF_RE matched the reference keyword ANYWHERE
+# in a line, so a genuine this-session PF entry whose TITLE/body merely MENTIONED
+# one of those words (safety PF-S11-01 — a PF *about* the recurrence filter; its
+# heading contained "recurrence") had its whole declaration line dropped and was
+# NEVER gated — a silent FALSE-PASS in a fail-closed gate, the exact disease this
+# gate exists to prevent (it left PF-S5-02 / PF-S8-01 historically ungated). Fix: a
+# line is a prior-REFERENCE only when it LEADS with a reference FIELD LABEL
+# (`Recurrence:` / `Superseded:` / `Prior`, after optional indent / list-marker /
+# bold) AND the keyword ends on a word boundary — `([^A-Za-z]|:|$)`, so "Priority"/
+# "Prioritize" do NOT prefix-match "Prior" (BUG-6 review, 2026-07-02: dropping that
+# trailing boundary let a `- Priority: … PF-Sn-nn …` declaration be misread as a
+# reference and false-PASS). A declaration heading or `- <id>:` entry never leads with
+# such a label, so its id is always gated even if its title says "recurrence". (KNOWN
+# RESIDUAL: a standalone `- <id> HELD` prior reference with NO leading Recurrence label
+# is treated as a declaration and gated — a SAFE false-FAIL the operator resolves by
+# moving it into a `Recurrence:` field, the documented a-plus #8 mitigation. The
+# dangerous false-PASS direction is NARROWED, not fully closed: a genuine declaration
+# whose line LEADS with the bare word "Prior"/"Recurrence" as prose is still dropped —
+# same as before this change, pre-existing, not introduced here.)
+REF_RE='^[[:space:]]*([-*>][[:space:]]*)*(\*\*)?([Rr]ecurrence|[Ss]upersed(e|ed|es)|[Pp]rior)([^A-Za-z]|:|$)'
+
+# ids appearing on any non-reference line (genuine this-session declarations)
 PF_IDS="$(printf '%s\n' "$SESSION_BLOCK" \
-  | grep -oE '(FAIL-[A-Z0-9]+-[0-9]+|PF-S[0-9]+-[0-9]+)' \
+  | grep -Ev "$REF_RE" \
+  | grep -oE "$HARVEST_PF_ID_PATTERN" \
   | sort -u)"
 
 if [ -z "$PF_IDS" ]; then
-  # No failures recorded this session is a legitimate clean state — nothing to
-  # harvest. (This is NOT a couldn't-run skip: the PF log was read fine.)
-  emit "no session failure ids found in PF log${SESSION:+ (session ${SESSION})} — nothing to gate"
+  # The active id pattern matched nothing in the declaration lines. Two cases —
+  # and they are NOT the same (CF-1 / F-008):
+  #   (a) genuinely clean: the block contains NO failure-id-shaped token at all
+  #       -> legitimately nothing to gate -> PASS.
+  #   (b) couldn't gate: the block DOES carry a failure-id-shaped token (PF-/FAIL-
+  #       hyphen prefix) that the ACTIVE pattern did not match — e.g. a date-form id
+  #       PF-2026-06-04-03 under the default numbered-session pattern. This is the
+  #       vacuous-pass trap: it must be LOUD and fail-closed, not read as clean.
+  # Conservative "looks like a failure id" probe: require the PF-/FAIL- hyphen
+  # prefix shape (NOT the bare words "PF"/"failure" in prose). Then subtract the
+  # ids the active pattern already matched anywhere in the block.
+  MATCHED_ANY="$(printf '%s\n' "$SESSION_BLOCK" \
+    | grep -oE "$HARVEST_PF_ID_PATTERN" | sort -u)"
+  LOOKS_LIKE="$(printf '%s\n' "$SESSION_BLOCK" \
+    | grep -oE '(PF-[A-Za-z0-9-]+|FAIL-[A-Za-z0-9-]+)' | sort -u)"
+  UNMATCHED="$(comm -23 \
+    <(printf '%s\n' "$LOOKS_LIKE" | grep -v '^$' | sort -u) \
+    <(printf '%s\n' "$MATCHED_ANY" | grep -v '^$' | sort -u))"
+  if [ -n "$UNMATCHED" ]; then
+    # case (b): cannot honestly gate this id scheme.
+    unmatched_flat="$(printf '%s' "$UNMATCHED" | tr '\n' ' ')"
+    skipped "PF block carries failure-id-shaped token(s) the active id pattern did not match:${unmatched_flat:+ }${unmatched_flat}— set HARVEST_PF_ID_PATTERN to this project's id scheme (this gate cannot honestly gate it as-is)"
+  else
+    # case (a): genuinely clean. The PF log was read fine — NOT a couldn't-run skip.
+    emit "no session failure ids found in PF log${SESSION:+ (session ${SESSION})} — nothing to gate"
+  fi
 else
   while IFS= read -r pfid; do
     [ -n "$pfid" ] || continue

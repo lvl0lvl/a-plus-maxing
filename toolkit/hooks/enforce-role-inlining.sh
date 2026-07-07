@@ -46,6 +46,17 @@
 
 set -euo pipefail
 
+# Dep preflight (bead skills_library-kfi): a missing grep/sed/tr makes the
+# role-detection greps fail, which reads as "not a role dispatch" → silent ALLOW
+# of an un-inlined role prompt. A gate whose matcher cannot run must fail CLOSED
+# instead (F-008). `command -v` is a bash builtin, so the preflight itself needs
+# none of the tools it checks.
+for _dep in grep sed tr; do
+  command -v "$_dep" >/dev/null 2>&1 && continue
+  echo "enforce-role-inlining: DENY — required tool '$_dep' not found on PATH; the matcher cannot run (fail-closed, F-008)" >&2
+  exit 2
+done
+
 # ---------------------------------------------------------------------------
 # CONFIG (all overridable via environment) ----------------------------------
 # ---------------------------------------------------------------------------

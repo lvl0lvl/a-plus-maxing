@@ -1,0 +1,140 @@
+[
+  {
+    "action": "navigate",
+    "destination": "screen/list",
+    "endpoint": "none",
+    "ephemeral": false,
+    "name": "btn/back",
+    "reads": [],
+    "screen": "screen/_shell",
+    "shell": true,
+    "shellStates": [
+      "screen/detail"
+    ],
+    "status": "planned",
+    "wireId": "back",
+    "writes": []
+  },
+  {
+    "action": "navigate",
+    "destination": "screen/list",
+    "endpoint": "none",
+    "ephemeral": false,
+    "name": "link/home",
+    "reads": [],
+    "screen": "screen/_shell",
+    "shell": true,
+    "shellStates": [
+      "*"
+    ],
+    "status": "planned",
+    "wireId": "home",
+    "writes": []
+  },
+  {
+    "action": "toggle",
+    "destination": "self",
+    "endpoint": "none",
+    "ephemeral": false,
+    "name": "btn/refresh",
+    "reads": [],
+    "screen": "screen/detail",
+    "status": "planned",
+    "wireId": "refresh",
+    "writes": []
+  },
+  {
+    "action": "toggle",
+    "destination": "self",
+    "endpoint": "none",
+    "ephemeral": false,
+    "name": "btn/retry",
+    "reads": [],
+    "screen": "screen/detail",
+    "status": "planned",
+    "wireId": "retry",
+    "writes": []
+  },
+  {
+    "action": "submit",
+    "destination": "self",
+    "endpoint": [
+      "POST /api/note"
+    ],
+    "ephemeral": false,
+    "name": "btn/status-note",
+    "reads": [],
+    "screen": "screen/detail",
+    "status": "planned",
+    "wireId": "status-note",
+    "writes": [
+      "note.text"
+    ]
+  },
+  {
+    "action": "filter",
+    "destination": "self",
+    "endpoint": "none",
+    "ephemeral": true,
+    "localEffect": "applies the chosen filter and closes the modal",
+    "name": "btn/apply-filter",
+    "reads": [],
+    "screen": "screen/list",
+    "status": "planned",
+    "wireId": "apply-filter",
+    "writes": []
+  },
+  {
+    "action": "select",
+    "destination": "self",
+    "endpoint": "none",
+    "ephemeral": true,
+    "localEffect": "highlights the selected incident row",
+    "name": "row/incident-row",
+    "reads": [
+      "incident.title"
+    ],
+    "screen": "screen/list",
+    "status": "planned",
+    "wireId": "incident-row",
+    "writes": []
+  },
+  {
+    "action": "navigate",
+    "destination": "screen/detail",
+    "endpoint": "none",
+    "ephemeral": false,
+    "name": "btn/open-detail",
+    "reads": [],
+    "screen": "screen/list",
+    "status": "planned",
+    "wireId": "open-detail",
+    "writes": []
+  },
+  {
+    "action": "toggle",
+    "destination": "self",
+    "endpoint": "none",
+    "ephemeral": true,
+    "localEffect": "opens the filters modal (rendered through a portal)",
+    "name": "btn/open-filters",
+    "reads": [],
+    "screen": "screen/list",
+    "status": "planned",
+    "wireId": "open-filters",
+    "writes": []
+  },
+  {
+    "action": "input",
+    "destination": "self",
+    "endpoint": "none",
+    "ephemeral": true,
+    "localEffect": "filters the incident list in place",
+    "name": "input/search",
+    "reads": [],
+    "screen": "screen/list",
+    "status": "planned",
+    "wireId": "search",
+    "writes": []
+  }
+]

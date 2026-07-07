@@ -1,0 +1,73 @@
+{
+  "id": "incident-mgmt",
+  "initial": "dashboard",
+  "on": {
+    "NAV_INCIDENTS": [
+      {
+        "fromWireId": "incidents",
+        "guard": "",
+        "target": "dashboard"
+      }
+    ]
+  },
+  "states": {
+    "dashboard": {
+      "initial": "viewing",
+      "states": {
+        "viewing": {
+          "on": {
+            "DRILL": [
+              {
+                "fromWireId": "metric-open-incidents.drill",
+                "guard": "",
+                "target": "incident-review"
+              }
+            ],
+            "NEW_INCIDENT": [
+              {
+                "fromWireId": "new-incident",
+                "guard": "",
+                "target": "incident-review"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "incident-review": {
+      "initial": "viewing",
+      "states": {
+        "editing": {
+          "on": {
+            "DONE_EDITING": [
+              {
+                "fromWireId": "notes",
+                "guard": "",
+                "target": "viewing"
+              }
+            ]
+          }
+        },
+        "submitting": {},
+        "viewing": {
+          "on": {
+            "EDIT_NOTES": [
+              {
+                "fromWireId": "notes",
+                "guard": "",
+                "target": "editing"
+              }
+            ],
+            "SUBMIT_REPORT": [
+              {
+                "fromWireId": "submit-report",
+                "guard": "canSubmit",
+                "target": "submitting"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

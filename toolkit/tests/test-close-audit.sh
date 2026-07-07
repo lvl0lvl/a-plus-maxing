@@ -26,6 +26,13 @@ source "${TEST_DIR}/../lib/test-lib.sh"
 CLOSE_AUDIT="${TEST_DIR}/../scripts/close-audit.sh"
 FIX="${TEST_DIR}/fixtures/close-audit"
 
+# The roster-mechanics assertions below exercise the CONSTITUENT logic, not the
+# suite-first step (W1-3). Skip the suite here so these cases don't run the real
+# suite (which would recurse back into this test). The dedicated suite-first cases
+# at the end override this with a trivial fake suite. Robust whether this test is
+# run directly or via run-all-tests.sh (which also exports this).
+export CLOSE_AUDIT_SKIP_SUITE=1
+
 rm -rf "$FIX"
 mkdir -p "$FIX"
 
@@ -103,5 +110,28 @@ assert_red_when_guard_removed \
 # that the opt-out is wired. A real violation must still NOT be downgraded.
 expect_exit 0 env AUDIT_ALLOW_SKIP=1 bash "$CLOSE_AUDIT" --scripts-dir "$BAD_FATAL"
 expect_exit 1 env AUDIT_ALLOW_SKIP=1 bash "$CLOSE_AUDIT" --scripts-dir "$BAD_VIOL"
+
+# === Suite-first step (W1-3): close-audit runs run-all-tests.sh BEFORE the audits ===
+# The load-bearing F-007 protection: if a negative test can no longer prove its audit
+# goes RED on bad input, the close is blocked before any audit is trusted to go green.
+# Trivial fake suites stand in for run-all-tests.sh (real path overridable via
+# $CLOSE_AUDIT_SUITE) so these cases exercise the step without recursing into the suite.
+SUITE_PASS="${FIX}/suite-pass.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SUITE_PASS"; chmod +x "$SUITE_PASS"
+SUITE_FAIL="${FIX}/suite-fail.sh"
+printf '#!/usr/bin/env bash\necho "[fake-suite] a negative test regressed"; exit 1\n' > "$SUITE_FAIL"; chmod +x "$SUITE_FAIL"
+SUITE_MISSING="${FIX}/no-such-suite.sh"   # deliberately never created
+
+# Passing suite + clean roster -> the audits then run and pass -> exit 0.
+expect_exit 0 env CLOSE_AUDIT_SKIP_SUITE=0 CLOSE_AUDIT_SUITE="$SUITE_PASS" bash "$CLOSE_AUDIT" --scripts-dir "$GOOD"
+# FAILING suite -> close BLOCKED (exit 1) BEFORE the audits, even over a clean roster.
+expect_exit 1 env CLOSE_AUDIT_SKIP_SUITE=0 CLOSE_AUDIT_SUITE="$SUITE_FAIL" bash "$CLOSE_AUDIT" --scripts-dir "$GOOD"
+# MISSING suite -> FATAL (exit 2): cannot prove the audits still FAIL on bad input.
+expect_exit 2 env CLOSE_AUDIT_SKIP_SUITE=0 CLOSE_AUDIT_SUITE="$SUITE_MISSING" bash "$CLOSE_AUDIT" --scripts-dir "$GOOD"
+
+# Guard-fires pairing for the suite-first step: passing suite GREEN, broken suite RED.
+assert_red_when_guard_removed \
+  "env CLOSE_AUDIT_SKIP_SUITE=0 CLOSE_AUDIT_SUITE='$SUITE_PASS' bash '$CLOSE_AUDIT' --scripts-dir '$GOOD'" \
+  "env CLOSE_AUDIT_SKIP_SUITE=0 CLOSE_AUDIT_SUITE='$SUITE_FAIL' bash '$CLOSE_AUDIT' --scripts-dir '$GOOD'"
 
 test_summary

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Generic judge-gate (3.5) — test fixture",
+  "type": "object",
+  "required": ["phase","verdict","judge_verdicts","halt_reasons","attestation_chain","timestamp"],
+  "properties": {
+    "phase": {"const": "3.5"},
+    "verdict": {"enum": ["PASS","HALT"]},
+    "timestamp": {"type": "string"},
+    "mode_threshold": {"type": "integer"},
+    "iterations": {"type": "integer"},
+    "judge_verdicts": {"type": "array", "items": {"type": "object"}},
+    "halt_reasons": {"type": "array"},
+    "attestation_chain": {"type": "object"}
+  }
+}

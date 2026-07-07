@@ -1,0 +1,38 @@
+{
+  "journey": "review",
+  "e2e": {
+    "detail/status-note": {
+      "drive": [
+        { "click": "list/open-detail" },
+        { "click": "detail/status-note" }
+      ],
+      "effect": { "kind": "persist", "entity": "note", "field": "text", "value": "reviewed" }
+    },
+    "list/open-filters": {
+      "drive": [
+        { "click": "list/open-filters" }
+      ],
+      "effect": { "kind": "present", "oid": "list/apply-filter" }
+    },
+    "list/apply-filter": {
+      "drive": [
+        { "click": "list/open-filters" },
+        { "click": "list/apply-filter" }
+      ],
+      "effect": { "kind": "absent", "oid": "list/apply-filter" }
+    },
+    "list/search": {
+      "drive": [
+        { "fill": "list/search", "value": "Pump" }
+      ],
+      "effect": { "kind": "count", "oid": "list/incident-row", "op": "eq", "n": 1 }
+    },
+    "list/incident-row": {
+      "oiid": { "instances": 3 },
+      "drive": [
+        { "clickInstance": "list/incident-row", "index": "$k" }
+      ],
+      "effect": { "kind": "instanceAttr", "oid": "list/incident-row", "index": "$k", "attr": "aria-selected", "value": "true" }
+    }
+  }
+}

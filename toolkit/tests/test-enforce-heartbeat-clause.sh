@@ -39,6 +39,20 @@ cat > "${FIX}/bad-no-clause.json" <<'EOF'
 }
 EOF
 
+# BAD (W1-9 review, scattered-vocabulary bypass): NO real liveness clause, but
+# incidental words — "liveness", an emit-verb ("Output"), "status", and "silent
+# drop" — scattered across separate lines. Flattening must NOT let these join into a
+# false-PASS: marker-2 requires an emit-verb next to a status-RECORD noun, which a bare
+# "status board" is not. Must DENY.
+cat > "${FIX}/bad-scattered-vocab.json" <<'EOF'
+{
+  "tool_name": "Task",
+  "tool_input": {
+    "prompt": "Check the liveness of the pool.\nOutput the findings.\nThen update the status board.\nNever allow a silent drop of work."
+  }
+}
+EOF
+
 # BAD (specific false-green): has a 'heartbeat' heading and an 'emit status'
 # line, but OMITS the drop-detection/re-dispatch semantics — the load-bearing
 # teeth. A lazy substring match on just the word 'heartbeat' would false-GREEN
@@ -50,6 +64,18 @@ cat > "${FIX}/bad-no-drop-semantics.json" <<'EOF'
     "prompt": "You are a sub-agent.\n\n## Heartbeat\nPlease emit a progress status after each step so I can see liveness. Thanks!"
   }
 }
+EOF
+
+# GOOD (regression guard, W1-4): the hook's OWN canonical clause, which WRAPS the
+# "emit/append a one-line" / "status record" phrase across a line break (and likewise
+# "presumes a DROP and" / "re-dispatches"). This previously self-DENIED because the
+# line-oriented grep could not match a wrapped marker — the defect that made the hook
+# unwireable. It MUST now ALLOW.
+# BUG-6 (W1-9 review): built with a heredoc, NOT python3 — a python3-absent box left the
+# fixture 0 bytes, so the hook saw an empty prompt and ALLOWed regardless of the fix
+# (a maquette-S36 vacuity). The `\n` line-wraps + `\"` JSON-example quotes are literal here.
+cat > "${FIX}/good-canonical-wrapped.json" <<'EOF'
+{"tool_name":"Task","tool_input":{"prompt":"# Bug Hunter\nYou are a sub-agent.\n\n## Heartbeat / liveness protocol (MANDATORY)\n1. As your FIRST action, create a heartbeat-<agent>.jsonl record.\n2. After every distinct work or verification step, emit/append a one-line\n   status record: {\"ts\":\"<iso8601>\",\"step\":\"<desc>\",\"progress\":\"<n/total>\"}.\n3. In your final reply, attest the heartbeat record count (wc -l).\n4. If the heartbeat stalls, the orchestrator presumes a DROP and\n   re-dispatches. No silent drops.\n"}}
 EOF
 
 # EMPTY: not a gatable dispatch (no prompt) — hook must ALLOW (BUG-4).
@@ -81,10 +107,23 @@ expect_exit 1 run_hook "${FIX}/bad-no-drop-semantics.json"
 # Good case passes on its own.
 expect_exit 0 run_hook "${FIX}/good.json"
 
+# Regression: the hook's own WRAPPED canonical clause must ALLOW (W1-4 self-denial fix).
+expect_exit 0 run_hook "${FIX}/good-canonical-wrapped.json"
+
+# W1-9 review: the scattered-incidental-vocabulary bypass MUST be DENIED (the flatten
+# fix must not let unrelated words on separate lines satisfy the emit->status marker).
+expect_exit 1 run_hook "${FIX}/bad-scattered-vocab.json"
+
 # Empty prompt is allowed (not a dispatch we can gate).
 expect_exit 0 run_hook "${FIX}/empty.json"
 
 # Malformed JSON is denied (fail-closed).
 expect_exit 1 run_hook "${FIX}/malformed.json"
+
+# (kfi) dep preflight: missing grep/sed/tr/awk must fail CLOSED (exit 2) —
+# previously PATH='' made marker detection crash under set -e (exit 127, which
+# PreToolUse treats as non-blocking = ALLOW). Goes RED if the preflight is
+# removed (the stripped copy exits 127, not 2).
+expect_exit 2 env PATH='' /bin/bash "${HOOK}" < /dev/null
 
 test_summary

@@ -1,0 +1,9 @@
+<!-- screen/twosv-challenge -->
+<main data-screen="screen/twosv-challenge">
+  <h1>Two-step verification</h1>
+  <form>
+    <input data-oid="twosv-challenge/code" data-handler="onCodeInput" type="text" name="code" placeholder="Authenticator code" maxlength="6">
+    <button data-oid="twosv-challenge/verify" data-handler="submitVerify" type="submit">Verify</button>
+    <button data-oid="twosv-challenge/recovery-mode" data-handler="onToggleRecoveryMode" type="button">Use a recovery code</button>
+  </form>
+</main>

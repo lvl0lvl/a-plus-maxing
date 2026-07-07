@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Generic single-source gate (4.75) with a required structured field — test fixture",
+  "type": "object",
+  "required": ["phase","verdict","payload","halt_reasons","attestation_chain","timestamp"],
+  "properties": {
+    "phase": {"const": "4.75"},
+    "verdict": {"enum": ["PASS","HALT"]},
+    "timestamp": {"type": "string"},
+    "payload": {"type": "object", "required": ["checked"], "properties": {"checked": {"type": "integer"}}},
+    "halt_reasons": {"type": "array"},
+    "attestation_chain": {"type": "object"}
+  }
+}

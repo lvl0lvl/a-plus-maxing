@@ -1,0 +1,6 @@
+{
+  "tool_name": "Task",
+  "tool_input": {
+    "prompt": "Check the liveness of the pool.\nOutput the findings.\nThen update the status board.\nNever allow a silent drop of work."
+  }
+}

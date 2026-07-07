@@ -1,0 +1,5 @@
+format: pen-export-envelope-v0
+content-sha256: bdd20560c387089a8f25e4ebe2ee495d44b14076561a7380ee323a03a40acd63
+pen-sha256: fb4349cb4c3ddd135bcb7fa237baada1d2a1785fc8e99f69e0ed862ba7f87254
+pen-path: designs/fixtures/safety-auth-annotated.pen
+stamped: 2026-07-03T12:00:00Z

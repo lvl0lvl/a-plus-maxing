@@ -117,4 +117,19 @@ printf -- '---\nname: c2\ndescription: x\n---\n# c2\nSee `./references/missing.m
 expect_exit 1 bash "$AUDIT" --lib "$DOT" --deploy "$DOT"   # dead ./references/x -> CAUGHT
 rm -rf "$DOT"
 
+# BUG-22i regression (non-artifact immunity, F-007): some ~/.claude/... tokens are NOT
+# library artifacts the deploy must produce — the user's global CLAUDE.md, and
+# runtime-transient paths a command creates mid-run (an atomic-rename .staged file, an
+# .in-progress lock). These must NOT false-FAIL. Load-bearing: a lib referencing ONLY
+# those exempt shapes must PASS; a control with a genuinely un-deployed artifact must FAIL.
+NART="$(mktemp -d 2>/dev/null || mktemp -d -t parity)"
+mkdir -p "$NART/skills/recur"
+printf -- '---\nname: recur\ndescription: x\n---\n# r\nWrite `~/.claude/commands/recur.md.staged`; lock `~/.claude/commands/.recur.in-progress`; follow `@~/.claude/CLAUDE.md`.\n' \
+  > "$NART/skills/recur/SKILL.md"
+expect_exit 0 bash "$AUDIT" --lib "$NART" --deploy "$NART"   # user-global + transient -> EXEMPT -> PASS
+# Control: a genuinely un-deployed ~/.claude artifact (not an exempt shape) is still caught.
+printf -- '\nAlso read `~/.claude/skills/recur/references/real.md`.\n' >> "$NART/skills/recur/SKILL.md"
+expect_exit 1 bash "$AUDIT" --lib "$NART" --deploy "$NART"   # genuine un-deployed artifact -> CAUGHT
+rm -rf "$NART"
+
 test_summary

@@ -1,0 +1,10 @@
+[
+  {
+    "date": "2026-07-03",
+    "designDigest": "5ddc8349019840733e9b65d551755b3d9a890c3b90c57b8c342f8046e6ff9bb7",
+    "reason": "note is a single-field entity (note.text); a placement redirect has no observable sibling field to land in, so proof (b) is UNPROVABLE. A reviewer confirmed the write targets note.text.",
+    "screen": "screen/detail",
+    "signedBy": "res3-fixture",
+    "wireId": "status-note"
+  }
+]

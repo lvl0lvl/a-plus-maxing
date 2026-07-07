@@ -73,6 +73,18 @@
 
 set -euo pipefail
 
+# Dep preflight (bead skills_library-kfi): a missing grep/sed/tr/awk makes the
+# marker-detection pipelines fail, which reads as "no heartbeat obligation" →
+# silent ALLOW. A gate whose matcher cannot run must fail CLOSED instead (F-008).
+# awk is in this hook's decision path (the prompt flattener), so it is checked
+# here too. `command -v` is a bash builtin, so the preflight itself needs none of
+# the tools it checks.
+for _dep in grep sed tr awk; do
+  command -v "$_dep" >/dev/null 2>&1 && continue
+  echo "enforce-heartbeat-clause: DENY — required tool '$_dep' not found on PATH; the matcher cannot run (fail-closed, F-008)" >&2
+  exit 2
+done
+
 PROMPT_FIELD="${HEARTBEAT_PROMPT_FIELD:-.tool_input.prompt}"
 
 # --- emit a PreToolUse decision and exit -----------------------------------
@@ -124,7 +136,7 @@ fi
 #   3. drop-detection / re-dispatch semantics (the "0-silent-drops" teeth)
 # A project that pins a stricter convention overrides via env (see header).
 default_marker_re='([Hh]eartbeat|[Ll]iveness|[Kk]eep[- ]?alive)
-([Ee]mit|[Aa]ppend|[Ww]rite|[Rr]eport|[Pp]oll|[Oo]utput).*(status|progress|heartbeat|update)
+([Ee]mit|[Aa]ppend|[Ww]rite|[Rr]eport|[Pp]oll|[Oo]utput).{0,80}(status|progress|liveness|heartbeat)[ -]?(record|line|entry|update|count|log|message|marker|file)
 ([Rr]e-?dispatch|[Pp]resume[ds]? (a )?drop|[Tt]reated? as (a )?drop|[Ss]ilent drop)'
 default_marker_label='liveness/heartbeat clause heading
 "emit/append observable status as you work" instruction
@@ -151,9 +163,25 @@ if [ "${#MARKER_RE[@]}" -ne "${#MARKER_LABEL[@]}" ]; then
     "Heartbeat-clause hook misconfigured: HEARTBEAT_MARKER_RE has ${#MARKER_RE[@]} entries but HEARTBEAT_MARKER_LABEL has ${#MARKER_LABEL[@]}. Failing closed (F-008)."
 fi
 
+# BUG-5 (W1-4, 2026-07-02): match markers against a WHITESPACE-FLATTENED prompt.
+# grep is line-oriented, so a marker whose two halves legitimately WRAP across a
+# line break — as the hook's OWN canonical clause does ("emit/append a one-line\n
+# status record") — was never matched, and the hook DENIED its own reference clause.
+# Real dispatch prompts wrap constantly, so line-oriented matching false-DENYs valid
+# clauses (which is why both field adopters left this hook unwired). Flattening lets a
+# wrapped clause match.
+# BUG-5b (W1-9 review, 2026-07-02): flattening the whole prompt widened marker-2's reach,
+# so a dispatch with NO real liveness clause but scattered incidental words ("Output the
+# findings … update the status board" on separate lines) satisfied it — a false-PASS
+# bypass of the 0-silent-drops gate. Marker-2 now requires an emit-verb within 80 chars
+# of a status/progress/liveness/heartbeat word that is IMMEDIATELY followed by a
+# liveness-ARTIFACT noun (record/line/entry/count/log/…), matching the canonical clause's
+# "status record" / "heartbeat record count" while rejecting a bare "status board".
+PROMPT_FLAT=$(printf '%s' "$PROMPT" | tr '\n\r\t' '   ' | tr -s ' ')
+
 MISSING=()
 for i in "${!MARKER_RE[@]}"; do
-  if ! printf '%s\n' "$PROMPT" | grep -qE "${MARKER_RE[$i]}"; then
+  if ! printf '%s' "$PROMPT_FLAT" | grep -qE "${MARKER_RE[$i]}"; then
     MISSING+=("${MARKER_LABEL[$i]}")
   fi
 done
