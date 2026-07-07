@@ -16,9 +16,9 @@ such files, so token detection is simply empty there while the operator-AGNOSTIC
 patterns still run. The operator-agnostic set is the two structural
 `{item, timepoint, source, value}` store-line patterns (neither carries personal
 data) plus `SECRET_PATTERNS` — agnostic credential shapes (the
-CLAUDE_CODE_OAUTH_TOKEN) that run trunk-wide AND unconditionally, since a leaked
-secret in any tracked file (fixtures included) is a leak regardless of operator
-(bead aque / ADR-0039 SEC-02). Contact moved OUT of the agnostic set at 3lv: a generic `@gmail.com`
+CLAUDE_CODE_OAUTH_TOKEN + the no-train API key) that run trunk-wide AND
+unconditionally, since a leaked secret in any tracked file (fixtures included) is
+a leak regardless of operator (beads aque + SEC-01). Contact moved OUT of the agnostic set at 3lv: a generic `@gmail.com`
 pattern run trunk-wide flags the scanner's own synthetic test fixtures and bead
 example emails (14 false hits on a routine staged set), so the operator's REAL
 contact is detected config-driven instead — present on the operator instance,
