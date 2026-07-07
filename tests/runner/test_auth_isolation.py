@@ -49,6 +49,20 @@ def test_ac1_stray_api_key_dropped_copy_not_mutated():
     assert base == {"ANTHROPIC_API_KEY": "sk-stray", "PATH": "/usr/bin", "HOME": "/tmp/x"}
 
 
+@pytest.mark.parametrize("metered_var", sorted(auth_isolation._METERED_ROUTING_ENV_VARS))
+def test_metered_routing_var_scrubbed_from_session_env(metered_var):
+    # SEC-01: EACH metered/cloud-routing var Claude Code ranks ABOVE the subscription OAuth token is
+    # dropped from the built session env. A stray CLAUDE_CODE_USE_BEDROCK / CLAUDE_CODE_USE_VERTEX or
+    # ANTHROPIC_{AUTH_TOKEN,BASE_URL} would otherwise route the session to metered/cloud credentials,
+    # bypassing both the API key and the OAuth token (the T2-class footgun). Non-tautology guard: an
+    # UNRELATED var (PATH) still survives, so a "return OAuth-only dict" that drops everything reddens.
+    base = {metered_var: "stray-value", "PATH": "/usr/bin"}
+    result = auth_isolation.build_subscription_env(base, keychain_reader=lambda: _FIXTURE_OAUTH_TOKEN)
+    assert metered_var not in result, f"{metered_var} survived the metered/cloud auth scrub (SEC-01)"
+    assert result["PATH"] == "/usr/bin", "the scrub dropped an unrelated var (PATH) — over-broad"
+    assert result["CLAUDE_CODE_OAUTH_TOKEN"] == _FIXTURE_OAUTH_TOKEN
+
+
 def test_ac2_oauth_token_set_from_keychain():
     # AC-2: CLAUDE_CODE_OAUTH_TOKEN is set to the value the injected keychain seam returned — the
     # session authenticates via the OAuth token read from the keychain at call time.

@@ -1,10 +1,13 @@
 """The subscription-session auth env-scrub (ADR-0039-T2).
 
-`build_subscription_env(base_env)` returns a COPY of the parent env with `ANTHROPIC_API_KEY`
-dropped and `CLAUDE_CODE_OAUTH_TOKEN` set from the macOS keychain — so a scheduled subscription
-session authenticates via the subscription OAuth token, not the metered API. Claude Code's auth
-precedence ranks `ANTHROPIC_API_KEY` ABOVE the subscription OAuth token, so a stray env key would
-silently bill the metered API instead of the subscription (ADR-0039 Consequences-Negative-3, the
+`build_subscription_env(base_env)` returns a COPY of the parent env with the full
+metered/cloud-routing surface (`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_BEDROCK`,
+`CLAUDE_CODE_USE_VERTEX`, `ANTHROPIC_BASE_URL` — the `_METERED_ROUTING_ENV_VARS` set) dropped and
+`CLAUDE_CODE_OAUTH_TOKEN` set from the macOS keychain — so a scheduled subscription session
+authenticates via the subscription OAuth token, not metered or cloud credentials. Claude Code's auth
+precedence ranks EACH of those vars ABOVE the subscription OAuth token, so a stray one would silently
+bill the metered API — or route the session to Bedrock/Vertex cloud credentials, bypassing both the
+API key and the OAuth token — instead of the subscription (ADR-0039 Consequences-Negative-3, the
 VERIFIED auth-precedence footgun).
 
 It returns a COPY and never mutates the caller's mapping or `os.environ`, so the de-id
@@ -28,9 +31,18 @@ import subprocess
 # subscription rather than the metered API.
 OAUTH_ENV_VAR = "CLAUDE_CODE_OAUTH_TOKEN"
 
-# The metered-API key var dropped from the subscription session's env: Claude Code ranks it ABOVE
-# the subscription OAuth token, so a stray value would bill the API instead of the subscription.
-API_KEY_ENV_VAR = "ANTHROPIC_API_KEY"
+# The metered/cloud-routing env vars dropped from the subscription session's env — one home for the
+# drop-set. Claude Code ranks EACH above the subscription OAuth token, so a stray value would bill the
+# metered API (ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / ANTHROPIC_BASE_URL) or route the session to
+# Bedrock / Vertex cloud credentials (CLAUDE_CODE_USE_BEDROCK / CLAUDE_CODE_USE_VERTEX) — bypassing
+# the OAuth token entirely (SEC-01).
+_METERED_ROUTING_ENV_VARS = frozenset({
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "ANTHROPIC_BASE_URL",
+})
 
 # The OAuth token's keychain item — a project label DISTINCT from `a-plus-maxing-api-key` (the
 # no-train API key `key_source` owns). The service NAME is a label; the token VALUE lives only in
@@ -75,10 +87,12 @@ def _oauth_keychain_reader():
 def build_subscription_env(base_env, *, keychain_reader=_oauth_keychain_reader):
     """Return a scrubbed COPY of base_env for the subscription session's process env.
 
-    Drops `ANTHROPIC_API_KEY` (so Claude Code's auth precedence cannot bill the metered API) and
-    sets `CLAUDE_CODE_OAUTH_TOKEN` from the keychain at call time, preserving every other key.
-    Returns a COPY — never mutates the caller's mapping or `os.environ`, so the driver-process de-id
-    `ModelClient` still resolves the `a-plus-maxing-api-key` keychain item.
+    Drops every `_METERED_ROUTING_ENV_VARS` var (the metered-API + cloud-routing surface Claude Code
+    ranks ABOVE the subscription OAuth token — so no stray value can bill the metered API or route to
+    Bedrock/Vertex cloud credentials) and sets `CLAUDE_CODE_OAUTH_TOKEN` from the keychain at call
+    time, preserving every other key. Returns a COPY — never mutates the caller's mapping or
+    `os.environ`, so the driver-process de-id `ModelClient` still resolves the `a-plus-maxing-api-key`
+    keychain item.
 
     Args:
         base_env (Mapping): The parent env to scrub (typically a copy of `os.environ`).
@@ -87,7 +101,8 @@ def build_subscription_env(base_env, *, keychain_reader=_oauth_keychain_reader):
             injected in tests so no real keychain or token is touched.
 
     Returns:
-        (dict) A copy of base_env with `ANTHROPIC_API_KEY` removed and `CLAUDE_CODE_OAUTH_TOKEN` set.
+        (dict) A copy of base_env with every `_METERED_ROUTING_ENV_VARS` var removed and
+        `CLAUDE_CODE_OAUTH_TOKEN` set.
 
     Raises:
         OAuthTokenUnavailableError: When the keychain yields no token — fail-loud, naming
@@ -101,6 +116,7 @@ def build_subscription_env(base_env, *, keychain_reader=_oauth_keychain_reader):
             f"keychain per the {_RUNBOOK} runbook (service '{_KEYCHAIN_SERVICE}')."
         )
     scrubbed = dict(base_env)
-    scrubbed.pop(API_KEY_ENV_VAR, None)
+    for var in _METERED_ROUTING_ENV_VARS:
+        scrubbed.pop(var, None)
     scrubbed[OAUTH_ENV_VAR] = token
     return scrubbed
