@@ -16,9 +16,9 @@ such files, so token detection is simply empty there while the operator-AGNOSTIC
 patterns still run. The operator-agnostic set is the two structural
 `{item, timepoint, source, value}` store-line patterns (neither carries personal
 data) plus `SECRET_PATTERNS` — agnostic credential shapes (the
-CLAUDE_CODE_OAUTH_TOKEN) that run trunk-wide AND unconditionally, since a leaked
-secret in any tracked file (fixtures included) is a leak regardless of operator
-(bead aque / ADR-0039 SEC-02). Contact moved OUT of the agnostic set at 3lv: a generic `@gmail.com`
+CLAUDE_CODE_OAUTH_TOKEN + the no-train API key) that run trunk-wide AND
+unconditionally, since a leaked secret in any tracked file (fixtures included) is
+a leak regardless of operator (beads aque + SEC-01). Contact moved OUT of the agnostic set at 3lv: a generic `@gmail.com`
 pattern run trunk-wide flags the scanner's own synthetic test fixtures and bead
 example emails (14 false hits on a routine staged set), so the operator's REAL
 contact is detected config-driven instead — present on the operator instance,
@@ -76,6 +76,17 @@ _COMPILED_AGNOSTIC = [re.compile(p, re.DOTALL) for p in AGNOSTIC_PATTERNS.values
 # comes `[`, outside the value class), so this module does not self-trip.
 SECRET_PATTERNS = {
     "claude-code-oauth-token": r"sk-ant-oat[A-Za-z0-9_-]+",
+    # The no-train API key (bead SEC-01): the SEPARATE `a-plus-maxing-api-key` keychain
+    # item the de-id `ModelClient` reads — a live METERED-SPEND credential, so its leak
+    # into a tracked PUBLIC-repo file is a spend exposure. Same shape/ReDoS-free/
+    # high-signal properties as the OAuth entry (`sk-ant-api` then a base64url body); the
+    # pattern TEXT is not itself a match (`[` follows `sk-ant-api`). Closes the sibling
+    # of the ADR-0027 at-commit-denial assurance the OAuth entry closed for ADR-0039.
+    # Key name avoids the provider/SDK-client tokens the crown-jewel serve/ingest egress
+    # grep forbids anywhere in `scripts/` outside `scripts/model/` (this file is
+    # `scripts/guard/`) — the PF-S112-01 provider-token class; the descriptive name keeps
+    # this guard module egress-grep-clean.
+    "no-train-api-key": r"sk-ant-api[A-Za-z0-9_-]+",
 }
 # Case-SENSITIVE, matching the ADR-0039-T2 AC-5 tree-scan semantics (the token prefix
 # is fixed lowercase); the value class after the prefix is the token body.

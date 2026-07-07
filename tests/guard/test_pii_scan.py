@@ -649,6 +649,18 @@ def _synthetic_oauth_token():
     return _OAUTH_PREFIX + "01" + "A9b8C7d6" * 5
 
 
+# The no-train API-key prefix (bead SEC-01): the SEPARATE `a-plus-maxing-api-key`
+# keychain item the ModelClient reads — same runtime fragment-assembly so this file
+# carries no matchable `sk-ant-api`+alnum literal (the very trap this bead's own text
+# tripped; PF-S112-01).
+_API_PREFIX = "sk-" + "ant-" + "api"
+
+
+def _synthetic_api_key():
+    """A synthetic (non-real) key of the `sk-ant-api<alnum>` shape, runtime-built."""
+    return _API_PREFIX + "03" + "F4e5D6c7" * 5
+
+
 def test_oauth_token_secret_blocked_trunk_wide(tmp_path):
     """SEC-02 (aque): a leaked CLAUDE_CODE_OAUTH_TOKEN is BLOCKED trunk-wide by `scan`.
 
@@ -676,27 +688,51 @@ def test_oauth_token_secret_blocked_trunk_wide(tmp_path):
     assert scan(_tracked(root), token_config=NO_CONFIG, include_structural=False) >= 1
 
 
-def test_oauth_token_pattern_anchored_not_overbroad(tmp_path):
-    """The secret pattern is anchored to the `sk-ant-oat` OAuth prefix — a different
-    `sk-ant-` shape (an api-key prefix) or the bare prefix with no trailing alnum does
-    NOT match, so the trunk scanner does not flood on incidental `sk-ant-` mentions in
-    docs (clonability preserved; the same conservatism as the gmail-only contact
-    choice). Reds if a future edit broadens the pattern to bare `sk-ant-`.
-
-    Leads with an F-TEST1 liveness assert (mirrors the sibling negative-control
-    tests): a real token detects >=1, so the `== 0` near-miss assertions below
-    cannot go vacuously green under a regression that disables the secret pattern.
+def test_api_key_secret_blocked_trunk_wide(tmp_path):
+    """SEC-01 (sibling of aque): a leaked no-train API key (`sk-ant-api…`) is BLOCKED
+    trunk-wide by `scan`, exactly as the OAuth token. The api-prefixed key is the
+    SEPARATE `a-plus-maxing-api-key` keychain item — a live METERED-SPEND credential —
+    so an accidental commit into this PUBLIC repo is a spend-leak (the same threat model
+    aque closed for the OAuth token). Detected with NO token config AND in the fixture
+    scope (`include_structural=False`). RED before the sibling pattern is added;
+    mutation-RED if its `SECRET_PATTERNS` entry is removed.
     """
-    # F-TEST1 liveness: prove the pattern is live (else the `== 0` below is vacuous).
+    root = _scratch_clone(tmp_path)
+    assert scan(_tracked(root), token_config=NO_CONFIG) == 0
+
+    leak = root / "code.py"
+    leak.write_text(leak.read_text() + f"API_KEY = {_synthetic_api_key()!r}\n")
+    _git(["add", "-A"], root)
+
+    assert scan(_tracked(root), token_config=NO_CONFIG) >= 1
+    assert scan(_tracked(root), token_config=NO_CONFIG, include_structural=False) >= 1
+
+
+def test_secret_patterns_anchored_not_overbroad(tmp_path):
+    """The secret patterns are anchored to the `sk-ant-oat` (OAuth) and `sk-ant-api`
+    (no-train API key) prefixes — a DIFFERENT `sk-ant-` shape, or EITHER bare prefix
+    with no trailing alnum, does NOT match, so the trunk scanner does not flood on
+    incidental `sk-ant-` mentions in docs (clonability preserved; the same conservatism
+    as the gmail-only contact choice). Reds if a future edit broadens either pattern to
+    bare `sk-ant-`.
+
+    Leads with an F-TEST1 liveness assert (mirrors the sibling negative-control tests):
+    a real token of EACH covered class detects, so the `== 0` near-miss assertions below
+    cannot go vacuously green under a regression that disables the secret patterns.
+    """
+    # F-TEST1 liveness: BOTH covered classes detect (else the `== 0` below is vacuous).
     live = tmp_path / "live.txt"
-    live.write_text(f"T = {_synthetic_oauth_token()!r}\n")
-    assert scan([str(live)], token_config=NO_CONFIG) >= 1  # pattern live
+    live.write_text(f"O = {_synthetic_oauth_token()!r}\nA = {_synthetic_api_key()!r}\n")
+    assert scan([str(live)], token_config=NO_CONFIG) >= 2  # both patterns live
 
     root = _scratch_clone(tmp_path)
     leak = root / "README.md"
-    near_miss = ("sk-" + "ant-") + "api03-" + "notoauth"   # different prefix (not oat)
-    bare = _OAUTH_PREFIX                                    # prefix, no trailing alnum
-    leak.write_text(leak.read_text() + f"mentions {near_miss} and {bare} only\n")
+    other = ("sk-" + "ant-") + "zzz9-" + "notarealprefix"  # a sk-ant- shape, neither oat nor api
+    bare_oat = _OAUTH_PREFIX                                # oat prefix, no trailing alnum
+    bare_api = _API_PREFIX                                  # api prefix, no trailing alnum
+    leak.write_text(
+        leak.read_text() + f"mentions {other} and {bare_oat} and {bare_api} only\n"
+    )
     _git(["add", "-A"], root)
 
     assert scan(_tracked(root), token_config=NO_CONFIG) == 0
