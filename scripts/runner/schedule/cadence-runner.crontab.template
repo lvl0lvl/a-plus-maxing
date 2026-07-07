@@ -1,0 +1,6 @@
+# ADR-0039-T3 cron fallback for the weekly cadence runner (used when launchd is unavailable).
+# Operator-agnostic (ADR-0005-safe): {{PYTHON}} / {{REPO_ROOT}} / {{LABEL}} are substituted at
+# enable() runtime; ZERO operator-specific path, ZERO OAuth token (keychain-read at runtime, T2).
+# The trailing `# {{LABEL}}` marker scopes the line so disable() strips exactly this runner's entry.
+# Weekly: 03:00 every Monday. RRULE mirrors the plist StartCalendarInterval (Weekday 1, 03:00).
+0 3 * * 1 cd {{REPO_ROOT}} && {{PYTHON}} -m scripts.runner.cadence_runner  # {{LABEL}}
