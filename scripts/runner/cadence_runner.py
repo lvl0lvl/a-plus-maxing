@@ -12,10 +12,12 @@ sole receiver of raw store content and the dispatch payloads carry only the de-i
 EXTEND-NOT-REBUILD (SEC-03 governance floor): the driver supplies seams and re-hosts none of the
 loop. The debounce, the fail-closed gate composition, the cross-domain holds, and the loop's pinned
 constants all stay inside the built loop; the driver names none of their symbols and touches no file
-under `scripts/serve/` / `scripts/plan/` / `scripts/store/`. Its whole import surface is
+under `scripts/serve/` / `scripts/plan/` / `scripts/store/`. Its loop-facing import surface is
 `scripts.serve.plan_loop` (for the entry + the trigger label) plus `scripts.runner.subscription_dispatch`
 and the sibling `scripts.runner.store_lock` advisory lock (ADR-0039-T4), which serializes the tick's single
 read -> regenerate -> promote critical section runner-to-runner; a busy tick defers (0 re-gen, 0 store write).
+Its only other imports are `main()`'s entry-point plumbing: `pathlib.Path` + `scripts.store.store` (for the
+repo-anchored `DEFAULT_ROOT`) and the ADR-0027 de-id `scripts.model.client.ModelClient` that `main()` constructs.
 
 Ships DISABLED BY DEFAULT: importing arms nothing (0 signal / de-id / dispatch on import — the
 `__main__` guard keeps `main()` off the import path), and the default subscription-session factory
