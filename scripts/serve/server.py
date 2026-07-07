@@ -805,7 +805,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                     "recorded" if record and record["recorded"] else ((record or {}).get("reason") or "no-plan")
                 )
 
-            plan_html = app_shell._plan_zone(store.read_all(store_root), today)
+            plan_html = app_shell._plan_zone(store.read_all(store_root), today, store_root)
             self._write_json(200, {"need_key": False, "results": results, "plan_html": plan_html})
         except Exception:
             # Thread survival (mirrors _do_chat / _do_confirm_extraction): a malformed state / an

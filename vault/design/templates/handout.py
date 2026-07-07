@@ -33,7 +33,7 @@ is a module exposing `render(store_read) -> html_str`.
 import datetime
 from pathlib import Path
 
-from scripts.store import biomarker_meta, plan_schema, queue_schema
+from scripts.store import biomarker_meta, plan_confirm, plan_schema, queue_schema
 from scripts.store.loop_schema import derive_watchout_questions, panel_pending
 from vault.design.templates import component_set as cs
 
@@ -355,7 +355,7 @@ def _footer(today):
     )
 
 
-def render(store_read, _today=None):
+def render(store_read, _today=None, _root=None):
     """Assemble the doctor-visit SBAR handout HTML from the shared component set.
 
     Reads operator data ONLY from `store_read`: the flagged-interactions section
@@ -370,6 +370,11 @@ def render(store_read, _today=None):
         store_read (list): The store read model passed through by render.emit.
         _today (datetime.date, optional): Test-only date seam (prepared date,
             plan resolution, footer); defaults to the current date.
+        _root (str | Path, optional): The store root, threaded by `generate.run`
+            so the regimen/recommendation sections drop HELD (un-confirmed)
+            `plan::` readings via `plan_confirm.filter_confirmed` (bead
+            a-plus-maxing-zsre). None (a direct template-seam render) runs no
+            confirm filter.
 
     Returns:
         (str) The assembled handout HTML (single document, inline styling, zero
@@ -385,7 +390,12 @@ def render(store_read, _today=None):
         if item.startswith("plan::"):
             domain = item[len("plan::"):]
             if domain in ("supplements", "peptides"):
-                plan_readings[domain] = readings
+                # Drop HELD (un-confirmed) readings before the regimen/recommendation
+                # sections resolve them as the standing plan (a-plus-maxing-zsre).
+                plan_readings[domain] = (
+                    plan_confirm.filter_confirmed(readings, domain, _root)
+                    if _root is not None else readings
+                )
         elif item.startswith("panel::"):
             panels[item] = readings
         elif item.startswith("watch-out::"):

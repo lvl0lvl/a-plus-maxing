@@ -207,20 +207,23 @@ def _preserve_prior_content(new_html, prior_html):
     return new_html.replace(open_tag + close_tag, open_tag + prior_inner + close_tag, 1)
 
 
-def _render_report(store_read, today, profile_paths):
+def _render_report(store_read, today, profile_paths, root):
     """Render the ADR-0004 report, optionally over a test-only profile source, without leaking.
 
     The report header reads `report._PROFILE_PATHS` internally (a module constant). To point the
     header at a synthetic test profile WITHOUT a persistent global side-effect (which would leak
     into other suites sharing the process), the constant is overridden ONLY across this render and
     restored in a finally — production (`profile_paths is None`) leaves the real default untouched.
+
+    `root` is threaded into `report.render` so the regimen/asks sections drop HELD (un-confirmed)
+    `plan::` readings via `plan_confirm.filter_confirmed` (bead a-plus-maxing-zsre).
     """
     if profile_paths is None:
-        return report.render(store_read, _today=today)
+        return report.render(store_read, _today=today, _root=root)
     saved = report._PROFILE_PATHS
     report._PROFILE_PATHS = tuple(profile_paths)
     try:
-        return report.render(store_read, _today=today)
+        return report.render(store_read, _today=today, _root=root)
     finally:
         report._PROFILE_PATHS = saved
 
@@ -261,7 +264,7 @@ def _assemble_maintained(store_read, root, on_date, today, profile_paths, tailor
     the ADR-0037-T1 care-lane tailored sections (when present), and a preserved-content container
     the re-emit folds prior entries into.
     """
-    body = _render_report(store_read, today, profile_paths)
+    body = _render_report(store_read, today, profile_paths, root)
     fold = _fold_tracking_section(root, on_date)
     tailored = _tailored_sections_html(tailored_sections)
     preserved = "<div class='maintained-preserved'></div><!--/maintained-preserved-->"

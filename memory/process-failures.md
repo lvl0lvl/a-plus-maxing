@@ -2005,7 +2005,7 @@ S111 close (2026-07-06): One new PF promoted — **PF-S111-01** (a real-state ha
 ### Disclosure ledger (S111 close)
 Caught this session: 12 (all fixed or beaded before the merge-gate; 0 reached the operator only because they asked).
 - Recipe-review blocker: the T3 plist ProgramArguments targeted a `python -m scripts.runner.cadence_runner` entry T1 built no `main()` for — detection: gate (create-task-plan Architect, executed `find_spec`); surfaced_by: self.
-- Recipe-review blocker: the `sk-ant-oat-SYNTHETIC` positive-control literal would self-trip the whole-tree token scan once the recipe/test committed → permanent build-HALT — detection: gate (create-task-plan Security + orchestrator-confirmed grep of the untracked recipe); surfaced_by: self.
+- Recipe-review blocker: the `sk-ant-oat…` synthetic positive-control literal (elided here — writing the verbatim `sk-ant-oat`+alnum token in this prose would itself self-trip the scan, which it briefly did) would self-trip the whole-tree token scan once the recipe/test committed → permanent build-HALT — detection: gate (create-task-plan Security + orchestrator-confirmed grep of the untracked recipe); surfaced_by: self.
 - Recipe-review MUST-FIX: the T3 AC-8 real-state mutation-RED left the forcing mechanism unpinned → risked reintroducing the scratch-HOME tautology — detection: gate (create-task-plan QA, executed counterfactual); surfaced_by: self.
 - The canonical frozen-glob omitted `plan_orchestrator.py`/`plan_driver.py` (the crown-jewel de-id/dispatch orchestrator) — detection: gate (Security M1 + Architect F3); surfaced_by: self (spec amended).
 - Tier-2: the crontab real-state test hangs the mandatory `pytest -q` gate headless (PF-S111-01) — detection: gate (Tier-2 QA, executed); surfaced_by: self.

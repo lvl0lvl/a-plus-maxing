@@ -18,7 +18,7 @@ import re
 import pytest
 
 from scripts.generate import generate
-from scripts.store import loop_schema, plan_schema, store
+from scripts.store import loop_schema, plan_confirm, plan_schema, store
 from vault.design.templates import component_set as cs
 from vault.design.templates import dashboard
 
@@ -558,6 +558,32 @@ def test_production_path_renders_populated_plan_zone(tmp_path):
     assert zone.count("'>today</span>") == 4, "all four cards resolve populated"
     assert "awaiting plan" not in zone
     assert "Bench Press" in zone and "via strength-coach" in zone
+
+
+# --- held (un-confirmed) plan filtering (bead a-plus-maxing-zsre, ADR-0040 render side) ---
+
+
+def test_held_supplements_plan_absent_from_zone3_card(tmp_path):
+    """A HELD (pending-pointer) supplements plan does NOT render as the standing zone-3
+    card; a co-seeded non-held workout plan still resolves populated (the render-side
+    confirm filter drops only the held domain). RED before the fix (bead
+    a-plus-maxing-zsre): the dashboard resolves raw `plan::` readings without
+    `plan_confirm.filter_confirmed`, so the held plan leaks in as today's card."""
+    root = tmp_path / "store"
+    plan_schema.record_plan("supplements", _supplements_plan(), _DATE, "supplement-specialist", root)
+    plan_confirm.mark_pending("supplements", _DATE, root)
+    plan_schema.record_plan("workout", _workout_plan(), _DATE, "strength-coach", root)
+
+    path = generate.run("dashboard", _root=root, _out_dir=tmp_path / "out", _today=_TODAY)
+    cards = _cards(_zones(path.read_text())["Today's Plan"])
+
+    assert "Creatine" not in cards["supplements"], "a HELD supplements plan leaked as the standing card"
+    assert "<span class='pill'>awaiting plan</span>" in cards["supplements"], (
+        "the held domain must render the awaiting-plan absence state"
+    )
+    # positive control: the co-seeded non-held workout plan still resolves populated
+    assert "Bench Press" in cards["training"], "the non-held workout plan must still render"
+    assert "via strength-coach" in cards["training"]
 
 
 # --- report routing ---

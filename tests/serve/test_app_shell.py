@@ -831,6 +831,41 @@ def test_plan_zone_escapes_injected_exercise_name(tmp_path):
     assert payload not in html, "the raw <script> token leaked into the rendered markup (XSS)"
 
 
+def test_held_supplements_plan_absent_from_plan_screen(tmp_path):
+    """A HELD (pending-pointer) supplements plan does NOT render on the Plan screen; a co-seeded
+    non-held workout plan still renders (the render-side confirm filter drops only the held
+    domain). RED before the fix (bead a-plus-maxing-zsre): `_plan_zone` resolves raw `plan::`
+    readings without `plan_confirm.filter_confirmed`, so the held plan leaks onto the Plan screen
+    as the standing plan. Driven through the production `generate.run('app')` factory so the store
+    root is the one that resolves the confirm-pointer stream."""
+    import datetime
+
+    from scripts.store import plan_confirm, plan_schema
+
+    root = tmp_path / "store"
+    on_date = "2026-06-18"
+    _seed_complete_profile(root)  # unlock the platform shell (the Plan zone lives in #screen-plan)
+    plan_schema.record_plan(
+        "supplements", {"items": [{"name": "Creatine", "dose": "5 g"}]},
+        on_date, "supplement-specialist", root)
+    plan_confirm.mark_pending("supplements", on_date, root)
+    plan_schema.record_plan(
+        "workout", {"exercises": [{"name": "Back Squat", "sets": 5}]},
+        on_date, "personal-trainer", root)
+
+    html = generate.run(
+        "app", _root=root, _out_dir=tmp_path / "out",
+        _dna_root=tmp_path / "dna", _labs_root=tmp_path / "labs",
+        _today=datetime.date(2026, 6, 18),
+    ).read_text()
+
+    # Scope to the Plan-screen's plan-item-line markup: the SPA embeds an intake wizard whose
+    # supplements field carries an "e.g. Creatine…" PLACEHOLDER, so assert the rendered plan row
+    # (`<li><b>NAME</b>`) is absent, not the bare word.
+    assert "<li><b>Creatine</b>" not in html, "a HELD supplements plan leaked onto the Plan screen"
+    assert "<li><b>Back Squat</b>" in html, "the non-held workout plan must still render"
+
+
 def test_extracted_genotype_dna_status_renders_in_both_doc_cards():
     """API-01: an extracted-genotype dna status (files: [], count: N) renders in BOTH templates.
 

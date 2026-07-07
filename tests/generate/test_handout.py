@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from scripts.generate import generate, render
-from scripts.store import loop_schema, plan_schema, queue_schema, store
+from scripts.store import loop_schema, plan_confirm, plan_schema, queue_schema, store
 from vault.design.templates import component_set as cs
 from vault.design.templates import handout
 
@@ -259,6 +259,26 @@ def test_regimen_awaiting_when_no_plan_today(tmp_path):
     """No plan dated today -> the honest awaiting line, never an invented regimen."""
     regimen = _between(_emit(tmp_path / "store", tmp_path), "current regimen", "flagged interactions")
     assert "No supplement or peptide plan recorded for today." in regimen
+
+
+def test_held_supplements_plan_absent_from_regimen(tmp_path):
+    """A HELD (pending-pointer) supplements plan does NOT render in the SBAR regimen; a
+    co-seeded non-held peptides plan still renders (the render-side confirm filter drops only
+    the held domain). RED before the fix (bead a-plus-maxing-zsre): the handout resolves raw
+    `plan::` readings without `plan_confirm.filter_confirmed`, so the held plan leaks in as
+    the standing 'current regimen'."""
+    root = tmp_path / "store"
+    plan_schema.record_plan(
+        "supplements", {"items": [{"name": "Creatine", "dose": "5 g"}]},
+        _ISO, "supplement-specialist", root)
+    plan_confirm.mark_pending("supplements", _ISO, root)
+    plan_schema.record_plan(
+        "peptides", {"compound": "bpc-157", "dose": "250 mcg", "route": "subq"},
+        _ISO, "peptide-specialist", root)
+
+    regimen = _between(_emit(root, tmp_path), "current regimen", "flagged interactions")
+    assert "Creatine" not in regimen, "a HELD supplements plan leaked into the regimen"
+    assert "bpc-157 · 250 mcg · subq" in regimen, "the non-held peptides plan must still render"
 
 
 def test_non_experimental_peptide_has_no_disclosure_note(tmp_path):
