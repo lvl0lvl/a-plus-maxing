@@ -397,9 +397,11 @@ library and check whether `main` is ahead of your adopted SHA (not just whether 
 delta touches `toolkit/`, flag it upstream to bump `VERSION` rather than pulling unversioned changes.
 (a-plus tracks this as bead `lczu`; the upstream fix is the library bumping `VERSION` + a `CHANGELOG` row.)
 
+**Next run — the first VERSIONED pull is logged in §11 below.** The S118 run (1.0.0 → 1.20.0) had a versioned delta, so unlike the S67 hold it was PULLED; its detail (delta, the `ffit` reference lesson, the `23q5` a-plus consequence) is in §11.
+
 ---
 
-## Pull run — 2026-07-07 (S118, operator-directed): the first REAL versioned pull (1.0.0 → 1.20.0)
+## 11. Pull run — S118 (2026-07-07, operator-directed): the first REAL versioned pull (1.0.0 → 1.20.0)
 
 | Date | Pinned | Library `VERSION` | Origin delta | Action | Outcome |
 |---|---|---|---|---|---|
