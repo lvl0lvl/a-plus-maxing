@@ -38,7 +38,7 @@ SUBSCRIPTION_ENV_SCRUBBED_MARKER = "A_PLUS_MAXING_SUBSCRIPTION_ENV_SCRUBBED"
 
 
 class SubscriptionEnvNotScrubbed(RuntimeError):
-    """The subscription auth env-scrub is unapplied — refusing to build a live session (SEC-04)."""
+    """The subscription auth env-scrub marker is unset — refusing to build a live session (SEC-04)."""
 
 
 def build_dispatch(session):
@@ -137,8 +137,11 @@ def default_session_factory(*, keychain_reader=None, session_spawn=None):
     """
     if not _subscription_env_scrubbed():
         raise SubscriptionEnvNotScrubbed(
-            "the subscription auth env-scrub (ADR-0039-T2 build_subscription_env) is not applied; "
-            "refusing to construct a live subscription session pre-scrub (SEC-04)")
+            f"the subscription auth env-scrub marker {SUBSCRIPTION_ENV_SCRUBBED_MARKER!r} is unset "
+            "— refusing to construct a live subscription session (SEC-04). `build_subscription_env` "
+            "IS wired (it runs once the marker is present); the gate is the MARKER, not a missing "
+            "scrub. The marker is set at the operator-gated live-enable after the env-scrub is "
+            "applied (bead r3vw); it is deliberately unset while the runner is disabled by default.")
     base_env = dict(os.environ)
     scrubbed_env = (
         build_subscription_env(base_env)
