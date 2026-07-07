@@ -682,7 +682,16 @@ def test_oauth_token_pattern_anchored_not_overbroad(tmp_path):
     NOT match, so the trunk scanner does not flood on incidental `sk-ant-` mentions in
     docs (clonability preserved; the same conservatism as the gmail-only contact
     choice). Reds if a future edit broadens the pattern to bare `sk-ant-`.
+
+    Leads with an F-TEST1 liveness assert (mirrors the sibling negative-control
+    tests): a real token detects >=1, so the `== 0` near-miss assertions below
+    cannot go vacuously green under a regression that disables the secret pattern.
     """
+    # F-TEST1 liveness: prove the pattern is live (else the `== 0` below is vacuous).
+    live = tmp_path / "live.txt"
+    live.write_text(f"T = {_synthetic_oauth_token()!r}\n")
+    assert scan([str(live)], token_config=NO_CONFIG) >= 1  # pattern live
+
     root = _scratch_clone(tmp_path)
     leak = root / "README.md"
     near_miss = ("sk-" + "ant-") + "api03-" + "notoauth"   # different prefix (not oat)

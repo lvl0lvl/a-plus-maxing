@@ -236,7 +236,12 @@ def _load_token_patterns(config_path):
 
 def scan(tracked_files, token_config=_SENTINEL, include_structural=True,
          identity_config=None):
-    """Count operator-PII matches across the contents of the supplied files.
+    """Count operator-PII + agnostic-secret matches across the file contents.
+
+    The operator-agnostic `SECRET_PATTERNS` (credential shapes, e.g. the
+    CLAUDE_CODE_OAUTH_TOKEN) run UNCONDITIONALLY — independent of
+    `include_structural` and `token_config` — since a leaked secret in any
+    tracked file is a leak regardless of operator (bead `aque`).
 
     Args:
         tracked_files (iterable[str]): Paths to scan (the caller's current
@@ -247,7 +252,10 @@ def scan(tracked_files, token_config=_SENTINEL, include_structural=True,
         include_structural (bool, optional): Apply the agnostic structural
             store-line patterns. Callers scanning known-fixture paths (test
             suites whose fixtures embed synthetic reading-shaped literals by
-            construction) pass False so only the config-driven tokens run there
+            construction) pass False so the STRUCTURAL net is skipped there — but
+            the operator-agnostic `SECRET_PATTERNS` and the config-driven tokens
+            STILL run (this gates only the structural set, not all agnostic
+            patterns; a credential in a fixture is still a leak, bead `aque`)
             (bead dv3 — the structural net over fixtures is pure false positive).
         identity_config (str | Path, optional): Deprecated alias for
             `token_config` (the pre-b9l kwarg name, kept for the ADR-0005-T1
@@ -256,8 +264,8 @@ def scan(tracked_files, token_config=_SENTINEL, include_structural=True,
             TypeError.
 
     Returns:
-        (int) Total number of operator-PII matches across the files' contents.
-        Each file with >=1 match is named on stderr as `PII-HIT: <path>`.
+        (int) Total operator-PII + agnostic-secret matches across the files'
+        contents. Each file with >=1 match is named on stderr as `PII-HIT: <path>`.
     """
     if identity_config is not None:
         if token_config is not _SENTINEL:
@@ -412,6 +420,9 @@ def scan_scoped(changed, data_bearing, contact_config=DEFAULT_CONTACT_CONFIG,
 
     - trunk-wide: structural store-line patterns + contact tokens over non-fixture
       changed paths; contact tokens ONLY over `tests/` fixture paths.
+    - unconditional (every scope): the operator-agnostic `SECRET_PATTERNS`
+      (credential shapes) run in EVERY `scan` call below — non-fixture, fixture,
+      and data-bearing — a credential in any tracked file is a leak (bead `aque`).
     - identity, data-bearing only: operator-name tokens over the `data_bearing`
       subset (health-data paths where the name is a leak).
 
