@@ -13,7 +13,9 @@ EXTEND-NOT-REBUILD (SEC-03 governance floor): the driver supplies seams and re-h
 loop. The debounce, the fail-closed gate composition, the cross-domain holds, and the loop's pinned
 constants all stay inside the built loop; the driver names none of their symbols and touches no file
 under `scripts/serve/` / `scripts/plan/` / `scripts/store/`. Its whole import surface is
-`scripts.serve.plan_loop` (for the entry + the trigger label) plus `scripts.runner.subscription_dispatch`.
+`scripts.serve.plan_loop` (for the entry + the trigger label) plus `scripts.runner.subscription_dispatch`
+and the sibling `scripts.runner.store_lock` advisory lock (ADR-0039-T4), which serializes the tick's single
+read -> regenerate -> promote critical section runner-to-runner; a busy tick defers (0 re-gen, 0 store write).
 
 Ships DISABLED BY DEFAULT: importing arms nothing (0 signal / de-id / dispatch on import — the
 `__main__` guard keeps `main()` off the import path), and the default subscription-session factory
@@ -33,7 +35,7 @@ from scripts.model.client import ModelClient
 from scripts.serve import plan_loop
 from scripts.store import store
 
-from scripts.runner import subscription_dispatch
+from scripts.runner import store_lock, subscription_dispatch
 
 
 def run(root, *, dispatch_factory, deid_client, tailor_client=None, plan_date=None):
@@ -57,16 +59,27 @@ def run(root, *, dispatch_factory, deid_client, tailor_client=None, plan_date=No
             post-promote tailoring seam. None -> pass-through (0 tailoring spend).
         plan_date (str, optional): The plans' YYYY-MM-DD date. None -> today's ISO date (in the loop).
 
+    The single `plan_loop.signal` critical section runs inside `store_lock.cadence_lock(root)` (the
+    ADR-0039-T4 advisory lock): when a concurrent runner tick already holds the lock this tick DEFERS —
+    it returns a `lock-busy` receipt WITHOUT calling `signal` (0 re-gen, 0 store write) and catches up on
+    the next tick. The lock releases in a `finally` on every exit (including an exception raised inside
+    the critical section), so a crashed tick frees the lock and does not wedge the schedule.
+
     Returns:
         (dict) The `plan_loop.signal` receipt unchanged (the re-gen result on a gate-pass, else a
-        no-op / hold+prompt receipt).
+        no-op / hold+prompt receipt), OR a `{"regenerated": False, "deferred": True, ...,
+        "reason": "lock-busy"}` deferred receipt when a concurrent tick held the lock.
     """
-    session = dispatch_factory()
-    dispatch = subscription_dispatch.build_dispatch(session)
-    return plan_loop.signal(
-        root, trigger=plan_loop.CADENCE_TRIGGER, dispatch=dispatch, deid_client=deid_client,
-        tailor_client=tailor_client, plan_date=plan_date,
-    )
+    with store_lock.cadence_lock(root) as acquired:
+        if not acquired:
+            return {"regenerated": False, "deferred": True,
+                    "trigger": plan_loop.CADENCE_TRIGGER, "reason": "lock-busy"}
+        session = dispatch_factory()
+        dispatch = subscription_dispatch.build_dispatch(session)
+        return plan_loop.signal(
+            root, trigger=plan_loop.CADENCE_TRIGGER, dispatch=dispatch, deid_client=deid_client,
+            tailor_client=tailor_client, plan_date=plan_date,
+        )
 
 
 def _resolved_store_root():
