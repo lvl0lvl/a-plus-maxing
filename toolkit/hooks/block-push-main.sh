@@ -54,6 +54,18 @@
 
 set -uo pipefail
 
+# Dep preflight (bead skills_library-kfi): under `pipefail` a missing grep/sed/tr
+# makes every matcher pipeline return non-zero, which reads as "not our concern"
+# → silent ALLOW. A gate whose matcher cannot run must fail CLOSED instead
+# (F-008): exit 2 is a PreToolUse blocking error in hook mode and FATAL in test
+# mode. `command -v` is a bash builtin, so the preflight itself needs none of the
+# tools it checks.
+for _dep in grep sed tr; do
+  command -v "$_dep" >/dev/null 2>&1 && continue
+  echo "block-push-main: DENY — required tool '$_dep' not found on PATH; the matcher cannot run (fail-closed, F-008)" >&2
+  exit 2
+done
+
 # Protected branches — space-separated, overridable. Defaults cover the two
 # conventional trunk names.
 PROTECTED_BRANCHES="${PROTECTED_BRANCHES:-main master}"

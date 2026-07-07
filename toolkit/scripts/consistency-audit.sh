@@ -103,6 +103,23 @@ BYREF_MARKER="${CONSISTENCY_BYREF_MARKER:-(INLINE-EXEMPT|by-reference: sanctione
 # Reference to a role profile, by slug, anywhere in a dispatching file.
 AGENTMD_REGEX='roles/[a-z0-9][a-z0-9-]*/agent\.md'
 
+# sha256_first12 <file> — first 12 lowercase hex chars of the file's sha256.
+# Portable: prefer `shasum -a 256` (macOS/BSD) else `sha256sum` (GNU), detected once.
+if command -v shasum >/dev/null 2>&1; then
+  _sha256() { shasum -a 256 "$1" 2>/dev/null; }
+elif command -v sha256sum >/dev/null 2>&1; then
+  _sha256() { sha256sum "$1" 2>/dev/null; }
+else
+  _sha256() { return 1; }
+fi
+sha256_first12() {
+  # stdout: first 12 hex chars; exit 1 if no hasher / unreadable file.
+  local out
+  out="$(_sha256 "$1")" || return 1
+  [ -n "$out" ] || return 1
+  printf '%s' "${out%% *}" | cut -c1-12
+}
+
 # Non-dispatcher opt-out: a calibration/example CORPUS references role paths as
 # SUBJECT MATTER (a sample review OF a profile), not as dispatches. Such a file
 # declares itself with this explicit, greppable marker so the dispatch scan does
@@ -142,13 +159,17 @@ emit "auditing cross-layer consistency under ${LIB}"
 # shipped_filter — drop non-shipped working dirs and (BUG-22e) the toolkit's own
 # tests/fixtures from the DISPATCH scan, so the audit never flags its own
 # negative-test data or unshipped scratch as a real cross-layer violation.
+# vault/ is gitignored local-only knowledge (Obsidian notes, session records) —
+# not shipped library content, so its historical mentions of old scores (e.g. a
+# past upgrade round's "100/100") are not a live library threshold and must not
+# be scanned (bead skills_library-kf4; same non-shipped class as drafts/.research).
 # EXEMPTION (BUG-22e pattern): when --lib points AT a fixtures tree (the audit's
 # own negative test runs against good/ + bad/ mini-libs UNDER tests/fixtures), we
-# must NOT prune tests/fixtures or the whole lib root would vanish. drafts/ and
-# .research/ are always pruned (never a valid lib root for the test).
+# must NOT prune tests/fixtures or the whole lib root would vanish. drafts/,
+# .research/ and vault/ are always pruned (never a valid lib root for the test).
 case "$LIB" in
-  *tests/fixtures*) shipped_filter() { grep -Ev '/(drafts|\.research)/' || true; } ;;
-  *)                shipped_filter() { grep -Ev '/(drafts|\.research|tests/fixtures)/' || true; } ;;
+  *tests/fixtures*) shipped_filter() { grep -Ev '/(drafts|\.research|vault)/' || true; } ;;
+  *)                shipped_filter() { grep -Ev '/(drafts|\.research|vault|tests/fixtures)/' || true; } ;;
 esac
 
 # ---------------------------------------------------------------------------
@@ -233,6 +254,30 @@ if [ -n "$DISPATCH_FILES_RAW" ]; then
       # marker binds to a slug, not to a line). The slug already resolved
       # (role_exists check above), so Mode B is marker + resolution, both verified.
       if grep -qE "${BYREF_MARKER}.{0,30}roles/${slug}/agent\.md|roles/${slug}/agent\.md.{0,30}${BYREF_MARKER}" "$f" 2>/dev/null; then
+        # OPTIONAL content pin (15j): a marker may pin the sanctioned profile's
+        # content with `roles/<slug>/agent.md sha256:<first12hex>` right after the
+        # slug path. When pinned, the CURRENT profile hash must match the pin —
+        # else the profile DRIFTED behind a stale reference (a section removed /
+        # content rewritten) while the marker still says "sanctioned". Pinning is
+        # OPT-IN: an unpinned marker is accepted on marker + resolution as before.
+        pin="$(grep -oE "roles/${slug}/agent\.md sha256:[0-9a-f]{12}" "$f" 2>/dev/null \
+                | head -n1 | sed -E 's/.*sha256:([0-9a-f]{12})$/\1/')"
+        if [ -n "$pin" ]; then
+          actual="$(sha256_first12 "${ROLES_DIR}/${slug}/agent.md")" || actual=""
+          if [ -z "$actual" ]; then
+            skipped "cannot verify content pin for roles/${slug}/agent.md (no sha256 tool or unreadable profile)"
+            continue
+          fi
+          if [ "$actual" != "$pin" ]; then
+            # BUG-15j (stale content pin): the sanctioned profile drifted behind a
+            # stale by-reference. The marker still says "sanctioned" but the file
+            # changed since it was pinned.
+            fail "profile drift behind a stale reference: roles/${slug}/agent.md content changed since it was sanctioned (pinned ${pin}, now ${actual}); re-sanction with the current hash"
+            continue
+          fi
+          emit "  ${f}: role '${slug}' sanctioned by-reference (content pin sha256:${pin} verified)"
+          continue
+        fi
         emit "  ${f}: role '${slug}' sanctioned by-reference (adjacent per-slug marker + resolves)"
         continue
       fi

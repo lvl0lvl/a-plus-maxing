@@ -5,3 +5,11 @@ git push --force-with-lease origin main
 git clean -n
 ls -la /
 rm -rf /tmp/scratch-dir
+rm -rf /home/user/project/build
+git clean -nd
+rm -rf ./build && ls /
+cd / && rm -rf ./build
+find / -name node_modules && rm -rf ./cache
+git clean -f ./generated.txt ; ls -d */
+git push origin main ; rm -f stale.txt
+git push origin main && rm -f /tmp/x

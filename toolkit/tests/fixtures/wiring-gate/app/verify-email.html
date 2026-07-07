@@ -1,0 +1,10 @@
+<!-- screen/verify-email -->
+<main data-screen="screen/verify-email">
+  <h1>Verify your email</h1>
+  <form>
+    <input data-oid="verify-email/code" data-handler="submitEmailCode" type="text" name="code" placeholder="6-digit code" maxlength="6">
+    <button data-oid="verify-email/resend" data-handler="submitResend" type="button">Resend email</button>
+    <a data-oid="verify-email/change-email" data-handler="goToRegister" href="#/register">Change email</a>
+    <a data-oid="verify-email/back-to-sign-in" data-handler="goToLogin" href="#/login">Back to sign in</a>
+  </form>
+</main>

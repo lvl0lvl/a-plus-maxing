@@ -131,4 +131,18 @@ assert_red_when_guard_removed \
   "bash '$AUDIT' --current $CUR '${FIX}/good.md'" \
   "bash '$AUDIT' --current $CUR '${FIX}/bad.md'"
 
+echo "== BUG-009 (W1-7): an en-dash Sxxx–Sxxx range on a counted bullet is SKIPPED =="
+# A pointer bullet carrying an en-dash range of OUT-of-window sessions must PASS: the
+# range is a historical span, not per-session stamps. Byte-oriented awk did not honour
+# the in-regex \xe2\x80\x93 escape, so the range was counted -> false STACK FAIL.
+printf '# Doc\n\n## State (VOLATILE)\n\n- **Current session:** S172\n- **Prior session:** S140\xe2\x80\x93S150 (historical span)\n' > "${FIX}/good-endash-range.md"
+expect_exit 0 bash "$AUDIT" --current "$CUR" "${FIX}/good-endash-range.md"
+# The SAME sessions as SEPARATE out-of-window bullets must still FAIL — proves the skip
+# is scoped to ranges and real out-of-window stamps are not masked.
+printf '# Doc\n\n## State (VOLATILE)\n\n- **Current session:** S172\n- **Prior session:** S140\n- **Two-back session:** S150\n' > "${FIX}/bad-endash-split.md"
+expect_exit 1 bash "$AUDIT" --current "$CUR" "${FIX}/bad-endash-split.md"
+assert_red_when_guard_removed \
+  "bash '$AUDIT' --current $CUR '${FIX}/good-endash-range.md'" \
+  "bash '$AUDIT' --current $CUR '${FIX}/bad-endash-split.md'"
+
 test_summary

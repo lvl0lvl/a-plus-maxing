@@ -1,0 +1,11 @@
+<!-- screen/login — data-oid = <bare-screen>/<wireId> (screen/ prefix stripped, per §6.3-res-1 shell example). -->
+<main data-screen="screen/login">
+  <h1>Sign in</h1>
+  <form>
+    <input data-oid="login/email" data-handler="onEmailInput" type="email" name="email" placeholder="Work email">
+    <input data-oid="login/password" data-handler="onPasswordInput" type="password" name="password" placeholder="Password">
+    <button data-oid="login/password-visibility" data-handler="onTogglePasswordVisibility" type="button">Show</button>
+    <a data-oid="login/forgot-password" data-handler="goToResetRequest" href="#/reset-request">Forgot password?</a>
+    <button data-oid="login/sign-in" data-handler="submitSignIn" type="submit">Sign in</button>
+  </form>
+</main>

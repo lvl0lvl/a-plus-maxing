@@ -1,0 +1,74 @@
+{
+  "id": "review",
+  "initial": "list",
+  "states": {
+    "detail": {
+      "initial": "idle",
+      "states": {
+        "error": {
+          "on": {
+            "RETRY": [
+              {
+                "fromWireId": "retry",
+                "guard": "",
+                "target": "idle"
+              }
+            ]
+          }
+        },
+        "idle": {
+          "on": {
+            "REFRESH": [
+              {
+                "fromWireId": "refresh",
+                "guard": "",
+                "target": "error"
+              }
+            ],
+            "SAVE_NOTE": [
+              {
+                "fromWireId": "status-note",
+                "guard": "",
+                "target": "idle"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "list": {
+      "initial": "idle",
+      "states": {
+        "filtering": {
+          "on": {
+            "APPLY_FILTER": [
+              {
+                "fromWireId": "apply-filter",
+                "guard": "",
+                "target": "idle"
+              }
+            ]
+          }
+        },
+        "idle": {
+          "on": {
+            "OPEN_DETAIL": [
+              {
+                "fromWireId": "open-detail",
+                "guard": "",
+                "target": "detail"
+              }
+            ],
+            "OPEN_FILTERS": [
+              {
+                "fromWireId": "open-filters",
+                "guard": "",
+                "target": "filtering"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

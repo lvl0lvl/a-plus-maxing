@@ -155,4 +155,10 @@ assert_stderr_contains 'UNEXPANDED by-reference/EMBED marker' bash "${HOOK}" < "
 # Empty / non-JSON stdin must not crash; allow (nothing to check).
 expect_exit 0 bash "${HOOK}" < /dev/null
 
+# (kfi) dep preflight: missing grep/sed/tr must fail CLOSED (exit 2) — previously
+# PATH='' made role detection crash under set -e (exit 127, which PreToolUse
+# treats as non-blocking = ALLOW of an un-inlined role prompt). Goes RED if the
+# preflight is removed (the stripped copy exits 127, not 2).
+expect_exit 2 env PATH='' /bin/bash "${HOOK}" < /dev/null
+
 test_summary

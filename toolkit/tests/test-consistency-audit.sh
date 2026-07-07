@@ -162,6 +162,20 @@ A fractional aggregate like 8.99/100 is a score, not the 99/100 gate (drift_re
 left-boundary guard: remove the decimal-reject and this turns GOOD RED).
 EOF
 
+# vault/ exclusion (bead skills_library-kf4): vault/ is gitignored local-only
+# knowledge (Obsidian notes / session records), not shipped library content. A
+# historical note there naming an ACTIVE-looking literal 99/100 must NOT be
+# flagged -> GOOD stays PASS. Remove `vault` from shipped_filter and this turns
+# GOOD RED (F-006 false-positive on non-shipped content). Load-bearing for the
+# vault prune. (The text is a live-gate shape on purpose: only the prune, not the
+# removal-meta-prose exemption, keeps it green.)
+mkdir -p "${GOOD}/vault/upgrades"
+cat > "${GOOD}/vault/upgrades/round-log.md" <<'EOF'
+# Upgrade round log (local vault, gitignored)
+- Round 4: 100/100 → final pass
+- Pass threshold was a literal 99/100 across all dimensions.
+EOF
+
 # F-005 check-(d) guards: a .sh comment that names "close-protocol" and a prose
 # MENTION of "the session-close protocol" (no heading) must NOT count as close-
 # protocol definers -> GOOD keeps its single definer (close.md) and stays PASS.

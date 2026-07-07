@@ -41,6 +41,88 @@ REQUIRED=(
 # The 9th operational slot varies by role.
 SLOTS=( "## Modes" "## Audit Protocol" "## Task Routing" )
 
+# validate_frontmatter <slug> <profile-path>
+# If the profile begins with a `---` YAML frontmatter block, verify (a) the block
+# is valid YAML and (b) it carries non-empty name/title/description keys. A profile
+# WITHOUT a frontmatter block is allowed (backward compat) — this is a no-op then.
+# WHY (dogfooding finding): roles/*/agent.md frontmatter is parsed by downstream
+# consumers (the website build, gray-matter). Unquoted colons produced invalid YAML
+# that these section-grep audits passed while the website build FAILED. The library
+# must validate what tools depend on.
+validate_frontmatter() {
+  local slug="$1" prof="$2"
+  # Frontmatter only counts when `---` is the VERY FIRST line of the file.
+  IFS= read -r first_line < "$prof" || first_line=""
+  [ "$first_line" = "---" ] || return 0   # no frontmatter block -> nothing to validate
+
+  # BUG-1 (W1-1, 2026-07-02): PyYAML is an OPTIONAL dependency for this SECONDARY
+  # sub-check only. The audit's load-bearing property — the 10+1 section-completeness
+  # that mirrors the dispatch hook — is dependency-free and always runs. The
+  # frontmatter YAML lint is the only part that needs PyYAML, so it is a documented
+  # optional-dep non-blocker (parity with lib/gate_attest.py's optional
+  # python3+jsonschema, which loud-skips so the suite stays green). We WARN (loud,
+  # non-gating) rather than skipped()/FATAL: the prior skipped() forced the WHOLE
+  # section audit to FATAL on any box without PyYAML, making it perpetually-red
+  # (PF-S1-05) and taking run-all-tests.sh — and therefore close-audit once it runs
+  # the suite — permanently red. F-008 still bites where it matters: the property
+  # that CANNOT be verified without the dep (frontmatter YAML) is loudly flagged
+  # unverified, never reported clean; the section property, verifiable without the
+  # dep, still decides PASS/FAIL. When PyYAML IS present, invalid-YAML / missing-key
+  # frontmatter still FAILs — the negative test proves that direction still bites.
+  if ! python3 -c "import yaml" >/dev/null 2>&1; then
+    warn "role '$slug' frontmatter: python3+PyYAML unavailable — YAML lint NOT run (section-completeness still enforced)"
+    return 0
+  fi
+
+  local result
+  result="$(python3 - "$prof" <<'PY'
+import sys, yaml
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    text = fh.read()
+lines = text.split("\n")
+# lines[0] is the opening '---'; find the closing '---'.
+end = None
+for i in range(1, len(lines)):
+    if lines[i].strip() == "---":
+        end = i
+        break
+if end is None:
+    print("no-close")
+    sys.exit(0)
+block = "\n".join(lines[1:end])
+try:
+    data = yaml.safe_load(block)
+except yaml.YAMLError as e:
+    msg = " ".join(str(e).split())
+    print("invalid-yaml\t" + msg)
+    sys.exit(0)
+if not isinstance(data, dict):
+    print("not-mapping")
+    sys.exit(0)
+missing = [k for k in ("name", "title", "description")
+           if k not in data
+           or data[k] is None
+           or str(data[k]).strip() == ""]
+if missing:
+    print("missing-keys\t" + ",".join(missing))
+    sys.exit(0)
+print("ok")
+PY
+)"
+
+  local code="${result%%	*}"
+  local detail="${result#*	}"
+  case "$code" in
+    ok)          emit "role '$slug': frontmatter valid (name/title/description present)" ;;
+    no-close)    fail "role '$slug' frontmatter: opening '---' has no closing '---' delimiter" ;;
+    invalid-yaml) fail "role '$slug' frontmatter: invalid YAML — $detail" ;;
+    not-mapping) fail "role '$slug' frontmatter: not a YAML mapping (expected name/title/description keys)" ;;
+    missing-keys) fail "role '$slug' frontmatter: missing or empty required key(s): $detail" ;;
+    *)           fail "role '$slug' frontmatter: validator produced unexpected output: '$result'" ;;
+  esac
+}
+
 found_any=0
 for prof in "$LIB"/roles/*/agent.md; do
   [ -f "$prof" ] || continue
@@ -60,6 +142,7 @@ for prof in "$LIB"/roles/*/agent.md; do
   else
     emit "role '$slug': complete (11 sections)"
   fi
+  validate_frontmatter "$slug" "$prof"
 done
 
 [ "$found_any" -eq 1 ] || { emit "FATAL: no roles/*/agent.md profiles found under $LIB"; exit 2; }

@@ -1,0 +1,4 @@
+{
+  "incident": ["id", "title", "status"],
+  "note": ["text"]
+}

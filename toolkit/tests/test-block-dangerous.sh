@@ -64,4 +64,10 @@ else
   echo "[SKIP] jq absent; hook-mode JSON checks skipped (--check mode still covered)"
 fi
 
+# (kfi) dep preflight: missing grep/tr must fail CLOSED (exit 2) — previously
+# PATH='' made every matcher read "not dangerous" → silent ALLOW (--check exit 0).
+# (block-dangerous parses with grep+tr only, NOT sed — review QUAL-1.)
+# Goes RED if the preflight is removed.
+expect_exit 2 env PATH='' /bin/bash "$HOOK" --check 'rm -rf /'
+
 test_summary

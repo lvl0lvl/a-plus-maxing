@@ -195,7 +195,19 @@ EOF
     # placeholder ('...') is ILLUSTRATIVE prose — a command/skill documenting deploy
     # paths (e.g. deploy-and-verify.md's own examples), not a real reference. Resolving
     # it would make an artifact's own documentation fail the audit forever. Skip it.
-    case "$ref" in *...*) continue ;; esac
+    # BUG-22i (non-artifact immunity, F-007): some ~/.claude/... tokens are NOT library
+    # artifacts the deploy must produce, so resolving them would false-FAIL forever:
+    #   - the user's own global memory file (~/.claude/CLAUDE.md) — user-owned, never
+    #     deployed by the library;
+    #   - runtime-transient paths a command creates/renames mid-execution — an
+    #     atomic-rename staging file (*.staged) or an in-progress lock (*.in-progress) —
+    #     which by design exist only during a run.
+    # A genuinely un-deployed artifact does NOT match these shapes and is still caught.
+    case "$ref" in
+      *...*)                        continue ;;   # BUG-22f: illustrative prose
+      '~/.claude/CLAUDE.md')        continue ;;   # user's global memory file, not a library artifact
+      *.staged | *.in-progress)     continue ;;   # runtime-transient (staging file / lock)
+    esac
     sub="${ref#'~/.claude/'}"
     sub="${sub%/}"
     [ -z "$sub" ] && continue

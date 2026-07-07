@@ -1,0 +1,19 @@
+{
+  "name": "seam-gate-fixture-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Minimal real-hydrating React fixture for the §6.4 seam gate (Phase-2 mechanism prover). Not shipped; test substrate only.",
+  "scripts": {
+    "build": "vite build",
+    "serve": "node serve.mjs"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.4",
+    "vite": "5.4.11"
+  }
+}

@@ -43,6 +43,12 @@ write_fixture push-wordboundary.json "git push origin maintenance" # allow (not 
 write_fixture commit-good.json "git commit -m hello"               # allow when branch ok
 write_fixture commit-bad.json  "git commit -m hello"               # block when branch=main
 write_fixture commit-embedded.json 'echo git commit'               # allow (embedded text, BUG-3)
+# 4jx: transparent-exec wrappers must be stripped so a wrapped commit on main blocks.
+write_fixture commit-wrap-command.json 'command git commit -m x'   # block on main
+write_fixture commit-wrap-nested.json  'nohup env git commit -m x' # block on main
+write_fixture commit-wrap-timeout.json 'timeout 5 git commit -m x' # block (scalar-arg wrapper)
+write_fixture commit-wrap-envu.json    'env -u FOO git commit -m x' # block (value-flag)
+write_fixture commit-wrap-substr.json  'commander git commit'      # allow (substring-safe)
 
 # ── helpers that invoke the hooks in TEST MODE ────────────────────────────────
 run_push()   { BLOCK_PUSH_MAIN_TESTMODE=1   bash "$PUSH_HOOK"   < "$FIX/$1"; }
@@ -75,9 +81,40 @@ expect_exit 0 run_commit commit-good.json feature/x   # commit on feature branch
 expect_exit 1 run_commit commit-bad.json  main        # commit on main → block
 expect_exit 1 run_commit commit-bad.json  master      # commit on master → block
 expect_exit 0 run_commit commit-embedded.json main    # 'echo git commit' on main → allow (BUG-3)
+expect_exit 1 run_commit commit-wrap-command.json main # 4jx: command git commit → block
+expect_exit 1 run_commit commit-wrap-nested.json  main # 4jx: nohup env git commit → block
+expect_exit 1 run_commit commit-wrap-timeout.json main # 4jx: timeout 5 git commit → block
+expect_exit 1 run_commit commit-wrap-envu.json    main # 4jx: env -u FOO git commit → block
+expect_exit 0 run_commit commit-wrap-substr.json  main # 'commander' substring-safe → allow
 
 # F-008 fail-closed: non-empty input with no extractable command → FATAL (2).
 printf '{"tool_input":{}}' > "$FIX/commit-noemcmd.json"
 expect_exit 2 run_commit commit-noemcmd.json main
+
+# (pif) case-fold: on a case-insensitive FS `GIT commit` / `TIMEOUT 5 Git commit`
+# RUN exactly like their lowercase forms but previously matched nothing → un-gated
+# commit on main (executed triage C3). Must block on main, still allow elsewhere.
+write_fixture commit-caps.json     'GIT commit -m x'
+write_fixture commit-capswrap.json 'TIMEOUT 5 Git commit -m x'
+write_fixture echo-caps.json       'ECHO git commit'
+expect_exit 1 run_commit commit-caps.json     main       # folds → git commit → block
+expect_exit 1 run_commit commit-capswrap.json main       # folds → wrapper strips → block
+expect_exit 0 run_commit commit-caps.json     feature/x  # branch still decides
+expect_exit 0 run_commit echo-caps.json       main       # fold must not widen echo into exec
+
+# (pif) two-pass hazard parity (review SHOULD-FIX-1): the strip logic is
+# byte-identical to enforce-commit-gate, so the setsid/env-C hazards are pinned
+# here too. setsid's lowercase -c takes NO argument — pass 1's -[uCg] class must
+# keep catching it (a single folded -[ucg] pass would eat 'git' as -c's value).
+write_fixture commit-setsid.json 'setsid -c git commit -m x'
+write_fixture commit-envC.json   'env -C /tmp git commit -m x'
+expect_exit 1 run_commit commit-setsid.json main   # setsid -c git commit → pass 1 catches → block
+expect_exit 1 run_commit commit-envC.json   main   # env -C /tmp git commit → value-flag → block
+
+# (kfi) dep preflight: with grep/sed/tr unavailable the old hooks read every
+# command as "not our concern" → silent ALLOW (exit 0). Must now FATAL (2).
+# Goes RED if the preflight is removed (PATH='' would again exit 0).
+expect_exit 2 env PATH='' BLOCK_PUSH_MAIN_TESTMODE=1   /bin/bash "$PUSH_HOOK"   'git push origin main'
+expect_exit 2 env PATH='' BLOCK_COMMIT_MAIN_TESTMODE=1 /bin/bash "$COMMIT_HOOK" 'git commit -m x'
 
 test_summary

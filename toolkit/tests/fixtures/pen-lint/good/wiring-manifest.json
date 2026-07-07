@@ -1,0 +1,97 @@
+[
+  {
+    "action": "submit",
+    "destination": "screen/dashboard",
+    "endpoint": [
+      "POST /incidents/:id/submit"
+    ],
+    "ephemeral": false,
+    "name": "btn/submit-report",
+    "reads": [
+      "incident.summary"
+    ],
+    "screen": "screen/incident-review",
+    "status": "planned",
+    "wireId": "submit-report",
+    "writes": [
+      "incident.status"
+    ]
+  },
+  {
+    "action": "edit",
+    "destination": "self",
+    "endpoint": [
+      "PATCH /incidents/:id"
+    ],
+    "ephemeral": false,
+    "name": "input/notes",
+    "reads": [
+      "incident.notes"
+    ],
+    "screen": "screen/incident-review",
+    "status": "planned",
+    "wireId": "notes",
+    "writes": [
+      "incident.notes"
+    ]
+  },
+  {
+    "action": "toggle",
+    "destination": "self",
+    "endpoint": "none",
+    "ephemeral": true,
+    "localEffect": "Expand the incident detail panel",
+    "name": "toggle/details",
+    "screen": "screen/incident-review",
+    "status": "planned",
+    "wireId": "details"
+  },
+  {
+    "action": "navigate",
+    "destination": "screen/incident-review",
+    "endpoint": "none",
+    "ephemeral": false,
+    "name": "btn/new-incident",
+    "screen": "screen/dashboard",
+    "status": "planned",
+    "wireId": "new-incident"
+  },
+  {
+    "action": "navigate",
+    "destination": "screen/incident-review",
+    "endpoint": "none",
+    "ephemeral": false,
+    "name": "btn/drill",
+    "screen": "screen/dashboard",
+    "status": "planned",
+    "wireId": "metric-open-incidents.drill"
+  },
+  {
+    "action": "navigate",
+    "destination": "screen/dashboard",
+    "endpoint": "none",
+    "ephemeral": false,
+    "name": "nav/incidents",
+    "screen": "screen/_shell",
+    "shell": true,
+    "shellStates": [
+      "screen/dashboard",
+      "screen/incident-review"
+    ],
+    "status": "planned",
+    "wireId": "incidents"
+  },
+  {
+    "action": "input",
+    "destination": "self",
+    "endpoint": "none",
+    "ephemeral": true,
+    "localEffect": "holds the incident search query for local filtering",
+    "name": "input/search-incidents",
+    "reads": [],
+    "screen": "screen/dashboard",
+    "status": "planned",
+    "wireId": "search-incidents",
+    "writes": []
+  }
+]

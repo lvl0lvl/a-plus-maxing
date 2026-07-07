@@ -8,3 +8,10 @@ git push --force origin main
 git push -f origin main
 git clean -fd
 git clean -df
+rm -rf /*
+rm --recursive --force /
+git clean -f -d
+git clean -d -f .
+ls / && rm -rf /
+make build || git clean -fd
+echo start ; rm -rf /*

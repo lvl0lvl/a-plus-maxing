@@ -12,6 +12,14 @@ review_cadence: weekly
 
 # Session Handoff
 
+## Resume — S118 (VOLATILE)
+
+Stamped 2026-07-07. main @ a77d2f00 (pre-rigor-1.20.0-merge; re-stamped to the merge SHA at the S118 close).
+
+The rigor-1.20.0 pull's follow-ups are next. `a-plus-maxing-ffit` is open (the roster-select upstream test fix — the library-tree-scoped close-audit floor red). `a-plus-maxing-ijd0` is open (the vendored-but-unwired toolkit scripts to assess). `a-plus-maxing-r3vw` is open (the ADR-0039 marker set-site — operator-gated live-enable). `a-plus-maxing-2deg` is closed (the frozen-spine floor-red repoint, landed in #308). The r3vw refusal-message fix landed in #310; the S117 close docs landed in #311.
+
+<!-- 3b resume-claims-audit adoption (rigor 1.19.0): this VOLATILE region carries one machine-checkable claim per sentence (backticked `project-id` + status keyword; `main @ <sha>`; `landed in #N`; the Stamped line). ADVISORY until one full session cycle passes with zero FAIL, then gate per upstream bead `bud`. -->
+
 ## Scope Contract — Session 117 (2026-07-07)
 
 Goal: Resume the operator-authorized continuous autonomous build loop (after the operator flagged the S116-close over-surfacing — **PF-S117-01**) and land `r3vw` sub-task 2 (fix the misdirecting ADR-0039 subscription-refusal message) end-to-end (fix → direct review → merge → close).

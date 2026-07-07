@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>seam-gate fixture</title>
+  </head>
+  <body>
+    <!-- CSR only: this served markup carries ZERO data-oid. Every data-oid,
+         portal node, and induced state exists only AFTER the React engine runs.
+         A byte-scan of this file finds nothing; the seam crawl must run the
+         real engine (memo O1 in its strongest form). -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

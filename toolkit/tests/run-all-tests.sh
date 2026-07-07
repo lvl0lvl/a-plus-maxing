@@ -8,6 +8,11 @@
 #
 # Exit 0 if all pass, 1 if any fail.
 set -u
+# Recursion guard (W1-3): close-audit.sh now runs THIS suite first. When a test
+# (e.g. test-close-audit.sh) invokes close-audit, that nested close-audit must NOT
+# re-enter the suite. Exporting the skip flag here breaks the cycle; the test's own
+# suite-first cases override it back on with a trivial fake suite.
+export CLOSE_AUDIT_SKIP_SUITE=1
 HERE="$(cd "$(dirname "$0")" && pwd)"
 pass=0; fail=0; failed=""
 for t in "$HERE"/test-*.sh; do

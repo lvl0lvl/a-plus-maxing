@@ -170,7 +170,7 @@ check_volatile_stacking() {
     if [ "$marker" = "STACK" ]; then
       fail "VOLATILE-section stacking in '${header}' — distinct out-of-window stamps: ${count} (${stamps}); window is {S$((cur-1))..S$((cur+2))}"
     fi
-  done < <(awk -v cur="$cur" '
+  done < <(awk -v cur="$cur" -v ed="$(printf '\xe2\x80\x93')" '
     function flush_section() {
       if (current != "") {
         n = split(stamps, parts, ",")
@@ -207,7 +207,12 @@ check_volatile_stacking() {
       if (line ~ /^\|/) { next }                                   # table row
       if (line ~ /^\*\*Historical \(kept for reference\):\*\*/) { next }
       # BUG-004: only skip ranges with a literal S on BOTH sides of the dash.
-      if (line ~ /S[0-9]+[-\xe2\x80\x93]S[0-9]+/ || line ~ /S[0-9]+ ?through ?S[0-9]+/) { next }
+      # BUG-009 (W1-7, 2026-07-02): the en-dash was written as an in-regex byte escape
+      # /[-\xe2\x80\x93]/, which byte-oriented BSD/BWK awk does NOT honour (and a 3-byte
+      # en-dash cannot live in a single-char bracket anyway), so `S140–S172` ranges were
+      # NOT skipped and their endpoints counted as stamps -> false STACK FAIL. The
+      # en-dash bytes now arrive via -v ed=... and match as a literal alternation.
+      if (line ~ ("S[0-9]+(-|" ed ")S[0-9]+") || line ~ /S[0-9]+ ?through ?S[0-9]+/) { next }
       # Structural-position filter — count only canonical pointer bullets and
       # session-block headers (BUG-002 widened the pointer set).
       if (line !~ /^- \*\*(Current|Prior(-session)?( pointer)?|Next|Two-back) session:/ \

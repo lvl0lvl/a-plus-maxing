@@ -1,0 +1,3 @@
+# Retired (screen, wireId) pairs. Re-minting any of these is a pen-lint ck4 FAIL
+# unless the line is removed in the same change (§4.1 / T-30). Format: <screen> <wireId>
+screen/dashboard legacy-filter

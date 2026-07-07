@@ -1,0 +1,12 @@
+<!-- screen/register -->
+<main data-screen="screen/register">
+  <h1>Create account</h1>
+  <form>
+    <input data-oid="register/name" data-handler="onNameInput" type="text" name="name" placeholder="Full name">
+    <input data-oid="register/email" data-handler="onEmailInput" type="email" name="email" placeholder="Work email">
+    <input data-oid="register/password" data-handler="onPasswordInput" type="password" name="password" placeholder="Password">
+    <button data-oid="register/password-visibility" data-handler="onTogglePasswordVisibility" type="button">Show</button>
+    <button data-oid="register/create-account" data-handler="submitCreateAccount" type="submit">Create account</button>
+    <a data-oid="register/sign-in" data-handler="goToLogin" href="#/login">Have an account? Sign in</a>
+  </form>
+</main>
