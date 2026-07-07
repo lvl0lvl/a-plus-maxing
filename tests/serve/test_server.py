@@ -2032,6 +2032,60 @@ def test_generate_plan_holds_cross_domain_additive_ae_pair(tmp_path):
         srv.server_close()
 
 
+def test_generate_plan_render_drops_held_pending_supplements_plan(tmp_path):
+    """A HELD (pending-pointer) plan does NOT leak onto the POST /generate-plan re-render.
+
+    The `_do_generate_plan` render (server.py:808) must resolve `plan::` readings through the SAME
+    confirm filter the SPA factory (`generate.run('app')`, app_shell.py:577) already uses: a plan the
+    loop path recorded but left carrying an un-confirmed PENDING pointer (`plan_confirm.mark_pending`,
+    the loop-hold state — the only production writer of pending pointers) must be dropped before it
+    renders as the standing plan. Seeds a held `plan::supplements` + a pending pointer and a NON-held
+    `plan::workout` control, then drives the real POST /generate-plan with every author failing (so
+    the frozen orchestrator records nothing new and the served render is over the seeded held state
+    alone, isolating the confirm filter under test). Asserts the held supplements row is ABSENT from
+    the returned `plan_html` and the non-held control IS present. RED before the fix: server.py:808
+    called `_plan_zone` WITHOUT the in-scope store root, so `filter_confirmed` never ran and the held
+    plan leaked as the standing plan; GREEN once `store_root` is threaded — the Factory-to-Component
+    wiring the second production caller had missed.
+    """
+    from scripts.store import plan_confirm
+
+    root = tmp_path / "store"
+    on_date = datetime.date.today().isoformat()  # the handler renders plan-for-today (server.py:773)
+    _seed_summary_store(root)
+    # HELD supplements: recorded, then an un-confirmed PENDING pointer (the loop-hold state).
+    plan_schema.record_plan(
+        "supplements", {"items": [{"name": "Creatine", "dose": "5 g"}]},
+        on_date, "supplement-specialist", root)
+    plan_confirm.mark_pending("supplements", on_date, root)
+    # NON-held control: a recorded workout with NO pointer (filter_confirmed keeps it).
+    plan_schema.record_plan(
+        "workout", {"exercises": [{"name": "Back Squat", "sets": 5}]},
+        on_date, "personal-trainer", root)
+
+    # Every author fails -> the orchestrator records nothing new; the served render (server.py:808)
+    # is over the seeded held state alone. 0 live spend (mock author, no key call).
+    client = _MockAuthorClient(
+        _domain_envelopes(),
+        raise_for={d: ModelCallError("no backend") for d in plan_schema.PLAN_DOMAINS},
+    )
+    srv, port = _server_with_author(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"POST /generate-plan returned {status}, expected 200"
+        payload = json.loads(body)
+        assert payload.get("plan_html") is not None, f"the served render degraded (no plan_html): {payload}"
+        plan_html = payload["plan_html"]
+        assert "<li><b>Creatine</b>" not in plan_html, (
+            "a HELD (pending-pointer) supplements plan leaked onto the /generate-plan re-render"
+        )
+        assert "<li><b>Back Squat</b>" in plan_html, "the non-held workout control must still render"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
 def test_generate_plan_production_none_store_root_resolves_default(tmp_path, monkeypatch):
     """TEST3 (F1 class): the production None-store_root path resolves to store.DEFAULT_ROOT, no TypeError.
 

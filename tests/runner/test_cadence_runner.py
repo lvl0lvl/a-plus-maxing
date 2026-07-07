@@ -248,18 +248,23 @@ def test_cadence_runner_import_is_inert(monkeypatch):
 
 
 def test_extend_not_rebuild_no_rehost_no_serve_edit():
-    # AC-3: extend-not-rebuild. The runner names 0 re-host tokens and edits 0 files under
-    # scripts/serve/ (it drives plan_loop.signal INSIDE scripts/serve/plan_loop.py, editing nothing).
+    # AC-3: extend-not-rebuild. The runner names 0 re-host tokens and drives plan_loop.signal INSIDE
+    # scripts/serve/plan_loop.py WITHOUT editing that frozen containment host.
+    # Scope note (PF-S63-02 mis-fire, S112/2026-07-07): assertion #2 formerly diffed the WHOLE
+    # scripts/serve/ dir, which over-broadly tripped on the legitimate non-runner render-filter edit to
+    # server.py (a non-frozen, non-runner file). Scoped to plan_loop.py (the frozen containment host,
+    # also covered by the sibling frozen-glob numstat assertion) so it no longer over-blocks non-runner
+    # serve edits, while still asserting the runner drives-but-does-not-edit the containment host.
     src = ((REPO_ROOT / "scripts/runner/cadence_runner.py").read_text()
            + (REPO_ROOT / "scripts/runner/subscription_dispatch.py").read_text())
     for token in ("_should_regenerate", "compose_disposition", "orchestrate.generate_plans",
                   "plan_driver.drive", "MIN_REGEN_INTERVAL_DAYS"):
         assert src.count(token) == 0, f"the runner re-hosts a loop symbol (extend-not-rebuild): {token}"
     out = subprocess.run(
-        ["git", "diff", "--name-only", "origin/main", "--", "scripts/serve/"],
+        ["git", "diff", "--name-only", "origin/main", "--", "scripts/serve/plan_loop.py"],
         capture_output=True, text=True, cwd=REPO_ROOT, check=True,
     )
-    assert out.stdout.strip() == "", f"the runner edited scripts/serve/: {out.stdout!r}"
+    assert out.stdout.strip() == "", f"the runner edited the frozen plan_loop.py containment host: {out.stdout!r}"
 
 
 def test_frozen_glob_numstat_empty():
