@@ -349,6 +349,15 @@ def _top_defs(text):
     }
 
 
+# The pre-ADR-0040-hold plan_loop.py baseline: the parent of the first ADR-0040-hold commit
+# (`d8f10921` "hold large-change re-gen until confirm"), before the hold layer modified
+# regenerate / _change_magnitude / _post_promote_tailoring. The non-vacuity "these defs DID
+# change" guard pins against this FIXED pre-change SHA, not origin/main — once the ADR-0040
+# build merged, origin/main caught up to the changed defs so `!= origin` self-invalidated
+# (bead 2deg). Mirrors test_generate_plan.py's PRE_TASK_HEAD pattern.
+PRE_TASK_HEAD = "300de2f1cd57e700194de0e20114a844299eab31"
+
+
 def test_frozen_spine_and_only_regenerate_changed():
     # AC-6: the ADR-0032 write-path+engine glob is byte-frozen (numstat=0), and the ONLY top-level
     # def in plan_loop.py that changed vs origin/main is `regenerate` — so _last_regen_date /
@@ -378,6 +387,14 @@ def test_frozen_spine_and_only_regenerate_changed():
         assert current.get(name) == src, f"{name} changed vs origin/main (must be byte-unchanged)"
     for helper in ("_last_regen_date", "_prior_standing_plan"):
         assert current[helper] == origin[helper], f"{helper} is not byte-unchanged"
-    # sanity (not vacuous): each changed def DID change vs origin/main.
+    # sanity (not vacuous): each changed def DID change vs the pinned PRE-ADR-0040 baseline,
+    # NOT origin/main — origin caught up once the ADR-0040 build merged, so `!= origin` reads
+    # empty and self-invalidates (bead 2deg). `.get` tolerates a def absent at the baseline
+    # (would read as "changed").
+    pretask = _top_defs(subprocess.run(
+        ["git", "show", f"{PRE_TASK_HEAD}:scripts/serve/plan_loop.py"],
+        capture_output=True, text=True, cwd=repo, check=True,
+    ).stdout)
     for name in changed_defs:
-        assert current[name] != origin[name], f"{name} did not change (fix not applied)"
+        assert current[name] != pretask.get(name), \
+            f"{name} did not change vs the pre-ADR-0040 baseline (fix not applied)"
