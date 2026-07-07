@@ -631,3 +631,89 @@ def test_trunk_scan_stays_gmail_conservative(tmp_path):
     )
     _git(["add", "-A"], root)
     assert scan(_tracked(root), token_config=NO_CONFIG) == 0
+
+
+# --- SEC-02 / aque: CLAUDE_CODE_OAUTH_TOKEN secret detection -------------------
+# The OAuth token literal is assembled at RUNTIME so this tracked test file carries
+# no matchable `sk-ant-oat`+alnum literal — the tree-wide token scan (and, once this
+# feature lands, `scan` itself) greps ALL tracked files, prose + tests included, so a
+# naive literal here would self-trip the very scanner under test (PF-S112-01). The
+# in-source fragments (`"sk-"`, `"ant-"`, `"oat"`) never form a contiguous
+# `sk-ant-oat`+alnum, so neither the pattern under test nor the ADR-0039 T2 tree scan
+# matches this file.
+_OAUTH_PREFIX = "sk-" + "ant-" + "oat"
+
+
+def _synthetic_oauth_token():
+    """A synthetic (non-real) token of the `sk-ant-oat<alnum>` shape, runtime-built."""
+    return _OAUTH_PREFIX + "01" + "A9b8C7d6" * 5
+
+
+def test_oauth_token_secret_blocked_trunk_wide(tmp_path):
+    """SEC-02 (aque): a leaked CLAUDE_CODE_OAUTH_TOKEN is BLOCKED trunk-wide by `scan`.
+
+    `pii_scan` is the SINGLE policy the block-pii-commit + pre-push-pii-scan hooks run,
+    but it had NO secret/credential detection — a `sk-ant-oat...` token in a tracked
+    file passed both hooks clean (only the ADR-0039-T2 pytest-time tree scan, a
+    backstop over already-tracked files, caught it — missing new-file commits,
+    `--no-verify`, and human-terminal commits). The token is operator-AGNOSTIC (a
+    credential shape, not operator data), so `scan` must detect it with NO token config
+    AND even in the fixture scope (`include_structural=False`) — a leaked token in a
+    `tests/` fixture is still a leak. RED before the pattern is added; mutation-RED if
+    `_COMPILED_SECRET` is later removed from `scan`.
+    """
+    root = _scratch_clone(tmp_path)
+    # AC: clean tracked set -> the secret class adds 0 (non-vacuous baseline).
+    assert scan(_tracked(root), token_config=NO_CONFIG) == 0
+
+    leak = root / "code.py"
+    leak.write_text(leak.read_text() + f"OAUTH_TOKEN = {_synthetic_oauth_token()!r}\n")
+    _git(["add", "-A"], root)
+
+    # Detected with NO identity config (agnostic secret pattern)...
+    assert scan(_tracked(root), token_config=NO_CONFIG) >= 1
+    # ...AND in the fixture scope (structural off) — a token in tests/ is a leak.
+    assert scan(_tracked(root), token_config=NO_CONFIG, include_structural=False) >= 1
+
+
+def test_oauth_token_pattern_anchored_not_overbroad(tmp_path):
+    """The secret pattern is anchored to the `sk-ant-oat` OAuth prefix — a different
+    `sk-ant-` shape (an api-key prefix) or the bare prefix with no trailing alnum does
+    NOT match, so the trunk scanner does not flood on incidental `sk-ant-` mentions in
+    docs (clonability preserved; the same conservatism as the gmail-only contact
+    choice). Reds if a future edit broadens the pattern to bare `sk-ant-`.
+    """
+    root = _scratch_clone(tmp_path)
+    leak = root / "README.md"
+    near_miss = ("sk-" + "ant-") + "api03-" + "notoauth"   # different prefix (not oat)
+    bare = _OAUTH_PREFIX                                    # prefix, no trailing alnum
+    leak.write_text(leak.read_text() + f"mentions {near_miss} and {bare} only\n")
+    _git(["add", "-A"], root)
+
+    assert scan(_tracked(root), token_config=NO_CONFIG) == 0
+
+
+def test_scan_scoped_blocks_oauth_token_in_fixture_path(tmp_path):
+    """`scan_scoped` (the single policy both hooks run) blocks an OAuth token even on a
+    `tests/`-prefixed fixture path — where the structural net is intentionally OFF
+    (bead dv3), the secret pattern must still fire (a token in a fixture is a leak).
+    """
+    root = _scratch_clone(tmp_path)
+    fixture = root / "tests"
+    fixture.mkdir()
+    (fixture / "conftest_fixture.py").write_text(
+        f"TOKEN = {_synthetic_oauth_token()!r}\n"
+    )
+    _git(["add", "-A"], root)
+    changed = _tracked(root)
+    # scan_scoped keys the fixture partition on the "tests/" prefix of the REPO-relative
+    # path; _tracked returns absolute paths, so pass repo-relative here.
+    rel = [str(Path(p).relative_to(root)) for p in changed]
+    import os
+    cwd = os.getcwd()
+    try:
+        os.chdir(root)
+        assert pii_scan.scan_scoped(rel, [], contact_config=NO_CONFIG,
+                                    identity_config=NO_CONFIG) >= 1
+    finally:
+        os.chdir(cwd)

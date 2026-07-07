@@ -14,8 +14,11 @@ operator's real email/handles) load at run time from GITIGNORED configs
 scanner carries NO operator PII and the trunk is shareable. A fresh clone has no
 such files, so token detection is simply empty there while the operator-AGNOSTIC
 patterns still run. The operator-agnostic set is the two structural
-`{item, timepoint, source, value}` store-line patterns; neither carries personal
-data. Contact moved OUT of the agnostic set at 3lv: a generic `@gmail.com`
+`{item, timepoint, source, value}` store-line patterns (neither carries personal
+data) plus `SECRET_PATTERNS` — agnostic credential shapes (the
+CLAUDE_CODE_OAUTH_TOKEN) that run trunk-wide AND unconditionally, since a leaked
+secret in any tracked file (fixtures included) is a leak regardless of operator
+(bead aque / ADR-0039 SEC-02). Contact moved OUT of the agnostic set at 3lv: a generic `@gmail.com`
 pattern run trunk-wide flags the scanner's own synthetic test fixtures and bead
 example emails (14 false hits on a routine staged set), so the operator's REAL
 contact is detected config-driven instead — present on the operator instance,
@@ -53,6 +56,30 @@ AGNOSTIC_PATTERNS = {
 # Structural store-line patterns match across newlines (a pretty-printed reading
 # spans lines) and stay DOTALL-only (store keys are canonical lowercase JSON).
 _COMPILED_AGNOSTIC = [re.compile(p, re.DOTALL) for p in AGNOSTIC_PATTERNS.values()]
+
+# Operator-AGNOSTIC secret/credential patterns (bead aque / ADR-0039 SEC-02): a leaked
+# credential in ANY tracked file is a leak regardless of the operator, so — unlike
+# AGNOSTIC_PATTERNS (structural, switched OFF for known `tests/` fixtures) and the
+# config-driven operator tokens — secrets run in `scan` UNCONDITIONALLY: trunk-wide,
+# in the fixture scope (`include_structural=False`), and on a fresh clone with no
+# token config. The `sk-ant-oat…` OAuth prefix is the CLAUDE_CODE_OAUTH_TOKEN the
+# ADR-0039 subscription runner reads from the keychain — it must never come to rest in
+# a tracked file. It is high-signal BY CONSTRUCTION (the prefix does not appear in
+# legitimate content), so — unlike the generic email/phone VALUE classes that flood
+# docs/fixtures (bead 3lv) — it is safe to run trunk-wide with no clonability cost.
+# This closes the gap the ADR-0039-T2 pytest-time tree scan leaves open: that scan is
+# a backstop over ALREADY-TRACKED files, so a NEW-file commit (or `--no-verify`, or a
+# human-terminal commit that bypasses the PreToolUse hooks) reaches the boundary
+# unscanned; wiring the pattern into `pii_scan.scan` puts it in the block-pii-commit +
+# pre-push-pii-scan hooks (both delegate to `scan_scoped` -> `scan`) that gate commits.
+# Self-reference note: the pattern TEXT below is not itself a match (after `sk-ant-oat`
+# comes `[`, outside the value class), so this module does not self-trip.
+SECRET_PATTERNS = {
+    "claude-code-oauth-token": r"sk-ant-oat[A-Za-z0-9_-]+",
+}
+# Case-SENSITIVE, matching the ADR-0039-T2 AC-5 tree-scan semantics (the token prefix
+# is fixed lowercase); the value class after the prefix is the token body.
+_COMPILED_SECRET = [re.compile(p) for p in SECRET_PATTERNS.values()]
 
 # Value-boundary PII patterns (bead g5x): the EXCLUDED_RAW_PII contact classes the
 # router names that are tractable for a free-text value scan — generic dotted-domain
@@ -244,7 +271,10 @@ def scan(tracked_files, token_config=_SENTINEL, include_structural=True,
     elif token_config is _SENTINEL:
         token_config = DEFAULT_IDENTITY_CONFIG
     structural = _COMPILED_AGNOSTIC if include_structural else []
-    patterns = structural + _load_token_patterns(token_config)
+    # Secrets run UNCONDITIONALLY (agnostic + high-signal): a credential in a `tests/`
+    # fixture is still a leak, so they are added regardless of include_structural or
+    # token_config (bead aque / SEC-02).
+    patterns = structural + _COMPILED_SECRET + _load_token_patterns(token_config)
     total = 0
     for path in tracked_files:
         try:
