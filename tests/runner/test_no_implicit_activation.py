@@ -7,32 +7,45 @@ no build / provision / `init_instance` step may load a runner entry. It has thre
     names no scheduler-install token and no `activate.enable` call — in BOTH the dotted
     `activate.enable(...)` form AND the `from ...schedule.activate import enable; enable()`
     import-and-call form (a dotted-only substring grep MISSES the second form).
-  - Behavioral arm: `init_instance.run(clone_root=<scratch>)` installs 0 runner entries — the
-    active-entry counter (REUSED from `activate.status()`'s REAL-state counter) reads 0 after `run()`.
-  - EXECUTED mutation-RED: injecting a REALISTIC `activate.enable()` — in BOTH call-forms — into a
-    SCRATCH provision path, forced down the LAUNCHD (file) branch, drives the REAL
-    ~/Library/LaunchAgents install-file counter to >=1 and reddens the guard; then it is reverted +
-    the installed agent file unlinked in an unconditional teardown. A guard that stays green under this
-    injection — or that reddens only via a fixture-HOME counter — is tautological. This proves (i) the
-    counter reads REAL launchd state and (ii) the grep matches the import-and-call form, not only the
-    dotted literal.
+  - Behavioral arm: `init_instance.run(clone_root=<scratch>)` installs 0 runner entries — a before/after
+    COUNT DELTA on the DEFAULT `activate.RUNNER_LABEL` (the label init_instance WOULD arm under a real
+    implicit activation) is 0 across `run()`. Polling a per-run RANDOM label instead would stay green
+    even under a real implicit `enable()` on the default label (tautological — the TEST-001 fix). The
+    delta is isolation-safe even if a real armed runner exists on the dev machine (before == after).
+  - EXECUTED mutation-RED: injecting a REALISTIC `activate.enable()` on the DEFAULT `RUNNER_LABEL` — in
+    BOTH call-forms — into a SCRATCH provision path, forced down the LAUNCHD (file) branch, raises the
+    REAL ~/Library/LaunchAgents install-file DELTA on that default label above 0 and reddens the guard;
+    then the default label is disabled + the installed agent file unlinked in a bulletproof teardown (a
+    leaked DEFAULT-label armed agent is worse than a random-label one). A guard that stays green under
+    this injection — or that reddens only via a fixture-HOME counter — is tautological. This proves (i)
+    the counter reads REAL launchd state on the label init_instance would touch and (ii) the grep matches
+    the import-and-call form, not only the dotted literal.
 
 `scripts/clone/init_instance.py` is NEVER edited — the guard SCANS it; the mutation injects into a
 SCRATCH copy only. The real-state arms use the REAL ~/Library/LaunchAgents (a reliable, non-hanging
 home-dir read/write — never a fixture HOME, never the crontab-TCC-hanging path); an OS-capability
-probe loud-skips (never a vacuity skip) only if the home dir is unwritable.
+probe loud-skips (never a vacuity skip) only if the home dir is unwritable, and the mutation arm
+additionally loud-skips if the operator's DEFAULT-label runner is already armed (it needs a disarmed
+default-label baseline and must not disturb a real armed runner).
 """
 
 import importlib.util
 import textwrap
 from pathlib import Path
 
+import pytest
+
 from scripts.clone import init_instance
 from scripts.runner.schedule import activate
 
 # The real-state test-hygiene helpers (one home, in the Cycle-1 file): the forced-launchd unique-label
-# context manager with a bullet-proof disable()+file-unlink teardown, and the direct real-install read.
-from tests.runner.test_activation_surface import _installed_for, real_state_label
+# context manager with a bullet-proof disable()+file-unlink teardown, the writability probe, and the
+# direct real-install read.
+from tests.runner.test_activation_surface import (
+    _installed_for,
+    _require_launchagents_writable_or_skip,
+    real_state_label,
+)
 
 # tests/runner/test_no_implicit_activation.py -> tests -> <repo root>.
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -63,50 +76,70 @@ def test_grep_arm_init_instance_is_clean():
 
 
 def test_behavioral_arm_init_instance_arms_nothing(tmp_path):
-    # AC-8 (behavioral arm): init_instance.run(clone_root=<scratch>) installs 0 runner entries — the
-    # active-entry counter (the SAME real-state counter AC-1/AC-3 exercised) reads 0 for a fresh label
-    # after run(). Forced launchd + unconditional teardown; the real init_instance.py is NEVER edited.
-    with real_state_label() as label:
-        assert activate.active_entry_count(label) == 0
+    # AC-8 (behavioral arm): init_instance.run(clone_root=<scratch>) installs 0 runner entries. The
+    # counter polls the DEFAULT activate.RUNNER_LABEL — the label init_instance WOULD arm under a real
+    # implicit enable() — as a before/after COUNT DELTA. Polling a per-run RANDOM label instead (the
+    # pre-fix arm) would stay green even under a real implicit enable() on the default label, since the
+    # default-label counter was never read (tautological — TEST-001). The delta is isolation-safe even
+    # if a real armed runner exists on the dev machine (before == after regardless of the baseline).
+    # real_state_label() forces the launchd branch + restores it; its random label is unused here — the
+    # DEFAULT label is what we poll, and init_instance arms nothing so no default-label file is created.
+    with real_state_label():
+        before = activate.active_entry_count(activate.RUNNER_LABEL)
         init_instance.run(clone_root=tmp_path)
-        assert activate.active_entry_count(label) == 0, (
-            "init_instance.run armed a runner entry (implicit activation on the provisioning path)"
+        after = activate.active_entry_count(activate.RUNNER_LABEL)
+        assert after == before, (
+            "init_instance.run changed the DEFAULT-label runner count (implicit activation on the "
+            "provisioning path)"
         )
-        # the guard rests GREEN over the real provisioning surface.
-        assert _provisioning_is_clean(_PROVISIONING_SURFACES, label)
+        # the guard rests GREEN over the real provisioning surface (the isolation-safe grep arm).
+        assert activate._scan_provisioning_for_activation(_PROVISIONING_SURFACES) == []
 
 
 def test_mutation_red_guard_catches_injected_activation(tmp_path):
     # AC-8 (EXECUTED mutation-RED — the BLOCKING QA MUST-FIX; mirrors T4 AC-7(d)): inject a REALISTIC
-    # activate.enable() in BOTH the dotted and the bare import-and-call forms into a SCRATCH provision
-    # path, force it down the LAUNCHD (file) branch (real_state_label monkeypatches the launchd probe
-    # True), and EXECUTE it — confirming (a) the grep arm matches BOTH forms, (b) the behavioral counter
-    # reports >=1 FROM the real ~/Library/LaunchAgents install file (NOT a fixture-HOME), and (c) the
-    # guard rests RED. Then the injected label is disabled + the installed agent file unlinked in the
-    # real_state_label finally (a crash between the injected enable() and teardown must not leave a REAL
-    # armed agent).
+    # activate.enable() on the DEFAULT activate.RUNNER_LABEL — the label init_instance WOULD arm under a
+    # real implicit activation (TEST-001) — in BOTH the dotted and the bare import-and-call forms into a
+    # SCRATCH provision path, force it down the LAUNCHD (file) branch, and EXECUTE it — confirming (a)
+    # the grep arm matches BOTH forms, (b) the behavioral counter catches the arming via a >0 DELTA on
+    # the SAME default label the behavioral arm polls, read FROM the real ~/Library/LaunchAgents install
+    # file (NOT a fixture-HOME), and (c) the guard rests RED. Then the default label is disabled + the
+    # installed agent file unlinked in a bulletproof finally (a crash between the injected enable() and
+    # teardown must not leave a REAL armed DEFAULT-label agent — worse than a random-label one).
     #
-    # OS-CAPABILITY SKIP vs VACUITY SKIP: real_state_label gates on a fast writability probe
-    # (`_require_launchagents_writable_or_skip`). In a CAPABLE env (writable home, ~universal) this test
-    # RUNS the real mutation-RED (real install-file counter >=1, guard RED) — non-vacuity preserved.
-    # Only when the OS genuinely denies the home-dir write does it loud-skip with a documented reason —
-    # NOT a clean pass, and distinct from a vacuity skip. It NEVER hangs (no crontab-TCC write path).
-    with real_state_label() as label:
-        # baseline: the guard is GREEN over the REAL tracked init_instance.py.
-        assert _provisioning_is_clean(_PROVISIONING_SURFACES, label), (
+    # OS-CAPABILITY / OS-STATE SKIP vs VACUITY SKIP: a fast writability probe loud-skips only when the OS
+    # denies the home-dir write, and an armed-default-label probe loud-skips only when the operator
+    # already has the DEFAULT-label runner armed (the delta needs a disarmed baseline and must not
+    # disturb a real armed runner). Neither is a clean pass; in a capable, disarmed env this RUNS the
+    # real mutation-RED (real install-file delta >0, guard RED). It NEVER hangs (no crontab-TCC write).
+    _require_launchagents_writable_or_skip()
+    label = activate.RUNNER_LABEL
+    if activate._installed_plist_path(label).exists():
+        pytest.skip(
+            "the operator has the DEFAULT-label runner armed; the mutation-RED needs a disarmed "
+            "default-label baseline and must not disturb a real armed runner (OS-state skip)"
+        )
+    saved_probe = activate._launchd_available
+    activate._launchd_available = lambda: True
+    try:
+        before = activate.active_entry_count(label)
+        assert before == 0, "the DEFAULT-label runner was armed at mutation-RED entry (baseline not disarmed)"
+
+        # baseline: the guard is GREEN over the REAL tracked init_instance.py (the isolation-safe grep arm).
+        assert activate._scan_provisioning_for_activation(_PROVISIONING_SURFACES) == [], (
             "the guard was not green over the real provisioning surface at baseline"
         )
 
-        # a SCRATCH provision path that (wrongly) arms the runner, in BOTH call-forms.
+        # a SCRATCH provision path that (wrongly) arms the runner on the DEFAULT label, in BOTH call-forms.
         scratch = tmp_path / "provision_mutated.py"
-        scratch.write_text(textwrap.dedent(f"""\
+        scratch.write_text(textwrap.dedent("""\
             \"\"\"SCRATCH provisioning path that WRONGLY arms the runner (AC-8 mutation injection).\"\"\"
             import scripts.runner.schedule.activate as activate
             from scripts.runner.schedule.activate import enable
 
             def run():
-                activate.enable({label!r})   # dotted activate.enable(...) form
-                enable({label!r})            # bare `from ...import enable; enable()` form
+                activate.enable()   # dotted activate.enable(...) form, DEFAULT RUNNER_LABEL
+                enable()            # bare `from ...import enable; enable()` form, DEFAULT label
         """), encoding="utf-8")
 
         # (a) grep arm matches BOTH forms.
@@ -122,9 +155,11 @@ def test_mutation_red_guard_catches_injected_activation(tmp_path):
         spec.loader.exec_module(mod)
         mod.run()
 
-        # the behavioral counter reads >=1 FROM the real install file (the scratch-HOME tautology killer).
-        assert activate.active_entry_count(label) >= 1, (
-            "the injected enable() did not register a REAL scheduler entry (counter not reading real state)"
+        # the behavioral counter catches the arming via a >0 DELTA on the DEFAULT label, read FROM the
+        # real install file (the scratch-HOME tautology killer) — the SAME label the behavioral arm polls.
+        after = activate.active_entry_count(label)
+        assert after > before, (
+            "the injected enable() did not raise the DEFAULT-label real-state count (delta not caught)"
         )
         assert _installed_for(label), "the injected entry is not in the REAL ~/Library/LaunchAgents (fixture-HOME read?)"
 
@@ -132,6 +167,21 @@ def test_mutation_red_guard_catches_injected_activation(tmp_path):
         assert not _provisioning_is_clean([scratch], label), (
             "the guard stayed GREEN under an injected activate.enable() — it is tautological (QA-F2)"
         )
+    finally:
+        # bulletproof teardown: disable() the DEFAULT label, then unlink both artifacts (each step
+        # independent so a failing disable() never skips the RELIABLE filesystem unlink), then restore
+        # the launchd probe. A leaked DEFAULT-label armed agent is worse than a random-label one.
+        try:
+            activate.disable(label)
+        except Exception:
+            pass
+        for artifact in (activate._installed_plist_path(label), activate._rendered_plist_path(label)):
+            try:
+                if artifact.exists():
+                    artifact.unlink()
+            except OSError:
+                pass
+        activate._launchd_available = saved_probe
 
-    # after the unconditional teardown, NO real armed agent for the injected label survives.
+    # after teardown, NO real armed agent for the DEFAULT label survives.
     assert not _installed_for(label), "a REAL armed launchd agent survived teardown (implicit activation)"
