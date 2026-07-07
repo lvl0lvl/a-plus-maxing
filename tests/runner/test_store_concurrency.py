@@ -141,11 +141,18 @@ def test_accept_stale_snapshot_no_torn_read(tmp_path):
     observed_counts = []
     torn_lines = []
     done = threading.Event()
+    writer_error = []
 
     def writer():
-        for n in range(initial, initial + total_appends):
-            store.append(item, _reading(n), root=root)
-        done.set()
+        # `done` is set in a `finally` so the reader loop below can NEVER hang on a writer crash; any
+        # writer exception is captured and re-raised loudly after the join (never a vacuous pass).
+        try:
+            for n in range(initial, initial + total_appends):
+                store.append(item, _reading(n), root=root)
+        except BaseException as exc:  # noqa: BLE001 — capture so the reader terminates + the failure surfaces
+            writer_error.append(exc)
+        finally:
+            done.set()
 
     t = threading.Thread(target=writer)
     t.start()
@@ -164,7 +171,10 @@ def test_accept_stale_snapshot_no_torn_read(tmp_path):
                     json.loads(line)
                 except json.JSONDecodeError:
                     torn_lines.append(line)
-    t.join()
+    t.join(timeout=30)
+    assert not t.is_alive(), "the concurrent writer thread did not finish within the timeout (deadlock?)"
+    if writer_error:
+        raise AssertionError(f"the concurrent writer raised: {writer_error[0]!r}") from writer_error[0]
     # one last read after the writer finished, to pin the final count
     observed_counts.append(sum(1 for r in store.read_all(root) if r["item"] == item))
     final = initial + total_appends
