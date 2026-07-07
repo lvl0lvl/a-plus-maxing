@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ADR-0039-T3 launchd agent template for the weekly cadence runner.
+
+  Operator-agnostic (ADR-0005-safe to track): the interpreter, the repo root, and the runner label
+  are the {{PYTHON}} / {{REPO_ROOT}} / {{LABEL}} placeholders, substituted only at enable() runtime
+  into a gitignored *.rendered.plist. Carries ZERO operator-specific path and ZERO OAuth token — the
+  runner process keychain-reads the OAuth token at runtime (ADR-0039-T2), never a launchd
+  EnvironmentVariables value (SEC-02). ProgramArguments invoke T1's `python -m scripts.runner.cadence_runner`
+  entry. RunAtLoad is false so loading the agent arms the weekly schedule WITHOUT firing a tick.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{{LABEL}}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{PYTHON}}</string>
+        <string>-m</string>
+        <string>scripts.runner.cadence_runner</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>{{REPO_ROOT}}</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

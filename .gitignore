@@ -28,6 +28,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Runner: rendered launchd instance (operator-specific; templates are tracked, ADR-0039-T3)
+scripts/runner/schedule/*.rendered.plist
+
 # Beads sync artifacts
 .beads/sync/
 coordination/
