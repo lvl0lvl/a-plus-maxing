@@ -634,6 +634,73 @@ def test_include_dob_false_drops_only_the_dob_class():
     assert pii_scan.scan_text("born 1986-03-14", token_config=NO_CONFIG, include_dob=True) >= 1
 
 
+@pytest.mark.parametrize("value, label", [
+    ("call me at 4155550199", "10-digit contiguous phone"),
+    ("phone 14155550199 now", "11-digit with country code"),
+    ("mrn 0084721399 on file", "10-digit MRN"),
+    ("ssn 123456789", "9-digit no-separator SSN"),
+    ("account 123456789012", "12-digit account"),
+])
+def test_scan_operator_value_catches_bare_digit_run(value, label):
+    """6hts (operator-signed-off): a bare CONTIGUOUS >=9-digit run (phone/MRN/no-separator
+    SSN/account) that the separator-anchored phone/SSN patterns miss is caught at the
+    free-text operator-value boundary. Reds without the digitrun-long class / include_digit_run.
+    """
+    assert pii_scan.scan_operator_value(value, token_config=NO_CONFIG, full=True) >= 1, label
+
+
+@pytest.mark.parametrize("value", [
+    "target 100000 steps",            # 6-digit metric
+    "1234567 lifetime steps",         # 7-digit metric (the ceiling of a realistic metric)
+    "walked 5 km in 65000 steps",     # 5-digit
+    "40/30/30 macros",                # separated, not contiguous
+    "BP 120 over 80",
+    "3 sets x 12 reps at rpe 8",
+])
+def test_digit_run_floor_flood_safe(value):
+    """6hts: the >=9-digit floor does NOT trip on legit health metrics (<=7 digits).
+
+    Verified flood-safe threshold. The leading liveness assert proves the digit-run class
+    is ACTIVE, so a regression that disabled it OR lowered the floor into metric range reds
+    here too."""
+    assert pii_scan.scan_operator_value("call 4155550199", token_config=NO_CONFIG, full=True) >= 1  # class live
+    assert pii_scan.scan_operator_value(value, token_config=NO_CONFIG, full=True) == 0
+
+
+def test_scan_public_content_excludes_dob_and_digit_run_keeps_base():
+    """contracts-2: scan_public_content applies ONLY the base contact/identifier classes —
+    a research/schedule DATE or numeric citation is NOT flagged (the contracts-1 regression
+    class), but a real email/phone/postal/SSN leaking into a public page STILL is."""
+    # DOB + digit-run must NOT trip on public/derived content
+    assert pii_scan.scan_public_content(
+        "retest by 2026-09-01, born 3/14/86, ref 4155550199 in the study",
+        token_config=NO_CONFIG, full=True) == 0
+    # base classes still fire (a real leak onto a public page)
+    assert pii_scan.scan_public_content(
+        "contact op.user@protonmail.com", token_config=NO_CONFIG, full=True) >= 1
+
+
+def test_digit_run_is_opt_in_off_for_frozen_default():
+    """6hts / EXTEND-NOT-REBUILD: the bare-digit-run class is OPT-IN — the low-level
+    scan_text_full default (what the byte-frozen plan_step/deid_in callers use) does NOT
+    apply it, so a long number in a derived plan does not fail-close the frozen gate
+    (the contracts-1 regression class, avoided by construction)."""
+    v = "aim for 1000000000 lifetime steps by 2026"
+    assert pii_scan.scan_text_full(v, token_config=NO_CONFIG) == 0                       # frozen default: OFF
+    assert pii_scan.scan_operator_value(v, token_config=NO_CONFIG, full=True) >= 1       # operator-value: ON
+
+
+def test_email_pattern_is_length_bounded_no_redos():
+    """SEC-DEID-05: the email local-part/domain are length-bounded so the unanchored `+`
+    cannot backtrack O(n^2) on a long no-@ blob in the uncapped scan_text_full. Structural
+    guard (a timing assert would flake): the RFC-64 local-part bound must be present, and
+    real emails still match."""
+    email_src = pii_scan._VALUE_PII_PATTERNS["email"][0]
+    assert "{1,64}" in email_src, "the email local-part length bound (ReDoS guard) was removed"
+    for e in ("op.user@protonmail.com", "A@B.CO", "x_y+z@mail.example.org"):
+        assert pii_scan.scan_text_full(e, token_config=NO_CONFIG) >= 1, e
+
+
 @pytest.mark.parametrize("value", [
     "train at 5 Star Gym Way",             # Title-case gym name, not a street (BUG-1)
     "30 min Dr Patel followup",            # 'Dr' as Doctor honorific, not Drive (BUG-1)

@@ -154,7 +154,10 @@ _US_STATE = (
     r"mt|ne|nv|nh|nj|nm|ny|nc|nd|oh|ok|or|pa|ri|sc|sd|tn|tx|ut|vt|va|wa|wv|wi|wy|dc"
 )
 _VALUE_PII_PATTERNS = {
-    "email": (r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", re.IGNORECASE),
+    # Local-part bounded to RFC-5321's 64 + domain to 255 so the unanchored `+`
+    # cannot backtrack O(n^2) on a long no-@ blob in the uncapped scan_text_full
+    # (SEC-DEID-05); real emails are well within these bounds.
+    "email": (r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,}", re.IGNORECASE),
     "phone-e164": (r"(?<!\d)\+\d{8,15}(?!\d)", 0),
     "phone-separated": (
         r"(?<!\d)(?:\+?\d{1,3}[\s.\-])?\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}(?!\d)",
@@ -212,12 +215,13 @@ _VALUE_PII_PATTERNS = {
     # boundary). Bare years and day/month-only fragments are deliberately out (too
     # low-signal — they flood on legit health numbers).
     #
-    # LOAD-BEARING KEY CONVENTION (see the _VALUE_COMPILED/_DOB_COMPILED split below):
-    # every date detector's key MUST start with "dob-" — that prefix is what routes it
-    # into the include_dob-gated (OPT-IN) set. A new date detector added WITHOUT the
-    # prefix lands in the ALWAYS-ON base set, so it would run even for the frozen-engine
-    # and public-content scans that keep the DOB class OFF — fail-closing a legit
-    # schedule/citation date on a plan or page (the contracts-1 regression, inverted).
+    # LOAD-BEARING KEY CONVENTION (see the _VALUE_COMPILED/_DOB_COMPILED/_DIGITRUN_COMPILED
+    # split below): every OPT-IN detector's key MUST start with its group prefix — "dob-"
+    # for a date detector (include_dob-gated), "digitrun-" for a bare-digit detector
+    # (include_digit_run-gated). A new opt-in detector added WITHOUT its prefix lands in
+    # the ALWAYS-ON base set, so it would run even for the frozen-engine and public-content
+    # scans that keep the aggressive classes OFF — fail-closing a legit schedule/citation
+    # date or numeric reference on a plan or page (the contracts-1 regression, inverted).
     "dob-iso": (
         # (?!T\d{2}:) excludes ONLY the date-part of a T-separated ISO store timestamp
         # ("2026-06-01T08:00:00+00:00") — a store-reading timepoint is not a DOB. The
@@ -274,48 +278,69 @@ _VALUE_PII_PATTERNS = {
         re.IGNORECASE,
     ),
     # US SSN (bead 6hts): the dashed 3-2-4 token is unambiguous PII with no flood
-    # cost — no legit health metric takes that shape. NOTE the deliberate boundary:
-    # bare CONTIGUOUS digit runs (a phone/MRN typed as one number, "4155550199")
-    # stay OUT — a bare-digit-run detector floods on legit numeric metrics (the same
-    # rationale as the phone digit-floor), so opting into it is a precision/recall
-    # tradeoff needing an explicit threshold decision (bead 6hts). This module adds
-    # only the no-flood high-signal shape.
+    # cost — no legit health metric takes that shape.
     "ssn-dashed": (
         r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)",
         0,
     ),
+    # Bare CONTIGUOUS digit run of >=9 digits (bead 6hts, OPERATOR-SIGNED-OFF): a
+    # phone / MRN / no-separator-SSN / account number typed as ONE number ("4155550199",
+    # "123456789") that the separator-anchored phone/SSN patterns miss. The >=9 floor IS
+    # the precision/recall threshold decision: legit health metrics are <=7 digits (even a
+    # lifetime step count), so >=9 catches the PII shapes with 0 flood (verified: 0 hits on
+    # steps/calories/BP/reps up to 7 digits, incl. "1234567 lifetime steps"). OPT-IN (the
+    # `digitrun-` prefix routes it into the gated group), so it applies ONLY at the free-text
+    # operator-value boundaries (via scan_operator_value / include_digit_run=True) and NEVER
+    # at the frozen-engine or public-content scans. A rare legit >=9-digit run (a study /
+    # product ID) is an accepted fail-closed residual — the operator rephrases.
+    "digitrun-long": (
+        r"(?<!\d)\d{9,}(?!\d)",
+        0,
+    ),
 }
 # The value patterns split into the base contact/identifier set (email, phone,
-# postal, SSN — applied by EVERY value-scan) and the DOB/full-date class (the `dob-*`
-# keys), which is OPT-IN (`include_dob=True`; the default is OFF). The DOB class is a
-# NEW capability (bead yduw) that applies only at the FREE-TEXT OPERATOR-VALUE
-# boundaries where a human can type a birthday into a pass-through field — NOT a
-# public-content, derived-artifact, or structured-token concern (a genetics/wiki page
-# carries research/provenance DATES; a model-authored plan carries SCHEDULE dates; a
-# de-identified class token carries neither — none is operator PII). Defaulting the DOB
-# class OFF keeps the byte-FROZEN engine's value-scans (plan_step's crown-jewel GATE
-# scan of the DERIVED plan, deid_in's de-id boundary) behaviourally UNCHANGED — an
-# EXTEND-NOT-REBUILD requirement (ADR-0032): the new class must not silently alter a
-# frozen caller (a derived plan carrying a schedule date must still surface; a DOB
-# defaulted-on there would have failed the GATE CLOSED -> no plan, contracts-1). The
-# include_dob=True OPT-IN sites — the ONLY DOB-scanning callers — are:
-#   - scripts/serve/capture.py         (free-text form-field values)
-#   - scripts/plan/router.py summarize (the 8j6 pass-through-field gate — THE yduw vector)
-#   - scripts/serve/care_review.py     (med free-text values; + its local _DATE_LIKE)
-# The frozen engine (plan_step, deid_in), the public-content scans (research_query,
-# wiki-ingest-lint), and the structured-token scans (router rx-/trait-class) stay OFF.
-# No mechanical guard enforces this split yet (contracts-2 tracks named
-# scan_public_content / scan_operator_value entry points); this enumeration is the
-# audit list until then.
+# postal, SSN — applied by EVERY value-scan) and two OPT-IN "aggressive" classes,
+# both OFF by default: the DOB/full-date class (`dob-*` keys, bead yduw) and the
+# bare-digit-run class (`digitrun-*` keys, bead 6hts). These apply only at the
+# FREE-TEXT OPERATOR-VALUE boundaries where a human can type a birthday or a phone
+# number into a pass-through field — NOT a public-content, derived-artifact, or
+# structured-token concern (a genetics/wiki page carries research/provenance DATES +
+# numeric citations; a model-authored plan carries SCHEDULE dates + numeric references;
+# a de-identified class token carries neither — none is operator PII). Defaulting them
+# OFF keeps the byte-FROZEN engine's value-scans (plan_step's crown-jewel GATE scan of
+# the DERIVED plan, deid_in's de-id boundary) behaviourally UNCHANGED — an
+# EXTEND-NOT-REBUILD requirement (ADR-0032): a new class must not silently alter a
+# frozen caller (a derived plan carrying a schedule date OR a long number must still
+# surface; an aggressive class defaulted-on there would have failed the GATE CLOSED ->
+# no plan, the contracts-1 regression).
+#
+# Use the NAMED entry points (contracts-2), NOT the raw include_* booleans, so a caller
+# cannot silently land on the wrong side of the split:
+#   - scan_operator_value(...) — the FREE-TEXT operator-value boundaries (both aggressive
+#     classes ON): scripts/serve/capture.py, scripts/plan/router.py summarize (the 8j6
+#     pass-through-field gate — THE yduw/6hts vector), scripts/serve/care_review.py.
+#   - scan_public_content(...) — PUBLIC / DERIVED content (base classes only): the
+#     genetics research_query SEC3 landed-page guard, scripts/wiki-ingest-lint.sh.
+# The byte-frozen engine (plan_step, deid_in) + the structured-token scans (router
+# rx-/trait-class) call the low-level scan_text/scan_text_full with the defaults (both
+# aggressive classes OFF) and stay UNCHANGED.
 _VALUE_COMPILED = [
     re.compile(pat, flags)
     for name, (pat, flags) in _VALUE_PII_PATTERNS.items()
-    if not name.startswith("dob-")
+    if not (name.startswith("dob-") or name.startswith("digitrun-"))
 ]
 _DOB_COMPILED = [
     re.compile(pat, flags)
     for name, (pat, flags) in _VALUE_PII_PATTERNS.items()
     if name.startswith("dob-")
+]
+# The bare-digit-run class (bead 6hts) — gated like the DOB class, so it applies only
+# at the free-text operator-value boundaries (scan_operator_value / include_digit_run)
+# and never at the frozen-engine or public-content scans.
+_DIGITRUN_COMPILED = [
+    re.compile(pat, flags)
+    for name, (pat, flags) in _VALUE_PII_PATTERNS.items()
+    if name.startswith("digitrun-")
 ]
 
 # NFKC does not fold typographic dashes (en/em-dash, Unicode hyphen, minus) to the
@@ -474,7 +499,7 @@ def _resolve_token_config(token_config, identity_config, caller):
     return token_config
 
 
-def scan_text(text, token_config=_SENTINEL, identity_config=None, include_dob=False):
+def scan_text(text, token_config=_SENTINEL, identity_config=None, include_dob=False, include_digit_run=False):
     """Count operator-PII matches in a single in-memory string.
 
     The value-level counterpart to `scan` (which reads file CONTENTS for the
@@ -508,21 +533,28 @@ def scan_text(text, token_config=_SENTINEL, identity_config=None, include_dob=Fa
             Mutually exclusive with `token_config` — passing both raises
             TypeError.
         include_dob (bool, optional): Whether to apply the DOB/full-date class (the
-            `dob-*` patterns). Default False — the DOB class is OPT-IN. The free-text
-            operator-value boundaries (capture, summarize's 8j6 gate, care_review) pass
-            True; the frozen engine + public-content scans keep the default off (see the
-            `_VALUE_PII_PATTERNS` note for the opt-in sites and the freeze rationale).
+            `dob-*` patterns). Default False — OPT-IN. Prefer the named entry points
+            `scan_operator_value` / `scan_public_content` over this raw boolean.
+        include_digit_run (bool, optional): Whether to apply the bare-digit-run class
+            (`digitrun-*`, a >=9-digit contiguous run — bead 6hts). Default False —
+            OPT-IN, on only at the free-text operator-value boundaries. See the
+            `_VALUE_PII_PATTERNS` note for the opt-in sites and the freeze rationale.
 
     Returns:
         (int) Total operator-PII (value-class + identity) matches in `text`.
     """
     token_config = _resolve_token_config(token_config, identity_config, "scan_text")
     normalized = unicodedata.normalize("NFKC", text).translate(_DASH_TO_HYPHEN)[:_MAX_SCAN_TEXT_LEN]
-    patterns = _VALUE_COMPILED + (_DOB_COMPILED if include_dob else []) + _load_token_patterns(token_config)
+    patterns = (
+        _VALUE_COMPILED
+        + (_DOB_COMPILED if include_dob else [])
+        + (_DIGITRUN_COMPILED if include_digit_run else [])
+        + _load_token_patterns(token_config)
+    )
     return sum(len(pattern.findall(normalized)) for pattern in patterns)
 
 
-def scan_text_full(text, token_config=_SENTINEL, identity_config=None, include_dob=False):
+def scan_text_full(text, token_config=_SENTINEL, identity_config=None, include_dob=False, include_digit_run=False):
     """Count operator-PII matches in a string's FULL length (no `_MAX_SCAN_TEXT_LEN` cap).
 
     Identical to `scan_text` except it does NOT truncate at `_MAX_SCAN_TEXT_LEN`, so
@@ -545,19 +577,75 @@ def scan_text_full(text, token_config=_SENTINEL, identity_config=None, include_d
         identity_config (str | Path, optional): Deprecated alias for `token_config`;
             emits DeprecationWarning. Mutually exclusive with `token_config`.
         include_dob (bool, optional): Whether to apply the DOB/full-date class (the
-            `dob-*` patterns). Default False — the DOB class is OPT-IN. The free-text
-            operator-value boundaries (capture, care_review) pass True; the frozen
-            engine (plan_step GATE, deid_in) + public-content scans (research_query,
-            wiki-ingest-lint) keep the default off (EXTEND-NOT-REBUILD; see the
-            `_VALUE_PII_PATTERNS` note).
+            `dob-*` patterns). Default False — OPT-IN. Prefer the named entry points
+            `scan_operator_value` / `scan_public_content` over this raw boolean.
+        include_digit_run (bool, optional): Whether to apply the bare-digit-run class
+            (`digitrun-*`, a >=9-digit contiguous run — bead 6hts). Default False —
+            OPT-IN, on only at the free-text operator-value boundaries. The frozen
+            engine (plan_step GATE, deid_in) keeps both defaults off (EXTEND-NOT-REBUILD).
 
     Returns:
         (int) Total operator-PII (value-class + identity) matches in `text`.
     """
     token_config = _resolve_token_config(token_config, identity_config, "scan_text_full")
     normalized = unicodedata.normalize("NFKC", text).translate(_DASH_TO_HYPHEN)
-    patterns = _VALUE_COMPILED + (_DOB_COMPILED if include_dob else []) + _load_token_patterns(token_config)
+    patterns = (
+        _VALUE_COMPILED
+        + (_DOB_COMPILED if include_dob else [])
+        + (_DIGITRUN_COMPILED if include_digit_run else [])
+        + _load_token_patterns(token_config)
+    )
     return sum(len(pattern.findall(normalized)) for pattern in patterns)
+
+
+# Named entry points (contracts-2): express the operator-value / public-content
+# boundary in the NAME rather than a per-caller boolean, so a caller cannot silently
+# land on the wrong side of the split (the class of defect contracts-1 was — a derived
+# scan that failed to opt out). `scan_operator_value` turns the aggressive opt-in
+# classes ON (a free-text field a human types into — DOB + bare-digit run); the frozen
+# engine and public-content scans call the low-level scan_text/scan_text_full with the
+# defaults (both off) and stay behaviourally unchanged (EXTEND-NOT-REBUILD).
+def scan_operator_value(text, token_config=_SENTINEL, *, full=False):
+    """Count PII in a FREE-TEXT operator-VALUE (a field a human types into).
+
+    Applies the base contact/identifier classes PLUS the opt-in DOB/full-date class
+    (bead yduw) and the bare-digit-run class (bead 6hts) — the aggressive set for a
+    boundary where a person could type a birthday or a phone number. `full=True`
+    selects the non-truncating `scan_text_full` (bounded form-field values); `full=False`
+    the capped `scan_text` (the router summary boundary).
+
+    Args:
+        text (str): The operator-value to scan.
+        token_config (str | Path, optional): The gitignored operator-identity token
+            file; absent -> identity detection is empty.
+        full (bool, optional): Scan the FULL length (no `_MAX_SCAN_TEXT_LEN` cap).
+
+    Returns:
+        (int) Total operator-PII matches in `text`.
+    """
+    fn = scan_text_full if full else scan_text
+    return fn(text, token_config=token_config, include_dob=True, include_digit_run=True)
+
+
+def scan_public_content(text, token_config=_SENTINEL, *, full=False):
+    """Count PII in PUBLIC / DERIVED content (a library page, a model-authored plan).
+
+    Applies ONLY the base contact/identifier classes — the DOB and bare-digit-run
+    classes stay OFF, because a genetics/wiki page carries research/provenance DATES and
+    a derived plan carries SCHEDULE dates + numeric references that are NOT operator PII
+    (applying them fail-closes a legit page/plan — the contracts-1 regression class).
+
+    Args:
+        text (str): The public/derived content to scan.
+        token_config (str | Path, optional): The gitignored operator-identity token
+            file; absent -> identity detection is empty.
+        full (bool, optional): Scan the FULL length (no `_MAX_SCAN_TEXT_LEN` cap).
+
+    Returns:
+        (int) Total operator-PII matches in `text`.
+    """
+    fn = scan_text_full if full else scan_text
+    return fn(text, token_config=token_config, include_dob=False, include_digit_run=False)
 
 
 # tests/ fixtures embed synthetic reading-shaped literals BY CONSTRUCTION (the

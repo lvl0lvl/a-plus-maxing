@@ -248,13 +248,13 @@ def _value_has_pii(value, identity_config):
     Returns:
         (bool) True when the full value scans positive for operator PII.
     """
-    # include_dob=True: a capture free-text field is the yduw DOB vector (a birthday
-    # typed into a pass-through field). The DOB class is opt-in (default off) — the
-    # free-text operator-value boundaries (capture, summarize, care_review) opt in; the
-    # frozen engine's derived-content scans (plan_step GATE, deid_in) keep it off.
+    # scan_operator_value: a capture free-text field is a free-text OPERATOR-VALUE — the
+    # yduw DOB vector (a birthday) + the 6hts bare-digit-run vector (a phone typed as one
+    # number). The named entry point turns the aggressive opt-in classes ON; the frozen
+    # engine's derived-content scans (plan_step GATE, deid_in) use the low-level default (off).
     if identity_config is None:
-        return pii_scan.scan_text_full(value, include_dob=True) > 0
-    return pii_scan.scan_text_full(value, token_config=identity_config, include_dob=True) > 0
+        return pii_scan.scan_operator_value(value, full=True) > 0
+    return pii_scan.scan_operator_value(value, token_config=identity_config, full=True) > 0
 
 
 def _bounded_value_ok(name, value):

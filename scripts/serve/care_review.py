@@ -258,12 +258,13 @@ def _med_value_has_identity(value, identity_config):
     detector leaves cue-less). True on any hit — the caller defers the curation rather than
     egress a leaky de-identified request.
     """
-    # include_dob=True: a med free-text value is an operator-value boundary (the yduw DOB
-    # vector); the DOB class is opt-in (default off, so it stays off the frozen engine scans).
+    # scan_operator_value: a med free-text value is a free-text operator-value boundary
+    # (the yduw DOB + 6hts bare-digit-run vectors); the aggressive classes are opt-in (off
+    # at the frozen-engine scans).
     if identity_config is not None:
-        hits = pii_scan.scan_text_full(value, token_config=identity_config, include_dob=True)
+        hits = pii_scan.scan_operator_value(value, token_config=identity_config, full=True)
     else:
-        hits = pii_scan.scan_text_full(value, include_dob=True)
+        hits = pii_scan.scan_operator_value(value, full=True)
     return hits > 0 or bool(_DATE_LIKE.search(value))
 
 
