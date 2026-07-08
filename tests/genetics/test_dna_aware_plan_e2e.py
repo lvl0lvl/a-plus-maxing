@@ -498,8 +498,10 @@ def test_probe_crown_jewel_egress_de_associated_and_library_operator_free(tmp_pa
         lib, gene="CYP1A2", rsid="rs762551",
         findings=[("(A;A)", "fast-caffeine-metabolism", "clears caffeine quickly [1]")],
     )
-    assert pii_scan.scan_text(page.read_text(encoding="utf-8"), token_config=cfg,
-                              include_dob=False) == 0
+    # scan_public_content mirrors the production landed-page guard (research_query SEC3) —
+    # base classes only; a research/provenance date or numeric citation is not flagged.
+    assert pii_scan.scan_public_content(page.read_text(encoding="utf-8"),
+                                        token_config=cfg, full=True) == 0
 
 
 def test_probe_raw_genotype_never_reaches_no_train_planner(tmp_path):

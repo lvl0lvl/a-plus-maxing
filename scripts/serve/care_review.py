@@ -122,7 +122,7 @@ def confirm_curation(class_tokens, *, store_root=None, identity_config=None):
     Crown-jewel value gate (symmetric with the auto-persist `_curate_meds` path): `rx-interaction-classes`
     is a model-bound `SUMMARY_FIELD_SET` token whose only downstream backstop is `summarize`'s 8j6
     `pii_scan.scan_text`, which carries NO date detector. So this confirm write-back runs the SAME
-    `_med_value_has_identity` gate (`pii_scan.scan_text_full` + the `_DATE_LIKE` DOB backstop) that
+    `_med_value_has_identity` gate (`pii_scan.scan_operator_value` + the `_DATE_LIKE` DOB backstop) that
     `_curate_meds` runs before any value crosses: if ANY submitted token carries operator identity/contact
     or a DOB-shaped date, the WHOLE batch defers (persists nothing) — fail-closed, no leaky prefix. This
     matters because `confirm_curation` is network-reachable (POST `/confirm-curation`): the legitimate UI
@@ -180,7 +180,7 @@ def _curate_meds(client, scaffold_root, store_root, identity_config):
     Returns None when no medication is recorded (no curation request is made). Otherwise it FIRST
     runs the leg-2 value-level identity gate — the analogue of leg-1's `router.summarize` 8j6 gate
     (Security HIGH-1 / QA MUST-FIX): `capture` routes the raw med free-text record-only UNSCANNED,
-    so a med value carrying operator identity/contact (`pii_scan.scan_text_full`) OR a date-looking
+    so a med value carrying operator identity/contact (`pii_scan.scan_operator_value`) OR a date-looking
     token (a DOB `pii_scan` cannot detect) must NOT egress. Mirroring leg-1's FAIL-CLOSED posture
     (`summarize` RAISES; it never partial-strips — a partial strip is the leaky de-id the crown
     jewel refuses), the curation DEFERS with 0 `converse` call rather than send a leaky request.
@@ -251,12 +251,12 @@ def _scaffold_meds(scaffold_root):
 def _med_value_has_identity(value, identity_config):
     """Whether a raw med value carries operator identity/contact (pii_scan) or a DOB-like date.
 
-    The leg-2 fail-closed value gate. Runs the full-length `pii_scan.scan_text_full` (operator
-    identity + the tractable value-classes — any-domain email, phone, US/CA postal, and the
-    opt-in DOB/full-date class, include_dob=True) over the med free-text, PLUS the local
-    `_DATE_LIKE` backstop (which also catches the 2-digit-year dates pii_scan's flood-safe
-    detector leaves cue-less). True on any hit — the caller defers the curation rather than
-    egress a leaky de-identified request.
+    The leg-2 fail-closed value gate. Runs the full-length `pii_scan.scan_operator_value`
+    (operator identity + the tractable value-classes — any-domain email, phone, US/CA postal,
+    dashed SSN, the opt-in DOB/full-date class [yduw], and the opt-in bare-digit-run class
+    [6hts]) over the med free-text, PLUS the local `_DATE_LIKE` backstop (which also catches
+    the 2-digit-year dates pii_scan's flood-safe detector leaves cue-less). True on any hit —
+    the caller defers the curation rather than egress a leaky de-identified request.
     """
     # scan_operator_value: a med free-text value is a free-text operator-value boundary
     # (the yduw DOB + 6hts bare-digit-run vectors); the aggressive classes are opt-in (off

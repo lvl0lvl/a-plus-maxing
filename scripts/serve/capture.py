@@ -236,14 +236,17 @@ def _value_has_pii(value, identity_config):
     overlap can provably contain every match in some window: a long postal straddling
     a window step boundary is seen whole by neither window and leaks past the gate.
     Instead this scans the value in a SINGLE non-truncating pass via
-    `pii_scan.scan_text_full`, which has no window boundaries to straddle. Scoped to the
-    capture path — it does NOT change `scan_text`'s own default cap (which has other
-    callers); the capture-path values are bounded operator form fields.
+    `pii_scan.scan_operator_value(full=True)` (which dispatches to the non-truncating
+    `scan_text_full`), which has no window boundaries to straddle. `scan_operator_value`
+    also turns the opt-in DOB (yduw) + bare-digit-run (6hts) classes ON — a capture field
+    is a free-text operator value. Scoped to the capture path — it does NOT change
+    `scan_text`'s own default cap (which has other callers); the capture-path values are
+    bounded operator form fields.
 
     Args:
         value (str): The free-text field value to scan in full.
         identity_config (str | Path | None): The operator-identity token config passed
-            to `scan_text_full`; None falls through to its default.
+            to `scan_operator_value`; None falls through to its default.
 
     Returns:
         (bool) True when the full value scans positive for operator PII.

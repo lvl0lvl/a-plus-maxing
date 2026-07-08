@@ -651,33 +651,47 @@ def test_scan_operator_value_catches_bare_digit_run(value, label):
 
 @pytest.mark.parametrize("value", [
     "target 100000 steps",            # 6-digit metric
-    "1234567 lifetime steps",         # 7-digit metric (the ceiling of a realistic metric)
+    "1234567 target steps",           # 7-digit per-entry metric
+    "cumulative 98550000 steps",      # 8-digit lifetime step count — the floor's real ceiling
     "walked 5 km in 65000 steps",     # 5-digit
     "40/30/30 macros",                # separated, not contiguous
     "BP 120 over 80",
     "3 sets x 12 reps at rpe 8",
 ])
 def test_digit_run_floor_flood_safe(value):
-    """6hts: the >=9-digit floor does NOT trip on legit health metrics (<=7 digits).
+    """6hts: the >=9-digit floor does NOT trip on legit health metrics (which run up to 8
+    digits — a lifetime step count reaches 8 digits within a few years, so 9 is the MINIMUM
+    safe floor).
 
-    Verified flood-safe threshold. The leading liveness assert proves the digit-run class
-    is ACTIVE, so a regression that disabled it OR lowered the floor into metric range reds
+    Verified flood-safe threshold. The 8-digit row pins the floor's real ceiling (an 8-digit
+    metric must NOT trip). The leading liveness assert proves the digit-run class is ACTIVE,
+    so a regression that disabled it OR lowered the floor into metric range (e.g. to 8) reds
     here too."""
     assert pii_scan.scan_operator_value("call 4155550199", token_config=NO_CONFIG, full=True) >= 1  # class live
     assert pii_scan.scan_operator_value(value, token_config=NO_CONFIG, full=True) == 0
 
 
-def test_scan_public_content_excludes_dob_and_digit_run_keeps_base():
-    """contracts-2: scan_public_content applies ONLY the base contact/identifier classes —
-    a research/schedule DATE or numeric citation is NOT flagged (the contracts-1 regression
-    class), but a real email/phone/postal/SSN leaking into a public page STILL is."""
-    # DOB + digit-run must NOT trip on public/derived content
+def test_scan_public_content_excludes_dob_and_digit_run():
+    """contracts-2: scan_public_content turns the aggressive classes OFF — a research/schedule
+    DATE or numeric citation is NOT flagged (the contracts-1 regression class)."""
     assert pii_scan.scan_public_content(
         "retest by 2026-09-01, born 3/14/86, ref 4155550199 in the study",
         token_config=NO_CONFIG, full=True) == 0
-    # base classes still fire (a real leak onto a public page)
-    assert pii_scan.scan_public_content(
-        "contact op.user@protonmail.com", token_config=NO_CONFIG, full=True) >= 1
+
+
+@pytest.mark.parametrize("value, label", [
+    ("contact op.user@protonmail.com", "email"),
+    ("ring +1 415 555 0199", "separated phone"),
+    ("mail 123 Main St Springfield IL 62704", "US postal ZIP"),
+    ("ssn 123-45-6789 on file", "dashed SSN"),
+])
+def test_scan_public_content_keeps_every_base_class(value, label):
+    """contracts-2 / TC-318-02: scan_public_content (the public-repo guard used by
+    research_query + wiki-ingest-lint) must keep EVERY base contact/identifier class firing —
+    a real email/phone/postal/SSN leaking onto a public page is still caught. Pins per-class
+    (not just email), so a regression that narrowed the wrapper to a subset of base classes
+    reds through the named public-content entry point (the contracts-1 wrong-side-of-split class)."""
+    assert pii_scan.scan_public_content(value, token_config=NO_CONFIG, full=True) >= 1, label
 
 
 def test_digit_run_is_opt_in_off_for_frozen_default():

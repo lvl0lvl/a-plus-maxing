@@ -286,13 +286,16 @@ _VALUE_PII_PATTERNS = {
     # Bare CONTIGUOUS digit run of >=9 digits (bead 6hts, OPERATOR-SIGNED-OFF): a
     # phone / MRN / no-separator-SSN / account number typed as ONE number ("4155550199",
     # "123456789") that the separator-anchored phone/SSN patterns miss. The >=9 floor IS
-    # the precision/recall threshold decision: legit health metrics are <=7 digits (even a
-    # lifetime step count), so >=9 catches the PII shapes with 0 flood (verified: 0 hits on
-    # steps/calories/BP/reps up to 7 digits, incl. "1234567 lifetime steps"). OPT-IN (the
-    # `digitrun-` prefix routes it into the gated group), so it applies ONLY at the free-text
-    # operator-value boundaries (via scan_operator_value / include_digit_run=True) and NEVER
-    # at the frozen-engine or public-content scans. A rare legit >=9-digit run (a study /
-    # product ID) is an accepted fail-closed residual — the operator rephrases.
+    # the precision/recall threshold decision: legit per-entry health metrics run up to 8
+    # digits (a lifetime step count at 10k/day passes 8 digits within a few years), so 9 is
+    # the MINIMUM safe floor — the lowest value that does not flood on an 8-digit metric
+    # while still catching SSN(9)/US-phone(10)/long-MRN (verified: 0 hits on steps/calories/
+    # BP/reps AND on 8-digit metrics up to 98,550,000). Do NOT lower it to 8 (would flood on
+    # an 8-digit lifetime step count). OPT-IN (the `digitrun-` prefix routes it into the
+    # gated group), so it applies ONLY at the free-text operator-value boundaries (via
+    # scan_operator_value / include_digit_run=True) and NEVER at the frozen-engine or
+    # public-content scans. A rare legit >=9-digit run (a multi-decade cumulative count or a
+    # study/product ID) is the accepted fail-closed residual — the operator rephrases.
     "digitrun-long": (
         r"(?<!\d)\d{9,}(?!\d)",
         0,
