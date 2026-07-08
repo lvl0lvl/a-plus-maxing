@@ -60,33 +60,40 @@ while [ "$#" -gt 0 ]; do
 done
 
 # F2 (PR #139 SEC-002): surface accidental production use of a test-hook env var.
-for _thv in CLOSE_AUDIT_SKIP_FLOOR CLOSE_AUDIT_ROSTER CLOSE_AUDIT_ROSTER_DIR CLOSE_AUDIT_FLOORS CLOSE_AUDIT_FLOOR_EXCLUDE CLOSE_AUDIT_FSCAN CLOSE_AUDIT_PFLOG; do
+for _thv in CLOSE_AUDIT_SKIP_FLOOR CLOSE_AUDIT_ROSTER CLOSE_AUDIT_ROSTER_DIR CLOSE_AUDIT_FLOORS CLOSE_AUDIT_FLOOR_EXCLUDE CLOSE_AUDIT_FSCAN CLOSE_AUDIT_PFLOG TOOLKIT_FLOOR_DIR TOOLKIT_FLOOR_DEFAULT_EXCLUDE RUN_ALL_TESTS_DIR; do
   if [ -n "${!_thv:-}" ]; then
     echo "close-audit: WARNING: test-hook env var ${_thv} is active (intended for tests/CI only — NOT a production close)" >&2
   fi
 done
 
 # --- FLOOR: prove the audits can still FAIL on bad input (F-007) -------------
-# No default exclusion (S65): the former tracked red — test_audit_research_provenance
-# (gate_attest verify-chain needed jsonschema) — was FIXED (bead d1kc: jsonschema
-# installed into .venv + the audit points at the .venv python), so the full floor now
-# runs green. The override remains for any FUTURE tracked pre-existing red, LOUDLY
-# (RUN_ALL_TESTS prints the EXCLUDED line + reason; a stale exclusion fails the run,
-# so it can never rot silently).
+# No default exclusion ON THE A-PLUS FLOOR (S65): the former tracked red —
+# test_audit_research_provenance (gate_attest verify-chain needed jsonschema) — was
+# FIXED (bead d1kc: jsonschema installed into .venv + the audit points at the .venv
+# python), so the a-plus floor runs green with no default exclusion. The
+# CLOSE_AUDIT_FLOOR_EXCLUDE override below remains for any FUTURE tracked pre-existing
+# red ON THE A-PLUS FLOOR, LOUDLY (RUN_ALL_TESTS prints the EXCLUDED line + reason; a
+# stale exclusion fails the run, so it can never rot silently). The TOOLKIT floor DOES
+# carry one default exclusion (test-roster-select.sh / ffit), seeded + stale-guarded
+# inside its wrapper scripts/tests/toolkit-floor.sh and dropped on the ffit upstream
+# re-pull — see the DEFAULT_FLOORS note below.
 export RUN_ALL_TESTS_EXCLUDE="${CLOSE_AUDIT_FLOOR_EXCLUDE:-}"
 export RUN_ALL_TESTS_EXCLUDE_REASON="${CLOSE_AUDIT_FLOOR_EXCLUDE_REASON:-no reason given}"
 
 # Floors are injectable (CLOSE_AUDIT_FLOORS, newline list) so the negative test
 # can drive a failing / missing floor without disabling the block (F7/TEST-001).
 # The toolkit floor runs through the a-plus wrapper toolkit-floor.sh (bead 23q5),
-# NOT the vendored run-all-tests.sh directly: the vendored runner ignores
-# RUN_ALL_TESTS_EXCLUDE, so CLOSE_AUDIT_FLOOR_EXCLUDE could not reach it. The
-# wrapper applies the SAME loud + stale-guarded exclusion the a-plus floor uses,
-# seeding the ONE tracked library-tree-scoped red (test-roster-select.sh, bead
-# ffit — roster-select.sh itself works in a-plus), so a bare close is NATIVELY
-# green while every OTHER toolkit test still REDs the floor (F-007 intact). Both
-# floors now honor CLOSE_AUDIT_FLOOR_EXCLUDE identically. When ffit lands upstream
-# + a-plus re-pulls, the wrapper's stale-guard forces the exclusion's removal.
+# NOT the vendored run-all-tests.sh directly: the vendored runner has no exclusion
+# of its own, so it could not skip the ONE tracked library-tree-scoped red
+# (test-roster-select.sh, bead ffit — roster-select.sh itself works in a-plus). The
+# wrapper carries its OWN seeded, loud, stale-guarded exclusion for that red, so a
+# bare close is NATIVELY green while every OTHER toolkit test still REDs the floor
+# (F-007 intact). The wrapper does NOT read CLOSE_AUDIT_FLOOR_EXCLUDE /
+# RUN_ALL_TESTS_EXCLUDE — that shared var stays the a-plus floor's escape hatch alone
+# (forwarding one value to two disjoint-namespace floors would cross-fire each
+# floor's stale-guard on the other's names; bead 23q5 review). A future tracked
+# toolkit red is added to the wrapper's DEFAULT_EXCLUDE. When ffit lands upstream +
+# a-plus re-pulls, the wrapper's stale-guard forces the exclusion's removal.
 DEFAULT_FLOORS="${SELF_DIR}/tests/toolkit-floor.sh
 ${SELF_DIR}/tests/run-all-tests.sh"
 FLOORS="${CLOSE_AUDIT_FLOORS:-$DEFAULT_FLOORS}"

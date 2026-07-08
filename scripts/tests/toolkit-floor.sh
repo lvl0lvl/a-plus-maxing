@@ -1,44 +1,47 @@
 #!/usr/bin/env bash
 # toolkit-floor.sh — run the vendored toolkit negative-test floor
-# (toolkit/tests/test-*.sh) with the a-plus exclusion discipline (bead
-# a-plus-maxing-23q5). The a-plus twin of toolkit/tests/run-all-tests.sh with
-# the same loud + stale-guarded exclusion the a-plus floor (run-all-tests.sh)
-# already carries — because the VENDORED runner has NO exclusion of its own
-# (it ignores RUN_ALL_TESTS_EXCLUDE), so close-audit's CLOSE_AUDIT_FLOOR_EXCLUDE
-# could not reach the toolkit floor. This wrapper closes that gap without
-# editing the vendored runner (never edit the vendored toolkit — it would fork
-# the pull line).
+# (toolkit/tests/test-*.sh) with a loud + stale-guarded exclusion of the ONE
+# tracked library-tree-scoped false-red, so close-audit passes NATIVELY without
+# the off-label CLOSE_AUDIT_FLOORS test hook (bead a-plus-maxing-23q5).
 #
-# WHY an exclusion is needed at all: the vendored toolkit ships a library-tree-
-# scoped test (test-roster-select.sh, bead a-plus-maxing-ffit) whose line-141
-# git-range smoke hardcodes a `../` depth valid ONLY for the library's own
-# `frameworks/rigor/toolkit/` nesting. a-plus vendors the toolkit at the repo
-# root, so that walk overshoots into a non-git parent and the test correctly
-# FATALs — while roster-select.sh ITSELF works in a-plus (verified: --files and
-# real-range classify correctly). It is a false-red on a path-depth assumption,
-# not a real audit failure. The durable ROOT fix is upstream (ffit: resolve the
-# repo root via `git rev-parse --show-toplevel`); once it lands and a-plus
-# re-pulls, roster-select passes and stale-guard (b) below FAILS this floor,
-# forcing the exclusion's removal — it cannot rot silently.
+# WHY an exclusion is needed: the vendored toolkit ships test-roster-select.sh
+# (bead a-plus-maxing-ffit) whose line-141 git-range smoke hardcodes a `../`
+# depth valid ONLY for the library's own frameworks/rigor/toolkit/ nesting.
+# a-plus vendors the toolkit at the repo root, so that walk overshoots into a
+# non-git parent and the test correctly FATALs — while roster-select.sh ITSELF
+# works in a-plus (verified: --files + real-range classify). It is a false-red on
+# a path-depth assumption, not a real audit failure. The durable ROOT fix is
+# upstream (ffit: resolve the repo root via `git rev-parse --show-toplevel`);
+# when it lands and a-plus re-pulls, roster-select passes, stale-guard (b) below
+# FAILS this floor, and the exclusion must be removed — it cannot rot silently.
+# The vendored runner (toolkit/tests/run-all-tests.sh) has no exclusion of its
+# own and is NEVER edited (that forks the pull line), so this a-plus twin adds it.
 #
-# F-007 IS PRESERVED: every OTHER toolkit negative test runs, and any real
-# failure REDs this floor. Only the ONE documented, bead-tracked false-red is
-# excluded, and only while it is genuinely red.
+# NAMESPACE / not the a-plus floor: this floor owns ONLY the toolkit `test-*.sh`
+# namespace. The a-plus floor (scripts/tests/run-all-tests.sh, `test_*.sh`) is
+# separate and keeps its own CLOSE_AUDIT_FLOOR_EXCLUDE / RUN_ALL_TESTS_EXCLUDE
+# escape hatch. This floor deliberately does NOT read that shared env var: a
+# single exclusion value forwarded to two disjoint-namespace floors cross-fires
+# each floor's stale-guard on the other's names (bead 23q5 review, finding F1).
+# A future tracked TOOLKIT red is excluded by adding its basename to
+# DEFAULT_EXCLUDE below — a reviewed code edit, stale-guarded — NOT via an env var.
 #
-# Exclusions (NEVER silent — F-009 "no silent caps"):
-#   DEFAULT_EXCLUDE (below)      the tracked ffit red, seeded so a bare close
-#                                needs no env. Remove it when ffit lands.
-#   RUN_ALL_TESTS_EXCLUDE        space-separated ADDITIONAL toolkit test
-#                                basenames (the SAME env close-audit forwards to
-#                                the a-plus floor — so CLOSE_AUDIT_FLOOR_EXCLUDE
-#                                now reaches BOTH floors identically)
-#   RUN_ALL_TESTS_EXCLUDE_REASON reason string printed for env exclusions
-# An exclusion is stale-guarded TWO ways: (a) an excluded name that no longer
-# exists fails the run; (b) an excluded test that now PASSES fails the run.
+# F-007 IS PRESERVED: every OTHER toolkit negative test runs and any real failure
+# REDs this floor. Only the ONE documented, bead-tracked false-red is excluded,
+# and only while it is genuinely red (stale-guard (b)).
 #
-# Test hook (NOT production): TOOLKIT_FLOOR_DIR overrides the discovery dir so
-# the exclusion / stale logic can be tested against a fixture dir (F9), mirroring
-# the a-plus floor's RUN_ALL_TESTS_DIR.
+# Stale-guarded TWO ways (NEVER silent — F-009): (a) an excluded name that no
+# longer exists (deleted/renamed) fails the run; (b) an excluded test that now
+# PASSES fails the run. Both scoped to this floor's `test-*.sh` namespace.
+#
+# Test hooks (NOT production — both are on close-audit's SEC-002 warning list):
+#   TOOLKIT_FLOOR_DIR              override the test-discovery dir (fixture dir),
+#                                  mirroring the a-plus floor's RUN_ALL_TESTS_DIR
+#   TOOLKIT_FLOOR_DEFAULT_EXCLUDE  override the seeded default exclusion. The `-`
+#                                  (not `:-`) form below is DELIBERATE: an
+#                                  explicit EMPTY value means "no exclusion" (the
+#                                  negative test's no-exclusion cases depend on
+#                                  it; `:-` would wrongly re-inject the default).
 #
 # Exit: 0 all non-excluded pass + every exclusion still valid / 1 otherwise.
 set -uo pipefail
@@ -51,17 +54,14 @@ SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SELF_DIR/../.." && pwd)"
 TESTS_DIR="${TOOLKIT_FLOOR_DIR:-$REPO_ROOT/toolkit/tests}"
 
-# The tracked pre-existing false-red, seeded so a bare close needs no env.
-# When ffit lands + a-plus re-pulls, remove this (stale-guard (b) will force it).
+# The tracked pre-existing false-red(s), seeded so a bare close needs no env.
+# Add a future tracked toolkit red here (reviewed, stale-guarded); remove ffit
+# when the upstream fix lands + a-plus re-pulls (stale-guard (b) forces it).
 DEFAULT_EXCLUDE="${TOOLKIT_FLOOR_DEFAULT_EXCLUDE-test-roster-select.sh}"
-DEFAULT_REASON="ffit: library-tree-scoped test-roster-select.sh (hardcoded ../ depth); roster-select.sh works in a-plus; upstream fix = git rev-parse --show-toplevel"
+EXCLUDE_REASON="ffit: library-tree-scoped test-roster-select.sh (hardcoded ../ depth); roster-select.sh works in a-plus; upstream fix = git rev-parse --show-toplevel"
+EXCLUDE=" ${DEFAULT_EXCLUDE} "
 
-ENV_EXCLUDE="${RUN_ALL_TESTS_EXCLUDE:-}"
-ENV_REASON="${RUN_ALL_TESTS_EXCLUDE_REASON:-no reason given}"
-ALL_EXCLUDE=" ${DEFAULT_EXCLUDE} ${ENV_EXCLUDE} "
-
-is_excluded()   { case "$ALL_EXCLUDE" in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
-reason_for()    { case " ${DEFAULT_EXCLUDE} " in *" $1 "*) printf '%s' "$DEFAULT_REASON" ;; *) printf '%s' "$ENV_REASON" ;; esac; }
+is_excluded() { case "$EXCLUDE" in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 
 passed=0; failed=0; excluded=0; failed_names=()
 
@@ -74,7 +74,7 @@ for t in "$TESTS_DIR"/test-*.sh; do
       echo "[toolkit-floor] STALE-EXCLUSION  $b — now PASSES; remove the exclusion (the red is fixed)"
       failed=$((failed + 1)); failed_names+=("stale-pass:$b")
     else
-      echo "[toolkit-floor] EXCLUDED  $b — $(reason_for "$b")"
+      echo "[toolkit-floor] EXCLUDED  $b — $EXCLUDE_REASON"
       excluded=$((excluded + 1))
     fi
     continue
@@ -87,10 +87,14 @@ for t in "$TESTS_DIR"/test-*.sh; do
 done
 
 # stale-guard (a): an excluded name that does not exist (deleted/renamed) — a
-# silent cap that no longer applies must not pass quietly.
-for ex in $DEFAULT_EXCLUDE $ENV_EXCLUDE; do
+# silent cap that no longer applies must not pass quietly. Scoped to this floor's
+# own `test-*.sh` namespace: a name that is not a toolkit test basename belongs
+# to another floor and is not this floor's stale concern (so a mis-seeded foreign
+# name is a no-op, never a cross-floor stale RED).
+for ex in $DEFAULT_EXCLUDE; do
+  case "$ex" in test-*.sh) ;; *) continue ;; esac
   if [ ! -e "$TESTS_DIR/$ex" ]; then
-    echo "[toolkit-floor] STALE-EXCLUSION  $ex — no such test (deleted/renamed); remove the exclusion"
+    echo "[toolkit-floor] STALE-EXCLUSION  $ex — no such toolkit test (deleted/renamed); remove the exclusion"
     failed=$((failed + 1)); failed_names+=("stale-missing:$ex")
   fi
 done
