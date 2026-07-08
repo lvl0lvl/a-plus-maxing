@@ -703,6 +703,16 @@ def test_summarize_does_not_gate_derived_fields():
     ("goal-targets", "call me +1 415 555 0199 anytime", "415 555 0199", "phone"),
     ("hard-limits", "deliveries to 123 main st, springfield il 62704",
      "123 main st", "postal (nue)"),
+    # yduw (FINDING-1, crown-jewel): a full DOB typed into a pass-through field.
+    # Security EXECUTED this at the T9 review — it crossed VERBATIM to the no-train
+    # dispatch + the clarifying model request, because scan_text had no date detector.
+    # This row RED'd on the pre-yduw code and lands WITH the pii_scan DOB detector.
+    ("goal-targets", "reach peak by birthday 1986-03-14", "1986-03-14",
+     "DOB in pass-through (yduw)"),
+    # 6hts: a canonical TWO-LINE mailing address (street line \n city/ZIP line) in a
+    # pass-through field — caught by the [\s\S] street->ZIP span.
+    ("hard-limits", "mail me at 123 Main St\nSpringfield, IL 62704", "123 Main St",
+     "two-line postal (6hts)"),
 ])
 def test_summarize_raises_on_widened_pii_class_in_passthrough(field, value, secret, label):
     """g5x AC1 + nue: each tractable EXCLUDED_RAW_PII contact class in a pass-through

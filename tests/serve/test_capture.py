@@ -461,6 +461,43 @@ def test_canadian_postal_in_free_text_token_routes_record_only(tmp_path):
     assert "B2Y 1A1" in scaffold_text, "the Canadian-postal value did not route record-only"
 
 
+def test_dob_in_free_text_token_routes_record_only(tmp_path):
+    """yduw: a full DOB typed into a free-text wired token routes record-only.
+
+    Security EXECUTED the leak at the T9 review — a DOB in `goal-targets` crossed to the
+    no-train dispatch because pii_scan had no date detector. With the yduw fix,
+    `scan_text_full` catches the DOB at capture, so it must NOT reach the model-bound
+    `goal-targets` token — it routes record-only to the gitignored scaffold instead.
+    Failing-capable: without the date detector the value scans 0 and lands in the token.
+    """
+    store_root = tmp_path / "store"
+    scaffold_root = tmp_path / "scaffold"
+    value = "reach peak by birthday 1986-03-14"
+    # Pre-condition: the full-value scan catches the DOB (the capture gate's trigger).
+    # include_dob=True mirrors capture._value_has_pii's opt-in (the DOB class is opt-in,
+    # default off, so the byte-frozen engine scans stay unaffected — see the pii_scan note).
+    assert pii_scan.scan_text_full(value, token_config=_ABSENT_IDENTITY, include_dob=True) >= 1, (
+        "the DOB was not detected by scan_text_full — fixture/pattern invalid"
+    )
+
+    capture.persist_capture(
+        {"goal-targets": value},
+        root=store_root, scaffold_root=scaffold_root, identity_config=_ABSENT_IDENTITY,
+    )
+    # Negative (load-bearing): the DOB value never reached the model-bound token.
+    assert store.read("goal-targets", root=store_root) == [], (
+        "a free-text value carrying a full DOB reached the model-bound goal-targets token"
+    )
+    for token in SUMMARY_FIELD_SET:
+        readings = store.read(token, root=store_root)
+        assert all("1986-03-14" not in str(r.get("value")) for r in readings), (
+            f"the DOB leaked into the {token!r} field-set store item"
+        )
+    # Positive: it landed record-only in the gitignored scaffold instead.
+    scaffold_text = "".join(p.read_text() for p in scaffold_root.rglob("*") if p.is_file())
+    assert "1986-03-14" in scaffold_text, "the DOB value did not route record-only"
+
+
 # A PII token whose match span EXCEEDS the old `overlap=64`, so positioned across the
 # old window step boundary (~char 4032) it was seen WHOLE by neither overlapping window
 # and leaked. A 79-char postal (span > 64) and an email — both real `scan_text_full`

@@ -489,16 +489,22 @@ def test_leg2_failure_preserves_leg1_questions_with_deferred_curation(tmp_path):
 
 
 @pytest.mark.parametrize("dated, clean", [
-    ("atorvastatin 20mg 1986-04-12", "atorvastatin 20mg"),      # ISO YYYY-MM-DD
-    ("metformin 04/12/1986", "metformin 500mg"),                # slashed D/M/Y
+    # 2-digit-year forms: pii_scan is 4-digit-year-anchored (flood-safe against macro
+    # splits like "40/30/30"), so it reads 0 on these — the defer is attributable to
+    # care_review's local _DATE_LIKE ALONE, the isolation this test exists for. (pii_scan
+    # NOW catches 4-digit/ISO DOBs itself via bead yduw — a defense-in-depth overlap — so
+    # _DATE_LIKE's independent contribution is exactly these 2-digit-year formats.)
+    ("atorvastatin 20mg 4/12/86", "atorvastatin 20mg"),      # slashed 2-digit year
+    ("metformin 4-12-86", "metformin 500mg"),                # dashed 2-digit year
 ])
 def test_bare_dob_in_med_value_defers_isolating_date_like(dated, clean, tmp_path):
     """FIX-4: a DATE-ONLY med value (no name/email/phone) defers the curation — `_DATE_LIKE` alone.
 
     The existing fail-closed test uses a COMPOUND poison (name+email+DOB) where name+email already
     trip `pii_scan` `hits > 0`, so `_DATE_LIKE` never determines the outcome. This seeds a med value
-    whose ONLY identity signal is a date (`pii_scan.scan_text_full` reads 0, proven below), so the
-    defer is attributable to `_DATE_LIKE` alone. Parametrized over the ISO + slashed branches.
+    whose ONLY identity signal is a 2-digit-year date — a format pii_scan's 4-digit-year-anchored
+    detector leaves to `_DATE_LIKE` (`pii_scan.scan_text_full` reads 0, proven below), so the defer
+    is attributable to `_DATE_LIKE` alone. Parametrized over the slashed + dashed branches.
 
     RED-capable: drop the `or bool(_DATE_LIKE.search(value))` clause and the dated value scans 0,
     the curation proceeds (a converse call + a class-token write) — reddening BOTH assertions. The

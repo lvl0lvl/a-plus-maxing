@@ -805,8 +805,10 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG,
                 # Raw PII (operator identity / contact) in the value cannot be faithfully
                 # passed through; surface the gap at the boundary rather than leak it to
                 # the model (via dispatch) or the render (via assemble). Names the field,
-                # never the value (no PII echo).
-                if pii_scan.scan_text(str(value), token_config=identity_config):
+                # never the value (no PII echo). include_dob=True: a pass-through field
+                # value is THE yduw DOB vector — a birthday typed into goal-targets crossed
+                # here verbatim (the DOB class is opt-in; this free-text boundary opts in).
+                if pii_scan.scan_text(str(value), token_config=identity_config, include_dob=True):
                     raise ValueError(
                         f"summarize: pass-through field {field!r} carries raw operator "
                         f"PII; the PII-free-by-store-schema assumption is violated "

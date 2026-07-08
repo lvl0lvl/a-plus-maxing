@@ -252,14 +252,18 @@ def _med_value_has_identity(value, identity_config):
     """Whether a raw med value carries operator identity/contact (pii_scan) or a DOB-like date.
 
     The leg-2 fail-closed value gate. Runs the full-length `pii_scan.scan_text_full` (operator
-    identity + the tractable value-classes — any-domain email, phone, US/CA postal) over the med
-    free-text, PLUS the `_DATE_LIKE` DOB backstop (`pii_scan` has no date detector). True on any
-    hit — the caller defers the curation rather than egress a leaky de-identified request.
+    identity + the tractable value-classes — any-domain email, phone, US/CA postal, and the
+    opt-in DOB/full-date class, include_dob=True) over the med free-text, PLUS the local
+    `_DATE_LIKE` backstop (which also catches the 2-digit-year dates pii_scan's flood-safe
+    detector leaves cue-less). True on any hit — the caller defers the curation rather than
+    egress a leaky de-identified request.
     """
+    # include_dob=True: a med free-text value is an operator-value boundary (the yduw DOB
+    # vector); the DOB class is opt-in (default off, so it stays off the frozen engine scans).
     if identity_config is not None:
-        hits = pii_scan.scan_text_full(value, token_config=identity_config)
+        hits = pii_scan.scan_text_full(value, token_config=identity_config, include_dob=True)
     else:
-        hits = pii_scan.scan_text_full(value)
+        hits = pii_scan.scan_text_full(value, include_dob=True)
     return hits > 0 or bool(_DATE_LIKE.search(value))
 
 

@@ -580,6 +580,32 @@ def test_value_scan_helper_reds_on_a_planted_leak():
     assert plan_step._scan_yield_payload(author_with_token, pii_scan.DEFAULT_IDENTITY_CONFIG) == 0
 
 
+def test_dated_derived_plan_is_not_flagged_as_pii():
+    # contracts-1 (core-capability regression fix): a model-authored plan legitimately carries
+    # SCHEDULE dates (deload weeks, retest cadences, check-in dates). The frozen GATE scan of the
+    # DERIVED assembled plan does NOT opt into the DOB class (it is OPT-IN, default off — see the
+    # pii_scan _VALUE_PII_PATTERNS note), so a schedule date here is NOT a DOB leak; the operator's
+    # real DOB is age-banded upstream and never reaches this derived artifact. Had the DOB class
+    # defaulted ON (the original-PR shape), these dates would score >0 -> YIELD_PAYLOAD_PII -> NO
+    # plan (the core capability). RED-capable: flipping scan_text_full's include_dob default back
+    # to True makes these dates score >0 and this assertion reds.
+    producer = lambda assembled_plan: {}
+    dated_plan = {
+        "workout": "Deload the week of 2026-07-14; retest lipids by 2026-09-01.",
+        "check_in": "next review 08/15/2026",
+    }
+    dated_gate = plan_driver.Request(plan_driver.GATE, (dated_plan, producer))
+    assert plan_step._scan_yield_payload(dated_gate, pii_scan.DEFAULT_IDENTITY_CONFIG) == 0, (
+        "a legitimately-dated derived plan must NOT be flagged as raw PII (contracts-1)"
+    )
+    # the opt-out narrows the DOB date class ONLY — the base contact/identifier classes stay live,
+    # so a REAL operator contact leaking into the derived plan STILL fails closed.
+    leak_reauthor = plan_driver.Request(plan_driver.REAUTHOR, ("workout", {"note": _LEAK_EMAIL}))
+    assert plan_step._scan_yield_payload(leak_reauthor, pii_scan.DEFAULT_IDENTITY_CONFIG) >= 1, (
+        "include_dob=False must not disable the base contact classes on the derived-plan scan"
+    )
+
+
 def test_value_scan_fails_closed_on_planted_leak(tmp_path):
     # AC-3 (the INTEGRATED fail-closed through the harness): a planted raw-PII token (a contact token)
     # in a workout author surfaces in the assembled plan (the GATE payload[0]); the harness value-scan
