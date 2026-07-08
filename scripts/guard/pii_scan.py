@@ -123,14 +123,18 @@ _COMPILED_SECRET = [re.compile(p) for p in SECRET_PATTERNS.values()]
 # discriminator — "123 MAIN ST" and "123 main st" are the same address), yet
 # "Dr Patel followup" / "5 Star Gym Way" / "1 Rep Max St progression" cannot
 # match: no ZIP. A bare 5-digit number cannot match either: no street lead-in +
-# co-signal. Honest residuals, deliberate on a fail-closed PII boundary:
+# co-signal. CAPABILITY (bead 6hts): the canonical TWO-LINE mailing address
+# ("123 Main St\nSpringfield, IL 62704") IS detected — the suffix->ZIP span uses
+# [\s\S], so the street-line/city-line newline split is in scope, still bounded
+# (<=64) and co-signal-anchored (a hit needs street-number + suffix ... ZIP).
+# Honest residuals, deliberate on a fail-closed PII boundary:
 # (i) a value ENDING in a bare 5-digit metric after a word-state token ("did 3
 # sets, felt ok, 10000") still false-positives — fail-closed, the operator
 # rephrases; (ii) the tail guard makes a ZIP followed by a bare word ("62704
-# usa") an accepted recall miss; (iii) the canonical TWO-LINE mailing address
-# ("123 Main St\nSpringfield, IL 62704") IS now detected (bead 6hts): the
-# suffix->ZIP span uses [\s\S], so the street-line/city-line newline split is in
-# scope, still bounded (<=64) and co-signal-anchored.
+# usa") an accepted recall miss; (iii) the [\s\S] span can also cross a newline
+# onto UNRELATED content, so a suffix word + a value-final ZIP-shaped 5-digit
+# split across two lines ("did 3 sets on court\nnote to self: 62704") still
+# false-positives — same fail-closed direction as (i), the operator rephrases.
 # Spelled-out state names ("illinois") and ZIP-less street lines are NOT
 # matched (the ZIP is the co-signal that keeps the detector off legitimate
 # training text). Structured `postal-address` store data is already stripped
@@ -198,32 +202,50 @@ _VALUE_PII_PATTERNS = {
     # vector — Security EXECUTED it at the T9 review: goal-targets='reach peak by
     # birthday 1986-03-14' crossed VERBATIM to the no-train dispatch payload AND the
     # clarifying model request, because scan_text had no date detector. Fail-closed
-    # on any FULL date (all three of day/month/year) in ISO, slash/dot (either
-    # order), and month-name forms, each anchored on a 19xx/20xx year so a bare year,
-    # a time ("08:00:00"), a metric run ("10000 steps"), or a MONTH-YEAR partial
-    # ("pre-Jan-2026 loading") does NOT trip it. A legitimate FULL target date
+    # on any FULL date (all three of day/month/year) in ISO, slash/dot/dash (either
+    # order), and month-name forms, each anchored on a 4-digit 19xx/20xx year so a bare
+    # year, a time ("08:00:00"), a metric run ("10000 steps"), or a MONTH-YEAR partial
+    # ("pre-Jan-2026 loading") does NOT trip it; a 2-digit-year date is caught only next
+    # to a DOB cue word (dob-cued-2digit, SEC-DEID-01). A legitimate FULL target date
     # ("2026-08-01") is an accepted fail-closed residual — the operator restates it
     # relatively (mirrors the postal accepted-residual philosophy on this fail-closed
     # boundary). Bare years and day/month-only fragments are deliberately out (too
     # low-signal — they flood on legit health numbers).
+    #
+    # LOAD-BEARING KEY CONVENTION (see the _VALUE_COMPILED/_DOB_COMPILED split below):
+    # every date detector's key MUST start with "dob-" — that prefix is what routes it
+    # into the include_dob-gated (OPT-IN) set. A new date detector added WITHOUT the
+    # prefix lands in the ALWAYS-ON base set, so it would run even for the frozen-engine
+    # and public-content scans that keep the DOB class OFF — fail-closing a legit
+    # schedule/citation date on a plan or page (the contracts-1 regression, inverted).
     "dob-iso": (
-        # (?![T\s]\d{2}:) excludes the date-part of an ISO TIMESTAMP ("2026-06-01T08:00"
-        # / "2026-06-01 08:00") — a store-reading timepoint is not a DOB leak; a bare
-        # DOB ("1986-03-14", or followed by prose) still matches.
-        r"(?<!\d)(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?!\d)(?![T\s]\d{2}:)",
+        # (?!T\d{2}:) excludes ONLY the date-part of a T-separated ISO store timestamp
+        # ("2026-06-01T08:00:00+00:00") — a store-reading timepoint is not a DOB. The
+        # exclusion is T-ONLY (not [T\s]): a SPACE- or NEWLINE-separated date+time is a
+        # human-written DOB signal, not a store line, so "1986-03-14 08:00" and a DOB on
+        # a line above an "HH:MM" line DO match (bh-316-1 / SEC-DEID-02). Irreducible
+        # residual: a full-ISO-DATETIME DOB ("1986-03-14T00:00:00") is byte-identical to
+        # a store timepoint and stays out — compensated by upstream age-band derivation
+        # (the raw DOB never flows as a free-text value); a bare "1986-03-14" matches.
+        r"(?<!\d)(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?!\d)(?!T\d{2}:)",
         0,
     ),
     "dob-numeric-year-last": (
         # [/.-] covers slash, dot, AND dash ("04-12-1986"); still anchored on a
         # 4-digit 19xx/20xx year so a macro split ("40/30/30") or set scheme ("3-4-5")
-        # — which has no 4-digit year — does NOT trip it. A 2-digit-year date
-        # ("04/12/86") is a deliberate flood-avoidance residual (it collides with
-        # macro splits); care_review's local _DATE_LIKE covers it at the meds boundary.
+        # — which has no 4-digit year — does NOT trip it. A CUE-LESS 2-digit-year date
+        # ("04/12/86") stays out here (it collides with macro splits); a 2-digit-year
+        # date NEXT TO a DOB cue word is caught by dob-cued-2digit below (SEC-DEID-01).
         r"(?<!\d)\d{1,2}[/.-]\d{1,2}[/.-](?:19|20)\d{2}(?!\d)",
         0,
     ),
     "dob-numeric-year-first": (
-        r"(?<!\d)(?:19|20)\d{2}[/.]\d{1,2}[/.]\d{1,2}(?!\d)",
+        # [/.-] (slash, dot, AND dash) mirrors dob-numeric-year-last, so a non-padded
+        # dash form ("1986-3-14") is caught, not only the padded dob-iso form (bh-316-3).
+        # (?!T\d{2}:) mirrors dob-iso: a dashed year-first date is byte-identical to a
+        # store timepoint's date-part ("2026-06-01T08:00"), so the T-guard keeps this
+        # pattern (which now accepts dash) off store timepoints (bh-316-3 regression fix).
+        r"(?<!\d)(?:19|20)\d{2}[/.\-]\d{1,2}[/.\-]\d{1,2}(?!\d)(?!T\d{2}:)",
         0,
     ),
     "dob-monthname": (
@@ -235,6 +257,20 @@ _VALUE_PII_PATTERNS = {
         r"\b\d{1,2}(?:st|nd|rd|th)?\s+"
         r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+"
         r"(?:19|20)\d{2}\b",
+        re.IGNORECASE,
+    ),
+    # 2-digit-year DOB, CO-SIGNAL-anchored (bead yduw / SEC-DEID-01): a 4-digit-year
+    # anchor cannot catch "born 3/14/86" — the single most common way a person writes
+    # their birthday — without also flooding on macro splits ("40/30/30") and set
+    # schemes ("5/3/1"), which are shape-identical to a 2-digit date. The discriminator
+    # is a DOB CUE word (born / dob / birthday / b-day / birthdate) within ~20 chars of
+    # a D-M-Y run: a cue+date is a DOB, a bare "40/30/30" is not. Same co-signal design
+    # as postal-street-zip (a ZIP alone is low-signal; street-number + suffix ... ZIP is
+    # an address). Verified flood-safe: 0 hits on 40/30/30, 5/3/1, 3-4-5, zone 2/3/4, and
+    # a cue word WITHOUT a date ("born to run a 5k") does not fire — the date run is required.
+    "dob-cued-2digit": (
+        r"(?:born|d\.?o\.?b\.?|birth\s?date|birthday|b-?day)\b"
+        r".{0,20}?\b\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2}(?!\d)",
         re.IGNORECASE,
     ),
     # US SSN (bead 6hts): the dashed 3-2-4 token is unambiguous PII with no flood
@@ -251,12 +287,26 @@ _VALUE_PII_PATTERNS = {
 }
 # The value patterns split into the base contact/identifier set (email, phone,
 # postal, SSN — applied by EVERY value-scan) and the DOB/full-date class (the `dob-*`
-# keys). The date class is an OPERATOR-VALUE-boundary concern (a DOB typed into a
-# pass-through field / form field), NOT a public-content concern: a landed genetics/
-# wiki library page legitimately carries research/provenance DATES that are not
-# operator PII. Callers scanning operator VALUES keep `include_dob=True` (the
-# default); callers scanning PUBLIC PAGE CONTENT (the genetics SEC3 landed-page
-# guard) pass `include_dob=False` so a citation date is not mistaken for a DOB leak.
+# keys), which is OPT-IN (`include_dob=True`; the default is OFF). The DOB class is a
+# NEW capability (bead yduw) that applies only at the FREE-TEXT OPERATOR-VALUE
+# boundaries where a human can type a birthday into a pass-through field — NOT a
+# public-content, derived-artifact, or structured-token concern (a genetics/wiki page
+# carries research/provenance DATES; a model-authored plan carries SCHEDULE dates; a
+# de-identified class token carries neither — none is operator PII). Defaulting the DOB
+# class OFF keeps the byte-FROZEN engine's value-scans (plan_step's crown-jewel GATE
+# scan of the DERIVED plan, deid_in's de-id boundary) behaviourally UNCHANGED — an
+# EXTEND-NOT-REBUILD requirement (ADR-0032): the new class must not silently alter a
+# frozen caller (a derived plan carrying a schedule date must still surface; a DOB
+# defaulted-on there would have failed the GATE CLOSED -> no plan, contracts-1). The
+# include_dob=True OPT-IN sites — the ONLY DOB-scanning callers — are:
+#   - scripts/serve/capture.py         (free-text form-field values)
+#   - scripts/plan/router.py summarize (the 8j6 pass-through-field gate — THE yduw vector)
+#   - scripts/serve/care_review.py     (med free-text values; + its local _DATE_LIKE)
+# The frozen engine (plan_step, deid_in), the public-content scans (research_query,
+# wiki-ingest-lint), and the structured-token scans (router rx-/trait-class) stay OFF.
+# No mechanical guard enforces this split yet (contracts-2 tracks named
+# scan_public_content / scan_operator_value entry points); this enumeration is the
+# audit list until then.
 _VALUE_COMPILED = [
     re.compile(pat, flags)
     for name, (pat, flags) in _VALUE_PII_PATTERNS.items()
@@ -267,6 +317,13 @@ _DOB_COMPILED = [
     for name, (pat, flags) in _VALUE_PII_PATTERNS.items()
     if name.startswith("dob-")
 ]
+
+# NFKC does not fold typographic dashes (en/em-dash, Unicode hyphen, minus) to the
+# ASCII hyphen, so a date/SSN/postal pasted from a word processor that auto-formats
+# "-" to an en-dash would evade every dash-separated pattern (SEC-DEID-04). Fold the
+# common dash codepoints to ASCII "-" after NFKC, before matching — flood-free (a dash
+# is a dash), and it hardens every dash-separated value class, not only the dates.
+_DASH_TO_HYPHEN = {cp: 0x2D for cp in (0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212)}
 
 # scan_text caps its input before matching: the unanchored email local-part makes
 # `findall` O(n^2) on a long string (a measured multi-second hang on a pasted blob),
@@ -417,27 +474,28 @@ def _resolve_token_config(token_config, identity_config, caller):
     return token_config
 
 
-def scan_text(text, token_config=_SENTINEL, identity_config=None, include_dob=True):
+def scan_text(text, token_config=_SENTINEL, identity_config=None, include_dob=False):
     """Count operator-PII matches in a single in-memory string.
 
     The value-level counterpart to `scan` (which reads file CONTENTS for the
     file-distribution boundary). Applies the operator-IDENTITY tokens + the tractable
     EXCLUDED_RAW_PII value classes — generic dotted-domain email (any provider),
     phone (E.164 + NANP) (bead g5x), US postal address via the precise
-    ZIP/state-anchored detector (bead nue), and a Canadian postal code (the
-    A1A 1A1 token, bead nue-CA — the operator is in-population) — and NOT the
-    structural store-line patterns (those detect a leaked store NDJSON FILE, not
-    personal data inside a scalar token). Used by the router summary boundary
-    (bead 8j6) to fail-closed on raw PII in a pass-through field value.
+    ZIP/state-anchored detector (bead nue), a Canadian postal code (the A1A 1A1 token,
+    bead nue-CA — the operator is in-population), a full-date / DOB class (bead yduw,
+    gated by `include_dob`), and a dashed SSN (bead 6hts) — and NOT the structural
+    store-line patterns (those detect a leaked store NDJSON FILE, not personal data
+    inside a scalar token). Used by the router summary boundary (bead 8j6) to
+    fail-closed on raw PII in a pass-through field value.
 
     The text is NFKC-folded first, so compatibility homographs (e.g. a fullwidth
-    `＠`) normalise to their canonical form before matching, then capped at
-    `_MAX_SCAN_TEXT_LEN` to bound match cost. Out of scope for this single-operator
-    value boundary (see the `_VALUE_PII_PATTERNS` note): ZIP-less postal fragments,
-    two-line/multi-line addresses (the street line + city line split across
-    newlines), cross-script (Cyrillic) confusables, TLD-less local addresses
-    (`name@localhost`), and bare contiguous phone digits. The value classes are
-    deliberately NOT applied by `scan` — the trunk scanner stays gmail-conservative.
+    `＠`) normalise to their canonical form, and common typographic dashes (en/em-dash)
+    fold to ASCII `-`, before matching; then capped at `_MAX_SCAN_TEXT_LEN` to bound
+    match cost. In scope: single- AND two-line postal addresses (bead 6hts). Out of
+    scope for this single-operator value boundary (see the `_VALUE_PII_PATTERNS` note):
+    ZIP-less postal fragments, cross-script (Cyrillic) confusables, TLD-less local
+    addresses (`name@localhost`), and bare contiguous phone digits. The value classes
+    are deliberately NOT applied by `scan` — the trunk scanner stays gmail-conservative.
 
     Args:
         text (str): The value to scan.
@@ -449,17 +507,22 @@ def scan_text(text, token_config=_SENTINEL, identity_config=None, include_dob=Tr
             `token_config` (the pre-b9l kwarg name); emits DeprecationWarning.
             Mutually exclusive with `token_config` — passing both raises
             TypeError.
+        include_dob (bool, optional): Whether to apply the DOB/full-date class (the
+            `dob-*` patterns). Default False — the DOB class is OPT-IN. The free-text
+            operator-value boundaries (capture, summarize's 8j6 gate, care_review) pass
+            True; the frozen engine + public-content scans keep the default off (see the
+            `_VALUE_PII_PATTERNS` note for the opt-in sites and the freeze rationale).
 
     Returns:
         (int) Total operator-PII (value-class + identity) matches in `text`.
     """
     token_config = _resolve_token_config(token_config, identity_config, "scan_text")
-    normalized = unicodedata.normalize("NFKC", text)[:_MAX_SCAN_TEXT_LEN]
+    normalized = unicodedata.normalize("NFKC", text).translate(_DASH_TO_HYPHEN)[:_MAX_SCAN_TEXT_LEN]
     patterns = _VALUE_COMPILED + (_DOB_COMPILED if include_dob else []) + _load_token_patterns(token_config)
     return sum(len(pattern.findall(normalized)) for pattern in patterns)
 
 
-def scan_text_full(text, token_config=_SENTINEL, identity_config=None, include_dob=True):
+def scan_text_full(text, token_config=_SENTINEL, identity_config=None, include_dob=False):
     """Count operator-PII matches in a string's FULL length (no `_MAX_SCAN_TEXT_LEN` cap).
 
     Identical to `scan_text` except it does NOT truncate at `_MAX_SCAN_TEXT_LEN`, so
@@ -481,12 +544,18 @@ def scan_text_full(text, token_config=_SENTINEL, identity_config=None, include_d
             `identity_config`.
         identity_config (str | Path, optional): Deprecated alias for `token_config`;
             emits DeprecationWarning. Mutually exclusive with `token_config`.
+        include_dob (bool, optional): Whether to apply the DOB/full-date class (the
+            `dob-*` patterns). Default False — the DOB class is OPT-IN. The free-text
+            operator-value boundaries (capture, care_review) pass True; the frozen
+            engine (plan_step GATE, deid_in) + public-content scans (research_query,
+            wiki-ingest-lint) keep the default off (EXTEND-NOT-REBUILD; see the
+            `_VALUE_PII_PATTERNS` note).
 
     Returns:
         (int) Total operator-PII (value-class + identity) matches in `text`.
     """
     token_config = _resolve_token_config(token_config, identity_config, "scan_text_full")
-    normalized = unicodedata.normalize("NFKC", text)
+    normalized = unicodedata.normalize("NFKC", text).translate(_DASH_TO_HYPHEN)
     patterns = _VALUE_COMPILED + (_DOB_COMPILED if include_dob else []) + _load_token_patterns(token_config)
     return sum(len(pattern.findall(normalized)) for pattern in patterns)
 

@@ -473,8 +473,10 @@ def test_dob_in_free_text_token_routes_record_only(tmp_path):
     store_root = tmp_path / "store"
     scaffold_root = tmp_path / "scaffold"
     value = "reach peak by birthday 1986-03-14"
-    # Pre-condition: the full-value scan catches the DOB (the gate's trigger).
-    assert pii_scan.scan_text_full(value, token_config=_ABSENT_IDENTITY) >= 1, (
+    # Pre-condition: the full-value scan catches the DOB (the capture gate's trigger).
+    # include_dob=True mirrors capture._value_has_pii's opt-in (the DOB class is opt-in,
+    # default off, so the byte-frozen engine scans stay unaffected — see the pii_scan note).
+    assert pii_scan.scan_text_full(value, token_config=_ABSENT_IDENTITY, include_dob=True) >= 1, (
         "the DOB was not detected by scan_text_full — fixture/pattern invalid"
     )
 

@@ -381,14 +381,29 @@ def test_scan_text_counts_contact_and_identity(tmp_path):
 def test_scan_text_scopes_out_structural_store_pattern():
     """scan_text targets personal-identity tokens (name/contact), NOT the file-
     structural store-line patterns (those detect a leaked store NDJSON FILE, not raw
-    PII inside a scalar summary token). A bare store line carries no personal data."""
+    PII inside a scalar summary token). A bare store line carries no personal data.
+
+    Also pins the dob-iso / dob-numeric-year-first T-ONLY timestamp exclusion
+    (bh-316-1 / SEC-DEID-02): a T-separated store timepoint is scoped out of the DOB
+    class, but a SPACE- or NEWLINE-separated date+time is a human DOB signal and DOES
+    catch. The full-ISO-DATETIME DOB ("1986-03-14T00:00:00") is byte-identical to a
+    store timepoint and is the same accepted scope-out (compensated upstream by
+    age-banding); a regression that widened the exclusion back to [T\\s] would red the
+    space/newline asserts below."""
     from scripts.guard.pii_scan import scan_text
 
     store_line = (
         '{"item": "rhr", "timepoint": "2026-06-01T08:00:00+00:00", '
         '"source": "manual", "value": 55}'
     )
-    assert scan_text(store_line, token_config=NO_CONFIG) == 0
+    # include_dob=True exercises the opt-in DOB class so the T-exclusion is tested WITH
+    # the date class active (default off would make these trivially 0 — a tautology).
+    assert scan_text(store_line, token_config=NO_CONFIG, include_dob=True) == 0
+    # T-separated date+time (store shape / date-picker) is scoped out; …
+    assert scan_text("1986-03-14T00:00:00", token_config=NO_CONFIG, include_dob=True) == 0
+    # … but a SPACE- or NEWLINE-separated date+time is a DOB signal and catches.
+    assert scan_text("1986-03-14 08:00", token_config=NO_CONFIG, include_dob=True) >= 1
+    assert scan_text("dob 1986-03-14\nsession at 08:00", token_config=NO_CONFIG, include_dob=True) >= 1
 
 
 # --- g5x: widen scan_text to the full EXCLUDED_RAW_PII value classes ------------
@@ -515,15 +530,35 @@ def test_scan_text_detects_compatibility_homograph_email():
     ("born March 14, 1986", "month-name Month DD, YYYY"),
     ("b-day 14 Mar 2001", "day + abbreviated month + year"),
     ("dob jan 1st 1990", "month + ordinal day + year"),
+    # SEC-DEID-01: 2-digit-year DOB, CO-SIGNAL-anchored on a DOB cue word.
+    ("born 3/14/86", "2-digit-year DOB with 'born' cue"),
+    ("reach peak by birthday 3/14/86", "2-digit-year DOB in a goals field, 'birthday' cue"),
+    ("dob 03/14/86", "2-digit-year DOB, 'dob' cue"),
+    ("b-day 14.03.86", "2-digit-year DOB, 'b-day' cue, dotted"),
+    # bh-316-3: non-padded dash year-first (dob-iso needs leading zeros; year-first now has dash).
+    ("1986-3-14 birthdate", "dash year-first, non-padded"),
+    ("born 1986-1-5", "dash year-first, single-digit month AND day"),
+    # bh-316-1 / SEC-DEID-02: a DOB carrying a same-line or next-line clock time still catches
+    # (the T-only store exclusion no longer swallows a space/newline-separated date+time).
+    ("1986-03-14 08:00 recorded", "DOB + same-line HH:MM"),
+    ("dob 1986-03-14\n08:00 session", "DOB on a line above an HH:MM line"),
+    # SEC-DEID-04: en-dash / em-dash separators fold to ASCII before matching.
+    ("born 1986–03–14", "ISO DOB with en-dash separators"),
+    ("dob 1986—03—14", "ISO DOB with em-dash separators"),
 ])
 def test_scan_text_detects_dob_date(value, label):
     """yduw: a FULL calendar date (day+month+year) in a pass-through value scores >=1.
 
     Security EXECUTED this leak at the T9 review — a DOB typed into goal-targets crossed
     VERBATIM to the no-train dispatch + the clarifying model request because scan_text
-    had no date detector. Reds on the pre-yduw _VALUE_PII_PATTERNS.
+    had no date detector. Reds on the pre-yduw _VALUE_PII_PATTERNS. The extended rows
+    pin the T9-review residual closures (SEC-DEID-01 2-digit cued, bh-316-1/-3 time-suffix
+    + dash year-first, SEC-DEID-04 unicode dash). include_dob=True: the DOB class is
+    opt-in (default off) so it never alters the frozen-engine scans; the DOB tests
+    exercise it explicitly (free-text production callers opt in — capture / summarize
+    8j6 / care_review, per the _VALUE_PII_PATTERNS note).
     """
-    assert pii_scan.scan_text(value, token_config=NO_CONFIG) >= 1, label
+    assert pii_scan.scan_text(value, token_config=NO_CONFIG, include_dob=True) >= 1, label
 
 
 @pytest.mark.parametrize("value", [
@@ -535,17 +570,30 @@ def test_scan_text_detects_dob_date(value, label):
     "sleep 7-8 hours",
     "wake at 08:00:00",                      # time, no date
     "3 sets x 12 reps at rpe 8",
+    # SEC-DEID-01 flood corpus: macro splits / set schemes / rep drops are shape-identical
+    # to a 2-digit date but carry NO 4-digit year and NO DOB cue -> dob-cued-2digit stays off.
+    "macros 40/30/30",                       # macro split — no year, no cue
+    "bench 5/3/1 wave",                      # Wendler 5/3/1 set scheme — no year, no cue
+    "squat 12/10/8 drop set",                # rep-drop set — no year, no cue
+    "zone 2/3/4 intervals",                  # zone scheme — no year, no cue
+    "born to run a 5k",                      # DOB cue word but NO date run — cue alone must not fire
+    "march 14 birthday",                     # month-name + cue but NO year — partial
+    "dob 03/14",                             # numeric + cue but only 2 components (no year)
 ])
 def test_scan_text_dob_negative_controls(value):
-    """yduw: partial dates + health numerics do NOT trip the date class (== 0).
+    """yduw / SEC-DEID-01: partial dates, health numerics, and training vocab do NOT
+    trip the date class (== 0).
 
     Pins the fail-closed boundary's precision: a MONTH-YEAR partial, a bare year, a
-    time, and metric runs must not register — only a FULL date does. The leading
-    liveness assert proves the date class is ACTIVE so a regression that disabled it
+    time, metric runs, and — the SEC-DEID-01 flood vectors — macro splits ("40/30/30"),
+    set schemes ("5/3/1"), rep drops ("12/10/8"), and a bare DOB CUE word without a date
+    run must not register; only a FULL date (or a cue NEXT TO a 2-digit date) does. The
+    leading liveness assert proves the date class is ACTIVE so a regression that disabled
+    it — or that weakened the 4-digit-year / cue anchor and flooded on training vocab —
     reds here too.
     """
-    assert pii_scan.scan_text("dob 1986-03-14", token_config=NO_CONFIG) >= 1  # class live
-    assert pii_scan.scan_text(value, token_config=NO_CONFIG) == 0
+    assert pii_scan.scan_text("dob 1986-03-14", token_config=NO_CONFIG, include_dob=True) >= 1  # class live
+    assert pii_scan.scan_text(value, token_config=NO_CONFIG, include_dob=True) == 0
 
 
 @pytest.mark.parametrize("value, label", [
@@ -563,6 +611,27 @@ def test_scan_text_detects_ssn_and_two_line_postal(value, label):
     flood-avoidance residual pinned in test_scan_text_value_boundary_negative_controls.
     """
     assert pii_scan.scan_text(value, token_config=NO_CONFIG) >= 1, label
+
+
+def test_include_dob_false_drops_only_the_dob_class():
+    """yduw/contracts-1: include_dob=False (the public-page / derived-content opt-out)
+    removes ONLY the DOB class — every base contact/identifier class still fires.
+
+    The public-page (research_query, wiki-ingest-lint) and derived-artifact (plan_step
+    GATE) scanners pass include_dob=False so a citation/schedule date is not a DOB leak.
+    This must NOT weaken the boundary for the other classes. Pins both directions: a
+    value carrying email+phone+postal+SSN+DOB keeps all four base classes under False and
+    gains the DOB class under True; a pure-DOB value scores 0 under False and >=1 under
+    True (so the toggle controls the DOB class and nothing else)."""
+    v = ("born 1986-03-14 ssn 123-45-6789 reach op@x.com or "
+         "+14155550199 addr 12 Oak Ave Springfield IL 62704")
+    on = pii_scan.scan_text(v, token_config=NO_CONFIG, include_dob=True)
+    off = pii_scan.scan_text(v, token_config=NO_CONFIG, include_dob=False)
+    assert off >= 4, f"base classes (email/phone/postal/ssn) must all fire under False, got {off}"
+    assert on > off, "the DOB class must add matches under include_dob=True"
+    # The toggle controls ONLY the DOB class: a pure-DOB value is 0 off / >=1 on.
+    assert pii_scan.scan_text("born 1986-03-14", token_config=NO_CONFIG, include_dob=False) == 0
+    assert pii_scan.scan_text("born 1986-03-14", token_config=NO_CONFIG, include_dob=True) >= 1
 
 
 @pytest.mark.parametrize("value", [
@@ -583,6 +652,7 @@ def test_scan_text_detects_ssn_and_two_line_postal(value, label):
     "target 10000 steps or 12500 calories",  # word-state 'or' + two ZIP-shaped metrics (BUG-1)
     "12 week plan from dr patel: 10000 steps/day",  # 'dr' honorific as street-suffix lead (BUG-2)
     "10 sets in 90210 zone",               # word-state 'in' + 5-digit mid-value (HIST-1)
+    "walked 5 miles today\nthen logged 62704 steps",  # cross-line, no street-number+suffix co-signal (F12)
 ])
 def test_scan_text_value_boundary_negative_controls(value):
     """g5x AC2 + nue: health free-text does NOT trip the value patterns (== 0).
@@ -595,10 +665,13 @@ def test_scan_text_value_boundary_negative_controls(value):
     Saint/honorific 'St'/'Dr', or a suffix-shaped word WITHOUT a ZIP must not match.
     The BUG-1/BUG-2/HIST-1 rows pin the (?!\\s*\\w) tail guard: a ZIP-shaped metric
     followed by more words must not match even with a word-state/honorific co-signal
-    (a hit here fail-closes planning on legit health text). The two-line row pins the
-    documented out-of-scope street-line/city-line newline split. The leading liveness
-    assert proves _VALUE_COMPILED is ACTIVE, so a regression that disabled the
-    patterns reds here too (not only in the positive-detection test — F-TEST1).
+    (a hit here fail-closes planning on legit health text). The cross-line row pins
+    that the widened [\\s\\S] two-line-postal span (bead 6hts) still requires the
+    street-number + suffix co-signal — a ZIP-shaped metric on a later line without
+    that lead-in must NOT match (the two-line ADDRESS itself is a positive control in
+    test_scan_text_detects_ssn_and_two_line_postal). The leading liveness assert proves
+    _VALUE_COMPILED is ACTIVE, so a regression that disabled the patterns reds here too
+    (not only in the positive-detection test — F-TEST1).
     """
     assert pii_scan.scan_text("x@protonmail.com", token_config=NO_CONFIG) >= 1  # patterns live
     assert pii_scan.scan_text(value, token_config=NO_CONFIG) == 0
