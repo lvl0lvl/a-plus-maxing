@@ -507,6 +507,64 @@ def test_scan_text_detects_compatibility_homograph_email():
     assert pii_scan.scan_text(homograph, token_config=NO_CONFIG) >= 1
 
 
+@pytest.mark.parametrize("value, label", [
+    ("reach peak by birthday 1986-03-14", "ISO DOB in a goals field (the yduw T9 vector)"),
+    ("dob 03/14/1986", "US slash MM/DD/YYYY"),
+    ("born 14.03.1986", "dotted DD.MM.YYYY"),
+    ("1986/03/14 birthdate", "ISO-order slash year-first"),
+    ("born March 14, 1986", "month-name Month DD, YYYY"),
+    ("b-day 14 Mar 2001", "day + abbreviated month + year"),
+    ("dob jan 1st 1990", "month + ordinal day + year"),
+])
+def test_scan_text_detects_dob_date(value, label):
+    """yduw: a FULL calendar date (day+month+year) in a pass-through value scores >=1.
+
+    Security EXECUTED this leak at the T9 review — a DOB typed into goal-targets crossed
+    VERBATIM to the no-train dispatch + the clarifying model request because scan_text
+    had no date detector. Reds on the pre-yduw _VALUE_PII_PATTERNS.
+    """
+    assert pii_scan.scan_text(value, token_config=NO_CONFIG) >= 1, label
+
+
+@pytest.mark.parametrize("value", [
+    "return to pre-Jan-2026 loading",        # month+year partial, no day — deliberately out
+    "plan for august 2026",                  # month+year, no day
+    "born in 1986",                          # bare year — too low-signal (floods)
+    "target 10000 steps or 12500 calories",  # 5-digit metric runs
+    "BP 120 over 80",
+    "sleep 7-8 hours",
+    "wake at 08:00:00",                      # time, no date
+    "3 sets x 12 reps at rpe 8",
+])
+def test_scan_text_dob_negative_controls(value):
+    """yduw: partial dates + health numerics do NOT trip the date class (== 0).
+
+    Pins the fail-closed boundary's precision: a MONTH-YEAR partial, a bare year, a
+    time, and metric runs must not register — only a FULL date does. The leading
+    liveness assert proves the date class is ACTIVE so a regression that disabled it
+    reds here too.
+    """
+    assert pii_scan.scan_text("dob 1986-03-14", token_config=NO_CONFIG) >= 1  # class live
+    assert pii_scan.scan_text(value, token_config=NO_CONFIG) == 0
+
+
+@pytest.mark.parametrize("value, label", [
+    ("ssn 123-45-6789 on file", "dashed SSN"),
+    ("123 Main St\nSpringfield, IL 62704", "canonical two-line mailing address (6hts)"),
+    ("mail 456 Oak Avenue\nColumbus, OH 43004-1234", "two-line, full suffix + ZIP+4"),
+])
+def test_scan_text_detects_ssn_and_two_line_postal(value, label):
+    """6hts: a dashed SSN + a canonical TWO-LINE mailing address score >=1.
+
+    The SSN 3-2-4 dashed token is unambiguous PII with no flood cost. The two-line
+    address is caught by the [\\s\\S] street->ZIP span (still co-signal-anchored on
+    street-number + suffix ... ZIP). Reds on the pre-6hts _VALUE_PII_PATTERNS. NOTE: a
+    BARE contiguous digit run (a phone/MRN as one number) stays out by design — a
+    flood-avoidance residual pinned in test_scan_text_value_boundary_negative_controls.
+    """
+    assert pii_scan.scan_text(value, token_config=NO_CONFIG) >= 1, label
+
+
 @pytest.mark.parametrize("value", [
     "train at 5 Star Gym Way",             # Title-case gym name, not a street (BUG-1)
     "30 min Dr Patel followup",            # 'Dr' as Doctor honorific, not Drive (BUG-1)
@@ -525,7 +583,6 @@ def test_scan_text_detects_compatibility_homograph_email():
     "target 10000 steps or 12500 calories",  # word-state 'or' + two ZIP-shaped metrics (BUG-1)
     "12 week plan from dr patel: 10000 steps/day",  # 'dr' honorific as street-suffix lead (BUG-2)
     "10 sets in 90210 zone",               # word-state 'in' + 5-digit mid-value (HIST-1)
-    "123 Main St\nSpringfield, IL 62704",  # canonical TWO-LINE address — out of scope (TEST-1)
 ])
 def test_scan_text_value_boundary_negative_controls(value):
     """g5x AC2 + nue: health free-text does NOT trip the value patterns (== 0).

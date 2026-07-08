@@ -488,14 +488,18 @@ def test_probe_crown_jewel_egress_de_associated_and_library_operator_free(tmp_pa
     # the fixture token config is non-vacuous — a planted operator token IS detected
     assert pii_scan.scan_text("contact Waldo Testname today", token_config=cfg) >= 1
 
-    # library-association: the variant-keyed page is operator-free
+    # library-association: the variant-keyed page is operator-free. include_dob=False:
+    # a genetics PAGE carries research/provenance DATES that are citations, not the
+    # operator's DOB — the DOB class guards the operator-VALUE boundary, not public
+    # library content (bead yduw; matches the research_query + wiki-ingest-lint guards).
     lib = tmp_path / "genlib"
     lib.mkdir()
     page = _write_genetics_page(
         lib, gene="CYP1A2", rsid="rs762551",
         findings=[("(A;A)", "fast-caffeine-metabolism", "clears caffeine quickly [1]")],
     )
-    assert pii_scan.scan_text(page.read_text(encoding="utf-8"), token_config=cfg) == 0
+    assert pii_scan.scan_text(page.read_text(encoding="utf-8"), token_config=cfg,
+                              include_dob=False) == 0
 
 
 def test_probe_raw_genotype_never_reaches_no_train_planner(tmp_path):

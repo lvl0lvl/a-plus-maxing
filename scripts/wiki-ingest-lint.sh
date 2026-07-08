@@ -246,7 +246,11 @@ check_genetics() {
     local root cfg hits
     root="$(cd "$SCRIPT_DIR/.." && pwd)"
     cfg="$REPO_ROOT/vault/meta/operator-identity.txt"
-    if ! hits="$(PYTHONPATH="$root" python3 -c 'import sys; from scripts.guard.pii_scan import scan_text_full; print(scan_text_full(open(sys.argv[1], encoding="utf-8").read(), token_config=sys.argv[2]))' "$f" "$cfg" 2>/dev/null)"; then
+    # include_dob=False: this is PUBLIC library-PAGE content, not an operator value — a
+    # research/provenance DATE in a genetics page is a citation, not the operator's DOB
+    # (the DOB class guards the operator-VALUE boundary — summarize/capture — bead yduw).
+    # Identity tokens + email/phone/postal still scan (those WOULD be a public-page leak).
+    if ! hits="$(PYTHONPATH="$root" python3 -c 'import sys; from scripts.guard.pii_scan import scan_text_full; print(scan_text_full(open(sys.argv[1], encoding="utf-8").read(), token_config=sys.argv[2], include_dob=False))' "$f" "$cfg" 2>/dev/null)"; then
         violation "$INV" "$rel: SEC-ORD-01 operator-token scan failed to run"
     elif [ "${hits:-0}" -ge 1 ]; then
         violation "$INV" "$rel: operator-identity token(s) in body (SEC-ORD-01 — genetics library must be operator-free)"

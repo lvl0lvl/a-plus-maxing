@@ -128,15 +128,18 @@ _COMPILED_SECRET = [re.compile(p) for p in SECRET_PATTERNS.values()]
 # sets, felt ok, 10000") still false-positives — fail-closed, the operator
 # rephrases; (ii) the tail guard makes a ZIP followed by a bare word ("62704
 # usa") an accepted recall miss; (iii) the canonical TWO-LINE mailing address
-# ("123 Main St\nSpringfield, IL 62704") is NOT detected — the street-line/
-# city-line newline split is out of scope (extension tracked in a bead).
+# ("123 Main St\nSpringfield, IL 62704") IS now detected (bead 6hts): the
+# suffix->ZIP span uses [\s\S], so the street-line/city-line newline split is in
+# scope, still bounded (<=64) and co-signal-anchored.
 # Spelled-out state names ("illinois") and ZIP-less street lines are NOT
 # matched (the ZIP is the co-signal that keeps the detector off legitimate
 # training text). Structured `postal-address` store data is already stripped
 # via the router's _RAW_TO_FIELD derivation, so this covers the free-text-typed
-# residual. Out of scope here: cross-script (Cyrillic) homographs, TLD-less
-# local addresses (name@localhost), and bare contiguous phone digits (which
-# flood on numeric IDs) — single-operator accidental-leakage threat model.
+# residual. A full DOB / calendar date and a dashed SSN are detected too (beads
+# yduw / 6hts). Out of scope here: cross-script (Cyrillic) homographs, TLD-less
+# local addresses (name@localhost), and bare contiguous digit runs — a phone/MRN
+# typed as one number (floods on legit numeric metrics; a threshold opt-in is
+# tracked in bead 6hts) — single-operator accidental-leakage threat model.
 _ZIP = r"\d{5}(?:-\d{4})?"
 _STREET_SUFFIX = (
     r"st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|way|ct|court|"
@@ -157,7 +160,11 @@ _VALUE_PII_PATTERNS = {
     # the suffix->ZIP span is line-confined, the ZIP tail-guarded.
     "postal-street-zip": (
         rf"(?<!\d)\d{{1,5}}\s*,?\s+(?:[\w'’.#-]+\s+){{1,5}}(?:{_STREET_SUFFIX})\b\.?"
-        rf"[^\n]{{0,48}}?(?<!\d){_ZIP}(?!\s*\w)",
+        # [\s\S] (not [^\n]) so the canonical TWO-LINE mailing address — street line
+        # \n city/state/ZIP line — is caught (bead 6hts); still bounded (<=64) and
+        # co-signal-anchored (street-number + suffix ... ZIP), so it does not widen
+        # onto unrelated content across a paragraph.
+        rf"[\s\S]{{0,64}}?(?<!\d){_ZIP}(?!\s*\w)",
         re.IGNORECASE,
     ),
     # street-number lead-in ... 2-letter state token, then the tail-guarded ZIP
@@ -186,8 +193,80 @@ _VALUE_PII_PATTERNS = {
         r"\b[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d\b",
         re.IGNORECASE,
     ),
+    # Date-of-birth / full-date value class (bead yduw). A full calendar date
+    # (day + month + year) typed into a pass-through free-text field is a DOB leak
+    # vector — Security EXECUTED it at the T9 review: goal-targets='reach peak by
+    # birthday 1986-03-14' crossed VERBATIM to the no-train dispatch payload AND the
+    # clarifying model request, because scan_text had no date detector. Fail-closed
+    # on any FULL date (all three of day/month/year) in ISO, slash/dot (either
+    # order), and month-name forms, each anchored on a 19xx/20xx year so a bare year,
+    # a time ("08:00:00"), a metric run ("10000 steps"), or a MONTH-YEAR partial
+    # ("pre-Jan-2026 loading") does NOT trip it. A legitimate FULL target date
+    # ("2026-08-01") is an accepted fail-closed residual — the operator restates it
+    # relatively (mirrors the postal accepted-residual philosophy on this fail-closed
+    # boundary). Bare years and day/month-only fragments are deliberately out (too
+    # low-signal — they flood on legit health numbers).
+    "dob-iso": (
+        # (?![T\s]\d{2}:) excludes the date-part of an ISO TIMESTAMP ("2026-06-01T08:00"
+        # / "2026-06-01 08:00") — a store-reading timepoint is not a DOB leak; a bare
+        # DOB ("1986-03-14", or followed by prose) still matches.
+        r"(?<!\d)(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?!\d)(?![T\s]\d{2}:)",
+        0,
+    ),
+    "dob-numeric-year-last": (
+        # [/.-] covers slash, dot, AND dash ("04-12-1986"); still anchored on a
+        # 4-digit 19xx/20xx year so a macro split ("40/30/30") or set scheme ("3-4-5")
+        # — which has no 4-digit year — does NOT trip it. A 2-digit-year date
+        # ("04/12/86") is a deliberate flood-avoidance residual (it collides with
+        # macro splits); care_review's local _DATE_LIKE covers it at the meds boundary.
+        r"(?<!\d)\d{1,2}[/.-]\d{1,2}[/.-](?:19|20)\d{2}(?!\d)",
+        0,
+    ),
+    "dob-numeric-year-first": (
+        r"(?<!\d)(?:19|20)\d{2}[/.]\d{1,2}[/.]\d{1,2}(?!\d)",
+        0,
+    ),
+    "dob-monthname": (
+        r"(?<![a-z])(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+"
+        r"\d{1,2}(?:st|nd|rd|th)?,?\s+(?:19|20)\d{2}\b",
+        re.IGNORECASE,
+    ),
+    "dob-daymonthname": (
+        r"\b\d{1,2}(?:st|nd|rd|th)?\s+"
+        r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+"
+        r"(?:19|20)\d{2}\b",
+        re.IGNORECASE,
+    ),
+    # US SSN (bead 6hts): the dashed 3-2-4 token is unambiguous PII with no flood
+    # cost — no legit health metric takes that shape. NOTE the deliberate boundary:
+    # bare CONTIGUOUS digit runs (a phone/MRN typed as one number, "4155550199")
+    # stay OUT — a bare-digit-run detector floods on legit numeric metrics (the same
+    # rationale as the phone digit-floor), so opting into it is a precision/recall
+    # tradeoff needing an explicit threshold decision (bead 6hts). This module adds
+    # only the no-flood high-signal shape.
+    "ssn-dashed": (
+        r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)",
+        0,
+    ),
 }
-_VALUE_COMPILED = [re.compile(pat, flags) for pat, flags in _VALUE_PII_PATTERNS.values()]
+# The value patterns split into the base contact/identifier set (email, phone,
+# postal, SSN — applied by EVERY value-scan) and the DOB/full-date class (the `dob-*`
+# keys). The date class is an OPERATOR-VALUE-boundary concern (a DOB typed into a
+# pass-through field / form field), NOT a public-content concern: a landed genetics/
+# wiki library page legitimately carries research/provenance DATES that are not
+# operator PII. Callers scanning operator VALUES keep `include_dob=True` (the
+# default); callers scanning PUBLIC PAGE CONTENT (the genetics SEC3 landed-page
+# guard) pass `include_dob=False` so a citation date is not mistaken for a DOB leak.
+_VALUE_COMPILED = [
+    re.compile(pat, flags)
+    for name, (pat, flags) in _VALUE_PII_PATTERNS.items()
+    if not name.startswith("dob-")
+]
+_DOB_COMPILED = [
+    re.compile(pat, flags)
+    for name, (pat, flags) in _VALUE_PII_PATTERNS.items()
+    if name.startswith("dob-")
+]
 
 # scan_text caps its input before matching: the unanchored email local-part makes
 # `findall` O(n^2) on a long string (a measured multi-second hang on a pasted blob),
@@ -338,7 +417,7 @@ def _resolve_token_config(token_config, identity_config, caller):
     return token_config
 
 
-def scan_text(text, token_config=_SENTINEL, identity_config=None):
+def scan_text(text, token_config=_SENTINEL, identity_config=None, include_dob=True):
     """Count operator-PII matches in a single in-memory string.
 
     The value-level counterpart to `scan` (which reads file CONTENTS for the
@@ -376,11 +455,11 @@ def scan_text(text, token_config=_SENTINEL, identity_config=None):
     """
     token_config = _resolve_token_config(token_config, identity_config, "scan_text")
     normalized = unicodedata.normalize("NFKC", text)[:_MAX_SCAN_TEXT_LEN]
-    patterns = _VALUE_COMPILED + _load_token_patterns(token_config)
+    patterns = _VALUE_COMPILED + (_DOB_COMPILED if include_dob else []) + _load_token_patterns(token_config)
     return sum(len(pattern.findall(normalized)) for pattern in patterns)
 
 
-def scan_text_full(text, token_config=_SENTINEL, identity_config=None):
+def scan_text_full(text, token_config=_SENTINEL, identity_config=None, include_dob=True):
     """Count operator-PII matches in a string's FULL length (no `_MAX_SCAN_TEXT_LEN` cap).
 
     Identical to `scan_text` except it does NOT truncate at `_MAX_SCAN_TEXT_LEN`, so
@@ -408,7 +487,7 @@ def scan_text_full(text, token_config=_SENTINEL, identity_config=None):
     """
     token_config = _resolve_token_config(token_config, identity_config, "scan_text_full")
     normalized = unicodedata.normalize("NFKC", text)
-    patterns = _VALUE_COMPILED + _load_token_patterns(token_config)
+    patterns = _VALUE_COMPILED + (_DOB_COMPILED if include_dob else []) + _load_token_patterns(token_config)
     return sum(len(pattern.findall(normalized)) for pattern in patterns)
 
 
