@@ -48,6 +48,16 @@ rc=$?
 assert_rc "a stale exclusion fails the run" 1 $rc
 assert_contains "stale exclusion is named" "stale exclusion" "$out"
 
+# D: a foreign-namespace exclusion (a toolkit test-*.sh name) is a no-op, not a
+# stale RED — this floor only stale-guards its own test_*.sh namespace, so a shared
+# CLOSE_AUDIT_FLOOR_EXCLUDE forwarded to both floors cannot cross-fire (bead 23q5).
+CLEAN="$(mktemp -d)"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$CLEAN/test_alpha.sh"; chmod +x "$CLEAN/test_alpha.sh"
+RUN_ALL_TESTS_DIR="$CLEAN" RUN_ALL_TESTS_EXCLUDE="test-roster-select.sh" bash "$RUNNER" >/dev/null 2>&1
+rc=$?
+rm -rf "$CLEAN"
+assert_rc "a foreign-namespace exclusion is a no-op, not a stale RED" 0 $rc
+
 echo ""
 echo "test_run_all_tests: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1

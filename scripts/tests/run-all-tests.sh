@@ -46,7 +46,12 @@ excluded=0
 failed_names=()
 
 # Verify every excluded name actually exists (a stale exclusion is a silent cap).
+# Scoped to this floor's own test_*.sh namespace: a name that is not an a-plus test
+# basename belongs to another floor (e.g. the toolkit floor's test-*.sh) and is not
+# this floor's stale concern — so a shared CLOSE_AUDIT_FLOOR_EXCLUDE forwarded to
+# both floors never cross-fires this one's stale-guard (bead 23q5 review).
 for ex in ${RUN_ALL_TESTS_EXCLUDE:-}; do
+  case "$ex" in test_*.sh) ;; *) continue ;; esac
   if [ ! -e "$TESTS_DIR/$ex" ]; then
     echo "[run-all] ERROR: excluded test does not exist: $ex (stale exclusion)"
     failed=$((failed + 1))
