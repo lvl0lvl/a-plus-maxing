@@ -236,25 +236,28 @@ def _value_has_pii(value, identity_config):
     overlap can provably contain every match in some window: a long postal straddling
     a window step boundary is seen whole by neither window and leaks past the gate.
     Instead this scans the value in a SINGLE non-truncating pass via
-    `pii_scan.scan_text_full`, which has no window boundaries to straddle. Scoped to the
-    capture path — it does NOT change `scan_text`'s own default cap (which has other
-    callers); the capture-path values are bounded operator form fields.
+    `pii_scan.scan_operator_value(full=True)` (which dispatches to the non-truncating
+    `scan_text_full`), which has no window boundaries to straddle. `scan_operator_value`
+    also turns the opt-in DOB (yduw) + bare-digit-run (6hts) classes ON — a capture field
+    is a free-text operator value. Scoped to the capture path — it does NOT change
+    `scan_text`'s own default cap (which has other callers); the capture-path values are
+    bounded operator form fields.
 
     Args:
         value (str): The free-text field value to scan in full.
         identity_config (str | Path | None): The operator-identity token config passed
-            to `scan_text_full`; None falls through to its default.
+            to `scan_operator_value`; None falls through to its default.
 
     Returns:
         (bool) True when the full value scans positive for operator PII.
     """
-    # include_dob=True: a capture free-text field is the yduw DOB vector (a birthday
-    # typed into a pass-through field). The DOB class is opt-in (default off) — the
-    # free-text operator-value boundaries (capture, summarize, care_review) opt in; the
-    # frozen engine's derived-content scans (plan_step GATE, deid_in) keep it off.
+    # scan_operator_value: a capture free-text field is a free-text OPERATOR-VALUE — the
+    # yduw DOB vector (a birthday) + the 6hts bare-digit-run vector (a phone typed as one
+    # number). The named entry point turns the aggressive opt-in classes ON; the frozen
+    # engine's derived-content scans (plan_step GATE, deid_in) use the low-level default (off).
     if identity_config is None:
-        return pii_scan.scan_text_full(value, include_dob=True) > 0
-    return pii_scan.scan_text_full(value, token_config=identity_config, include_dob=True) > 0
+        return pii_scan.scan_operator_value(value, full=True) > 0
+    return pii_scan.scan_operator_value(value, token_config=identity_config, full=True) > 0
 
 
 def _bounded_value_ok(name, value):

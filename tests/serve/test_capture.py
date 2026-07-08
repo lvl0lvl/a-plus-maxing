@@ -498,6 +498,16 @@ def test_dob_in_free_text_token_routes_record_only(tmp_path):
     assert "1986-03-14" in scaffold_text, "the DOB value did not route record-only"
 
 
+def test_bare_digit_run_in_free_text_is_caught():
+    """6hts WIRING: capture._value_has_pii opts into the bare-digit-run class (via
+    scan_operator_value), so a phone/MRN typed as ONE contiguous >=9-digit number in a
+    free-text field IS caught. REDs if capture drops the scan_operator_value opt-in — the
+    separator-anchored phone pattern does NOT catch a bare-contiguous run. A legit <=8-digit
+    metric stays under the >=9 floor."""
+    assert capture._value_has_pii("call me at 4155550199", _ABSENT_IDENTITY) is True
+    assert capture._value_has_pii("cumulative 98550000 steps", _ABSENT_IDENTITY) is False
+
+
 # A PII token whose match span EXCEEDS the old `overlap=64`, so positioned across the
 # old window step boundary (~char 4032) it was seen WHOLE by neither overlapping window
 # and leaked. A 79-char postal (span > 64) and an email — both real `scan_text_full`

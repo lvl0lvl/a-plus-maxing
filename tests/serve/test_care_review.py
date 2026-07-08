@@ -318,6 +318,17 @@ def test_curation_defers_fail_closed_on_identity_in_med_value(tmp_path):
     assert result["questions"], "leg 1 was suppressed by the leg-2 fail-closed gate"
 
 
+def test_med_value_gate_catches_bare_digit_run():
+    """6hts WIRING: the leg-2 med gate _med_value_has_identity opts into the bare-digit-run
+    class (via scan_operator_value), so a phone/MRN typed as ONE contiguous >=9-digit number
+    in a med free-text value IS caught (the value defers rather than egress). REDs if the gate
+    drops the scan_operator_value opt-in — a bare-contiguous run is neither a _DATE_LIKE match
+    nor a separator-anchored phone. A legit <=8-digit metric stays under the >=9 floor."""
+    nc = "vault/meta/__no_such_identity_config__.txt"
+    assert care_review._med_value_has_identity("call the pharmacy at 4155550199", nc) is True
+    assert care_review._med_value_has_identity("took 98550000 total doses tracked", nc) is False
+
+
 def test_clean_med_value_still_curates_after_the_gate(tmp_path):
     """The leg-2 gate fires ONLY on a PII/date hit — a clean med value still curates normally."""
     store_root = tmp_path / "store"

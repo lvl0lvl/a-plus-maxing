@@ -713,6 +713,12 @@ def test_summarize_does_not_gate_derived_fields():
     # pass-through field — caught by the [\s\S] street->ZIP span.
     ("hard-limits", "mail me at 123 Main St\nSpringfield, IL 62704", "123 Main St",
      "two-line postal (6hts)"),
+    # 6hts (bare-digit-run WIRING): a phone/MRN typed as ONE contiguous >=9-digit number
+    # in a pass-through field — caught ONLY via scan_operator_value's include_digit_run.
+    # REDs if the 8j6 gate drops the scan_operator_value opt-in; the SEPARATED phone row
+    # above is caught by phone-separated and does NOT exercise the bare-digit-run class.
+    ("goal-targets", "call me at 4155550199 anytime", "4155550199",
+     "bare-digit-run phone (6hts)"),
 ])
 def test_summarize_raises_on_widened_pii_class_in_passthrough(field, value, secret, label):
     """g5x AC1 + nue: each tractable EXCLUDED_RAW_PII contact class in a pass-through

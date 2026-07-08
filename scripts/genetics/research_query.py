@@ -158,11 +158,11 @@ def land_finding_page(finding, *, library_root):
     content = "\n".join(lines) + "\n"
     # SEC3 (public-repo guard, symmetric with the outbound `assert_query_de_associated`): rescan the
     # rendered page for operator PII before it lands — the dispatcher content is otherwise verbatim,
-    # and the page commits to a PUBLIC repo. Fail-closed rather than leak. include_dob=False: this is
-    # PUBLIC PAGE CONTENT, not an operator value — a research/provenance DATE in a goal-agnostic
-    # library page is a citation, not the operator's DOB (the DOB class guards the operator-VALUE
-    # boundary — summarize/capture — not public wiki content; bead yduw).
-    if pii_scan.scan_text_full(content, include_dob=False):
+    # and the page commits to a PUBLIC repo. Fail-closed rather than leak. scan_public_content: this
+    # is PUBLIC PAGE CONTENT, not an operator value — a research/provenance DATE or numeric citation in
+    # a goal-agnostic library page is NOT the operator's DOB/phone (the DOB + bare-digit-run classes
+    # guard the operator-VALUE boundary — summarize/capture — not public wiki content; beads yduw/6hts).
+    if pii_scan.scan_public_content(content, full=True):
         raise ValueError(
             "genetics finding page carries operator PII — refusing to land (public-repo guard)"
         )

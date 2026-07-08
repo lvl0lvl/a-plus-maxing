@@ -593,6 +593,9 @@ def test_dated_derived_plan_is_not_flagged_as_pii():
     dated_plan = {
         "workout": "Deload the week of 2026-07-14; retest lipids by 2026-09-01.",
         "check_in": "next review 08/15/2026",
+        # a long numeric reference must not fail-close either — the 6hts bare-digit-run
+        # class is OPT-IN and stays OFF at the frozen GATE's low-level scan_text_full default.
+        "milestone": "cumulative 1000000000 total",
     }
     dated_gate = plan_driver.Request(plan_driver.GATE, (dated_plan, producer))
     assert plan_step._scan_yield_payload(dated_gate, pii_scan.DEFAULT_IDENTITY_CONFIG) == 0, (
