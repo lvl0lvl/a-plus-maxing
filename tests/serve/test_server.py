@@ -1337,6 +1337,36 @@ def test_generate_plan_records_all_domains_and_renders(tmp_path):
         srv.server_close()
 
 
+def test_generate_plan_path_b_normalizes_malformed_author_no_total_crash(tmp_path):
+    """bead mk0i / API-01: Path B (the in-app POST /generate-plan front door) normalizes each model
+    author envelope, so a LIST-valued scalar-contract rec field in ONE domain cannot crash the frozen
+    composer and degrade ALL FOUR domains. Before the fix a list `category` raised TypeError inside
+    the frozen generate_plans, taking down every domain (server.py's blanket except -> total
+    'could not generate plan'); server.py now wraps `self.client.author` with `normalize_author_output`
+    (mirroring the cadence path's build_dispatch). RED-capable: revert the server.py wrap and the three
+    well-formed domains stop recording."""
+    _seed_summary_store(tmp_path / "store")
+    envelopes = _domain_envelopes()
+    envelopes["peptides"]["recommendations"][0]["category"] = ["peptide-therapy", "other"]  # mk0i shape
+    client = _MockAuthorClient(envelopes)
+    srv, port = _server_with_author(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"POST /generate-plan returned {status}"
+        payload = json.loads(body)
+        today = datetime.date.today().isoformat()
+        # the three well-formed domains still RECORD — the malformed peptides rec did NOT crash them
+        for domain in ("workout", "nutrition", "supplements"):
+            assert payload["results"].get(domain) == "recorded", (
+                f"a malformed peptides author crashed {domain} (Path B not normalized): {payload['results']}"
+            )
+            assert plan_schema.read_plan(domain, today, tmp_path / "store")["plan"] is not None
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
 def test_generate_plan_different_author_yields_different_plan(tmp_path):
     """Non-tautological: a DIFFERENT mock author output -> a DIFFERENT rendered plan.
 

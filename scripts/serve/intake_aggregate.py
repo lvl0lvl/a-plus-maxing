@@ -128,6 +128,91 @@ def normalize_summary(summary):
     }
 
 
+# The population-mismatch grounding tokens the frozen plan composer flags on (mirrors
+# its `GROUNDING_NEEDS_FLAG`; a test-time pin in tests/serve/test_intake_aggregate.py fails on
+# desync — the serve-layer no-reimplementation grep guard blocks an in-module import/assert). A non-scalar
+# `grounding` (a list/tuple element OR a dict value) that CONTAINS one is coerced TO it, so the
+# mismatch disclosure still fires (fail-toward-flagging) rather than being silently missed.
+_GROUNDING_FLAG_TOKENS = ("animal", "in-vitro")
+
+
+def _normalize_rec(rec):
+    """Coerce one recommendation's scalar-contract fields to the frozen plan-composer contract.
+
+    A model author emitting a LIST/dict where the frozen plan composer expects a scalar crashes it
+    (the 940o class at the author-output boundary, bead mk0i) or silently defeats a safety filter.
+    Per field:
+      - `claim` -> `.lower()` + substring match (crashes on a non-string): a list is joined with a
+        single SPACE — NOT `; `, which would split a limit-violating phrase across the separator so
+        the literal-claim HALT check misses it (SEC-02); any other non-string is `str()`-ed.
+      - `category` -> exact `category in prohibited_classes` (crashes on an unhashable list; and is
+        case/whitespace-sensitive). A non-scalar class is set to None; a scalar string is
+        canonicalized `strip().lower() or None` (SEC-01). Both route a non-matching/empty class into
+        the composer's FAIL-CLOSED indeterminate path (suppress) — NEVER joined, because a joined
+        class would miss the prohibited-class set and fail OPEN (an unsafe plan). RESIDUAL: plural /
+        synonym token variants still miss the frozen exact-match set — tracked as a follow-up.
+      - `grounding` -> `in GROUNDING_NEEDS_FLAG` (does NOT crash, but a non-scalar silently misses the
+        population-mismatch disclosure): an animal/in-vitro marker held in a list/tuple element OR a
+        dict value is preserved so the flag still fires (SEC-03); else stringified.
+      - `numbers` -> `_is_complete` iterates and calls `number.get(...)` (crashes on a non-dict
+        element): filtered to dict-only elements (a malformed number is dropped; a rec left without
+        actionable numbers renders without dosing, never crashes).
+    Every other field (source / confidence_tier / reversibility — presence-checked; `cross_domain` —
+    a bool) is left untouched. A non-dict rec passes through unchanged.
+    """
+    if not isinstance(rec, dict):
+        return rec
+    out = dict(rec)
+    claim = out.get("claim")
+    if claim is not None and not isinstance(claim, str):
+        out["claim"] = " ".join(str(x) for x in claim) if isinstance(claim, list) else str(claim)
+    category = out.get("category")
+    if category is not None:
+        # non-scalar -> None (fail-closed); scalar string -> canonicalized to the composer's
+        # lowercase-singular token form (empty/whitespace-only -> None, fail-closed). NEVER join.
+        out["category"] = (None if not isinstance(category, str)
+                           else category.strip().lower() or None)
+    grounding = out.get("grounding")
+    if grounding is not None and not isinstance(grounding, str):
+        candidates = (list(grounding.values()) if isinstance(grounding, dict)
+                      else list(grounding) if isinstance(grounding, (list, tuple)) else [])
+        marker = next((t for t in _GROUNDING_FLAG_TOKENS if t in candidates), None)
+        out["grounding"] = marker or (
+            " ".join(str(x) for x in grounding) if isinstance(grounding, list) else str(grounding))
+    if "numbers" in out:
+        nums = out["numbers"]
+        out["numbers"] = [n for n in nums if isinstance(n, dict)] if isinstance(nums, list) else []
+    return out
+
+
+def normalize_author_output(envelope):
+    """Coerce a model AUTHOR envelope's recommendation fields to the frozen plan-composer contract.
+
+    The specialist author is a non-deterministic no-train MODEL; like the de-id model (bead 940o,
+    `normalize_summary`), it can emit a LIST/dict where the frozen composer expects a scalar,
+    crashing the frozen composer mid-run (bead mk0i, the author-side of the same class). Applied at the
+    injectable dispatch seam (`subscription_dispatch.build_dispatch`), UPSTREAM of the frozen
+    `run_orchestrated` plan composer — the frozen spine is untouched.
+
+    A no-op on any shape that is NOT an author envelope (a dict carrying a `recommendations` list):
+    the same dispatch seam also routes judge / lens verdicts, whose shapes differ and are guarded
+    downstream (`gate_dispatch`), so they pass through unchanged.
+
+    Args:
+        envelope: The dispatch return — an author envelope `{specialist, recommendations: [...]}`,
+            or a judge/lens verdict, or any other shape.
+
+    Returns:
+        The author envelope with each recommendation's scalar-contract fields coerced (see
+        `_normalize_rec`); any non-author shape returned unchanged.
+    """
+    if not isinstance(envelope, dict) or not isinstance(envelope.get("recommendations"), list):
+        return envelope
+    out = dict(envelope)
+    out["recommendations"] = [_normalize_rec(r) for r in envelope["recommendations"]]
+    return out
+
+
 class AggregatingDeidClient:
     """A de-id client adapter that (1) aggregates the raw intake's high-cardinality timeseries
     (in-process, deterministically) BEFORE delegating the de-id model call to the inner

@@ -763,6 +763,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             from scripts.model.client import ModelCallError
             from scripts.plan import orchestrate, router
             from scripts.plan.generate_plan import AUTHOR_CALL_FAILED
+            from scripts.serve.intake_aggregate import normalize_author_output
             from scripts.store import plan_schema, store
             from vault.design.templates import app_shell
 
@@ -782,7 +783,11 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             author_errors = {}
             for domain in plan_schema.PLAN_DOMAINS:
                 try:
-                    authors[domain] = self.client.author(domain, summary)
+                    # Path B (the in-app /generate-plan front door): normalize the model author
+                    # envelope's scalar-contract rec fields UPSTREAM of the frozen composer, exactly
+                    # as the cadence path does at build_dispatch (bead mk0i — a list/dict rec field
+                    # otherwise crashes the frozen generate_plans composer mid-run for ALL domains).
+                    authors[domain] = normalize_author_output(self.client.author(domain, summary))
                 except ModelCallError:
                     author_errors[domain] = AUTHOR_CALL_FAILED
                 except (ImportError, ModuleNotFoundError):

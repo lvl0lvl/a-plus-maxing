@@ -13,7 +13,7 @@ import json
 import pytest
 
 from scripts.serve.intake_aggregate import (
-    aggregate_operator_state, normalize_summary, AggregatingDeidClient,
+    aggregate_operator_state, normalize_summary, normalize_author_output, AggregatingDeidClient,
 )
 
 
@@ -190,3 +190,132 @@ def test_adapter_normalizes_list_valued_deid_output():
     out = AggregatingDeidClient(inner).deidentify({"operator_state": []})
     assert out["hard-limits"] == "overhead-press-restricted; pullup-restricted"
     assert out["training-age-band"] == "20-plus-years"
+
+
+# --- mk0i: the AUTHOR-output boundary (the author-side of the 940o class) --------------------
+
+
+def test_normalize_author_output_coerces_scalar_contract_rec_fields():
+    """bead mk0i: the model author can emit a LIST/dict where `assemble` string/hashable-processes
+    a scalar. Pin each coercion: claim joined; category -> None (FAIL-CLOSED, never joined);
+    grounding preserves the animal/in-vitro flag token; malformed `numbers` elements dropped;
+    structured/scalar fields untouched."""
+    env = {"specialist": "P", "recommendations": [{
+        "claim": ["do X", "do Y"], "category": ["stimulant", "other"], "grounding": ["animal", "human"],
+        "source": "Smith 2024", "confidence_tier": "moderate", "reversibility": "reversible",
+        "numbers": ["3 sets", {"value": "3", "units": "sets", "reference_range": "2-5"}],
+    }]}
+    r = normalize_author_output(env)["recommendations"][0]
+    assert r["claim"] == "do X do Y"                        # SPACE-joined (SEC-02: "; " would split a limit phrase)
+    assert r["category"] is None                            # fail-closed (NOT "stimulant; other" — would fail open)
+    assert r["grounding"] == "animal"                       # flag token preserved (population-mismatch still fires)
+    assert r["numbers"] == [{"value": "3", "units": "sets", "reference_range": "2-5"}]  # non-dict dropped
+    assert r["source"] == "Smith 2024" and r["reversibility"] == "reversible"  # untouched
+
+
+def test_normalize_author_output_is_noop_on_non_author_shapes():
+    # the dispatch seam also routes judge / lens verdicts (different shapes, guarded downstream) —
+    # normalize must pass them through unchanged, keyed on the presence of a `recommendations` list.
+    for shape in ({"scores": {"quality": 8}}, {"verdict": "pass"}, {"recommendations": "not-a-list"},
+                  "sentinel", ["x"], None):
+        assert normalize_author_output(shape) == shape or normalize_author_output(shape) is shape
+
+
+def _author_summary(hard_limits):
+    """A minimal frozen-composer summary carrying an explicit `hard-limits` (self-contained tests)."""
+    return {"training-age-band": "x", "hard-limits": hard_limits, "goal-domains": "s"}
+
+
+def test_normalized_author_output_is_consumable_by_the_real_assemble_AND_fails_closed():
+    """bead mk0i (real-consumer pin): drive the model's realistic LIST-shaped author envelope through
+    the REAL `assemble()`. Self-contained (TEST-03): its OWN summary + a hard-limit whose subject the
+    benign claim cannot assert, so category->None (indeterminate) is the ONLY route to the strike —
+    the RED-capability cannot silently erode via the literal-claim HALT path.
+
+    Arm 1 (RED-capable): the raw list-shaped author envelope RAISES at the real `assemble()` (the
+    unprotected mk0i crash). Arm 2: the coerced envelope composes WITHOUT raising AND fails CLOSED —
+    the list `category` became indeterminate so the rec's actionable content is SUPPRESSED (a joined
+    category would have missed the prohibited set and fail OPEN)."""
+    from scripts.plan.assemble import assemble
+
+    summary = _author_summary("no stimulants")   # benign claim "hydrate well" cannot assert this subject
+    bad_env = {"specialist": "P", "recommendations": [{
+        "claim": ["hydrate well"], "category": ["stimulant", "other"], "grounding": "human",
+        "source": "Smith 2024", "confidence_tier": "moderate", "reversibility": "reversible",
+        "numbers": ["3 sets"],
+    }]}
+    with pytest.raises((AttributeError, TypeError)):
+        assemble(["perf"], summary, {"perf": lambda d, s: bad_env})   # unprotected mk0i crash
+
+    section = assemble(["perf"], summary,
+                       {"perf": lambda d, s: normalize_author_output(bad_env)})["sections"][0]
+    recs = section["recommendations"]
+    assert len(recs) == 1                                            # composed, no crash
+    assert recs[0].get("indeterminate_class_suppressed") is True     # FAIL-CLOSED (category->None->indeterminate)
+    assert recs[0].get("actionable_content_struck") is True          # actionable content suppressed
+    assert "indeterminate" in (recs[0].get("contradiction_disposition") or "").lower()  # the indeterminate CAUSE
+    assert "numbers" not in recs[0]                                  # struck-indeterminate removed the regimen
+
+
+@pytest.mark.parametrize("cat, struck", [
+    ("stimulant", True),          # canonical -> struck
+    ("Stimulant", True),          # SEC-01: capitalized -> canonicalized -> struck
+    (" stimulant ", True),        # SEC-01: whitespace -> struck
+    ("stimulant\n", True),        # SEC-01: trailing newline -> struck
+    ("", True),                   # SEC-01: empty -> None -> indeterminate -> struck
+    ("stimulants", False),        # RESIDUAL (documented): plural misses the frozen exact-match set
+])
+def test_scalar_category_canonicalized_against_the_real_assemble_halt(cat, struck):
+    """SEC-01: a scalar-string `category` is canonicalized (`strip().lower() or None`) so case /
+    whitespace / empty variants still hit the frozen composer's EXACT lowercase-singular
+    prohibited-class set (fail-closed strike) instead of shipping ACTIONABLE (fail-open). The plural
+    variant remains a documented residual (needs the frozen class-token map — tracked)."""
+    from scripts.plan.assemble import assemble
+    env = {"specialist": "P", "recommendations": [{
+        "claim": "hydrate well", "category": cat, "grounding": "human", "source": "S 2024",
+        "confidence_tier": "moderate", "reversibility": "reversible",
+        "numbers": [{"value": "1", "units": "u", "reference_range": "1-2"}]}]}
+    rec = assemble(["perf"], _author_summary("no stimulants"),
+                   {"perf": lambda d, s: normalize_author_output(env)})["sections"][0]["recommendations"][0]
+    assert bool(rec.get("actionable_content_struck")) is struck
+
+
+def test_dict_grounding_preserves_population_mismatch_flag():
+    """SEC-03 / TEST-02: an animal/in-vitro marker held in a DICT `grounding` value (not just a
+    list/tuple element) is preserved, so the frozen composer's population-mismatch disclosure still
+    fires — matching `_normalize_rec`'s docstring contract."""
+    from scripts.plan.assemble import assemble
+    env = {"specialist": "P", "recommendations": [{
+        "claim": "consider X", "category": "training", "grounding": {"evidence": "animal"},
+        "source": "S 2024", "confidence_tier": "moderate", "reversibility": "reversible",
+        "numbers": [{"value": "1", "units": "u", "reference_range": "1-2"}]}]}
+    assert normalize_author_output(env)["recommendations"][0]["grounding"] == "animal"
+    rec = assemble(["perf"], _author_summary("none"),
+                   {"perf": lambda d, s: normalize_author_output(env)})["sections"][0]["recommendations"][0]
+    assert rec.get("population_mismatch_flag") is True
+
+
+def test_clean_populated_author_envelope_passes_through_unchanged():
+    """TEST-01: a WELL-FORMED populated author envelope is a value-preserving no-op — the normalizer
+    must never silently alter a valid plan (no field coerced, no number dropped), and the real
+    `assemble()` emits it ACTIONABLE (not struck)."""
+    from scripts.plan.assemble import assemble
+    clean = {"specialist": "P", "recommendations": [{
+        "claim": "progressive overload", "category": "training", "grounding": "human",
+        "source": "RCT 2024", "confidence_tier": "moderate", "reversibility": "reversible",
+        "numbers": [{"value": "3", "units": "sets", "reference_range": "2-5"}]}]}
+    assert normalize_author_output(clean) == clean            # verbatim (canonical fields unchanged)
+    rec = assemble(["perf"], _author_summary(""),            # no hard limit -> HALT_CLEAR (not struck)
+                   {"perf": lambda d, s: normalize_author_output(clean)})["sections"][0]["recommendations"][0]
+    assert not rec.get("actionable_content_struck")           # a valid rec is emitted actionable
+    assert rec["numbers"] == [{"value": "3", "units": "sets", "reference_range": "2-5"}]
+
+
+def test_grounding_flag_tokens_mirror_the_frozen_composer_no_desync():
+    """HIST-01 / QUAL-01: `_GROUNDING_FLAG_TOKENS` byte-mirrors the frozen composer's
+    `GROUNDING_NEEDS_FLAG`; the change-control tripwire lives here (a test importing `assemble` does
+    not trip the serve-layer 'assemble'-grep guard, which scans only scripts/serve/*.py). Fails on
+    any future desync — the CI-time analogue of the codebase's module-load desync asserts."""
+    from scripts.plan.assemble import GROUNDING_NEEDS_FLAG
+    import scripts.serve.intake_aggregate as agg
+    assert agg._GROUNDING_FLAG_TOKENS == GROUNDING_NEEDS_FLAG
