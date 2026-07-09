@@ -34,6 +34,7 @@ import pytest
 
 from scripts.plan import assemble as assemble_mod
 from scripts.plan.assemble import assemble
+from scripts.serve.intake_aggregate import normalize_summary
 
 
 # --- summary / recommendation / roster fixtures --------------------------------
@@ -932,3 +933,44 @@ def test_every_claim_transits_all_filters():
         assert not rec.get("cross_domain"), (
             f"cross-domain claim {rec.get('claim')!r} reached the emitted set"
         )
+
+
+# --- pkty / PF-S122-01: the real assemble() consumer on the model-realistic list shape ---------
+
+
+def test_model_realistic_list_hard_limits_crashes_raw_and_composes_normalized():
+    """PF-S122-01 (pkty): drive the MODEL's realistic list shape through the REAL `assemble()`.
+
+    `generate_plan` calls `assemble([domain], summary, roster)` (its :372 consumer). The no-train
+    MODEL de-id emits LIST-valued `hard-limits` (bead 940o); `assemble`'s first act is
+    `_prohibited_classes(summary)` -> `(summary.get("hard-limits") or "").lower()`, which raises on
+    a list. The plan-path mocks used the deterministic STRING shape, so this crash class was
+    invisible until the first live run. This drives the model's REALISTIC shape through the real
+    composer (not the private helper the S122 pin covered):
+
+      Arm 1 (RED-capable): the raw model list shape RAISES at the real `assemble()` — proves the
+        shape is load-bearing (the crash is real; `normalize` is not decorative).
+      Arm 2: the `normalize_summary`-coerced summary (the AggregatingDeidClient production wrap,
+        wired in `cadence_runner.main`) composes without raising.
+
+    The boundary-side robust fix (coerce at the frozen `deid_in`, so an UNWRAPPED supplier is also
+    safe) is bead `s923`; this test is the consumer-side proof that the model shape reaches a real
+    string op.
+    """
+    goal_set = ["strength"]
+    roster = {"strength": _specialist("S", [_rec("progressive overload")])}
+    model_shape = _summary(**{"hard-limits": ["overhead-press-restricted", "pullup-restricted"]})
+
+    with pytest.raises(AttributeError, match="has no attribute 'lower'"):
+        assemble(goal_set, model_shape, roster)   # un-normalized model list -> the 940o crash
+
+    # normalize (the AggregatingDeidClient production wrap) coerces list -> "; "-joined string, and
+    # the composed section CONSUMES it: personalization surfaces the field by name. Assert the
+    # normalized VALUE flowed INTO the plan -- not mere `sections` non-emptiness, which assemble
+    # yields for any non-empty goal_set (incl. a coverage-gap or a broken-but-non-crashing summary),
+    # so an existence-only assert would pass even if normalize produced garbage. This pins normalize
+    # as load-bearing at the real composer.
+    section = assemble(goal_set, normalize_summary(model_shape), roster)["sections"][0]
+    assert section["domain"] == "strength"
+    assert section["personalization"]["hard-limits"] == "overhead-press-restricted; pullup-restricted"
+    assert [r["claim"] for r in section["recommendations"]] == ["progressive overload"]
