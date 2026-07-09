@@ -90,21 +90,42 @@ def aggregate_operator_state(operator_state, *, min_count=DEFAULT_MIN_COUNT,
 
 
 def normalize_summary(summary):
-    """Coerce a model-de-id summary's list-valued fields to `; `-joined strings.
+    """Coerce a model-de-id summary's non-string field values to the string consumer contract.
 
     The no-train de-id MODEL (`deid_in` via `ModelClient`) emits multi-value SUMMARY_FIELD_SET
-    fields as LISTS (e.g. `hard-limits: [...]`), but the deterministic `router.summarize` — the
-    shape the downstream frozen plan-composition layer / translators consume — emits `; `-joined STRINGS and
-    string-processes them (`(summary.get("hard-limits") or "").lower()`). A raw list crashes
-    that consumer (`'list' object has no attribute 'lower'`, bead 940o — surfaced at the first
-    LIVE run; the mock tests used string-shaped fixtures). This coerces list values to the
-    string contract. The fail-closed sentinel (`{"deidentified": False}`) passes through
-    unchanged; `deid_in`'s key-whitelist has already validated the KEYS.
+    fields as LISTS (observed at the first LIVE run) — and, being a non-deterministic model on
+    the crown-jewel path, could emit a dict/scalar too. The downstream frozen plan-composition
+    layer / translators expect STRING values and string-process them (the hard-limit filter does
+    `(...).lower()`); ANY non-string value crashes that consumer (`'list'/'dict'/'bool' object
+    has no attribute 'lower'`, bead 940o — the mock tests used string-shaped fixtures so the
+    crash reached the first live run). This coerces EVERY value to a string: a list joins with
+    `; ` (which every current SUMMARY_FIELD_SET consumer parses equivalently — they all strip
+    tokens — though NOT byte-identical to `router.summarize`, which joins rx-/genetic-trait
+    tokens with `;`); any other non-string (dict/int/float/bool) is `str()`-ed (so a falsy 0
+    is not silently dropped by a downstream `(x or "")`).
+
+    `normalize_summary` runs INSIDE the de-id client, so `deid_in`'s own key-whitelist + PII
+    value-scan run on THIS return (downstream, not before). The fail-closed sentinel
+    (`{"deidentified": False}`) and any non-dict input pass through unchanged — the sentinel
+    branch is forward-defense for a de-id backend that RETURNS the sentinel rather than raising
+    (`deid_in`'s discriminated-union contract permits it, though the current `ModelClient` raises).
+
+    Args:
+        summary (dict): The de-id model output — SUMMARY_FIELD_SET-keyed (list / scalar / string
+            values), or the fail-closed sentinel.
+
+    Returns:
+        (dict) The summary with every field value coerced to a string (a list `; `-joined, any
+        other non-string `str()`-ed); the sentinel and non-dict inputs returned unchanged.
     """
     if not isinstance(summary, dict) or summary.get("deidentified") is False:
         return summary
-    return {k: ("; ".join(str(x) for x in v) if isinstance(v, list) else v)
-            for k, v in summary.items()}
+    return {
+        k: (v if isinstance(v, str)
+            else "; ".join(str(x) for x in v) if isinstance(v, list)
+            else str(v))
+        for k, v in summary.items()
+    }
 
 
 class AggregatingDeidClient:
@@ -135,6 +156,10 @@ class AggregatingDeidClient:
 
     def __getattr__(self, name):
         # Delegate every non-deidentify method (converse / author / extract_readings) to the
-        # inner client. `_inner`/`_min_count`/`_recent_window` exist on self, so they never
-        # reach here (no recursion).
+        # inner client. `_inner`/`_min_count`/`_recent_window` exist on self, so they never reach
+        # here. A dunder probe (copy/pickle asking for `__deepcopy__`/`__getstate__`) on a
+        # half-built instance would hit `__getattr__('_inner')` before __init__ set it — raise
+        # cleanly for dunders instead of recursing into a RecursionError.
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
         return getattr(self._inner, name)

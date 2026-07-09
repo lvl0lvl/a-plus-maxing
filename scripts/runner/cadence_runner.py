@@ -110,10 +110,11 @@ def main(argv=None):
     """
     root = _resolved_store_root()
     # AggregatingDeidClient: collapse the high-cardinality wearable timeseries in the raw intake
-    # BEFORE the metered de-id call (a real intake is ~131K Opus tokens, ~30x of which is raw
-    # RHR/HRV/SpO2 points the model would crunch into a trend) and normalise the model's
-    # list-valued output to the string shape the assemble/translate consumers expect (bead 940o).
-    # 0-spend at construct; the frozen engine (plan_loop/plan_orchestrator/deid_in) is untouched.
+    # BEFORE the metered de-id call — a real intake is ~131K Opus tokens, MOST of it raw
+    # RHR/HRV/SpO2 points the model would crunch into a trend; aggregation cuts that ~30x on a
+    # real intake (a ~10-100x reduction depending on timeseries density) — and normalise the
+    # model's non-string output to the string shape the plan-composition consumers expect
+    # (bead 940o). 0-spend at construct; the frozen engine is untouched.
     deid_client = AggregatingDeidClient(ModelClient())
     return run(root, dispatch_factory=subscription_dispatch.default_session_factory,
                deid_client=deid_client)

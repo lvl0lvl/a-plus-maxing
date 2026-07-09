@@ -7,7 +7,10 @@ boundary. These pin: the collapse + its stats, the pass-through of everything el
 payload reduction, and the `AggregatingDeidClient` adapter's delegate-else-aggregate contract.
 """
 
+import importlib
 import json
+
+import pytest
 
 from scripts.serve.intake_aggregate import (
     aggregate_operator_state, normalize_summary, AggregatingDeidClient,
@@ -77,8 +80,70 @@ def test_normalize_summary_coerces_lists_to_joined_strings():
     assert out["training-age-band"] == "20-plus-years"
     assert out["hard-limits"] == "overhead-press-restricted; pullup-restricted"
     assert out["goal-targets"] == "fitness; longevity"
-    # the coerced value survives .lower() (the exact assemble op that crashed on a list)
-    assert out["hard-limits"].lower() == "overhead-press-restricted; pullup-restricted"
+
+
+@pytest.mark.parametrize("bad_value", [
+    ["overhead-press-restricted", "pullup-restricted"],   # the OBSERVED live shape (list)
+    {"shoulder": "no-overhead"},                          # dict (BUG-940O-01)
+    True,                                                 # bool (BUG-940O-01)
+])
+def test_normalized_output_is_consumable_by_the_real_assemble_filter(bad_value):
+    """bead 940o / BUG-940O-01: the FIX must run the PRODUCTION crash path, not an inline .lower().
+
+    The real consumer `assemble._prohibited_classes` does `(summary.get("hard-limits") or "").lower()`
+    — a NON-STRING value crashes it. This pins that (a) the UN-normalized model value RAISES at the
+    real consumer (normalize is load-bearing, not decorative), and (b) the normalized value is
+    consumed without raising. Covers the list shape (observed) + dict/bool (BUG-940O-01)."""
+    assemble = importlib.import_module("scripts.plan.assemble")
+    raw = {"hard-limits": bad_value}
+    with pytest.raises(AttributeError):
+        assemble._prohibited_classes(raw)                 # un-normalized non-string -> the 940o crash
+    # normalized -> a string -> the consumer runs without raising
+    assert isinstance(assemble._prohibited_classes(normalize_summary(raw)), (set, frozenset, list, tuple))
+
+
+def test_normalized_rx_classes_parse_for_the_bpmh_screen():
+    """contracts-320 (safety RESCUE): a raw LIST at rx-interaction-classes makes the supplement<->Rx
+    BPMH screen (`router.rx_interaction_class_set`) return an EMPTY set — a silent 'no medication
+    interactions' hole. normalize coerces it to the `;`-parsed string the screen reads, so the
+    operator's present Rx-interaction classes are actually seen."""
+    router = importlib.import_module("scripts.plan.router")
+    normalized = normalize_summary({"rx-interaction-classes": ["bleeding-risk", "cyp3a4-pgp"]})
+    got = router.rx_interaction_class_set(normalized)
+    assert "bleeding-risk" in got and "cyp3a4-pgp" in got, got
+
+
+@pytest.mark.parametrize("n, collapses", [(19, False), (20, True)])
+def test_min_count_collapse_boundary(n, collapses):
+    """TC-320-02: the >=min_count collapse trigger is the feature's crux (collapse vs pass-raw).
+    Exactly min_count-1 must pass through raw (a PII-bearing stream must NOT be collapsed away);
+    exactly min_count must collapse. Kills the `>=`->`>` off-by-one mutation."""
+    out = aggregate_operator_state(_ts("rhr", list(range(50, 50 + n))), min_count=20)
+    rhr = [r for r in out if r["item"] == "rhr"]
+    if collapses:
+        assert len(rhr) == 1 and rhr[0].get("aggregated_from") == n
+    else:
+        assert len(rhr) == n and all("aggregated_from" not in r for r in rhr)
+
+
+def test_summary_stats_and_recent_window_trend():
+    """TC-320-03: pin median, span, and the recent_mean trailing-window slice (the material stat —
+    the recent-vs-overall trend signal fed to the de-id model). A stream LONGER than recent_window
+    with a flat-then-rising trend makes recent_mean differ from the overall mean."""
+    values = [50] * 100 + [90] * 20   # 120 readings: flat 50, then rising 90
+    out = aggregate_operator_state(_ts("rhr", values), min_count=20, recent_window=20)
+    v = [r for r in out if r["item"] == "rhr"][0]["value"]
+    assert v["span"] == ["2026-01-01", "2026-05-08"]              # [first, last] timepoint
+    assert v["median"] == 50                                      # 100 of 120 are 50
+    assert v["recent_mean"] == 90.0 and v["mean"] != v["recent_mean"]  # trailing window = the rising tail
+
+
+def test_adapter_passes_fail_closed_sentinel_through():
+    """TC-320-04: the adapter's fail-closed de-id-failure sentinel passthrough — a future adapter
+    post-process could mangle the crown-jewel fail-closed marker; pin it at the adapter seam."""
+    sentinel = {"deidentified": False, "reason": "deid-call-failed"}
+    out = AggregatingDeidClient(_RecordingClient(deid_return=sentinel)).deidentify({"operator_state": []})
+    assert out == sentinel and out.get("deidentified") is False
 
 
 def test_normalize_summary_passes_fail_closed_sentinel_through():
