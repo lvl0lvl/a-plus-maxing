@@ -67,13 +67,23 @@ class ModelClient:
             summary (dict): The de-identified `router.summarize` summary mapping.
 
         Returns:
-            (dict) The plan-author envelope `{"specialist": slug, "recommendations": [...]}`
-            or the thin-library sentinel `{"thin_library": True, "specialist": slug}`.
+            (dict) The plan-author envelope `{"specialist": slug, "recommendations": [...]}` with each
+            recommendation's scalar-contract fields normalized to the frozen composer's shape (bead
+            mk0i/ec4e), or the thin-library sentinel `{"thin_library": True, "specialist": slug}`
+            (which carries no `recommendations` list and passes through unchanged).
         """
         result = _call(self.backend.author, domain, summary)
         if not isinstance(result, dict) or not _is_author_envelope(result):
             raise ModelCallError("author: backend returned an empty or malformed envelope")
-        return result
+        # Normalize the non-deterministic model author output's scalar-contract rec fields at the
+        # SINGLE metered-model author boundary (bead ec4e) — so EVERY `ModelClient.author` consumer
+        # (the `/generate-plan` front door via `compute_plan`, any future caller) is structurally
+        # covered, not seam-by-seam (the PF-S124-01 lesson). Idempotent; a no-op on the thin-library
+        # sentinel. The import is method-local per this file's cross-package-import convention (cf.
+        # the SDK import) — NOT cycle-forced (`intake_aggregate` is a pure collections/statistics
+        # helper with no back-edge here); the model->serve direction is tracked for relocation (ywgr).
+        from scripts.serve.intake_aggregate import normalize_author_output
+        return normalize_author_output(result)
 
     def deidentify(self, raw_intake):
         """De-identify a raw operator plan-intake into the de-identified summary (de-id IN).
