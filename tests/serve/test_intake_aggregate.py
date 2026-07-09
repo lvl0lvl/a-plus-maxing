@@ -266,14 +266,21 @@ def test_normalized_author_output_is_consumable_by_the_real_assemble_AND_fails_c
     ("stimulants", "no stimulants", True),           # 99y4: plural -> "stimulant" -> struck
     ("CNS stimulant", "no stimulants", True),        # 99y4: synonym/prefix form -> struck
     ("overhead pressing", "no overhead pressing", True),  # 99y4: spaced -> "overhead-pressing" -> struck
+    ("fasting protocol", "no fasting", True),        # 99y4 (API-02): the fasting class, end-to-end
     ("training", "no stimulants", False),            # benign class (not prohibited) -> actionable
+    # WORD-level match: a phrase inside a longer word must NOT spuriously over-strike (SEC-01/BUG-01/TEST-01)
+    ("bench pressing", "no overhead pressing", False),        # a bench press is NOT overhead pressing
+    ("compressing", "no overhead pressing", False),           # "pressing" inside a longer word
+    ("appetite-suppressing", "no overhead pressing", False),  # cross-domain benign, "suppressing" ⊃ "pressing"
+    ("breakfasting window", "no fasting", False),             # "breakfasting" ⊃ "fasting"
 ])
 def test_scalar_category_canonicalized_against_the_real_assemble_halt(cat, limit, struck):
-    """SEC-01 + 99y4: a scalar `category` is canonicalized to the frozen composer's prohibited-class
-    token form so case / whitespace / empty / plural / synonym / spaced variants still hit the EXACT
-    prohibited-class set (fail-closed strike) instead of shipping ACTIONABLE (fail-open). Fail-toward-
-    safe: a category whose text implies a prohibited class is coerced to it (over-strike, never
-    under-strike), verified against its own matching hard-limit."""
+    """SEC-01 + 99y4: a scalar `category` is canonicalized (WORD-level, single-plural tolerant, against
+    a curated class-phrase subset) to the frozen composer's prohibited-class token so case / whitespace
+    / empty / plural / synonym / spaced variants still hit the EXACT prohibited-class set (fail-closed
+    strike) instead of shipping ACTIONABLE (fail-open). Fail-toward-safe (over-strike a genuine class
+    WORD, never fail-open) — but a phrase INSIDE a longer word ("bench pressing", "compressing",
+    "breakfasting") does NOT spuriously strike a benign rec. Verified against its own matching limit."""
     from scripts.plan.assemble import assemble
     env = {"specialist": "P", "recommendations": [{
         "claim": "hydrate well", "category": cat, "grounding": "human", "source": "S 2024",
@@ -324,6 +331,8 @@ def test_normalizer_mirrors_of_the_frozen_composer_no_desync():
     from scripts.plan.assemble import GROUNDING_NEEDS_FLAG, _LIMIT_PHRASE_CLASSES
     import scripts.serve.intake_aggregate as agg
     assert agg._GROUNDING_FLAG_TOKENS == GROUNDING_NEEDS_FLAG
-    assert agg._LIMIT_PHRASE_TO_CLASS == _LIMIT_PHRASE_CLASSES, (
-        "the category-canonicalization phrase->class map desynced from the frozen composer's"
+    assert set(agg._CATEGORY_PHRASE_TO_CLASS) <= set(_LIMIT_PHRASE_CLASSES), (
+        "the category-canonicalization phrase->class pairs must be a curated SUBSET of the frozen "
+        "composer's (the broad 'pressing' phrase is intentionally dropped — as a CATEGORY filter it "
+        "over-strikes benign 'bench pressing'/'leg pressing'; a desync on the KEPT pairs trips here)"
     )

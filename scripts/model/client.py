@@ -77,9 +77,11 @@ class ModelClient:
             raise ModelCallError("author: backend returned an empty or malformed envelope")
         # Normalize the non-deterministic model author output's scalar-contract rec fields at the
         # SINGLE metered-model author boundary (bead ec4e) — so EVERY `ModelClient.author` consumer
-        # (the /generate-plan front door, `adjust_plan`, any future caller) is structurally covered,
-        # not just the seams enumerated one-by-one (the PF-S124-01 lesson). Idempotent + a no-op on
-        # the thin-library sentinel.
+        # (the `/generate-plan` front door via `compute_plan`, any future caller) is structurally
+        # covered, not seam-by-seam (the PF-S124-01 lesson). Idempotent; a no-op on the thin-library
+        # sentinel. The import is method-local per this file's cross-package-import convention (cf.
+        # the SDK import) — NOT cycle-forced (`intake_aggregate` is a pure collections/statistics
+        # helper with no back-edge here); the model->serve direction is tracked for relocation (ywgr).
         from scripts.serve.intake_aggregate import normalize_author_output
         return normalize_author_output(result)
 

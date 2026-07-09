@@ -20,6 +20,7 @@ seam (`plan_loop.signal(..., deid_client=...)`) — the frozen `_read_raw_intake
 `run_orchestrated` engine is untouched (EXTEND-NOT-REBUILD).
 """
 
+import re
 from collections import defaultdict
 from statistics import mean, median
 
@@ -135,31 +136,41 @@ def normalize_summary(summary):
 # mismatch disclosure still fires (fail-toward-flagging) rather than being silently missed.
 _GROUNDING_FLAG_TOKENS = ("animal", "in-vitro")
 
-# The frozen composer's limit-phrase -> prohibited-CLASS map (mirrors its `_LIMIT_PHRASE_CLASSES`;
-# a test-time pin fails on desync). Applied to a rec CATEGORY so a plural / synonym / spaced form
-# ("stimulants", "CNS stimulant", "overhead pressing") canonicalizes to the exact class token the
-# composer's `category in prohibited_classes` checks — closing the SEC-01 residual (99y4). FAIL-TOWARD-
-# SAFE: a category whose text CONTAINS a limit phrase is coerced TO that class (an over-match
-# over-STRIKES a rec, never under-strikes — the safe direction for a health-safety HALT filter).
-_LIMIT_PHRASE_TO_CLASS = (("stimulant", "stimulant"), ("overhead", "overhead-pressing"),
-                          ("pressing", "overhead-pressing"), ("fasting", "fasting"))
+# The class-identifying phrases used to canonicalize a rec CATEGORY to the frozen composer's
+# prohibited-class token — a curated SUBSET of the frozen `_LIMIT_PHRASE_CLASSES` (a test pins
+# `⊆`; the frozen classes are the single source of truth). The broad "pressing" phrase is DROPPED
+# here: the frozen limit-scan fires on it for the LIMIT text ("no overhead pressing"), but as a
+# CATEGORY filter bare "pressing" over-strikes benign exercises ("bench pressing" / "leg pressing"
+# are NOT overhead pressing) — "overhead" is the unambiguous marker. Matched at WORD granularity
+# (with single-plural tolerance) so a phrase inside a longer word ("compressing" / "expressing" ⊃
+# "pressing") does NOT spuriously strike. Fail-toward-safe still holds — a genuine class WORD
+# over-strikes, never fail-open (the safe direction for a health-safety HALT filter). The coupling's
+# structural correctness rests on the frozen composer's exact `category in prohibited_classes`
+# consumption; a spine change to that consumption shape must re-verify this canonicalization
+# (the value-`⊆`-pin will not flag a same-token structural change).
+_CATEGORY_PHRASE_TO_CLASS = (("stimulant", "stimulant"), ("overhead", "overhead-pressing"),
+                             ("fasting", "fasting"))
 
 
 def _canonical_category(category):
     """Canonicalize a rec `category` to the frozen composer's prohibited-class token form.
 
     A non-scalar -> None (fail-closed). A scalar -> `strip().lower()`; empty/whitespace-only -> None
-    (fail-closed). Then if the text CONTAINS a known limit-phrase token, coerce to that phrase's CLASS
-    token so a plural / synonym / spaced category still hits the composer's EXACT prohibited-class set
-    (99y4). Fail-toward-safe: containment over-matches (over-strike), never under-matches (fail-open).
+    (fail-closed). Then if any WORD of the category (split on non-alphanumerics, single-plural
+    tolerant) is a class-identifying phrase (`_CATEGORY_PHRASE_TO_CLASS`), coerce to that phrase's
+    CLASS token so a plural / synonym / spaced category ("stimulants", "CNS stimulant", "overhead
+    pressing") still hits the composer's EXACT prohibited-class set (99y4). Word-granularity avoids
+    striking a benign category that merely contains a phrase inside a longer word ("compressing",
+    "expressing"). Fail-toward-safe: a genuine class word over-strikes; never under-matches (fail-open).
     """
     if not isinstance(category, str):
         return None
     norm = category.strip().lower()
     if not norm:
         return None
-    for phrase, klass in _LIMIT_PHRASE_TO_CLASS:
-        if phrase in norm:
+    words = [w for w in re.split(r"[^a-z0-9]+", norm) if w]
+    for phrase, klass in _CATEGORY_PHRASE_TO_CLASS:
+        if any(w == phrase or (w.endswith("s") and w[:-1] == phrase) for w in words):
             return klass
     return norm
 
@@ -215,13 +226,17 @@ def normalize_author_output(envelope):
 
     The specialist author is a non-deterministic no-train MODEL; like the de-id model (bead 940o,
     `normalize_summary`), it can emit a LIST/dict where the frozen composer expects a scalar,
-    crashing the frozen composer mid-run (bead mk0i, the author-side of the same class). Applied at the
-    injectable dispatch seam (`subscription_dispatch.build_dispatch`), UPSTREAM of the frozen
-    `run_orchestrated` plan composer — the frozen spine is untouched.
+    crashing the frozen composer mid-run (bead mk0i, the author-side of the same class). The CANONICAL
+    application site is the single metered-model author boundary `ModelClient.author` (bead ec4e —
+    every `ModelClient.author` consumer is covered there); it is also applied at the care-lane
+    subscription seam `subscription_dispatch.build_dispatch` (a separate author surface, not a
+    ModelClient) and — idempotently — at the `server.py` `/generate-plan` wrap (which retains it for
+    the captured-envelope `_FixedEnvelopeClient` path that bypasses `ModelClient.author`). Always
+    UPSTREAM of the frozen `run_orchestrated` plan composer — the frozen spine is untouched.
 
     A no-op on any shape that is NOT an author envelope (a dict carrying a `recommendations` list):
-    the same dispatch seam also routes judge / lens verdicts, whose shapes differ and are guarded
-    downstream (`gate_dispatch`), so they pass through unchanged.
+    judge / lens verdicts (whose shapes differ, guarded downstream by `gate_dispatch`) and the
+    thin-library sentinel pass through unchanged.
 
     Args:
         envelope: The dispatch return — an author envelope `{specialist, recommendations: [...]}`,
