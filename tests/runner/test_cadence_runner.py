@@ -304,7 +304,16 @@ def test_main_entry_wires_run(monkeypatch):
     assert captured["dispatch_factory"] is subscription_dispatch.default_session_factory, (
         "main() did not pass subscription_dispatch's default session factory"
     )
-    assert isinstance(captured["deid_client"], ModelClient), "main() did not construct a ModelClient de-id"
+    # bead 940o: main wraps the de-id ModelClient in the timeseries-aggregating + output-normalising
+    # adapter, so the metered de-id sees biomarker summaries (not thousands of raw readings) and its
+    # list-valued output is coerced to the string shape the assemble/translate consumers expect.
+    from scripts.serve.intake_aggregate import AggregatingDeidClient
+    assert isinstance(captured["deid_client"], AggregatingDeidClient), (
+        "main() did not wrap the de-id client in the AggregatingDeidClient adapter (bead 940o)"
+    )
+    assert isinstance(captured["deid_client"]._inner, ModelClient), (
+        "the aggregating adapter must wrap a real ModelClient de-id"
+    )
     assert captured["root"] == REPO_ROOT / store.DEFAULT_ROOT, (
         f"main() passed root {captured['root']!r}, want the resolved repo-anchored store root"
     )
