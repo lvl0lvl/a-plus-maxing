@@ -961,8 +961,16 @@ def test_model_realistic_list_hard_limits_crashes_raw_and_composes_normalized():
     roster = {"strength": _specialist("S", [_rec("progressive overload")])}
     model_shape = _summary(**{"hard-limits": ["overhead-press-restricted", "pullup-restricted"]})
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(AttributeError, match="has no attribute 'lower'"):
         assemble(goal_set, model_shape, roster)   # un-normalized model list -> the 940o crash
 
-    plan = assemble(goal_set, normalize_summary(model_shape), roster)
-    assert plan["sections"], "the normalized model shape did not compose a plan"
+    # normalize (the AggregatingDeidClient production wrap) coerces list -> "; "-joined string, and
+    # the composed section CONSUMES it: personalization surfaces the field by name. Assert the
+    # normalized VALUE flowed INTO the plan -- not mere `sections` non-emptiness, which assemble
+    # yields for any non-empty goal_set (incl. a coverage-gap or a broken-but-non-crashing summary),
+    # so an existence-only assert would pass even if normalize produced garbage. This pins normalize
+    # as load-bearing at the real composer.
+    section = assemble(goal_set, normalize_summary(model_shape), roster)["sections"][0]
+    assert section["domain"] == "strength"
+    assert section["personalization"]["hard-limits"] == "overhead-press-restricted; pullup-restricted"
+    assert [r["claim"] for r in section["recommendations"]] == ["progressive overload"]
