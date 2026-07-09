@@ -592,3 +592,35 @@ def test_deid_in_records_exception_type_not_message(tmp_path):
 
     assert result["error_type"] == "ValueError"
     assert pii_scan.scan_text(json.dumps(result), token_config=config) == 0
+
+
+# --- pkty / PF-S122-01: the boundary's value-SHAPE contract (model-realistic list shape) -------
+
+
+def test_boundary_passes_model_realistic_list_valued_field_through_unchanged():
+    """PF-S122-01 (pkty): drive the no-train MODEL's REALISTIC shape through the REAL `deid_in`.
+
+    The live run (bead 940o) proved the no-train MODEL emits LIST-valued `SUMMARY_FIELD_SET`
+    fields — not the deterministic `router.summarize` string form the plan-path mocks used. This
+    pins the boundary's actual value-SHAPE contract at `deid_in`: it whitelists field NAMES
+    (`set(summary) <= SUMMARY_FIELD_SET`) and PII-scans `str(value)`, but does NOT coerce value
+    SHAPE — so a faithful list-valued in-set field (PII-clean) passes THROUGH unchanged. The
+    consequence, made explicit here: a downstream STRING consumer (`assemble._prohibited_classes`
+    does `hard-limits.lower()`) crashes on that list until the boundary-side scalar enforcement
+    lands (bead `s923`). Non-vacuous: it asserts the exact list shape survives (a coercing
+    `deid_in` — what `s923` will build — flips both value asserts, the red-to-flip for that fix).
+    """
+    model_shape = {
+        "training-age-band": "10-15y",
+        "goal-targets": ["strength", "longevity"],          # the model's list shape
+        "hard-limits": ["overhead-press-restricted", "pullup-restricted"],  # the 940o-class shape
+    }
+    assert set(model_shape) <= set(router.SUMMARY_FIELD_SET), "fixture must be in-set to test pass-through"
+
+    out = deid_in(_raw_intake(), _FixedDeidClient(model_shape))
+
+    # the boundary returned the summary (not the fail-closed sentinel) with the LIST shape intact —
+    # deid_in does NOT enforce a scalar-value contract (that is `s923`'s frozen-boundary territory).
+    assert out.get("deidentified") is not False, out
+    assert out["hard-limits"] == ["overhead-press-restricted", "pullup-restricted"]
+    assert out["goal-targets"] == ["strength", "longevity"]
