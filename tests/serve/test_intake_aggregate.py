@@ -257,25 +257,29 @@ def test_normalized_author_output_is_consumable_by_the_real_assemble_AND_fails_c
     assert "numbers" not in recs[0]                                  # struck-indeterminate removed the regimen
 
 
-@pytest.mark.parametrize("cat, struck", [
-    ("stimulant", True),          # canonical -> struck
-    ("Stimulant", True),          # SEC-01: capitalized -> canonicalized -> struck
-    (" stimulant ", True),        # SEC-01: whitespace -> struck
-    ("stimulant\n", True),        # SEC-01: trailing newline -> struck
-    ("", True),                   # SEC-01: empty -> None -> indeterminate -> struck
-    ("stimulants", False),        # RESIDUAL (documented): plural misses the frozen exact-match set
+@pytest.mark.parametrize("cat, limit, struck", [
+    ("stimulant", "no stimulants", True),            # canonical -> struck
+    ("Stimulant", "no stimulants", True),            # SEC-01: capitalized -> struck
+    (" stimulant ", "no stimulants", True),          # SEC-01: whitespace -> struck
+    ("stimulant\n", "no stimulants", True),          # SEC-01: trailing newline -> struck
+    ("", "no stimulants", True),                     # SEC-01: empty -> None -> indeterminate -> struck
+    ("stimulants", "no stimulants", True),           # 99y4: plural -> "stimulant" -> struck
+    ("CNS stimulant", "no stimulants", True),        # 99y4: synonym/prefix form -> struck
+    ("overhead pressing", "no overhead pressing", True),  # 99y4: spaced -> "overhead-pressing" -> struck
+    ("training", "no stimulants", False),            # benign class (not prohibited) -> actionable
 ])
-def test_scalar_category_canonicalized_against_the_real_assemble_halt(cat, struck):
-    """SEC-01: a scalar-string `category` is canonicalized (`strip().lower() or None`) so case /
-    whitespace / empty variants still hit the frozen composer's EXACT lowercase-singular
-    prohibited-class set (fail-closed strike) instead of shipping ACTIONABLE (fail-open). The plural
-    variant remains a documented residual (needs the frozen class-token map — tracked)."""
+def test_scalar_category_canonicalized_against_the_real_assemble_halt(cat, limit, struck):
+    """SEC-01 + 99y4: a scalar `category` is canonicalized to the frozen composer's prohibited-class
+    token form so case / whitespace / empty / plural / synonym / spaced variants still hit the EXACT
+    prohibited-class set (fail-closed strike) instead of shipping ACTIONABLE (fail-open). Fail-toward-
+    safe: a category whose text implies a prohibited class is coerced to it (over-strike, never
+    under-strike), verified against its own matching hard-limit."""
     from scripts.plan.assemble import assemble
     env = {"specialist": "P", "recommendations": [{
         "claim": "hydrate well", "category": cat, "grounding": "human", "source": "S 2024",
         "confidence_tier": "moderate", "reversibility": "reversible",
         "numbers": [{"value": "1", "units": "u", "reference_range": "1-2"}]}]}
-    rec = assemble(["perf"], _author_summary("no stimulants"),
+    rec = assemble(["perf"], _author_summary(limit),
                    {"perf": lambda d, s: normalize_author_output(env)})["sections"][0]["recommendations"][0]
     assert bool(rec.get("actionable_content_struck")) is struck
 
@@ -311,11 +315,15 @@ def test_clean_populated_author_envelope_passes_through_unchanged():
     assert rec["numbers"] == [{"value": "3", "units": "sets", "reference_range": "2-5"}]
 
 
-def test_grounding_flag_tokens_mirror_the_frozen_composer_no_desync():
-    """HIST-01 / QUAL-01: `_GROUNDING_FLAG_TOKENS` byte-mirrors the frozen composer's
-    `GROUNDING_NEEDS_FLAG`; the change-control tripwire lives here (a test importing `assemble` does
-    not trip the serve-layer 'assemble'-grep guard, which scans only scripts/serve/*.py). Fails on
-    any future desync — the CI-time analogue of the codebase's module-load desync asserts."""
-    from scripts.plan.assemble import GROUNDING_NEEDS_FLAG
+def test_normalizer_mirrors_of_the_frozen_composer_no_desync():
+    """HIST-01/QUAL-01 + 99y4: the normalizer's copies of the frozen composer's constants
+    (`_GROUNDING_FLAG_TOKENS` ← `GROUNDING_NEEDS_FLAG`; `_LIMIT_PHRASE_TO_CLASS` ← `_LIMIT_PHRASE_CLASSES`)
+    carry no in-module tripwire (the serve-layer 'assemble'-grep guard blocks an import/assert there),
+    so the change-control tripwire lives HERE — a test importing `assemble` does not trip the grep
+    (it scans only scripts/serve/*.py). Fails on any future desync of either mirror."""
+    from scripts.plan.assemble import GROUNDING_NEEDS_FLAG, _LIMIT_PHRASE_CLASSES
     import scripts.serve.intake_aggregate as agg
     assert agg._GROUNDING_FLAG_TOKENS == GROUNDING_NEEDS_FLAG
+    assert agg._LIMIT_PHRASE_TO_CLASS == _LIMIT_PHRASE_CLASSES, (
+        "the category-canonicalization phrase->class map desynced from the frozen composer's"
+    )

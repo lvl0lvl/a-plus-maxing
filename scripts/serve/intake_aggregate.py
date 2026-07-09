@@ -135,6 +135,34 @@ def normalize_summary(summary):
 # mismatch disclosure still fires (fail-toward-flagging) rather than being silently missed.
 _GROUNDING_FLAG_TOKENS = ("animal", "in-vitro")
 
+# The frozen composer's limit-phrase -> prohibited-CLASS map (mirrors its `_LIMIT_PHRASE_CLASSES`;
+# a test-time pin fails on desync). Applied to a rec CATEGORY so a plural / synonym / spaced form
+# ("stimulants", "CNS stimulant", "overhead pressing") canonicalizes to the exact class token the
+# composer's `category in prohibited_classes` checks — closing the SEC-01 residual (99y4). FAIL-TOWARD-
+# SAFE: a category whose text CONTAINS a limit phrase is coerced TO that class (an over-match
+# over-STRIKES a rec, never under-strikes — the safe direction for a health-safety HALT filter).
+_LIMIT_PHRASE_TO_CLASS = (("stimulant", "stimulant"), ("overhead", "overhead-pressing"),
+                          ("pressing", "overhead-pressing"), ("fasting", "fasting"))
+
+
+def _canonical_category(category):
+    """Canonicalize a rec `category` to the frozen composer's prohibited-class token form.
+
+    A non-scalar -> None (fail-closed). A scalar -> `strip().lower()`; empty/whitespace-only -> None
+    (fail-closed). Then if the text CONTAINS a known limit-phrase token, coerce to that phrase's CLASS
+    token so a plural / synonym / spaced category still hits the composer's EXACT prohibited-class set
+    (99y4). Fail-toward-safe: containment over-matches (over-strike), never under-matches (fail-open).
+    """
+    if not isinstance(category, str):
+        return None
+    norm = category.strip().lower()
+    if not norm:
+        return None
+    for phrase, klass in _LIMIT_PHRASE_TO_CLASS:
+        if phrase in norm:
+            return klass
+    return norm
+
 
 def _normalize_rec(rec):
     """Coerce one recommendation's scalar-contract fields to the frozen plan-composer contract.
@@ -146,11 +174,11 @@ def _normalize_rec(rec):
         single SPACE — NOT `; `, which would split a limit-violating phrase across the separator so
         the literal-claim HALT check misses it (SEC-02); any other non-string is `str()`-ed.
       - `category` -> exact `category in prohibited_classes` (crashes on an unhashable list; and is
-        case/whitespace-sensitive). A non-scalar class is set to None; a scalar string is
-        canonicalized `strip().lower() or None` (SEC-01). Both route a non-matching/empty class into
-        the composer's FAIL-CLOSED indeterminate path (suppress) — NEVER joined, because a joined
-        class would miss the prohibited-class set and fail OPEN (an unsafe plan). RESIDUAL: plural /
-        synonym token variants still miss the frozen exact-match set — tracked as a follow-up.
+        case/whitespace/token-form-sensitive). Canonicalized via `_canonical_category`: a non-scalar
+        or empty class -> None (routes to the composer's FAIL-CLOSED indeterminate path); a scalar is
+        `strip().lower()`-ed and, when its text implies a prohibited class, coerced to that CLASS token
+        (SEC-01 + 99y4 — case / whitespace / plural / synonym / spaced forms all hit the exact set).
+        NEVER joined — a joined class would miss the set and fail OPEN (an unsafe plan).
       - `grounding` -> `in GROUNDING_NEEDS_FLAG` (does NOT crash, but a non-scalar silently misses the
         population-mismatch disclosure): an animal/in-vitro marker held in a list/tuple element OR a
         dict value is preserved so the flag still fires (SEC-03); else stringified.
@@ -168,10 +196,7 @@ def _normalize_rec(rec):
         out["claim"] = " ".join(str(x) for x in claim) if isinstance(claim, list) else str(claim)
     category = out.get("category")
     if category is not None:
-        # non-scalar -> None (fail-closed); scalar string -> canonicalized to the composer's
-        # lowercase-singular token form (empty/whitespace-only -> None, fail-closed). NEVER join.
-        out["category"] = (None if not isinstance(category, str)
-                           else category.strip().lower() or None)
+        out["category"] = _canonical_category(category)
     grounding = out.get("grounding")
     if grounding is not None and not isinstance(grounding, str):
         candidates = (list(grounding.values()) if isinstance(grounding, dict)

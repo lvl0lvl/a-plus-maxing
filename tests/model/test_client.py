@@ -157,6 +157,22 @@ def test_author_passes_thin_library_sentinel_through():
     assert client.author("peptides", {"goal": "token-B"}) == sentinel
 
 
+def test_author_normalizes_malformed_scalar_contract_rec_fields():
+    """bead ec4e: `ModelClient.author` normalizes the non-deterministic model author envelope's
+    scalar-contract rec fields at the SINGLE metered-model boundary, so EVERY consumer (the
+    /generate-plan front door, adjust_plan, any future caller) is structurally covered — not just
+    the seams enumerated one-by-one (PF-S124-01). A list `claim` is coerced + a plural `category`
+    is canonicalized (99y4) in the return."""
+    malformed = {"specialist": "peptide-specialist", "recommendations": [
+        {"claim": ["press", "harder"], "category": "stimulants", "source": "S",
+         "confidence_tier": "moderate", "reversibility": "reversible"}]}
+    client = ModelClient(backend=_FixtureBackend(author_result=malformed))
+
+    rec = client.author("peptides", {})["recommendations"][0]
+    assert rec["claim"] == "press harder"      # list claim SPACE-joined (mk0i)
+    assert rec["category"] == "stimulant"       # plural canonicalized to the frozen class token (99y4)
+
+
 def test_deidentify_returns_summary_over_mock_backend():
     """`deidentify` returns the de-identified summary mapping over a MOCK backend.
 
