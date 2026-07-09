@@ -84,7 +84,26 @@ def test_build_dispatch_routes_to_session():
     assert session.calls == [
         {"name": "workout", "prompt": "PROMPT-TEXT", "context": {"goal-domains": ["strength"]}}
     ]
-    assert returned is envelope
+    # RECONCILED (bead mk0i): build_dispatch now runs the author envelope through
+    # `normalize_author_output` (a value-preserving no-op on a well-formed envelope, so still equal),
+    # so the return is a normalized COPY, not the identical object. Value equality is the contract.
+    assert returned == envelope
+
+
+def test_build_dispatch_normalizes_author_output_but_not_judge_lens():
+    # bead mk0i: build_dispatch coerces a model AUTHOR envelope's scalar-contract rec fields to the
+    # frozen `assemble` shape (a list `category` -> None fail-closed; a list `claim` -> joined), so a
+    # malformed author output cannot crash the frozen composer mid-run. A judge/lens verdict (no
+    # `recommendations` list) passes through unchanged.
+    bad_author = {"specialist": "peptide-specialist", "recommendations": [
+        {"claim": ["a", "b"], "category": ["stimulant"], "source": "x",
+         "confidence_tier": "moderate", "reversibility": "reversible"}]}
+    dispatch = subscription_dispatch.build_dispatch(_RecordingSession(bad_author))
+    rec = dispatch("peptides", "P", {})["recommendations"][0]
+    assert rec["claim"] == "a; b" and rec["category"] is None      # normalized to the frozen contract
+
+    judge = {"scores": {"quality": 8}, "accept": True}
+    assert subscription_dispatch.build_dispatch(_RecordingSession(judge))("judge", "P", {}) == judge
 
 
 def test_subscription_dispatch_import_is_inert(monkeypatch):

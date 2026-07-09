@@ -27,6 +27,7 @@ nothing.
 import os
 
 from scripts.runner.auth_isolation import build_subscription_env
+from scripts.serve.intake_aggregate import normalize_author_output
 
 # The runtime marker gating the default factory: its presence is the "scrub enabled" predicate, set
 # at the operator-gated live-enable (off by default — SEC-04, disabled-by-default). A
@@ -46,9 +47,11 @@ def build_dispatch(session):
 
     Returns the `dispatch(name, prompt, context) -> author envelope` seam
     (`plan_orchestrator.py:148`): each specialist / judge / lens call is routed through `session`
-    as a subscription sub-agent, and the session's author envelope is returned unaltered. Routes
-    the already-de-identified tuple only — reads no store, de-identifies nothing, re-hosts no loop
-    logic.
+    as a subscription sub-agent, and a specialist AUTHOR envelope's scalar-contract recommendation
+    fields are normalized to the frozen composer's shape (`normalize_author_output`, bead mk0i — a
+    list/dict-valued rec field otherwise crashes the frozen `assemble` mid-run; a no-op on the
+    judge/lens verdict shapes). Routes the already-de-identified tuple only — reads no store,
+    de-identifies nothing, re-hosts no loop logic.
 
     Args:
         session (Callable): The subscription session, `session(name, prompt, context) -> envelope`
@@ -58,7 +61,10 @@ def build_dispatch(session):
         (Callable) The `dispatch(name, prompt, context)` seam the built loop consumes.
     """
     def dispatch(name, prompt, context):
-        return session(name, prompt, context)
+        # Normalize a model AUTHOR envelope's scalar-contract rec fields to the frozen `assemble`
+        # shape UPSTREAM of `run_orchestrated` (bead mk0i — a list/dict-valued rec field otherwise
+        # crashes the frozen composer mid-run). A no-op on judge/lens verdicts (guarded downstream).
+        return normalize_author_output(session(name, prompt, context))
 
     return dispatch
 
