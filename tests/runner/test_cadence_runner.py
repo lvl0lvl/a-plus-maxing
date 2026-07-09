@@ -100,7 +100,7 @@ def test_build_dispatch_normalizes_author_output_but_not_judge_lens():
          "confidence_tier": "moderate", "reversibility": "reversible"}]}
     dispatch = subscription_dispatch.build_dispatch(_RecordingSession(bad_author))
     rec = dispatch("peptides", "P", {})["recommendations"][0]
-    assert rec["claim"] == "a; b" and rec["category"] is None      # normalized to the frozen contract
+    assert rec["claim"] == "a b" and rec["category"] is None        # SPACE-joined (SEC-02); category fail-closed
 
     judge = {"scores": {"quality": 8}, "accept": True}
     assert subscription_dispatch.build_dispatch(_RecordingSession(judge))("judge", "P", {}) == judge

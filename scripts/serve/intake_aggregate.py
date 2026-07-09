@@ -129,26 +129,34 @@ def normalize_summary(summary):
 
 
 # The population-mismatch grounding tokens the frozen plan composer flags on (mirrors
-# its `GROUNDING_NEEDS_FLAG`). A non-scalar `grounding` that CONTAINS one is coerced TO it, so
-# the mismatch disclosure still fires (fail-toward-flagging) rather than being silently missed.
+# its `GROUNDING_NEEDS_FLAG`; a test-time pin in tests/serve/test_intake_aggregate.py fails on
+# desync — the serve-layer no-reimplementation grep guard blocks an in-module import/assert). A non-scalar
+# `grounding` (a list/tuple element OR a dict value) that CONTAINS one is coerced TO it, so the
+# mismatch disclosure still fires (fail-toward-flagging) rather than being silently missed.
 _GROUNDING_FLAG_TOKENS = ("animal", "in-vitro")
 
 
 def _normalize_rec(rec):
     """Coerce one recommendation's scalar-contract fields to the frozen plan-composer contract.
 
-    The frozen plan composer string/hashable-processes specific rec fields; a model author emitting a
-    LIST/dict there crashes it (the 940o class at the author-output boundary, bead mk0i):
-      - `claim` -> `.lower()`  (crashes on a non-string): joined to a string (descriptive text).
-      - `category` -> `category in prohibited_classes` (crashes on an unhashable list): a non-scalar
-        class is set to None, which routes into the frozen composer's FAIL-CLOSED indeterminate path
-        (suppress the actionable content) — NEVER joined, because a joined class would miss the
-        prohibited-class set and fail OPEN (an unsafe plan).
-      - `grounding` -> `in GROUNDING_NEEDS_FLAG`: a non-scalar preserves an animal/in-vitro marker so
-        the population-mismatch flag still fires.
+    A model author emitting a LIST/dict where the frozen plan composer expects a scalar crashes it
+    (the 940o class at the author-output boundary, bead mk0i) or silently defeats a safety filter.
+    Per field:
+      - `claim` -> `.lower()` + substring match (crashes on a non-string): a list is joined with a
+        single SPACE — NOT `; `, which would split a limit-violating phrase across the separator so
+        the literal-claim HALT check misses it (SEC-02); any other non-string is `str()`-ed.
+      - `category` -> exact `category in prohibited_classes` (crashes on an unhashable list; and is
+        case/whitespace-sensitive). A non-scalar class is set to None; a scalar string is
+        canonicalized `strip().lower() or None` (SEC-01). Both route a non-matching/empty class into
+        the composer's FAIL-CLOSED indeterminate path (suppress) — NEVER joined, because a joined
+        class would miss the prohibited-class set and fail OPEN (an unsafe plan). RESIDUAL: plural /
+        synonym token variants still miss the frozen exact-match set — tracked as a follow-up.
+      - `grounding` -> `in GROUNDING_NEEDS_FLAG` (does NOT crash, but a non-scalar silently misses the
+        population-mismatch disclosure): an animal/in-vitro marker held in a list/tuple element OR a
+        dict value is preserved so the flag still fires (SEC-03); else stringified.
       - `numbers` -> `_is_complete` iterates and calls `number.get(...)` (crashes on a non-dict
         element): filtered to dict-only elements (a malformed number is dropped; a rec left without
-        actionable numbers is safe — it renders without dosing, never crashes).
+        actionable numbers renders without dosing, never crashes).
     Every other field (source / confidence_tier / reversibility — presence-checked; `cross_domain` —
     a bool) is left untouched. A non-dict rec passes through unchanged.
     """
@@ -157,16 +165,20 @@ def _normalize_rec(rec):
     out = dict(rec)
     claim = out.get("claim")
     if claim is not None and not isinstance(claim, str):
-        out["claim"] = "; ".join(str(x) for x in claim) if isinstance(claim, list) else str(claim)
+        out["claim"] = " ".join(str(x) for x in claim) if isinstance(claim, list) else str(claim)
     category = out.get("category")
-    if category is not None and not isinstance(category, str):
-        out["category"] = None  # fail-closed -> INDETERMINATE suppress; NEVER join (would fail open)
+    if category is not None:
+        # non-scalar -> None (fail-closed); scalar string -> canonicalized to the composer's
+        # lowercase-singular token form (empty/whitespace-only -> None, fail-closed). NEVER join.
+        out["category"] = (None if not isinstance(category, str)
+                           else category.strip().lower() or None)
     grounding = out.get("grounding")
     if grounding is not None and not isinstance(grounding, str):
-        marker = next((t for t in _GROUNDING_FLAG_TOKENS
-                       if isinstance(grounding, (list, tuple)) and t in grounding), None)
+        candidates = (list(grounding.values()) if isinstance(grounding, dict)
+                      else list(grounding) if isinstance(grounding, (list, tuple)) else [])
+        marker = next((t for t in _GROUNDING_FLAG_TOKENS if t in candidates), None)
         out["grounding"] = marker or (
-            "; ".join(str(x) for x in grounding) if isinstance(grounding, list) else str(grounding))
+            " ".join(str(x) for x in grounding) if isinstance(grounding, list) else str(grounding))
     if "numbers" in out:
         nums = out["numbers"]
         out["numbers"] = [n for n in nums if isinstance(n, dict)] if isinstance(nums, list) else []
