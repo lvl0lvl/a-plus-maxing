@@ -336,3 +336,28 @@ def test_normalizer_mirrors_of_the_frozen_composer_no_desync():
         "composer's (the broad 'pressing' phrase is intentionally dropped — as a CATEGORY filter it "
         "over-strikes benign 'bench pressing'/'leg pressing'; a desync on the KEPT pairs trips here)"
     )
+
+
+class _HardLimitInner:
+    """A de-id inner client whose model output carries a chosen hard-limits value (API-03 test seam)."""
+
+    def __init__(self, hard):
+        self._hard = hard
+
+    def deidentify(self, raw_intake):
+        return {"hard-limits": self._hard, "goal-domains": "supplements"}
+
+
+def test_aggregating_deid_normalizes_model_emitted_confirmed_none_hard_limits():
+    """API-03 (PF-S124-01 ingress-completeness): the de-id MODEL is a SECOND producer of the summary
+    that feeds the frozen HALT filter (the run_orchestrated loop path), besides router.summarize.
+    AggregatingDeidClient applies the SAME confirmed-none hard-limits normalization, so a
+    model-emitted bare-sentinel 'none' (string OR the 940o list shape) does not strike-all on the loop
+    path; a real limit is preserved. Reds if the normalization is dropped from the de-id adapter.
+    """
+    # model emits a confirmed-none STRING -> normalized to '' (HALT_CLEAR)
+    assert AggregatingDeidClient(_HardLimitInner("none; none")).deidentify({})["hard-limits"] == ""
+    # model emits it as a LIST (the 940o shape): normalize_summary '; '-joins, then sentinel-strip -> ''
+    assert AggregatingDeidClient(_HardLimitInner(["none", "none"])).deidentify({})["hard-limits"] == ""
+    # a real limit is preserved verbatim (the guard is unchanged on the loop path)
+    assert AggregatingDeidClient(_HardLimitInner("no stimulants")).deidentify({})["hard-limits"] == "no stimulants"

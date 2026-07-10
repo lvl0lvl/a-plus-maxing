@@ -545,8 +545,10 @@ def _author_system_prompt(domain):
 # invalid_request_error "For 'integer' type, properties maximum, minimum are not supported" — the
 # workout/nutrition author call failed the first LIVE run until these were dropped, bead LIVE-01),
 # so integer bounds are NOT expressed here; the real bounds (sets 1..100, calorie_goal/macros > 0)
-# are enforced downstream in `record_plan`/`compute_plan` + the `plan_schema` validators, never here
-# (BUG-03). String `minLength` IS accepted by the API and is retained as a soft non-empty hint.
+# are enforced downstream by `record_plan` (the `plan_schema` validators) — NOT by `compute_plan`,
+# which passes the payload through — never here (BUG-03). Bead rxe9 tracks making that record-time
+# enforcement a graceful per-domain no-plan rather than an uncaught raise; dropping the schema hint
+# makes it reachable now that the author call succeeds. String `minLength` IS API-accepted, retained.
 _AUTHOR_PAYLOAD_SCHEMA = {
     "workout": {
         "type": "object",

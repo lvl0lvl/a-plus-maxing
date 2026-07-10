@@ -2082,15 +2082,38 @@ def test_experience_band_bands_years_and_defaults_to_sentinel():
 def test_normalize_hard_limits_drops_confirmed_none_preserves_real_limits():
     """LIVE-02: a confirmed-'none' hard-limits collapses to '' so the frozen HALT filter reads
     no-limit (HALT_CLEAR) rather than an unrecognized-limit strike-all; a REAL limit is preserved
-    verbatim (the fail-closed guard on a genuinely unrecognized limit is unchanged).
+    verbatim (the fail-closed guard on a genuinely unrecognized limit is unchanged). The sentinel set
+    matches the sibling class derivers ("none"/"no"/"n/a"/"na") — a non-sentinel like "nil" is kept.
     """
-    assert router._normalize_hard_limits("none; none") == ""      # the first real run's value
+    assert router._normalize_hard_limits("none; none") == ""          # the first real run's value
     assert router._normalize_hard_limits("none") == ""
-    assert router._normalize_hard_limits("No; N/A; nil") == ""     # case-insensitive sentinels
-    assert router._normalize_hard_limits("no stimulants") == "no stimulants"          # real limit kept
+    assert router._normalize_hard_limits("No; N/A; na") == ""          # case-insensitive sentinels
+    assert router._normalize_hard_limits("none AND none") == ""        # SEC-02/API-01: uppercase 'AND'
+    assert router._normalize_hard_limits("None And No") == ""          # mixed-case joiner + sentinels
+    assert router._normalize_hard_limits("nil") == "nil"               # NOT a sentinel (matches derivers)
+    assert router._normalize_hard_limits("no stimulants") == "no stimulants"           # real limit kept
     assert router._normalize_hard_limits("no overhead press; none") == "no overhead press"  # mix
-    assert router._normalize_hard_limits("no xyz unknown") == "no xyz unknown"  # unrecognized kept
-    assert router._normalize_hard_limits(None) is None            # non-string passes through
+    # >=2 surviving real limits exercise the "; ".join rejoin + the ' and ' separator (TEST-01)
+    assert router._normalize_hard_limits("no stimulants and no fasting") == "no stimulants; no fasting"
+    assert router._normalize_hard_limits("no dairy, none, no gluten") == "no dairy; no gluten"
+    assert router._normalize_hard_limits("no xyz unknown") == "no xyz unknown"   # unrecognized kept
+    assert router._normalize_hard_limits(None) is None                # non-string passes through
+
+
+def test_normalize_hard_limits_clause_parity_with_frozen_limit_clauses():
+    """LIVE-02 parity (SEC-02/API-01/QUAL-02/TEST-01): _normalize_hard_limits splits clauses the SAME
+    way the frozen consumer assemble._limit_clauses does (case-insensitive ' and ', ',', ';'), so a
+    real limit surviving normalization is parsed identically downstream. Pinned against the REAL frozen
+    function (not a copy) — reds if the two splitters ever drift (a rejoin / regex / case change).
+    """
+    from scripts.plan.assemble import _limit_clauses
+
+    # an uppercase-AND confirmed-none collapses (the SEC-02 fix) -> 0 downstream clauses
+    assert router._normalize_hard_limits("none AND none") == ""
+    assert _limit_clauses(router._normalize_hard_limits("none AND none")) == []
+    # a >=2-limit real value joined by mixed-case AND survives and parses to the SAME subjects as raw
+    raw = "no stimulants AND no fasting"
+    assert _limit_clauses(router._normalize_hard_limits(raw)) == _limit_clauses(raw) == ["stimulants", "fasting"]
 
 
 def test_summarize_normalizes_confirmed_none_hard_limits_so_a_plan_can_compose(tmp_path):
@@ -2122,3 +2145,35 @@ def test_summarize_normalizes_confirmed_none_hard_limits_so_a_plan_can_compose(t
     surviving = [r for r in section.get("recommendations", [])
                  if not r.get("actionable_content_struck")]
     assert len(surviving) == 1, "a clean rec should survive once confirmed-none hard-limits normalizes"
+
+
+def test_summarize_mixed_none_preserves_real_limit_still_strikes_downstream(tmp_path):
+    """LIVE-02 (TEST-02): a MIXED hard-limits ('no stimulants; none') summarizes to just the real
+    limit ('no stimulants'), which the frozen HALT filter STILL enforces — a stimulant rec is struck,
+    a clean rec survives. Proves the sentinel-drop never weakens the guard for a surviving real limit
+    (reds if normalization ever over-drops the real clause or the guard stops enforcing it).
+    """
+    import functools
+
+    from scripts.plan.assemble import assemble
+    from scripts.store import keying, store
+
+    store.append("hard-limits",
+                 {f: None for f in keying.LINE_FIELDS}
+                 | {"item": "hard-limits", "timepoint": "2026-07-10", "source": "intake",
+                    "value": "no stimulants; none"},
+                 root=tmp_path)
+    summary = router.summarize(functools.partial(store.read, root=tmp_path))
+    assert summary["hard-limits"] == "no stimulants", repr(summary["hard-limits"])
+
+    stim = {"claim": "take a strong stimulant preworkout", "category": "stimulant",
+            "source": "x 2020", "confidence_tier": "moderate", "reversibility": "reversible",
+            "grounding": "human", "payload": {"name": "Stim", "dose": "1"}}
+    clean = {"claim": "take creatine monohydrate 5 g daily", "category": "supplements",
+             "source": "ISSN 2017", "confidence_tier": "strong", "reversibility": "reversible",
+             "grounding": "human", "payload": {"name": "Creatine", "dose": "5 g"}}
+    roster = {"supplements": lambda d, s: {"specialist": "S",
+                                           "recommendations": [dict(stim), dict(clean)]}}
+    recs = assemble(["supplements"], summary, roster)["sections"][0]["recommendations"]
+    assert recs[0].get("actionable_content_struck") is True, "stimulant rec must strike under 'no stimulants'"
+    assert not recs[1].get("actionable_content_struck"), "clean rec must survive"

@@ -1819,7 +1819,11 @@ def test_author_schemas_carry_no_integer_bounds_the_api_rejects():
     def offenders(node, path="$"):
         found = []
         if isinstance(node, dict):
-            if node.get("type") == "integer" and ("minimum" in node or "maximum" in node):
+            t = node.get("type")
+            # TEST-03: catch a list-typed integer node (e.g. `["integer","null"]`) too — the API
+            # rejects minimum/maximum on it identically to a scalar "integer".
+            is_int = t == "integer" or (isinstance(t, list) and "integer" in t)
+            if is_int and ("minimum" in node or "maximum" in node):
                 found.append(path)
             for k, v in node.items():
                 found += offenders(v, f"{path}.{k}")

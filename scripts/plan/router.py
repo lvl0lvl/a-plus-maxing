@@ -705,9 +705,10 @@ assert all(
 
 
 # Confirmed-'none' hard-limit sentinel tokens — a clause that states the ABSENCE of a limit, not a
-# real limit. Mirrors the sentinel set the class derivers use (`_supplement_stack_class` /
-# `_peptide_use_class`, "none"/"no"/"n/a"/"na").
-_HARD_LIMIT_SENTINELS = ("none", "no", "n/a", "na", "nil")
+# real limit. The SAME set the sibling class derivers use (`_supplement_stack_class` /
+# `_peptide_use_class`, "none"/"no"/"n/a"/"na"), so a confirmed-none token reads consistently across
+# the de-id surface (a value not in this set is treated as present content everywhere, QUAL-01/HIST-03).
+_HARD_LIMIT_SENTINELS = ("none", "no", "n/a", "na")
 
 
 def _normalize_hard_limits(value):
@@ -717,16 +718,19 @@ def _normalize_hard_limits(value):
     to no known prohibited class as INDETERMINATE and strikes every recommendation fail-closed. A
     literal confirmed-none value (the first real run's operator stored `'none; none'`) is therefore
     read as an unrecognized limit -> strike-all -> NO plan can be composed for a no-hard-limits
-    operator. Splitting on the SAME separators the HALT filter's `_limit_clauses` uses (' and ', ',',
-    ';'), this drops any bare sentinel clause ('none'/'no'/'n/a'/'na'/'nil', case-insensitive) and
-    rejoins the surviving REAL limits with '; '. An all-sentinel value collapses to '' so the HALT
-    filter reads no-limit (HALT_CLEAR); a genuinely unrecognized real limit (e.g. 'no XYZ') is
-    preserved verbatim and still fails closed — the guard is unchanged for real limits. A non-string
-    value passes through untouched (the pass-through field is a string by store schema).
+    operator. Splitting CASE-INSENSITIVELY on the SAME separators the HALT filter's `_limit_clauses`
+    uses (' and ', ',', ';') — `_limit_clauses` lowercases the whole text BEFORE splitting, so its
+    ' and ' boundary is case-insensitive; matching that (SEC-02/API-01) makes a confirmed-none with an
+    'AND'/'And' joiner collapse too, not just a lowercase 'and'. This drops any bare sentinel clause
+    ('none'/'no'/'n/a'/'na', case-insensitive) and rejoins the surviving REAL limits with '; '. An
+    all-sentinel value collapses to '' so the HALT filter reads no-limit (HALT_CLEAR); a genuinely
+    unrecognized real limit (e.g. 'no XYZ') is preserved verbatim and still fails closed — the guard
+    is unchanged for real limits. A non-string value passes through untouched (the pass-through field
+    is a string by store schema).
     """
     if not isinstance(value, str):
         return value
-    clauses = [c.strip() for c in re.split(r"\s+and\s+|,|;", value)]
+    clauses = [c.strip() for c in re.split(r"\s+and\s+|,|;", value, flags=re.IGNORECASE)]
     kept = [c for c in clauses if c and c.lower() not in _HARD_LIMIT_SENTINELS]
     return "; ".join(kept)
 
