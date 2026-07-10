@@ -704,6 +704,37 @@ assert all(
 )
 
 
+# Confirmed-'none' hard-limit sentinel tokens — a clause that states the ABSENCE of a limit, not a
+# real limit. The SAME set the sibling class derivers use (`_supplement_stack_class` /
+# `_peptide_use_class`, "none"/"no"/"n/a"/"na"), so a confirmed-none token reads consistently across
+# the de-id surface (a value not in this set is treated as present content everywhere, QUAL-01/HIST-03).
+_HARD_LIMIT_SENTINELS = ("none", "no", "n/a", "na")
+
+
+def _normalize_hard_limits(value):
+    """Drop confirmed-'none' sentinel clauses from a hard-limits value (bead LIVE-02).
+
+    The frozen HALT filter (`assemble._halt_disposition`) reads a NON-EMPTY `hard-limits` that maps
+    to no known prohibited class as INDETERMINATE and strikes every recommendation fail-closed. A
+    literal confirmed-none value (the first real run's operator stored `'none; none'`) is therefore
+    read as an unrecognized limit -> strike-all -> NO plan can be composed for a no-hard-limits
+    operator. Splitting CASE-INSENSITIVELY on the SAME separators the HALT filter's `_limit_clauses`
+    uses (' and ', ',', ';') — `_limit_clauses` lowercases the whole text BEFORE splitting, so its
+    ' and ' boundary is case-insensitive; matching that (SEC-02/API-01) makes a confirmed-none with an
+    'AND'/'And' joiner collapse too, not just a lowercase 'and'. This drops any bare sentinel clause
+    ('none'/'no'/'n/a'/'na', case-insensitive) and rejoins the surviving REAL limits with '; '. An
+    all-sentinel value collapses to '' so the HALT filter reads no-limit (HALT_CLEAR); a genuinely
+    unrecognized real limit (e.g. 'no XYZ') is preserved verbatim and still fails closed — the guard
+    is unchanged for real limits. A non-string value passes through untouched (the pass-through field
+    is a string by store schema).
+    """
+    if not isinstance(value, str):
+        return value
+    clauses = [c.strip() for c in re.split(r"\s+and\s+|,|;", value, flags=re.IGNORECASE)]
+    kept = [c for c in clauses if c and c.lower() not in _HARD_LIMIT_SENTINELS]
+    return "; ".join(kept)
+
+
 def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG,
               genetics_library_root=None):
     """Derive the plan-reasoning summary from store-read state.
@@ -799,6 +830,11 @@ def summarize(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG,
             readings = store_read(field)
             if readings:
                 value = readings[-1]["value"]
+                if field == "hard-limits":
+                    # LIVE-02: collapse a confirmed-'none' hard-limits to '' so the frozen HALT
+                    # filter reads no-limit (HALT_CLEAR), not an unrecognized-limit strike-all.
+                    # A real limit is preserved verbatim (the fail-closed guard is unchanged).
+                    value = _normalize_hard_limits(value)
                 # 8j6 fail-closed: a pass-through field is contracted as a de-identified
                 # STATED TOKEN (PII-free by store schema). That assumption is unenforced
                 # upstream, so enforce it HERE — the summary IS the 0-raw-PII boundary.

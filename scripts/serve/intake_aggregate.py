@@ -267,8 +267,9 @@ class AggregatingDeidClient:
         self._recent_window = recent_window
 
     def deidentify(self, raw_intake):
-        """De-identify the intake — collapse its high-cardinality timeseries first, then
-        normalise the de-id output's list-valued fields to the string consumer contract."""
+        """De-identify the intake — collapse its high-cardinality timeseries first, then normalise
+        the de-id output's list-valued fields to the string consumer contract AND its confirmed-none
+        hard-limits sentinel to the frozen HALT filter's no-limit form."""
         if isinstance(raw_intake, dict) and isinstance(raw_intake.get("operator_state"), list):
             raw_intake = {
                 **raw_intake,
@@ -277,7 +278,18 @@ class AggregatingDeidClient:
                     min_count=self._min_count, recent_window=self._recent_window,
                 ),
             }
-        return normalize_summary(self._inner.deidentify(raw_intake))
+        summary = normalize_summary(self._inner.deidentify(raw_intake))
+        # API-03 (PF-S124-01 ingress-completeness): the no-train de-id MODEL is a SECOND producer of
+        # the SUMMARY_FIELD_SET summary that feeds the frozen HALT filter (on the run_orchestrated
+        # loop path), besides router.summarize. Apply the SAME confirmed-none hard-limits
+        # normalization the summarize producer applies (via the ONE shared helper), so a
+        # model-emitted bare-sentinel 'none' does not strike-all every rec on the loop path. Skipped
+        # on the fail-closed sentinel (no hard-limits key). Method-local import per the
+        # cross-package-import convention; no back-edge (router is a pure summary deriver).
+        if isinstance(summary, dict) and "hard-limits" in summary:
+            from scripts.plan.router import _normalize_hard_limits
+            summary["hard-limits"] = _normalize_hard_limits(summary["hard-limits"])
+        return summary
 
     def __getattr__(self, name):
         # Delegate every non-deidentify method (converse / author / extract_readings) to the
