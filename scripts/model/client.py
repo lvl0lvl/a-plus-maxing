@@ -541,16 +541,18 @@ def _author_system_prompt(domain):
 # each domain's actionable payload is a CONCRETE closed object matching its `plan_schema` validator
 # + translator (workout exercise / nutrition day-target-or-meal / supplements item / peptides
 # compound regimen). Optional fields are omitted from `required` (the model fills what applies).
-# `minimum`/`minLength` mirror the `plan_schema` validators (sets 1..100, calorie_goal/macros > 0,
-# non-empty required strings) so the schema-valid envelope is also VALUE-valid — a soft model-side
-# hint, NOT the enforcement (BUG-03: the structured-output API does not reliably enforce
-# minimum/minLength; the real fix is the engine catch in `record_plan`/`compute_plan`, bead deferred).
+# The structured-output API REJECTS `minimum`/`maximum` on an `integer` type (400
+# invalid_request_error "For 'integer' type, properties maximum, minimum are not supported" — the
+# workout/nutrition author call failed the first LIVE run until these were dropped, bead LIVE-01),
+# so integer bounds are NOT expressed here; the real bounds (sets 1..100, calorie_goal/macros > 0)
+# are enforced downstream in `record_plan`/`compute_plan` + the `plan_schema` validators, never here
+# (BUG-03). String `minLength` IS accepted by the API and is retained as a soft non-empty hint.
 _AUTHOR_PAYLOAD_SCHEMA = {
     "workout": {
         "type": "object",
         "properties": {
             "name": {"type": "string", "minLength": 1},
-            "sets": {"type": "integer", "minimum": 1, "maximum": 100},
+            "sets": {"type": "integer"},
             "reps": {"type": "string"},
             "detail": {"type": "string"},
             "load": {"type": "string"},
@@ -561,13 +563,13 @@ _AUTHOR_PAYLOAD_SCHEMA = {
     "nutrition": {
         "type": "object",
         "properties": {
-            "calorie_goal": {"type": "integer", "minimum": 1},
+            "calorie_goal": {"type": "integer"},
             "macros": {
                 "type": "object",
                 "properties": {
-                    "protein": {"type": "integer", "minimum": 1},
-                    "carbs": {"type": "integer", "minimum": 1},
-                    "fat": {"type": "integer", "minimum": 1},
+                    "protein": {"type": "integer"},
+                    "carbs": {"type": "integer"},
+                    "fat": {"type": "integer"},
                 },
                 "required": ["protein", "carbs", "fat"],
                 "additionalProperties": False,

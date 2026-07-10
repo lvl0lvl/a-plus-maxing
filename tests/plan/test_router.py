@@ -2077,3 +2077,48 @@ def test_experience_band_bands_years_and_defaults_to_sentinel():
     # it is a registered ALWAYS-SET derived field (present for a fresh operator)
     assert "training-experience-band" in router._ALWAYS_SET_DERIVED
     assert "training-experience-band" in router.SUMMARY_FIELD_SET
+
+
+def test_normalize_hard_limits_drops_confirmed_none_preserves_real_limits():
+    """LIVE-02: a confirmed-'none' hard-limits collapses to '' so the frozen HALT filter reads
+    no-limit (HALT_CLEAR) rather than an unrecognized-limit strike-all; a REAL limit is preserved
+    verbatim (the fail-closed guard on a genuinely unrecognized limit is unchanged).
+    """
+    assert router._normalize_hard_limits("none; none") == ""      # the first real run's value
+    assert router._normalize_hard_limits("none") == ""
+    assert router._normalize_hard_limits("No; N/A; nil") == ""     # case-insensitive sentinels
+    assert router._normalize_hard_limits("no stimulants") == "no stimulants"          # real limit kept
+    assert router._normalize_hard_limits("no overhead press; none") == "no overhead press"  # mix
+    assert router._normalize_hard_limits("no xyz unknown") == "no xyz unknown"  # unrecognized kept
+    assert router._normalize_hard_limits(None) is None            # non-string passes through
+
+
+def test_summarize_normalizes_confirmed_none_hard_limits_so_a_plan_can_compose(tmp_path):
+    """LIVE-02 end-to-end: a store whose hard-limits is the confirmed-'none' value summarizes to an
+    EMPTY hard-limits, so the frozen HALT filter clears and a clean rec survives (a plan can compose)
+    instead of being struck fail-closed. Failing-capable: revert `_normalize_hard_limits` and
+    hard-limits reads 'none' -> the assemble HALT strikes every rec -> no plan.
+    """
+    import functools
+
+    from scripts.plan.assemble import assemble
+    from scripts.store import keying, store
+
+    store.append("hard-limits",
+                 {f: None for f in keying.LINE_FIELDS}
+                 | {"item": "hard-limits", "timepoint": "2026-07-10", "source": "intake",
+                    "value": "none; none"},
+                 root=tmp_path)
+    store_read = functools.partial(store.read, root=tmp_path)
+    summary = router.summarize(store_read)
+    assert summary["hard-limits"] == "", repr(summary["hard-limits"])
+
+    rec = {"claim": "take creatine monohydrate 5 g daily", "category": "supplements",
+           "source": "ISSN position stand 2017", "confidence_tier": "strong",
+           "reversibility": "fully reversible", "grounding": "human",
+           "payload": {"name": "Creatine monohydrate", "dose": "5 g"}}
+    roster = {"supplements": lambda d, s: {"specialist": "S", "recommendations": [dict(rec)]}}
+    section = assemble(["supplements"], summary, roster)["sections"][0]
+    surviving = [r for r in section.get("recommendations", [])
+                 if not r.get("actionable_content_struck")]
+    assert len(surviving) == 1, "a clean rec should survive once confirmed-none hard-limits normalizes"

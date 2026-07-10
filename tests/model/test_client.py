@@ -1805,6 +1805,34 @@ def test_good_author_fixture_validates_against_live_workout_schema():
     jsonschema.validate(_good_author_fixture(), _author_output_schema("workout"))
 
 
+def test_author_schemas_carry_no_integer_bounds_the_api_rejects():
+    """LIVE-01: the structured-output API 400s on `minimum`/`maximum` for an `integer` type
+    ("For 'integer' type, properties maximum, minimum are not supported") — this failed the
+    workout + nutrition author calls on the first REAL run (supplements/peptides, integer-bound-free,
+    succeeded). Assert NO integer-typed subschema in ANY domain's author schema carries
+    `minimum`/`maximum` (string `minLength` is API-accepted and allowed). Failing-capable: re-add
+    `"minimum": 1` to `sets` / `calorie_goal` / a `macros` member and this reds.
+    """
+    from scripts.model.client import _author_output_schema
+    from scripts.store.plan_schema import PLAN_DOMAINS
+
+    def offenders(node, path="$"):
+        found = []
+        if isinstance(node, dict):
+            if node.get("type") == "integer" and ("minimum" in node or "maximum" in node):
+                found.append(path)
+            for k, v in node.items():
+                found += offenders(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                found += offenders(v, f"{path}[{i}]")
+        return found
+
+    for domain in PLAN_DOMAINS:
+        bad = offenders(_author_output_schema(domain))
+        assert not bad, f"{domain} author schema carries API-rejected integer bounds at {bad}"
+
+
 def test_model_failure_category_maps_by_type_and_never_leaks():
     """A suppressed converse failure yields a PII-safe, category-specific operator message.
 
