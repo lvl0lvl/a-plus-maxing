@@ -58,7 +58,7 @@ per-author concerns — they run in the cross-domain layer (the step-4 reconcile
 """
 
 from scripts.model.client import ModelCallError, ModelClient
-from scripts.plan import router
+from scripts.plan import context_assembler, router
 from scripts.plan.assemble import assemble
 from scripts.store import plan_schema
 
@@ -353,7 +353,7 @@ def compute_plan(domain, author_output=None, store_read=None, *, gates=None, cli
         )
     gates = gates or {}
     client = client if client is not None else _FixedEnvelopeClient(author_output)
-    summary = router.summarize(store_read)
+    summary = context_assembler.assemble_context(store_read)
 
     # Author the envelope through the one model client (H-1). A failed call (the typed
     # `ModelCallError`) is the honest no-plan state — never a fabricated/degraded plan
