@@ -2377,3 +2377,21 @@ Caught this session: 6.
 - RT-008 ADR-0042 "all health substance flows" vs ADR-0032 "raw genotypes never cross" — detection: gate (red team); surfaced_by: self. Resolved (genetics carve-out preserving the S102 crown jewel).
 - health-PII in the tracked/public design docs (specialist-contracts + mockup carry the operator's real stack) — detection: self; surfaced_by: self. Flagged to the operator + the health-laden docs left UNSTAGED before any push (only the generic ADRs committed).
 Two operator-surfaced (PF-S127-01/02) — above the 0 target; the four rigor-loop/self catches (RT-006/007/008 + the PII boundary) landed before any commit/push. The two operator-surfaced misses are the ones the guards must grow to catch: the core-capability gate re-based onto product (PF-S127-01), and the read-the-full-record-before-asserting discipline (PF-S127-02).
+
+## Session 128 (2026-07-11)
+
+Context: the PLANNING ARC for the comprehensive-plan re-architecture — `/create-spec` (a 15-task spec, judged ≥9/10 all dimensions) + `/create-build-plan` (a 6-wave plan, judged 100/100) on ADR-0041..0046, both committed on `feature/comprehensive-plan-adr`. The `/create-task-plan` (TDD recipes) + `/execute-plan` (the code build) are the NEXT session — the planning→build boundary (execute = real code superseding the frozen spine + the operator-gated LIVE runs).
+
+### Per-PR gated-skill invocation table (INV-SKILL-TRACE)
+No PR lifecycles ran this session.
+
+### PF attestation
+S128 close (2026-07-11): No new process-failure entries this session. The planning arc ran cleanly through the full create-spec + create-build-plan rigor loops: the judges + gates caught every issue before commit (the spec's ADR-0042 grounding slip, the spec's 3 minor findings, the build-plan's inherited critical-path defect) — that is the rigor working as designed, not process failures; the spec was judged ≥9/10 on every dimension and the build plan 100/100. The `enforce-role-inlining` hook BLOCKED one Architect dispatch that abbreviated the Modes + Negative-Examples sections → re-dispatched with the full verbatim profile (the mechanical guard working — no truncated dispatch reached the agent). Prior process-failures referenced DESCRIPTIVELY: the PF-S127-01 core-capability-gate lesson HOLDS (the spec + build-plan target the PRODUCT capability — the orchestrated comprehensive plan — not a thin proxy); the PF-S127-02 read-the-full-record discipline HELD (every task ground against the LIVE tree via the Repo-Grounding Ledger, not against the ADR's description of the tree). One documented scope change: S128 was scoped to the planning arc (spec + build-plan + task-plan); the task-plan is DEFERRED to the next session at the planning→build boundary — a session-length boundary, not scope-creep, evaluated CHANGED in the S128 scope-contract eval.
+
+### Disclosure ledger (S128 close)
+Caught this session: 4 (all self/gate; 0 operator-surfaced).
+- The spec's ADR-0042 FAIL-1 grounding slip (`plan_driver` mis-attributed to `compute_plan`/`router.summarize`) — detection: gate (the spec verify pass); surfaced_by: self. Fixed in-cycle + re-judged 10/10.
+- The spec's 3 minor findings (missing 0044-T2→T3 dependency edge; 2 Repo-Grounding-Ledger line-cite errors) — detection: gate (the spec judge); surfaced_by: self. Fixed.
+- The build-plan critical-path defect inherited from the spec's self-named path — detection: gate (the Architect AND the build-plan judge, independently); surfaced_by: self. Corrected to the true zero-slack chain, the spec's named chain preserved as a co-critical risk headline.
+- The abbreviated Architect dispatch (dropped the Modes + Negative-Examples sections) — detection: gate (the `enforce-role-inlining` PreToolUse hook BLOCKED it); surfaced_by: self. Re-dispatched with the full verbatim profile.
+All 4 caught by the pipelines' own gates/judges/hooks BEFORE any commit; 0 reached the operator (the operator's only input was "proceed"/"you should not have stopped" — they surfaced no specific defect).
