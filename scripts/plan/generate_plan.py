@@ -353,6 +353,10 @@ def compute_plan(domain, author_output=None, store_read=None, *, gates=None, cli
         )
     gates = gates or {}
     client = client if client is not None else _FixedEnvelopeClient(author_output)
+    # S2 precondition (LOW-2): `assemble_context` inherits `summarize`'s cwd-relative
+    # `identity_config` default — correct when cwd == the instance root (the single-operator
+    # deployment). A divergent-cwd caller must pass an instance-bound config (see the
+    # `assemble_context` docstring); this is unchanged from the prior `summarize(store_read)`.
     summary = context_assembler.assemble_context(store_read)
 
     # Author the envelope through the one model client (H-1). A failed call (the typed

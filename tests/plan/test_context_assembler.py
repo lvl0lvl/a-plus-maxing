@@ -378,3 +378,41 @@ def test_config_absent_residual(tmp_path):
         assert sum(value in leaf for leaf in flat) == 0, f"structured value leaked config-absent: {cls}"
     # the residual: the value-embedded name flows (caught only by structural patterns).
     assert any(residual_name in leaf for leaf in flat), "config-absent residual not demonstrated"
+
+
+# --- Tier-2 Security review fixes ----------------------------------------------
+
+
+def test_nested_value_under_allowlisted_key_fails_closed(tmp_path):
+    """MEDIUM-1 (crown-jewel): a NESTED value under an allowlisted key fails closed.
+
+    The store is value-type-agnostic — an adapter reading may carry a structured value. A
+    nested-dict value under the allowlisted `raw-lab-values` key would smuggle third-party PII
+    (a provider-name + MRN) past BOTH the allowlist (it is under an allowlisted key) AND the
+    operator-value gate (which catches only OPERATOR identity). The FLAT-SCALAR boundary gate
+    rejects it, naming the field, never echoing the smuggled value. Mutation-RED-capable:
+    removing the `_is_flat_scalar` enforcement lets the nested value flow to the payload.
+    """
+    nested = {"provider": "Dr. Jane Smith, Kaiser Permanente", "mrn": "A12345"}
+    _append(tmp_path, "raw-lab-values", nested)
+    store_read = functools.partial(store.read, root=tmp_path)
+    with pytest.raises(
+        ValueError,
+        match=r"carried field 'raw-lab-values' has a non-scalar value; the flat-scalar payload contract is violated",
+    ) as exc:
+        context_assembler.assemble_context(store_read)
+    assert "Kaiser Permanente" not in str(exc.value)  # names the field, never echoes the smuggled PII
+    assert "A12345" not in str(exc.value)
+
+
+def test_falsy_present_value_carried(tmp_path):
+    """BUG-ESCALATION: a PRESENT-but-falsy value (numeric 0) is carried, not dropped.
+
+    `router.summarize` reads `readings[-1]["value"]` with no truthiness skip; the assembler
+    must match — an adapter-sourced `bodyweight-kg` of 0 (or an intentional zero reading) is a
+    present value, not an absent one. Failing-capable: a `if not value` truthiness skip drops it.
+    """
+    _append(tmp_path, "bodyweight-kg", 0)
+    store_read = functools.partial(store.read, root=tmp_path)
+    result = context_assembler.assemble_context(store_read)
+    assert result.get("bodyweight-kg") == 0, "a present falsy value (0) was dropped"

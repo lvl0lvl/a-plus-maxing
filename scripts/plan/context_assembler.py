@@ -59,6 +59,47 @@ _HEALTH_SUBSTANCE_ALLOWLIST = (
     "bodyweight-kg",
 )
 
+# The 10 identity/identifier classes of `router.EXCLUDED_RAW_PII` (name / exact-DOB /
+# government-id / contact / geolocation + the 3 health-identifier classes
+# medical-record-number / insurance-id / provider-name) — the crown-jewel exclusion set.
+# Named here ONLY for the change-control tripwires below (NEVER to BUILD the allowlist — that
+# stays a positive enumeration, never `EXCLUDED_RAW_PII` minus this denylist).
+_IDENTITY_IDENTIFIER_CLASSES = frozenset({
+    "legal-name", "date-of-birth", "government-id", "email-address", "phone-number",
+    "postal-address", "geolocation", "medical-record-number", "insurance-id", "provider-name",
+})
+
+# Change-control tripwires (LOW-1, mirroring router.py:667-668 / :688-689): a future edit that
+# adds an identity/identifier class (e.g. `provider-name`) to the allowlist, mistypes a class
+# name, or reclassifies a class in `EXCLUDED_RAW_PII` trips at IMPORT — not silently by comment.
+assert set(_HEALTH_SUBSTANCE_ALLOWLIST) <= set(router.EXCLUDED_RAW_PII)  # every allowlisted class is a known raw-PII class
+assert set(_HEALTH_SUBSTANCE_ALLOWLIST).isdisjoint(_IDENTITY_IDENTIFIER_CLASSES)  # no identity/identifier class is allowlisted
+assert (
+    set(_HEALTH_SUBSTANCE_ALLOWLIST) | _IDENTITY_IDENTIFIER_CLASSES == set(router.EXCLUDED_RAW_PII)
+)  # exact partition — a reclassified EXCLUDED_RAW_PII member keeps this mirror honest
+
+
+def _is_flat_scalar(value):
+    """Return whether `value` is a scalar or a FLAT list of scalars (the payload contract).
+
+    A scalar is `None` / `str` / `int` / `float` / `bool`; a list is admitted only when every
+    item is itself such a scalar. A nested dict/mapping — or a list holding one — returns
+    False, so identity or a genotype cannot hide at a nested leaf under an allowlisted key
+    (Security MEDIUM-1). Mirrors `dispatch`'s positive-scalar allowlist (`router.py:907-914`),
+    widened to permit a list of scalars.
+
+    Args:
+        value: The candidate carried value.
+
+    Returns:
+        (bool) True iff `value` conforms to the flat-scalar / list-of-scalar contract.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return True
+    if isinstance(value, list):
+        return all(item is None or isinstance(item, (str, int, float, bool)) for item in value)
+    return False
+
 
 def assemble_context(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFIG,
                      genetics_library_root=None):
@@ -104,17 +145,34 @@ def assemble_context(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFI
         if not readings:
             continue
         value = readings[-1].get("value")
-        if not value:
+        # Carry a PRESENT value even when falsy (0 / False / "") — skip only an absent/None
+        # reading, matching `router.summarize`'s `readings[-1]["value"]` (no truthiness skip).
+        # A truthiness skip silently dropped an adapter-sourced numeric 0 (BUG-ESCALATION).
+        if value is None:
             continue
-        # Reuse the `summarize` `:848` 8j6 gate: a carried free-text value is contracted
-        # PII-free by store schema, but that contract is unenforced upstream, so enforce it
-        # HERE — the assembler IS the 0-raw-PII boundary on the plan path. Names the field,
-        # never the value (no PII echo).
-        if pii_scan.scan_operator_value(str(value), token_config=identity_config):
+        # MEDIUM-1 (crown-jewel): enforce the FLAT-SCALAR / list-of-scalar payload contract at
+        # the boundary. The store is value-type-agnostic (an adapter reading may carry a
+        # structured value — ingest.py), so a nested-dict value under an allowlisted key would
+        # smuggle third-party PII (a provider-name / MRN) past BOTH the allowlist (it is under
+        # an allowlisted key) AND the operator-value gate (which catches only OPERATOR
+        # identity). The plan path never runs `dispatch`'s scalar gate (`router.py:907-914`),
+        # so enforce the analogue HERE — reject any non-scalar / nested value fail-closed.
+        if not _is_flat_scalar(value):
             raise ValueError(
-                f"assemble_context: carried field {field!r} carries raw operator "
-                f"PII; the PII-free-by-store-schema assumption is violated "
-                f"(fail-closed)"
+                f"assemble_context: carried field {field!r} has a non-scalar value; the "
+                f"flat-scalar payload contract is violated (fail-closed)"
             )
+        # Reuse the `summarize` `:848` 8j6 gate at EVERY carried scalar (the payload is flat by
+        # the contract above; a list-of-scalar is walked item-by-item): a carried value
+        # smuggling operator identity fails closed. Names the field, never the value.
+        for scalar in value if isinstance(value, list) else (value,):
+            if scalar is not None and pii_scan.scan_operator_value(
+                str(scalar), token_config=identity_config
+            ):
+                raise ValueError(
+                    f"assemble_context: carried field {field!r} carries raw operator "
+                    f"PII; the PII-free-by-store-schema assumption is violated "
+                    f"(fail-closed)"
+                )
         specialist_input[field] = value
     return specialist_input
