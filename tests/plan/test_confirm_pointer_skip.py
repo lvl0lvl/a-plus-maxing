@@ -34,7 +34,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # The ADR-0032 Validation-named WRITE-path + engine glob that must stay byte-frozen.
 FROZEN_GLOB = (
     "scripts/plan/orchestrate.py", "scripts/plan/pipeline.py", "scripts/plan/assemble.py",
-    "scripts/plan/generate_plan.py", "scripts/plan/adjudicate.py", "scripts/plan/adjust.py",
+    # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD) superseded plan front door; guarded by tests/plan/test_generate_plan.py + core-capability-audit.sh + per-ADR numstat probes. Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
+    "scripts/plan/adjudicate.py", "scripts/plan/adjust.py",
     "scripts/plan/track.py", "scripts/plan/plan_driver.py", "scripts/plan/plan_orchestrator.py",
     "scripts/store/keying.py", "scripts/store/store.py",
 )
