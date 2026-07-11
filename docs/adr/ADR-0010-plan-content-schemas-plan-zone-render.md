@@ -1,8 +1,8 @@
 # ADR-0010 — Plan-content schemas + plan-zone render: day-keyed per-domain plans with slot-level honesty
 
-**Status:** Accepted (2026-06-12, S53)
+**Status:** Accepted (2026-06-12, S53) · Superseded-in-part (2026-07-11, Phase-8 backfill) — specialist-OUTPUT half by ADR-0041; plan-content STORAGE half (D1/D2/D3/D4/D6) by ADR-0044; **D5 render contract NOT superseded** (re-based as build tasks under ADR-0044's model / ADR-0046 progressive activation, RT-010).
 **Owner:** Walter McGivney
-**Relates to:** ADR-0002 (local-first time-series store), ADR-0004 (single-file artifact generation; inert controls), ADR-0006 (multi-domain plan assembly via roster — the T2 seam), ADR-0008 (type-routed dashboard), ADR-0009 (7-zone visual shell + honesty rule), `vault/design/dashboard-v1-visual-spec.md` (zone 3 as amended 2026-06-12, bead `1oh`)
+**Relates to:** ADR-0002 (local-first time-series store), ADR-0004 (single-file artifact generation; inert controls), ADR-0006 (multi-domain plan assembly via roster — the T2 seam), ADR-0008 (type-routed dashboard), ADR-0009 (7-zone visual shell + honesty rule), ADR-0041 (uniform specialist domain-program schema — supersedes ADR-0010's specialist-OUTPUT half), ADR-0044 (comprehensive plan model — supersedes ADR-0010's plan-content STORAGE half D1/D2/D3/D4/D6; D5 render NOT superseded), `vault/design/dashboard-v1-visual-spec.md` (zone 3 as amended 2026-06-12, bead `1oh`)
 
 ## Context
 
