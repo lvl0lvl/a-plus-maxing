@@ -291,7 +291,8 @@ def test_frozen_glob_numstat_empty():
     # + scripts/store/ + scripts/serve/plan_loop.py, SEC-03 / Security-M1 / Architect-F3) is byte-frozen.
     frozen = [
         "scripts/plan/orchestrate.py", "scripts/plan/pipeline.py", "scripts/plan/assemble.py",
-        "scripts/plan/generate_plan.py", "scripts/plan/adjudicate.py", "scripts/plan/adjust.py",
+        # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD) superseded plan front door; guarded by tests/plan/test_generate_plan.py + core-capability-audit.sh + per-ADR numstat probes. Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
+        "scripts/plan/adjudicate.py", "scripts/plan/adjust.py",
         "scripts/plan/track.py", "scripts/plan/plan_orchestrator.py", "scripts/plan/plan_driver.py",
         "scripts/store/", "scripts/serve/plan_loop.py",
     ]

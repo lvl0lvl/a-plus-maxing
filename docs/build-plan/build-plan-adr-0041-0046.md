@@ -1,0 +1,366 @@
+---
+source-specs: [docs/spec/adr-0041-0046-comprehensive-plan-spec.md]
+adrs: [ADR-0041, ADR-0042, ADR-0043, ADR-0044, ADR-0045, ADR-0046]
+created: 2026-07-11
+status: approved
+total-waves: 6
+critical-path-length: 6 tasks
+estimated-effort: 17 task-days
+---
+
+# Build Plan: Comprehensive Plan-Platform Re-Architecture (ADR-0041…0046, Tiers 1-3)
+
+Scope: the approved single spec (`docs/spec/adr-0041-0046-comprehensive-plan-spec.md`, 15 tasks) that builds the full authoring→monitoring spine fixing DATA-COLLAPSE + NO-LOOP: the uniform seven-field DOMAIN PROGRAM schema (ADR-0041), the identity-stripped Context Assembler (ADR-0042), the care-agent Orchestrator (ADR-0043), the comprehensive Plan Model (ADR-0044), the plan-compiled monitoring compiler + four-tier deterministic executor (ADR-0045), and the 4→15+ dispatch scale-up with progressive activation (ADR-0046). The wave schedule is GROUNDED on the spec's already-built Dependency Map + six Kahn parallel groups + Test Strategy + File Manifest — this plan schedules them, it does not re-derive them.
+
+## Overview / Governing Constraints
+
+**The build rides four checkpoint invariants on EVERY wave, none deferred to the last (the ADR-0032 EXTEND-NOT-REBUILD posture applied to a set that deliberately, operator-signed-off, breaks the freeze on four surfaces):**
+
+1. **Frozen-spine byte-freeze, per-ADR-SCOPED.** Four of six ADRs break the ADR-0032 freeze on the plan spine (0041 supersedes the four thin translators + `assemble._is_complete`; 0042 supersedes the plan-path `router.summarize` USE; 0043 generalizes the SAFETY-CRITICAL `orchestrate.reconcile`; 0044 supersedes the `plan_schema.py` record spine). The set-wide frozen-spine sign-off was OBTAINED at the Phase-1 discovery gate — this plan does not re-gate it; it SCHEDULES it honestly. Every break is verified by a **per-ADR-scoped `git diff --numstat` probe** (each ADR scoped to its OWN commit delta, EXCLUDING the files a SIBLING ADR is intended to supersede — so the probes never forbid each other's supersession). The HARD-frozen WRITE primitive stays byte-frozen for the ENTIRE build: `git diff --numstat origin/main -- <always-frozen>` == EMPTY at every checkpoint, where **`<always-frozen>`** = `scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` (the comprehensive plan rides `store.append`/`keying`'s `(item, timepoint, source)` unchanged as a richer VALUE — disposition #14; `router.summarize`/`adjust.py` persist for their non-plan roles, only the plan-path USE is superseded at the call site).
+
+   *[AMENDED 2026-07-11 — Architect, frozen-guard reconciliation]:* The per-ADR numstat probes above are the build's OWN gates. Independently, **prior-feature byte-guards** (e.g. `tests/serve/test_route.py`, `test_pdf_ingestion_e2e.py`, `test_intake_onboarding_e2e.py`, `tests/genetics/test_dna_aware_plan_e2e.py`, `tests/serve/test_plan_loop_hold.py`, `tests/plan/test_confirm_pointer_skip.py`, `tests/runner/test_cadence_runner.py`) freeze the superseded surfaces and MUST be surgically carved out as each wave supersedes its surface — a standing per-wave checkpoint item, NOT a Wave-1 one-off. Rule (Architect ruling `docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md`): for each surface a wave supersedes, extend the carve-out in EVERY prior guard that freezes it, removing ONLY that surface (glob guards: add the module name to the `scripts/plan/*.py` exclusion tuple; explicit-list guards: remove the path token), leaving every other frozen member — above all the `<always-frozen>` HARD set — intact. Superseded surfaces + their prior guards: `generate_plan.py` (Wave 1, all seven guards); `assemble.py` (Wave 2, 0041-T2); `orchestrate.py` (Wave 3, 0043-T2); `plan_schema.py` (Wave 2, 0044-T1). New modules (`domain_program.py`, `context_assembler.py`, `plan_model.py`, `monitoring_compiler.py`, `activation.py`) are excluded from the two GLOB guards as they land. Each removed byte-guard membership REQUIRES a behavioral replacement guard (ruling §4) AND the wave's per-ADR probe SHALL bound the superseded surface's delta to the task's sanctioned insertions/deletions (upper bound), replacing the removed "0-line" tripwire. `generate_plan.py` gets NO deletion-cap companion (it is superseded across four waves — the `horizons.py` precedent, not `router.py`'s). A carve-out without a behavioral replacement is a gate gap — HALT.
+2. **Crown-jewel non-egress (the de-id boundary is load-bearing).** The Context Assembler (0042) redraws the PII boundary: it feeds specialists the FULL record with pure identity (legal name / exact DOB / contact / address) stripped, and preserves the genetics carve-out — raw rsID+allele genotypes NEVER cross to the planner; genetics reaches the assembled record ONLY as the derived coarse `genetic-trait-classes` token (RT-008). The crown-jewel identity-leak + genetics carve-out probes are checkpoint gates from Wave 1 onward, re-asserted in the terminal battery.
+3. **0 live-API spend / 0 real operator PII.** Every one of the 15 build tasks is satisfiable with fixture DOMAIN PROGRAMs, a fixture `dispatch`/de-id client, scratch synthetic stores, and synthetic identity/genetics tokens. No test opens a socket or makes a live model/Agent-tool call; 0 real operator PII enters the test tree. The **six DEFER items** (the operator-present LIVE runs that spend model budget + fire the metered de-id-IN call) are NOT build tasks — they are the downstream operator-gated attestations AFTER this build (uniform with the ADR-0032/0039 pattern).
+4. **Store-surface discipline.** The ADR-0044 store-surface tasks (0044-T1 record surface, 0044-T2 mixed-history reader) satisfy the four-category store-adversarial battery (`docs/checklists/store-adversarial-tests.md`) with the category-(d) mutation run RED — a Tier-1 SE self-check AND a Tier-2 QA dispatch item — proving the comprehensive plan introduces 0 new dedupe key (identity stays `keying`'s frozen `(item, timepoint, source)`).
+
+Grounded live against the worktree-authoritative checkout **`feature/comprehensive-plan-adr` @ `033114261941`** (origin/main @ `43e5260addaa`), 2026-07-11. Re-confirmed by reading the live tree (not the spec prose): all 7 Create targets ABSENT; all 11 Modify targets present; the four HARD-frozen files + `adjust.py`/`router.py` numstat-clean vs origin/main; the ADR-0039 runner IS built (`scripts/runner/{cadence_runner,auth_isolation,store_lock,subscription_dispatch}.py` + `schedule/activate.py`); `monitoring_signals`/`adjustment_rules`/`cross_domain_seams` return 0 hits in `scripts/` (the DOMAIN PROGRAM fields are genuinely net-new); 20 specialist/safety agents deployed under `.claude/agents/` (the 15+ dispatch roster). The `.venv` suite baseline is **2 failed, 2489 passed, 7 skipped** (2498 collected) — the two failures (`tests/serve/test_bind.py::test_port_collision_exits_nonzero_fail_loud`, `tests/serve/test_server.py::test_main_reads_no_stdin`) are PRE-EXISTING, environment-sensitive (OS port-binding + stdin capture), the known-red floor every wave checkpoint must not regress past, NOT this build's to fix. The gate is "no NEW failure", not an absolute number.
+
+## Infrastructure Prerequisites
+
+| Prerequisite | Purpose | Verification Command |
+|-------------|---------|---------------------|
+| `.venv` Python 3.14 test runtime (pytest + jsonschema, per `requirements.txt`) at the captured baseline | Every task runs `pytest`; the captured baseline (`2 failed, 2489 passed, 7 skipped`) is the behavior-preservation precondition for every wave's suite-green gate — a 3rd failure is a regression, HALT | `.venv/bin/python -m pytest -q 2>&1 \| tail -1` (expect `2 failed, 2489 passed, 7 skipped`) |
+| Frozen-spine clean at entry (HEAD == the pre-build baseline; the always-frozen glob shows numstat=0 vs origin/main) | The per-ADR numstat probes assert 0 changed lines on `<always-frozen>`; the checkout must be clean at entry for the probe to be meaningful | `git diff --numstat origin/main -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing (verified EMPTY 2026-07-11) |
+| Seven Create targets ABSENT (Create-only, no stale/duplicate artifact — RGC-4) | 0041-T1/0042-T1/0044-T1/0046-T1/0045-T1/0045-T2/0045-T3 create the seven new modules; a pre-existing file would be a duplicate | `for f in scripts/plan/domain_program.py scripts/plan/context_assembler.py scripts/store/plan_model.py scripts/plan/activation.py scripts/plan/monitoring_compiler.py scripts/plan/tiered_executor.py scripts/runner/daily_monitor.py; do test -e "$f" && { echo "PRESENT $f"; exit 1; }; done && echo "ABSENT (Create OK)"` (verified: all 7 ABSENT) |
+| Eleven Modify targets present | The Modify tasks touch these existing files; a missing file is a stale premise | `for f in scripts/plan/generate_plan.py scripts/plan/assemble.py scripts/serve/care_chat.py scripts/plan/orchestrate.py scripts/serve/plan_loop.py scripts/serve/server.py scripts/store/plan_schema.py scripts/plan/track.py scripts/plan/horizons.py scripts/plan/plan_driver.py scripts/runner/schedule/activate.py; do test -e "$f" \|\| { echo "MISSING $f"; exit 1; }; done && echo OK` (verified: all 11 present) |
+| Net-new DOMAIN PROGRAM fields genuinely absent (0 hits in `scripts/`) | 0041-T1's seven-field contract + 0045-T1's compiler premise: `monitoring_signals`/`adjustment_rules`/`cross_domain_seams` are source-fields, not existing | `[ "$(grep -rl 'monitoring_signals\|adjustment_rules\|cross_domain_seams' scripts/ \| wc -l)" -eq 0 ] && echo OK` (verified: 0 hits) |
+| Store WRITE primitive `store.append` present; 0 pre-existing comprehensive-plan stream | 0044-T1 rides the UNCHANGED `store.append(item, _reading(...), root)`; the value grows, the key + sink do not | `grep -q "def append" scripts/store/store.py && echo OK` (verified) |
+| Frozen-spine anchor surfaces present (the superseded surfaces exist to be superseded) | 0041-T2 supersedes the four translators + `_is_complete`; 0042-T1 the `router.summarize` plan-path use at `generate_plan.py:356`; 0043-T2 `orchestrate.reconcile`; 0044-T1 the `plan_schema.py` validators/`record_plan`/`resolve_plan`/`PLAN_DOMAINS` | `grep -q "_PLAN_TRANSLATORS" scripts/plan/generate_plan.py && grep -q "def _is_complete" scripts/plan/assemble.py && grep -q "def summarize" scripts/plan/router.py && grep -q "def reconcile" scripts/plan/orchestrate.py && grep -q "PLAN_DOMAINS" scripts/store/plan_schema.py && echo OK` |
+| ADR-0039 runner host built (0045-T3's daily-pass host is a real surface) | 0045-T3 hosts the daily deterministic pass in the built runner; `schedule/activate.py` registers the disabled-by-default cadence | `test -d scripts/runner && grep -q "def " scripts/runner/cadence_runner.py && test -e scripts/runner/schedule/activate.py && echo OK` (verified: runner built) |
+| Store-adversarial checklist present | 0044-T1/T2 (store-surface) satisfy the four-part battery per the checklist (Tier-1 self-check AND Tier-2 QA dispatch) | `test -e docs/checklists/store-adversarial-tests.md && echo OK` (verified) |
+| Specialist-plan-contracts + the deployed 15+ roster present | 0046-T1's §1-13 card-emitting vs §14-genetics/§15-labs partition reads `design/specialist-plan-contracts.md`; the fixture-driven build grounds that a real roster exists to activate | `test -e design/specialist-plan-contracts.md && [ "$(ls -d .claude/agents/*/ \| wc -l)" -ge 15 ] && echo OK` (verified: contracts present, 20 agents deployed) |
+| `plan-integrity` role profile present (grounds the plan + gates each wave transition) | The build is `/execute-plan`-driven with `plan-integrity` grounding inputs against the LIVE tree + gating each wave's checkpoint Go/No-Go (executed, not reasoned) | `test -e ~/Documents/Projects/skills_library/roles/plan-integrity/agent.md && echo OK` (verified) |
+
+All prerequisites verified live 2026-07-11 at `feature/comprehensive-plan-adr @ 033114261941`. No Wave-1 task depends on an unlisted prerequisite (BP-08 clear): 0041-T1 → `.venv` baseline + the net-new-fields probe + the Create-absent probe; 0042-T1 → `.venv` baseline + the `router.summarize` anchor + `generate_plan.py` present + the Create-absent probe. Every later wave's entry additionally consumes the prior wave's green checkpoint.
+
+## Wave Schedule
+
+**Wave grouping (the spec's six Kahn parallel groups over the verified-acyclic Dependency Map — GROUNDED, not re-derived).** The spec's topological analysis (15 nodes, BFS-verified acyclic, 0 remaining) yields six same-depth groups; those groups ARE the waves. Same-depth tasks (no inter-dependency) share a wave and run in parallel; a task never precedes its dependency's wave.
+
+**Tier ordering is enforced by the EDGES, not by draining whole tiers.** The spec fixes Tier-1 = {ADR-0041 schema, ADR-0042 assembler}, Tier-2 = {ADR-0043 orchestrator, ADR-0044 model, ADR-0046 dispatch}, Tier-3 = {ADR-0045 monitoring}, and confirms "every dependency edge points down-tier or within-tier." The tiers therefore OVERLAP across waves — Tier-2 work opens in Wave 2 (while Tier-1's `0041-T2` closes there); Tier-3 work (`0045-T1`) opens in Wave 3 (while Tier-2 completes through Wave 5). No edge points up-tier, so no dependency is violated. This maximal-parallelism reading is the FAITHFUL topological schedule; the alternative "all-Tier-1 then all-Tier-2 then all-Tier-3" 3-wave structure is REJECTED — it would place intra-wave dependencies (e.g. `0043-T1 → 0043-T2 → 0043-T3` all inside one "Tier-2 wave", which is not a valid parallel wave) and over-serialize per BP-04 (forcing `0045-T1`, which needs only `0041-T1`+`0044-T1`, to wait for all of Tier-2). **`ADR-0043-T1` (the orchestrator decompose→brief prompt rewrite) lands in Wave 2 — the FIRST wave carrying Tier-2 work.**
+
+Effort proxy = files-touched × criteria-count with new-artifact / store-surface / crown-jewel / frozen-spine / dual-review modifiers; a wave's wall-clock is its longest single task (tasks run in parallel), stated as a range (upper bound feeds critical-path/frontmatter). The four governing invariants (per-ADR frozen-spine numstat; crown-jewel non-egress; 0-live-spend; store-surface battery) are checkpoint gates on every wave — assertability noted per wave where a property first becomes end-to-end testable.
+
+### Wave 1: Tier-1 Foundation — Uniform Schema + Context Assembler (De-Id Boundary)
+
+**Tasks:**
+| Task ID | Title | Agent | Est. Effort |
+|---------|-------|-------|-------------|
+| ADR-0041-T1 | The uniform seven-field DOMAIN PROGRAM schema + conformance validator | SE + Architect review | 1.5-2 days |
+| ADR-0042-T1 | The Context Assembler — identity-stripped full record + genetics carve-out (CROWN-JEWEL) | SE + Security review | 2-3 days |
+
+**Entry Criteria:**
+- All Infrastructure Prerequisites verified (commands above return 0 / print OK).
+- `.venv/bin/python -m pytest -q` baseline captured (`2 failed, 2489 passed, 7 skipped`; the 2 known env-sensitive serve failures are the floor, not a regression).
+- `plan-integrity` has GROUNDED the plan: every task's inputs confirmed against the LIVE tree (`stat`/`grep`, not the plan prose), the Dependency Map confirmed an acyclic DAG with artifact-named edges, each wave's checkpoint confirmed runnable.
+- Both tasks are entry points (Dependencies "None") writing DISJOINT files (0041-T1: `domain_program.py` + its test; 0042-T1: `context_assembler.py` + `generate_plan.py:356` swap + its test) — parallel-safe, no intra-wave collision.
+
+**Exit Criteria / Checkpoint (Wave 1 → Wave 2):** see Checkpoint Protocol § Wave 1. DOMAIN PROGRAM seven-field conformance (≥2 domains) + required-vs-conditional rejection + validity-tier + autoregulation-required pass (0041-T1 AC-1/2/3/4/5); the Context Assembler no-collapse + identity-strip + **CROWN-JEWEL identity-leak** + **GENETICS carve-out** probes pass (0042-T1 AC-1/2/3/4/5/6); `router.py` numstat=EMPTY (the :356 plan-path USE is superseded, `router.py` itself untouched); `<always-frozen>` numstat=0; both test modules green; suite has no NEW failure; 0 live spend, 0 real PII.
+
+---
+
+### Wave 2: Tier-1 Migration Close + Tier-2 Foundations (first Tier-2 wave)
+
+**Tasks:**
+| Task ID | Title | Agent | Est. Effort |
+|---------|-------|-------|-------------|
+| ADR-0041-T2 | Transitional additive adapter — migrate the 4 translators + `assemble._is_complete` to the uniform shape (FROZEN-SPINE) | SE | 2-3 days |
+| ADR-0044-T1 | The comprehensive Plan Model + resolver — value rides the frozen `store.append` (FROZEN-SPINE + STORE SURFACE) | SE + Architect review + Security review | 2-3 days |
+| ADR-0043-T1 | Care-agent decompose→brief — rewrite `_care_messages` to the orchestration system prompt | SE | 1.5-2 days |
+
+**Entry Criteria:**
+- Wave 1 checkpoint passed (the DOMAIN PROGRAM schema/validator RAN green — it is the contract 0044-T1 stores against and 0041-T2's migrated translators emit against; the Context Assembler RAN green — it is the assembled record 0043-T1's briefs carry).
+- Shared-file serialization confirmed: `generate_plan.py`'s `:356` assembler swap (0042-T1, Wave 1) landed BEFORE 0041-T2's translator-region migration (disjoint regions, spec dispositions #2); within Wave 2 no two tasks share a file (0041-T2 → `generate_plan.py`+`assemble.py`; 0044-T1 → `plan_model.py`+`plan_schema.py`; 0043-T1 → `care_chat.py`).
+
+**Exit Criteria / Checkpoint (Wave 2 → Wave 3):** see Checkpoint Protocol § Wave 2. The transitional adapter accepts both shapes + rejects non-uniform-non-liftable output + 0 fields dropped round-trip (0041-T2 AC-1/2/3), **per-ADR numstat** shows the `generate_plan.py`+`assemble.py` supersession with the frozen four + siblings (`plan_schema.py`/`orchestrate.py`/`router.py`) EMPTY (0041-T2 AC-4); the comprehensive model round-trips with 0 missing elements + resolves standing (0044-T1 AC-1/2/3), **per-ADR numstat** shows `pipeline.py`/`adjudicate.py`/`store.py`/`keying.py`==0 + exactly the four named `plan_schema.py` surfaces superseded (0044-T1 AC-4), the **store-adversarial battery** passes all four with category-(d) RED (0044-T1 AC-5); the orchestrator emits brief-count == active-specialist-count, each brief carries the assembled record NOT a band, the capture path is byte-unchanged (0043-T1 AC-1/2/3/4/5); `<always-frozen>` numstat=0; three test modules green; suite no NEW failure; 0 live spend.
+
+---
+
+### Wave 3: Tier-2 Core (reader + activation + reconcile) + Tier-3 Compiler Opens
+
+**Tasks:**
+| Task ID | Title | Agent | Est. Effort |
+|---------|-------|-------|-------------|
+| ADR-0044-T2 | Mixed-history-tolerant reader + consumer re-point (STORE SURFACE) | SE + Security review | 1.5-2 days |
+| ADR-0046-T1 | Progressive-activation gate at dispatch + grow the dispatch roster 4→15+ | SE + Architect review* | 2-3 days |
+| ADR-0045-T1 | The monitoring compiler — Tier-1-safe vs must-escalate rule grammar (Tier-3 opens) | SE | 1.5-2 days |
+| ADR-0043-T2 | Collect + reconcile `cross_domain_seams` — generalize the 5 holds, safety floors always-on (FROZEN-SPINE + SAFETY) | SE + Security review* | 2-3 days |
+
+**Entry Criteria:**
+- Wave 2 checkpoint passed (0044-T2 extends 0044-T1's resolver; 0046-T1 grows registries after 0044-T1 retires `PLAN_DOMAINS`'s stored-key role + after 0041-T2's shape migration; 0045-T1 compiles fields 3-4 against 0041-T1's schema + stores config in 0044-T1's model; 0043-T2 collects from 0043-T1's briefs + reconciles 0041-T1's `cross_domain_seams` shape).
+- Shared-file serialization confirmed: `plan_schema.py`'s dispatch-registry growth (0046-T1) is disjoint from 0044-T1's validator/resolver supersession (Wave 2) and later in sequence; `generate_plan.py`'s `_PLAN_TRANSLATORS` roster growth (0046-T1) is disjoint from and after 0042-T1 (Wave 1) + 0041-T2 (Wave 2); `care_chat.py`'s collect/reconcile region (0043-T2) is disjoint from and after 0043-T1's decompose region (Wave 2). Within Wave 3 no two tasks share a file (0044-T2 → `plan_model.py`+`track.py`; 0046-T1 → `activation.py`+`plan_schema.py`+`plan_driver.py`+`generate_plan.py`; 0045-T1 → `monitoring_compiler.py`; 0043-T2 → `care_chat.py`+`orchestrate.py`).
+
+**Exit Criteria / Checkpoint (Wave 3 → Wave 4):** see Checkpoint Protocol § Wave 3. Mixed-history read resolves latest comprehensive as standing with 0 thin readings rewritten + thin-only fallback + consumer re-point, **store-adversarial battery** four-part with category-(d) RED (0044-T2 AC-1/2/3/4); data-driven active set (two surfaces differ) + empty-state-no-card + data-present-dispatch + fan-out-bound + roster §1-13/§14-15 partition (0046-T1 AC-1/2/3/4/5/6); Tier-1-safe grammar vs must-escalate classification + out-of-bounds compile rejection + config-round-trips-in-model (0045-T1 AC-1/2/3/4); reconcile-through-ONE-path + un-reconciled-conflict falsifier + **ALWAYS-ON safety floors** (RED-S/LEA, additive-AE, Rx-BPMH fire un-declared) + five-holds coverage re-based, **per-ADR numstat** shows `orchestrate.py` reconcile generalization with frozen four + siblings EMPTY (0043-T2 AC-1/2/3/4/5); `<always-frozen>` numstat=0; four test modules green; suite no NEW failure; 0 live spend.
+
+---
+
+### Wave 4: Tier-2 Completion — Front-Door Redefinition + Resolver/Horizon Re-bases
+
+**Tasks:**
+| Task ID | Title | Agent | Est. Effort |
+|---------|-------|-------|-------------|
+| ADR-0044-T4 | Re-base the ADR-0040 confirmation-pointer hold onto the comprehensive resolver | SE | 1-1.5 days |
+| ADR-0044-T3 | Re-base the ADR-0038 horizon composition onto the comprehensive periodization | SE | 1-1.5 days |
+| ADR-0043-T3 | Synthesize one integrated plan + milestones + front-door redefinition (FROZEN-SPINE probe) | SE + Architect review | 2-3 days |
+
+**Entry Criteria:**
+- Wave 3 checkpoint passed (0044-T4 rebases on 0044-T2's mixed-history reader; 0044-T3 reads 0044-T1's periodization + resolves pre-migration via 0044-T2; 0043-T3 synthesizes 0043-T2's reconciled programs, stores via 0044-T1's model, dispatches 0046-T1's `active_domains`).
+- Shared-file serialization confirmed: `plan_model.py`'s confirm-hold-skip region (0044-T4) is disjoint from 0044-T2's reader region (Wave 3) and 0044-T1's create (Wave 2). Within Wave 4 no two tasks share a file (0044-T4 → `plan_model.py`; 0044-T3 → `horizons.py`; 0043-T3 → `care_chat.py`+`plan_loop.py`+`server.py`).
+
+**Exit Criteria / Checkpoint (Wave 4 → Wave 5):** see Checkpoint Protocol § Wave 4. Unconfirmed large-change comprehensive plan does NOT stand + confirmed stands + no-pointer-default stands + pointer mechanism byte-unchanged (0044-T4 AC-1/2/3/4); horizon window reads comprehensive periodization (0 reads of the retired flat history) + window membership preserved + thin-only back-compat (0044-T3 AC-1/2/3); ONE integrated plan carrying dated milestones (not a per-domain map) + milestones first-class + front-door redefinition (`regenerate` reaches the orchestrator, flat composition retired) + active-set wiring (0043-T3 AC-1/2/3/4), **per-ADR numstat** shows the frozen four EMPTY (0043-T3 AC-5); `<always-frozen>` numstat=0; three test modules green; suite no NEW failure; 0 live spend.
+
+---
+
+### Wave 5: Threshold Re-base + Tier-3 Four-Tier Executor
+
+**Tasks:**
+| Task ID | Title | Agent | Est. Effort |
+|---------|-------|-------|-------------|
+| ADR-0046-T2 | Re-base `LARGE_CHANGE_THRESHOLD_DOMAINS` as a fraction of the active-domain set | SE | 1-1.5 days |
+| ADR-0045-T2 | The four-tier deterministic executor + escalation predicate (FAIL-CLOSED) | SE + Security review* | 2-3 days |
+
+**Entry Criteria:**
+- Wave 4 checkpoint passed (0046-T2 rebases the threshold on 0046-T1's `active_domains` after 0043-T3's front-door rewrite settles `plan_loop.py`; 0045-T2 runs 0045-T1's compiled config, calls 0043-T2's `cross_domain_seams` reconciler at Tier-3, reuses 0044-T4's re-based confirm hold at Tier-4).
+- Shared-file serialization confirmed: `plan_loop.py`'s `LARGE_CHANGE_THRESHOLD_DOMAINS` region (0046-T2) is disjoint from 0043-T3's `regenerate` front-door region (Wave 4). Within Wave 5 no two tasks share a file (0046-T2 → `plan_loop.py`; 0045-T2 → `tiered_executor.py`).
+
+**Exit Criteria / Checkpoint (Wave 5 → Wave 6):** see Checkpoint Protocol § Wave 5. The large-change hold fires on a MAJORITY FRACTION of the active set (3-of-4 holds, 3-of-10 does not, 6-of-10 does) + narrow-surface parity (2-of-2) + no fixed-3 residue + sequencing pinned (0046-T2 AC-1/2/3/4); the executor runs a no-event day at **0 model calls + 0 de-id-IN calls** + finding-A parity (Tier-2 through the composition, `adjust.py` untouched) + cross-domain→Tier-3 + **HUMAN-GATE hold at Tier-4** + out-of-bounds no-auto-apply + **fail-closed-by-direction** (0045-T2 AC-1/2/3/4/5/6); `<always-frozen>` numstat=0 (incl. `adjust.py` — Tier-2 routes THROUGH the composition, never the bare leg); two test modules green; suite no NEW failure; 0 live spend against a fixture `dispatch` + fixture de-id client.
+
+---
+
+### Wave 6: Tier-3 Daily Deterministic Pass (terminal)
+
+**Tasks:**
+| Task ID | Title | Agent | Est. Effort |
+|---------|-------|-------|-------------|
+| ADR-0045-T3 | The daily deterministic pass hosted in the built ADR-0039 runner (disabled-by-default) | SE | 1.5-2 days |
+
+**Entry Criteria:**
+- Wave 5 checkpoint passed (0045-T3 hosts 0045-T2's tiered executor's Tier-1 + escalation classification in the runner).
+- Single task; no intra-wave collision. Writes `daily_monitor.py` (Create) + `scripts/runner/schedule/activate.py` (Modify, additive cadence entry).
+
+**Exit Criteria / Checkpoint (Wave 6 → Done):** see Checkpoint Protocol § Wave 6. The daily pass runs in the runner host + **no-event-day 0 model calls** + disabled-by-default (0 active daily-monitor entries pre-enable) + Tier-1 recording as a bounded adjustment (does NOT reach ADR-0040's large-change threshold) + **0 metered de-id-IN calls** on a no-event day (0045-T3 AC-1/2/3/4/5); plus the **TERMINAL whole-spec falsification battery** (below). This is the terminal wave — the operator-present LIVE run (real key + real data + spend) is the downstream operator-gated attestation AFTER this build, NOT a wave.
+
+## Agent Assignment Matrix
+
+**SE implements every one of the 15 tasks** (TDD per recipe). **QA verifies at every checkpoint** (test execution + the Tier-2 store-adversarial battery dispatch on the 0044 store-surface tasks). The **`plan-integrity`** role grounds the plan before the build and gates each wave transition (a wave advances only when its checkpoint Go/No-Go RAN green — executed, not reasoned); it is a READ-ONLY verification lens, correctly NOT a deployed a-plus agent (absent from `branch-completeness-audit`'s roster), dispatched alongside the Tier-2/Tier-3 reviewers.
+
+**Reviewer assignment — DIRECTED core set:** Architect reviews the interface/contract tasks (**0041-T1** the DOMAIN PROGRAM schema every specialist emits + every consumer reads; **0044-T1** the comprehensive Plan Model storage contract). Security reviews the de-id-boundary + store-surface tasks (**0042-T1** the crown-jewel identity strip + genetics carve-out; **0044-T1** + **0044-T2** the store record surface + mixed-history reader).
+
+**Reviewer assignment — ARCHITECT-ADDED lenses (marked `*`, flagged for orchestrator adjudication):** three additions the profile's assignment-fit + "Security review is never optional for safety modules" heuristics oblige, matching the exemplar's fail-closed-review pattern — (a) **Security on 0043-T2**: the always-on safety-floor generalization on the frozen SAFETY-CRITICAL `orchestrate.reconcile` is a fail-OPEN patient-safety surface (dropping a RED-S/LEA / additive-AE / Rx-BPMH floor); (b) **Security on 0045-T2**: the four-tier deterministic auto-apply executor is a fail-closed-safety one-way door (a mis-classified auto-apply or a bypassed human-gate — ADR-0045 Consequences-Negative names it a live risk); (c) **Architect on 0046-T1**: `activation.active_domains(operator_surface)` publishes a cross-module contract consumed by 0043-T3 (front door) and 0046-T2 (fraction threshold) — the cross-module-wiring heuristic routes it to Architect review.
+
+| Task ID | Agent | Reviewer(s) | Rationale |
+|---------|-------|-------------|-----------|
+| ADR-0041-T1 | SE | Architect, QA | Interface/contract: the seven-field DOMAIN PROGRAM is THE schema every specialist emits + the orchestrator/model/compiler/dispatch all consume → Architect validates the contract; QA runs the conformance/rejection/validity-tier suite. New-schema-module modifier. |
+| ADR-0042-T1 | SE | Security, QA | De-id boundary (crown-jewel): the identity strip + genetics carve-out is the load-bearing PII seam — a leak is the identity-egress failure class → Security is the load-bearing reviewer. New-module + crown-jewel modifiers. |
+| ADR-0041-T2 | SE | QA | Implementation (frozen-spine migration): the transitional adapter supersedes the 4 translators + `_is_complete` in place; the guard is the per-ADR numstat probe + the fail-closed validator (both QA-run) + the `plan-integrity` wave gate. No new cross-module contract (emits 0041-T1's already-Architect-reviewed schema) → no Architect; no de-id/store/safety surface → no Security. |
+| ADR-0044-T1 | SE | Architect, Security, QA | Interface/contract + store surface + frozen-spine (the biggest one-way door): the comprehensive model shape is the storage contract every consumer reads → Architect; the `plan_schema.py` record-spine supersession + the ride-the-frozen-`store.append` value-not-key property + the four-part store-adversarial battery → Security; QA runs the battery. Dual-review + store-surface modifiers. |
+| ADR-0043-T1 | SE | QA | Implementation: the `_care_messages` decompose→brief prompt rewrite consumes 0042-T1's assembled record (already-Security-reviewed de-id boundary) + emits against 0041-T1's schema; the capture path is byte-unchanged (a grep AC). No new cross-module contract → no Architect; capture unchanged → no Security. |
+| ADR-0043-T2 | SE | Security\*, QA | Frozen-spine + SAFETY (Architect-added Security): generalizes the SAFETY-CRITICAL `orchestrate.reconcile`; the always-on floors (RED-S/LEA, additive-AE, Rx-BPMH) are a fail-OPEN risk if a floor is dropped → Security lens on the safety-floor generalization + the per-ADR numstat (QA-run). Generalizes the reconciler in place (no new contract) → no Architect. |
+| ADR-0043-T3 | SE | Architect, QA | Cross-module wiring: `regenerate`'s front-door redefinition wires the orchestrator + `activation.active_domains` across `plan_loop.py`/`server.py`/`care_chat.py`, stores via 0044-T1's model → Architect validates the front-door + active-set contract. Frozen-four numstat probe (QA-run). |
+| ADR-0044-T2 | SE | Security, QA | Store surface: the mixed-history reader is the append-only-preserving read contract; a cross-stream leak / a widened dedupe key is the store-keying-escape class → Security + the four-part battery (QA-run). |
+| ADR-0044-T3 | SE | QA | Implementation: re-bases the horizon composition onto 0044-T1's periodization in place; back-compat resolves via 0044-T2's reader. No new contract, no store/de-id/safety surface → QA only. |
+| ADR-0044-T4 | SE | QA | Implementation: re-bases the ADR-0040 confirm-hold skip onto the comprehensive resolver; the pointer mechanism (`plan_confirm.py`) is byte-unchanged (a grep AC). Reuses the existing confirm contract → QA only. |
+| ADR-0046-T1 | SE | Architect\*, QA | Cross-module wiring (Architect-added): `active_domains(operator_surface)` publishes the frozenset contract consumed by 0043-T3 + 0046-T2, and grows three registries (`PLAN_DOMAINS` dispatch-role, `_ROLE_OF_DOMAIN`, `_PLAN_TRANSLATORS`) → Architect validates the activation contract + the §1-13/§14-15 partition. New-module + 3-registry-growth modifiers. |
+| ADR-0046-T2 | SE | QA | Implementation: re-bases `LARGE_CHANGE_THRESHOLD_DOMAINS` as a fraction of 0046-T1's active set in place. Consumes the already-Architect-reviewed activation contract → QA only. |
+| ADR-0045-T1 | SE | QA | Implementation: the monitoring compiler's rule grammar; the out-of-bounds compile rejection is the safety guard (a QA-run AC); the config lives in 0044-T1's already-Architect-reviewed model. New-module modifier. |
+| ADR-0045-T2 | SE | Security\*, QA | FAIL-CLOSED (Architect-added Security): the four-tier deterministic auto-apply executor — a mis-classified auto-apply / a bypassed human-gate is a fail-closed-safety one-way door → Security lens on the escalation predicate + the no-event-day 0-model-call + the human-gate hold + fail-closed-by-direction. New-module modifier. |
+| ADR-0045-T3 | SE | QA | Implementation: hosts 0045-T2's executor's Tier-1 in the built runner, disabled-by-default; the no-event-day 0-model-call + disabled-by-default posture are QA-run ACs. New-module-in-existing-host modifier. |
+
+**Coordination note (intra-spec shared-file writers):** five files are written by more than one task, always across DIFFERENT waves in disjoint regions — `generate_plan.py` (0042-T1 W1 → 0041-T2 W2 → 0046-T1 W3), `care_chat.py` (0043-T1 W2 → 0043-T2 W3 → 0043-T3 W4), `plan_model.py` (0044-T1 W2 create → 0044-T2 W3 → 0044-T4 W4), `plan_schema.py` (0044-T1 W2 → 0046-T1 W3), `plan_loop.py` (0043-T3 W4 → 0046-T2 W5). No file is co-modified WITHIN one wave (BP-07 clear by construction). The stable seams established early (0041-T1's schema, 0042-T1's assembler, 0044-T1's model, 0046-T1's `active_domains`) are the contracts later tasks import; a change to any seam's signature triggers a contract-update notice to its reviewer (Architect for schema/model/activation).
+
+## Checkpoint Protocol
+
+Each criterion is a SPECIFIC command / grep / numstat / count with an expected result and a verifier role — EXECUTED at `/execute-plan` time, not reasoned. `<always-frozen>` abbreviates `scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py`. **Per-ADR-scoped numstat convention:** `<base>` in a per-ADR probe = the parent of that task's own commit (the task's own delta); the always-frozen assertion uses `origin/main` (the pre-build trunk). The store-adversarial obligation lives on the two store-surface tasks (0044-T1, 0044-T2); the suite-green gate re-runs the existing store-adversarial batteries across every change.
+
+*[AMENDED 2026-07-11 — Architect, frozen-guard reconciliation]:* Each wave checkpoint additionally asserts: (a) the prior-feature frozen guards touched by this wave's supersession are surgically carved out per `docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md` (grep the guard's frozen set to confirm ONLY the sanctioned surface was removed and the `<always-frozen>` HARD set remains a member); (b) the full `.venv` suite shows the reconciled guards GREEN with no NEW failure. The carve-out is a source edit reviewed at Tier-2/Tier-3; it is NOT a licence to weaken any guard beyond the named superseded surface.
+
+**0-live-spend note:** the 0-live-spend property is fixture-by-construction — every test uses fixture DOMAIN PROGRAMs / a fixture `dispatch` + fixture de-id client + synthetic PII-free stores, consistent with the existing offline 2489-passing suite (which carries no network probe). No checkpoint needs a live-call assertion beyond confirming the fixture seams are fed and 0 real PII enters the test tree.
+
+### Wave 1 → Wave 2 Boundary
+- **Tests:** `.venv/bin/python -m pytest tests/plan/test_domain_program.py tests/plan/test_context_assembler.py -q` → all pass, 0 failures [0041-T1 AC-6, 0042-T1 AC-7]; `.venv/bin/python -m pytest -q` → no NEW failure vs the captured baseline (still `2 failed, 2489 passed, 7 skipped`; a 3rd failure = regression, HALT).
+- **DOMAIN PROGRAM 7-field conformance (go/no-go):** a training-domain AND a compound-domain fixture program each carry all seven fields → `domain_program.validate` returns, missing-required-field count == 0; a program omitting any ONE of the four required fields → typed error (count ≥1 → reject); a compound program with `required_labs` absent → rejected, a pure-training program with `required_labs` empty → validates; a compound program with 0 `monitoring_signals` OR 0 `adjustment_rules` → rejected; a `monitoring_signals` entry missing its validity tier → rejected [0041-T1 AC-1/2/3/4/5].
+- **Crown-jewel identity-leak (go/no-go, LOAD-BEARING):** seed a SYNTHETIC legal name + synthetic contact; scan every specialist payload → **0 pure-identity tokens** (legal name / exact DOB / contact / address); ≥1 → HALT-and-repair [0042-T1 AC-3/AC-4].
+- **Genetics carve-out (go/no-go, RT-008):** seed a raw rsID+allele genotype; scan the assembled input → **0 raw rsID/allele tokens** AND the derived `genetic-trait-classes` token IS present; a de-id-bypass mutation (embedding a raw genotype in a carried field) drives the scan RED (observe RED, revert) [0042-T1 AC-5].
+- **No-collapse (go/no-go):** a rich free-text training split + multi-item stack reaches the specialist input with substantive detail (≥1 operator-specific parameter `router.summarize` would discard); if the input is byte-identical to `router.summarize`'s ~18-token band → RED (DATA-COLLAPSE unfixed) [0042-T1 AC-1/2/6].
+- **Frozen-spine (go/no-go):** `git diff --numstat origin/main -- <always-frozen>` → 0 changed lines; a scan confirms `router.py` numstat=0 (the :356 plan-path USE is superseded at the call site, `router.py` itself untouched) [invariant 1].
+- **Artifacts Present:** `scripts/plan/domain_program.py`, `scripts/plan/context_assembler.py` (created); `scripts/plan/generate_plan.py` (modified: :356 assembler swap only).
+- **0-live-spend / crown-jewel invariants:** all probes run against synthetic PII-free fixtures (0 live calls, 0 real PII); the crown-jewel non-egress property is end-to-end assertable HERE (Wave 1 wires the de-id boundary).
+- **Go/No-Go:** all tests pass, all artifacts present, the conformance + crown-jewel identity-leak + genetics carve-out + no-collapse + frozen-spine gates all green, suite no NEW failure, no blocking defect.
+- **Verifier:** Architect (the DOMAIN PROGRAM schema contract) + Security (the crown-jewel de-id boundary) + QA (test execution) + `plan-integrity` (gates the transition: confirms the checkpoint RAN green, executed not reasoned).
+
+### Wave 2 → Wave 3 Boundary
+- **Tests:** `.venv/bin/python -m pytest tests/plan/test_generate_plan_uniform.py tests/store/test_plan_model.py tests/serve/test_orchestrator_brief.py -q` → all pass [0041-T2 AC-5, 0044-T1 AC-6, 0043-T1 AC-6]; `.venv/bin/python -m pytest -q` → no NEW failure vs baseline.
+- **Transitional-adapter migration (go/no-go):** a uniform program round-trips translator→`assemble`→recorded plan with 0 fields dropped; the adapter accepts BOTH a legacy thin payload (lifted into `prescription`) AND a full uniform program (0 conformant inputs rejected); an OLD non-uniform-non-liftable shape is rejected at the collection boundary (0 reach reconcile; ≥1 silently adapted → RED) [0041-T2 AC-1/2/3].
+- **0041-T2 per-ADR numstat (go/no-go):** `git diff --numstat <base> -- scripts/plan/generate_plan.py scripts/plan/assemble.py` shows the supersession; `git diff --numstat <base> -- scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/store/store.py scripts/store/keying.py scripts/store/plan_schema.py scripts/plan/orchestrate.py scripts/plan/router.py` → EMPTY (the frozen four + sibling-superseded surfaces untouched by THIS commit) [0041-T2 AC-4].
+- **Comprehensive round-trip + standing resolution (go/no-go):** a fixture plan for ≥2 domains (each seven-field) + narrative + milestones + monitoring config loads back with missing-element count == 0; periodization + milestones + monitoring survive store→load (any dropped → RED); a plan dated the render date resolves STANDING, not `NO_PLAN`/`NO_PLAN_TODAY` [0044-T1 AC-1/2/3].
+- **0044-T1 per-ADR numstat + store-adversarial battery (go/no-go):** `git diff --numstat <base> -- scripts/plan/pipeline.py scripts/plan/adjudicate.py` == 0 AND `... scripts/store/store.py scripts/store/keying.py` == 0 (value rides the primitive unchanged); the superseded set == exactly the four named `plan_schema.py` surfaces; the four-part battery — (a) cross-stream collision, (b) same-timepoint dedupe, (c) dedupe-key boundary (0 new keying, grep), (d) **mutation — widening the dedupe key to include `value` drives a battery test RED** (observe RED, revert; a green under the mutation is tautological and FAILS this gate) [0044-T1 AC-4/AC-5].
+- **Emit-N-briefs (go/no-go):** goals + an assembled state spanning ≥2 domains + an injected active set → brief count == active-specialist count, each brief carries the assembled record (0 briefs collapse to a `SUMMARY_FIELD_SET` band; an under-briefed brief → RED); every active domain gets exactly one brief; `persist_capture`/`persist_extraction` byte-unchanged (grep) [0043-T1 AC-1/2/3/4/5].
+- **Frozen-spine (go/no-go):** `git diff --numstat origin/main -- <always-frozen>` → 0 changed lines [invariant 1].
+- **Artifacts Present:** `scripts/plan/generate_plan.py`+`scripts/plan/assemble.py` (modified: translator region), `scripts/store/plan_model.py` (created)+`scripts/store/plan_schema.py` (modified: four surfaces), `scripts/serve/care_chat.py` (modified: decompose region).
+- **Go/No-Go:** all tests pass, all artifacts present, the adapter + per-ADR numstat (×2) + comprehensive-round-trip + store-adversarial-battery-(d)-RED + emit-N-briefs + frozen-spine gates all green, suite no NEW failure, no blocking defect.
+- **Verifier:** Architect (the model + adapter contracts) + Security (the store surface + frozen-spine break) + QA (the store-adversarial battery dispatch) + `plan-integrity`.
+
+### Wave 3 → Wave 4 Boundary
+- **Tests:** `.venv/bin/python -m pytest tests/store/test_plan_model_reader.py tests/plan/test_activation.py tests/plan/test_monitoring_compiler.py tests/serve/test_orchestrator_reconcile.py -q` → all pass [0044-T2 AC-5, 0046-T1 AC-7, 0045-T1 AC-5, 0043-T2 AC-6]; `.venv/bin/python -m pytest -q` → no NEW failure vs baseline.
+- **Mixed-history reader + store-adversarial (go/no-go):** a store with BOTH thin `plan::<domain>` readings and comprehensive versions resolves the latest comprehensive as standing (0 thin readings rewritten); a thin-only store resolves without error; `track.resolve_plan_progress` reads through the reader (comprehensive prescription, not `NO_PLAN`); the four-part battery with (d) **removing the comprehensive-precedence rule drives the mixed-history test RED** (observe RED, revert) [0044-T2 AC-1/2/3/4].
+- **Progressive activation (go/no-go):** two distinct operator surfaces yield DIFFERENT dispatched sets each == its computed active set (the same closed four regardless of surface → RED); a goal/data in a domain D beyond the original four → dispatch-for-D == 1 AND card-for-D present; an empty-state D → dispatch-for-D == 0 AND personalized-card-for-D == 0 (a personalized card → RED); a data-present D → dispatched (a missed active domain → RED); narrow-surface dispatch-count == |active set| < |roster|; the §14-genetics/§15-labs cross-cutting inputs emit 0 domain cards (partitioned from §1-13) [0046-T1 AC-1/2/3/4/5/6].
+- **Monitoring compiler grammar (go/no-go):** a bounded/in-domain/monotone rule → Tier-1-auto-apply-safe; a material/cross-domain/safety-threshold rule → must-escalate (0 marked auto-apply-safe); an out-of-bounds/safety-crossing rule → REJECTED at compile (an out-of-bounds rule compiling to Tier-1 → RED); the compiled config round-trips through `plan_model` store→load [0045-T1 AC-1/2/3/4].
+- **Reconcile + always-on safety floors (go/no-go):** two programs declaring a seam reconcile through ONE uniform-field code path (0 new per-domain-pair branches; a pair-specific branch → RED); a declared seam conflict never reaches the synthesized output un-reconciled (≥1 → RED); a **RED-S/LEA, additive-AE, or Rx-BPMH condition is held even when NOT declared** in `cross_domain_seams` (removing a floor drives the safety test RED, observe RED, revert); each of the five prior holds' safety CONTENT still reconciles its case [0043-T2 AC-1/2/3/4].
+- **0043-T2 per-ADR numstat + frozen-spine (go/no-go):** `git diff --numstat <base> -- scripts/plan/orchestrate.py` shows the reconcile generalization; `... scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/store/store.py scripts/store/keying.py scripts/plan/generate_plan.py scripts/plan/assemble.py scripts/store/plan_schema.py` → EMPTY; `git diff --numstat origin/main -- <always-frozen>` → 0 changed lines [0043-T2 AC-5, invariant 1].
+- **Artifacts Present:** `scripts/store/plan_model.py`+`scripts/plan/track.py` (modified), `scripts/plan/activation.py` (created)+`scripts/store/plan_schema.py`+`scripts/plan/plan_driver.py`+`scripts/plan/generate_plan.py` (modified: roster region), `scripts/plan/monitoring_compiler.py` (created), `scripts/serve/care_chat.py`+`scripts/plan/orchestrate.py` (modified: reconcile region).
+- **Go/No-Go:** all tests pass, all artifacts present, the mixed-history + store-adversarial-(d)-RED + activation-4-probes + roster-partition + compiler-grammar + reconcile-one-path + always-on-safety-floors + per-ADR numstat + frozen-spine gates all green, suite no NEW failure, no blocking defect.
+- **Verifier:** Security (the store surface 0044-T2 + the safety-floor generalization 0043-T2) + Architect (the activation cross-module contract 0046-T1) + QA (the battery dispatch + test execution) + `plan-integrity`.
+
+### Wave 4 → Wave 5 Boundary
+- **Tests:** `.venv/bin/python -m pytest tests/store/test_plan_model_confirm_hold.py tests/plan/test_horizons_rebase.py tests/serve/test_orchestrator_synthesize.py -q` → all pass [0044-T4 AC-5, 0044-T3 AC-4, 0043-T3 AC-6]; `.venv/bin/python -m pytest -q` → no NEW failure vs baseline.
+- **Confirm-hold re-base (go/no-go):** a HELD (unconfirmed) large-change comprehensive re-gen with a pending `plan-confirm::` pointer does NOT stand (stands pre-confirm → RED); a `confirmed` pointer stands (0 false holds); a no-pointer (non-large-change) plan stands (no default hold); `plan_confirm.py`'s `mark_pending`/pointer stream byte-unchanged (grep) [0044-T4 AC-1/2/3/4].
+- **Horizon re-base (go/no-go):** a horizon window over a comprehensive plan returns the periodization from the comprehensive model (0 reads of the retired flat `plan::<domain>` history); window membership preserved (in-window block kept, out-of-window dropped); a thin-only pre-migration store resolves via the mixed-history reader (0 crashes) [0044-T3 AC-1/2/3].
+- **Synthesize one plan + front-door redefinition (go/no-go):** two programs declaring a seam → ONE integrated plan carrying dated milestones (a per-domain map with no synthesis → RED); milestone count ≥1 on a multi-domain plan; `regenerate`'s call graph reaches the orchestrator front door (the flat `run_orchestrated` re-run retired); the front door dispatches `activation.active_domains(...)`, not the closed `PLAN_DOMAINS` tuple (a data-driven surface changes the dispatched set) [0043-T3 AC-1/2/3/4].
+- **0043-T3 per-ADR numstat + frozen-spine (go/no-go):** `git diff --numstat <base> -- scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/store/store.py scripts/store/keying.py` → EMPTY (the front-door rewrite edits `plan_loop.py`/`server.py`/`care_chat.py`, never the frozen four); `git diff --numstat origin/main -- <always-frozen>` → 0 changed lines [0043-T3 AC-5, invariant 1].
+- **Artifacts Present:** `scripts/store/plan_model.py` (modified: confirm-hold region), `scripts/plan/horizons.py` (modified), `scripts/serve/care_chat.py`+`scripts/serve/plan_loop.py`+`scripts/serve/server.py` (modified: synthesize + front-door region).
+- **Go/No-Go:** all tests pass, all artifacts present, the confirm-hold + horizon-re-base + single-integrated-plan + front-door-redefinition + per-ADR numstat + frozen-spine gates all green, suite no NEW failure, no blocking defect.
+- **Verifier:** Architect (the front-door + active-set contract) + QA (test execution) + `plan-integrity`.
+
+### Wave 5 → Wave 6 Boundary
+- **Tests:** `.venv/bin/python -m pytest tests/serve/test_large_change_fraction.py tests/plan/test_tiered_executor.py -q` → all pass [0046-T2 AC-5, 0045-T2 AC-7]; `.venv/bin/python -m pytest -q` → no NEW failure vs baseline.
+- **Fraction threshold re-base (go/no-go):** the large-change hold fires on a MAJORITY FRACTION of the active set — a 4-active-domain 3-of-4 swap holds (parity with the retired constant), a 10-active-domain 3-of-10 swap does NOT hold (minority) while a 6-of-10 swap DOES; a 2-active-domain 2-of-2 swap holds; a grep asserts the check is computed against `|active set|`, not a hardcoded `3`; the re-base is a documented hard precondition BEFORE the scaled loop runs [0046-T2 AC-1/2/3/4].
+- **Four-tier executor fail-closed (go/no-go, LOAD-BEARING):** on a no-event day (no `monitoring_signal` crosses a material threshold) → **model-call-count == 0 AND de-id-IN-count == 0 AND 0 front-door re-entries** (ANY model/de-id-IN call → RED); a material in-domain event → Tier-2 re-plan THROUGH the composed gate + per-domain safety floor, NOT the bare `adjust.py` leg (a Tier-2 re-plan without the composition → RED); a cross-domain seam → Tier-3 `orchestrate` reconciler (0 auto-applied at Tier-1); a safety-threshold event → **HELD at Tier-4 on ADR-0040's confirm hold, 0 auto-advance** (advances past the human-gate → RED); a mis-compiled out-of-bounds rule → escalated/rejected (0 auto-applies); an unclassifiable event escalates UP (a Tier-1+Tier-3 ambiguity → Tier-3) [0045-T2 AC-1/2/3/4/5/6].
+- **Frozen-spine (go/no-go):** `git diff --numstat origin/main -- <always-frozen>` → 0 changed lines (INCLUDING `adjust.py` — Tier-2 routes THROUGH the composition, finding-A, never editing the bare leg) [invariant 1].
+- **Artifacts Present:** `scripts/serve/plan_loop.py` (modified: `LARGE_CHANGE_THRESHOLD_DOMAINS` region), `scripts/plan/tiered_executor.py` (created).
+- **0-live-spend invariant:** driven through a fixture `dispatch` + fixture de-id client + synthetic fixtures (0 live calls, 0 real PII).
+- **Go/No-Go:** all tests pass, all artifacts present, the fraction-re-base + no-event-day-0-model-call + finding-A-parity + human-gate-hold + fail-closed-by-direction + frozen-spine gates all green, suite no NEW failure, no blocking defect.
+- **Verifier:** Security (the fail-closed executor: no-event-day determinism + human-gate + fail-closed-by-direction) + QA (test execution) + `plan-integrity`.
+
+### Wave 6 → Done Boundary (TERMINAL)
+- **Tests:** `.venv/bin/python -m pytest tests/runner/test_daily_monitor.py -q` → all pass [0045-T3 AC-6]; `.venv/bin/python -m pytest -q` → no NEW failure vs baseline (`2 failed, 2489 passed, 7 skipped`; a 3rd failure = regression, HALT).
+- **Daily deterministic pass (go/no-go):** a fixture daily tick invokes `daily_monitor` over a seeded compiled config in the built runner (the weekly cadence unchanged, both coexist); on a no-event day **model-call-count == 0** (≥1 → RED); a fresh runner install has the daily-pass entry DISABLED (0 active daily-monitor schedule entries pre-enable); a Tier-1 auto-apply records in the ADR-0044 model as a bounded adjustment AND does NOT reach ADR-0040's large-change threshold; **0 metered de-id-IN calls** on a no-event day [0045-T3 AC-1/2/3/4/5].
+- **TERMINAL whole-spec falsification battery (go/no-go):** re-run the end-to-end spine on fixtures and assert in one pass — **crown-jewel non-egress** (0 identity tokens + 0 raw genotypes across every specialist payload, `genetic-trait-classes` present; 0042-T1 AC-4/5); **DOMAIN PROGRAM 7-field conformance** (each dispatched specialist's grown translator emits a conformant uniform program; 0041-T1 + 0046-T1); **no-collapse** (the assembled record reaches the brief, not a band; 0042-T1 + 0043-T1); **one integrated plan + milestones round-trips + resolves standing** (0043-T3 + 0044-T1); **always-on safety floors** (0043-T2 AC-3); **daily pass 0-model-call on a no-event day + human-gate hold + fail-closed-by-direction** (0045-T2/T3); **store-adversarial batteries** re-green (0044-T1/T2); **the UNION per-ADR frozen-spine numstat** — `git diff --numstat origin/main -- <always-frozen>` == EMPTY over the whole build AND each superseded surface changed ONLY in its owning ADR's commit (0041→`generate_plan.py`/`assemble.py`; 0042→the :356 use; 0043→`orchestrate.py`+the front door; 0044→the four `plan_schema.py` surfaces+`plan_model.py`; 0046→the three registries); and the full `.venv/bin/python -m pytest -q` green with NO new failure vs `2 failed, 2489 passed, 7 skipped` — all at 0 live spend, 0 real PII. **One-pass host:** the UNION of the 15 test modules re-run via the full `pytest -q` line above, PLUS the consolidated end-to-end integration assertion hosted in the spec's Integration-Tests host (`tests/runner/test_daily_monitor.py` + the spine integration module — no new invented test module).
+- **Artifacts Present:** `scripts/runner/daily_monitor.py` (created), `scripts/runner/schedule/activate.py` (modified: additive daily cadence).
+- **Go/No-Go:** all tests pass, all artifacts present, the daily-pass + TERMINAL whole-spec falsification battery + the union frozen-spine numstat + the crown-jewel non-egress + the store-adversarial batteries all green, the full suite has no NEW failure, no blocking defect. **The six operator-present LIVE runs (real key + real data + spend; real specialist dispatches authoring DOMAIN PROGRAMs, the full identity-stripped record reaching a live specialist, a real Tier-2 escalation firing the metered de-id-IN call) are the downstream operator-gated attestations AFTER this build (out of plan scope, ADR-0039-gated) — the live 0-raw-PII-to-a-REAL-specialist property is the one residual flagged for those checkpoints.**
+- **Verifier:** Security (the crown-jewel non-egress + the fail-closed executor + the whole-spec battery) + Architect (the schema/model/front-door/activation contracts held end-to-end) + QA (full E2E + the terminal battery + the store-adversarial re-green) + `plan-integrity` (final gate: confirms the whole-spec battery RAN green on the wired path, executed not reasoned).
+
+## Critical Path
+
+```
+ADR-0041-T1 → ADR-0044-T1 → ADR-0044-T2 → ADR-0044-T4 → ADR-0045-T2 → ADR-0045-T3
+```
+
+- **Length: 6 tasks** (Waves 1→2→3→4→5→6 — five wave boundaries + one terminal boundary). This is the actual longest zero-slack chain, verified by CPM forward/backward pass with the effort ranges above: `0045-T2`'s earliest start is gated by `0044-T4` (Wave 4), not by `0045-T1` (Wave 3) or `0043-T2` (Wave 3), so the chain runs through the comprehensive-model resolver line (`0044-T1 → 0044-T2 → 0044-T4`) into the executor.
+- **Zero-slack tasks:** ADR-0041-T1, ADR-0044-T1, ADR-0044-T2, ADR-0044-T4, ADR-0045-T2, ADR-0045-T3.
+- **Reconciliation with the spec's named chain (Architect note — the one place this plan does not copy the spec verbatim, with rationale):** the spec NAMES its critical path as the monitoring-loop chain `ADR-0041-T1 → ADR-0044-T1 → ADR-0045-T1 → ADR-0045-T2 → ADR-0045-T3` ("the longest-RISK chain — the monitoring loop"). That chain is the highest-RISK DELIVERABLE chain (schema → model → compiler → executor → daily pass) and the right chain to watch for reasoning quality, and this plan preserves it as the risk-headline. But it is NOT the zero-slack longest chain: `ADR-0045-T1` (the monitoring compiler) carries **~1 wave / ~1.5 days of slack** — it completes in Wave 3 but its only successor `0045-T2` cannot start until Wave 5 (held by `0044-T4` in Wave 4), so `0045-T1` could slip to Wave 4 without delaying completion. The true zero-slack path therefore substitutes `0044-T2 → 0044-T4` (Waves 3-4) for `0045-T1` (Wave 3). Both chains share the `0041-T1 → 0044-T1` head and the `0045-T2 → 0045-T3` tail, and both are six waves deep — matching the spec's own "6-node depth" figure. Watch BOTH: the model-resolver line for schedule (zero-slack), the monitoring-loop line for reasoning risk.
+- **Non-critical tasks with slack** (CPM total float, wave-units, upper-bound durations):
+  - ADR-0042-T1: 1 wave slack (Wave 1 entry point; its successors 0041-T2/0043-T1 are in Wave 2, and neither is on the zero-slack path).
+  - ADR-0041-T2: 1 wave slack (Wave 2; successor 0046-T1 in Wave 3 is not zero-slack).
+  - ADR-0043-T1: 1 wave slack (Wave 2; successor 0043-T2 in Wave 3 is not zero-slack).
+  - ADR-0046-T1: 1 wave slack (Wave 3; successors 0043-T3/0046-T2 in Waves 4-5 are not zero-slack).
+  - ADR-0045-T1: 1 wave slack (Wave 3; the monitoring-loop risk chain, but 0045-T2's start is gated by 0044-T4).
+  - ADR-0043-T2: 1 wave slack (Wave 3; successors 0043-T3/0045-T2 — the 0045-T2 link is not the binding constraint).
+  - ADR-0044-T3: 2 waves slack (Wave 4 terminal leaf — no downstream dependency).
+  - ADR-0043-T3: 1 wave slack (Wave 4; successor 0046-T2 in Wave 5 is a leaf).
+  - ADR-0046-T2: 1 wave slack (Wave 5 terminal leaf — no downstream dependency).
+
+## Risk Schedule
+
+- **Spikes:** NONE. This build has no `T0`-suffixed research task — all 26 open questions the ADRs left to spec/build were RESOLVED in-spec (30 PROCEED dispositions folded into tasks/assumptions); the 6 DEFER items are the operator-present LIVE runs (no task). Per the wave-scheduling Rule-1 exception (high-risk work that is a build task, not knowledge-gathering), the highest-risk foundational surfaces are placed as early as the topological chain permits — the schema + de-id boundary (0041-T1, 0042-T1) in Wave 1, the frozen-spine record spine (0044-T1) in Wave 2.
+- **Risk-mitigating tasks (mitigating-before-mitigated):**
+  - **ADR-0041-T1 (Wave 1)** mitigates ADR-0041 Neg-4 (under-delivery of a richer author call) via the fail-closed rejection (AC-2/AC-4 — under-delivery is an honest no-plan state) — scheduled BEFORE every consumer (0043/0044/0045/0046) that emits/stores/compiles the uniform shape.
+  - **ADR-0042-T1 (Wave 1)** mitigates ADR-0042 Neg-1/Neg-3 (the redrawn crown-jewel boundary + the load-bearing strip) via the identity-leak (AC-4) + genetics carve-out (AC-5) probes — the de-id boundary is closed BEFORE any brief (0043-T1, Wave 2) carries the assembled record downstream.
+  - **ADR-0044-T1 (Wave 2)** mitigates ADR-0044 Neg-1 (the record-spine freeze break — the biggest one-way door) via the per-ADR numstat + the store-WRITE-primitive numstat=0, and the S37-S41 store-keying-escape pattern (bead `pka`) via the four-part store-adversarial battery run category-(d) RED — BEFORE 0044-T2/T3/T4 + 0045-T1 consume the model.
+  - **ADR-0043-T2 (Wave 3)** mitigates ADR-0043 Neg-2/Neg-3 (the freeze break on the SAFETY-CRITICAL reconcile + coverage-depends-on-declaration) via the always-on safety floors (AC-3 — the safety subset does not depend on a declaration) + the un-reconciled-conflict probe (AC-2) — BEFORE 0045-T2's Tier-3 calls the reconciler (Wave 5).
+  - **ADR-0044-T4 (Wave 4)** provides the re-based confirm hold BEFORE 0045-T2's Tier-4 human-gate reuses it (Wave 5).
+  - **ADR-0046-T2 (Wave 5)** mitigates ADR-0046 Neg-4 (roster >4 trips the count-of-3 majority-of-four, disposition #36) via the fraction re-base — the documented hard precondition BEFORE the scaled loop runs live.
+- **Frozen-spine + crown-jewel + 0-spend pinned at EVERY checkpoint (not deferred to the last):**
+  - `git diff --numstat origin/main -- <always-frozen>` == 0 is a go/no-go gate at ALL six boundaries — a frozen-spine regression HALTs at the wave it appears, never surviving to the terminal.
+  - The per-ADR-scoped supersession numstat fires at the boundary of the wave completing that ADR's freeze-break task (0041-T2 + 0044-T1 at W2→W3; 0043-T2 at W3→W4; 0043-T3 at W4→W5) and is re-asserted as a UNION at the terminal — so no probe forbids a sibling's intended supersession, yet every break is bounded to its owning commit.
+  - The crown-jewel identity-leak + genetics carve-out is assertable from Wave 1 (the wave that wires the de-id boundary) and is re-asserted in the terminal battery. The store-adversarial battery (highest store-keying-escape risk) fires in Waves 2-3 (the store-surface tasks), BEFORE the terminal.
+  - The 0-live-spend property is a fixture-by-construction invariant on every wave; a test making a live call or admitting real PII HALTs that wave.
+- **Security-sensitive / crown-jewel ordering:** the de-id boundary (0042-T1, Wave 1) is closed FIRST, before any specialist brief carries the assembled record. Security review is assigned on every de-id / store-surface / fail-closed / safety surface and is NOT deferred past the wave where the implementation occurs (0042-T1 W1, 0044-T1/0044-T2 W2-W3, 0043-T2 W3, 0045-T2 W5). **Build-vs-runtime divergence must be PRESERVED at execute time (verifier watch-item):** every build task drives a FIXTURE `dispatch` + fixture de-id client + synthetic PII seeds; at RUNTIME only the serve front door feeds a real raw intake into the de-id boundary. `plan-integrity` + Security MUST confirm at execute time that the build tasks' drivers are fed ONLY fixtures (no live de-id-IN or live Agent-tool dispatch enters the build path) — a watch-item, not a one-time check.
+
+## Cross-Spec Coordination
+
+Single-spec plan (one source spec: `docs/spec/adr-0041-0046-comprehensive-plan-spec.md`, covering ADR-0041…0046). No cross-spec coordination required.
+
+**Intra-spec shared-file check (parallel-execution safety, BP-07):** five files are written by more than one task, but NEVER two writers in one wave — every shared-file pair is serialized across DIFFERENT waves in disjoint regions:
+
+| Shared file | Writers (task, wave, region) | Resolution |
+|-------------|------------------------------|------------|
+| `scripts/plan/generate_plan.py` | 0042-T1 (W1, :356 assembler swap) → 0041-T2 (W2, translator migration) → 0046-T1 (W3, `_PLAN_TRANSLATORS` roster growth) | Serialized across W1→W2→W3, three disjoint regions (spec dispositions #2/RT-009); no intra-wave collision |
+| `scripts/serve/care_chat.py` | 0043-T1 (W2, decompose) → 0043-T2 (W3, collect+reconcile) → 0043-T3 (W4, synthesize) | Serialized across W2→W3→W4, three disjoint regions |
+| `scripts/store/plan_model.py` | 0044-T1 (W2, create) → 0044-T2 (W3, mixed-history reader) → 0044-T4 (W4, confirm-hold skip) | Serialized across W2→W3→W4, disjoint resolver regions |
+| `scripts/store/plan_schema.py` | 0044-T1 (W2, validator/resolver supersession) → 0046-T1 (W3, dispatch-registry growth) | Serialized across W2→W3, disjoint regions (RT-009: stored-key role retired, dispatch-role grown) |
+| `scripts/serve/plan_loop.py` | 0043-T3 (W4, `regenerate` front-door) → 0046-T2 (W5, `LARGE_CHANGE_THRESHOLD_DOMAINS`) | Serialized across W4→W5, disjoint regions |
+
+No file is co-modified WITHIN one wave — there is no intra-wave shared-file writer sequencing to manage (the shared-file writers are a data-dependency chain across waves, not a same-wave collision). This is enforced by the Dependency Map's edges: every shared-file writer pair carries a dependency edge (e.g. 0041-T2 depends on 0042-T1; 0043-T2 on 0043-T1; 0044-T2 on 0044-T1), which places them in different Kahn groups.
+
+## Feedback Protocol
+
+| Issue Type | Action | Blocks Plan? |
+|-----------|--------|-------------|
+| Spec defect (untestable criteria) | Flag for spec revision, log in `docs/build-plan/.pipeline/deviations.md`; halt the affected wave | Yes — checkpoint cannot verify the criterion |
+| Missing dependency discovered | Add the edge, re-run wave generation (Kahn), re-validate topological ordering; log the adjusted schedule | No — plan self-corrects in place |
+| Acceptance criteria untestable | Flag for spec revision with the specific task-ID + criterion number | Yes — cannot verify completion |
+| Scope change needed | Halt execution, escalate to user (scope is fixed by the six ADRs; a new requirement is a new spec/ADR — e.g. a per-specialist context slice, or a new de-id scheme, both parked) | Yes — plan scope is fixed |
+| File manifest conflict (two tasks co-modify a file in one wave) | Flag for spec revision, identify the conflicting tasks, apply non-overlap verification or add a dependency edge | Yes — but NONE exists here (shared-file writers are serialized across waves, disjoint regions) |
+| Task too large for a single wave | Split recommendation in the deviations log, adjust the wave schedule | No — plan accommodates the split |
+| Missing task (coverage gap — an in-scope ADR section with no task) | Flag for spec revision naming the uncovered ADR section | Yes — plan would be incomplete |
+| **Frozen-spine violation** (non-zero numstat on `<always-frozen>`, OR a per-ADR-scoped probe shows an edit to a file a SIBLING ADR owns, OR the superseded set exceeds the named surfaces) | HALT the wave immediately; the ADR-0032 EXTEND-NOT-REBUILD spine is byte-frozen and each supersession is bounded to its owning commit; route to the responsible SE to move the change to the intended surface; re-run the per-ADR + always-frozen numstat probes before resuming | Yes — a frozen-spine edit / a cross-ADR bleed is the ADR-0032 one-way-door failure class |
+| **Crown-jewel / de-id leak** (a pure-identity token OR a raw rsID/allele genotype reaches any specialist payload) | HALT; the assembler must strip pure identity + carry genetics ONLY as the derived `genetic-trait-classes` token; route to the responsible SE to fix the strip / carve-out; re-run the identity-leak + genetics carve-out probes (observe RED under the bypass mutation, then GREEN) | Yes — an identity/genotype egress is the crown-jewel failure class |
+| **Store-adversarial battery tautological** (category (d) does not go RED under the dedupe-key-widened / precedence-rule-removed mutations) | HALT; a battery green under the mutation encodes broken behavior; route to the SE to make each mutation RED (F-007 negative-test floor) before reverting | Yes — a tautological store test is a latent keying-escape (bead `pka`) |
+| **Fail-closed violation** (a mis-compiled out-of-bounds rule auto-applies at Tier-1, OR a safety-threshold event advances past the Tier-4 human-gate, OR a no-event day fires a model/de-id-IN call, OR an under-delivered program is admitted as a static plan) | HALT; the executor must fail-closed-by-direction (escalate UP), hold at the human-gate, and stay 0-model-call on a no-event day; route to the SE to fix the escalation predicate / the compiler bounds; re-run the no-event-day + human-gate + out-of-bounds probes | Yes — a fail-open auto-apply is the ADR-0045 core safety failure class |
+| **0-live-spend violation** (a test makes a live API/Agent-tool call, or real operator PII enters the test tree) | HALT; replace the live call with the fixture `dispatch` / fixture de-id client seam + synthetic PII-free fixtures; the live run is the post-build operator checkpoint only (ADR-0039-gated) | Yes — live spend / real PII in a build test breaks the mock-tested-posture invariant |
+
+Blocking issues halt the pipeline with: "Spec revision needed before build-plan execution can continue. Issues: [list]. Run `/create-spec` to update the spec, then re-run `/create-build-plan`." Non-blocking issues are logged in `docs/build-plan/.pipeline/deviations.md` (issue, original plan state, adjusted state, justification) and execution continues.
+
+## Validation Checklist
+
+### Wave Integrity
+- [x] Every task appears in exactly one wave (all 15: W1×2, W2×3, W3×4, W4×3, W5×2, W6×1 = 15).
+- [x] No task is scheduled in a wave before its dependency's wave (every one of the 24 Dependency-Map edges verified: successor wave strictly greater than every predecessor wave — traced per task in the Wave Schedule entry criteria).
+- [x] Topological ordering respected across all waves (the six waves ARE the spec's six Kahn parallel groups, GROUNDED not re-derived; every edge points to a later wave).
+
+### Checkpoint Quality
+- [x] Every wave boundary has at least one verifiable exit criterion (6 boundaries, each with named `pytest` + numstat/grep/count/falsifiable-pair 0-threshold gates).
+- [x] Every checkpoint names specific test commands or conditions (exact `pytest`/`git diff --numstat`/`grep`/count invocations with expected results, not "run tests").
+- [x] Every checkpoint identifies a verifier role (Architect/Security + QA + `plan-integrity` per boundary, per the surface each wave completes).
+
+### Agent Assignment
+- [x] Every spec task appears in the Agent Assignment Matrix (all 15).
+- [x] No implementation task assigned to Architect (SE is primary on all 15; Architect is reviewer only on 0041-T1/0044-T1/0043-T3/0046-T1).
+- [x] No interface/contract task assigned to SE without Architect review (0041-T1 schema, 0044-T1 model, 0043-T3 front-door wiring, 0046-T1 activation contract all carry Architect review; the frozen-spine implementation tasks 0041-T2/0043-T2/0044-T4 consume already-Architect-reviewed contracts + are guarded by the per-ADR numstat probe + `plan-integrity` gate).
+- [x] Security-sensitive tasks have Security review assigned (0042-T1 crown-jewel de-id, 0044-T1/0044-T2 store surface — directed; 0043-T2 always-on safety floors, 0045-T2 fail-closed executor — Architect-added with flagged rationale).
+
+### Critical Path
+- [x] Critical path is the actual longest chain (0041-T1→0044-T1→0044-T2→0044-T4→0045-T2→0045-T3, length 6 = topological depth 6, verified by CPM forward/backward pass; the spec's named monitoring-loop chain is reconciled as the co-critical risk-headline with 0045-T1's ~1-wave slack documented).
+- [x] Zero-slack tasks identified (the six chain tasks).
+- [x] No task on the critical path has an alternative shorter route (the chain is the binding sequence: 0045-T2's Wave-5 start is gated by 0044-T4 in Wave 4).
+
+### Risk Ordering
+- [x] All spike tasks are in Wave 1 (NONE exist — stated explicitly; the highest-risk foundational surfaces 0041-T1/0042-T1 in Wave 1, the frozen-spine record spine 0044-T1 in Wave 2, per the Rule-1 exception).
+- [x] Risk-mitigating tasks precede the tasks they protect (0041-T1 schema before all consumers; 0042-T1 de-id boundary before the briefs carry the record; 0044-T1 store spine + battery before the model consumers; 0043-T2 always-on floors before 0045-T2's Tier-3; 0044-T4 confirm hold before 0045-T2's Tier-4; 0046-T2 fraction before the scaled loop — documented in Risk Schedule).
+- [x] Security ordering correct (the de-id boundary in Wave 1 before any downstream brief; the store surface + battery in Waves 2-3; the fail-closed executor in Wave 5; frozen-spine + crown-jewel + 0-spend pinned at every checkpoint, not deferred; Security review through the terminal wave).
+
+### Spec Traceability
+- [x] Every spec task appears in the wave schedule (15/15; no orphan).
+- [x] No task in the plan is absent from the source spec (every plan task ID traces to a spec task block ADR-004{1..6}-T{n}).
+- [x] `source-specs` frontmatter lists the consumed spec.
+
+### Infrastructure
+- [x] Every prerequisite has a verification command (11 prerequisites, each with a runnable command verified live 2026-07-11 at `feature/comprehensive-plan-adr @ 033114261941`).
+- [x] Wave 1 tasks do not depend on an unlisted prerequisite (0041-T1 → `.venv` baseline + net-new-fields probe + Create-absent probe; 0042-T1 → `.venv` baseline + the `router.summarize` anchor + `generate_plan.py` present + Create-absent probe — all listed; BP-08 clear).
+
+### Feedback Protocol
+- [x] Feedback protocol section is present.
+- [x] Protocol covers: spec defect, missing dep, untestable criteria, scope change, file conflict, oversized task, missing task (+ five project-specific frozen-spine / crown-jewel-leak / store-adversarial-tautology / fail-closed / 0-live-spend categories).
+- [x] Each issue type has a blocking/non-blocking classification.
+
+All 24 base checklist items pass. No BP-01..BP-08 anti-pattern present: **BP-01** no dependency violation (the six waves are the spec's six Kahn groups; every edge points to a later wave); **BP-02** every checkpoint has commands + a verifier (no empty checkpoint); **BP-03** SE-primary with correct reviewers, no contract task without Architect review, no implementation-to-Architect; **BP-04** six waves == topological depth 6 (the faithful Kahn grouping — the alternative 3-tier-wave structure is REJECTED as over-serialized + intra-wave-dependent, documented in the Wave Schedule); **BP-05** no deferred spike/risk-mitigating task (no spikes; each mitigating task precedes the mitigated); **BP-06** no orphan (15 spec tasks ↔ 15 plan tasks); **BP-07** no intra-wave file collision (the five shared-file writers are serialized across waves in disjoint regions, per the Cross-Spec Coordination table); **BP-08** no phantom infrastructure (every Wave-1 requirement is a listed prerequisite, verified live).
