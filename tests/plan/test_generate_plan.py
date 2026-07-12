@@ -25,7 +25,7 @@ import pytest
 
 from scripts.generate import generate
 from scripts.model.client import ModelCallError, ModelClient
-from scripts.plan import router
+from scripts.plan import context_assembler, router
 from scripts.plan.assemble import THIN_LIBRARY_GAP
 from scripts.plan.generate_plan import (
     AUTHOR_CALL_FAILED,
@@ -1022,8 +1022,9 @@ def test_record_plan_byte_unchanged_vs_pretask():
 
 
 def test_author_payload_is_deidentified_summary(tmp_path):
-    # The payload to client.author is the router.summarize de-identified summary (0 raw
-    # operator PII) — this path is summary-only, NOT the /chat raw-egress carve-out.
+    # The payload to client.author is context_assembler.assemble_context's identity-stripped
+    # record (0 raw operator IDENTITY PII) — this path routes through assemble_context, NOT the
+    # superseded router.summarize band, and NOT the /chat raw-egress carve-out.
     store_read = _seed_store(tmp_path, **{"hard-limits": "no fasting"})
     envelope = _author(_workout_rec("Goblet squat", 3))
     client, backend = _mock_client(envelope)
@@ -1031,9 +1032,34 @@ def test_author_payload_is_deidentified_summary(tmp_path):
     generate_plan("workout", None, store_read, tmp_path, plan_date=PLAN_DATE, client=client)
 
     domain, summary = backend.calls[0]
-    assert summary == router.summarize(store_read)  # the exact de-identified summary
-    # the de-identified summary carries field-set tokens, never raw store internals
+    assert summary == context_assembler.assemble_context(store_read)  # the exact record
+    # the record carries field-set tokens by name, never raw store internals
     assert summary.get("hard-limits") == "no fasting"
+
+
+def test_author_payload_routes_through_assemble_context(tmp_path):
+    # The front door routes the author payload through assemble_context (the no-DATA-COLLAPSE
+    # record), NOT the superseded router.summarize band. Seeds an allowlisted health-substance
+    # field (a multi-day split) so assemble_context carries the uncollapsed detail while
+    # summarize collapses it to the coarse `training-volume-band`. The payload must carry the
+    # substantive detail AND differ from the summarize band — proving the compute_plan summary
+    # source is assemble_context, not summarize.
+    # MUTATION: reverting compute_plan's `assemble_context(store_read)` to `summarize(store_read)`
+    # drops the split (the band has no raw detail) -> both assertions RED.
+    split = (
+        "Mon: back squat 5x5 at RPE 8, romanian deadlift 4x8; "
+        "Wed: bench press 5x5, weighted dip 3x10; "
+        "Fri: front squat 4x6, barbell row 4x8"
+    )
+    store_read = _seed_store(tmp_path, **{"raw-training-detail-free-text": split})
+    envelope = _author(_workout_rec("Goblet squat", 3))
+    client, backend = _mock_client(envelope)
+
+    generate_plan("workout", None, store_read, tmp_path, plan_date=PLAN_DATE, client=client)
+
+    _, summary = backend.calls[0]
+    assert summary.get("raw-training-detail-free-text") == split  # carried UNCOLLAPSED
+    assert summary != router.summarize(store_read)  # routed through assemble_context, not the band
 
 
 # --- AC-4: honest no-plan on a FAILED author call (the typed ModelCallError) ----

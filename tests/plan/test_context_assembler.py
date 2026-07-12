@@ -416,3 +416,97 @@ def test_falsy_present_value_carried(tmp_path):
     store_read = functools.partial(store.read, root=tmp_path)
     result = context_assembler.assemble_context(store_read)
     assert result.get("bodyweight-kg") == 0, "a present falsy value (0) was dropped"
+
+
+# --- review-pr #330 fixes: genotype crown jewel, list-value paths, None-skip -----
+
+
+def test_genotype_in_carried_value_fails_closed(tmp_path):
+    """FIX-1 (F1 CROWN JEWEL): a raw rsID+allele genotype in an allowlisted field fails closed.
+
+    `router._RAW_GENOTYPE_PATTERNS` catches what the operator-value gate (identity-only) does
+    NOT — a raw genotype — enforcing ADR-0042's explicit "raw genotypes NEVER cross to the
+    planner" exception. The seeded `clinical-notes` value carries a raw `rs4988235 (G;G)`
+    genotype that `pii_scan.scan_operator_value` passes clean (no identity, no >=9-digit run);
+    the genotype scrubber raises. Names the field, never echoes the value. Mutation-RED:
+    removing the genotype scrubber lets the genotype flow (no raise) -> this REDs.
+    """
+    _append(tmp_path, "clinical-notes", "MCM6 rs4988235 (G;G) lactase-persistent per report")
+    store_read = functools.partial(store.read, root=tmp_path)
+    with pytest.raises(
+        ValueError,
+        match=r"carried field 'clinical-notes' carries a raw genotype",
+    ) as exc:
+        context_assembler.assemble_context(store_read)
+    assert "rs4988235" not in str(exc.value)  # names the field, never echoes the value
+    assert "(G;G)" not in str(exc.value)
+    assert "fail-closed" in str(exc.value)
+
+
+def test_list_of_scalars_carried_verbatim(tmp_path):
+    """FIX-7(a) (F6): a LIST value of clean scalars under an allowlisted field is carried verbatim.
+
+    The payload contract admits a flat list-of-scalars (`_is_flat_scalar`'s list branch); a
+    clean list is carried unchanged. Mutation-RED: an `_is_flat_scalar` list branch that
+    returns False (rejecting all lists) makes this raise instead of carry.
+    """
+    values = ["fasting glucose 92 mg/dL", "hs-CRP 0.4 mg/L", "ALT 22 U/L"]
+    _append(tmp_path, "raw-lab-values", values)
+    store_read = functools.partial(store.read, root=tmp_path)
+    result = context_assembler.assemble_context(store_read)
+    assert result.get("raw-lab-values") == values
+
+
+def test_list_with_nested_dict_fails_closed(tmp_path):
+    """FIX-7(b) (F6): a LIST holding a nested dict fails closed (the flat-scalar gate).
+
+    A list item that is itself a dict violates the flat-scalar / list-of-scalar contract — it
+    would smuggle third-party PII (a provider-name + MRN) under an allowlisted key past the
+    operator-value gate. The gate names the field, never echoes the smuggled value.
+    Mutation-RED: removing the `_is_flat_scalar` enforcement lets the nested value flow.
+    """
+    listed = ["ALT 22 U/L", {"provider": "Dr. Jane Smith, Kaiser Permanente", "mrn": "A12345"}]
+    _append(tmp_path, "raw-lab-values", listed)
+    store_read = functools.partial(store.read, root=tmp_path)
+    with pytest.raises(
+        ValueError,
+        match=r"carried field 'raw-lab-values' has a non-scalar value; the flat-scalar payload contract is violated",
+    ) as exc:
+        context_assembler.assemble_context(store_read)
+    assert "Kaiser Permanente" not in str(exc.value)  # names the field, never echoes the value
+    assert "A12345" not in str(exc.value)
+
+
+def test_list_item_with_operator_identity_fails_closed(tmp_path):
+    """FIX-7(c) (F6): operator identity in a LIST ITEM is caught by the per-item value-gate walk.
+
+    The synthetic operator name embedded inside ONE item of a carried list is caught by the
+    REUSED `pii_scan.scan_operator_value` gate walking each list item — `assemble_context`
+    RAISES a field-naming ValueError, never echoing the value. Mutation-RED: a value gate that
+    scans only `(value,)` (not the list items) misses the name in a list item (no raise).
+    """
+    cfg = _identity_config(tmp_path)
+    listed = ["clean lab note", f"panel ordered by {SYNTH_NAME}"]
+    _append(tmp_path, "raw-lab-values", listed)
+    store_read = functools.partial(store.read, root=tmp_path)
+    with pytest.raises(
+        ValueError,
+        match=r"carried field 'raw-lab-values' carries raw operator PII",
+    ) as exc:
+        context_assembler.assemble_context(store_read, identity_config=cfg)
+    assert SYNTH_NAME not in str(exc.value)  # names the field, never echoes the value
+
+
+def test_none_value_skipped(tmp_path):
+    """FIX-9 (F8): a None value under an allowlisted field is SKIPPED — the key is absent.
+
+    The `if value is None: continue` branch drops an absent/None reading (matching
+    `summarize`'s `readings[-1]["value"]`). Paired with `test_falsy_present_value_carried`:
+    0/False/"" are CARRIED (present-but-falsy), only None is skipped — the None-vs-falsy
+    boundary. Mutation-RED: removing the None check flows `field: None` into the payload, so
+    the key becomes present.
+    """
+    _append(tmp_path, "raw-lab-values", None)
+    store_read = functools.partial(store.read, root=tmp_path)
+    result = context_assembler.assemble_context(store_read)
+    assert "raw-lab-values" not in result

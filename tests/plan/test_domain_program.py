@@ -209,3 +209,35 @@ def test_monitoring_signal_nonvocabulary_tier_rejected():
         domain_program.validate(program)
     assert exc.value.offending_field == "monitoring_signals"
     assert exc.value.offending_signal == bad
+
+
+# --- review-pr #330 fix (F2): malformed non-Mapping/non-list shapes fail closed ---
+# `validate` promises "raises DomainProgramError on ANY non-conformant program". A malformed
+# non-Mapping program / non-list monitoring_signals / non-Mapping entry (exactly the shapes
+# untrusted author output can produce) must leave via the typed channel, NOT a bare
+# AttributeError/TypeError a contract-written `except DomainProgramError` caller would miss.
+
+
+@pytest.mark.parametrize("bad", [None, 42, "a program", ["prescription"]])
+def test_non_mapping_program_rejected(bad):
+    """A non-Mapping program leaves via DomainProgramError, not a bare TypeError."""
+    with pytest.raises(domain_program.DomainProgramError) as exc:
+        domain_program.validate(bad)
+    assert exc.value.offending_field is None  # the whole program is malformed, not one field
+
+
+def test_non_list_monitoring_signals_rejected():
+    """A non-list monitoring_signals leaves via DomainProgramError, not a bare TypeError."""
+    program = _training_program(monitoring_signals=42)
+    with pytest.raises(domain_program.DomainProgramError) as exc:
+        domain_program.validate(program)
+    assert exc.value.offending_field == "monitoring_signals"
+
+
+def test_non_mapping_monitoring_entry_rejected():
+    """A non-Mapping monitoring_signals entry leaves via DomainProgramError, not AttributeError."""
+    program = _training_program(monitoring_signals=["weight trending up"])
+    with pytest.raises(domain_program.DomainProgramError) as exc:
+        domain_program.validate(program)
+    assert exc.value.offending_field == "monitoring_signals"
+    assert exc.value.offending_signal == "weight trending up"

@@ -42,9 +42,14 @@ from scripts.plan import router
 # The EXPLICIT health-substance ALLOWLIST (Security-F1) — the auditable seam a NEW
 # health-substance class is added to. Mirrors `care_chat._CARE_HEALTH_DETAIL`'s
 # explicit-allowlist pattern, extended past its 5 to the full plan-relevant set. These are
-# EXACTLY the non-identity members of `router.EXCLUDED_RAW_PII` (the raw health-substance
-# classes `summarize` collapses to coarse bands FOR THE SPECIALIST); the assembler carries
-# them UNCOLLAPSED. This tuple names ONLY health-substance classes — NEVER an identity /
+# EXACTLY the non-identity members of `router.EXCLUDED_RAW_PII` (the load-time partition
+# assert below pins that): the raw health-substance free-text classes, carried UNCOLLAPSED to
+# the specialist. That is a DELIBERATE widening past `summarize`, which for each of these
+# either collapses it to a coarse band (`raw-supplement-free-text` -> `supplement-stack-class`)
+# or DROPS it outright (`medication-list` / `raw-lab-values` have no `_RAW_TO_FIELD` entry and
+# never reach `summarize`'s output at all). Carrying the raw text uncollapsed is the whole
+# point of ADR-0042's no-DATA-COLLAPSE; each value is identity-stripped by the `pii_scan`
+# value gate below. This tuple names ONLY health-substance classes — NEVER an identity /
 # contact / health-identifier class (those are excluded by not being here).
 _HEALTH_SUBSTANCE_ALLOWLIST = (
     "raw-nutrition-free-text",
@@ -164,11 +169,23 @@ def assemble_context(store_read, identity_config=pii_scan.DEFAULT_IDENTITY_CONFI
             )
         # Reuse the `summarize` `:848` 8j6 gate at EVERY carried scalar (the payload is flat by
         # the contract above; a list-of-scalar is walked item-by-item): a carried value
-        # smuggling operator identity fails closed. Names the field, never the value.
+        # smuggling operator identity OR a raw genotype fails closed. Names the field, never
+        # the value.
         for scalar in value if isinstance(value, list) else (value,):
-            if scalar is not None and pii_scan.scan_operator_value(
-                str(scalar), token_config=identity_config
-            ):
+            if scalar is None:
+                continue
+            text = str(scalar)
+            # CROWN JEWEL (ADR-0042): the raw rsID+allele genotype NEVER crosses to the
+            # planner. The operator-value gate below catches operator identity, not a
+            # genotype — reuse `router._RAW_GENOTYPE_PATTERNS` (the `summarize` `:307`
+            # backstop) to fail closed on a genotype smuggled into an allowlisted free-text
+            # scalar (or a list item), enforcing the explicit crown-jewel exception.
+            if any(pattern.search(text) for pattern in router._RAW_GENOTYPE_PATTERNS):
+                raise ValueError(
+                    f"assemble_context: carried field {field!r} carries a raw genotype; "
+                    f"raw genotypes never cross to the planner (fail-closed)"
+                )
+            if pii_scan.scan_operator_value(text, token_config=identity_config):
                 raise ValueError(
                     f"assemble_context: carried field {field!r} carries raw operator "
                     f"PII; the PII-free-by-store-schema assumption is violated "

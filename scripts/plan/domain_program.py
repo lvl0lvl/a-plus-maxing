@@ -23,12 +23,14 @@ Conditional (present per the domain kind's required-vs-conditional row):
     required_labs     -- empty-OK for a training domain; PRESENT-AND-NON-EMPTY for a
                          compound domain.
     refusal_escalation-- a safety-threshold escalation marker (a condition/event token
-                         slot). T1 pins presence + the marker slot; ADR-0045-T2's
-                         Tier-4 owns the escalation-event semantics.
-    cross_domain_seams-- a list of seam entries; each entry's LOCKED structure is a
-                         paired-domain reference + a seam-nature/conflict token. T1
-                         pins this edge shape; ADR-0043-T2 owns the reconciliation
-                         semantics.
+                         slot). T1 pins the FIELD NAME as a conditional field but does NOT
+                         pin its presence or the marker slot's shape; ADR-0045-T2's Tier-4
+                         owns the escalation-event semantics (`validate` does not check it).
+    cross_domain_seams-- a list of seam entries; each entry's intended structure is a
+                         paired-domain reference + a seam-nature/conflict token. T1 pins the
+                         FIELD NAME as a conditional field but does NOT pin its presence or
+                         edge shape; ADR-0043-T2 owns the reconciliation semantics AND the
+                         seam-edge validation (`validate` does not check it).
 
 The domain KIND
 ---------------
@@ -135,6 +137,9 @@ def validate(program: Mapping) -> None:
     Fail-closed: an incomplete or under-delivered program is rejected with a structured
     offense accessor set, never returned in a degraded form. The checks, in order:
 
+        0. the program is a Mapping, `monitoring_signals` is a list, and each entry is a
+           Mapping -- a malformed non-Mapping/non-list shape from untrusted author output
+           leaves via `DomainProgramError`, not a bare AttributeError/TypeError;
         1. every required field is present (else `offending_field` = the missing field);
         2. the domain kind is present and a `DOMAIN_KINDS` member (else `offending_field`
            = `KIND_FIELD` -- absent/non-vocabulary kinds fail closed, never default);
@@ -150,6 +155,11 @@ def validate(program: Mapping) -> None:
     Returns:
         (None) When the program conforms.
     """
+    if not isinstance(program, Mapping):
+        raise DomainProgramError(
+            f"program is not a mapping (got {type(program).__name__})"
+        )
+
     missing = missing_required_fields(program)
     if missing:
         raise DomainProgramError(
@@ -162,7 +172,19 @@ def validate(program: Mapping) -> None:
             f"domain kind absent or unrecognized: {kind!r}", offending_field=KIND_FIELD
         )
 
-    for entry in program[MONITORING_SIGNALS]:
+    signals = program[MONITORING_SIGNALS]
+    if not isinstance(signals, list):
+        raise DomainProgramError(
+            f"{MONITORING_SIGNALS} must be a list (got {type(signals).__name__})",
+            offending_field=MONITORING_SIGNALS,
+        )
+    for entry in signals:
+        if not isinstance(entry, Mapping):
+            raise DomainProgramError(
+                f"{MONITORING_SIGNALS} entry is not a mapping (got {type(entry).__name__})",
+                offending_field=MONITORING_SIGNALS,
+                offending_signal=entry,
+            )
         if entry.get(SIGNAL_TIER_KEY) not in VALIDITY_TIERS:
             raise DomainProgramError(
                 f"monitoring signal without a valid {SIGNAL_TIER_KEY}",

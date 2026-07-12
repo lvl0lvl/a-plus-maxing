@@ -2,12 +2,13 @@
 
 This is `assemble`'s production caller (the PF-S63-02 core-capability proof). Under the
 runtime-A interactive agent-dispatch model (`vault/design/plan-generation-pipeline-v1.md`),
-the orchestrator dispatches a plan-author specialist over the de-identified
-`router.summarize` summary plus the gated wiki, captures the author's structured output,
-and feeds it here. This module then:
+the orchestrator dispatches a plan-author specialist over the identity-stripped
+`context_assembler.assemble_context` record plus the gated wiki, captures the author's
+structured output, and feeds it here. This module then:
 
-  1. derives the canonical summary from the store (`router.summarize`) — the one
-     operator-state source, the 0-raw-PII boundary;
+  1. derives the identity-stripped operator-state record from the store
+     (`context_assembler.assemble_context`, built on `router.summarize`'s identity-safe
+     base) — the one operator-state source and the sole de-id control on the plan path;
   2. wraps the captured author output as the `assemble` roster callable for the domain;
   3. runs `assemble` (the four safety filters — attribution, sourcing-completeness,
      population-mismatch, the fail-closed class-aware HALT filter) over the author's
@@ -58,7 +59,7 @@ per-author concerns — they run in the cross-domain layer (the step-4 reconcile
 """
 
 from scripts.model.client import ModelCallError, ModelClient
-from scripts.plan import context_assembler, router
+from scripts.plan import context_assembler
 from scripts.plan.assemble import assemble
 from scripts.store import plan_schema
 
