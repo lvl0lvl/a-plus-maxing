@@ -377,6 +377,13 @@ def record_plan(domain, plan, plan_date, specialist, root):
     (domain, date, specialist) identity is a no-op — never a silent overwrite;
     an intended value change goes through `correct_plan`.
 
+    Superseded (ADR-0044-T1): ``scripts.store.plan_model.record_plan_version`` is the
+    canonical comprehensive plan-storage entry — ONE composite version per date (per
+    active domain the seven-field DOMAIN PROGRAM + integrated narrative + dated
+    milestones + compiled monitoring config) under the disjoint ``plan-model::`` stream.
+    This thin single-domain ``plan::<domain>`` record path is retained for the pre-model
+    history the ADR-0044-T2 mixed-history reader still consumes (comprehensive-wins).
+
     Args:
         domain (str): A `PLAN_DOMAINS` member.
         plan (dict): The plan content per the domain's schema table (closed on
@@ -471,6 +478,12 @@ def resolve_plan(readings, on_date):
     correction supersedes its identity's value WITHOUT re-promoting it past
     a later-recorded same-date plan — and resolves to the plan value plus
     its specialist attribution (the source minus the ``plan::`` prefix).
+
+    Superseded (ADR-0044-T1): ``scripts.store.plan_model.resolve_comprehensive`` is the
+    canonical comprehensive resolver — it mirrors this reversed-scan latest-wins-per-date
+    shape (and this three-state NO_PLAN / NO_PLAN_TODAY vocabulary) over the composite
+    plan-version value. This thin ``plan::<domain>`` resolver is retained for the pre-model
+    history the ADR-0044-T2 mixed-history reader still consumes (comprehensive-wins).
 
     Args:
         readings (list): One plan item's readings, in `store.read` order.
