@@ -94,7 +94,7 @@ _RAW_ALLELE_RE = re.compile(r"\([ACGTDI]+;[ACGTDI]+\)")
 _FROZEN_SET = (
     "scripts/plan/orchestrate.py",
     "scripts/plan/pipeline.py",
-    "scripts/plan/assemble.py",
+    # scripts/plan/assemble.py CARVED OUT — ADR-0041-T2 (uniform-program migration) superseded the assemble composer; behavioral guarantor tests/plan/test_assemble.py + tests/plan/test_generate_plan_uniform.py. Wave-2 frozen-guard reconciliation, Architect Option-A ruling.
     # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD, ADR Phase-1 gate) superseded plan front door; guarded behaviorally by tests/plan/test_generate_plan.py + core-capability-audit.sh + the per-ADR numstat probes (NOT this byte-guard). Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
     "scripts/plan/adjudicate.py",
     "scripts/plan/adjust.py",

@@ -983,6 +983,12 @@ def _git_diff_lines(path):
     return out.stdout
 
 
+@pytest.mark.skip(
+    reason="assemble.py SANCTIONED-SUPERSEDED by ADR-0041-T2 (uniform-program migration); this "
+    "single-file byte-freeze vs the pre-task baseline is void. Behavioral guarantor: "
+    "tests/plan/test_assemble.py + tests/plan/test_generate_plan_uniform.py. Wave-2 frozen-guard "
+    "reconciliation, Architect Option-A ruling (§4)."
+)
 def test_assemble_byte_unchanged_vs_pretask():
     # The re-wire amends ONLY ADR-0006's dispatch MECHANISM; the four filters + the clearance
     # gate stay byte-identical to the pre-task commit (ADR-0015 Negative-4).
@@ -1001,20 +1007,22 @@ def _func_src(source_text, name):
 
 
 def test_record_plan_byte_unchanged_vs_pretask():
-    # ADR-0040 (AR-007): plan_schema.py's ONLY sanctioned edit is read_plan's caller-side
-    # confirmation-pointer pre-filter; the record spine (record_plan/correct_plan/
-    # record_plan_tracking) + the pure resolve_plan body stay byte-frozen. Narrowed from a
-    # whole-file freeze (which the sanctioned read_plan edit trips) to the record spine — the
-    # authoritative ADR-0032:107 frozen surface. Failing-capable: an edit to any frozen function reds it.
+    # ADR-0040 (AR-007) + ADR-0044-T1: plan_schema.py's sanctioned edits are read_plan's caller-side
+    # confirmation-pointer pre-filter (ADR-0040) AND the record-spine supersession (ADR-0044-T1:
+    # resolve_plan + record_plan now delegate to scripts.store.plan_model, behavioral guarantor
+    # tests/store/test_plan_model.py). The SURVIVORS correct_plan + record_plan_tracking stay
+    # byte-frozen. Failing-capable: an edit to either surviving frozen function reds it.
     pre = subprocess.run(
         ["git", "show", f"{PRE_TASK_HEAD}:scripts/store/plan_schema.py"],
         cwd=REPO_ROOT, capture_output=True, text=True, check=True,
     ).stdout
     cur = (REPO_ROOT / "scripts" / "store" / "plan_schema.py").read_text()
-    for name in ("record_plan", "correct_plan", "record_plan_tracking", "resolve_plan"):
+    # resolve_plan + record_plan CARVED OUT — ADR-0044-T1 record-spine supersession; guarantor
+    # tests/store/test_plan_model.py. Wave-2 frozen-guard reconciliation, Architect Option-A ruling.
+    for name in ("correct_plan", "record_plan_tracking"):
         assert _func_src(cur, name) == _func_src(pre, name), (
-            f"{name} changed vs pre-task — the record spine must stay byte-frozen "
-            "(only read_plan's ADR-0040 read-side pre-filter is sanctioned)"
+            f"{name} changed vs pre-task — the record-spine survivors must stay byte-frozen "
+            "(read_plan's ADR-0040 pre-filter + the ADR-0044-T1 record-spine supersession are sanctioned)"
         )
 
 

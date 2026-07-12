@@ -293,8 +293,17 @@ def test_no_new_store_stream():
     assert src.count(".correct(") == 0, "store_lock.py writes a correction record (must not)"
     assert "::" not in src, "store_lock.py introduces a ::-prefixed store item id (must not)"
 
+    # scripts/store/ frozen EXCEPT plan_model.py (ADR-0044-T1 NEW plan-model store) + plan_schema.py
+    # (ADR-0044-T1 record-spine supersession); behavioral guarantor tests/store/test_plan_model.py.
+    # Glob-minus-exclusion (mirrors _FROZEN_ENGINE_PATHS) keeps every OTHER current + future store
+    # file frozen — the "no new store stream" guarantee survives. Wave-2 reconciliation, Architect Option-A.
+    frozen_store = sorted(
+        str(p.relative_to(REPO_ROOT))
+        for p in (REPO_ROOT / "scripts" / "store").glob("*.py")
+        if p.name not in ("plan_model.py", "plan_schema.py")
+    )
     out = subprocess.run(
-        ["git", "diff", "--numstat", "origin/main", "--", "scripts/store/"],
+        ["git", "diff", "--numstat", "origin/main", "--", *frozen_store],
         capture_output=True, text=True, cwd=REPO_ROOT, check=True,
     )
     assert out.stdout.strip() == "", f"the frozen store changed (EXTEND-NOT-REBUILD violation): {out.stdout!r}"

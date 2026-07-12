@@ -290,11 +290,22 @@ def test_frozen_glob_numstat_empty():
     # AC-4: the canonical frozen superset (7 plan-engine files + plan_orchestrator.py + plan_driver.py
     # + scripts/store/ + scripts/serve/plan_loop.py, SEC-03 / Security-M1 / Architect-F3) is byte-frozen.
     frozen = [
-        "scripts/plan/orchestrate.py", "scripts/plan/pipeline.py", "scripts/plan/assemble.py",
+        "scripts/plan/orchestrate.py", "scripts/plan/pipeline.py",
+        # scripts/plan/assemble.py CARVED OUT — ADR-0041-T2 (uniform-program migration) superseded the assemble composer; behavioral guarantor tests/plan/test_assemble.py + tests/plan/test_generate_plan_uniform.py. Wave-2 frozen-guard reconciliation, Architect Option-A ruling.
         # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD) superseded plan front door; guarded by tests/plan/test_generate_plan.py + core-capability-audit.sh + per-ADR numstat probes. Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
         "scripts/plan/adjudicate.py", "scripts/plan/adjust.py",
         "scripts/plan/track.py", "scripts/plan/plan_orchestrator.py", "scripts/plan/plan_driver.py",
-        "scripts/store/", "scripts/serve/plan_loop.py",
+        # scripts/store/ frozen EXCEPT plan_model.py (ADR-0044-T1 NEW plan-model store) +
+        # plan_schema.py (ADR-0044-T1 record-spine supersession); behavioral guarantor
+        # tests/store/test_plan_model.py. Glob-minus-exclusion (mirrors _FROZEN_ENGINE_PATHS)
+        # keeps every OTHER current + future store file frozen — the "no new store stream"
+        # guarantee survives. Wave-2 frozen-guard reconciliation, Architect Option-A ruling.
+        *sorted(
+            str(p.relative_to(REPO_ROOT))
+            for p in (REPO_ROOT / "scripts" / "store").glob("*.py")
+            if p.name not in ("plan_model.py", "plan_schema.py")
+        ),
+        "scripts/serve/plan_loop.py",
     ]
     out = subprocess.run(
         ["git", "diff", "--numstat", "origin/main", "--", *frozen],

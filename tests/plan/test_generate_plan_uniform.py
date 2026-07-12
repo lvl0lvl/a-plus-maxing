@@ -382,9 +382,14 @@ def _numstat(base, *paths):
 
 def test_per_adr_scoped_freeze_break_numstat():
     """AC-4: the supersession is BOUNDED to `generate_plan.py` + `assemble.py`; the HARD-frozen
-    four + the sibling-superseded surfaces (0044 `plan_schema.py`, 0043 `orchestrate.py`, 0042
-    `router.py`) are byte-untouched in THIS commit, and the `<always-frozen>` set is EMPTY over
-    the whole build (`origin/main` base).
+    four + the sibling-superseded surfaces (0043 `orchestrate.py`, 0042 `router.py`) are
+    byte-untouched in THIS commit, and the `<always-frozen>` set is EMPTY over the whole build
+    (`origin/main` base).
+
+    0044 `plan_schema.py` is DROPPED from (b): this probe is working-tree-scoped (PRE_TASK_HEAD
+    base), and 0044-T1's sibling record-spine supersession legitimately edits plan_schema.py, so
+    freezing it here false-REDs. 0041-T2 itself never touched plan_schema.py (guarantor
+    tests/store/test_plan_model.py). Wave-2 frozen-guard reconciliation, Architect Option-A ruling.
 
     RED-capable: a transient edit to any forbidden file makes (b)/(c) non-empty -> RED.
     """
@@ -397,7 +402,7 @@ def test_per_adr_scoped_freeze_break_numstat():
         PRE_TASK_HEAD,
         "scripts/plan/pipeline.py", "scripts/plan/adjudicate.py",
         "scripts/store/store.py", "scripts/store/keying.py",
-        "scripts/store/plan_schema.py", "scripts/plan/orchestrate.py", "scripts/plan/router.py",
+        "scripts/plan/orchestrate.py", "scripts/plan/router.py",
     ) == "", "the frozen four + sibling-superseded surfaces must be byte-untouched in this commit"
     # (c) the <always-frozen> HARD set is EMPTY over the whole build (origin/main base).
     assert _numstat(
