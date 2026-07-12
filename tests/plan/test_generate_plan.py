@@ -898,7 +898,7 @@ def test_peptides_end_to_end_renders_on_dashboard(tmp_path):
 # ModelCallError raise) yields the honest no-plan state (recorded == False), never a
 # fabricated plan. assemble's filters + the translators + record_plan stay byte-unchanged.
 
-PRE_TASK_HEAD = "0ecdce6017ed789ebb23f588be0a6ba11719f685"
+PRE_TASK_HEAD = "3e17b1d8291d86d48441e36177a71f34910fbe57"  # wdhc: 0ecdce60 (a pre-squash working commit) was gc-pruned mid-S132; repointed to the merge-base (== origin/main), a durable reachable base. plan_schema.py is byte-untouched in Wave 3, so the survivors correct_plan + record_plan_tracking stay byte-frozen vs it.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 

@@ -248,6 +248,54 @@ def _contains_load(value):
     return False
 
 
+# domain -> the renderable IDENTITY field that distinguishes a nameable renderable entry from a
+# degenerate PERIODIZED-ONLY prescription (dated `blocks`, no top-level card identity). Only the
+# per-entry translators key here; nutrition AGGREGATES day targets + meals and already fails closed
+# (honest no-plan) when the aggregation is incomplete, so it needs no identity gate.
+_RENDERABLE_IDENTITY = {
+    "workout": "name",
+    "supplements": "name",
+    "peptides": "compound",
+}
+
+
+def _project_renderable(prescription, domain, *, strip_load):
+    """Project a (possibly PERIODIZED) DOMAIN PROGRAM prescription to its flat renderable form.
+
+    The uniform prescription is canonically PERIODIZED (dated `blocks`, per-block `load`), but the
+    four frozen `plan_schema` per-domain validators consume the FLAT top-level fields. This projects
+    the prescription for both the renderable and the store-bound program (bead 58z0):
+
+      1. DEEP-STRIP `load` over the FULL periodized structure when `strip_load` (the ADR-0015
+         clearance leg — a per-block `load` must never reach stored plan state, the load-clearance
+         safety gate); the dated `blocks` ride on as an open-on-extras extra.
+      2. Honest no-plan (return None) for a DEGENERATE periodized-only prescription — one carrying
+         dated `blocks` but NO top-level renderable identity for its domain — rather than passing a
+         `{"blocks": [...]}` shell to `record_plan`, whose frozen validator would raise a hard
+         ValueError (the 58z0 crash). A FLAT prescription missing a required field is a genuine
+         malformation, NOT a periodized shape, so it is passed through and still surfaces LOUD at
+         `record_plan` (the never-silently-drop contract is preserved).
+
+    Args:
+        prescription: The DOMAIN PROGRAM's prescription (a dict for a real prescription).
+        domain (str): The plan domain — keys the renderable-identity check (`_RENDERABLE_IDENTITY`).
+        strip_load (bool): Deep-strip `load` at every depth when True.
+
+    Returns:
+        (dict | None) The projected prescription (flat fields + load-handled `blocks`), or None for
+        a non-dict prescription or a degenerate periodized-only shape (the honest no-plan / skip).
+    """
+    if not isinstance(prescription, dict):
+        return None
+    projected = _deep_strip_load(prescription) if strip_load else dict(prescription)
+    identity = _RENDERABLE_IDENTITY.get(domain)
+    if identity is not None and "blocks" in projected:
+        value = projected.get(identity)
+        if not (isinstance(value, str) and value):
+            return None
+    return projected
+
+
 def _to_workout_plan(recommendations, gates):
     """Translate surviving workout recommendations into a `plan_schema` workout plan.
 
@@ -279,19 +327,15 @@ def _to_workout_plan(recommendations, gates):
         prog = _lift_program(claim, "workout")
         if prog is None:
             continue
-        prescription = prog.get(domain_program.PRESCRIPTION)
-        if not isinstance(prescription, dict):
+        # Clearance gate (ADR-0015): with no clinician clearance, deep-strip `load` at every depth
+        # so a PERIODIZED prescription's per-block load never ships into the renderable OR the
+        # store-bound program (the program prescription is set to this same exercise); a degenerate
+        # periodized-only prescription is honest no-plan (skip), never a `record_plan` crash (58z0).
+        exercise = _project_renderable(
+            prog.get(domain_program.PRESCRIPTION), "workout", strip_load=not clearance_granted,
+        )
+        if exercise is None:
             continue
-        # Clearance gate (ADR-0015): with no clinician clearance, deep-strip `load` at every
-        # depth so a PERIODIZED prescription's per-block load never ships into the renderable
-        # or the store-bound program (the program prescription is set to this same exercise).
-        # Clearance gate (ADR-0015): with no clinician clearance, deep-strip `load` at every
-        # depth so a PERIODIZED prescription's per-block load never ships into the renderable
-        # or the store-bound program (the program prescription is set to this same exercise).
-        if clearance_granted:
-            exercise = dict(prescription)
-        else:
-            exercise = _deep_strip_load(prescription)
         exercises.append(exercise)
         if program is None and claim.get(PROGRAM_KEY) is not None:
             program = dict(prog)
@@ -338,11 +382,14 @@ def _to_nutrition_plan(recommendations, gates):
         prog = _lift_program(claim, "nutrition")
         if prog is None:
             continue
-        payload = prog.get(domain_program.PRESCRIPTION)
-        if not isinstance(payload, dict):
+        payload = _project_renderable(
+            prog.get(domain_program.PRESCRIPTION), "nutrition", strip_load=True,
+        )
+        if payload is None:
             continue
         if program is None and claim.get(PROGRAM_KEY) is not None:
-            program = prog
+            program = dict(prog)
+            program[domain_program.PRESCRIPTION] = payload
         if "calorie_goal" in payload:
             calorie_goal = payload["calorie_goal"]
         if "macros" in payload:
@@ -388,12 +435,15 @@ def _to_supplements_plan(recommendations, gates):
         prog = _lift_program(claim, "supplements")
         if prog is None:
             continue
-        prescription = prog.get(domain_program.PRESCRIPTION)
-        if not isinstance(prescription, dict):
+        item = _project_renderable(
+            prog.get(domain_program.PRESCRIPTION), "supplements", strip_load=True,
+        )
+        if item is None:
             continue
-        items.append(dict(prescription))
+        items.append(item)
         if program is None and claim.get(PROGRAM_KEY) is not None:
-            program = prog
+            program = dict(prog)
+            program[domain_program.PRESCRIPTION] = item
     if not items:
         return None
     return _with_program({"items": items}, program)
@@ -425,10 +475,19 @@ def _to_peptides_plan(recommendations, gates):
         prog = _lift_program(claim, "peptides")
         if prog is None:
             continue
-        prescription = prog.get(domain_program.PRESCRIPTION)
-        if isinstance(prescription, dict):
-            program = prog if claim.get(PROGRAM_KEY) is not None else None
-            return _with_program(dict(prescription), program)
+        regimen = _project_renderable(
+            prog.get(domain_program.PRESCRIPTION), "peptides", strip_load=True,
+        )
+        if regimen is None:
+            continue
+        program = None
+        if claim.get(PROGRAM_KEY) is not None:
+            program = dict(prog)
+            # The peptides plan IS the regimen (no wrapper dict), so the store-bound program
+            # prescription must be a DISTINCT object — else `_with_program` attaching the program to
+            # the regimen makes regimen->program->prescription->regimen a serialization cycle.
+            program[domain_program.PRESCRIPTION] = dict(regimen)
+        return _with_program(regimen, program)
     return None
 
 

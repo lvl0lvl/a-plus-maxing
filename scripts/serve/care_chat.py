@@ -387,3 +387,55 @@ def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=N
         # is the contract).
         logging.exception("plan-loop signal failed after care-chat capture (additive; reply unaffected)")
     return {"reply": result.get("reply"), "receipt": receipt}
+
+
+def collect(collected, store_read):
+    """Collect the dispatched specialists' DOMAIN PROGRAMs and reconcile through the ONE path (T2).
+
+    The care-agent Orchestrator's collect step (ADR-0043-T2), placed AFTER + DISJOINT from the T1
+    decompose region. Gathers the collected dispatched-specialist candidates — each a
+    `compute_plan`-shaped result carrying its DOMAIN PROGRAM (with `cross_domain_seams`) under the
+    plan's `PROGRAM_KEY`, plus the source `meta` (the additive-AE / conflict / energy triggers) and
+    `reason` (the RED-S/LEA clinical-routing reason) — into the `{domain: candidate}` shape
+    `orchestrate.reconcile` consumes, and routes them through the ONE `orchestrate.reconcile` path
+    (reached via a function-level import mirroring the lazy `plan_loop` import in `respond`, cycle-free
+    — `scripts.plan.orchestrate` never imports this module).
+
+    SEC-W3-03 (BLOCKING; fail-OPEN otherwise): the shaped candidates PRESERVE every always-on
+    safety-floor trigger the source carries — the additive-AE / conflict `meta.ae_profile` and the
+    RED-S/LEA `reason`, NOT only the `domain_program` — AND the collect DERIVES + threads
+    `operator_rx_classes` from the store exactly as `generate_plans` does
+    (`router.rx_interaction_class_set(router.summarize(store_read))`). Shaping only the program (dropping
+    `meta`/`reason`, defaulting `operator_rx_classes` to the empty set) makes all three floors DEAD on
+    the care_chat path — the exact fail-OPEN this preservation closes.
+
+    The collect step does NOT dispatch specialists, compute the active set, or synthesize the integrated
+    plan (that is ADR-0043-T3). The dispatch SOURCE of `collected` is wired at the front door by
+    ADR-0043-T3 / ADR-0046-T1; this task only ACCEPTS the injected value.
+
+    Args:
+        collected: An iterable of collected specialist candidates — each a mapping carrying `domain`,
+            the candidate `plan` (with the DOMAIN PROGRAM under `PROGRAM_KEY`), the source `meta`, and
+            the `reason`.
+        store_read (Callable): The instance-root-bound store read surface; the operator's present
+            Rx-interaction classes are derived from it (de-identified) for the BPMH floor.
+
+    Returns:
+        (dict) The `orchestrate.reconcile` result — `report` (incl. the uniform `seams`), `holds`,
+        `conflict_held`, `rx_bpmh_held`.
+    """
+    from scripts.plan import orchestrate
+
+    candidates = {
+        item["domain"]: {
+            "domain": item["domain"],
+            "specialist": item.get("specialist"),
+            "plan": item.get("plan"),
+            "meta": item.get("meta") or {},  # PRESERVE the additive-AE / conflict / energy triggers
+            "reason": item.get("reason"),     # PRESERVE the RED-S/LEA clinical-routing reason
+            "section": item.get("section"),
+        }
+        for item in collected
+    }
+    operator_rx_classes = router.rx_interaction_class_set(router.summarize(store_read))
+    return orchestrate.reconcile(candidates, operator_rx_classes=operator_rx_classes)

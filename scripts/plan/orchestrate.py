@@ -54,8 +54,9 @@ surface (covered by `tests/store/test_queue_schema.py`); this collation is a SEP
 `generate_plans` itself stays a pure compute-reconcile-record pass.
 """
 
-from scripts.plan import router
+from scripts.plan import domain_program, router
 from scripts.plan.adjudicate import adjudicate
+from scripts.plan.assemble import PROGRAM_KEY
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, compute_plan
 from scripts.store import plan_schema, queue_schema
 
@@ -67,6 +68,14 @@ RED_S_LEA_CROSS_DOMAIN = RED_S_LEA_CLINICAL_ROUTING  # the nutrition screen shor
 ADDITIVE_AE_HELD = "additive-ae-held"  # supplement<->peptide additive-AE risk holds the supplement
 CONFLICT_HELD = "cross-domain-conflict-held"  # an author-declared cross-domain conflict holds the declarer
 RX_BPMH_HELD = "rx-bpmh-held"  # a compound's additive-AE class stacks against an operator Rx-interaction class
+
+# The `cross_domain_seams` edge shape (ADR-0043-T2-owned; `domain_program.validate` does not check
+# it). Each entry names a paired domain (`SEAM_WITH_DOMAIN`) + a seam-nature/conflict token
+# (`SEAM_NATURE`). A `SEAM_CONFLICT`-nature seam HOLDS the declaring domain (reusing the INDEPENDENT
+# `conflict_held` set, mirroring the author-conflict hold); a softer nature is detected + routed.
+SEAM_WITH_DOMAIN = "with_domain"  # the paired-domain reference in a cross_domain_seams entry
+SEAM_NATURE = "nature"            # the seam-nature/conflict token
+SEAM_CONFLICT = "conflict"        # a seam nature that holds the declaring domain
 
 
 def _compound_identities(candidate):
@@ -122,6 +131,34 @@ def _ae_profile(candidate):
     """
     profile = (candidate.get("meta") or {}).get("ae_profile")
     return profile if isinstance(profile, dict) else {}
+
+
+def _cross_domain_seams(candidate):
+    """The DOMAIN PROGRAM `cross_domain_seams` a candidate declares (the ADR-0043-T2 uniform pass).
+
+    The seven-field DOMAIN PROGRAM rides on the candidate plan under `PROGRAM_KEY` (the 0041-T2
+    additive emit); each `cross_domain_seams` entry is a paired-domain reference + a
+    seam-nature/conflict token. A candidate with no plan / no program / a malformed seams field
+    contributes NO seam (the trusted-author-malformed-is-inert contract, mirroring `_ae_profile`); a
+    non-dict entry is dropped. So an empty/absent declaration is inert here — the always-on safety
+    floors fire from their own triggers regardless (this pass never gates a floor).
+
+    Args:
+        candidate (dict): A `compute_plan` result (or a collected specialist candidate).
+
+    Returns:
+        (list) The candidate's declared seam entries (each a dict), possibly empty.
+    """
+    plan = candidate.get("plan")
+    if not isinstance(plan, dict):
+        return []
+    program = plan.get(PROGRAM_KEY)
+    if not isinstance(program, dict):
+        return []
+    seams = program.get(domain_program.CROSS_DOMAIN_SEAMS)
+    if not isinstance(seams, list):
+        return []
+    return [seam for seam in seams if isinstance(seam, dict)]
 
 
 def _normalized_ae_classes(profile):
@@ -361,7 +398,7 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
         its own — clearing one never releases a domain whose other concern is still open.
     """
     report = {"red_s_lea_cross_domain": False, "bounce": None, "overlaps": [],
-              "conflicts": [], "additive_ae": [], "rx_bpmh": []}
+              "conflicts": [], "additive_ae": [], "rx_bpmh": [], "seams": []}
     holds = {}
     conflict_held = []  # declaring domains held by an author-conflict — INDEPENDENT of `holds`
     rx_bpmh_held = []  # compound domains held by a supplement<->Rx BPMH match — INDEPENDENT of both
@@ -451,6 +488,34 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
         if matched:
             report["rx_bpmh"].append({"held_domain": domain, "classes": sorted(matched)})
             rx_bpmh_held.append(domain)
+
+    # Uniform cross_domain_seams pass (the ADR-0043-T2 generalization of the five hard-coded holds):
+    # ONE loop over every candidate's DOMAIN PROGRAM cross_domain_seams — NO per-domain-PAIR branch,
+    # so a seam between ANY pair is reconciled through this one path. Each declared seam names a paired
+    # domain + a nature token; a SEAM_CONFLICT-nature seam HOLDS the declaring domain (reusing the
+    # INDEPENDENT conflict_held set, mirroring the author-conflict hold), a softer nature is detected +
+    # routed. This pass is ADDITIVE and runs AFTER the three always-on safety floors above (1/4/5),
+    # which fire from their OWN triggers regardless of any declaration — the pass NEVER gates a floor,
+    # and a program with EMPTY seams contributes nothing here, so every meta-seeded existing fixture is
+    # inert on this pass (the transitional-additive property that keeps the existing suite byte-green).
+    for domain, cand in candidates.items():
+        for seam in _cross_domain_seams(cand):
+            paired = seam.get(SEAM_WITH_DOMAIN)
+            if not isinstance(paired, str):
+                continue  # a malformed seam (no paired-domain reference) is inert (SEC-W3-04)
+            is_held_conflict = seam.get(SEAM_NATURE) == SEAM_CONFLICT and cand.get("plan") is not None
+            report["seams"].append({
+                "from": domain, SEAM_WITH_DOMAIN: paired, SEAM_NATURE: seam.get(SEAM_NATURE),
+                "disposition": "held" if is_held_conflict else "routed",
+            })
+            # DEFERRED (ADR-0043-T3, bead a-plus-maxing-ncsy): the seam-sourced conflict is HELD
+            # correctly here, but its downstream adjudication / doctor-visit-queue DETAIL is
+            # degenerate — `_conflict_safety_finding` distills only `report["conflicts"]`, not
+            # `report["seams"]`, so a seam-only hold would route an empty finding. Single-sourcing
+            # the two conflict channels waits on the seam-emitting specialist + adjudicator wiring;
+            # no Wave-3 production path emits a seam-only conflict, so nothing triggers it yet.
+            if is_held_conflict and domain not in conflict_held:
+                conflict_held.append(domain)
 
     return {"report": report, "holds": holds, "conflict_held": conflict_held,
             "rx_bpmh_held": rx_bpmh_held}
