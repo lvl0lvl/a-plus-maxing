@@ -351,25 +351,28 @@ def _numstat(base, *paths):
 
 
 def test_per_adr_scoped_freeze_break_numstat():
-    """FROZEN-SPINE (per-ADR-scoped): the sanctioned edits touch exactly `activation.py` +
-    `generate_plan.py`; `plan_schema.py`/`plan_driver.py` (frozen for this task — the roster growth
-    is Wave 4) + the HARD-frozen four are byte-untouched vs the task-entry HEAD; the <always-frozen>
-    six-file set is EMPTY over the whole build; and `PLAN_DOMAINS` is STILL the closed four.
+    """FROZEN-SPINE (per-ADR-scoped): the 0046-T1 sanctioned edits touch exactly `activation.py` +
+    `generate_plan.py`; the HARD-frozen four are byte-untouched vs the task-entry HEAD; and the
+    <always-frozen> six-file set is EMPTY over the whole build. `plan_schema.py`/`plan_driver.py`
+    (PLAN_DOMAINS + _ROLE_OF_DOMAIN roster growth) are CARVED — they are ADR-0043-T3 (Wave 4)
+    supersessions now, not 0046-T1's frozen set; behavioral guarantor
+    tests/plan/test_activation.py::test_registries_coherent_over_grown_roster. Wave-4 frozen-guard
+    reconciliation (F-011), Architect Option-A ruling.
 
-    RED-capable: a transient edit to any forbidden file makes (b)/(c) non-empty -> RED; a grown
-    `PLAN_DOMAINS` makes (d) RED.
+    RED-capable: a transient edit to any HARD-frozen file makes (b)/(c) non-empty -> RED.
     """
     # (a) the sanctioned edits changed exactly these two surfaces.
     assert _numstat(
         PRE_TASK_HEAD, "scripts/plan/activation.py", "scripts/plan/generate_plan.py"
     ) != "", "the sanctioned edits must change activation.py + generate_plan.py"
-    # (b) plan_schema.py + plan_driver.py (frozen for this task) + the HARD-frozen four untouched.
+    # (b) the HARD-frozen four untouched. plan_schema.py + plan_driver.py CARVED — ADR-0043-T3
+    # (Wave 4) grew PLAN_DOMAINS + _ROLE_OF_DOMAIN; they are Wave-4 supersessions, not 0046-T1's
+    # frozen set (see the docstring).
     assert _numstat(
         PRE_TASK_HEAD,
-        "scripts/store/plan_schema.py", "scripts/plan/plan_driver.py",
         "scripts/store/store.py", "scripts/store/keying.py",
         "scripts/plan/pipeline.py", "scripts/plan/adjudicate.py",
-    ) == "", "plan_schema.py/plan_driver.py + the HARD-frozen four must be byte-untouched"
+    ) == "", "the HARD-frozen four must be byte-untouched"
     # (c) the <always-frozen> six-file HARD set is EMPTY over the whole build (origin/main base).
     assert _numstat(
         "origin/main",
@@ -377,8 +380,9 @@ def test_per_adr_scoped_freeze_break_numstat():
         "scripts/plan/pipeline.py", "scripts/plan/adjudicate.py",
         "scripts/plan/adjust.py", "scripts/plan/router.py",
     ) == "", "the <always-frozen> HARD set must be numstat=0 over the whole build"
-    # (d) PLAN_DOMAINS is STILL the closed four (the roster growth is Wave 4 / ADR-0043-T3).
-    assert plan_schema.PLAN_DOMAINS == ("workout", "nutrition", "supplements", "peptides")
+    # (d) CARVED — ADR-0043-T3 (Wave 4) grew PLAN_DOMAINS beyond the closed four (now the §1-§13
+    # dispatch registry); the grown-roster coherence is guarded by
+    # test_registries_coherent_over_grown_roster. The closed-four assertion is retired.
 
 
 # --- AC-7: offline, 0 live-API, 0 real PII, 0 live-client import ----------------

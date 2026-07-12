@@ -282,25 +282,23 @@ def test_extend_not_rebuild_no_rehost_no_serve_edit():
     # AC-3: extend-not-rebuild. The runner names 0 re-host tokens and drives plan_loop.signal INSIDE
     # scripts/serve/plan_loop.py WITHOUT editing that frozen containment host.
     # Scope note (PF-S63-02 mis-fire, S112/2026-07-07): assertion #2 formerly diffed the WHOLE
-    # scripts/serve/ dir, which over-broadly tripped on the legitimate non-runner render-filter edit to
-    # server.py (a non-frozen, non-runner file). Scoped to plan_loop.py (the frozen containment host,
-    # also covered by the sibling frozen-glob numstat assertion) so it no longer over-blocks non-runner
-    # serve edits, while still asserting the runner drives-but-does-not-edit the containment host.
+    # scripts/serve/ dir, then was scoped to plan_loop.py alone. Wave 4 CARVES that numstat leg
+    # entirely — ADR-0043-T3 legitimately redefined the plan_loop.py front door (a non-runner
+    # supersession), so a diff-vs-origin can no longer distinguish the runner's edits from 0043-T3's.
+    # The runner's extend-not-rebuild guarantee is now the token-scan below (0 re-hosted loop symbols);
+    # plan_loop.py's non-superseded internals stay byte-pinned by tests/serve/test_plan_loop_hold.py's
+    # def-comparison. Wave-4 frozen-guard reconciliation (F-011), Architect Option-A ruling.
     src = ((REPO_ROOT / "scripts/runner/cadence_runner.py").read_text()
            + (REPO_ROOT / "scripts/runner/subscription_dispatch.py").read_text())
     for token in ("_should_regenerate", "compose_disposition", "orchestrate.generate_plans",
                   "plan_driver.drive", "MIN_REGEN_INTERVAL_DAYS"):
         assert src.count(token) == 0, f"the runner re-hosts a loop symbol (extend-not-rebuild): {token}"
-    out = subprocess.run(
-        ["git", "diff", "--name-only", "origin/main", "--", "scripts/serve/plan_loop.py"],
-        capture_output=True, text=True, cwd=REPO_ROOT, check=True,
-    )
-    assert out.stdout.strip() == "", f"the runner edited the frozen plan_loop.py containment host: {out.stdout!r}"
 
 
 def test_frozen_glob_numstat_empty():
-    # AC-4: the canonical frozen superset (7 plan-engine files + plan_orchestrator.py + plan_driver.py
-    # + scripts/store/ + scripts/serve/plan_loop.py, SEC-03 / Security-M1 / Architect-F3) is byte-frozen.
+    # AC-4: the canonical frozen superset (plan-engine files + plan_orchestrator.py + scripts/store/,
+    # SEC-03 / Security-M1 / Architect-F3) is byte-frozen. plan_driver.py + scripts/serve/plan_loop.py
+    # CARVED — ADR-0043-T3 (Wave 4) supersessions (see the carve-out comments in the list below).
     frozen = [
         # scripts/plan/orchestrate.py CARVED OUT — ADR-0043-T2 (reconcile via cross_domain_seams) superseded the orchestrator; behavioral guarantor tests/serve/test_orchestrator_reconcile.py. Wave-3 frozen-guard reconciliation (F-011), Architect Option-A ruling.
         "scripts/plan/pipeline.py",
@@ -308,7 +306,8 @@ def test_frozen_glob_numstat_empty():
         # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD) superseded plan front door; guarded by tests/plan/test_generate_plan.py + core-capability-audit.sh + per-ADR numstat probes. Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
         "scripts/plan/adjudicate.py", "scripts/plan/adjust.py",
         # scripts/plan/track.py CARVED OUT — ADR-0044-T2 (mixed-history reader re-point of resolve_plan_progress) superseded track.py; behavioral guarantor tests/store/test_plan_model_reader.py + tests/plan/test_track.py. Wave-3 frozen-guard reconciliation (F-011), Architect Option-A ruling.
-        "scripts/plan/plan_orchestrator.py", "scripts/plan/plan_driver.py",
+        # scripts/plan/plan_driver.py CARVED OUT — ADR-0043-T3 (dispatch-registry _ROLE_OF_DOMAIN growth 4→13) superseded the plan driver's role map; behavioral guarantor tests/plan/test_activation.py::test_registries_coherent_over_grown_roster. Wave-4 frozen-guard reconciliation (F-011), Architect Option-A ruling.
+        "scripts/plan/plan_orchestrator.py",
         # scripts/store/ frozen EXCEPT plan_model.py (ADR-0044-T1 NEW plan-model store) +
         # plan_schema.py (ADR-0044-T1 record-spine supersession); behavioral guarantor
         # tests/store/test_plan_model.py. Recursive glob-minus-exclusion (mirrors
@@ -320,7 +319,7 @@ def test_frozen_glob_numstat_empty():
             for p in (REPO_ROOT / "scripts" / "store").glob("**/*.py")
             if p.name not in ("plan_model.py", "plan_schema.py")
         ),
-        "scripts/serve/plan_loop.py",
+        # scripts/serve/plan_loop.py CARVED OUT — ADR-0043-T3 (Wave 4) front-door redefinition superseded the loop front door; its non-superseded internals stay byte-pinned by tests/serve/test_plan_loop_hold.py's def-comparison. Wave-4 frozen-guard reconciliation (F-011), Architect Option-A ruling.
     ]
     out = subprocess.run(
         ["git", "diff", "--numstat", "origin/main", "--", *frozen],

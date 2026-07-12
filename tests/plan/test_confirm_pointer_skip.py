@@ -39,7 +39,8 @@ FROZEN_GLOB = (
     # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD) superseded plan front door; guarded by tests/plan/test_generate_plan.py + core-capability-audit.sh + per-ADR numstat probes. Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
     "scripts/plan/adjudicate.py", "scripts/plan/adjust.py",
     # scripts/plan/track.py CARVED OUT — ADR-0044-T2 (mixed-history reader re-point of resolve_plan_progress) superseded track.py; behavioral guarantor tests/store/test_plan_model_reader.py + tests/plan/test_track.py. Wave-3 frozen-guard reconciliation (F-011), Architect Option-A ruling.
-    "scripts/plan/plan_driver.py", "scripts/plan/plan_orchestrator.py",
+    # scripts/plan/plan_driver.py CARVED OUT — ADR-0043-T3 (dispatch-registry _ROLE_OF_DOMAIN growth 4→13) superseded the plan driver's role map; behavioral guarantor tests/plan/test_activation.py::test_registries_coherent_over_grown_roster. Wave-4 frozen-guard reconciliation (F-011), Architect Option-A ruling.
+    "scripts/plan/plan_orchestrator.py",
     "scripts/store/keying.py", "scripts/store/store.py",
 )
 

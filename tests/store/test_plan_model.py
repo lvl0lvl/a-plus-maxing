@@ -359,17 +359,6 @@ def _func_src(source_text, name):
     raise AssertionError(f"function {name!r} not found in source")
 
 
-def _assign_src(source_text, name):
-    import ast
-
-    for node in ast.parse(source_text).body:
-        if isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == name for target in node.targets
-        ):
-            return ast.get_source_segment(source_text, node)
-    raise AssertionError(f"assignment {name!r} not found in source")
-
-
 def test_frozen_store_primitive_numstat_zero():
     # The value rides the FROZEN write primitive + inner engine UNCHANGED (disposition #14).
     assert _numstat(PRE_TASK_HEAD, "scripts/plan/pipeline.py", "scripts/plan/adjudicate.py") == ""
@@ -385,7 +374,11 @@ def test_frozen_store_primitive_numstat_zero():
 
 def test_plan_schema_superseded_set_is_exactly_named():
     # The plan_schema.py delta touches ONLY the superseded record spine. The NON-superseded
-    # functions + the PLAN_DOMAINS tuple stay byte-identical to origin/main (0 unnamed edits).
+    # functions stay byte-identical to origin/main (0 unnamed edits). The PLAN_DOMAINS tuple is
+    # CARVED OUT — ADR-0043-T3 (Wave 4) grew the dispatch registry from the closed four to the
+    # §1-§13 card roster (tuple(sorted(activation.CARD_DOMAINS))); behavioral guarantor
+    # tests/plan/test_activation.py::test_registries_coherent_over_grown_roster. Wave-4 frozen-guard
+    # reconciliation (F-011), Architect Option-A ruling.
     base = subprocess.run(
         ["git", "show", "origin/main:scripts/store/plan_schema.py"],
         cwd=REPO_ROOT, capture_output=True, text=True, check=True,
@@ -395,9 +388,6 @@ def test_plan_schema_superseded_set_is_exactly_named():
         assert _func_src(current, name) == _func_src(base, name), (
             f"non-superseded plan_schema function {name!r} changed — it must stay byte-frozen"
         )
-    assert _assign_src(current, "PLAN_DOMAINS") == _assign_src(base, "PLAN_DOMAINS"), (
-        "the PLAN_DOMAINS tuple literal must survive byte-identical (only its stored-key USE is rerouted)"
-    )
 
 
 # --------------------------------------------------------------------------- #

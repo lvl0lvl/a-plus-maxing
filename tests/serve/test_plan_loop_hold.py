@@ -69,7 +69,8 @@ _FROZEN_GLOB = (
     # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD) superseded plan front door; guarded by tests/plan/test_generate_plan.py + core-capability-audit.sh + per-ADR numstat probes. Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
     "scripts/plan/adjudicate.py scripts/plan/adjust.py "
     # scripts/plan/track.py CARVED OUT — ADR-0044-T2 (mixed-history reader re-point of resolve_plan_progress) superseded track.py; behavioral guarantor tests/store/test_plan_model_reader.py + tests/plan/test_track.py. Wave-3 frozen-guard reconciliation (F-011), Architect Option-A ruling.
-    "scripts/plan/plan_driver.py scripts/plan/plan_orchestrator.py "
+    # scripts/plan/plan_driver.py CARVED OUT — ADR-0043-T3 (dispatch-registry _ROLE_OF_DOMAIN growth 4→13) superseded the plan driver's role map; behavioral guarantor tests/plan/test_activation.py::test_registries_coherent_over_grown_roster. Wave-4 frozen-guard reconciliation (F-011), Architect Option-A ruling.
+    "scripts/plan/plan_orchestrator.py "
     "scripts/store/keying.py scripts/store/store.py"
 ).split()
 
@@ -363,9 +364,12 @@ PRE_TASK_HEAD = "300de2f1cd57e700194de0e20114a844299eab31"
 
 
 def test_frozen_spine_and_only_regenerate_changed():
-    # AC-6: the ADR-0032 write-path+engine glob is byte-frozen (numstat=0), and the ONLY top-level
-    # def in plan_loop.py that changed vs origin/main is `regenerate` — so _last_regen_date /
-    # _prior_standing_plan / _change_magnitude / _post_promote_tailoring are all byte-unchanged.
+    # AC-6: the ADR-0032 write-path+engine glob is byte-frozen (numstat=0, plan_driver.py carved —
+    # ADR-0043-T3 Wave-4 supersession), and the changed plan_loop.py defs vs origin/main are exactly
+    # the sanctioned set — the ADR-0040 hold layer (regenerate / _change_magnitude /
+    # _post_promote_tailoring) + the ADR-0043-T3 front-door redefinition (_last_regen_date, plus the
+    # additive _surface_tokens / derive_operator_surface / active_plan_domains) — so _prior_standing_plan
+    # stays byte-unchanged.
     repo = _repo_root()
     numstat = subprocess.run(
         ["git", "diff", "--numstat", "origin/main", "--", *_FROZEN_GLOB],
@@ -381,16 +385,22 @@ def test_frozen_spine_and_only_regenerate_changed():
 
     # [AMENDED 2026-07-05, 6-lens review] `regenerate` (the hold layer), `_change_magnitude` (the
     # materiality baseline now filters via filter_confirmed — the HIGH fix + its `root` call-site
-    # change), and `_post_promote_tailoring` (docstring records the T4 confirm-time second caller) are
-    # the ONLY changed defs. `_last_regen_date` (the debounce) and `_prior_standing_plan` stay
-    # byte-unchanged.
-    changed_defs = ("regenerate", "_change_magnitude", "_post_promote_tailoring")
+    # change), and `_post_promote_tailoring` (docstring records the T4 confirm-time second caller)
+    # are the ADR-0040-era changed defs. `_last_regen_date` CARVED into the changed set — ADR-0043-T3
+    # (Wave 4) front-door redefinition re-derived the debounce over the active-domains surface (the
+    # additive _surface_tokens / derive_operator_surface / active_plan_domains defs it added are not
+    # in origin, so the origin-iterating loop never checks them); behavioral guarantor
+    # tests/runner/test_cadence_runner.py::test_crownjewel_faithful_zero_raw_pii + tests/plan/
+    # test_activation.py. Wave-4 frozen-guard reconciliation (F-011), Architect Option-A ruling.
+    # `_prior_standing_plan` stays byte-unchanged.
+    changed_defs = ("regenerate", "_change_magnitude", "_post_promote_tailoring", "_last_regen_date")
     for name, src in origin.items():
         if name in changed_defs:
             continue
         assert current.get(name) == src, f"{name} changed vs origin/main (must be byte-unchanged)"
-    for helper in ("_last_regen_date", "_prior_standing_plan"):
-        assert current[helper] == origin[helper], f"{helper} is not byte-unchanged"
+    assert current["_prior_standing_plan"] == origin["_prior_standing_plan"], (
+        "_prior_standing_plan is not byte-unchanged"
+    )
     # sanity (not vacuous): each changed def DID change vs the pinned PRE-ADR-0040 baseline,
     # NOT origin/main — origin caught up once the ADR-0040 build merged, so `!= origin` reads
     # empty and self-invalidates (bead 2deg). `.get` tolerates a def absent at the baseline
