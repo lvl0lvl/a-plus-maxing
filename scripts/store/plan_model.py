@@ -1,6 +1,6 @@
 """The comprehensive Plan Model — ONE composite object per plan version (ADR-0044-T1).
 
-This is the canonical comprehensive plan store: per active domain the seven-field
+This is the canonical plan-model store: per active domain the seven-field
 DOMAIN PROGRAM intact (validated via ``scripts.plan.domain_program``), plus an
 integrated narrative, dated milestones, a compiled monitoring config, and plan-level
 adjustment rules — assembled into ONE composite VALUE per plan version. It SUPERSEDES
@@ -26,8 +26,13 @@ frozen ``(item, timepoint, source)`` dedupe identity with ``value`` EXCLUDED:
 
 This module defines NO second dedupe key and reimplements no store I/O — the identity is
 reached ONLY through ``store.append`` / ``store.read``. There is no ``store.correct``:
-comprehensive versions are append-only, a revision is a new version. A CHANGED value at
+plan-model versions are append-only, a revision is a new version. A CHANGED value at
 the same ``(item, timepoint, source)`` is a store-dedupe no-op (never a silent overwrite).
+
+Revert hole (ADR-0010 consequences, mirroring ``plan_schema.record_plan_tracking``): once a
+later version supersedes an earlier one, re-recording the earlier version is a store-dedupe
+no-op (its content-tagged identity already exists), so a superseded version is not restorable
+by re-recording — a new forward-dated version is the supported revert path.
 
 Fail-closed conformance
 -----------------------
@@ -48,7 +53,7 @@ from scripts.plan import domain_program
 from scripts.store import store
 from scripts.store.loop_schema import _content_tag, _reading
 
-# The comprehensive plan-version stream's item namespace. The prefix IS the item id: the
+# The plan-version stream's item namespace. The prefix IS the item id: the
 # "::" separator is not a path separator, so it stays a direct child of the store root.
 _PREFIX_MODEL = "plan-model::"
 
@@ -72,7 +77,7 @@ _DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 class PlanVersionError(Exception):
-    """The single typed rejection channel for a non-conformant comprehensive plan version.
+    """The single typed rejection channel for a non-conformant plan version.
 
     Attributes:
         offending_element (str | None): The missing/malformed version element — a top-level
@@ -108,7 +113,7 @@ def _check_date(value, what):
 
 
 def validate_plan_version(version):
-    """Raise `PlanVersionError` unless `version` is a conformant comprehensive plan version.
+    """Raise `PlanVersionError` unless `version` is a conformant plan version.
 
     Fail-closed on the model-level required elements: at least one per-domain program (each
     passing `domain_program.validate`), a non-empty narrative, at least one dated milestone,
@@ -172,7 +177,7 @@ def validate_plan_version(version):
 
 
 def record_plan_version(version, root):
-    """Record one comprehensive plan version — the value rides the frozen `store.append`.
+    """Record one plan version — the value rides the frozen `store.append`.
 
     Validates the composite fail-closed FIRST (per-domain `domain_program.validate` + the
     model-level required-element check + a real declared date), then appends ONE reading via
@@ -228,7 +233,7 @@ def resolve_comprehensive(readings, on_date):
 
 
 def read_plan_version(on_date, root):
-    """Resolve the stored comprehensive plan version for a date (see `resolve_comprehensive`).
+    """Resolve the stored plan version for a date (see `resolve_comprehensive`).
 
     Args:
         on_date (str): The render date, YYYY-MM-DD.
