@@ -503,12 +503,18 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
             paired = seam.get(SEAM_WITH_DOMAIN)
             if not isinstance(paired, str):
                 continue  # a malformed seam (no paired-domain reference) is inert (SEC-W3-04)
-            is_conflict = seam.get(SEAM_NATURE) == SEAM_CONFLICT and cand.get("plan") is not None
+            is_held_conflict = seam.get(SEAM_NATURE) == SEAM_CONFLICT and cand.get("plan") is not None
             report["seams"].append({
                 "from": domain, SEAM_WITH_DOMAIN: paired, SEAM_NATURE: seam.get(SEAM_NATURE),
-                "disposition": "held" if is_conflict else "routed",
+                "disposition": "held" if is_held_conflict else "routed",
             })
-            if is_conflict and domain not in conflict_held:
+            # DEFERRED (ADR-0043-T3, bead a-plus-maxing-ncsy): the seam-sourced conflict is HELD
+            # correctly here, but its downstream adjudication / doctor-visit-queue DETAIL is
+            # degenerate — `_conflict_safety_finding` distills only `report["conflicts"]`, not
+            # `report["seams"]`, so a seam-only hold would route an empty finding. Single-sourcing
+            # the two conflict channels waits on the seam-emitting specialist + adjudicator wiring;
+            # no Wave-3 production path emits a seam-only conflict, so nothing triggers it yet.
+            if is_held_conflict and domain not in conflict_held:
                 conflict_held.append(domain)
 
     return {"report": report, "holds": holds, "conflict_held": conflict_held,
