@@ -23,7 +23,7 @@ this module defines no store key, records no plan, and reuses the plan/tracking 
 Writers raise only ValueError; readers never raise on absence.
 """
 
-from scripts.store import plan_schema
+from scripts.store import plan_model, plan_schema
 
 # Measure result states. A tracking snapshot records only against an existing plan — the honest
 # no-plan-to-track boundary (a domain with zero recorded plans has nothing to have been done).
@@ -110,7 +110,7 @@ def resolve_plan_progress(domain, on_date, root):
         raise ValueError(
             f"untracked plan domain {domain!r}; known: {plan_schema.TRACKED_DOMAINS}"
         )
-    plan = plan_schema.read_plan(domain, on_date, root)
+    plan = plan_model.read_standing_plan(domain, on_date, root)
     tracking = plan_schema.read_plan_tracking(domain, on_date, root)
     has_plan = plan["state"] is None  # a plan dated on_date -> plan content present (vs NO_PLAN/NO_PLAN_TODAY)
     return {

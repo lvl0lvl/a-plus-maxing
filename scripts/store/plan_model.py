@@ -50,7 +50,7 @@ import datetime
 import re
 
 from scripts.plan import domain_program
-from scripts.store import store
+from scripts.store import plan_schema, store
 from scripts.store.loop_schema import _content_tag, _reading
 
 # The plan-version stream's item namespace. The prefix IS the item id: the
@@ -243,3 +243,41 @@ def read_plan_version(on_date, root):
         (dict) The `resolve_comprehensive` result over the `plan-model::` item's readings.
     """
     return resolve_comprehensive(store.read(_PREFIX_MODEL, root=root), on_date)
+
+
+def read_standing_plan(domain, on_date, root):
+    """Resolve a domain's standing plan over a MIXED thin + comprehensive history (comprehensive-wins).
+
+    Reads BOTH streams through the UNCHANGED ``store.read``: the comprehensive ``plan-model::`` side
+    via ``read_plan_version`` (``resolve_comprehensive`` over the composite value), the thin
+    ``plan::<domain>`` side via ``plan_schema.read_plan`` (the retained thin resolver + its
+    ``filter_confirmed``). Applies comprehensive-wins precedence: when a comprehensive version resolves
+    STANDING for ``on_date`` (state None) AND its ``domain_programs`` covers ``domain``, the covered
+    domain's periodized PRESCRIPTION stands. Otherwise the thin result verbatim — a pre-migration
+    thin-only store AND a domain the comprehensive plan does not cover both keep their exact thin
+    behavior (backward-compatible).
+
+    Returns the SAME shape as ``plan_schema.read_plan`` so the ``track.resolve_plan_progress`` re-point
+    is a pure call-site swap. Read-only: it writes nothing, rewrites no reading on either stream
+    (append-only preserved), and defines no store key — identity is reached only through ``store.read``
+    / the composed resolvers.
+
+    Args:
+        domain (str): A ``plan_schema.PLAN_DOMAINS`` member.
+        on_date (str): The render date, YYYY-MM-DD.
+        root (str | Path): The store root.
+
+    Returns:
+        (dict) Keys `state` (None | `NO_PLAN` | `NO_PLAN_TODAY`), `plan` (the comprehensive prescription
+        | the thin plan | None), `specialist` (str | None — None on the comprehensive branch, which is
+        orchestrator-synthesized, not single-specialist), and `plan_date`.
+    """
+    comprehensive = read_plan_version(on_date, root)
+    if comprehensive["state"] is None and domain in comprehensive["version"][DOMAIN_PROGRAMS]:
+        return {
+            "state": None,
+            "plan": comprehensive["version"][DOMAIN_PROGRAMS][domain][domain_program.PRESCRIPTION],
+            "specialist": None,
+            "plan_date": on_date,
+        }
+    return plan_schema.read_plan(domain, on_date, root)
