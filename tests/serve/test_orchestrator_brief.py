@@ -20,12 +20,18 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from scripts.plan import router
 from scripts.plan.context_assembler import assemble_context
 from scripts.serve import care_chat
 from scripts.store import store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# A distinctive SYNTHETIC operator name — never a real person (public repo); mirrors the
+# tests/plan/test_context_assembler.py SYNTH_NAME convention.
+SYNTH_NAME = "Zephyrina Testwood"
 
 
 class _RecordingBackend:
@@ -263,3 +269,43 @@ def test_respond_default_no_active_set_preserves_conversation(tmp_path):
     assert first.get("task") == "care-conversation", "the conversational context was dropped"
     assert "briefs" not in first, "briefs leaked into a no-active-set turn (not additive)"
     assert "orchestration" not in first, "the orchestration block leaked into a no-active-set turn (not additive)"
+
+
+# --- TEST-04 (SAFETY / DE-ID SEAM): respond threads identity_config into the brief path --------
+
+def test_respond_threads_identity_config_into_orchestration_deid(tmp_path):
+    """`respond` threads `identity_config` into `assemble_context` on the orchestration path
+    (care_chat.py:351-356), so an operator-identity literal smuggled into a carried free-text
+    field is caught FAIL-CLOSED at the crown-jewel gate BEFORE it can reach a per-specialist
+    brief. Realized as a fail-closed raise: the gate RAISES on a match (it does not silently
+    scrub), so the identity never reaches `brief['assembled_state']` and the model is never called.
+
+    LOAD-BEARING / REDs-if-dropped: the synthetic operator name is seeded into an allowlisted
+    free-text field and named in `identity_config`; the threaded seam raises a field-named
+    ValueError (never echoing the name). Drop the `identity_config=identity_config` threading and
+    `assemble_context` runs under the DEFAULT config — which does not know this instance's name —
+    so the name is NOT caught, it flows into the brief (the operator-PII-into-brief leak this
+    guards), the raise disappears, and this test REDs.
+    """
+    root = tmp_path / "store"
+    _seed(root)
+    # Smuggle the synthetic operator name into an allowlisted health-substance free-text field,
+    # at a LATER timepoint so it is the value assemble_context reads back.
+    store.append(
+        "raw-training-detail-free-text",
+        {"item": "raw-training-detail-free-text", "timepoint": "2026-06-02T00:00:00+00:00",
+         "source": "intake", "value": f"Friday deadlift session coached by {SYNTH_NAME}"},
+        root=root,
+    )
+    cfg = tmp_path / "operator-identity.txt"
+    cfg.write_text(SYNTH_NAME + "\n")
+    scaffold = tmp_path / "scaffold"
+    backend = _RecordingBackend()
+    active = frozenset({"workout", "peptides"})
+    with pytest.raises(ValueError, match=r"carries raw operator PII") as exc:
+        care_chat.respond(
+            "plan my next block", [], client=backend, store_root=root, scaffold_root=scaffold,
+            identity_config=cfg, active_domains=active,
+        )
+    assert SYNTH_NAME not in str(exc.value), "the seam must name the field, never echo the identity"
+    assert backend.calls == [], "the model must never be called once the de-id seam fail-closes"

@@ -471,6 +471,93 @@ def test_non_liftable_bespoke_shape_rejected_at_collection(tmp_path):
     assert result["reason"], "the honest no-plan reason must be set (coverage-gap / no-actionable)"
 
 
+# --- TEST-05 / TEST-06: explicit-program ride (nutrition+supplements) + drop-to-None ---------
+
+
+def _nutrition_uniform_rec():
+    """A nutrition (training-kind) rec carrying a FULL uniform program whose prescription holds
+    the day targets + a meal (so the aggregating translator produces a plan)."""
+    prescription = {
+        "calorie_goal": 2400, "macros": {"protein": 180, "carbs": 240, "fat": 70},
+        "meal": {"name": "Breakfast"},
+    }
+    return {
+        "claim": "set energy and protein at maintenance with breakfast protein",
+        "source": "ISSN position stand on protein and exercise 2017",
+        "confidence_tier": "established",
+        "reversibility": "fully reversible on discontinuation",
+        "category": "nutrition",
+        PROGRAM_KEY: _uniform_program(prescription, "training"),
+    }
+
+
+def _supplements_uniform_rec():
+    """A supplements (compound-kind) rec carrying a FULL uniform program whose prescription is a
+    single supplement item."""
+    prescription = {"name": "Creatine monohydrate", "dose": "5 g", "timing": "daily"}
+    return {
+        "claim": "supplement creatine monohydrate to close a documented gap",
+        "source": "Examine.com creatine monograph 2024",
+        "confidence_tier": "established",
+        "reversibility": "fully reversible on discontinuation",
+        "category": "supplementation",
+        PROGRAM_KEY: _uniform_program(prescription, "compound", required_labs=["CBC", "CMP"]),
+    }
+
+
+@pytest.mark.parametrize(
+    "domain, rec_factory, specialist",
+    [
+        ("nutrition", _nutrition_uniform_rec, "nutritionist"),
+        ("supplements", _supplements_uniform_rec, "supplement-specialist"),
+    ],
+)
+def test_explicit_program_rides_nutrition_and_supplements(tmp_path, domain, rec_factory, specialist):
+    """TEST-05: an EXPLICIT uniform program rides `_to_nutrition_plan` + `_to_supplements_plan`
+    too (workout+peptides are covered by AC-1), all seven fields value-intact through record/read.
+
+    Completes the four-translator ride coverage. REDs if a regression drops the program ride
+    (`_with_program`) for these two translators (`plan[PROGRAM_KEY]` becomes absent).
+    """
+    seven = domain_program.REQUIRED_FIELDS + domain_program.CONDITIONAL_FIELDS
+    rec = rec_factory()
+    uniform = rec[PROGRAM_KEY]
+    store_read = _seed_store(tmp_path)
+    result = generate_plan(
+        domain, _author(rec, specialist=specialist), store_read, tmp_path, plan_date=PLAN_DATE,
+    )
+    assert result["recorded"] is True, f"the uniform-program {domain} must record a plan"
+    plan = plan_schema.read_plan(domain, PLAN_DATE, tmp_path)["plan"]
+    assert plan is not None, f"the recorded {domain} plan must read back"
+    program = plan.get(PROGRAM_KEY)
+    assert program is not None, f"{domain}: the seven-field program must ride the record path"
+    assert [f for f in seven if f not in program] == [], f"{domain}: 0-of-7 program fields dropped"
+    assert program == uniform, f"{domain}: the program must round-trip value-intact"
+
+
+@pytest.mark.parametrize("payload", [None, ["not", "a", "dict"], "a string"])
+def test_legacy_rec_non_dict_payload_drops_to_none(tmp_path, payload):
+    """TEST-06: a legacy rec whose payload is NOT a dict lifts to None -> plan is None + reason set.
+
+    `_lift_program`'s drop-to-None branch (generate_plan.py:191-192) is the honest no-plan state.
+    REDs if a mutation lifted a non-dict payload into a program (it would fabricate a plan).
+    """
+    store_read = _seed_store(tmp_path)
+    rec = {
+        "claim": "rebuild a movement base with goblet squats",
+        "source": "ACSM resistance-training guidelines 2024",
+        "confidence_tier": "established",
+        "reversibility": "fully reversible on discontinuation",
+        "category": "training",
+        "payload": payload,
+    }
+    result = compute_plan(
+        "workout", {"specialist": "personal-trainer", "recommendations": [rec]}, store_read,
+    )
+    assert result["plan"] is None, "a non-dict payload must drop to the honest no-plan state"
+    assert result["reason"], "the honest no-plan reason must be set"
+
+
 # --- AC-4: the per-ADR-scoped freeze-break numstat ------------------------------
 
 
