@@ -25,9 +25,11 @@ from scripts.store import plan_model, plan_schema, store
 from scripts.store.loop_schema import _reading
 from tests.store.test_plan_model import _comprehensive_version, _training_program
 
-# This task's rollback target AND the per-ADR numstat base (QA-06: the FIXED entry HEAD,
-# pre-commit-runnable + in-flow RED-capability-demonstrable — mirrors test_plan_model.py:27).
-PRE_TASK_HEAD = "9f6fe9f9893008b1971e76dcc6cd5063a85fb047"
+# The per-ADR freeze-break numstat base. wdhc: the ADR-0044-T2 entry HEAD 9f6fe9f9 is an
+# intermediate wave commit (orphan-prone — the repo squash-merges); repointed to the merge-base
+# 3e17b1d8 (== origin/main), a durable reachable base. The probed frozen files are byte-untouched
+# across the whole wave, so their numstat vs the merge-base equals their numstat vs the entry HEAD.
+PRE_TASK_HEAD = "3e17b1d8291d86d48441e36177a71f34910fbe57"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 RENDER = "2026-07-13"  # the render date the default _comprehensive_version fixture is dated

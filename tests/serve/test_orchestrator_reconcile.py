@@ -40,10 +40,12 @@ from scripts.serve import care_chat
 from scripts.store import store
 from tests.plan.test_generate_plan import _seed_store
 
-# The task-entry HEAD the AC-5 per-ADR numstat probe diffs against (mirrors
-# tests/plan/test_generate_plan_uniform.py:55's PRE_TASK_HEAD constant pattern). Recorded at
-# ADR-0043-T2 entry on feature/comprehensive-plan-wave-3 (siblings 0045-T1 + 0044-T2 committed).
-PRE_TASK_HEAD = "9982b95274173f051790bcb75adcd7de2501124c"
+# The AC-5 per-ADR numstat probe base (mirrors tests/plan/test_generate_plan_uniform.py:55's
+# PRE_TASK_HEAD constant pattern). wdhc: the ADR-0043-T2 entry HEAD 9982b952 is an intermediate wave
+# commit (orphan-prone — the repo squash-merges); repointed to the merge-base 3e17b1d8 (==
+# origin/main), a durable reachable base. Only 0043-T2 edits orchestrate.py in the wave, so its
+# numstat vs the merge-base equals vs the entry HEAD; the frozen paths are byte-untouched vs both.
+PRE_TASK_HEAD = "3e17b1d8291d86d48441e36177a71f34910fbe57"
 
 # The domain KIND each fixture domain declares (compound-band domains are compound-kind so their
 # required_labs is mandatory-and-non-empty, per domain_program.DOMAIN_KIND_RULES).

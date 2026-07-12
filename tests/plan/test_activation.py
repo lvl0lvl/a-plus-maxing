@@ -38,10 +38,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # runs the SAME test body against the un-reconciled code).
 PROGRAM_KEY = "domain_program"
 
-# The task-entry HEAD the freeze-break numstat probe diffs the working tree against (mirrors
-# tests/plan/test_generate_plan_uniform.py:55's PRE_TASK_HEAD pattern). Recorded at ADR-0046-T1 entry
-# on feature/comprehensive-plan-wave-3.
-PRE_TASK_HEAD = "7038c25acef70de6734276f54dbbaafd6721c8a1"
+# The freeze-break numstat probe base (mirrors tests/plan/test_generate_plan_uniform.py:55's
+# PRE_TASK_HEAD pattern). wdhc: the ADR-0046-T1 entry HEAD 7038c25a is an intermediate wave commit
+# (orphan-prone — the repo squash-merges); repointed to the merge-base 3e17b1d8 (== origin/main), a
+# durable reachable base. Only 0046-T1 edits activation.py/generate_plan.py in the wave, so their
+# numstat vs the merge-base equals vs the entry HEAD; the frozen paths are byte-untouched vs both.
+PRE_TASK_HEAD = "3e17b1d8291d86d48441e36177a71f34910fbe57"
 
 # The canonical periodized blocks (dated phases, per-block `load` — PF-S131-01). A fresh copy is spun
 # per fixture so no test mutates the shared literal.
