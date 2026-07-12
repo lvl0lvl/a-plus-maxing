@@ -308,6 +308,72 @@ def test_uniform_program_round_trips_zero_fields_dropped(tmp_path):
     assert plan_p["compound"] == "BPC-157", "the single-compound renderable regimen must record"
 
 
+# --- BUG-01 (SAFETY): the clearance gate deep-strips a PERIODIZED prescription's load --------
+
+
+def _has_load_at_any_depth(value):
+    """Whether a `load` key appears at ANY depth of `value` (dicts + lists)."""
+    if isinstance(value, dict):
+        return "load" in value or any(_has_load_at_any_depth(v) for v in value.values())
+    if isinstance(value, list):
+        return any(_has_load_at_any_depth(item) for item in value)
+    return False
+
+
+def _periodized_workout_uniform_rec():
+    """A workout rec whose uniform-program prescription is PERIODIZED — dated `blocks` each
+    carrying a per-block `load` (the ADR-0046-T1 specialist shape), plus a top-level `load`.
+
+    The per-block `load` is exactly what the pre-fix top-level `exercise.pop('load')` MISSED.
+    """
+    prescription = {
+        "name": "Back squat", "sets": 3, "load": "75% 1RM",
+        "blocks": [
+            {"date": "2026-08-01", "phase": "wk1", "load": "80% 1RM"},
+            {"date": "2026-08-08", "phase": "wk2", "load": "82.5% 1RM"},
+        ],
+    }
+    return {
+        "claim": "periodized back-squat progression",
+        "source": "ACSM resistance-training guidelines 2024",
+        "confidence_tier": "established",
+        "reversibility": "fully reversible on discontinuation",
+        "category": "training",
+        PROGRAM_KEY: _uniform_program(prescription, "training"),
+    }
+
+
+def test_clearance_gate_deep_strips_periodized_load(tmp_path):
+    """BUG-01 (SAFETY, LOAD-BEARING): with no clearance, the workout clearance gate deep-strips
+    `load` at EVERY depth — from BOTH the renderable exercise AND the store-bound program
+    prescription — so a PERIODIZED prescription's per-block load never ships.
+
+    REDs-if-reverted: the pre-fix `exercise.pop('load', None)` stripped only the TOP-LEVEL load,
+    so the per-block `load` under `blocks[*]` rode into the recorded plan + the stored program —
+    the ADR-0015 clearance-gate defeat. This asserts 0 `load` at any depth in the read-back plan.
+    """
+    root = tmp_path / "workout"
+    store_read = _seed_store(root)
+    result = generate_plan(
+        "workout", _author(_periodized_workout_uniform_rec()), store_read, root,
+        plan_date=PLAN_DATE, gates={"clearance_granted": False},
+    )
+    assert result["recorded"] is True, "the periodized workout must still record a plan"
+    plan = plan_schema.read_plan("workout", PLAN_DATE, root)["plan"]
+    assert plan is not None, "the recorded workout plan must read back"
+    # (a) the renderable exercise carries NO load at any depth (incl. per-block).
+    for exercise in plan["exercises"]:
+        assert not _has_load_at_any_depth(exercise), (
+            "an un-cleared load survived in the renderable (top-level-only strip)"
+        )
+    # (b) the store-bound program prescription carries NO load at any depth either.
+    program = plan.get(PROGRAM_KEY)
+    assert program is not None, "the seven-field program must ride the record path"
+    assert not _has_load_at_any_depth(program[domain_program.PRESCRIPTION]), (
+        "an un-cleared load survived in the store-bound program prescription"
+    )
+
+
 # --- AC-2: the transitional adapter accepts BOTH shapes (0 conformant rejected) -
 
 

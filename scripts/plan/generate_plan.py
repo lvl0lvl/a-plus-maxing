@@ -224,6 +224,30 @@ def _with_program(plan, program):
     return plan
 
 
+def _deep_strip_load(value):
+    """Return a deep copy of a prescription structure with every `load` key removed.
+
+    The ADR-0015 clearance gate drops load prescriptions when no clinician clearance is
+    granted. A PERIODIZED prescription nests per-block `load` under dated `blocks`/phases, so a
+    top-level pop leaks the nested load into the renderable AND the store-bound program; this
+    recurses dicts and lists so `load` is stripped at EVERY depth before either is built.
+    """
+    if isinstance(value, dict):
+        return {key: _deep_strip_load(sub) for key, sub in value.items() if key != "load"}
+    if isinstance(value, list):
+        return [_deep_strip_load(item) for item in value]
+    return value
+
+
+def _contains_load(value):
+    """Return whether a `load` key appears at ANY depth of `value` (dicts + lists)."""
+    if isinstance(value, dict):
+        return "load" in value or any(_contains_load(sub) for sub in value.values())
+    if isinstance(value, list):
+        return any(_contains_load(item) for item in value)
+    return False
+
+
 def _to_workout_plan(recommendations, gates):
     """Translate surviving workout recommendations into a `plan_schema` workout plan.
 
@@ -258,9 +282,16 @@ def _to_workout_plan(recommendations, gates):
         prescription = prog.get(domain_program.PRESCRIPTION)
         if not isinstance(prescription, dict):
             continue
-        exercise = dict(prescription)
-        if not clearance_granted:
-            exercise.pop("load", None)
+        # Clearance gate (ADR-0015): with no clinician clearance, deep-strip `load` at every
+        # depth so a PERIODIZED prescription's per-block load never ships into the renderable
+        # or the store-bound program (the program prescription is set to this same exercise).
+        # Clearance gate (ADR-0015): with no clinician clearance, deep-strip `load` at every
+        # depth so a PERIODIZED prescription's per-block load never ships into the renderable
+        # or the store-bound program (the program prescription is set to this same exercise).
+        if clearance_granted:
+            exercise = dict(prescription)
+        else:
+            exercise = _deep_strip_load(prescription)
         exercises.append(exercise)
         if program is None and claim.get(PROGRAM_KEY) is not None:
             program = dict(prog)
@@ -671,7 +702,7 @@ def _self_test():
         if not result["recorded"]:
             print(f"core-capability self-test FAIL: no plan recorded ({result['reason']})")
             return 1
-        if any("load" in ex for ex in result["plan"]["exercises"]):
+        if any(_contains_load(ex) for ex in result["plan"]["exercises"]):
             print("core-capability self-test FAIL: load prescription shipped without clearance")
             return 1
         out = generate.run(
