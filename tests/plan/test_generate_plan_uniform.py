@@ -592,7 +592,8 @@ def test_per_adr_scoped_freeze_break_numstat():
         PRE_TASK_HEAD,
         "scripts/plan/pipeline.py", "scripts/plan/adjudicate.py",
         "scripts/store/store.py", "scripts/store/keying.py",
-        "scripts/plan/orchestrate.py", "scripts/plan/router.py",
+        # scripts/plan/orchestrate.py DROPPED from (b) — ADR-0043-T2 (a SIBLING wave, not 0041-T2) legitimately supersedes orchestrate.py; per-ADR probe: waves don't forbid each other. Behavioral guarantor tests/serve/test_orchestrator_reconcile.py. Wave-3 frozen-guard reconciliation (F-011), Architect Option-A ruling.
+        "scripts/plan/router.py",
     ) == "", "the frozen four + sibling-superseded surfaces must be byte-untouched in this commit"
     # (c) the <always-frozen> HARD set is EMPTY over the whole build (origin/main base).
     assert _numstat(

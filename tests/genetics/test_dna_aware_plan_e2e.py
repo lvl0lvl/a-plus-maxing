@@ -92,13 +92,13 @@ _RAW_ALLELE_RE = re.compile(r"\([ACGTDI]+;[ACGTDI]+\)")
 # The byte-frozen inner engine + store sink (AC-5). router.py is EXCLUDED — it is T3's
 # sanctioned additive seam for the de-identified `genetic-trait-classes` token.
 _FROZEN_SET = (
-    "scripts/plan/orchestrate.py",
+    # scripts/plan/orchestrate.py CARVED OUT — ADR-0043-T2 (reconcile via cross_domain_seams) superseded the orchestrator; behavioral guarantor tests/serve/test_orchestrator_reconcile.py. Wave-3 frozen-guard reconciliation (F-011), Architect Option-A ruling.
     "scripts/plan/pipeline.py",
     # scripts/plan/assemble.py CARVED OUT — ADR-0041-T2 (uniform-program migration) superseded the assemble composer; behavioral guarantor tests/plan/test_assemble.py + tests/plan/test_generate_plan_uniform.py. Wave-2 frozen-guard reconciliation, Architect Option-A ruling.
     # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD, ADR Phase-1 gate) superseded plan front door; guarded behaviorally by tests/plan/test_generate_plan.py + core-capability-audit.sh + the per-ADR numstat probes (NOT this byte-guard). Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
     "scripts/plan/adjudicate.py",
     "scripts/plan/adjust.py",
-    "scripts/plan/track.py",
+    # scripts/plan/track.py CARVED OUT — ADR-0044-T2 (mixed-history reader re-point of resolve_plan_progress) superseded track.py; behavioral guarantor tests/store/test_plan_model_reader.py + tests/plan/test_track.py. Wave-3 frozen-guard reconciliation (F-011), Architect Option-A ruling.
     "scripts/store/keying.py",
     "scripts/store/store.py",
 )
