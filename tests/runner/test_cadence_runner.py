@@ -297,12 +297,13 @@ def test_frozen_glob_numstat_empty():
         "scripts/plan/track.py", "scripts/plan/plan_orchestrator.py", "scripts/plan/plan_driver.py",
         # scripts/store/ frozen EXCEPT plan_model.py (ADR-0044-T1 NEW plan-model store) +
         # plan_schema.py (ADR-0044-T1 record-spine supersession); behavioral guarantor
-        # tests/store/test_plan_model.py. Glob-minus-exclusion (mirrors _FROZEN_ENGINE_PATHS)
-        # keeps every OTHER current + future store file frozen — the "no new store stream"
-        # guarantee survives. Wave-2 frozen-guard reconciliation, Architect Option-A ruling.
+        # tests/store/test_plan_model.py. Recursive glob-minus-exclusion (mirrors
+        # _FROZEN_ENGINE_PATHS) keeps every OTHER current + future store file frozen — INCLUDING
+        # a subtree stream (scripts/store/<pkg>/x.py); the "no new store stream" guarantee
+        # survives (HIST-01). Wave-2 frozen-guard reconciliation, Architect Option-A ruling.
         *sorted(
             str(p.relative_to(REPO_ROOT))
-            for p in (REPO_ROOT / "scripts" / "store").glob("*.py")
+            for p in (REPO_ROOT / "scripts" / "store").glob("**/*.py")
             if p.name not in ("plan_model.py", "plan_schema.py")
         ),
         "scripts/serve/plan_loop.py",
