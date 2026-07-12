@@ -59,8 +59,8 @@ per-author concerns — they run in the cross-domain layer (the step-4 reconcile
 """
 
 from scripts.model.client import ModelCallError, ModelClient
-from scripts.plan import context_assembler
-from scripts.plan.assemble import assemble
+from scripts.plan import context_assembler, domain_program
+from scripts.plan.assemble import PROGRAM_KEY, assemble
 from scripts.store import plan_schema
 
 # The honest no-plan reason when the plan-author model call fails (ADR-0015 fail-closed,
@@ -121,37 +121,184 @@ def _surviving(recommendations):
     return [c for c in recommendations if not c.get("actionable_content_struck")]
 
 
+# domain -> DOMAIN PROGRAM kind (ADR-0041-T2). Grounded against domain_program.DOMAIN_KIND_RULES:
+# movement/nutrition are training-kind (required_labs empty-OK); supplements/peptides are
+# compound-kind (required_labs + autoregulation mandatory-and-non-empty). The module-load
+# tripwire fails fast if a mapped kind ever leaves the frozen DOMAIN_KINDS vocabulary.
+_DOMAIN_KIND = {
+    "workout": "training",
+    "nutrition": "training",
+    "supplements": "compound",
+    "peptides": "compound",
+}
+assert set(_DOMAIN_KIND.values()) <= domain_program.DOMAIN_KINDS, (
+    f"_DOMAIN_KIND maps outside DOMAIN_KINDS: {set(_DOMAIN_KIND.values())}"
+)
+
+# Transitional ramp floors for a legacy thin rec's non-prescription fields (ADR-0041-T2). These
+# are clearly-transitional placeholders during the migration: ADR-0046-T1's dispatched
+# specialists emit full uniform programs, and ADR-0044-T1 stores them first-class. Each floor is
+# conformant per domain_program.validate — a monitoring signal carries a VALIDITY_TIERS tier, and
+# a compound kind additionally gets a non-empty required-labs floor (built per kind in `_lift_program`).
+_TRANSITIONAL_MONITORING_SIGNALS = (
+    {"signal": "transitional: specialist monitoring pending",
+     domain_program.SIGNAL_TIER_KEY: "low"},
+)
+_TRANSITIONAL_ADJUSTMENT_RULES = (
+    {"rule": "transitional: specialist autoregulation pending"},
+)
+_TRANSITIONAL_REFUSAL_ESCALATION = {"marker": "transitional: specialist escalation pending"}
+_TRANSITIONAL_REQUIRED_LAB = "transitional: specialist labs pending"
+
+
+def _lift_rationale(rec):
+    """Derive the GRADE `rationale` from a legacy rec's completeness metadata.
+
+    `domain_program.validate` checks the rationale's PRESENCE only (the internal GRADE shape is a
+    downstream-consumer contract), so this maps the legacy source + confidence_tier +
+    reversibility (+ evidence grounding) into the structured slot the seven-field program carries.
+    """
+    return {
+        "source": rec.get("source"),
+        "certainty_of_evidence": rec.get("confidence_tier"),
+        "reversibility": rec.get("reversibility"),
+        "basis": rec.get("grounding", "unspecified"),
+    }
+
+
+def _lift_program(rec, domain):
+    """The transitional additive adapter — produce a uniform DOMAIN PROGRAM from a recommendation.
+
+    Pass a full uniform program THROUGH (a rec carrying a `PROGRAM_KEY` program, already validated
+    at the collection boundary by `assemble._is_complete`), OR LIFT a legacy thin rec: map its
+    `payload` -> the program's `prescription`, derive the GRADE `rationale` from the legacy
+    metadata, set the domain KIND from `domain`, and ramp the remaining fields to conformant
+    transitional floors. For a COMPOUND kind a clean legacy rec ramps `required_labs` +
+    autoregulation to NON-EMPTY floors, so the lift always succeeds (QA-01). The lift it
+    CONSTRUCTS is BOUNDED by `domain_program.validate` — a non-conformant construction returns
+    None (the incomplete signal), NEVER a silent thin fallback. A rec that emits an explicit
+    program is passed through, not ramped (the author committed to the uniform shape; its
+    conformance is the `_is_complete` gate's job, so a plan never rides an unvalidated program).
+
+    Returns:
+        (dict | None) The uniform program, or None when a legacy rec carries no dict payload or
+        its lift cannot be made conformant.
+    """
+    embedded = rec.get(PROGRAM_KEY)
+    if embedded is not None:
+        return dict(embedded)
+    payload = rec.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    kind = _DOMAIN_KIND[domain]
+    program = {
+        domain_program.PRESCRIPTION: payload,
+        domain_program.RATIONALE: _lift_rationale(rec),
+        domain_program.MONITORING_SIGNALS: [dict(s) for s in _TRANSITIONAL_MONITORING_SIGNALS],
+        domain_program.ADJUSTMENT_RULES: [dict(r) for r in _TRANSITIONAL_ADJUSTMENT_RULES],
+        domain_program.REQUIRED_LABS: (
+            [_TRANSITIONAL_REQUIRED_LAB]
+            if domain_program.DOMAIN_KIND_RULES[kind]["required_labs_nonempty"] else []
+        ),
+        domain_program.REFUSAL_ESCALATION: dict(_TRANSITIONAL_REFUSAL_ESCALATION),
+        domain_program.CROSS_DOMAIN_SEAMS: [],
+        domain_program.KIND_FIELD: kind,
+    }
+    try:
+        domain_program.validate(program)
+    except domain_program.DomainProgramError:
+        return None
+    return program
+
+
+def _with_program(plan, program):
+    """Attach the transitional seven-field DOMAIN PROGRAM to a renderable plan as an additive extra.
+
+    The renderable plan rides the FROZEN `record_plan`/`store.append` unchanged (the thin shape
+    the per-domain validator requires); the program attaches under `PROGRAM_KEY` as an extra (the
+    `plan_schema` open-on-extras seam), so the round-trip drops 0 of 7. ADR-0044-T1 later
+    supersedes this additive ride with first-class storage.
+    """
+    if program is not None:
+        plan[PROGRAM_KEY] = program
+    return plan
+
+
+def _deep_strip_load(value):
+    """Return a deep copy of a prescription structure with every `load` key removed.
+
+    The ADR-0015 clearance gate drops load prescriptions when no clinician clearance is
+    granted. A PERIODIZED prescription nests per-block `load` under dated `blocks`/phases, so a
+    top-level pop leaks the nested load into the renderable AND the store-bound program; this
+    recurses dicts and lists so `load` is stripped at EVERY depth before either is built.
+    """
+    if isinstance(value, dict):
+        return {key: _deep_strip_load(sub) for key, sub in value.items() if key != "load"}
+    if isinstance(value, list):
+        return [_deep_strip_load(item) for item in value]
+    return value
+
+
+def _contains_load(value):
+    """Return whether a `load` key appears at ANY depth of `value` (dicts + lists)."""
+    if isinstance(value, dict):
+        return "load" in value or any(_contains_load(sub) for sub in value.values())
+    if isinstance(value, list):
+        return any(_contains_load(item) for item in value)
+    return False
+
+
 def _to_workout_plan(recommendations, gates):
     """Translate surviving workout recommendations into a `plan_schema` workout plan.
 
-    Each recommendation's `payload` is the exercise dict (`name` + `sets` required;
-    `reps` / `detail` / `load` optional — the `plan_schema` workout schema). Unless a
-    clinician clearance is granted, the `load` prescription is dropped from every exercise
-    (the asymmetric-downside clearance gate) so the plan ships as deferred coaching, never
-    an un-cleared load prescription.
+    Each recommendation's normalized DOMAIN PROGRAM prescription is the exercise dict (`name` +
+    `sets` required; `reps` / `detail` / `load` optional — the `plan_schema` workout schema;
+    ADR-0041-T2 reads the migrated program's prescription, which for a legacy rec is the lifted
+    `payload`). Unless a clinician clearance is granted, the `load` prescription is dropped from
+    every exercise (the asymmetric-downside clearance gate) so the plan ships as deferred
+    coaching, never an un-cleared load prescription — when a program rides, the gate is applied to
+    its prescription too (safety preserved in the additive ride, not only the renderable). The
+    seven-field program rides the plan ADDITIVELY only when a surviving rec emits an EXPLICIT
+    uniform program (`_with_program`); a legacy-lifted plan stays byte-identical (the store-attach
+    is conditional — emit-into-store deferred to ADR-0043-T3, ADR-0041-T2 disposition Y).
 
     Args:
         recommendations (list): The assembled workout section's composed claims.
         gates (dict): Per-domain safety inputs; reads `clearance_granted` (default False).
 
     Returns:
-        (dict | None) `{"exercises": [...]}` when >=1 surviving recommendation carries a
-        usable exercise payload, else None (record nothing — the dashboard renders the
-        honest no-plan state rather than a fabricated regimen).
+        (dict | None) `{"exercises": [...]}` (with the seven-field program attached additively)
+        when >=1 surviving recommendation lifts to a usable exercise prescription, else None
+        (record nothing — the dashboard renders the honest no-plan state, never a fabricated
+        regimen).
     """
     clearance_granted = bool(gates.get("clearance_granted"))
     exercises = []
+    program = None
     for claim in _surviving(recommendations):
-        payload = claim.get("payload")
-        if not isinstance(payload, dict):
+        prog = _lift_program(claim, "workout")
+        if prog is None:
             continue
-        exercise = dict(payload)
-        if not clearance_granted:
-            exercise.pop("load", None)
+        prescription = prog.get(domain_program.PRESCRIPTION)
+        if not isinstance(prescription, dict):
+            continue
+        # Clearance gate (ADR-0015): with no clinician clearance, deep-strip `load` at every
+        # depth so a PERIODIZED prescription's per-block load never ships into the renderable
+        # or the store-bound program (the program prescription is set to this same exercise).
+        # Clearance gate (ADR-0015): with no clinician clearance, deep-strip `load` at every
+        # depth so a PERIODIZED prescription's per-block load never ships into the renderable
+        # or the store-bound program (the program prescription is set to this same exercise).
+        if clearance_granted:
+            exercise = dict(prescription)
+        else:
+            exercise = _deep_strip_load(prescription)
         exercises.append(exercise)
+        if program is None and claim.get(PROGRAM_KEY) is not None:
+            program = dict(prog)
+            program[domain_program.PRESCRIPTION] = exercise
     if not exercises:
         return None
-    return {"exercises": exercises}
+    return _with_program({"exercises": exercises}, program)
 
 
 RED_S_LEA_CLINICAL_ROUTING = "red-s-lea-clinical-routing"
@@ -161,14 +308,17 @@ def _to_nutrition_plan(recommendations, gates):
     """Aggregate surviving nutrition recommendations into a `plan_schema` nutrition plan.
 
     Unlike the 1:1 workout translator, nutrition AGGREGATES: the surviving recommendations
-    compose one day plan. A recommendation's `payload` carries day targets (`calorie_goal`
-    int, `macros` {protein, carbs, fat}, `water_l?`) and/or a single `meal` ({name, contents?,
-    kcal?}); the day-target fields are taken from the surviving recommendation(s) carrying them
-    (a later one supersedes) and each surviving `meal` accumulates. A plan needs day targets
-    AND >=1 meal; if any is absent among the survivors (e.g. the energy-prescribing
-    recommendation was struck), nothing is recorded — the honest no-plan state, never a
-    fabricated regimen. Present-but-malformed fields pass through to `record_plan` and fail
-    loud there.
+    compose one day plan. A recommendation's normalized DOMAIN PROGRAM prescription (ADR-0041-T2;
+    the lifted `payload` for a legacy rec) carries day targets (`calorie_goal` int, `macros`
+    {protein, carbs, fat}, `water_l?`) and/or a single `meal` ({name, contents?, kcal?}); the
+    day-target fields are taken from the surviving recommendation(s) carrying them (a later one
+    supersedes) and each surviving `meal` accumulates. A plan needs day targets AND >=1 meal; if
+    any is absent among the survivors (e.g. the energy-prescribing recommendation was struck),
+    nothing is recorded — the honest no-plan state, never a fabricated regimen. Present-but-
+    malformed fields pass through to `record_plan` and fail loud there. The seven-field program
+    rides the plan ADDITIVELY only when a surviving rec emits an EXPLICIT uniform program
+    (`_with_program`); a legacy-lifted plan stays byte-identical (emit-into-store deferred to
+    ADR-0043-T3, ADR-0041-T2 disposition Y).
 
     Args:
         recommendations (list): The assembled nutrition section's composed claims.
@@ -176,17 +326,23 @@ def _to_nutrition_plan(recommendations, gates):
             screen runs as a pre-translation veto in `_nutrition_safety_gate`).
 
     Returns:
-        (dict | None) `{calorie_goal, macros, meals[, water_l]}` when the survivors compose a
-        complete plan, else None.
+        (dict | None) `{calorie_goal, macros, meals[, water_l]}` (with the seven-field program
+        attached additively) when the survivors compose a complete plan, else None.
     """
     calorie_goal = None
     macros = None
     water_l = None
     meals = []
+    program = None
     for claim in _surviving(recommendations):
-        payload = claim.get("payload")
+        prog = _lift_program(claim, "nutrition")
+        if prog is None:
+            continue
+        payload = prog.get(domain_program.PRESCRIPTION)
         if not isinstance(payload, dict):
             continue
+        if program is None and claim.get(PROGRAM_KEY) is not None:
+            program = prog
         if "calorie_goal" in payload:
             calorie_goal = payload["calorie_goal"]
         if "macros" in payload:
@@ -201,36 +357,46 @@ def _to_nutrition_plan(recommendations, gates):
     plan = {"calorie_goal": calorie_goal, "macros": macros, "meals": meals}
     if water_l is not None:
         plan["water_l"] = water_l
-    return plan
+    return _with_program(plan, program)
 
 
 def _to_supplements_plan(recommendations, gates):
     """Translate surviving supplement recommendations into a `plan_schema` supplements plan.
 
-    1 recommendation -> 1 item: each surviving recommendation's `payload` is a supplement item
+    1 recommendation -> 1 item: each surviving recommendation's normalized DOMAIN PROGRAM
+    prescription (ADR-0041-T2; the lifted `payload` for a legacy rec) is a supplement item
     ({name, dose, timing?} — the `plan_schema` supplements schema). Records nothing when no
-    surviving recommendation carries a usable item payload (the honest no-plan state). Each item
-    here is single-domain filtered by `assemble`; the cross-compound additive-AE /
+    surviving recommendation lifts to a usable item prescription (the honest no-plan state). Each
+    item here is single-domain filtered by `assemble`; the cross-compound additive-AE /
     supplement<->peptide interaction screen runs in the cross-domain reconciler
-    (`scripts/plan/orchestrate.py`), not this single-domain translator.
+    (`scripts/plan/orchestrate.py`), not this single-domain translator. The seven-field program
+    rides the plan ADDITIVELY only when a surviving rec emits an EXPLICIT uniform program
+    (`_with_program`); a legacy-lifted plan stays byte-identical (emit-into-store deferred to
+    ADR-0043-T3, ADR-0041-T2 disposition Y).
 
     Args:
         recommendations (list): The assembled supplements section's composed claims.
         gates (dict): Per-domain safety inputs (none for supplements in this slice).
 
     Returns:
-        (dict | None) `{"items": [...]}` when >=1 surviving recommendation carries a usable
-        item payload, else None.
+        (dict | None) `{"items": [...]}` (with the seven-field program attached additively) when
+        >=1 surviving recommendation lifts to a usable item prescription, else None.
     """
     items = []
+    program = None
     for claim in _surviving(recommendations):
-        payload = claim.get("payload")
-        if not isinstance(payload, dict):
+        prog = _lift_program(claim, "supplements")
+        if prog is None:
             continue
-        items.append(dict(payload))
+        prescription = prog.get(domain_program.PRESCRIPTION)
+        if not isinstance(prescription, dict):
+            continue
+        items.append(dict(prescription))
+        if program is None and claim.get(PROGRAM_KEY) is not None:
+            program = prog
     if not items:
         return None
-    return {"items": items}
+    return _with_program({"items": items}, program)
 
 
 def _to_peptides_plan(recommendations, gates):
@@ -239,22 +405,30 @@ def _to_peptides_plan(recommendations, gates):
     The `plan_schema` peptides plan is a SINGLE compound regimen ({compound, dose, route,
     cycle_week?, cycle_length_weeks?, tags?, evidence?}); V1 records one compound per plan
     document (a multi-compound peptide stack within one plan is not supported). The first
-    surviving recommendation's `payload` is the regimen; records nothing when none survives (the
-    honest no-plan state). The author dispatch is briefed to return one compound for the plan.
-    The cross-domain supplement<->peptide additive-AE screen runs in the reconciler.
+    surviving recommendation's normalized DOMAIN PROGRAM prescription (ADR-0041-T2; the lifted
+    `payload` for a legacy rec) is the regimen; records nothing when none lifts (the honest
+    no-plan state). The author dispatch is briefed to return one compound for the plan. The
+    cross-domain supplement<->peptide additive-AE screen runs in the reconciler. The seven-field
+    program rides the plan ADDITIVELY only when the surviving rec emits an EXPLICIT uniform program
+    (`_with_program`); a legacy-lifted plan stays byte-identical (emit-into-store deferred to
+    ADR-0043-T3, ADR-0041-T2 disposition Y).
 
     Args:
         recommendations (list): The assembled peptides section's composed claims.
         gates (dict): Per-domain safety inputs (none for peptides in this slice).
 
     Returns:
-        (dict | None) The single-compound plan from the first surviving recommendation, else
-        None.
+        (dict | None) The single-compound plan (with the seven-field program attached additively)
+        from the first surviving recommendation, else None.
     """
     for claim in _surviving(recommendations):
-        payload = claim.get("payload")
-        if isinstance(payload, dict):
-            return dict(payload)
+        prog = _lift_program(claim, "peptides")
+        if prog is None:
+            continue
+        prescription = prog.get(domain_program.PRESCRIPTION)
+        if isinstance(prescription, dict):
+            program = prog if claim.get(PROGRAM_KEY) is not None else None
+            return _with_program(dict(prescription), program)
     return None
 
 
@@ -528,7 +702,7 @@ def _self_test():
         if not result["recorded"]:
             print(f"core-capability self-test FAIL: no plan recorded ({result['reason']})")
             return 1
-        if any("load" in ex for ex in result["plan"]["exercises"]):
+        if any(_contains_load(ex) for ex in result["plan"]["exercises"]):
             print("core-capability self-test FAIL: load prescription shipped without clearance")
             return 1
         out = generate.run(

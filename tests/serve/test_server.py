@@ -18,6 +18,7 @@ carries 0 artifact-serving route. The 0-shared-routine-edit proof (AC-6) lives i
 import http.client
 import io
 import json
+import re
 import socket
 import subprocess
 import sys
@@ -941,9 +942,15 @@ def test_serve_layer_delegates_plan_generation_no_reimplementation():
     serve_dir = REPO_ROOT / "scripts" / "serve"
     for py in serve_dir.glob("*.py"):
         src = py.read_text()
-        assert "assemble" not in src, (
-            f"{py.name} references plan assembly — the serve layer must DELEGATE to the frozen "
-            f"plan engine, never re-implement assemble"
+        # RECLASSIFIED (Wave-2 frozen-guard reconciliation, Architect Option-A ruling): forbid a
+        # re-implemented DEFINITION, not any mention of "assemble". ADR-0043-T1's care_chat.py
+        # legitimately DELEGATES via `from scripts.plan.context_assembler import assemble_context`
+        # + calls; the safety-filter must never be RE-DEFINED in the serve layer. `def \w*assemble`
+        # also catches `def _assemble…`. Guarantor of the frozen filter: tests/plan/test_context_assembler.py.
+        assert re.search(r"def\s+\w*assemble", src) is None, (
+            f"{py.name} DEFINES an assemble function — the serve layer must DELEGATE to the frozen "
+            f"plan engine (import/call context_assembler.assemble_context), never re-implement the "
+            f"assemble safety-filter"
         )
     server_src = (serve_dir / "server.py").read_text()
     assert "generate_plans" in server_src and "orchestrate" in server_src, (

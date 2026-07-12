@@ -31,6 +31,7 @@ import logging
 
 from scripts.model.client import ModelCallError
 from scripts.plan import router
+from scripts.plan.context_assembler import assemble_context
 from scripts.serve import extract
 from scripts.store import store
 
@@ -59,6 +60,19 @@ _EXTRACTABLE_FIELDS = {
 _PERSISTENCE_NOTE = (
     "This conversation is automatically saved and restored when the operator reloads — the earlier "
     "turns you are shown are the full, durable history, so never tell the operator you cannot save it."
+)
+
+# The orchestration system-prompt block (mirrors `_PERSISTENCE_NOTE`): supplied in the CONTEXT when an
+# assembled record + a non-empty active set are present, so the care agent knows it is the Orchestrator
+# — it DECOMPOSES the operator's goals + assembled state into one brief per active specialist. The
+# `briefs` list carries exactly one brief per active domain, each with that specialist's FULL assembled
+# record (the operator's uncollapsed health detail, NOT a coarse band) + the operator's goals.
+_ORCHESTRATION_NOTE = (
+    "You are the Orchestrator. Decompose the operator's stated goals and assembled state into one brief "
+    "per active specialist: the `briefs` list below carries exactly one brief per active domain, each "
+    "with that specialist's full assembled record (the operator's uncollapsed health detail) and the "
+    "operator's goals. Reason per-specialist from each brief's full record; never collapse it to a "
+    "coarse band."
 )
 
 
@@ -200,16 +214,62 @@ def _care_profile(store_read, *, scaffold_root=None, identity_config=None):
     return profile
 
 
-def _care_messages(profile, conversation, turn_text, *, weight_display=None, weight_pref=None, age_display=None):
-    """Build the care-conversation converse payload: the operator's FULL profile + conversation + turn.
+def _derive_goals(record):
+    """Project the operator's stated-goal fields out of the assembled record (NOT re-collapsed).
+
+    The `goal-*` fields already present in the ADR-0042 assembled record (`goal-domains`,
+    `goal-priority-order`, `goal-targets`) — surfaced whole for the specialist, never re-summarized.
+    Empty when the record carries no stated goal.
+
+    Args:
+        record (dict): The `assemble_context` assembled record.
+
+    Returns:
+        (dict) The `goal-*` subset of `record`.
+    """
+    return {key: value for key, value in record.items() if key.startswith("goal")}
+
+
+def decompose(goals, assembled_state, active_domains):
+    """Decompose the operator's goals + assembled state into one per-specialist brief per active domain.
+
+    The brief-builder seam of the care-agent Orchestrator: for EACH active domain, emit exactly one
+    brief carrying (a) the domain identity, (b) the FULL ADR-0042 `assembled_state` record — carried
+    WHOLE, never sliced and never re-collapsed to a coarse `router.summarize` band (the per-specialist
+    slice is deferred), and (c) the operator's goals. A PURE function of its three inputs — it does NOT
+    read the store, compute the active set (no second activation gate), or call the model. The active
+    set is INJECTED (its source is wired at the front door by ADR-0043-T3 + ADR-0046-T1).
+
+    Args:
+        goals: The operator's stated goals (in `respond`, derived from the record's stated-goal fields).
+        assembled_state (dict): The ADR-0042 `assemble_context` record — the identity-stripped FULL
+            record each brief carries whole.
+        active_domains: The injected active-specialist set (a collection of domain identifiers).
+
+    Returns:
+        (list) One `brief` per active domain — `len == len(active_domains)`, 0 un-briefed, 0
+        duplicates. Each `brief` is `{"domain", "assembled_state", "goals"}`.
+    """
+    return [
+        {"domain": domain, "assembled_state": assembled_state, "goals": goals}
+        for domain in active_domains
+    ]
+
+
+def _care_messages(profile, conversation, turn_text, *, weight_display=None, weight_pref=None,
+                   age_display=None, goals=None, assembled_state=None, active_domains=None):
+    """Build the care converse payload: the operator's FULL profile + conversation + turn (+ orchestration).
 
     Mirrors `chat._model_messages`'s API-valid shape (every entry role ∈ {user, assistant}, string
     content) but the index-0 context is the operator's FULL care profile (`_care_profile`: the
     identity-safe demographics/goals/genetics + the raw `health_detail`) — so the Care Assistant
     reasons over the operator's actual specifics, not coarse bands. The optional `weight_display` (both
     units) + `weight_pref` (the operator's chosen unit) are added so the assistant talks weight in the
-    operator's unit, not kg-only. A malformed conversation entry (not a `{role, content}` dict) is
-    SKIPPED, never char-splatted into the payload.
+    operator's unit, not kg-only. When an `assembled_state` record + a non-empty `active_domains` set
+    are supplied, the orchestration decompose→brief system prompt + the per-specialist `briefs` list are
+    LAYERED ON ADDITIVELY (the care agent becomes the Orchestrator) — the reply-only conversational
+    context is preserved, so an existing caller with no active set is unaffected. A malformed
+    conversation entry (not a `{role, content}` dict) is SKIPPED, never char-splatted into the payload.
     """
     context = {
         "task": "care-conversation",
@@ -228,6 +288,13 @@ def _care_messages(profile, conversation, turn_text, *, weight_display=None, wei
         context["profile_glossary"] = {
             "training-age-band": "the operator's chronological age in years (NOT training experience)"
         }
+    # Orchestration layer (ADDITIVE): when an assembled record + a non-empty active set are supplied,
+    # LAYER ON the decompose→brief system prompt + one brief per active specialist. An absent/empty
+    # active set adds neither key, so the payload is byte-equivalent to the reply-only conversational
+    # turn — the existing agent (and every existing conversational test) is unaffected.
+    if assembled_state is not None and active_domains:
+        context["orchestration"] = _ORCHESTRATION_NOTE
+        context["briefs"] = decompose(goals, assembled_state, active_domains)
     messages = [{"role": "user", "content": json.dumps(context, sort_keys=True)}]
     if isinstance(conversation, list):
         for turn in conversation:
@@ -238,7 +305,7 @@ def _care_messages(profile, conversation, turn_text, *, weight_display=None, wei
 
 
 def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=None, identity_config=None,
-            loop_dispatch=None, loop_deid_client=None):
+            loop_dispatch=None, loop_deid_client=None, active_domains=None):
     """Run one Care Assistant conversation turn over the operator's FULL profile; reply + gated capture.
 
     Re-reads the operator's full care profile server-side (`_care_profile`: identity-safe demographics /
@@ -263,6 +330,12 @@ def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=N
             record-only values under.
         identity_config (str | Path, optional): The instance operator-identity token config threaded
             into `router.summarize`'s 8j6 PII gate AND the capture gate's free-text PII scan.
+        active_domains (optional): The INJECTED active-specialist set. When non-empty, `respond`
+            assembles the ADR-0042 record + derives the operator's goals and threads the orchestration
+            decompose→brief context into `_care_messages` (one brief per active specialist). Absent or
+            empty -> the reply-only conversational turn, unchanged. The SOURCE
+            (`activation.active_domains`) is wired at the front door by ADR-0043-T3/0046; this task
+            only ACCEPTS the injected value, it does not compute it.
 
     Returns:
         (dict) `{"reply": <assistant reply>, "receipt": {"store", "scaffold", "dropped"}}`, or the
@@ -270,11 +343,23 @@ def respond(turn_text, conversation, *, client, store_root=None, scaffold_root=N
     """
     store_read = functools.partial(store.read, root=store_root) if store_root is not None else store.read
     profile = _care_profile(store_read, scaffold_root=scaffold_root, identity_config=identity_config)
+    # Orchestration inputs (additive): ONLY when an active set is INJECTED do we assemble the ADR-0042
+    # record + derive the operator's goals — no needless assembler call / model-cost on a plain
+    # conversational turn with no active set. The assembled record is identity-stripped + genetics-carved
+    # BY CONSTRUCTION (the ADR-0042 seam, mirroring `_care_profile`'s identity_config handling).
+    goals = assembled_state = None
+    if active_domains:
+        if identity_config is not None:
+            assembled_state = assemble_context(store_read, identity_config=identity_config)
+        else:
+            assembled_state = assemble_context(store_read)
+        goals = _derive_goals(assembled_state)
     messages = _care_messages(
         profile, conversation, turn_text,
         weight_display=_weight_display(profile),
         weight_pref=_weight_unit_preference(scaffold_root),
         age_display=_age_display(profile),
+        goals=goals, assembled_state=assembled_state, active_domains=active_domains,
     )
     try:
         result = client.converse(messages)

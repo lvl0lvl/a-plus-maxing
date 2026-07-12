@@ -63,7 +63,8 @@ PLAN_DATE = "2026-06-18"
 WITHIN_INTERVAL_DATE = "2026-06-20"  # 2 days after PLAN_DATE (< MIN_REGEN_INTERVAL_DAYS)
 
 _FROZEN_GLOB = (
-    "scripts/plan/orchestrate.py scripts/plan/pipeline.py scripts/plan/assemble.py "
+    "scripts/plan/orchestrate.py scripts/plan/pipeline.py "
+    # scripts/plan/assemble.py CARVED OUT — ADR-0041-T2 (uniform-program migration) superseded the assemble composer; behavioral guarantor tests/plan/test_assemble.py + tests/plan/test_generate_plan_uniform.py. Wave-2 frozen-guard reconciliation, Architect Option-A ruling.
     # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD) superseded plan front door; guarded by tests/plan/test_generate_plan.py + core-capability-audit.sh + per-ADR numstat probes. Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
     "scripts/plan/adjudicate.py scripts/plan/adjust.py "
     "scripts/plan/track.py scripts/plan/plan_driver.py scripts/plan/plan_orchestrator.py "

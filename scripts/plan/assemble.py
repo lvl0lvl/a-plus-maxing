@@ -22,8 +22,15 @@ source is the summary.
 
 import re
 
+from scripts.plan import domain_program
+
 # Evidence-grounding categories that require a population-mismatch flag (crit 3).
 GROUNDING_NEEDS_FLAG = ("animal", "in-vitro")
+
+# The rec-embedded / plan-attached uniform DOMAIN PROGRAM key (ADR-0041-T2). A rec MAY carry a
+# full uniform program under this key; the migrated `_is_complete` validates it, and the
+# transitional adapter (`generate_plan._lift_program`) rides it onto the plan additively.
+PROGRAM_KEY = "domain_program"
 
 # The single shared coverage-gap disclosure shape — used by the thin-library (crit 4),
 # the no-specialist (crit 5), and the empty-output (Security LOW 5-4) paths. One
@@ -114,8 +121,25 @@ def _is_cross_domain(rec):
 
 
 def _is_complete(rec):
-    """crit 2: a rec carries source + tier + reversibility; every number carries
-    units + a reference range."""
+    """crit 2, migrated to the uniform DOMAIN PROGRAM (ADR-0041-T2): a rec is complete iff it
+    carries a `domain_program.validate`-conformant program OR is a liftable legacy thin rec.
+
+    The single collection-boundary conformance gate. A rec that emits an explicit uniform
+    program (`PROGRAM_KEY`) MUST be conformant — `validate` fails closed and the rec is dropped,
+    NEVER a silent thin fallback. A LEGACY thin rec (no embedded program) is liftable iff it
+    carries the old completeness metadata (source + tier + reversibility; every number carries
+    units + a reference range): the transitional adapter (`generate_plan._lift_program`) always
+    ramps such a rec to a conformant program, so this liftability precondition SUBSUMES the old
+    thin gate and preserves its drop-semantics (a rec missing the metadata is non-liftable ->
+    dropped). `assemble` imports `domain_program` (a leaf), never `generate_plan` (no cycle).
+    """
+    program = rec.get(PROGRAM_KEY)
+    if program is not None:
+        try:
+            domain_program.validate(program)
+        except domain_program.DomainProgramError:
+            return False
+        return True
     if not (rec.get("source") and rec.get("confidence_tier") and rec.get("reversibility")):
         return False
     for number in rec.get("numbers", []):

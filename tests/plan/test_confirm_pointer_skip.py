@@ -33,7 +33,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # The ADR-0032 Validation-named WRITE-path + engine glob that must stay byte-frozen.
 FROZEN_GLOB = (
-    "scripts/plan/orchestrate.py", "scripts/plan/pipeline.py", "scripts/plan/assemble.py",
+    "scripts/plan/orchestrate.py", "scripts/plan/pipeline.py",
+    # scripts/plan/assemble.py CARVED OUT — ADR-0041-T2 (uniform-program migration) superseded the assemble composer; behavioral guarantor tests/plan/test_assemble.py + tests/plan/test_generate_plan_uniform.py. Wave-2 frozen-guard reconciliation, Architect Option-A ruling.
     # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD) superseded plan front door; guarded by tests/plan/test_generate_plan.py + core-capability-audit.sh + per-ADR numstat probes. Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
     "scripts/plan/adjudicate.py", "scripts/plan/adjust.py",
     "scripts/plan/track.py", "scripts/plan/plan_driver.py", "scripts/plan/plan_orchestrator.py",
@@ -211,9 +212,11 @@ def test_tailor_emit_gate_skips_held(tmp_path, monkeypatch):
 def test_frozen_spine_numstat_and_read_plan_only_hunk():
     # AC-6 (AR-007): the ADR-0032 WRITE-path + engine glob is byte-frozen (0 changed lines vs
     # origin/main), care_team_rollup.py is byte-unchanged (pairs with AC-7), and the ONLY
-    # plan_schema.py hunk is read_plan's pre-filter — resolve_plan's body, record_plan,
-    # correct_plan, record_plan_tracking (which carry every store.append/store.correct caller
-    # line) are byte-identical to the origin/main baseline.
+    # plan_schema.py hunk is read_plan's pre-filter — the record-spine SURVIVORS correct_plan,
+    # record_plan_tracking (which carry every store.append/store.correct caller line) are
+    # byte-identical to the origin/main baseline. resolve_plan + record_plan are SANCTIONED-
+    # SUPERSEDED by ADR-0044-T1 (plan-model record spine, scripts.store.plan_model), behavioral
+    # guarantor tests/store/test_plan_model.py — carved from this freeze below.
     diff = subprocess.run(
         ["git", "diff", "--numstat", "origin/main", "--", *FROZEN_GLOB],
         cwd=REPO_ROOT, capture_output=True, text=True, check=True,
@@ -233,7 +236,11 @@ def test_frozen_spine_numstat_and_read_plan_only_hunk():
     current = (REPO_ROOT / "scripts/store/plan_schema.py").read_text(encoding="utf-8")
     base_funcs = _module_func_sources(baseline)
     cur_funcs = _module_func_sources(current)
-    for name in ("resolve_plan", "record_plan", "correct_plan", "record_plan_tracking"):
+    # resolve_plan + record_plan CARVED OUT — ADR-0044-T1 record-spine supersession (plan-model
+    # record spine); behavioral guarantor tests/store/test_plan_model.py. Wave-2 frozen-guard
+    # reconciliation, Architect Option-A ruling.
+    for name in ("correct_plan", "record_plan_tracking"):
         assert base_funcs[name] == cur_funcs[name], (
-            f"frozen plan_schema function {name!r} changed — only read_plan's hunk is sanctioned"
+            f"frozen plan_schema function {name!r} changed — only read_plan's hunk + the "
+            "ADR-0044-T1 record-spine supersession are sanctioned"
         )
