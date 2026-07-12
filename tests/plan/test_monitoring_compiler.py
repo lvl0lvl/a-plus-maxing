@@ -216,6 +216,35 @@ def test_safety_crossing_rule_rejected_at_compile():
     assert exc.value.offending_rule == offending
 
 
+# --- AC-3 (hardening): a MALFORMED magnitude is REJECTED fail-closed, never Tier-1 -
+#
+# This module is the net-new rule-grammar boundary (`domain_program.validate` never inspects
+# adjustment_rules). Without the grammar guard, `delta=-100` / `delta=nan` fall through both
+# `delta >= bound` and `delta >= materiality` (each False) and are silently certified Tier-1,
+# and `delta="5"` raises a bare `TypeError` on the first comparison — the ADR-0045 fail-open
+# hole. Reverting the guard turns each case below RED.
+
+
+@pytest.mark.parametrize("bad_delta", [-100, float("nan"), "5"])
+def test_malformed_delta_rejected_not_tier1(bad_delta):
+    """A negative / NaN / non-numeric delta raises MonitoringCompileError, never lands Tier-1."""
+    offending = _tier1_rule(delta=bad_delta)
+    with pytest.raises(monitoring_compiler.MonitoringCompileError) as exc:
+        monitoring_compiler.compile_config(
+            {"training": _training_program(adjustment_rules=[offending])}
+        )
+    assert exc.value.offending_rule == offending
+
+
+def test_duplicate_signal_name_rejected_at_compile():
+    """Two monitoring_signals sharing a name is a fail-closed collision, not a silent last-wins."""
+    dup = [_training_signal(), _training_signal(bound=99.0)]  # both named "session_rpe"
+    with pytest.raises(monitoring_compiler.MonitoringCompileError):
+        monitoring_compiler.compile_config(
+            {"training": _training_program(monitoring_signals=dup)}
+        )
+
+
 # --- AC-4: the compiled config round-trips through plan_model (PRODUCTION path) ----
 
 

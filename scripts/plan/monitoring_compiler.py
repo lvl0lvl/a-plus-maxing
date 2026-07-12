@@ -48,6 +48,7 @@ Tier-3 config seam ADR-0045-T2's four-tier executor runs on. ADR-0045-T2 must no
 them without Architect review.
 """
 
+import math
 from collections.abc import Mapping
 
 from scripts.plan import domain_program
@@ -129,6 +130,25 @@ def _is_non_monotone(direction) -> bool:
     return True
 
 
+def _is_finite_nonneg_real(magnitude) -> bool:
+    """Return True when `magnitude` is a finite, non-negative real number.
+
+    The grammar predicate for a rule's driven `delta` and a signal's `bound` /
+    `materiality_threshold`: a present magnitude must be a real int/float (a `bool` is a
+    type-confusion, not a magnitude), finite (no `NaN` / `inf`), and non-negative. A present
+    value failing this is a grammar violation the compiler rejects fail-closed.
+
+    Args:
+        magnitude: A candidate delta, bound, or materiality_threshold value.
+
+    Returns:
+        (bool) True when the value is a finite non-negative int/float, `bool` excluded.
+    """
+    if isinstance(magnitude, bool) or not isinstance(magnitude, (int, float)):
+        return False
+    return math.isfinite(magnitude) and magnitude >= 0
+
+
 def _classify(rule, own_domain, signal_index) -> str:
     """Classify ONE adjustment rule, or raise on a fatally-unsafe one (fail-closed).
 
@@ -154,6 +174,17 @@ def _classify(rule, own_domain, signal_index) -> str:
     signal = signal_index.get(rule.get(RULE_TARGET_SIGNAL))
     bound = signal.get(SIGNAL_BOUND) if signal is not None else None
     materiality = signal.get(SIGNAL_MATERIALITY) if signal is not None else None
+
+    # 0. GRAMMAR — reject a PRESENT-but-malformed magnitude (non-numeric, bool, NaN, inf,
+    #    negative) fail-closed, so a bad delta/bound/materiality never falls through to a silent
+    #    Tier-1 or a bare TypeError on the ordered comparisons below. (An ABSENT None is handled
+    #    by the escalate ladder — only a present malformed value raises.)
+    for magnitude in (delta, bound, materiality):
+        if magnitude is not None and not _is_finite_nonneg_real(magnitude):
+            raise MonitoringCompileError(
+                "malformed magnitude: delta/bound/materiality must be a finite non-negative real",
+                offending_rule=rule,
+            )
 
     # 1. FATAL rejects — raise ONLY on a positive determination of unsafety (fail-closed).
     if safety == SAFETY_CROSS:
@@ -214,7 +245,17 @@ def compile_config(domain_programs: Mapping) -> dict:
     config = {}
     for domain_name, program in domain_programs.items():
         signals = program[domain_program.MONITORING_SIGNALS]
-        signal_index = {signal.get(SIGNAL_NAME): signal for signal in signals}
+        # Fail-closed on a DUPLICATE signal name — a last-wins index would silently collapse two
+        # signals sharing a name, so one rule could be certified against the wrong envelope.
+        signal_index = {}
+        for signal in signals:
+            name = signal.get(SIGNAL_NAME)
+            if name in signal_index:
+                raise MonitoringCompileError(
+                    f"duplicate signal name {name!r} in the monitoring_signals envelope",
+                    offending_rule=None,
+                )
+            signal_index[name] = signal
         compiled_rules = [
             {_RULE_KEY: rule, _CLASSIFICATION_KEY: _classify(rule, domain_name, signal_index)}
             for rule in program[domain_program.ADJUSTMENT_RULES]
