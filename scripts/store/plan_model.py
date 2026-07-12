@@ -156,16 +156,17 @@ def validate_plan_version(version):
             f"version missing required element {MILESTONES!r} (>=1 dated milestone)",
             offending_element=MILESTONES,
         )
-    for milestone in milestones:
+    for i, milestone in enumerate(milestones):
         if not isinstance(milestone, dict) or "date" not in milestone:
             raise PlanVersionError(
                 f"version element {MILESTONES!r} carries an undated milestone",
                 offending_element=MILESTONES,
             )
+        _check_date(milestone["date"], f"{MILESTONES}[{i}].date")
 
-    if not isinstance(version.get(MONITORING_CONFIG), dict):
+    if not isinstance(version.get(MONITORING_CONFIG), dict) or not version.get(MONITORING_CONFIG):
         raise PlanVersionError(
-            f"version missing required element {MONITORING_CONFIG!r} (a mapping)",
+            f"version missing required element {MONITORING_CONFIG!r} (a non-empty mapping)",
             offending_element=MONITORING_CONFIG,
         )
 
