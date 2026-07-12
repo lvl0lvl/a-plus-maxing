@@ -180,6 +180,12 @@ def _drop(element):
     return mutate
 
 
+def _set(element, value):
+    def mutate(version):
+        version[element] = value
+    return mutate
+
+
 def _nonconformant_program(version):
     # a compound program with an EMPTY required_labs -> domain_program.validate rejects
     version["domain_programs"]["peptides"] = _compound_program(required_labs=[])
@@ -193,6 +199,16 @@ def _nonconformant_program(version):
         (_drop("milestones"), "milestones"),
         (_drop("monitoring_config"), "monitoring_config"),
         (_nonconformant_program, "peptides"),
+        # TEST-01: the version-date guard (_check_date) — real-date, regex, and None branches.
+        (_set("date", "2026-13-01"), "date"),
+        (_set("date", "not-a-date"), "date"),
+        (_drop("date"), "date"),
+        # TEST-02 / API-01: undated milestone (no "date" key) is rejected naming milestones.
+        (_set("milestones", [{"label": "first re-test"}]), "milestones"),
+        # BUG-02 / API-01: a milestone carrying a MALFORMED date fails closed (per-milestone
+        # _check_date), and an EMPTY monitoring_config is rejected (non-empty parity).
+        (_set("milestones", [{"date": "2026-13-40", "label": "first re-test"}]), "milestones"),
+        (_set("monitoring_config", {}), "monitoring_config"),
     ],
 )
 def test_partial_version_rejected_fail_closed(tmp_path, mutate, token):
@@ -277,6 +293,48 @@ def test_resolve_comprehensive_absence_states(tmp_path):
     assert resolved["state"] == plan_model.NO_PLAN_TODAY
     assert resolved["version"] is None
     assert resolved["plan_date"] == "2026-07-12"  # the latest on-file date
+
+
+def test_resolve_same_date_latest_append_wins(tmp_path):
+    """TEST-03(a): two DISTINCT versions at ONE on_date -> the LATER-recorded narrative stands.
+
+    Both persist (distinct content tags); the reversed-scan tie-break returns the LAST-appended
+    version dated on_date. REDs if resolve scanned forward / first-wins (it would return the
+    earlier narrative).
+    """
+    render = "2026-07-13"
+    plan_model.record_plan_version(
+        _comprehensive_version(date=render, narrative="the earlier-recorded version"), tmp_path
+    )
+    plan_model.record_plan_version(
+        _comprehensive_version(date=render, narrative="the later-recorded version"), tmp_path
+    )
+    resolved = plan_model.read_plan_version(render, tmp_path)
+    assert resolved["state"] is None
+    assert resolved["version"]["narrative"] == "the later-recorded version", (
+        "the LAST-appended version dated on_date must win the reversed-scan resolve"
+    )
+
+
+def test_resolve_backdated_exact_date_stands(tmp_path):
+    """TEST-03(b): a backdated on_date resolves the EXACT-date version STANDING, not the latest.
+
+    Versions dated 07-10 + 07-12 on file; resolving on_date=07-10 returns the 07-10 version
+    STANDING (state None), NOT NO_PLAN_TODAY and NOT the latest-on-file 07-12 version. REDs if
+    resolve returned the latest reading instead of the exact-date match.
+    """
+    plan_model.record_plan_version(
+        _comprehensive_version(date="2026-07-10", narrative="the 07-10 version"), tmp_path
+    )
+    plan_model.record_plan_version(
+        _comprehensive_version(date="2026-07-12", narrative="the later 07-12 version"), tmp_path
+    )
+    resolved = plan_model.read_plan_version("2026-07-10", tmp_path)
+    assert resolved["state"] is None, "an exact-date match is a STANDING state, not an absence"
+    assert resolved["plan_date"] == "2026-07-10"
+    assert resolved["version"]["narrative"] == "the 07-10 version", (
+        "the exact-date version must resolve, not the latest-on-file 07-12 version"
+    )
 
 
 # --------------------------------------------------------------------------- #
