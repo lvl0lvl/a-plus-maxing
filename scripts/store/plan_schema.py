@@ -39,14 +39,21 @@ Writers raise only ValueError; readers never raise on absence.
 import datetime
 import re
 
+from scripts.plan import activation
 from scripts.store import plan_confirm, store
 from scripts.store.loop_schema import _content_tag, _reading
 
 NO_PLAN = "no-plan"
 NO_PLAN_TODAY = "no-plan-today"
 
-# The closed plan-domain set (ADR-0010 D1) and its tracked subset (D3).
-PLAN_DOMAINS = ("workout", "nutrition", "supplements", "peptides")
+# The plan-domain DISPATCH-REGISTRY set (RT-009). GROWN 4->§1-§13 (ADR-0043-T3) and DERIVED from
+# `activation.CARD_DOMAINS` (the ONE source of truth — A3: never a second hand-maintained literal
+# asserted equal), ordered deterministically. A card domain added to `CARD_DOMAINS` propagates here.
+# This is the dispatch-registry role (which domains the front door + the dispatch registries span),
+# DISTINCT from the ADR-0044-T1-retired stored-key role; the thin per-domain record path stays
+# validator-backed for the RENDERABLE four only (`_PLAN_VALIDATORS` deliberately DIVERGES — rich
+# domains record first-class via `plan_model`, never the thin validators).
+PLAN_DOMAINS = tuple(sorted(activation.CARD_DOMAINS))
 TRACKED_DOMAINS = ("workout", "nutrition", "supplements")
 
 # Per-stream item-id prefixes. "plan::" doubles as the source-tag prefix for
@@ -274,6 +281,13 @@ _PLAN_VALIDATORS = {
     "peptides": _validate_peptides_plan,
 }
 
+# The RENDERABLE roster — the domains with a thin per-domain plan_schema validator. RT-009: this
+# stays the original four even as PLAN_DOMAINS grows (rich domains record first-class via
+# `plan_model`, never the thin path). DERIVED from `_PLAN_VALIDATORS` so it can never silently
+# diverge from the validator set. The front door routes only these through Leg 1's thin path
+# (`active ∩ RENDERABLE_DOMAINS`); a rich domain beyond them never reaches `_PLAN_VALIDATORS[domain]`.
+RENDERABLE_DOMAINS = tuple(_PLAN_VALIDATORS)
+
 
 def _is_sets_done(value):
     """Report whether `value` is a dict of exercise name -> int >= 0."""
@@ -362,6 +376,16 @@ def _check_plan_args(domain, plan, plan_date, specialist):
     """
     if domain not in PLAN_DOMAINS:
         raise ValueError(f"unknown plan domain {domain!r}; known: {PLAN_DOMAINS}")
+    # RT-009 divergence: PLAN_DOMAINS (grown, dispatch-registry role) and _PLAN_VALIDATORS (the
+    # renderable four) DIVERGE by construction, so a grown rich member reaching this thin record
+    # boundary would raw-KeyError at `_PLAN_VALIDATORS[domain]` OUTSIDE any try/except. Fail CLOSED
+    # with the ValueError the callers already handle (informed sign-off, ADR-0043-T3 Deviation #4) —
+    # a rich domain records first-class via `plan_model`, never here.
+    if domain not in _PLAN_VALIDATORS:
+        raise ValueError(
+            f"no thin plan validator for domain {domain!r}; the renderable roster is "
+            f"{tuple(_PLAN_VALIDATORS)} — a rich domain records via plan_model.record_plan_version"
+        )
     _check_date(plan_date, "plan_date")
     if not _is_nonempty_str(specialist):
         raise ValueError(f"specialist must be a non-empty str, got {specialist!r}")

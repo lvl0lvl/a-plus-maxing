@@ -11,7 +11,13 @@ library only, so no consumer dependency cycle can form.
 The seven fields
 ----------------
 Required (present on every program, any kind):
-    prescription      -- a periodized/dated representation (dated blocks/phases).
+    prescription      -- a periodized/dated representation (dated blocks/phases). The
+                         renderable IDENTITY that names a card entry (`RENDERABLE_IDENTITY`:
+                         `name` for workout/supplements, `compound` for peptides) is a
+                         TOP-LEVEL prescription field (ubsp) -- the 58z0 honest-no-plan
+                         boundary (`project_renderable`) reads it there, so a specialist
+                         emitting identity only INSIDE `blocks` is a degenerate periodized-
+                         only shape that projects to honest no-plan, never a card.
     rationale         -- the GRADE structure: per claim, certainty-of-evidence x
                          strength-of-recommendation plus a causal-vs-associational
                          marker. `validate` checks presence only; the internal GRADE
@@ -27,10 +33,13 @@ Conditional (present per the domain kind's required-vs-conditional row):
                          pin its presence or the marker slot's shape; ADR-0045-T2's Tier-4
                          owns the escalation-event semantics (`validate` does not check it).
     cross_domain_seams-- a list of seam entries; each entry's intended structure is a
-                         paired-domain reference + a seam-nature/conflict token. T1 pins the
-                         FIELD NAME as a conditional field but does NOT pin its presence or
-                         edge shape; ADR-0043-T2 owns the reconciliation semantics AND the
-                         seam-edge validation (`validate` does not check it).
+                         paired-domain reference (`SEAM_WITH_DOMAIN`) + a seam-nature/conflict
+                         token (`SEAM_NATURE`; a `SEAM_CONFLICT`-nature seam holds the declaring
+                         domain). Those key-names are single-source constants HERE (pule),
+                         referenced by `orchestrate.SEAM_*` so a divergent filler is caught, not
+                         silently dropped. T1 pins the FIELD NAME as a conditional field but does
+                         NOT pin its presence or edge shape; ADR-0043-T2 owns the reconciliation
+                         semantics AND the seam-edge validation (`validate` does not check it).
 
 The domain KIND
 ---------------
@@ -55,10 +64,11 @@ state, not a static plan missing autoregulation or required fields.
 Change control
 --------------
 The seven-field shape, the domain-KIND attribute + `DOMAIN_KINDS`, the
-`cross_domain_seams` / `refusal_escalation` pinned structure, the `validate` /
-`missing_required_fields` signatures, `DomainProgramError`'s accessors, and
+`cross_domain_seams` / `refusal_escalation` pinned structure, the seam-edge key-name
+constants (`SEAM_*`) + the renderable-identity table + `project_renderable`, the
+`validate` / `missing_required_fields` signatures, `DomainProgramError`'s accessors, and
 `VALIDITY_TIERS` are the frozen seam. ADR-0041-T2 / 0044-T1 / 0043-T2 / 0045-T1 /
-0046-T1 must not change them without Architect review.
+0046-T1 / 0043-T3 must not change them without Architect review.
 """
 
 from collections.abc import Mapping
@@ -75,6 +85,15 @@ CROSS_DOMAIN_SEAMS = "cross_domain_seams"
 
 REQUIRED_FIELDS = (PRESCRIPTION, RATIONALE, MONITORING_SIGNALS, ADJUSTMENT_RULES)
 CONDITIONAL_FIELDS = (REQUIRED_LABS, REFUSAL_ESCALATION, CROSS_DOMAIN_SEAMS)
+
+# --- cross_domain_seams edge key-names (single source of truth, pule) ------------
+# The seam-edge structure `orchestrate.reconcile` reads: each entry names a paired domain
+# (`SEAM_WITH_DOMAIN`) + a seam-nature token (`SEAM_NATURE`); a `SEAM_CONFLICT`-nature seam
+# holds the declaring domain. `orchestrate.SEAM_*` REFERENCE these, so a fixture / specialist
+# diverging from the pinned key-names is caught by the reader, never silently dropped.
+SEAM_WITH_DOMAIN = "with_domain"
+SEAM_NATURE = "nature"
+SEAM_CONFLICT = "conflict"
 
 # --- the domain KIND: first-class attribute + closed, membership-checked vocab ---
 
@@ -209,3 +228,70 @@ def validate(program: Mapping) -> None:
                 f"a {kind} domain requires at least one adjustment rule",
                 offending_field=ADJUSTMENT_RULES,
             )
+
+
+# --- prescription -> renderable projection (the 58z0 boundary; ubsp/qrg4 single home) ---
+# domain -> the renderable IDENTITY field distinguishing a nameable renderable entry from a
+# degenerate PERIODIZED-ONLY prescription (dated `blocks`, no card identity at the top). The ubsp
+# pin that this identity is a top-level field lives in the `prescription` contract (module docstring
+# above), the single authoritative statement. This is the ONE projection home (`project_renderable`),
+# reused by `generate_plan` (the four translators) AND `plan_model.read_standing_plan` (qrg4) so no
+# consumer duplicates the projection and no layering inversion (`plan_model` never imports
+# `generate_plan`) forms.
+RENDERABLE_IDENTITY = {
+    "workout": "name",
+    "supplements": "name",
+    "peptides": "compound",
+}
+
+
+def _deep_strip_load(value):
+    """Return a deep copy of a prescription structure with every `load` key removed.
+
+    The ADR-0015 clearance gate drops load prescriptions when no clinician clearance is granted. A
+    PERIODIZED prescription nests per-block `load` under dated `blocks`/phases, so a top-level pop
+    leaks the nested load into the renderable AND the store-bound program; this recurses dicts and
+    lists so `load` is stripped at EVERY depth.
+    """
+    if isinstance(value, dict):
+        return {key: _deep_strip_load(sub) for key, sub in value.items() if key != "load"}
+    if isinstance(value, list):
+        return [_deep_strip_load(item) for item in value]
+    return value
+
+
+def project_renderable(prescription, domain, *, strip_load):
+    """Project a (possibly PERIODIZED) DOMAIN PROGRAM prescription to its flat renderable form.
+
+    The uniform prescription is canonically PERIODIZED (dated `blocks`, per-block `load`), but the
+    four frozen `plan_schema` per-domain validators + the dashboard consume the FLAT top-level
+    fields. This projects the prescription for the renderable, the store-bound program, AND the
+    ADR-0044-T2 standing reader (bead 58z0 / qrg4):
+
+      1. DEEP-STRIP `load` over the FULL periodized structure when `strip_load` (the ADR-0015
+         clearance leg — a per-block `load` must never reach a rendered plan); the dated `blocks`
+         ride on as an open-on-extras extra.
+      2. Honest no-plan (return None) for a DEGENERATE periodized-only prescription — dated `blocks`
+         but NO top-level renderable identity for its domain — rather than passing a
+         `{"blocks": [...]}` shell to a consumer whose frozen validator would raise. A FLAT
+         prescription missing a required field is a genuine malformation, NOT a periodized shape, so
+         it is passed through and still surfaces LOUD downstream.
+
+    Args:
+        prescription: The DOMAIN PROGRAM's prescription (a dict for a real prescription).
+        domain (str): The plan domain — keys the renderable-identity check (`RENDERABLE_IDENTITY`).
+        strip_load (bool): Deep-strip `load` at every depth when True.
+
+    Returns:
+        (dict | None) The projected prescription (flat fields + load-handled `blocks`), or None for
+        a non-dict prescription or a degenerate periodized-only shape (the honest no-plan / skip).
+    """
+    if not isinstance(prescription, dict):
+        return None
+    projected = _deep_strip_load(prescription) if strip_load else dict(prescription)
+    identity = RENDERABLE_IDENTITY.get(domain)
+    if identity is not None and "blocks" in projected:
+        value = projected.get(identity)
+        if not (isinstance(value, str) and value):
+            return None
+    return projected

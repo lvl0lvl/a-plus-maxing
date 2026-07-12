@@ -71,7 +71,7 @@ def _training_program(**overrides):
         "required_labs": [],  # empty-OK for a pure-training domain
         "refusal_escalation": {"threshold_event": "acute joint pain",
                                "action": "hold_and_escalate"},
-        "cross_domain_seams": [{"paired_domain": "nutrition", "seam_nature": "route"}],
+        "cross_domain_seams": [{"with_domain": "nutrition", "nature": "route"}],
     }
     program.update(overrides)
     return program
@@ -113,7 +113,7 @@ def _compound_program(**overrides):
         "required_labs": ["fasting_glucose", "lipid_panel"],  # mandatory + non-empty for compound
         "refusal_escalation": {"threshold_event": "out-of-range lab",
                                "action": "hold_on_human_gate"},
-        "cross_domain_seams": [{"paired_domain": "training", "seam_nature": "hold"}],
+        "cross_domain_seams": [{"with_domain": "training", "nature": "hold"}],
     }
     program.update(overrides)
     return program

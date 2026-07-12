@@ -114,11 +114,25 @@ class _ReplayNeeded(BaseException):
 # `_ROLE_OF_DOMAIN[domain]` KeyError escape), and `plan_orchestrator._dispatch_domains` imports it for
 # the role-slug VALUE lookup (`_ROLE_OF_DOMAIN[domain]` -> the profile the dispatch prompt inlines).
 # The orchestrator already imports `plan_driver`, so it imports this map — no fork, no import cycle.
+# GROWN 4->§1-§13 (ADR-0043-T3, relocated from ADR-0046-T1): each card domain maps to the role
+# whose full profile the dispatch prompt inlines, per the deployed roster
+# (design/specialist-plan-contracts.md §1-§13). Kept coherent with the grown
+# `plan_schema.PLAN_DOMAINS` so `_dispatch_domains`'s `_ROLE_OF_DOMAIN[domain]` lookup never
+# KeyErrors on a dispatched member.
 _ROLE_OF_DOMAIN = {
     "workout": "personal-trainer",
     "nutrition": "nutritionist",
     "supplements": "supplement-specialist",
     "peptides": "peptide-specialist",
+    "endocrine": "endocrine-specialist",
+    "cardiovascular": "cardiovascular-specialist",
+    "recovery": "recovery-specialist",
+    "sleep": "sleep-coach",
+    "longevity": "longevity-strategist",
+    "mental-performance": "mental-performance-coach",
+    "dermatology": "dermatologist",
+    "gi": "gi-specialist",
+    "lymphatic": "lymphatic-specialist",
 }
 
 # The bounded revise loop's reason vocabulary (ADR-0022-T2), the same kebab-string family as

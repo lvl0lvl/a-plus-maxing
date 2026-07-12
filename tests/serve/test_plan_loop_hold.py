@@ -77,7 +77,7 @@ _FROZEN_GLOB = (
 def _large_regen(root, *, plan_date=PLAN_DATE):
     """Seed a full 4-of-4 large change and drive one re-gen through the T1 front door; return result."""
     _seed_store(root)
-    _seed_prior_standing(root, plan_schema.PLAN_DOMAINS)  # 4 differing standing plans -> large change
+    _seed_prior_standing(root, plan_schema.RENDERABLE_DOMAINS)  # 4 differing standing plans -> large change
     return plan_loop.regenerate(
         root,
         dispatch=_LoopDispatch(_clean_authors()),
@@ -110,7 +110,7 @@ def test_marker_before_exposure_temporal(tmp_path, monkeypatch):
 
     result = _large_regen(root)
     promoted = _promoted(result)
-    assert set(promoted) == set(plan_schema.PLAN_DOMAINS), f"expected a full swap: {promoted}"
+    assert set(promoted) == set(plan_schema.RENDERABLE_DOMAINS), f"expected a full swap: {promoted}"
 
     # (a) every promoted domain marked pending exactly once, keyed on the re-gen date (held as a unit).
     assert sorted(d for d, _ in marked) == sorted(promoted), f"marker coverage: {marked}"
@@ -134,7 +134,7 @@ def test_marker_before_exposure_temporal(tmp_path, monkeypatch):
     # (d) NON-fail-closed clause: an UNMARKED reading STILL stands — the prior standing plans (dated
     #     _T4_PRIOR_DATE, never marked) resolve normally. The window is closed by the marker ORDER,
     #     not by read_plan failing closed on an unmarked reading.
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         prior = plan_schema.read_plan(domain, _T4_PRIOR_DATE, root)
         assert prior["state"] is None, f"{domain}: an unmarked reading did not stand (spurious hold)"
         assert prior["plan"] == _differing_prior(domain)
@@ -148,7 +148,7 @@ def test_held_regen_recorded_but_does_not_stand(tmp_path):
     # read_plan HOLDS it -> NO_PLAN_TODAY, plan None, NOT the held date, NOT a walk-back.
     root = tmp_path / "store"
     _large_regen(root)
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         rows = [r for r in store.read(f"plan::{domain}", root=root) if r["timepoint"] == PLAN_DATE]
         assert len(rows) == 1, f"{domain}: the frozen promote did not record the new plan: {rows}"
 
@@ -166,7 +166,7 @@ def test_zero_horizon_surfacing(tmp_path):
     # (the prior CONFIRMED in-window block or None may return, but never the held plan_date).
     root = tmp_path / "store"
     _large_regen(root)
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         for span in (7, 30):
             block = horizons.window_block(domain, root, PLAN_DATE, span)
             assert block is None or block["plan_date"] != PLAN_DATE, (
@@ -212,7 +212,7 @@ def test_debounce_mutation_repoint_at_read_plan_refires(tmp_path, monkeypatch):
     def _regen_date_via_read_plan(store_read, on_date):
         dates = [
             plan_schema.read_plan(d, on_date, root)["plan_date"]
-            for d in plan_schema.PLAN_DOMAINS
+            for d in plan_schema.RENDERABLE_DOMAINS
         ]
         dates = [d for d in dates if d is not None]
         return max(dates) if dates else None
@@ -263,7 +263,7 @@ def test_large_regen_gates_held_from_tailoring_seam(tmp_path, monkeypatch):
     # (b) end-to-end: 0 tailored artifact section for any held domain.
     art = out / "maintained.html"
     text = art.read_text(encoding="utf-8") if art.exists() else ""
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         assert f"data-domain='{domain}'" not in text, f"held {domain} was shadow-tailored/egressed"
 
 
@@ -284,7 +284,7 @@ def test_regen_re_deriving_held_content_is_held_again(tmp_path):
     # unheld -> the asserts below go RED.
     root = tmp_path / "store"
     _large_regen(root)  # 4 differing priors stand; the PLAN_DATE re-gen is held (all domains pending)
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         assert plan_confirm.decision_for(domain, PLAN_DATE, root) == plan_confirm.DECISION_PENDING, (
             f"{domain}: precondition failed — the PLAN_DATE re-gen is not held"
         )
@@ -297,10 +297,10 @@ def test_regen_re_deriving_held_content_is_held_again(tmp_path):
         deid_client=_FixedDeidClient(_deid_summary()),
         plan_date=POST_INTERVAL_DATE,
     )
-    assert set(_promoted(result)) == set(plan_schema.PLAN_DOMAINS), f"the re-gen did not promote: {result}"
+    assert set(_promoted(result)) == set(plan_schema.RENDERABLE_DOMAINS), f"the re-gen did not promote: {result}"
 
     # The re-derived re-gen is HELD AGAIN — materiality read the STANDING prior, not the never-confirmed one.
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         assert plan_confirm.decision_for(domain, POST_INTERVAL_DATE, root) == plan_confirm.DECISION_PENDING, (
             f"{domain}: the re-derived re-gen was not held (materiality read the never-confirmed baseline)"
         )
@@ -322,7 +322,7 @@ def test_post_interval_regen_supersedes_pending_pointer(tmp_path):
 
     _large_regen(root, plan_date=POST_INTERVAL_DATE)  # second held re-gen; domains still pending from the first
 
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         assert plan_confirm.decision_for(domain, POST_INTERVAL_DATE, root) == plan_confirm.DECISION_PENDING, (
             f"{domain}: no fresh pending pointer at the superseding date (OQ-6 supersede)"
         )

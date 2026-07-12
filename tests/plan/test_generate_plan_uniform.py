@@ -111,7 +111,7 @@ def _uniform_program(prescription, kind, *, required_labs=None):
         domain_program.REQUIRED_LABS: list(required_labs) if required_labs else [],
         domain_program.REFUSAL_ESCALATION: {"marker": "chest pain -> stop + clinician review"},
         domain_program.CROSS_DOMAIN_SEAMS: [
-            {"paired_domain": "nutrition", "seam": "energy availability floor"},
+            {"with_domain": "nutrition", "nature": "energy availability floor"},
         ],
         domain_program.KIND_FIELD: kind,
     }
@@ -274,7 +274,7 @@ def test_uniform_program_round_trips_zero_fields_dropped(tmp_path):
         "causal_marker": "associational",
     }, "the GRADE rationale must round-trip value-intact"
     assert program[domain_program.CROSS_DOMAIN_SEAMS] == [
-        {"paired_domain": "nutrition", "seam": "energy availability floor"}
+        {"with_domain": "nutrition", "nature": "energy availability floor"}
     ], "cross_domain_seams must round-trip value-intact"
     assert program[domain_program.REQUIRED_LABS] == [], (
         "training required_labs must round-trip value-intact (empty-OK for a training kind)"

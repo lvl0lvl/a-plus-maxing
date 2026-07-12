@@ -699,6 +699,10 @@ def render(store_read, _today=None, _root=None):
             pass  # page-2 table only
         elif item.startswith("plan-confirm::"):
             pass  # ADR-0040 confirmation-pointer control stream — not rendered
+        elif item.startswith("plan-model::"):
+            pass  # ADR-0044-T1 comprehensive plan-version stream (the ADR-0043-T3 Leg-2 additive
+            # record) — this thin per-domain report renders from plan:: verbatim; the composite
+            # version rides alongside, not page-rendered here.
         elif "::" in item:
             prefix = item.split("::", 1)[0] + "::"
             raise KeyError(

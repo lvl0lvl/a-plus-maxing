@@ -103,7 +103,8 @@ def _uniform_program(prescription, kind, *, required_labs=None):
         domain_program.REQUIRED_LABS: list(required_labs) if required_labs else [],
         domain_program.REFUSAL_ESCALATION: {"marker": "chest pain -> stop + clinician review"},
         domain_program.CROSS_DOMAIN_SEAMS: [
-            {"paired_domain": "nutrition", "seam": "energy availability floor"},
+            {domain_program.SEAM_WITH_DOMAIN: "nutrition",
+             domain_program.SEAM_NATURE: "energy availability floor"},
         ],
         domain_program.KIND_FIELD: kind,
     }
@@ -175,11 +176,13 @@ def test_active_set_is_data_driven():
 
 
 def test_active_domains_reaches_new_card_domain():
-    """AC-2 (PURE reach, re-grounded Option C): `active_domains(surface)` RETURNS a §1-§13
-    `CARD_DOMAINS` domain D BEYOND the original four when D is active on the surface. Non-tautology:
-    a closed-four `active_domains` (or a `CARD_DOMAINS` missing D) never returns D -> RED."""
+    """AC-2 (PURE reach): `active_domains(surface)` RETURNS a §1-§13 `CARD_DOMAINS` domain D BEYOND
+    the RENDERABLE four when D is active on the surface. Non-tautology anchor re-grounded on
+    `RENDERABLE_DOMAINS` (the thin-validator four) now that ADR-0043-T3 grew `PLAN_DOMAINS` to the
+    full card roster: a closed-four `active_domains` (or a `CARD_DOMAINS` missing D) never returns
+    D -> RED."""
     d = "sleep"
-    assert d not in plan_schema.PLAN_DOMAINS, "D must be beyond the closed four to prove reach"
+    assert d not in plan_schema.RENDERABLE_DOMAINS, "D must be beyond the renderable four to prove reach"
     assert d in activation.CARD_DOMAINS
     surface = {"goals": [d]}
     assert d in activation.active_domains(surface)
@@ -214,7 +217,7 @@ def test_data_present_domain_is_active():
     """AC-4 (false-negative falsifier): a domain D with data present IS in `active_domains`. A
     missed active domain -> RED. (Composes with AC-2's reach on a beyond-the-four domain.)"""
     d = "endocrine"
-    assert d not in plan_schema.PLAN_DOMAINS
+    assert d not in plan_schema.RENDERABLE_DOMAINS
     surface = {"data": [d]}
     assert d in activation.active_domains(surface)
 
@@ -255,17 +258,19 @@ def test_genetics_labs_partitioned_as_cross_cutting_inputs():
 # --- current-four registry coherence -------------------------------------------
 
 
-def test_registries_coherent_over_current_four():
-    """Current-four coherence gate: every `PLAN_DOMAINS` member is dispatchable, translatable, and
-    kinded over the CLOSED FOUR; `PLAN_DOMAINS` is still exactly four (growth is Wave 4); and
-    `CARD_DOMAINS` (the gate's card roster) has >=13 members. An orphan `PLAN_DOMAINS` member, a
-    prematurely-grown `PLAN_DOMAINS`, or a <13 `CARD_DOMAINS` -> RED."""
-    current_four = set(plan_schema.PLAN_DOMAINS)
-    assert current_four <= set(generate_plan._PLAN_TRANSLATORS)
-    assert current_four <= set(plan_driver._ROLE_OF_DOMAIN)
-    assert current_four <= set(generate_plan._DOMAIN_KIND)
-    assert plan_schema.PLAN_DOMAINS == ("workout", "nutrition", "supplements", "peptides")
+def test_registries_coherent_over_grown_roster():
+    """Grown-roster coherence gate (ADR-0043-T3 AC-10, superseding the closed-four assertion): every
+    grown `PLAN_DOMAINS` member is dispatchable, translatable, and kinded over the §1-§13 roster;
+    `PLAN_DOMAINS` DERIVES from `CARD_DOMAINS` (>=13); the renderable four keep their thin validators
+    (RT-009 divergence). An orphan `PLAN_DOMAINS` member, a non-derived roster, or a <13
+    `CARD_DOMAINS` -> RED."""
+    members = set(plan_schema.PLAN_DOMAINS)
+    assert members <= set(generate_plan._PLAN_TRANSLATORS)
+    assert members <= set(plan_driver._ROLE_OF_DOMAIN)
+    assert members <= set(generate_plan._DOMAIN_KIND)
+    assert set(plan_schema.PLAN_DOMAINS) == set(activation.CARD_DOMAINS)
     assert len(activation.CARD_DOMAINS) >= 13
+    assert set(plan_schema.RENDERABLE_DOMAINS) == set(plan_schema._PLAN_VALIDATORS)
 
 
 # --- BUG-01 / bead 58z0: the periodized-prescription reconciliation ------------

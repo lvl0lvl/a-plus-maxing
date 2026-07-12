@@ -295,10 +295,18 @@ def read_standing_plan(domain, on_date, root):
     thin-only store AND a domain the comprehensive plan does not cover both keep their exact thin
     behavior (backward-compatible).
 
-    Returns the SAME shape as ``plan_schema.read_plan`` so the ``track.resolve_plan_progress`` re-point
-    is a pure call-site swap. Read-only: it writes nothing, rewrites no reading on either stream
-    (append-only preserved), and defines no store key — identity is reached only through ``store.read``
-    / the composed resolvers.
+    Shape reconciliation (qrg4, ADR-0043-T3): the top-level ``{state, plan, specialist, plan_date}``
+    KEYS match ``plan_schema.read_plan``, but ``plan`` is NOT identical across branches — the
+    comprehensive branch returns the DOMAIN PROGRAM's periodized ``PRESCRIPTION`` (dated ``blocks``),
+    the thin branch returns ``read_plan``'s flat renderable plan. This is deliberate and the shape its
+    consumers were built for: ``track.resolve_plan_progress`` (``track.py``) threads ``plan`` through to
+    ``horizons`` (which reads the periodized ``prescription.blocks``) and to ``adjust`` / the maintained
+    artifact / the dashboard — all of which consume the periodized prescription on the comprehensive
+    branch (the ADR-0044-T3 horizons rebase reads ``blocks`` directly). It is therefore NOT a "pure
+    call-site swap to read_plan's renderable plan" on the comprehensive branch — the earlier docstring
+    claim to that effect is corrected here. Read-only: it writes nothing, rewrites no reading on either
+    stream (append-only preserved), and defines no store key — identity is reached only through
+    ``store.read`` / the composed resolvers.
 
     Args:
         domain (str): A ``plan_schema.PLAN_DOMAINS`` member.

@@ -14,6 +14,7 @@ is a `(name, prompt, context) -> envelope` callable, so the precedent's `_TrendD
 shape) doubles as the recording fixture session end-to-end.
 """
 
+import functools
 import importlib
 import json
 import subprocess
@@ -184,11 +185,22 @@ def test_crownjewel_faithful_zero_raw_pii(tmp_path):
                        deid_client=_SummarizeDeid(root), plan_date=_ON_DATE)
     spec = session.spec_calls()
     captured_domains = {c["name"] for c in spec}
-    assert set(plan_schema.PLAN_DOMAINS) <= captured_domains, (
-        "not every plan domain was dispatched (payload set not proven-non-empty): "
-        f"missing {set(plan_schema.PLAN_DOMAINS) - captured_domains}"
+    # OPTION 2 (ADR-0043-T3): the front door dispatches EXACTLY the active ∩ renderable subset
+    # (activation.active_domains over the derived de-id surface) — a PROPER subset of the grown
+    # PLAN_DOMAINS, proven-non-empty. Computed here from the SAME de-id surface the front door derives;
+    # reverting the active-subset narrowing (mutation #1 — dispatch the closed roster, no deriver) makes
+    # the captured set the whole renderable roster (or the grown roster), != this active subset -> RED.
+    from scripts.plan import router as _router
+    from scripts.serve import plan_loop as _plan_loop
+
+    store_read = functools.partial(store.read, root=root)
+    expected = _plan_loop.active_plan_domains(_router.summarize(store_read)) & set(plan_schema.RENDERABLE_DOMAINS)
+    assert captured_domains, "the dispatched active subset is empty (payload set not proven-non-empty)"
+    assert captured_domains == expected, (
+        f"the dispatched set {captured_domains} is not the active ∩ renderable subset {expected} "
+        "(active-subset narrowing reverted)"
     )
-    assert len(spec) >= len(plan_schema.PLAN_DOMAINS)
+    assert len(spec) >= 1
     wire = json.dumps(session.calls)
     assert _SYNTHETIC_NAME not in wire, "the raw legal name reached a dispatch payload (de-id breach)"
     assert _SYNTHETIC_DRUG not in wire, "the raw med reached a dispatch payload (de-id breach)"

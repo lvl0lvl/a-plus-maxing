@@ -184,7 +184,7 @@ def test_loop_route_produces_one_new_dated_plan_set(tmp_path):
         today = datetime.date.today().isoformat()
         root = tmp_path / "store"
         dated = set()
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             rows = _plan_rows_today(root, domain, today)
             assert len(rows) == 1, f"{domain} did not record exactly one plan for today: {rows}"
             dated.update(r["timepoint"] for r in store.read(f"plan::{domain}", root=root))
@@ -392,7 +392,7 @@ def test_not_true_gate_returns_safety_blocked(tmp_path):
         today = datetime.date.today().isoformat()
         root = tmp_path / "store"
         # 0 plan:: rows promoted into `root` across EVERY domain (the fail-closed surface)
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             assert _plan_rows_today(root, domain, today) == [], (
                 f"a plan was promoted for {domain} despite the not-True safety gate (fail-closed broken)"
             )
@@ -460,7 +460,7 @@ def test_non_json_content_type_refused_before_regenerate(tmp_path, monkeypatch):
 
         today = datetime.date.today().isoformat()
         root = tmp_path / "store"
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             assert _plan_rows_today(root, domain, today) == [], (
                 f"a plan was promoted for {domain} despite the 415 refusal"
             )
@@ -495,7 +495,7 @@ def test_regenerate_raises_returns_degraded(tmp_path, monkeypatch):
 
         today = datetime.date.today().isoformat()
         root = tmp_path / "store"
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             assert _plan_rows_today(root, domain, today) == [], (
                 f"a plan was promoted for {domain} despite the degraded-fallback branch"
             )
@@ -530,7 +530,7 @@ def _new_dated_sets(root, plan_date):
     """Count of NEW dated plan:: sets for `plan_date` (0 or 1 — one generation is one date)."""
     return len({
         r["timepoint"]
-        for domain in plan_schema.PLAN_DOMAINS
+        for domain in plan_schema.RENDERABLE_DOMAINS
         for r in store.read(f"plan::{domain}", root=root)
         if r["timepoint"] == plan_date
     })
@@ -940,7 +940,7 @@ def test_large_change_surfaces_advisory_and_holds(tmp_path, monkeypatch):
     dispatch = _LoopDispatch(_clean_authors())
     deid_client = _FixedDeidClient(_deid_summary())
     srv, port = _loop_server(tmp_path, dispatch, deid_client)
-    _seed_prior_standing(tmp_path / "store", plan_schema.PLAN_DOMAINS)  # 4 replaced -> >= threshold
+    _seed_prior_standing(tmp_path / "store", plan_schema.RENDERABLE_DOMAINS)  # 4 replaced -> >= threshold
     _serve_in_thread(srv)
     try:
         status, body = _post_plan_loop(port)
@@ -958,7 +958,7 @@ def test_large_change_surfaces_advisory_and_holds(tmp_path, monkeypatch):
         # yet read_plan HOLDS it — today resolves to NO_PLAN_TODAY (never the held swap, never a
         # walk-back to the prior confirmed plan). T4 flips the pending pointer to land the swap.
         today = datetime.date.today().isoformat()
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             standing = plan_schema.read_plan(domain, today, tmp_path / "store")
             assert standing["state"] == plan_schema.NO_PLAN_TODAY, (
                 f"{domain}: the unconfirmed large swap stood instead of holding"
@@ -999,7 +999,7 @@ def test_below_threshold_change_no_advisory(tmp_path, monkeypatch):
         # promoted domain pending would red both legs.
         today = datetime.date.today().isoformat()
         root = tmp_path / "store"
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             standing = plan_schema.read_plan(domain, today, root)
             assert standing["state"] is None and standing["plan"] is not None, (
                 f"{domain}: the below-threshold small change did not stand: {standing}"
@@ -1070,7 +1070,7 @@ def test_post_promote_tailoring_seam_fires_once(tmp_path, monkeypatch):
         assert status == 200
         assert len(calls) == 1, f"the tailoring-hook seam fired {len(calls)} times, expected once per re-gen"
         promoted_plan, render_target = calls[0]
-        assert set(promoted_plan) == set(plan_schema.PLAN_DOMAINS), (
+        assert set(promoted_plan) == set(plan_schema.RENDERABLE_DOMAINS), (
             f"the seam did not receive the promoted plan set: {sorted(promoted_plan)}"
         )
         assert str(render_target) == str(tmp_path / "store"), (
@@ -1115,7 +1115,7 @@ def test_adherence_read_separately_absent_does_not_block(tmp_path, monkeypatch):
         # the trend-driven re-gen still promoted plans despite absent adherence (OQ-5)
         today = datetime.date.today().isoformat()
         root = tmp_path / "store"
-        assert all(len(_plan_rows_today(root, d, today)) == 1 for d in plan_schema.PLAN_DOMAINS), (
+        assert all(len(_plan_rows_today(root, d, today)) == 1 for d in plan_schema.RENDERABLE_DOMAINS), (
             "absent adherence blocked the trend-driven re-gen"
         )
     finally:
@@ -1129,8 +1129,10 @@ def test_adherence_read_separately_absent_does_not_block(tmp_path, monkeypatch):
 def test_rationale_adherence_path_writes_no_new_stream(tmp_path, monkeypatch):
     # AC-6: the rationale/adherence/seam path introduces 0 new `::`-prefixed store stream. A
     # store.append spy over the re-gen (patched AFTER the operator-state seed, so it captures only the
-    # re-gen's writes) shows every appended item is a plan::/dvq:: promote (the T1 baseline) — no
-    # rationale::/adherence::/tailoring::/large-change:: stream.
+    # re-gen's writes) shows every appended item is a plan::/dvq:: promote (the T1 baseline) OR the
+    # ADR-0043-T3 Leg-2 comprehensive record (`plan-model::`, ADR-0044-T1's stream — the intended
+    # additive write ON TOP of the kept thin promote) — no rationale::/adherence::/tailoring::/
+    # large-change:: stream.
     dispatch = _LoopDispatch(_clean_authors())
     deid_client = _FixedDeidClient(_deid_summary())
     srv, port = _loop_server(tmp_path, dispatch, deid_client)
@@ -1149,7 +1151,7 @@ def test_rationale_adherence_path_writes_no_new_stream(tmp_path, monkeypatch):
         assert status == 200
         assert appended, "the re-gen wrote nothing (a vacuous store-scan)"
         for item in appended:
-            assert item.startswith(("plan::", "dvq::")), (
+            assert item.startswith(("plan::", "dvq::", "plan-model::")), (
                 f"the rationale/adherence/seam path persisted a new store stream {item!r}"
             )
     finally:

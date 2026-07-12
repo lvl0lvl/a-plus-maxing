@@ -127,6 +127,94 @@ def _read_raw_intake(root):
     return {"operator_state": store.read_all(root)}
 
 
+# Summary fields whose PRESENCE signals activity in a specific card domain (RULING 2). The coarse
+# chat-sourced rich-domain band tokens (ADR-0019-T1) are CLASS values, not domain slugs — so their
+# PRESENCE in the de-id summary maps to the corresponding card domain (a stated diet -> nutrition,
+# a supplement stack -> supplements, a peptide-use band -> peptides, a training-volume band ->
+# workout). Goal / issue / genetic-trait fields carry card slugs directly (filtered).
+_FIELD_PRESENCE_DOMAIN = {
+    "dietary-pattern-class": "nutrition",
+    "supplement-stack-class": "supplements",
+    "peptide-use-class": "peptides",
+    "training-volume-band": "workout",
+}
+
+# Band-field values that signal NO active use (so they do NOT activate their domain): the documented
+# `router` absent sentinel (`not-discussed`) and a confirmed-none. A real coarse class value ("omnivore",
+# a supplement-stack class, …) DOES activate its domain.
+_INACTIVE_BAND_VALUES = frozenset({router._NOT_DISCUSSED, "none", ""})
+
+
+def _surface_tokens(value):
+    """Tokenize a de-id summary field value (str or iterable) into candidate card-domain slugs."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return value.replace(",", " ").split()
+    if isinstance(value, (list, tuple, set)):
+        return [str(token) for token in value]
+    return []
+
+
+def derive_operator_surface(summary):
+    """Project the ALREADY-de-identified summary into the `activation` surface (RULING 2, crown-jewel).
+
+    The front-door helper `active_domains` had no surface constructor — this is it. It PROJECTS the
+    post-de-id summary (`router.summarize` / `deid_in` output) into the four `activation` channels
+    (`goals` / `data` / `mentions` / `lab_or_trait_touches`), each an iterable of card-domain slugs:
+    `goals` from `goal-domains`, `mentions` from the coarse rich-domain band-field PRESENCE + a card
+    slug named in `active-issue-class`, `lab_or_trait_touches` from the coarse `genetic-trait-classes`
+    tokens. It originates NO new operator-state source — a pure projection of what the assembled /
+    de-identified context already holds.
+
+    DE-ID-SAFE by construction (the LOAD-BEARING crown-jewel boundary): it consumes the post-de-id
+    `summary` ONLY (never the raw intake), and every channel value is FILTERED to
+    `activation.CARD_DOMAINS ∪ activation.CROSS_CUTTING_INPUTS` (card slugs / coarse tokens only) — so
+    a raw operator identifier, a raw med free-text, or a raw genotype structurally cannot enter the
+    surface (ADR-0032 genetics crown jewel: only the coarse de-id trait-CLASS token can touch
+    `lab_or_trait_touches`, never a raw allele).
+
+    Args:
+        summary (Mapping): The post-de-id operator summary (`router.SUMMARY_FIELD_SET` fields).
+
+    Returns:
+        (dict) The `_SURFACE_CHANNELS` mapping `activation.active_domains` consumes.
+    """
+    from scripts.plan import activation
+
+    known = set(activation.CARD_DOMAINS) | set(activation.CROSS_CUTTING_INPUTS)
+    goals = {slug for slug in _surface_tokens(summary.get("goal-domains")) if slug in known}
+    mentions = {slug for slug in _surface_tokens(summary.get("active-issue-class")) if slug in known}
+    mentions |= {
+        domain for field, domain in _FIELD_PRESENCE_DOMAIN.items()
+        if str(summary.get(field) or "").strip().lower() not in _INACTIVE_BAND_VALUES
+    }
+    traits = {slug for slug in _surface_tokens(summary.get("genetic-trait-classes")) if slug in known}
+    # `data` (tracked-stream presence) is not a summary field — the goals/mentions channels carry the
+    # activation signal here; the deriver stays a pure summary projection (no store read).
+    return {
+        "goals": sorted(goals), "data": [],
+        "mentions": sorted(mentions), "lab_or_trait_touches": sorted(traits),
+    }
+
+
+def active_plan_domains(summary):
+    """The active card-emitting domains for the front door (RULING 2 + the renderable-core floor).
+
+    `activation.active_domains(derive_operator_surface(summary))`, FLOORED at the renderable core four
+    when the surface carries NO renderable-domain signal — the baseline plan (backward-compatible with
+    the pre-growth always-four behavior). Progressive activation ADDS a rich domain when the surface
+    signals it, and NARROWS the renderable subset only when the surface explicitly signals a proper
+    renderable subset (AC-4 / AC-S2). The result never zeroes out an existing operator's plan.
+    """
+    from scripts.plan import activation
+
+    active = set(activation.active_domains(derive_operator_surface(summary)))
+    if not (active & set(plan_schema.RENDERABLE_DOMAINS)):
+        active |= set(plan_schema.RENDERABLE_DOMAINS)
+    return active
+
+
 def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tailor_client=None):
     """Drive the loop's re-gen through the full-composition front door and return the run result.
 
@@ -173,10 +261,20 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tai
     # trend from the live feed — never a cached/stale summary.
     raw_intake = _read_raw_intake(root)
     store_read = functools.partial(store.read, root=root)
+    # Leg 1 (OPTION 2 — the ADR-0028 composed safety gate PRESERVED, WRAPPED not retired): derive the
+    # de-id-safe operator surface and NARROW the dispatched set to active ∩ the renderable roster; the
+    # composed gate_dispatch is STILL injected so run_orchestrated's loop_enabled path (drive ->
+    # compose_disposition -> the fail-closed safety_passed gate -> the five holds -> thin promote) runs
+    # unchanged. `domains=` is an already-accepted run_orchestrated param — plan_orchestrator is NOT
+    # edited. A rich domain active in the surface is folded in by Leg 2 (it never traverses the thin
+    # renderable-validator path).
+    summary = router.summarize(store_read)
+    active = active_plan_domains(summary)
+    renderable = tuple(sorted(active & set(plan_schema.RENDERABLE_DOMAINS)))
     gate_producer = compose_gate_dispatch(_JudgeClient(dispatch), dispatch)
     result = plan_orchestrator.run_orchestrated(
         raw_intake, deid_client, dispatch, store_read, root,
-        plan_date=plan_date, gate_dispatch=gate_producer,
+        plan_date=plan_date, domains=renderable, gate_dispatch=gate_producer,
     )
     # Post-promote seams (ADR-0036-T4): the re-gen rationale, the large-change ADVISORY notice, the
     # pass-through tailoring-hook seam, and the separate adherence input. Only a run that actually
@@ -185,6 +283,18 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tai
     promoted = _promoted_domains(result)
     if not promoted:
         return result
+    # Leg 2 (OPTION 2 — ADDITIVE, gated by the pass): the `if not promoted` guard above IS the
+    # SAFETY_BLOCKED boundary (on a block, promoted is empty and regenerate returned untouched — no
+    # synthesis, no comprehensive record, the prior version stands, 0 partial write, AC-BP). Reaching
+    # here ⟺ Leg 1's composed gate SURFACED a pass, so the care-agent synthesize step composes ONE
+    # comprehensive plan version from the gate-cleared programs Leg 1 surfaced PLUS any active rich
+    # domain (authored via the dispatch seam over the de-id summary, reconciled through the always-on
+    # floors) and records it via plan_model.record_plan_version — ON TOP of Leg 1's KEPT thin write.
+    from scripts.serve import care_chat
+    care_chat.synthesize(
+        active, result, lambda domain: dispatch(domain, "", summary),
+        store_read, on_date=plan_date, root=root,
+    )
     # AC-1: a non-empty plain-language what-changed rationale on every promoted re-gen.
     result["rationale"] = _compose_rationale(promoted, trigger)
     # AC-5: read adherence as a SEPARATE additional input, distinct from the trend (which the de-id
@@ -397,17 +507,26 @@ def _date_of(timepoint):
 
 
 def _last_regen_date(store_read, on_date):
-    """The latest on-file `plan::` date across `PLAN_DOMAINS` — the derived last-re-gen date, or None.
+    """The latest on-file re-gen date across BOTH the thin `plan::` rows and the comprehensive stream.
 
-    Reads each domain's `plan::<domain>` series through `plan_schema.resolve_plan` (the dated read):
-    a domain with a plan resolves to its plan date, the max of which is the last time ANY plan was
-    generated. Zero on-file plans resolve to None (no prior re-gen to debounce against).
+    Dual-source resolver (RULING 1 consequence). OPTION 2 KEEPS Leg 1's thin `plan::<domain>` write,
+    so a re-gen promoting >=1 renderable domain advances the marker via `plan::` (read across the
+    RENDERABLE roster — the only domains that ever carry a thin row). It ALSO reads the comprehensive
+    `plan-model::` version stream (`plan_model.resolve_comprehensive`) so a renderable-LESS (all-rich)
+    comprehensive re-gen — which writes NO thin row — still advances the `MIN_REGEN_INTERVAL_DAYS`
+    debounce floor; a `plan::`-only marker would starve on such a re-gen and every subsequent trigger
+    would re-fire (debounce thrash). Zero on-file re-gens resolve to None.
     """
+    from scripts.store import plan_model
+
     dates = []
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         resolved = plan_schema.resolve_plan(store_read(f"plan::{domain}"), on_date)
         if resolved["plan_date"] is not None:
             dates.append(resolved["plan_date"])
+    comprehensive = plan_model.resolve_comprehensive(store_read(plan_model._PREFIX_MODEL), on_date)
+    if comprehensive["plan_date"] is not None:
+        dates.append(comprehensive["plan_date"])
     return max(dates) if dates else None
 
 
