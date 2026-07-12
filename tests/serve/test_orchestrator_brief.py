@@ -17,12 +17,15 @@ is a tmp root; ALL fixtures are SYNTHETIC (0 real operator PII, 0 live API, no k
 
 import functools
 import json
+import subprocess
 from pathlib import Path
 
 from scripts.plan import router
 from scripts.plan.context_assembler import assemble_context
 from scripts.serve import care_chat
 from scripts.store import store
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class _RecordingBackend:
@@ -144,23 +147,47 @@ def test_every_active_domain_gets_exactly_one_brief():
 
 # --- AC-5: capture call site + _care_profile byte-unchanged -------------------------------------
 
-def test_capture_call_site_byte_unchanged():
-    """The additive rewrite left the gated capture call block + `_care_profile` byte-unchanged (AC-5).
+def _func_src(source_text, name):
+    """The exact source segment of the top-level `def name` (mirrors test_plan_model.py:295)."""
+    import ast
 
-    A source-level guard: the care agent still PROPOSES facts through the same de-identify-by-data-class
-    gate (`extract.persist_extraction`), and the private full-profile builder is untouched. Reds if the
-    rewrite reached into the capture wiring or `_care_profile`.
+    for node in ast.parse(source_text).body:
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return ast.get_source_segment(source_text, node)
+    raise AssertionError(f"function {name!r} not found in source")
+
+
+def _persist_extraction_src(source_text):
+    """The exact source segment of the `extract.persist_extraction(...)` capture call."""
+    import ast
+
+    for node in ast.walk(ast.parse(source_text)):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "persist_extraction"):
+            return ast.get_source_segment(source_text, node)
+    raise AssertionError("extract.persist_extraction(...) call not found in source")
+
+
+def test_capture_call_site_byte_unchanged():
+    """The additive rewrite left the gated capture call + `_care_profile` BYTE-unchanged vs origin/main (AC-5).
+
+    Hardened from a 4-landmark `in`-check to byte-equality (QA-T2-03): `_care_profile`'s full source AND
+    the `extract.persist_extraction(...)` capture-call region are extracted from BOTH the current tree and
+    `origin/main` and asserted byte-identical — so a change to either region that preserved the old landmark
+    substrings can no longer pass. The care agent still PROPOSES facts through the same
+    de-identify-by-data-class gate, and the private full-profile builder is untouched.
     """
-    src = Path(care_chat.__file__).read_text()
-    # the exact capture call block, verbatim (care_chat.py:286-289)
-    assert "extract.persist_extraction(" in src, "the gated capture call was removed"
-    assert 'result.get("extraction"), turn_text, root=store_root,' in src, "the capture call args changed"
-    assert "scaffold_root=scaffold_root, identity_config=identity_config," in src, "the capture gate args changed"
-    # `_care_profile` (166-200) load-bearing structure, verbatim
-    assert "def _care_profile(store_read, *, scaffold_root=None, identity_config=None):" in src, "_care_profile signature changed"
-    assert 'profile["health_detail"] = detail' in src, "_care_profile health_detail enrich changed"
-    assert 'meds = record.pop("rx-interaction-classes", None)' in src, "_care_profile medication handling changed"
-    assert 'profile["record"] = record' in src, "_care_profile record handling changed"
+    current = Path(care_chat.__file__).read_text()
+    base = subprocess.run(
+        ["git", "show", "origin/main:scripts/serve/care_chat.py"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    ).stdout
+    assert _func_src(current, "_care_profile") == _func_src(base, "_care_profile"), (
+        "_care_profile changed vs origin/main — the additive rewrite must leave it byte-unchanged"
+    )
+    assert _persist_extraction_src(current) == _persist_extraction_src(base), (
+        "the extract.persist_extraction capture-call region changed vs origin/main"
+    )
 
 
 # --- PF-S130-01: production-path integration (MANDATORY, non-tautological) ----------------------

@@ -251,6 +251,34 @@ def test_uniform_program_round_trips_zero_fields_dropped(tmp_path):
     assert [ex["name"] for ex in plan["exercises"]] == ["Goblet squat"]
     # the workout clearance gate is PRESERVED (a LOAD-BEARING safety gate)
     assert "load" not in plan["exercises"][0], "the clearance gate must strip load without clearance"
+    # QA-T2-01 (SAFETY-ADJACENT): the clearance gate strips `load` from the STORE-BOUND program
+    # prescription too — not only the renderable exercise. `program["prescription"]` rides
+    # record_plan -> store.append into stored plan state (and ADR-0044 first-class storage), so an
+    # un-cleared load must not survive there while the renderable assertion above stays green.
+    assert "load" not in program[domain_program.PRESCRIPTION], (
+        "the clearance gate must strip load from the store-bound program prescription too"
+    )
+    # QA-T2-02: the non-prescription ramped field VALUES round-trip byte-equal (the 0044-T1 AC-2
+    # fidelity bar), not just the seven KEYS above — a migration emitting the keys with an
+    # emptied/renamed sub-value would pass key-presence but fail here. Values are the
+    # `_uniform_program` fixture's known literals.
+    assert program[domain_program.MONITORING_SIGNALS] == [
+        {"signal": "morning HRV", domain_program.SIGNAL_TIER_KEY: "moderate"}
+    ], "monitoring_signals (with its validity tier) must round-trip value-intact"
+    assert program[domain_program.ADJUSTMENT_RULES] == [
+        {"trigger": "HRV drop >1SD across 3 days", "action": "reduce volume 20%"}
+    ], "adjustment_rules must round-trip value-intact"
+    assert program[domain_program.RATIONALE] == {
+        "certainty_of_evidence": "moderate",
+        "strength_of_recommendation": "strong",
+        "causal_marker": "associational",
+    }, "the GRADE rationale must round-trip value-intact"
+    assert program[domain_program.CROSS_DOMAIN_SEAMS] == [
+        {"paired_domain": "nutrition", "seam": "energy availability floor"}
+    ], "cross_domain_seams must round-trip value-intact"
+    assert program[domain_program.REQUIRED_LABS] == [], (
+        "training required_labs must round-trip value-intact (empty-OK for a training kind)"
+    )
 
     # compound-kind domain (peptides) — the seven fields ride the single-compound plan.
     root_p = tmp_path / "peptides"
@@ -268,6 +296,15 @@ def test_uniform_program_round_trips_zero_fields_dropped(tmp_path):
     assert [f for f in seven if f not in program_p] == [], (
         "compound: all seven program fields must round-trip (0 dropped)"
     )
+    # QA-T2-02 (compound): the ramped field VALUES round-trip byte-equal — required_labs is the
+    # distinguishing compound value (mandatory-and-non-empty for a compound kind, ["CBC","CMP"] in
+    # the fixture), plus a monitoring-signal validity tier, mirroring 0044-T1 AC-2's == bar.
+    assert program_p[domain_program.REQUIRED_LABS] == ["CBC", "CMP"], (
+        "compound required_labs must round-trip value-intact"
+    )
+    assert program_p[domain_program.MONITORING_SIGNALS] == [
+        {"signal": "morning HRV", domain_program.SIGNAL_TIER_KEY: "moderate"}
+    ], "compound: monitoring_signals must round-trip value-intact"
     assert plan_p["compound"] == "BPC-157", "the single-compound renderable regimen must record"
 
 
