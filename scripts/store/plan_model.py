@@ -50,7 +50,7 @@ import datetime
 import re
 
 from scripts.plan import domain_program
-from scripts.store import plan_schema, store
+from scripts.store import plan_confirm, plan_schema, store
 from scripts.store.loop_schema import _content_tag, _reading
 
 # The plan-version stream's item namespace. The prefix IS the item id: the
@@ -232,17 +232,55 @@ def resolve_comprehensive(readings, on_date):
     }
 
 
+def _standing_versions(readings, root):
+    """Drop each plan version held by a non-`confirmed` covered-domain confirmation pointer.
+
+    Generalizes the thin `plan_confirm.filter_confirmed` (one domain) to a composite version's
+    domain set: a version stands only when EVERY domain in its `domain_programs` reads `None`
+    (no pointer) or `DECISION_CONFIRMED` at the version's timepoint; a version with ANY covered
+    domain carrying a `pending`/`declined` pointer is HELD (dropped, so the whole large-change swap
+    is held as a unit). Reads the UNCHANGED `plan_confirm.decision_for` per version-domain; it writes
+    nothing, rewrites nothing (append-only preserved), and defines no store key — identity is reached
+    only through `store.read`.
+
+    Args:
+        readings (list): One plan-model item's readings, in `store.read` order.
+        root (str | Path): The store root.
+
+    Returns:
+        (list) The readings minus any held by a non-confirmed covered-domain pointer.
+    """
+    return [
+        reading
+        for reading in readings
+        if all(
+            plan_confirm.decision_for(domain, reading["timepoint"], root)
+            in (None, plan_confirm.DECISION_CONFIRMED)
+            for domain in reading["value"][DOMAIN_PROGRAMS]
+        )
+    ]
+
+
 def read_plan_version(on_date, root):
-    """Resolve the stored plan version for a date (see `resolve_comprehensive`).
+    """Resolve the stored plan version for a date, honoring the ADR-0040 confirm hold.
+
+    Applies the confirmation-pointer hold (`_standing_versions`) to the `plan-model::` readings
+    BEFORE the pure `resolve_comprehensive`: a version whose date carries a non-`confirmed`
+    (`pending`/`declined`) `plan-confirm::<domain>` pointer for ANY covered domain resolves
+    NOT-standing (the large-change swap is held as a unit); a confirmed / no-pointer version stands.
+    This mirrors the thin path (`plan_schema.read_plan` applies `filter_confirmed` before `resolve_plan`)
+    generalized from one domain to the composite version's domain set; `resolve_comprehensive` stays PURE.
 
     Args:
         on_date (str): The render date, YYYY-MM-DD.
         root (str | Path): The store root.
 
     Returns:
-        (dict) The `resolve_comprehensive` result over the `plan-model::` item's readings.
+        (dict) The `resolve_comprehensive` result over the STANDING (non-held) `plan-model::` readings.
     """
-    return resolve_comprehensive(store.read(_PREFIX_MODEL, root=root), on_date)
+    return resolve_comprehensive(
+        _standing_versions(store.read(_PREFIX_MODEL, root=root), root), on_date
+    )
 
 
 def read_standing_plan(domain, on_date, root):
@@ -257,10 +295,18 @@ def read_standing_plan(domain, on_date, root):
     thin-only store AND a domain the comprehensive plan does not cover both keep their exact thin
     behavior (backward-compatible).
 
-    Returns the SAME shape as ``plan_schema.read_plan`` so the ``track.resolve_plan_progress`` re-point
-    is a pure call-site swap. Read-only: it writes nothing, rewrites no reading on either stream
-    (append-only preserved), and defines no store key — identity is reached only through ``store.read``
-    / the composed resolvers.
+    Shape reconciliation (qrg4, ADR-0043-T3): the top-level ``{state, plan, specialist, plan_date}``
+    KEYS match ``plan_schema.read_plan``, but ``plan`` is NOT identical across branches — the
+    comprehensive branch returns the DOMAIN PROGRAM's periodized ``PRESCRIPTION`` (dated ``blocks``),
+    the thin branch returns ``read_plan``'s flat renderable plan. This is deliberate and the shape its
+    consumers were built for: ``track.resolve_plan_progress`` (``track.py``) threads ``plan`` through to
+    ``horizons`` (which reads the periodized ``prescription.blocks``) and to ``adjust`` / the maintained
+    artifact / the dashboard — all of which consume the periodized prescription on the comprehensive
+    branch (the ADR-0044-T3 horizons rebase reads ``blocks`` directly). It is therefore NOT a "pure
+    call-site swap to read_plan's renderable plan" on the comprehensive branch — the earlier docstring
+    claim to that effect is corrected here. Read-only: it writes nothing, rewrites no reading on either
+    stream (append-only preserved), and defines no store key — identity is reached only through
+    ``store.read`` / the composed resolvers.
 
     Args:
         domain (str): A ``plan_schema.PLAN_DOMAINS`` member.

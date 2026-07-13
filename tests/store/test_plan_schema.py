@@ -158,9 +158,10 @@ def test_record_plan_schema_violation_raises(tmp_path, domain, mutate):
     assert store.items(root=tmp_path) == []
 
 
-@pytest.mark.parametrize("domain", plan_schema.PLAN_DOMAINS)
+@pytest.mark.parametrize("domain", plan_schema.RENDERABLE_DOMAINS)
 def test_record_plan_valid_document_round_trips(tmp_path, domain):
-    """A valid plan stores exactly one reading: item/timepoint/source/value."""
+    """A valid plan stores exactly one reading (the thin renderable path is the RENDERABLE roster
+    only — RT-009: a grown rich domain records first-class via plan_model, never the thin validator)."""
     plan = _VALID_PLANS[domain]()
     plan_schema.record_plan(domain, plan, "2026-06-10", "coach", tmp_path)
     readings = store.read(f"plan::{domain}", root=tmp_path)

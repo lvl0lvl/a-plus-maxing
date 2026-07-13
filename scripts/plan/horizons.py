@@ -14,7 +14,7 @@ reads are local file I/O; 0 model-bound send.
 
 import datetime
 
-from scripts.store import calendar_schema, goal_schema, plan_confirm, plan_schema, store
+from scripts.store import calendar_schema, goal_schema, plan_confirm, plan_model, plan_schema, store
 
 # Trailing window spans in days, anchored on (and inclusive of) the render date
 # (OQ-2 boundary decision): a window is the `span` dates [on_date - (span-1),
@@ -129,15 +129,52 @@ def _in_window(timepoint, on_date, span_days):
     return start <= point <= end
 
 
-def window_block(domain, root, on_date, span_days):
-    """Select a domain's latest plan reading in the trailing window, or None.
+def _latest_in_window(dated_blocks, on_date, span_days):
+    """Return the latest in-window block as the `{plan_date, extras}` contract, or None.
 
-    Widens ``plan_schema.resolve_plan``'s single-date equality to window
-    membership: over the domain's ``plan::<domain>`` readings, keep those whose
-    timepoint is in-window and return the latest-dated one. The ADR-0036 loop
-    day-keys a new dated plan on every trigger (RT-09), so multiple dated plans
-    can share one window — the max-timepoint reading is "the block", mirroring
-    ``resolve_plan``'s latest-wins (the last store-order reading at the max date).
+    The shared selection both ``window_block`` sources feed: each item is a
+    ``(date, source)`` pair — a comprehensive periodization block ``(block["date"],
+    block)`` or a flat reading ``(reading["timepoint"], reading["value"])``. Keep the
+    in-window items (the boundary-inclusive ``_in_window`` over the date) and return
+    the latest-dated one's date plus the ``HORIZON_EXTRAS`` framing lifted off its
+    source (the last item at the max date wins, mirroring the store-order latest-wins).
+
+    Args:
+        dated_blocks (list): `(date_str, extras_source)` pairs.
+        on_date (str): The render date, YYYY-MM-DD.
+        span_days (int): The trailing window width in days.
+
+    Returns:
+        (dict | None) Keys `plan_date` (the latest in-window date) and `extras`, or
+        None when no item is in-window.
+    """
+    in_window = [
+        (date, source) for date, source in dated_blocks if _in_window(date, on_date, span_days)
+    ]
+    if not in_window:
+        return None
+    latest_date = max(date for date, _ in in_window)
+    source = None
+    for date, candidate in in_window:
+        if date == latest_date:
+            source = candidate
+    return {"plan_date": latest_date, "extras": plan_extras(source)}
+
+
+def window_block(domain, root, on_date, span_days):
+    """Select a domain's latest in-window plan block, or None (ADR-0044-T3 re-base).
+
+    Resolves the standing plan through the mixed-history reader
+    ``plan_model.read_standing_plan`` (comprehensive-wins). When a COMPREHENSIVE
+    plan stands and covers the domain, its first-class periodization
+    (``prescription["blocks"]``, dated blocks) is the source: keep the blocks whose
+    ``block["date"]`` is in-window and return the latest — 0 reads of the retired
+    flat ``plan::<domain>`` history for periodization. OTHERWISE (a pre-migration
+    thin-only store, or a standing plan carrying no ``blocks``) it falls back to the
+    RETAINED flat ``plan::<domain>`` range-query: the ADR-0036 loop day-keys a new
+    dated plan on every trigger (RT-09), so multiple dated plans share one window
+    and the max-timepoint reading is "the block". Both branches apply the SAME
+    boundary-inclusive ``_in_window`` predicate and latest-wins selection.
 
     Args:
         domain (str): A `plan_schema.PLAN_DOMAINS` member.
@@ -147,28 +184,31 @@ def window_block(domain, root, on_date, span_days):
 
     Returns:
         (dict | None) Keys `plan_date` (the block's date) and `extras` (the
-        `HORIZON_EXTRAS` week-framing off the block value); or None when no plan
-        falls in the window.
+        `HORIZON_EXTRAS` week-framing off the block); or None when no block falls
+        in the window.
     """
+    standing = plan_model.read_standing_plan(domain, on_date, root)
+    plan = standing["plan"]
+    if standing["state"] is None and isinstance(plan, dict) and isinstance(plan.get("blocks"), list):
+        return _latest_in_window(
+            [(block["date"], block) for block in plan["blocks"]], on_date, span_days
+        )
     readings = plan_confirm.filter_confirmed(
         store.read(f"plan::{domain}", root=root), domain, root
     )
-    in_window = [r for r in readings if _in_window(r["timepoint"], on_date, span_days)]
-    if not in_window:
-        return None
-    latest_date = max(r["timepoint"] for r in in_window)
-    block = None
-    for reading in in_window:
-        if reading["timepoint"] == latest_date:
-            block = reading
-    return {"plan_date": latest_date, "extras": plan_extras(block["value"])}
+    return _latest_in_window(
+        [(reading["timepoint"], reading["value"]) for reading in readings], on_date, span_days
+    )
 
 
 def read_horizons(domain, slug, root, on_date):
     """Compose the four tracking horizons for a domain + goal on a render date.
 
-    Today's action is the date-equality plan (``plan_schema.read_plan`` — the
-    render-date plan when present, ``NO_PLAN``/``NO_PLAN_TODAY`` when absent, never
+    Today's action is the comprehensive-wins standing plan
+    (``plan_model.read_standing_plan`` — a comprehensive plan standing for the render
+    date surfaces as today's action; a thin-only store preserves the exact
+    date-equality result, since the reader's thin fallback IS ``plan_schema.read_plan``:
+    the render-date plan when present, ``NO_PLAN``/``NO_PLAN_TODAY`` when absent, never
     the nearest date). This week's block and the month arc are the latest-in-window
     plans over the 7- and 30-day trailing windows. The milestone is the goal's
     derived progress via ``read_horizon`` (the single progress owner). Composes
@@ -182,12 +222,12 @@ def read_horizons(domain, slug, root, on_date):
         on_date (str): The render date, YYYY-MM-DD.
 
     Returns:
-        (dict) Keys `today` (the `resolve_plan` result), `week` and `month` (the
-        `window_block` results, or None), and `milestone` (the `read_horizon`
-        result, or None).
+        (dict) Keys `today` (the `read_standing_plan` result — same `{state, plan,
+        specialist, plan_date}` shape), `week` and `month` (the `window_block`
+        results, or None), and `milestone` (the `read_horizon` result, or None).
     """
     return {
-        "today": plan_schema.read_plan(domain, on_date, root),
+        "today": plan_model.read_standing_plan(domain, on_date, root),
         "week": window_block(domain, root, on_date, WEEK_SPAN_DAYS),
         "month": window_block(domain, root, on_date, MONTH_SPAN_DAYS),
         "milestone": read_horizon(slug, root),

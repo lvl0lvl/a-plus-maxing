@@ -123,13 +123,24 @@ def _surviving(recommendations):
 
 # domain -> DOMAIN PROGRAM kind (ADR-0041-T2). Grounded against domain_program.DOMAIN_KIND_RULES:
 # movement/nutrition are training-kind (required_labs empty-OK); supplements/peptides are
-# compound-kind (required_labs + autoregulation mandatory-and-non-empty). The module-load
-# tripwire fails fast if a mapped kind ever leaves the frozen DOMAIN_KINDS vocabulary.
-_DOMAIN_KIND = {
+# compound-kind (required_labs + autoregulation mandatory-and-non-empty). GROWN 4->§1-§13
+# (ADR-0043-T3) DERIVED from the grown plan_schema.PLAN_DOMAINS: the RICH card domains (§5-§13)
+# BYPASS compute_plan at the front door, so their kind here is the AC-10 coherence sentinel + the
+# legacy-single-domain-reach kind — grounded in the deployed roster
+# (design/specialist-plan-contracts.md): the compound-reasoning domains (endocrine/dermatology/gi)
+# are compound-kind, the behavioral/synthesis domains training-kind. The module-load tripwire fails
+# fast if a mapped kind ever leaves the frozen DOMAIN_KINDS vocabulary.
+_RENDERABLE_DOMAIN_KIND = {
     "workout": "training",
     "nutrition": "training",
     "supplements": "compound",
     "peptides": "compound",
+}
+_RICH_COMPOUND_DOMAINS = frozenset({"endocrine", "dermatology", "gi"})
+_DOMAIN_KIND = {
+    **_RENDERABLE_DOMAIN_KIND,
+    **{domain: ("compound" if domain in _RICH_COMPOUND_DOMAINS else "training")
+       for domain in plan_schema.PLAN_DOMAINS if domain not in _RENDERABLE_DOMAIN_KIND},
 }
 assert set(_DOMAIN_KIND.values()) <= domain_program.DOMAIN_KINDS, (
     f"_DOMAIN_KIND maps outside DOMAIN_KINDS: {set(_DOMAIN_KIND.values())}"
@@ -224,21 +235,6 @@ def _with_program(plan, program):
     return plan
 
 
-def _deep_strip_load(value):
-    """Return a deep copy of a prescription structure with every `load` key removed.
-
-    The ADR-0015 clearance gate drops load prescriptions when no clinician clearance is
-    granted. A PERIODIZED prescription nests per-block `load` under dated `blocks`/phases, so a
-    top-level pop leaks the nested load into the renderable AND the store-bound program; this
-    recurses dicts and lists so `load` is stripped at EVERY depth before either is built.
-    """
-    if isinstance(value, dict):
-        return {key: _deep_strip_load(sub) for key, sub in value.items() if key != "load"}
-    if isinstance(value, list):
-        return [_deep_strip_load(item) for item in value]
-    return value
-
-
 def _contains_load(value):
     """Return whether a `load` key appears at ANY depth of `value` (dicts + lists)."""
     if isinstance(value, dict):
@@ -246,54 +242,6 @@ def _contains_load(value):
     if isinstance(value, list):
         return any(_contains_load(item) for item in value)
     return False
-
-
-# domain -> the renderable IDENTITY field that distinguishes a nameable renderable entry from a
-# degenerate PERIODIZED-ONLY prescription (dated `blocks`, no top-level card identity). Only the
-# per-entry translators key here; nutrition AGGREGATES day targets + meals and already fails closed
-# (honest no-plan) when the aggregation is incomplete, so it needs no identity gate.
-_RENDERABLE_IDENTITY = {
-    "workout": "name",
-    "supplements": "name",
-    "peptides": "compound",
-}
-
-
-def _project_renderable(prescription, domain, *, strip_load):
-    """Project a (possibly PERIODIZED) DOMAIN PROGRAM prescription to its flat renderable form.
-
-    The uniform prescription is canonically PERIODIZED (dated `blocks`, per-block `load`), but the
-    four frozen `plan_schema` per-domain validators consume the FLAT top-level fields. This projects
-    the prescription for both the renderable and the store-bound program (bead 58z0):
-
-      1. DEEP-STRIP `load` over the FULL periodized structure when `strip_load` (the ADR-0015
-         clearance leg — a per-block `load` must never reach stored plan state, the load-clearance
-         safety gate); the dated `blocks` ride on as an open-on-extras extra.
-      2. Honest no-plan (return None) for a DEGENERATE periodized-only prescription — one carrying
-         dated `blocks` but NO top-level renderable identity for its domain — rather than passing a
-         `{"blocks": [...]}` shell to `record_plan`, whose frozen validator would raise a hard
-         ValueError (the 58z0 crash). A FLAT prescription missing a required field is a genuine
-         malformation, NOT a periodized shape, so it is passed through and still surfaces LOUD at
-         `record_plan` (the never-silently-drop contract is preserved).
-
-    Args:
-        prescription: The DOMAIN PROGRAM's prescription (a dict for a real prescription).
-        domain (str): The plan domain — keys the renderable-identity check (`_RENDERABLE_IDENTITY`).
-        strip_load (bool): Deep-strip `load` at every depth when True.
-
-    Returns:
-        (dict | None) The projected prescription (flat fields + load-handled `blocks`), or None for
-        a non-dict prescription or a degenerate periodized-only shape (the honest no-plan / skip).
-    """
-    if not isinstance(prescription, dict):
-        return None
-    projected = _deep_strip_load(prescription) if strip_load else dict(prescription)
-    identity = _RENDERABLE_IDENTITY.get(domain)
-    if identity is not None and "blocks" in projected:
-        value = projected.get(identity)
-        if not (isinstance(value, str) and value):
-            return None
-    return projected
 
 
 def _to_workout_plan(recommendations, gates):
@@ -331,7 +279,7 @@ def _to_workout_plan(recommendations, gates):
         # so a PERIODIZED prescription's per-block load never ships into the renderable OR the
         # store-bound program (the program prescription is set to this same exercise); a degenerate
         # periodized-only prescription is honest no-plan (skip), never a `record_plan` crash (58z0).
-        exercise = _project_renderable(
+        exercise = domain_program.project_renderable(
             prog.get(domain_program.PRESCRIPTION), "workout", strip_load=not clearance_granted,
         )
         if exercise is None:
@@ -382,7 +330,7 @@ def _to_nutrition_plan(recommendations, gates):
         prog = _lift_program(claim, "nutrition")
         if prog is None:
             continue
-        payload = _project_renderable(
+        payload = domain_program.project_renderable(
             prog.get(domain_program.PRESCRIPTION), "nutrition", strip_load=True,
         )
         if payload is None:
@@ -435,7 +383,7 @@ def _to_supplements_plan(recommendations, gates):
         prog = _lift_program(claim, "supplements")
         if prog is None:
             continue
-        item = _project_renderable(
+        item = domain_program.project_renderable(
             prog.get(domain_program.PRESCRIPTION), "supplements", strip_load=True,
         )
         if item is None:
@@ -475,7 +423,7 @@ def _to_peptides_plan(recommendations, gates):
         prog = _lift_program(claim, "peptides")
         if prog is None:
             continue
-        regimen = _project_renderable(
+        regimen = domain_program.project_renderable(
             prog.get(domain_program.PRESCRIPTION), "peptides", strip_load=True,
         )
         if regimen is None:
@@ -514,14 +462,32 @@ def _nutrition_safety_gate(recommendations, gates):
     return None
 
 
-# domain -> translator(recommendations, gates) -> plan dict | None. A new plan-domain author
-# wires in by adding its translator here (workout is 1:1; nutrition aggregates; supplements is
-# 1 rec -> 1 item; peptides records one compound regimen).
+def _rich_domain_program_only(recommendations, gates):
+    """Rich card domains (§5-§13) emit NO thin renderable plan (ADR-0043-T3).
+
+    Their content is the seven-field DOMAIN PROGRAM composed by the Orchestrator synthesize step and
+    stored first-class via `plan_model.record_plan_version`; they BYPASS `compute_plan` at the front
+    door (the `active ∩ renderable` narrowing). This sentinel keeps `_PLAN_TRANSLATORS` coherent with
+    the grown `PLAN_DOMAINS` (AC-10, no orphan) and, if a legacy single-domain `generate_plan(<rich>,
+    …)` ever reaches it, returns `compute_plan`'s renderable `dict | None` contract as None (honest no
+    thin plan) so the thin `record_plan` path is never entered for a rich domain (the `_check_plan_args`
+    guard is the fail-closed backstop for any residual thin reach).
+    """
+    return None
+
+
+# domain -> translator(recommendations, gates) -> plan dict | None. A new renderable plan-domain
+# author wires in by adding its translator here (workout is 1:1; nutrition aggregates; supplements
+# is 1 rec -> 1 item; peptides records one compound regimen). GROWN 4->§1-§13 (ADR-0043-T3) DERIVED
+# from plan_schema.PLAN_DOMAINS: rich card domains map to the program-only sentinel (they bypass
+# compute_plan) — the coherence-gate no-orphan requirement (AC-10) + a legacy-reach safety.
 _PLAN_TRANSLATORS = {
     "workout": _to_workout_plan,
     "nutrition": _to_nutrition_plan,
     "supplements": _to_supplements_plan,
     "peptides": _to_peptides_plan,
+    **{domain: _rich_domain_program_only for domain in plan_schema.PLAN_DOMAINS
+       if domain not in plan_schema.RENDERABLE_DOMAINS},
 }
 
 # domain -> safety veto(recommendations, gates) -> reason str | None. Every gate here MUST

@@ -73,9 +73,11 @@ RX_BPMH_HELD = "rx-bpmh-held"  # a compound's additive-AE class stacks against a
 # it). Each entry names a paired domain (`SEAM_WITH_DOMAIN`) + a seam-nature/conflict token
 # (`SEAM_NATURE`). A `SEAM_CONFLICT`-nature seam HOLDS the declaring domain (reusing the INDEPENDENT
 # `conflict_held` set, mirroring the author-conflict hold); a softer nature is detected + routed.
-SEAM_WITH_DOMAIN = "with_domain"  # the paired-domain reference in a cross_domain_seams entry
-SEAM_NATURE = "nature"            # the seam-nature/conflict token
-SEAM_CONFLICT = "conflict"        # a seam nature that holds the declaring domain
+# The key-names are the SINGLE-SOURCE constants pinned in `domain_program` (pule) — REFERENCED here,
+# not re-inlined, so a fixture/specialist diverging from the pinned key-names is caught by the reader.
+SEAM_WITH_DOMAIN = domain_program.SEAM_WITH_DOMAIN  # the paired-domain reference in a seam entry
+SEAM_NATURE = domain_program.SEAM_NATURE            # the seam-nature/conflict token
+SEAM_CONFLICT = domain_program.SEAM_CONFLICT        # a seam nature that holds the declaring domain
 
 
 def _compound_identities(candidate):
@@ -262,6 +264,21 @@ def _additive_ae_safety_finding(findings):
     }
 
 
+def _conflict_identity(conflict):
+    """The routable identity token of a conflict entry — author-conflict `with`, or a seam's nature.
+
+    Single-sources the two conflict channels (ncsy): an author-declared conflict carries a `with`
+    intervention identity; a seam-sourced conflict (emitted into `report["conflicts"]` by the uniform
+    seam pass) carries a `nature` token instead. Returns the first non-empty string identity, or None
+    for a malformed entry (dropped from the routing surface, trusted-author-malformed-is-inert).
+    """
+    for key in ("with", SEAM_NATURE):
+        value = conflict.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
 def _conflict_safety_finding(from_domain, conflicts):
     """The `safety_finding` the orchestrator routes to the liaison for a held cross-domain conflict.
 
@@ -277,17 +294,22 @@ def _conflict_safety_finding(from_domain, conflicts):
     Returns:
         (dict) `finding_id`, `source`, `held_domain`, `caution`, and the raw `conflicts`.
     """
-    # Order the entries by (with_domain, with) so BOTH the finding_id tokens AND the caution detail
-    # share one deterministic ordering — the caution must reproduce verbatim through the liaison, so an
-    # order-stable caution keeps it regenerable. A malformed entry (no string `with`) is dropped from
-    # the routing surface (trusted-author-malformed-is-inert, mirroring `_ae_profile`), never emitted
-    # as a `None/None` token; it still rides the raw `conflicts` for the record.
+    # Order the entries by (with_domain, identity) so BOTH the finding_id tokens AND the caution
+    # detail share one deterministic ordering — the caution must reproduce verbatim through the
+    # liaison, so an order-stable caution keeps it regenerable. Each entry's routable IDENTITY is the
+    # author-conflict `with` intervention OR (ncsy — the single-sourced seam channel) a seam's
+    # `nature` token, so a SEAM_CONFLICT-sourced held domain distils a FAITHFUL finding (with_domain
+    # + nature preserved), not the degenerate `conflict:<d>:` empty finding. A malformed entry (no
+    # string identity) is dropped from the routing surface (trusted-author-malformed-is-inert),
+    # never a `None/None` token; it still rides the raw `conflicts` for the record.
     routable = sorted(
-        (c for c in conflicts if isinstance(c.get("with"), str)),
-        key=lambda c: (str(c.get("with_domain")), c.get("with")),
+        (c for c in conflicts if _conflict_identity(c) is not None),
+        key=lambda c: (str(c.get("with_domain")), _conflict_identity(c)),
     )
-    tokens = [f"{c.get('with_domain')}/{c['with']}" for c in routable]
-    detail = "; ".join(f"{c['with']} ({c.get('with_domain')}) — {c.get('reason')}" for c in routable)
+    tokens = [f"{c.get('with_domain')}/{_conflict_identity(c)}" for c in routable]
+    detail = "; ".join(
+        f"{_conflict_identity(c)} ({c.get('with_domain')}) — {c.get('reason')}" for c in routable
+    )
     return {
         "finding_id": "conflict:" + from_domain + ":" + ";".join(tokens),
         "source": "cross-domain-conflict", "held_domain": from_domain,
@@ -508,14 +530,21 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
                 "from": domain, SEAM_WITH_DOMAIN: paired, SEAM_NATURE: seam.get(SEAM_NATURE),
                 "disposition": "held" if is_held_conflict else "routed",
             })
-            # DEFERRED (ADR-0043-T3, bead a-plus-maxing-ncsy): the seam-sourced conflict is HELD
-            # correctly here, but its downstream adjudication / doctor-visit-queue DETAIL is
-            # degenerate — `_conflict_safety_finding` distills only `report["conflicts"]`, not
-            # `report["seams"]`, so a seam-only hold would route an empty finding. Single-sourcing
-            # the two conflict channels waits on the seam-emitting specialist + adjudicator wiring;
-            # no Wave-3 production path emits a seam-only conflict, so nothing triggers it yet.
-            if is_held_conflict and domain not in conflict_held:
-                conflict_held.append(domain)
+            # ncsy — single-source the seam-conflict channel into `report["conflicts"]`: a
+            # SEAM_CONFLICT-nature held seam ALSO emits a conflict-shaped entry carrying `from` /
+            # `with_domain` / `nature`, so `_conflict_safety_finding` (which reads `report["conflicts"]`)
+            # distils a FAITHFUL finding (with_domain + nature preserved) at BOTH callers (the liaison
+            # adjudication + the doctor-visit queue), not the degenerate `conflict:<d>:` empty finding.
+            # The `from` (declaring domain) is authoritative. No double-count: `_conflict_safety_finding`
+            # aggregates a declaring domain's conflicts into ONE finding, and `conflict_held` is
+            # deduped (below + the `set(...)` in `generate_plans`).
+            if is_held_conflict:
+                report["conflicts"].append({
+                    "from": domain, SEAM_WITH_DOMAIN: paired, SEAM_NATURE: seam.get(SEAM_NATURE),
+                    "reason": f"cross-domain {seam.get(SEAM_NATURE)} seam with {paired}",
+                })
+                if domain not in conflict_held:
+                    conflict_held.append(domain)
 
     return {"report": report, "holds": holds, "conflict_held": conflict_held,
             "rx_bpmh_held": rx_bpmh_held}

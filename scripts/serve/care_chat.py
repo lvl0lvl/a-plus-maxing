@@ -426,16 +426,158 @@ def collect(collected, store_read):
     """
     from scripts.plan import orchestrate
 
-    candidates = {
-        item["domain"]: {
-            "domain": item["domain"],
+    # 61cy — FAIL LOUD on a duplicate domain rather than the silent last-wins dict-comprehension: a
+    # duplicate would silently drop a trigger-bearing candidate (its `meta`/`reason` safety-floor
+    # trigger), a fail-OPEN. Now that ADR-0043-T3 wires the seam-emitting dispatch source that COULD
+    # emit two candidates for one domain, the collision must surface, not be swallowed.
+    candidates = {}
+    for item in collected:
+        domain = item["domain"]
+        if domain in candidates:
+            raise ValueError(
+                f"care_chat.collect: duplicate domain {domain!r} in the collected specialists — a "
+                f"duplicate silently drops a trigger-bearing candidate (61cy fail-loud)"
+            )
+        candidates[domain] = {
+            "domain": domain,
             "specialist": item.get("specialist"),
             "plan": item.get("plan"),
             "meta": item.get("meta") or {},  # PRESERVE the additive-AE / conflict / energy triggers
             "reason": item.get("reason"),     # PRESERVE the RED-S/LEA clinical-routing reason
             "section": item.get("section"),
         }
-        for item in collected
-    }
     operator_rx_classes = router.rx_interaction_class_set(router.summarize(store_read))
     return orchestrate.reconcile(candidates, operator_rx_classes=operator_rx_classes)
+
+
+def _program_for_renderable(domain, plan):
+    """The domain's seven-field DOMAIN PROGRAM for the comprehensive version, from Leg 1's plan.
+
+    Uses the author-emitted program (`PROGRAM_KEY`) when the surviving rec carried one, else LIFTs a
+    transitional program from the recorded renderable plan (prescription = the plan, kind + the
+    conformant transitional floors) via `generate_plan._lift_program` — so EVERY promoted renderable
+    domain contributes a `domain_program.validate`-conformant program, none is silently dropped.
+    """
+    from scripts.plan import generate_plan
+    from scripts.plan.assemble import PROGRAM_KEY
+
+    if isinstance(plan, dict) and plan.get(PROGRAM_KEY) is not None:
+        return dict(plan[PROGRAM_KEY])
+    payload = {k: v for k, v in plan.items() if k != PROGRAM_KEY} if isinstance(plan, dict) else plan
+    return generate_plan._lift_program({"payload": payload}, domain)
+
+
+def _rich_program_from_envelope(envelope):
+    """The first embedded seven-field DOMAIN PROGRAM (`PROGRAM_KEY`) in a rich-domain author envelope."""
+    from scripts.plan.assemble import PROGRAM_KEY
+
+    for rec in (envelope or {}).get("recommendations", []):
+        program = rec.get(PROGRAM_KEY)
+        if program is not None:
+            return dict(program)
+    return None
+
+
+def _compose_version(programs, on_date):
+    """Compose ONE comprehensive plan version from the gate-cleared per-domain DOMAIN PROGRAMs.
+
+    Satisfies `plan_model.validate_plan_version`: >=1 domain program, a non-empty integrated
+    narrative, >=1 dated milestone, and a non-empty monitoring config (`compile_config` returns a
+    non-empty config over the non-empty `programs` map — `synthesize` returns None before reaching
+    here when there is no program, so the empty case never arrives).
+    """
+    from scripts.plan import monitoring_compiler
+    from scripts.store import plan_model
+
+    monitoring_config = monitoring_compiler.compile_config(programs)
+    return {
+        plan_model.VERSION_DATE: on_date,
+        plan_model.DOMAIN_PROGRAMS: dict(programs),
+        plan_model.NARRATIVE: (
+            "Integrated comprehensive plan across " + ", ".join(sorted(programs)) + "."
+        ),
+        plan_model.MILESTONES: [
+            {"date": on_date, "label": "plan established", "metric": "adherence + first re-test"},
+        ],
+        plan_model.MONITORING_CONFIG: monitoring_config,
+    }
+
+
+def synthesize(active, run_result, author_rich, store_read, *, on_date, root):
+    """Leg 2 (ADR-0043-T3, OPTION 2): compose ONE comprehensive plan version and record it.
+
+    The care-agent synthesize step, placed AFTER + DISJOINT from the T1 decompose / T2 collect
+    regions. Runs ONLY after Leg 1's composed gate surfaced a PASS (the caller invokes it after its
+    pass-guard) — so a SAFETY_BLOCKED run never reaches here (the prior comprehensive version stands,
+    0 partial write, AC-BP). Composes ONE integrated version from the gate-cleared programs Leg 1
+    surfaced (the renderable domains it promoted) PLUS any rich domain active in the surface (authored
+    via `author_rich`, reconciled through `collect`'s always-on floors, folded in when not held), and
+    records it via `plan_model.record_plan_version` — the ADDITIVE comprehensive record ON TOP of
+    Leg 1's KEPT thin per-domain write.
+
+    Args:
+        active (Iterable[str]): The active card-emitting domains for this run (the surface's active
+            set); rich members beyond `plan_schema.RENDERABLE_DOMAINS` are authored + folded here.
+        run_result (dict): Leg 1's result (`results` maps each domain to its record — a promoted
+            renderable domain carries a recorded `plan`).
+        author_rich (Callable): `author_rich(domain) -> author envelope | None` — dispatches a rich
+            specialist (the unified subscription seam in `regenerate`, the no-train client in the
+            server twin). 0 live spend in tests (a fixture seam).
+        store_read (Callable): The instance-root-bound store read surface (the always-on-floor
+            `operator_rx_classes` is derived from it inside `collect`).
+        on_date (str): The version's YYYY-MM-DD date.
+        root (str | Path): The store root the comprehensive version records into.
+
+    Returns:
+        (dict | None) The recorded comprehensive version, or None when there is no program to compose.
+    """
+    from scripts.plan import domain_program
+    from scripts.plan.assemble import PROGRAM_KEY
+    from scripts.store import plan_model, plan_schema
+
+    programs = {}
+    for domain, record in (run_result.get("results") or {}).items():
+        if record.get("recorded") and record.get("plan") is not None:
+            program = _program_for_renderable(domain, record["plan"])
+            if program is not None:
+                programs[domain] = program
+
+    rich = sorted(set(active) - set(plan_schema.RENDERABLE_DOMAINS))
+    if rich:
+        candidates = []
+        for domain in rich:
+            envelope = author_rich(domain)
+            program = _rich_program_from_envelope(envelope)
+            candidates.append({
+                "domain": domain, "specialist": (envelope or {}).get("specialist"),
+                "plan": {PROGRAM_KEY: program} if program is not None else None,
+                "meta": {}, "reason": None, "section": None,
+            })
+        outcome = collect(candidates, store_read)  # the always-on floors (SEC-W3-03 preserved)
+        held = (set(outcome["holds"]) | set(outcome["conflict_held"])
+                | set(outcome["rx_bpmh_held"]))
+        for candidate in candidates:
+            program = (candidate["plan"] or {}).get(PROGRAM_KEY)
+            if candidate["domain"] in held or program is None:
+                continue
+            # W4-02: validate before folding — a non-conformant rich program is DROPPED (mirror
+            # generate_plan._lift_program), never folded to crash the downstream composer
+            # (monitoring_compiler.compile_config reads program[MONITORING_SIGNALS]).
+            try:
+                domain_program.validate(program)
+            except domain_program.DomainProgramError:
+                continue
+            # HCR-01: deep-strip `load` from the rich prescription before folding, so no un-cleared
+            # load reaches stored comprehensive state (ADR-0015/BUG-01). Clearance is not plumbed to
+            # the rich path -> strip UNCONDITIONALLY (a rich domain's RENDERABLE_IDENTITY is None, so
+            # project_renderable just deep-strips + passes through), matching the renderable translators.
+            program = dict(program)
+            program[domain_program.PRESCRIPTION] = domain_program.project_renderable(
+                program.get(domain_program.PRESCRIPTION), candidate["domain"], strip_load=True)
+            programs[candidate["domain"]] = program
+
+    if not programs:
+        return None
+    version = _compose_version(programs, on_date)
+    plan_model.record_plan_version(version, root)
+    return version

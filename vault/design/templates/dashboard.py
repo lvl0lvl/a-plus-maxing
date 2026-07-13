@@ -1220,6 +1220,10 @@ def render(store_read, _today=None, _root=None):
             events_by_date = calendar_schema.resolve_events(readings)
         elif item.startswith("plan-confirm::"):
             pass  # ADR-0040 confirmation-pointer control stream — not rendered
+        elif item.startswith("plan-model::"):
+            pass  # ADR-0044-T1 comprehensive plan-version stream (the ADR-0043-T3 Leg-2 additive
+            # record) — the dashboard renders from plan:: verbatim; the composite version rides
+            # alongside, not rendered here (mirrors report.py's skip).
         elif "::" in item:
             prefix = item.split("::", 1)[0] + "::"
             raise KeyError(

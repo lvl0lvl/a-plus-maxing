@@ -763,6 +763,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             from scripts.model.client import ModelCallError
             from scripts.plan import orchestrate, router
             from scripts.plan.generate_plan import AUTHOR_CALL_FAILED
+            from scripts.serve import care_chat, plan_loop
             from scripts.serve.intake_aggregate import normalize_author_output
             from scripts.store import plan_schema, store
             from vault.design.templates import app_shell
@@ -773,15 +774,24 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             store_read = functools.partial(store.read, root=store_root)
             today = datetime.date.today().isoformat()
 
-            # Gather each domain's author envelope through the no-train client (the ONE model call
-            # per domain), isolated per domain: a ModelCallError degrades to the honest
+            # OPTION 2 (ADR-0043-T3): derive the de-id-safe operator surface and NARROW the author
+            # loop to the active ∩ renderable subset (not the closed grown PLAN_DOMAINS). The composed
+            # cross-domain-safety delegation (orchestrate.generate_plans — the gate Leg 1 for this
+            # front door) is PRESERVED and promotes the active subset thin as today; a rich domain
+            # active in the surface is folded into the comprehensive version by Leg 2 (never the thin
+            # renderable-validator path).
+            summary = router.summarize(store_read)
+            active = plan_loop.active_plan_domains(summary)
+            renderable_active = sorted(active & set(plan_schema.RENDERABLE_DOMAINS))
+
+            # Gather each active domain's author envelope through the no-train client (the ONE model
+            # call per domain), isolated per domain: a ModelCallError degrades to the honest
             # author-call-failed reason; an un-importable SDK / un-constructable client degrades to
             # an honest model-backend-unavailable reason; any other unexpected author error degrades
             # THAT domain — never a thread drop, never an aborted run.
-            summary = router.summarize(store_read)
             authors = {}
             author_errors = {}
-            for domain in plan_schema.PLAN_DOMAINS:
+            for domain in renderable_active:
                 try:
                     # Path B (the in-app /generate-plan front door): normalize the model author
                     # envelope's scalar-contract rec fields UPSTREAM of the frozen composer, exactly
@@ -801,7 +811,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             outcome = orchestrate.generate_plans(authors, store_read, store_root, plan_date=today)
 
             results = {}
-            for domain in plan_schema.PLAN_DOMAINS:
+            for domain in renderable_active:
                 if domain in author_errors:
                     results[domain] = author_errors[domain]
                     continue
@@ -809,6 +819,19 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                 results[domain] = (
                     "recorded" if record and record["recorded"] else ((record or {}).get("reason") or "no-plan")
                 )
+
+            # Leg 2 (OPTION 2 — ADDITIVE, gated by the pass): once the reconcile promoted >=1 domain,
+            # the care-agent synthesize step records ONE comprehensive version (the gate-cleared
+            # programs + any active rich domain authored via the no-train client, reconciled through
+            # the always-on floors) — ON TOP of the KEPT thin write. When nothing promoted, no record.
+            if any(record.get("recorded") for record in outcome["results"].values()):
+                def _author_rich(domain, _summary=summary):
+                    try:
+                        return normalize_author_output(self.client.author(domain, _summary))
+                    except Exception:
+                        return None
+                care_chat.synthesize(active, outcome, _author_rich, store_read,
+                                     on_date=today, root=store_root)
 
             plan_html = app_shell._plan_zone(store.read_all(store_root), today, store_root)
             self._write_json(200, {"need_key": False, "results": results, "plan_html": plan_html})

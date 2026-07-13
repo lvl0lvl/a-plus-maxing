@@ -69,7 +69,8 @@ _FROZEN_GLOB = (
     # scripts/plan/generate_plan.py CARVED OUT — ADR-0042/0041/0046/0043 operator-signed-off (HARD) superseded plan front door; guarded by tests/plan/test_generate_plan.py + core-capability-audit.sh + per-ADR numstat probes. Architect ruling docs/adr/.pipeline/frozen-guard-reconciliation-ruling.md §2, feature/comprehensive-plan-adr.
     "scripts/plan/adjudicate.py scripts/plan/adjust.py "
     # scripts/plan/track.py CARVED OUT — ADR-0044-T2 (mixed-history reader re-point of resolve_plan_progress) superseded track.py; behavioral guarantor tests/store/test_plan_model_reader.py + tests/plan/test_track.py. Wave-3 frozen-guard reconciliation (F-011), Architect Option-A ruling.
-    "scripts/plan/plan_driver.py scripts/plan/plan_orchestrator.py "
+    # scripts/plan/plan_driver.py CARVED OUT — ADR-0043-T3 (dispatch-registry _ROLE_OF_DOMAIN growth 4→13) superseded the plan driver's role map; behavioral guarantor tests/plan/test_activation.py::test_registries_coherent_over_grown_roster. Wave-4 frozen-guard reconciliation (F-011), Architect Option-A ruling.
+    "scripts/plan/plan_orchestrator.py "
     "scripts/store/keying.py scripts/store/store.py"
 ).split()
 
@@ -77,7 +78,7 @@ _FROZEN_GLOB = (
 def _large_regen(root, *, plan_date=PLAN_DATE):
     """Seed a full 4-of-4 large change and drive one re-gen through the T1 front door; return result."""
     _seed_store(root)
-    _seed_prior_standing(root, plan_schema.PLAN_DOMAINS)  # 4 differing standing plans -> large change
+    _seed_prior_standing(root, plan_schema.RENDERABLE_DOMAINS)  # 4 differing standing plans -> large change
     return plan_loop.regenerate(
         root,
         dispatch=_LoopDispatch(_clean_authors()),
@@ -110,7 +111,7 @@ def test_marker_before_exposure_temporal(tmp_path, monkeypatch):
 
     result = _large_regen(root)
     promoted = _promoted(result)
-    assert set(promoted) == set(plan_schema.PLAN_DOMAINS), f"expected a full swap: {promoted}"
+    assert set(promoted) == set(plan_schema.RENDERABLE_DOMAINS), f"expected a full swap: {promoted}"
 
     # (a) every promoted domain marked pending exactly once, keyed on the re-gen date (held as a unit).
     assert sorted(d for d, _ in marked) == sorted(promoted), f"marker coverage: {marked}"
@@ -134,7 +135,7 @@ def test_marker_before_exposure_temporal(tmp_path, monkeypatch):
     # (d) NON-fail-closed clause: an UNMARKED reading STILL stands — the prior standing plans (dated
     #     _T4_PRIOR_DATE, never marked) resolve normally. The window is closed by the marker ORDER,
     #     not by read_plan failing closed on an unmarked reading.
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         prior = plan_schema.read_plan(domain, _T4_PRIOR_DATE, root)
         assert prior["state"] is None, f"{domain}: an unmarked reading did not stand (spurious hold)"
         assert prior["plan"] == _differing_prior(domain)
@@ -148,7 +149,7 @@ def test_held_regen_recorded_but_does_not_stand(tmp_path):
     # read_plan HOLDS it -> NO_PLAN_TODAY, plan None, NOT the held date, NOT a walk-back.
     root = tmp_path / "store"
     _large_regen(root)
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         rows = [r for r in store.read(f"plan::{domain}", root=root) if r["timepoint"] == PLAN_DATE]
         assert len(rows) == 1, f"{domain}: the frozen promote did not record the new plan: {rows}"
 
@@ -166,7 +167,7 @@ def test_zero_horizon_surfacing(tmp_path):
     # (the prior CONFIRMED in-window block or None may return, but never the held plan_date).
     root = tmp_path / "store"
     _large_regen(root)
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         for span in (7, 30):
             block = horizons.window_block(domain, root, PLAN_DATE, span)
             assert block is None or block["plan_date"] != PLAN_DATE, (
@@ -212,7 +213,7 @@ def test_debounce_mutation_repoint_at_read_plan_refires(tmp_path, monkeypatch):
     def _regen_date_via_read_plan(store_read, on_date):
         dates = [
             plan_schema.read_plan(d, on_date, root)["plan_date"]
-            for d in plan_schema.PLAN_DOMAINS
+            for d in plan_schema.RENDERABLE_DOMAINS
         ]
         dates = [d for d in dates if d is not None]
         return max(dates) if dates else None
@@ -263,7 +264,7 @@ def test_large_regen_gates_held_from_tailoring_seam(tmp_path, monkeypatch):
     # (b) end-to-end: 0 tailored artifact section for any held domain.
     art = out / "maintained.html"
     text = art.read_text(encoding="utf-8") if art.exists() else ""
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         assert f"data-domain='{domain}'" not in text, f"held {domain} was shadow-tailored/egressed"
 
 
@@ -284,7 +285,7 @@ def test_regen_re_deriving_held_content_is_held_again(tmp_path):
     # unheld -> the asserts below go RED.
     root = tmp_path / "store"
     _large_regen(root)  # 4 differing priors stand; the PLAN_DATE re-gen is held (all domains pending)
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         assert plan_confirm.decision_for(domain, PLAN_DATE, root) == plan_confirm.DECISION_PENDING, (
             f"{domain}: precondition failed — the PLAN_DATE re-gen is not held"
         )
@@ -297,10 +298,10 @@ def test_regen_re_deriving_held_content_is_held_again(tmp_path):
         deid_client=_FixedDeidClient(_deid_summary()),
         plan_date=POST_INTERVAL_DATE,
     )
-    assert set(_promoted(result)) == set(plan_schema.PLAN_DOMAINS), f"the re-gen did not promote: {result}"
+    assert set(_promoted(result)) == set(plan_schema.RENDERABLE_DOMAINS), f"the re-gen did not promote: {result}"
 
     # The re-derived re-gen is HELD AGAIN — materiality read the STANDING prior, not the never-confirmed one.
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         assert plan_confirm.decision_for(domain, POST_INTERVAL_DATE, root) == plan_confirm.DECISION_PENDING, (
             f"{domain}: the re-derived re-gen was not held (materiality read the never-confirmed baseline)"
         )
@@ -322,7 +323,7 @@ def test_post_interval_regen_supersedes_pending_pointer(tmp_path):
 
     _large_regen(root, plan_date=POST_INTERVAL_DATE)  # second held re-gen; domains still pending from the first
 
-    for domain in plan_schema.PLAN_DOMAINS:
+    for domain in plan_schema.RENDERABLE_DOMAINS:
         assert plan_confirm.decision_for(domain, POST_INTERVAL_DATE, root) == plan_confirm.DECISION_PENDING, (
             f"{domain}: no fresh pending pointer at the superseding date (OQ-6 supersede)"
         )
@@ -363,9 +364,12 @@ PRE_TASK_HEAD = "300de2f1cd57e700194de0e20114a844299eab31"
 
 
 def test_frozen_spine_and_only_regenerate_changed():
-    # AC-6: the ADR-0032 write-path+engine glob is byte-frozen (numstat=0), and the ONLY top-level
-    # def in plan_loop.py that changed vs origin/main is `regenerate` — so _last_regen_date /
-    # _prior_standing_plan / _change_magnitude / _post_promote_tailoring are all byte-unchanged.
+    # AC-6: the ADR-0032 write-path+engine glob is byte-frozen (numstat=0, plan_driver.py carved —
+    # ADR-0043-T3 Wave-4 supersession), and the changed plan_loop.py defs vs origin/main are exactly
+    # the sanctioned set — the ADR-0040 hold layer (regenerate / _change_magnitude /
+    # _post_promote_tailoring) + the ADR-0043-T3 front-door redefinition (_last_regen_date, plus the
+    # additive _surface_tokens / derive_operator_surface / active_plan_domains) — so _prior_standing_plan
+    # stays byte-unchanged.
     repo = _repo_root()
     numstat = subprocess.run(
         ["git", "diff", "--numstat", "origin/main", "--", *_FROZEN_GLOB],
@@ -381,16 +385,22 @@ def test_frozen_spine_and_only_regenerate_changed():
 
     # [AMENDED 2026-07-05, 6-lens review] `regenerate` (the hold layer), `_change_magnitude` (the
     # materiality baseline now filters via filter_confirmed — the HIGH fix + its `root` call-site
-    # change), and `_post_promote_tailoring` (docstring records the T4 confirm-time second caller) are
-    # the ONLY changed defs. `_last_regen_date` (the debounce) and `_prior_standing_plan` stay
-    # byte-unchanged.
-    changed_defs = ("regenerate", "_change_magnitude", "_post_promote_tailoring")
+    # change), and `_post_promote_tailoring` (docstring records the T4 confirm-time second caller)
+    # are the ADR-0040-era changed defs. `_last_regen_date` CARVED into the changed set — ADR-0043-T3
+    # (Wave 4) front-door redefinition re-derived the debounce over the active-domains surface (the
+    # additive _surface_tokens / derive_operator_surface / active_plan_domains defs it added are not
+    # in origin, so the origin-iterating loop never checks them); behavioral guarantor
+    # tests/runner/test_cadence_runner.py::test_crownjewel_faithful_zero_raw_pii + tests/plan/
+    # test_activation.py. Wave-4 frozen-guard reconciliation (F-011), Architect Option-A ruling.
+    # `_prior_standing_plan` stays byte-unchanged.
+    changed_defs = ("regenerate", "_change_magnitude", "_post_promote_tailoring", "_last_regen_date")
     for name, src in origin.items():
         if name in changed_defs:
             continue
         assert current.get(name) == src, f"{name} changed vs origin/main (must be byte-unchanged)"
-    for helper in ("_last_regen_date", "_prior_standing_plan"):
-        assert current[helper] == origin[helper], f"{helper} is not byte-unchanged"
+    assert current["_prior_standing_plan"] == origin["_prior_standing_plan"], (
+        "_prior_standing_plan is not byte-unchanged"
+    )
     # sanity (not vacuous): each changed def DID change vs the pinned PRE-ADR-0040 baseline,
     # NOT origin/main — origin caught up once the ADR-0040 build merged, so `!= origin` reads
     # empty and self-invalidates (bead 2deg). `.get` tolerates a def absent at the baseline

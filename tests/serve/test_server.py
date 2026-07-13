@@ -1306,7 +1306,7 @@ def test_generate_plan_records_all_domains_and_renders(tmp_path):
     """E2E happy path: POST /generate-plan records every domain + the re-render is content-traceable.
 
     Seeds the summary store, injects a MOCK author returning a valid per-domain envelope, then
-    POSTs /generate-plan. Asserts: every `plan_schema.PLAN_DOMAINS` domain is RECORDED in the
+    POSTs /generate-plan. Asserts: every `plan_schema.RENDERABLE_DOMAINS` domain is RECORDED in the
     store (`plan::<domain>` resolves a plan for today), and the re-rendered Plan zone in the JSON
     reply carries a recommendation TRACEABLE to each mock author's output (a content assertion,
     not merely "a plan exists"). The mock author is reached once per domain — 0 live API / key.
@@ -1320,13 +1320,13 @@ def test_generate_plan_records_all_domains_and_renders(tmp_path):
         assert status == 200, f"POST /generate-plan returned {status}, expected 200"
         payload = json.loads(body)
         assert payload["need_key"] is False, "a present author client + resolvable key must not report need_key"
-        assert payload["results"] == {d: "recorded" for d in plan_schema.PLAN_DOMAINS}, (
+        assert payload["results"] == {d: "recorded" for d in plan_schema.RENDERABLE_DOMAINS}, (
             f"not every domain recorded: {payload['results']}"
         )
 
         # Each domain's plan is RECORDED in the store (resolved for today).
         today = datetime.date.today().isoformat()
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             resolved = plan_schema.read_plan(domain, today, tmp_path / "store")
             assert resolved["plan"] is not None, f"{domain} plan was not recorded into the store"
 
@@ -1336,9 +1336,46 @@ def test_generate_plan_records_all_domains_and_renders(tmp_path):
             assert token in plan_html, f"the re-rendered Plan zone does not carry {token!r}"
 
         # The author was reached exactly once per domain (no live API, no duplicate calls).
-        assert sorted(client.calls) == sorted(plan_schema.PLAN_DOMAINS), (
+        assert sorted(client.calls) == sorted(plan_schema.RENDERABLE_DOMAINS), (
             f"the author was not reached once per domain: {client.calls}"
         )
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_generate_plan_records_comprehensive_version(tmp_path):
+    """TC-01: POST /generate-plan records the Leg-2 comprehensive plan version (server.py:827-834).
+
+    The in-app /generate-plan front door's Leg-2 additive record (`care_chat.synthesize` ->
+    `plan_model.record_plan_version`) had ZERO assertion — deleting server.py's Leg-2 block left the
+    suite green (the PF-S130-01 gap on the primary user path). This drives the REAL POST /generate-plan
+    with a mock author over a summary activating the renderable four, then reads the comprehensive
+    version back: a version STANDING for today carrying domain_programs + narrative + milestones. REDs
+    when server.py's Leg-2 synthesize block is removed (no version -> read_plan_version state != None).
+    """
+    from scripts.store import plan_model
+
+    _seed_summary_store(tmp_path / "store")
+    client = _MockAuthorClient(_domain_envelopes())
+    srv, port = _server_with_author(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"POST /generate-plan returned {status}, expected 200"
+        today = datetime.date.today().isoformat()
+        resolved = plan_model.read_plan_version(today, tmp_path / "store")
+        assert resolved["state"] is None, (
+            "the Leg-2 comprehensive plan version did not stand for today "
+            f"(state={resolved['state']!r}) — server.py's synthesize record never fired"
+        )
+        version = resolved["version"]
+        programs = version[plan_model.DOMAIN_PROGRAMS]
+        assert isinstance(programs, dict) and programs, f"no domain_programs recorded: {programs!r}"
+        assert isinstance(version[plan_model.NARRATIVE], str) and version[plan_model.NARRATIVE], (
+            "the comprehensive version carries no narrative"
+        )
+        assert version[plan_model.MILESTONES], "the comprehensive version carries no dated milestones"
     finally:
         srv.shutdown()
         srv.server_close()
@@ -1420,7 +1457,7 @@ def test_generate_plan_no_key_records_nothing(tmp_path):
         assert payload["need_key"] is True, "a None author client must report need_key"
         assert payload["results"] == {}, "the no-key path must not run the engine for any domain"
 
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             assert store.read(f"plan::{domain}", root=tmp_path / "store") == [], (
                 f"the no-key path wrongly recorded a {domain} plan"
             )
@@ -1454,7 +1491,7 @@ def test_generate_plan_one_domain_failure_does_not_abort_run(tmp_path):
         results = payload["results"]
 
         # The run did NOT abort — all four domains were attempted and reported.
-        assert set(results) == set(plan_schema.PLAN_DOMAINS), (
+        assert set(results) == set(plan_schema.RENDERABLE_DOMAINS), (
             f"the run aborted on one domain's failure: {results}"
         )
         # The two healthy domains recorded.
@@ -1501,7 +1538,7 @@ def test_generate_plan_live_client_but_no_key_returns_need_key(tmp_path):
         assert payload["results"] == {}, "the keyless path must not run the engine for any domain"
         # The honest need_key is returned BEFORE any author/live call — no spend on a keyless press.
         assert client.calls == [], "the author was called despite no key (a live call was attempted)"
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             assert store.read(f"plan::{domain}", root=tmp_path / "store") == [], (
                 f"the keyless path wrongly recorded a {domain} plan"
             )
@@ -1792,9 +1829,9 @@ def test_generate_plan_author_importerror_degrades_thread_survives(tmp_path):
         assert status == 200, f"an author ImportError returned {status} (dropped thread / 5xx?), expected 200"
         payload = json.loads(body)  # a valid JSON response came back -> the thread was NOT dropped
         assert payload["need_key"] is False, "a resolving key must not report need_key"
-        assert set(payload["results"]) == set(plan_schema.PLAN_DOMAINS)
+        assert set(payload["results"]) == set(plan_schema.RENDERABLE_DOMAINS)
         assert all(v == "model-backend-unavailable" for v in payload["results"].values()), payload["results"]
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             assert store.read(f"plan::{domain}", root=tmp_path / "store") == [], f"{domain} wrongly recorded"
         assert _still_alive(port), "the handler died after an author ImportError (thread dropped)"
     finally:
@@ -1819,7 +1856,7 @@ def test_generate_plan_rejects_non_json_content_type_415(tmp_path):
         status, _ = _post_generate_plan(port, content_type="text/plain")
         assert status == 415, f"a text/plain /generate-plan POST returned {status}, expected 415"
         assert client.calls == [], "the author was reached despite the rejected content-type (forced spend)"
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             assert store.read(f"plan::{domain}", root=tmp_path / "store") == [], f"{domain} wrongly recorded"
         assert _still_alive(port), "the handler died after a rejected content-type POST"
     finally:
@@ -2104,7 +2141,7 @@ def test_generate_plan_render_drops_held_pending_supplements_plan(tmp_path):
     # is over the seeded held state alone. 0 live spend (mock author, no key call).
     client = _MockAuthorClient(
         _domain_envelopes(),
-        raise_for={d: ModelCallError("no backend") for d in plan_schema.PLAN_DOMAINS},
+        raise_for={d: ModelCallError("no backend") for d in plan_schema.RENDERABLE_DOMAINS},
     )
     srv, port = _server_with_author(tmp_path, client)
     _serve_in_thread(srv)
@@ -2148,9 +2185,9 @@ def test_generate_plan_production_none_store_root_resolves_default(tmp_path, mon
         assert status == 200, f"production None store_root returned {status}, expected 200"
         payload = json.loads(body)
         assert payload.get("degraded") is not True, f"the None store_root path degraded (TypeError?): {payload}"
-        assert payload["results"] == {d: "recorded" for d in plan_schema.PLAN_DOMAINS}, payload["results"]
+        assert payload["results"] == {d: "recorded" for d in plan_schema.RENDERABLE_DOMAINS}, payload["results"]
         today = datetime.date.today().isoformat()
-        for domain in plan_schema.PLAN_DOMAINS:
+        for domain in plan_schema.RENDERABLE_DOMAINS:
             assert plan_schema.read_plan(domain, today, default_root)["plan"] is not None, (
                 f"{domain} did not land into the resolved production default root"
             )
