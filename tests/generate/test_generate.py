@@ -20,6 +20,7 @@ The load-bearing gates here are falsifiable by construction:
   two modes' artifacts is a CORROBORATING secondary check only.
 """
 
+import datetime
 import os
 import re
 import subprocess
@@ -30,7 +31,12 @@ from pathlib import Path
 import pytest
 
 from scripts.generate import generate, render
-from scripts.store import store
+from scripts.store import plan_model, store
+from vault.design.templates import dashboard, report
+
+# The canonical periodized comprehensive version (PF-S131-01) — imported, not
+# re-authored, so this regression pins the exact shipped plan-model:: shape.
+from tests.store.test_plan_model import _comprehensive_version
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -423,3 +429,38 @@ def test_empty_store_succeeds_and_writes_file(tmp_path):
 
     assert path.exists()
     assert path.is_file()
+
+
+# --------------------------------------------------------------------------- #
+# Regression (Wave-4 Tier-2): the comprehensive `plan-model::` stream must route
+# through EVERY renderer without raising. 0043-T3 Leg-2 made `plan-model::` a live
+# store stream; report.py:702 gained the skip but dashboard.py missed it, so any
+# store holding a comprehensive plan crashed the dashboard render with the
+# 'unrouted stream prefix' KeyError. The report co-edit was unguarded — this test
+# guards BOTH surfaces so neither skip can be silently removed.
+# --------------------------------------------------------------------------- #
+
+
+def test_plan_model_stream_does_not_crash_renderers(tmp_path):
+    """A store holding a comprehensive plan-model:: version renders on every surface.
+
+    RED capability: reverting the dashboard.py plan-model:: skip re-raises the
+    'unrouted stream prefix' KeyError on the dashboard entry point AND render fn;
+    removing the report.py:702 skip re-raises it on the report entry point AND
+    render fn. Either regression fails this test.
+    """
+    root = tmp_path / "store"
+    out = tmp_path / "out"
+    on_date = "2026-07-13"
+    plan_model.record_plan_version(_comprehensive_version(date=on_date), root)
+    today = datetime.date.fromisoformat(on_date)
+    store_read = store.read_all(root)
+
+    # Both entry points route plan-model:: without raising and write an artifact.
+    for artifact in ("dashboard", "report"):
+        path = generate.run(artifact, _root=root, _out_dir=out, _today=today)
+        assert path.exists() and path.is_file()
+
+    # The render fns route plan-model:: directly (not only via generate.run).
+    assert dashboard.render(store_read, _today=today, _root=root)
+    assert report.render(store_read, _today=today, _root=root)

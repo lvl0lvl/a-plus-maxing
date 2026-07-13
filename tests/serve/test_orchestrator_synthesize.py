@@ -370,6 +370,18 @@ def test_front_door_derives_surface_then_dispatches_active_subset(tmp_path):
     assert dispatched == {"workout", "sleep"}, dispatched
 
 
+def test_rich_only_surface_floors_to_renderable_core():
+    # AC-S4 (renderable-core floor, plan_loop.active_plan_domains): a RICH-only surface — a
+    # genetics/labs cross-cutting touch with NO renderable-domain signal — activates NO card
+    # domain, so active_plan_domains FLOORS it to EXACTLY the four RENDERABLE_DOMAINS (the
+    # baseline plan; never zero out an existing operator's plan). RED capability: drop the
+    # `active |= RENDERABLE_DOMAINS` floor and the surface resolves to the EMPTY set instead.
+    summary = {"genetic-trait-classes": "genetics"}  # rich cross-cutting substrate, no card domain
+    surface = plan_loop.derive_operator_surface(summary)
+    assert activation.active_domains(surface) == frozenset(), "surface must carry no active card domain"
+    assert plan_loop.active_plan_domains(summary) == set(plan_schema.RENDERABLE_DOMAINS)
+
+
 def test_debounce_floor_engages_after_comprehensive_regen(tmp_path):
     # AC-S3 (RULING 1 consequence): after a comprehensive re-gen the debounce floor engages —
     # _last_regen_date advances from the recorded comprehensive version (a renderable-LESS all-rich
