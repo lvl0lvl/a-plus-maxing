@@ -39,6 +39,18 @@ from pathlib import Path
 # The single runner-label home — reused by enable/disable/status + the templates' {{LABEL}} slot.
 RUNNER_LABEL = "com.aplusmaxing.cadence-runner"
 
+# The daily deterministic-pass label (ADR-0045-T3) — a DISTINCT home for the daily monitoring cadence
+# (`scripts.runner.daily_monitor`), registered alongside the weekly RUNNER_LABEL. It is
+# LABEL-REGISTRATION ONLY: the already-label-parameterized `active_entry_count(DAILY_MONITOR_LABEL)` /
+# `status(DAILY_MONITOR_LABEL)` read its disabled-by-default state (a fresh install reads 0 — no daily
+# entry is ever armed). NO daily `enable`/`disable`/render/install path is added here: the existing
+# `enable(label)` renders the WEEKLY `cadence-runner.plist.template` (`ProgramArguments =
+# scripts.runner.cadence_runner`, the model-SPENDING weekly runner) + the weekly-hardcoded crontab
+# line, so an `enable(DAILY_MONITOR_LABEL)` would arm the WEEKLY spending runner under a daily label —
+# a mis-target. The correct daily-interval enable (a NEW daily template -> `scripts.runner.daily_monitor`)
+# is deferred to the operator-gated LIVE-wiring follow-up (bead `a-plus-maxing-glzi`).
+DAILY_MONITOR_LABEL = "com.aplusmaxing.daily-monitor"
+
 # This surface's directory — the templates live here and the rendered *.rendered.plist is written here.
 SCHEDULE_DIR = Path(__file__).resolve().parent
 PLIST_TEMPLATE = SCHEDULE_DIR / "cadence-runner.plist.template"
