@@ -283,33 +283,24 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tai
     promoted = _promoted_domains(result)
     if not promoted:
         return result
-    # Leg 2 (OPTION 2 — ADDITIVE, gated by the pass): the `if not promoted` guard above IS the
-    # SAFETY_BLOCKED boundary (on a block, promoted is empty and regenerate returned untouched — no
-    # synthesis, no comprehensive record, the prior version stands, 0 partial write, AC-BP). Reaching
-    # here ⟺ Leg 1's composed gate SURFACED a pass, so the care-agent synthesize step composes ONE
-    # comprehensive plan version from the gate-cleared programs Leg 1 surfaced PLUS any active rich
-    # domain (authored via the dispatch seam over the de-id summary, reconciled through the always-on
-    # floors) and records it via plan_model.record_plan_version — ON TOP of Leg 1's KEPT thin write.
-    from scripts.serve import care_chat
-    care_chat.synthesize(
-        active, result, lambda domain: dispatch(domain, "", summary),
-        store_read, on_date=plan_date, root=root,
-    )
-    # AC-1: a non-empty plain-language what-changed rationale on every promoted re-gen.
+    # AC-1: a non-empty plain-language what-changed rationale on every promoted re-gen. Computed
+    # AHEAD of Leg 2 because the large-change advisory below reads it.
     result["rationale"] = _compose_rationale(promoted, trigger)
     # AC-5: read adherence as a SEPARATE additional input, distinct from the trend (which the de-id
     # boundary re-derives via router.summarize). Absent adherence never blocks the trend-driven
     # re-gen — the re-gen already promoted.
     adherence = _read_adherence(root, plan_date)
-    # AC-2/AC-3 (OQ-4 → ADR-0040): a re-gen that replaced at least the pinned number of existing
-    # STANDING plans is a materially-large swap. ADR-0040 HOLDS it: the new plan was RECORDED by the
-    # front-door promote inside `run_orchestrated`, but it does NOT stand — the hold branch below marks
-    # every promoted domain `pending` before this function returns, so the read-side skip (T2) resolves
-    # it `NO_PLAN_TODAY` until an explicit operator confirm. The `large_change_advisory` dict is now the
-    # confirm-PROMPT payload (not a swap-already-landed notice). Materiality is measured against the last
-    # STANDING (confirmed / no-pointer) plan — `_change_magnitude` filters the prior readings through
-    # `filter_confirmed`, so a never-confirmed held re-gen is not the baseline. `>=` fires at 3 OR 4 of
-    # the 4 domains: a majority-of-domains swap is material enough to hold.
+    # AC-2/AC-3 (OQ-4 → ADR-0040), W4-01: apply the materially-large HOLD BEFORE Leg 2. The hold
+    # concerns the thin swap Leg 1 already RECORDED by the front-door promote inside `run_orchestrated`;
+    # it does NOT depend on Leg 2, so running it first makes it fire REGARDLESS of Leg 2's outcome — a
+    # Leg-2 raise can no longer skip it and leave a materially-large thin swap standing UNCONFIRMED
+    # (the partial-write hole in AC-BP). The hold branch marks every promoted domain `pending` before
+    # this function returns, so the read-side skip (T2) resolves it `NO_PLAN_TODAY` until an explicit
+    # operator confirm; the `large_change_advisory` dict is the confirm-PROMPT payload (not a
+    # swap-already-landed notice). Materiality is measured against the last STANDING (confirmed /
+    # no-pointer) plan — `_change_magnitude` filters the prior readings through `filter_confirmed`, so a
+    # never-confirmed held re-gen is not the baseline. `>=` fires at 3 OR 4 of the 4 domains: a
+    # majority-of-domains swap is material enough to hold.
     if _change_magnitude(store_read, result, promoted, plan_date, root) >= LARGE_CHANGE_THRESHOLD_DOMAINS:
         # ADR-0040 hold: the whole materially-large swap is held as a unit (OQ-3). Write a `pending`
         # pointer for EVERY promoted domain (not just the content-changed subset) BEFORE this function
@@ -326,6 +317,27 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tai
         held = set()
         result["large_change"] = False
         result["large_change_advisory"] = None
+    # Leg 2 (OPTION 2 — ADDITIVE, gated by the pass): the `if not promoted` guard above IS the
+    # SAFETY_BLOCKED boundary (on a block, promoted is empty and regenerate returned untouched — no
+    # synthesis, no comprehensive record, the prior version stands, 0 partial write, AC-BP). Reaching
+    # here ⟺ Leg 1's composed gate SURFACED a pass, so the care-agent synthesize step composes ONE
+    # comprehensive plan version from the gate-cleared programs Leg 1 surfaced PLUS any active rich
+    # domain (authored via the dispatch seam over the de-id summary, reconciled through the always-on
+    # floors) and records it via plan_model.record_plan_version — ON TOP of Leg 1's KEPT thin write.
+    # W4-01: the rich-author dispatch is ISOLATED (try/except -> None) so a transient rich dispatch
+    # error degrades that domain to honest no-plan (Leg 1 stands), never propagating out of the loop —
+    # mirroring the server twin's `_author_rich` (server.py).
+    from scripts.serve import care_chat
+
+    def _author_rich(domain):
+        try:
+            return dispatch(domain, "", summary)
+        except Exception:
+            return None
+
+    care_chat.synthesize(
+        active, result, _author_rich, store_read, on_date=plan_date, root=root,
+    )
     # AC-4: the post-promote tailoring-hook seam — fired exactly once per promoted re-gen with the
     # promoted plan set + the render target. ADR-0037-T1 fills it: on a threaded `tailor_client` the
     # care-lane tailoring pass runs once (else it stays a pass-through — the un-wired site).

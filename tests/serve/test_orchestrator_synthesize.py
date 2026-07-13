@@ -24,7 +24,7 @@ from scripts.plan import plan_driver
 from scripts.plan.assemble import PROGRAM_KEY
 from scripts.plan.safety_review import DEFAULT_LENSES
 from scripts.serve import care_chat, plan_loop
-from scripts.store import plan_model, plan_schema, store
+from scripts.store import plan_confirm, plan_model, plan_schema, store
 
 from tests.plan.test_deid_in import _FixedDeidClient
 from tests.plan.test_generate_plan import (
@@ -39,9 +39,27 @@ from tests.plan.test_orchestrate import _nutrition, _recon
 from tests.plan.test_plan_orchestrator import _deid_summary
 from tests.plan.test_quality_judge import _clean_scores
 from tests.store.test_plan_model import _compound_program, _training_program
+from tests.serve.test_plan_loop import _seed_prior_standing
 
-PRE_TASK_HEAD = "5d4c105a3dfd471e17afb24bfc1f13ca88b47302"
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _merge_base():
+    """The DURABLE per-ADR numstat base — ``git merge-base origin/main HEAD`` (== origin/main).
+
+    Computed dynamically, NOT hardcoded (TC-02): a per-task feature-branch SHA orphans on the repo's
+    squash-merge, so the numstat freeze-guard raises ``CalledProcessError`` on a fresh clone of main.
+    The merge-base is reachable + stable across the squash. Mirrors the helper in
+    ``tests/store/test_plan_model_confirm_hold.py``.
+    """
+    out = subprocess.run(
+        ["git", "merge-base", "origin/main", "HEAD"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    )
+    return out.stdout.strip()
+
+
+PRE_TASK_HEAD = _merge_base()
 _JUDGE_ROLE = plan_loop.JUDGE_ROLE
 
 
@@ -452,6 +470,106 @@ def test_blocked_regen_preserves_prior_plan(tmp_path):
     for d in plan_schema.RENDERABLE_DOMAINS:
         rows = [r for r in store.read(f"plan::{d}", root=root) if r["timepoint"] == "2026-07-13"]
         assert rows == [], f"{d} partial-wrote a thin row on a blocked re-gen"
+
+
+# --- FIX A safety cluster (Tier-3 W4-02 / HCR-01 / W4-01) ---------------------------
+# The rich-domain leg of care_chat.synthesize is under-processed vs the renderable leg: it must
+# VALIDATE (drop non-conformant) and LOAD-STRIP each rich program before folding (mirror the
+# renderable leg), and plan_loop.regenerate's ADR-0040 hold + rich-author dispatch must be robust to
+# a Leg-2 raise. Each test is a per-mutation revert-RED (PF-S130-01 non-tautology).
+
+
+def _rich_author_env(program):
+    """A rich-domain author envelope carrying a single embedded program under PROGRAM_KEY."""
+    return {"specialist": "sleep-specialist", "recommendations": [{PROGRAM_KEY: program}]}
+
+
+def test_synthesize_drops_nonconformant_rich_program(tmp_path):
+    # W4-02: a rich author returning a PRESENT-but-non-conformant program (missing monitoring_signals)
+    # is DROPPED at the fold (mirror generate_plan._lift_program), not folded to crash the downstream
+    # monitoring_compiler.compile_config (KeyError on program[MONITORING_SIGNALS]). synthesize records
+    # ONLY the conformant programs and does NOT raise. REDs (KeyError) if the validate/drop is removed.
+    root = tmp_path / "store"
+    read = _seed_surface_store(root, goal_domains=["workout"])
+    run_result = {"results": {"workout": {"recorded": True, "plan": {PROGRAM_KEY: _training_program()}}}}
+    nonconformant = _training_program()
+    del nonconformant[domain_program.MONITORING_SIGNALS]  # a required field -> non-conformant
+    version = care_chat.synthesize(
+        {"workout", "sleep"}, run_result, lambda d: _rich_author_env(nonconformant),
+        read, on_date="2026-07-13", root=root)
+    assert version is not None, "the conformant renderable program should still compose a version"
+    programs = version[plan_model.DOMAIN_PROGRAMS]
+    assert "sleep" not in programs, "the non-conformant rich program was folded (validate/drop absent)"
+    assert "workout" in programs
+    assert plan_model.read_plan_version("2026-07-13", root)["state"] is None, "no version recorded"
+
+
+def test_synthesize_strips_load_from_rich_program(tmp_path):
+    # HCR-01: a rich author whose prescription carries per-block + top-level `load` is folded with load
+    # DEEP-STRIPPED — no un-cleared load reaches the stored comprehensive state (ADR-0015/BUG-01).
+    # Clearance is not plumbed to the rich path, so the strip is UNCONDITIONAL. REDs if the strip is removed.
+    root = tmp_path / "store"
+    read = _seed_surface_store(root, goal_domains=["workout"])
+    loaded = {"name": "sleep-protocol", "load": "top-level",
+              "blocks": [{"date": "2026-07-13", "load": "60% 1RM", "detail": "x"}]}
+    run_result = {"results": {"workout": {"recorded": True, "plan": {PROGRAM_KEY: _training_program()}}}}
+    version = care_chat.synthesize(
+        {"workout", "sleep"}, run_result,
+        lambda d: _rich_author_env(_training_program(prescription=loaded)),
+        read, on_date="2026-07-13", root=root)
+    assert "sleep" in version[plan_model.DOMAIN_PROGRAMS], "the rich program was not folded"
+    sleep_presc = version[plan_model.DOMAIN_PROGRAMS]["sleep"][domain_program.PRESCRIPTION]
+    assert not _contains_load(sleep_presc), f"un-cleared load reached stored comprehensive state: {sleep_presc}"
+
+
+def test_regen_isolates_raising_rich_author_and_holds(tmp_path):
+    # W4-01 (PF-S130-01 production path): a materially-large regen (>= LARGE_CHANGE_THRESHOLD_DOMAINS
+    # renderable swaps) + a rich domain (sleep) whose Leg-2 author RAISES. The rich-author dispatch is
+    # isolated (try/except -> None), so regenerate does NOT raise; and because the ADR-0040 hold runs
+    # BEFORE Leg 2, mark_pending fired for every promoted domain (the thin swap is held, no unconfirmed
+    # standing swap). REDs if the rich-author isolation is reverted (the raise then propagates out).
+    root = tmp_path / "store"
+    _seed_surface_store(root, goal_domains=[*plan_schema.RENDERABLE_DOMAINS, "sleep"])
+    _seed_prior_standing(root, plan_schema.RENDERABLE_DOMAINS)  # 4 differing priors -> large change
+
+    class _RaisingRichDispatch(_LoopDispatch):
+        def __call__(self, name, prompt, context):
+            if name == "sleep":
+                raise RuntimeError("transient rich dispatch failure")
+            return super().__call__(name, prompt, context)
+
+    result = plan_loop.regenerate(  # must NOT raise
+        root, dispatch=_RaisingRichDispatch(_clean_authors()),
+        deid_client=_FixedDeidClient(_deid_summary()), plan_date="2026-07-13", trigger="test")
+    promoted = [d for d, r in result["results"].items() if r.get("recorded")]
+    assert set(promoted) == set(plan_schema.RENDERABLE_DOMAINS), promoted
+    for domain in promoted:
+        assert plan_confirm.decision_for(domain, "2026-07-13", root) == plan_confirm.DECISION_PENDING, (
+            f"{domain}: the ADR-0040 hold did not fire (a Leg-2 raise skipped it)"
+        )
+
+
+def test_regen_hold_fires_before_leg2(tmp_path, monkeypatch):
+    # W4-01 (hold reorder): the ADR-0040 hold runs BEFORE Leg 2, so even a Leg-2 (synthesize) raise
+    # cannot skip it. Force synthesize to raise; regenerate propagates it, but mark_pending ALREADY
+    # fired for every promoted domain (no unconfirmed standing swap / partial write). REDs if the hold
+    # is moved back AFTER Leg 2 (the raise then skips mark_pending).
+    root = tmp_path / "store"
+    _seed_surface_store(root, goal_domains=list(plan_schema.RENDERABLE_DOMAINS))
+    _seed_prior_standing(root, plan_schema.RENDERABLE_DOMAINS)
+
+    def _boom(*a, **k):
+        raise RuntimeError("Leg-2 synthesize failure")
+
+    monkeypatch.setattr(care_chat, "synthesize", _boom)
+    with pytest.raises(RuntimeError):
+        plan_loop.regenerate(
+            root, dispatch=_LoopDispatch(_clean_authors()),
+            deid_client=_FixedDeidClient(_deid_summary()), plan_date="2026-07-13", trigger="test")
+    for domain in plan_schema.RENDERABLE_DOMAINS:
+        assert plan_confirm.decision_for(domain, "2026-07-13", root) == plan_confirm.DECISION_PENDING, (
+            f"{domain}: the hold did not fire before Leg 2 (a Leg-2 raise skipped mark_pending)"
+        )
 
 
 def test_collect_raises_on_duplicate_domain(tmp_path):

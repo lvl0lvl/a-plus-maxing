@@ -482,13 +482,14 @@ def _compose_version(programs, on_date):
     """Compose ONE comprehensive plan version from the gate-cleared per-domain DOMAIN PROGRAMs.
 
     Satisfies `plan_model.validate_plan_version`: >=1 domain program, a non-empty integrated
-    narrative, >=1 dated milestone, and a non-empty monitoring config (compiled via
-    `monitoring_compiler.compile_config`, with a non-empty floor when the compile yields nothing).
+    narrative, >=1 dated milestone, and a non-empty monitoring config (`compile_config` returns a
+    non-empty config over the non-empty `programs` map — `synthesize` returns None before reaching
+    here when there is no program, so the empty case never arrives).
     """
     from scripts.plan import monitoring_compiler
     from scripts.store import plan_model
 
-    monitoring_config = monitoring_compiler.compile_config(programs) or {"domains": sorted(programs)}
+    monitoring_config = monitoring_compiler.compile_config(programs)
     return {
         plan_model.VERSION_DATE: on_date,
         plan_model.DOMAIN_PROGRAMS: dict(programs),
@@ -530,6 +531,7 @@ def synthesize(active, run_result, author_rich, store_read, *, on_date, root):
     Returns:
         (dict | None) The recorded comprehensive version, or None when there is no program to compose.
     """
+    from scripts.plan import domain_program
     from scripts.plan.assemble import PROGRAM_KEY
     from scripts.store import plan_model, plan_schema
 
@@ -556,8 +558,23 @@ def synthesize(active, run_result, author_rich, store_read, *, on_date, root):
                 | set(outcome["rx_bpmh_held"]))
         for candidate in candidates:
             program = (candidate["plan"] or {}).get(PROGRAM_KEY)
-            if candidate["domain"] not in held and program is not None:
-                programs[candidate["domain"]] = program
+            if candidate["domain"] in held or program is None:
+                continue
+            # W4-02: validate before folding — a non-conformant rich program is DROPPED (mirror
+            # generate_plan._lift_program), never folded to crash the downstream composer
+            # (monitoring_compiler.compile_config reads program[MONITORING_SIGNALS]).
+            try:
+                domain_program.validate(program)
+            except domain_program.DomainProgramError:
+                continue
+            # HCR-01: deep-strip `load` from the rich prescription before folding, so no un-cleared
+            # load reaches stored comprehensive state (ADR-0015/BUG-01). Clearance is not plumbed to
+            # the rich path -> strip UNCONDITIONALLY (a rich domain's RENDERABLE_IDENTITY is None, so
+            # project_renderable just deep-strips + passes through), matching the renderable translators.
+            program = dict(program)
+            program[domain_program.PRESCRIPTION] = domain_program.project_renderable(
+                program.get(domain_program.PRESCRIPTION), candidate["domain"], strip_load=True)
+            programs[candidate["domain"]] = program
 
     if not programs:
         return None
