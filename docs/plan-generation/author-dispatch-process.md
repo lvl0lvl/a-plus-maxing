@@ -182,8 +182,10 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
   `reconciliation.ae_profile`; put rich AE on the seams, NOT a program-level field (the seam reader is the
   only rich AE channel). `reconcile` pools `additive_classes` across a domain's seams and screens: a class
   SHARED by two present rich domains holds BOTH; a seam `interactions` list naming a present `with_domain`
-  holds the DECLARER; and the pooled classes also feed the Rx-BPMH screen. A malformed `ae_profile` (not a
-  dict; wrong-typed inner fields) is inert on the AE axis (trusted-author fail-open on the shape) but does
+  holds the DECLARER; and the pooled classes also feed the Rx-BPMH screen. A PRESENT-but-malformed
+  `ae_profile` (not a dict; wrong-typed inner fields) FAILS CLOSED on the AE axis — it HOLDS the declaring
+  domain and emits a `malformed-ae-profile` diagnostic finding (kn29 Tier-2 Security), never folded
+  un-screened; only an ABSENT or validly-EMPTY declaration is inert. A malformed `ae_profile` still does
   NOT suppress the seam's other fields (a `nature: "conflict"` seam still holds).
 
 **`reconcile(candidates, *, operator_rx_classes=...)` — five behaviors (no recording):**

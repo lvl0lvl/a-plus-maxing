@@ -128,6 +128,10 @@ def _ae_profile(candidate):
     rather than guessed at. The contract shape is documented in
     `docs/plan-generation/author-dispatch-process.md`; tightening this to fail-loud is a deferred
     hardening candidate (the liaison gate adjudicates the held finding, not the declaration's shape).
+    NOTE (kn29): the SIBLING rich-domain seam reader now FAILS CLOSED — `_seam_ae_malformed` holds the
+    declaring domain on a present-but-malformed seam `ae_profile` (Tier-2 Security). This compound-band
+    `meta.ae_profile` reader is deliberately NOT flipped here; its fail-loud upgrade stays deferred to
+    `validate_plan_version` (the `plan_model` version fail-fast boundary).
 
     Args:
         candidate (dict): A `compute_plan` result.
@@ -650,8 +654,11 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
     # SEAM_ADDITIVE_AE_HELD drop + a DISTINCT diagnostic finding (auditable, never silent), independent of
     # with_domain resolution — a garbled declaration is untrustworthy regardless of pairing. Scoped to the
     # ae_profile sub-structure: it never touches the seam's other fields, so the conflict-nature hold
-    # above still fires on the same seam (P5-ii). A malformed seam contributes no class to `seam_classes`
-    # (the reader returns `{}`), so paths a/b/c below are inert on it — this screen is its sole handler.
+    # above still fires on the same seam (P5-ii). Inertness on paths a/b/c is enforced PER-FIELD by the
+    # downstream type guards (`_normalized_ae_classes`'s list-guard drops a non-list `additive_classes`),
+    # NOT by a whole-profile drop: a PURELY-malformed seam (a non-dict ae_profile — the reader returns
+    # `{}`) contributes no class and this screen is its sole handler for THAT shape, but a MIXED seam's
+    # still-valid `additive_classes` IS screened by paths a/b/c (the mistyped field alone stays inert).
     for domain, cand in present.items():
         for seam in _cross_domain_seams(cand):
             if _seam_ae_malformed(seam):
@@ -659,7 +666,7 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
                     "kind": "malformed-ae-profile", "from": domain,
                     SEAM_WITH_DOMAIN: seam.get(SEAM_WITH_DOMAIN),
                 })
-                holds[domain] = SEAM_ADDITIVE_AE_HELD
+                holds.setdefault(domain, SEAM_ADDITIVE_AE_HELD)
     # (a) SHARED additive-AE class (symmetric): each unordered present pair sharing a class holds BOTH —
     # component tolerability does not compose to combination safety; dropping either breaks the stack, so
     # the fail-closed default holds both until adjudicated.
@@ -670,11 +677,13 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
         for ae_class in sorted(shared):
             report["seam_additive_ae"].append(
                 {"kind": "shared-class", "ae_class": ae_class, "between": [x, y]})
-        holds[x] = SEAM_ADDITIVE_AE_HELD
-        holds[y] = SEAM_ADDITIVE_AE_HELD
-    # (b) DECLARED interaction (directional): a seam whose ae_profile names a non-empty interactions list
+        holds.setdefault(x, SEAM_ADDITIVE_AE_HELD)
+        holds.setdefault(y, SEAM_ADDITIVE_AE_HELD)
+    # (b) DECLARED interaction (directional): a seam whose ae_profile names a CONTENTFUL interaction entry
     # AND whose with_domain resolves to a present-with-plan domain holds the DECLARER (the seam's
-    # with_domain IS the pairing — rich domains expose no compound identities).
+    # with_domain IS the pairing — rich domains expose no compound identities). A content-empty entry
+    # (no `with`/`mechanism`/`severity`, e.g. `[{}]`) is a genuine no-op — SKIPPED here so it does not
+    # hold, matching `_seam_ae_malformed`'s classification of it as a VALID no-op declaration (OBS-A).
     for domain, cand in present.items():
         for seam in _cross_domain_seams(cand):
             paired = seam.get(SEAM_WITH_DOMAIN)
@@ -683,7 +692,10 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
             interactions = _seam_ae_profile(seam).get("interactions")
             if not isinstance(interactions, list):
                 continue
-            declared = [i for i in interactions if isinstance(i, dict)]
+            declared = [
+                i for i in interactions
+                if isinstance(i, dict) and (i.get("with") or i.get("mechanism") or i.get("severity"))
+            ]
             if declared:
                 for i in declared:
                     report["seam_additive_ae"].append({
@@ -691,7 +703,7 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
                         "with": i.get("with"), "mechanism": i.get("mechanism"),
                         "severity": i.get("severity"),
                     })
-                holds[domain] = SEAM_ADDITIVE_AE_HELD
+                holds.setdefault(domain, SEAM_ADDITIVE_AE_HELD)
     # (c) Rx-BPMH re-base (§3c): extend screen 5's class source to the seams — a present domain whose
     # pooled seam classes stack against the operator's present Rx-interaction classes is held in the SAME
     # independent `rx_bpmh_held` set. Skip a domain the compound-band screen 5 already held so the one
