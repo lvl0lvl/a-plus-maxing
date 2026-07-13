@@ -45,7 +45,7 @@ JUDGE_ROLE = "quality-judge"
 # The large-change HOLD bar (ADR-0036 OQ-4 → ADR-0040 → ADR-0046 disposition #36): a re-gen that
 # replaces a STRICT MAJORITY of the ACTIVE RENDERABLE set is a materially-large swap ADR-0040 HOLDS
 # `pending` (it does NOT stand and is not tailored/egressed) until an explicit operator confirm. The
-# strict-majority DENOMINATOR is `|renderable|` (`active & RENDERABLE_DOMAINS`, the `regenerate` local),
+# strict-majority DENOMINATOR is `|renderable|` (`active & RENDERABLE_DOMAINS`, the `renderable` local),
 # NOT `|active|`: the numerator (`_change_magnitude`, the promoted standing-plan replacements) draws
 # only from `renderable` and caps at 4, so a `len(active)` bar is structurally unreachable for
 # `|active| ≥ 8` and would fail OPEN (the hold never fires; a full renderable swap stands unconfirmed).
@@ -321,8 +321,8 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tai
     # swap-already-landed notice). Materiality is measured against the last STANDING (confirmed /
     # no-pointer) plan — `_change_magnitude` filters the prior readings through `filter_confirmed`, so a
     # never-confirmed held re-gen is not the baseline. The hold fires when the swap is a STRICT
-    # MAJORITY of the active RENDERABLE set (`_is_renderable_majority` over `len(renderable)`, the `:273`
-    # local) — a majority-of-renderable swap is material enough to hold.
+    # MAJORITY of the active RENDERABLE set (`_is_renderable_majority` over `len(renderable)`, the
+    # `renderable` local bound above) — a majority-of-renderable swap is material enough to hold.
     if _is_renderable_majority(
         _change_magnitude(store_read, result, promoted, plan_date, root), len(renderable)
     ):

@@ -82,6 +82,19 @@ def _compiled(rules):
     return monitoring_compiler.compile_config({"workout": program})
 
 
+def _compiled_with_signals(rules, signals):
+    """Compile a one-domain ("workout") config carrying an EXPLICIT `signals` envelope + `rules`.
+
+    Same REAL `compile_config` path as `_compiled` (PF-S131-01), but with a caller-supplied
+    `monitoring_signals` list — for the WAVE5-02 nameless-signal + the CQ-1 materiality-less cases,
+    both of which the compiler tolerates via `.get()`.
+    """
+    program = _training_program(
+        monitoring_signals=list(signals), adjustment_rules=list(rules)
+    )
+    return monitoring_compiler.compile_config({"workout": program})
+
+
 def _execute(config, observations, root, *, raw_intake=None, deid_client=None, dispatch=None,
              store_read=None, plan_date=PLAN_DATE, gate_dispatch=None):
     """Drive the executor over `config` + `observations`, filling unexercised seams with defaults."""
@@ -308,9 +321,15 @@ def test_out_of_bounds_entry_surfaces_rejection_zero_tier1_auto_apply(tmp_path):
     config = _compiled([_ambiguous_rule()])  # missing direction -> un-certifiable -> MUST_ESCALATE
     result = _execute(config, {_SIGNAL: _MATERIAL}, tmp_path)
 
-    # the un-certifiable entry is SURFACED (present in the routing result), never silently dropped
+    # the un-certifiable entry is SURFACED (present in the routing result), never silently dropped.
+    # STRENGTHENED (TCR-338-02): assert the EXACT fail-closed-UP tier AND the surfaced hold
+    # disposition. The prior `!= TIER_1` was weaker than AC-6-F2's `== TIER_4` (it passed for a
+    # mis-route DOWN to Tier-2/3); the exact Tier-4 + observable `action` is the specific F3 surfaced
+    # outcome. NOTE (TCR-338-02): this row and AC-6-F2 (mutation #7) both revert the SAME in-domain
+    # un-certified -> Tier-4 branch — 6 DISTINCT branch-reverts across the 7 named falsifiers.
     routing = _routing_for(result, _SIGNAL)
-    assert routing["tier"] != tiered_executor.TIER_1, "an un-certifiable entry auto-applied at Tier-1"
+    assert routing["tier"] == tiered_executor.TIER_4, "an un-certifiable entry did not fail-close UP to Tier-4"
+    assert routing["action"] == "hold-pending-human-gate", "the rejection carried no surfaced hold disposition"
     # 0 un-certifiable entries auto-applied at Tier-1 across the whole result
     assert not [r for r in result["routings"] if r["tier"] == tiered_executor.TIER_1]
 
@@ -381,3 +400,116 @@ def test_adjust_py_untouched_numstat_empty():
         cwd=REPO_ROOT, capture_output=True, text=True, check=True,
     )
     assert diff.stdout.strip() == "", f"adjust.py is not byte-frozen (finding-A parity):\n{diff.stdout}"
+
+
+# === Wave-5 Tier-3 review fixes (WAVE5-01 gate fail-open, WAVE5-02 isolation, CQ-1 materiality) ===
+
+
+def test_tier2_composed_gate_unwired_fail_closes_to_tier4_no_uncomposed_replan(tmp_path, monkeypatch):
+    # WAVE5-01 (the Tier-2 composed-gate fail-OPEN): a material in-domain event routes to Tier-2, but
+    # with gate_dispatch=None the re-plan would drop to run_orchestrated's LEGACY non-loop path and
+    # record an UN-composed plan while emitting the lie `action="replan-through-composition"`. Post-fix
+    # the executor fail-closes UP to a Tier-4 hold (`hold-composed-gate-unwired`) and NEVER enters the
+    # front door. RED-capable: reverting the gate-None guard re-enters run_orchestrated (reentries
+    # non-empty) and re-emits the Tier-2 lie.
+    reentries = []
+
+    def front_door_spy(*args, **kwargs):
+        reentries.append((args, kwargs))
+        return {"deidentified": False, "results": {}, "dispatch_count": 0}
+
+    monkeypatch.setattr(plan_orchestrator, "run_orchestrated", front_door_spy)
+
+    config = _compiled([_tier1_rule()])  # certified in-domain rule -> Tier-2 on a material reading
+    result = _execute(config, {_SIGNAL: _MATERIAL}, tmp_path)  # gate_dispatch defaults None (unwired)
+
+    routing = _routing_for(result, _SIGNAL)
+    assert routing["tier"] == tiered_executor.TIER_4, "an unwired-gate Tier-2 did not fail-close UP to Tier-4"
+    assert routing["action"] == "hold-composed-gate-unwired"
+    assert reentries == [], "the executor re-entered the front door with an UNWIRED composed gate (fail-OPEN)"
+    # 0 un-composed re-plan recorded: no routing claims the composition ran
+    assert not [r for r in result["routings"] if r["action"] == "replan-through-composition"]
+    # the domain is HELD pending the human gate (the fail-closed disposition)
+    assert plan_confirm.decision_for("workout", PLAN_DATE, tmp_path) == plan_confirm.DECISION_PENDING
+
+
+def test_domain_level_fault_isolated_later_domain_tier4_hold_still_fires(tmp_path, monkeypatch):
+    # WAVE5-02 (per-domain isolation): a bad domain A (an UNANTICIPATED per-domain fault) must not
+    # abort a LATER domain B's safety hold. A two-domain config (workout first, nutrition/safety-gate
+    # second); `_implicated_tiers` is forced to raise for "workout" (a per-domain fault no signal-level
+    # guard anticipated). Post-fix workout fail-closes to a surfaced `hold-domain-fault` and nutrition's
+    # Tier-4 mark_pending STILL fires. RED-capable: reverting the per-domain try/except lets the fault
+    # propagate -> execute_monitoring_day raises -> nutrition never held.
+    real_implicated = tiered_executor._implicated_tiers
+
+    def implicated_or_boom(domain, entries, material, materiality_known):
+        if domain == "workout":
+            raise RuntimeError("simulated unanticipated per-domain fault in workout")
+        return real_implicated(domain, entries, material, materiality_known)
+
+    monkeypatch.setattr(tiered_executor, "_implicated_tiers", implicated_or_boom)
+
+    prog_a = _training_program(monitoring_signals=[_training_signal()], adjustment_rules=[_tier1_rule()])
+    sig_b = _training_signal(signal="hydration")
+    prog_b = _training_program(
+        monitoring_signals=[sig_b],
+        adjustment_rules=[_tier1_rule(target_signal="hydration", safety="gate")],
+    )
+    config = monitoring_compiler.compile_config({"workout": prog_a, "nutrition": prog_b})
+
+    result = _execute(config, {_SIGNAL: _MATERIAL, "hydration": _MATERIAL}, tmp_path)
+
+    # despite workout's fault, nutrition's safety-gate held at Tier-4 (the isolation guarantee)
+    assert plan_confirm.decision_for("nutrition", PLAN_DATE, tmp_path) == plan_confirm.DECISION_PENDING
+    # workout's fault is SURFACED (F3), not silently swallowed
+    assert any(r["domain"] == "workout" and r["action"] == "hold-domain-fault" for r in result["routings"])
+
+
+def test_nameless_signal_skipped_domain_still_routes_no_abort(tmp_path):
+    # WAVE5-02 (nameless monitored signal): an envelope entry with NO `signal` name (the compiler
+    # tolerates it via `.get()`, validate does not require it) must not KeyError the whole day. Post-fix
+    # the nameless signal is SKIPPED and the domain's named signal still routes. RED-capable: reverting
+    # :202 to the `signal[SIGNAL_NAME]` subscript KeyErrors the domain (per-domain isolation then turns
+    # the whole domain into a `hold-domain-fault`, so the named signal's Tier-1 routing disappears).
+    nameless = {k: v for k, v in _training_signal().items() if k != "signal"}
+    config = _compiled_with_signals([_tier1_rule()], [_training_signal(), nameless])
+
+    result = _execute(config, {_SIGNAL: _IMMATERIAL}, tmp_path)
+
+    # the named signal's certified rule routed normally (Tier-1); the nameless envelope was skipped
+    assert _routing_for(result, _SIGNAL)["tier"] == tiered_executor.TIER_1
+    # 0 domain-fault: the nameless signal did not abort the domain
+    assert not [r for r in result["routings"] if r["action"] == "hold-domain-fault"]
+
+
+def test_non_numeric_observation_fail_closes_that_signal_to_tier4(tmp_path):
+    # WAVE5-02 (categorical / non-numeric reading): an un-interpretable observation cannot be classified
+    # against materiality. Post-fix it fail-closes UP to a surfaced Tier-4 hold for THAT signal
+    # (`hold-uninterpretable-reading`) instead of a bare `observation >= materiality` TypeError that
+    # aborts the day. RED-capable: reverting the isinstance guard TypeErrors -> per-domain isolation
+    # turns it into `hold-domain-fault` (signal=None), so the per-signal record for _SIGNAL disappears.
+    config = _compiled([_tier1_rule()])
+    result = _execute(config, {_SIGNAL: "high"}, tmp_path)  # a categorical, non-numeric reading
+
+    routing = _routing_for(result, _SIGNAL)
+    assert routing["tier"] == tiered_executor.TIER_4, "a non-numeric reading did not fail-close UP to Tier-4"
+    assert routing["action"] == "hold-uninterpretable-reading"
+    # the fail-close held the domain pending the human gate
+    assert plan_confirm.decision_for("workout", PLAN_DATE, tmp_path) == plan_confirm.DECISION_PENDING
+
+
+def test_indeterminate_materiality_uncertified_rule_escalates_to_tier4_not_inert(tmp_path):
+    # CQ-1 / SEC-W5-02 (indeterminate materiality != provably-immaterial): a monitored signal with NO
+    # materiality_threshold makes `materiality is None`. An in-domain un-certified (MUST_ESCALATE) rule
+    # on it must NOT go inert on a large reading just because immateriality can't be shown — it
+    # fail-closes UP to Tier-4. RED-capable: reverting the `(material or not materiality_known)`
+    # condition to bare `material` collapses indeterminate into False -> inert (no routing).
+    matless = {k: v for k, v in _training_signal().items() if k != "materiality_threshold"}
+    config = _compiled_with_signals([_tier1_rule()], [matless])  # un-certifiable (materiality-less)
+
+    result = _execute(config, {_SIGNAL: _MATERIAL}, tmp_path)  # a large reading
+
+    assert _routing_for(result, _SIGNAL)["tier"] == tiered_executor.TIER_4, (
+        "an indeterminate-materiality un-certified rule went inert (fail-silent) on a large reading"
+    )
+    assert plan_confirm.decision_for("workout", PLAN_DATE, tmp_path) == plan_confirm.DECISION_PENDING
