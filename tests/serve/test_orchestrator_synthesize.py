@@ -718,6 +718,27 @@ def test_seam_ae_held_rich_domain_dropped_from_comprehensive(tmp_path):
     assert "workout" in programs  # the un-held renderable program still composes the version
 
 
+def test_seam_rx_bpmh_held_rich_domain_dropped_from_comprehensive(tmp_path):
+    # kn29 / SEC-W4-01 SF-1 (path-c Rx-BPMH end-to-end DROP): a rich domain held SOLELY via the seam
+    # Rx-BPMH re-base — its pooled seam ae_profile class intersects the operator's present
+    # `rx-interaction-classes` — lands in the DISTINCT `rx_bpmh_held` set and is DROPPED from the
+    # composed comprehensive version. The fail-closed postcondition THROUGH `rx_bpmh_held`, previously
+    # unasserted e2e. Non-tautological: sleep is the only rich domain (no shared-class pair, no
+    # interaction), so the drop is caused ONLY by path (c). RED if screen 5's seam class source is
+    # reverted to meta-only (sleep then folds back into the composed version).
+    root = tmp_path / "store"
+    read = _seed_surface_store(root, goal_domains=["workout"],
+                               extra={"rx-interaction-classes": "bleeding-risk"})
+    run_result = {"results": {"workout": {"recorded": True, "plan": {PROGRAM_KEY: _training_program()}}}}
+    version = care_chat.synthesize(
+        {"workout", "sleep"}, run_result,
+        lambda d: _rich_author_env(_seam_ae_program("workout", additive_classes=["bleeding-risk"])),
+        read, on_date="2026-07-13", root=root)
+    programs = version[plan_model.DOMAIN_PROGRAMS]
+    assert "sleep" not in programs, programs.keys()  # held via seam Rx-BPMH -> dropped fail-closed
+    assert "workout" in programs  # the un-held renderable program still composes the version
+
+
 # =========================================================================== #
 # GROUP C — contract pins (ubsp / qrg4)
 # =========================================================================== #

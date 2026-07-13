@@ -181,9 +181,10 @@ def _seam_ae_profile(seam):
     A rich domain carries no `meta.ae_profile`; its AE profile rides on each seam entry as an OPTIONAL
     `ae_profile` sub-structure — the SAME `{additive_classes, interactions}` shape the compound band
     reads from `meta`, so a shared-class token matches identically across both sources. A seam that
-    declares none — or a present-but-malformed declaration (an `ae_profile` that is not a dict) —
-    contributes an EMPTY profile (no finding), mirroring `_ae_profile`'s trusted-author-malformed-is-inert
-    posture. Pure; never raises.
+    declares none — or a present-but-malformed declaration (an `ae_profile` that is not a dict) — reads
+    as an EMPTY profile HERE, so the class / interaction screens (paths a/b/c) do not process it; a
+    PRESENT-but-malformed declaration is SEPARATELY caught by `_seam_ae_malformed` and held fail-closed
+    (kn29 Tier-2 Security HIGH), never folded un-screened. Pure; never raises.
 
     Args:
         seam (dict): One `cross_domain_seams` entry (already dict-filtered by `_cross_domain_seams`).
@@ -193,6 +194,44 @@ def _seam_ae_profile(seam):
     """
     profile = seam.get(SEAM_AE_PROFILE)
     return profile if isinstance(profile, dict) else {}
+
+
+def _seam_ae_malformed(seam):
+    """Whether a seam's PRESENT `ae_profile` is STRUCTURALLY MALFORMED (kn29 / SEC-W4-01, fail-closed).
+
+    Distinguishes a PRESENT-but-mistyped declaration from an ABSENT one, so a rich specialist (an AI)
+    that GARBLES its AE declaration fails closed — the declaring domain is held — instead of folding
+    un-screened (the Tier-2 Security HIGH ruling; the reader alone had collapsed absent + mistyped into
+    the same inert `{}`). NOT malformed: an ABSENT declaration (no `SEAM_AE_PROFILE` key), or a
+    WELL-TYPED one — a dict whose `additive_classes`, when present, is a list of strings and whose
+    `interactions`, when present, is a list of dicts (each possibly EMPTY, a valid no-op declaration).
+    MALFORMED: a non-dict `ae_profile`; an `additive_classes` present but not a list-of-strings (a
+    scalar, or a list-of-dicts); an `interactions` present but not a list-of-dicts (a single dict, or a
+    list of strings). Pure; never raises — a screen crash is itself a bypass — reading the same
+    dict-filtered seam `_seam_ae_profile` does.
+
+    Args:
+        seam (dict): One `cross_domain_seams` entry (already dict-filtered by `_cross_domain_seams`).
+
+    Returns:
+        (bool) True when a PRESENT `ae_profile` is structurally malformed; False for absent or well-typed.
+    """
+    if SEAM_AE_PROFILE not in seam:
+        return False  # ABSENT — a legitimate no-declaration, inert
+    profile = seam.get(SEAM_AE_PROFILE)
+    if not isinstance(profile, dict):
+        return True  # PRESENT but the whole sub-structure is not a dict
+    classes = profile.get("additive_classes")
+    if classes is not None and (
+        not isinstance(classes, list) or any(not isinstance(c, str) for c in classes)
+    ):
+        return True  # additive_classes present but not a list-of-strings
+    interactions = profile.get("interactions")
+    if interactions is not None and (
+        not isinstance(interactions, list) or any(not isinstance(i, dict) for i in interactions)
+    ):
+        return True  # interactions present but not a list-of-dicts
+    return False
 
 
 def _seam_ae_classes(candidate):
@@ -455,7 +494,8 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
     Returns:
         (dict) `report` (`red_s_lea_cross_domain` bool, `bounce` dict | None, `overlaps` list,
         `conflicts` list, `additive_ae` list, `rx_bpmh` list, `seams` list, and `seam_additive_ae`
-        list — the Option-B rich-domain additive-AE findings sourced from `cross_domain_seams`,
+        list — the Option-B rich-domain additive-AE findings sourced from `cross_domain_seams`
+        (shared-class, declared-interaction, AND `malformed-ae-profile` fail-closed diagnostics),
         kept DISTINCT from the compound-band `additive_ae`); `holds` (domain -> hold reason —
         workout under a RED-S/LEA short-circuit, supplements under an additive-AE finding, a rich
         domain under a seam additive-AE finding (`SEAM_ADDITIVE_AE_HELD`); the bounce-driven holds
@@ -603,6 +643,23 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
     # `holds` / `rx_bpmh_held` (reused so `synthesize` / `generate_plans` drop them with no consumer edit).
     present = {d: c for d, c in candidates.items() if c.get("plan") is not None}
     seam_classes = {d: _seam_ae_classes(c) for d, c in present.items()}
+    # (malformed) PRESENT-but-structurally-malformed seam ae_profile fails CLOSED (kn29 / SEC-W4-01,
+    # Tier-2 Security HIGH): a rich specialist (an AI) that GARBLES its AE declaration must not fold
+    # un-screened. Distinguished from ABSENT (a legitimate no-declaration, inert) + VALIDLY-EMPTY (inert)
+    # by `_seam_ae_malformed` — only a mistyped shape holds. Holds the DECLARING domain via the SAME
+    # SEAM_ADDITIVE_AE_HELD drop + a DISTINCT diagnostic finding (auditable, never silent), independent of
+    # with_domain resolution — a garbled declaration is untrustworthy regardless of pairing. Scoped to the
+    # ae_profile sub-structure: it never touches the seam's other fields, so the conflict-nature hold
+    # above still fires on the same seam (P5-ii). A malformed seam contributes no class to `seam_classes`
+    # (the reader returns `{}`), so paths a/b/c below are inert on it — this screen is its sole handler.
+    for domain, cand in present.items():
+        for seam in _cross_domain_seams(cand):
+            if _seam_ae_malformed(seam):
+                report["seam_additive_ae"].append({
+                    "kind": "malformed-ae-profile", "from": domain,
+                    SEAM_WITH_DOMAIN: seam.get(SEAM_WITH_DOMAIN),
+                })
+                holds[domain] = SEAM_ADDITIVE_AE_HELD
     # (a) SHARED additive-AE class (symmetric): each unordered present pair sharing a class holds BOTH —
     # component tolerability does not compose to combination safety; dropping either breaks the stack, so
     # the fail-closed default holds both until adjudicated.
