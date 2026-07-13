@@ -35,11 +35,15 @@ Conditional (present per the domain kind's required-vs-conditional row):
     cross_domain_seams-- a list of seam entries; each entry's intended structure is a
                          paired-domain reference (`SEAM_WITH_DOMAIN`) + a seam-nature/conflict
                          token (`SEAM_NATURE`; a `SEAM_CONFLICT`-nature seam holds the declaring
-                         domain). Those key-names are single-source constants HERE (pule),
+                         domain) + an OPTIONAL Option-B adverse-event sub-structure
+                         (`SEAM_AE_PROFILE`, the `{additive_classes, interactions}` shape the
+                         compound band carries on `meta.ae_profile` — the rich domain's AE channel;
+                         kn29 / SEC-W4-01). Those key-names are single-source constants HERE (pule),
                          referenced by `orchestrate.SEAM_*` so a divergent filler is caught, not
                          silently dropped. T1 pins the FIELD NAME as a conditional field but does
                          NOT pin its presence or edge shape; ADR-0043-T2 owns the reconciliation
-                         semantics AND the seam-edge validation (`validate` does not check it).
+                         semantics AND the seam-edge validation (`validate` does not check the edge
+                         shape, incl. the OPTIONAL `SEAM_AE_PROFILE` — it is reader-enforced).
 
 The domain KIND
 ---------------
@@ -94,6 +98,11 @@ CONDITIONAL_FIELDS = (REQUIRED_LABS, REFUSAL_ESCALATION, CROSS_DOMAIN_SEAMS)
 SEAM_WITH_DOMAIN = "with_domain"
 SEAM_NATURE = "nature"
 SEAM_CONFLICT = "conflict"
+# The OPTIONAL Option-B (kn29 / SEC-W4-01) adverse-event sub-structure on a seam entry: the SAME
+# `{additive_classes, interactions}` shape the compound band carries on `meta.ae_profile`, relocated
+# onto the seam so a RICH domain (no `meta.ae_profile`) declares its AE profile on its seams. Read by
+# `orchestrate` (`orchestrate.SEAM_AE_PROFILE`) — reader-enforced, NOT validated (ADR-0043-T2 boundary).
+SEAM_AE_PROFILE = "ae_profile"
 
 # --- the domain KIND: first-class attribute + closed, membership-checked vocab ---
 

@@ -173,6 +173,20 @@ lifts it into the candidate's `meta`, so the recorded plan shape is unchanged):
   intersects the operator's PRESENT Rx-interaction classes (read de-identified from the store, behavior 5)
   holds the compound through the liaison gate — so the canonical vocabulary is shared across the
   compound↔compound and compound↔Rx axes.
+- **rich domains (§5–§13, no `meta.ae_profile`)** — a rich specialist carries its adverse-event profile
+  on its DOMAIN PROGRAM's `cross_domain_seams` instead (Option B / kn29 / SEC-W4-01): each seam entry may
+  carry an OPTIONAL `ae_profile` sub-structure `{"additive_classes": [<token>, ...], "interactions":
+  [{"with": ..., "mechanism": ..., "severity": "low|moderate|high"}]}` — the SAME `{additive_classes,
+  interactions}` shape and canonical vocabulary the compound band uses, so a shared class matches
+  identically across both sources. This is the rich-domain equivalent of the compound band's top-level
+  `reconciliation.ae_profile`; put rich AE on the seams, NOT a program-level field (the seam reader is the
+  only rich AE channel). `reconcile` pools `additive_classes` across a domain's seams and screens: a class
+  SHARED by two present rich domains holds BOTH; a seam `interactions` list naming a present `with_domain`
+  holds the DECLARER; and the pooled classes also feed the Rx-BPMH screen. A PRESENT-but-malformed
+  `ae_profile` (not a dict; wrong-typed inner fields) FAILS CLOSED on the AE axis — it HOLDS the declaring
+  domain and emits a `malformed-ae-profile` diagnostic finding (kn29 Tier-2 Security), never folded
+  un-screened; only an ABSENT or validly-EMPTY declaration is inert. A malformed `ae_profile` still does
+  NOT suppress the seam's other fields (a `nature: "conflict"` seam still holds).
 
 **`reconcile(candidates, *, operator_rx_classes=...)` — five behaviors (no recording):**
 

@@ -42,6 +42,7 @@ from scripts.plan.orchestrate import (
     generate_plans,
     reconcile,
 )
+from scripts.plan.assemble import PROGRAM_KEY
 from scripts.store import queue_schema
 from scripts.store import plan_schema, store
 from tests.plan.test_generate_plan import (
@@ -54,7 +55,8 @@ from tests.plan.test_generate_plan import (
     _supplement_rec,
     _workout_rec,
 )
-from scripts.plan import adjudicate
+from tests.plan.test_generate_plan_uniform import _uniform_program
+from scripts.plan import adjudicate, domain_program, orchestrate
 from tests.plan.test_adjudicate import _envelope, _override_record
 
 
@@ -1448,6 +1450,13 @@ def _supp_candidate(additive_classes):
             "meta": {"ae_profile": {"additive_classes": additive_classes}}}
 
 
+def _pep_candidate(additive_classes):
+    """A raw peptides candidate dict (no I/O) declaring `additive_classes` via meta.ae_profile."""
+    return {"domain": "peptides", "specialist": "peptide-specialist", "section": {},
+            "reason": None, "plan": {"compound": "BPC-157"},
+            "meta": {"ae_profile": {"additive_classes": additive_classes}}}
+
+
 def test_reconcile_sets_rx_bpmh_hold_purely():
     # CORE mutation-proof: reconcile (pure, no I/O) holds a compound whose declared additive-AE class
     # intersects the operator's present Rx classes, in the INDEPENDENT rx_bpmh_held set. Remove the
@@ -1958,3 +1967,308 @@ def test_collate_derives_non_overridable_lead_via_collation(tmp_path):
     assert ranked[0]["axis"] == "rx-bpmh"  # the derived non-overridable auto-block leads
     assert ranked[0]["non_overridable"] is True
     assert {e["axis"] for e in ranked} == {"additive-ae", "cross-domain-conflict", "rx-bpmh"}
+
+
+# --- SEC-W4-01 / kn29: rich-domain additive-AE screen over cross_domain_seams (Option B) ---------
+#
+# The RICH specialist DOMAINs (active beyond RENDERABLE_DOMAINS) carry NO meta.ae_profile — their
+# ONLY AE channel is the ae_profile sub-structure FOLDED onto each cross_domain_seams entry (Option
+# B). reconcile screens the seam-declared classes/interactions symmetrically (a SHARED class holds
+# BOTH sharers) + directionally (a declared interaction naming a present domain holds the DECLARER),
+# and re-bases the Rx-BPMH class source to the seams — the floor coverage the compound band already
+# has, now earned by the rich program path. Findings land in the DISTINCT report["seam_additive_ae"]
+# key (so the compound band's report["additive_ae"] / Leg-1 collation stay byte-identical) and hold
+# via `holds` / `rx_bpmh_held`, so care_chat.synthesize's existing drop-on-held path fail-closes the
+# un-screened rich stack. These pin reconcile directly (pure, no I/O); P7 (end-to-end drop through
+# care_chat.synthesize) lives in tests/serve/test_orchestrator_synthesize.py.
+
+_SEAM_BLEED = "bleeding-risk"
+
+
+def _seam(paired, *, additive_classes=None, interactions=None, nature=None):
+    """One cross_domain_seams entry: a paired-domain ref + an OPTIONAL Option-B ae_profile sub-structure."""
+    seam = {domain_program.SEAM_WITH_DOMAIN: paired}
+    if nature is not None:
+        seam[domain_program.SEAM_NATURE] = nature
+    if additive_classes is not None or interactions is not None:
+        ae = {}
+        if additive_classes is not None:
+            ae["additive_classes"] = additive_classes
+        if interactions is not None:
+            ae["interactions"] = interactions
+        seam[domain_program.SEAM_AE_PROFILE] = ae
+    return seam
+
+
+def _rich_seam_candidate(domain, seams):
+    """A rich-domain candidate (the care_chat.synthesize shape): a plan carrying ONLY a DOMAIN PROGRAM
+    with the given cross_domain_seams, and an EMPTY meta (no meta.ae_profile — the Option-B channel)."""
+    return {
+        "domain": domain, "specialist": f"{domain}-specialist",
+        "plan": {PROGRAM_KEY: {domain_program.CROSS_DOMAIN_SEAMS: seams}},
+        "meta": {}, "reason": None, "section": None,
+    }
+
+
+def test_seam_shared_ae_class_holds_both_rich_domains():
+    # P1 (path a, SYMMETRIC): two rich domains each declaring bleeding-risk on a seam ae_profile, both
+    # present-with-plan -> reconcile HOLDS BOTH (each in `holds` with SEAM_ADDITIVE_AE_HELD) and records
+    # the shared-class finding in the DISTINCT report["seam_additive_ae"]. Mutation-RED: delete the
+    # _seam_ae_classes intersection screen -> neither held -> both fold un-screened -> RED.
+    outcome = reconcile({
+        "sleep": _rich_seam_candidate("sleep", [_seam("stress", additive_classes=[_SEAM_BLEED])]),
+        "stress": _rich_seam_candidate("stress", [_seam("sleep", additive_classes=[_SEAM_BLEED])]),
+    })
+    assert outcome["holds"]["sleep"] == orchestrate.SEAM_ADDITIVE_AE_HELD
+    assert outcome["holds"]["stress"] == orchestrate.SEAM_ADDITIVE_AE_HELD
+    findings = outcome["report"]["seam_additive_ae"]
+    assert {f["ae_class"] for f in findings if f["kind"] == "shared-class"} == {_SEAM_BLEED}
+    assert any(sorted(f["between"]) == ["sleep", "stress"] for f in findings)
+    assert outcome["report"]["additive_ae"] == []  # the compound-band key is NOT polluted (no leak)
+
+
+def test_seam_shared_class_is_case_insensitive():
+    # the seam class tokens normalize (lowercase/strip) before intersection, mirroring the compound band.
+    outcome = reconcile({
+        "sleep": _rich_seam_candidate("sleep", [_seam("stress", additive_classes=["  Bleeding-Risk "])]),
+        "stress": _rich_seam_candidate("stress", [_seam("sleep", additive_classes=[_SEAM_BLEED])]),
+    })
+    assert outcome["holds"].get("sleep") == orchestrate.SEAM_ADDITIVE_AE_HELD
+    assert outcome["holds"].get("stress") == orchestrate.SEAM_ADDITIVE_AE_HELD
+
+
+def test_seam_declared_interaction_holds_declarer_only():
+    # P2 (path b, DIRECTIONAL): rich X declares a seam interaction toward present-with-plan Y -> X held
+    # (SEAM_ADDITIVE_AE_HELD), the finding carries the interaction detail + with_domain; Y (declares
+    # nothing) NOT held. Mutation-RED: skip the seam-interaction read -> X not held -> RED.
+    interaction = {"with": "melatonin", "mechanism": "additive sedation", "severity": "high"}
+    outcome = reconcile({
+        "sleep": _rich_seam_candidate("sleep", [_seam("stress", interactions=[interaction])]),
+        "stress": _rich_seam_candidate("stress", []),
+    })
+    assert outcome["holds"].get("sleep") == orchestrate.SEAM_ADDITIVE_AE_HELD
+    assert "stress" not in outcome["holds"]  # the named counterparty declared nothing -> not held
+    finding = next(f for f in outcome["report"]["seam_additive_ae"] if f["kind"] == "declared-interaction")
+    assert finding["from"] == "sleep"
+    assert finding[domain_program.SEAM_WITH_DOMAIN] == "stress"
+    assert finding["with"] == "melatonin" and finding["severity"] == "high"
+
+
+def test_seam_interaction_inert_when_counterparty_absent():
+    # P2 control (non-tautology): a declared interaction whose with_domain is NOT present-with-plan does
+    # not fire — the seam's with_domain IS the pairing; no present counterparty -> no rich AE finding.
+    outcome = reconcile({
+        "sleep": _rich_seam_candidate("sleep", [_seam("stress", interactions=[
+            {"with": "melatonin", "mechanism": "x", "severity": "low"}])]),
+    })
+    assert "sleep" not in outcome["holds"]
+    assert outcome["report"]["seam_additive_ae"] == []
+
+
+def test_seam_rx_bpmh_holds_rich_domain():
+    # P3 (path c, Rx-BPMH re-base): a rich domain whose POOLED seam classes intersect the operator's
+    # present Rx-interaction classes is added to rx_bpmh_held + report["rx_bpmh"] (independent of `holds`).
+    # Mutation-RED: restrict screen 5's class source to ("supplements","peptides")/meta -> not held.
+    outcome = reconcile(
+        {"sleep": _rich_seam_candidate("sleep", [_seam("stress", additive_classes=[_SEAM_BLEED])])},
+        operator_rx_classes={_SEAM_BLEED},
+    )
+    assert "sleep" in outcome["rx_bpmh_held"]
+    assert outcome["report"]["rx_bpmh"] == [{"held_domain": "sleep", "classes": [_SEAM_BLEED]}]
+    assert "sleep" not in outcome["holds"]  # rx-bpmh tracked independently of `holds`
+
+
+def test_seam_clean_rich_pair_records_no_hold():
+    # P5 (DESIGN P4): two rich domains with DISJOINT seam classes + no interactions -> NEITHER held on
+    # the AE or Rx axes; both fold. Guards against a false-positive floor (the non-tautology control).
+    outcome = reconcile(
+        {
+            "sleep": _rich_seam_candidate("sleep", [_seam("stress", additive_classes=["sedation"])]),
+            "stress": _rich_seam_candidate("stress", [_seam("sleep", additive_classes=["stimulant-load"])]),
+        },
+        operator_rx_classes={"cyp3a4-pgp"},  # operator on a class NEITHER rich domain declares
+    )
+    assert outcome["holds"] == {}
+    assert outcome["rx_bpmh_held"] == []
+    assert outcome["report"]["seam_additive_ae"] == []
+    assert outcome["report"]["rx_bpmh"] == []
+
+
+def test_seam_present_but_malformed_ae_profile_holds_fail_closed():
+    # P6(i) FLIPPED (kn29 Tier-2 Security HIGH): a PRESENT-but-structurally-malformed seam ae_profile
+    # fails CLOSED — the DECLARING domain is HELD (SEAM_ADDITIVE_AE_HELD) + a distinct
+    # `malformed-ae-profile` diagnostic finding (auditable, not silent), so an AI specialist that garbles
+    # its AE declaration cannot fold un-screened. Covers 5 of Security's drift shapes; the counterparty
+    # (declares nothing) is NOT held (the hold is scoped to the declarer). Mutation-RED: revert
+    # `_seam_ae_malformed` to treat malformed as absent -> declarer not held + no finding -> RED.
+    for shape in (
+        "not-a-dict",                                          # non-dict ae_profile
+        {"additive_classes": "bleeding-risk"},                # additive_classes a scalar str, not a list
+        {"additive_classes": [{"class": "bleeding-risk"}]},   # additive_classes a list-of-dicts
+        {"interactions": {"with": "x", "severity": "high"}},  # interactions a single dict, not a list
+        {"interactions": ["bleeding-risk"]},                  # interactions a list of strings, not dicts
+    ):
+        outcome = reconcile({
+            "sleep": _rich_seam_candidate("sleep", [
+                {domain_program.SEAM_WITH_DOMAIN: "stress", domain_program.SEAM_AE_PROFILE: shape}]),
+            "stress": _rich_seam_candidate("stress", []),
+        }, operator_rx_classes={_SEAM_BLEED})
+        assert outcome["holds"].get("sleep") == orchestrate.SEAM_ADDITIVE_AE_HELD, shape
+        assert "stress" not in outcome["holds"], shape  # the hold is scoped to the DECLARER
+        assert any(f["kind"] == "malformed-ae-profile" and f["from"] == "sleep"
+                   for f in outcome["report"]["seam_additive_ae"]), shape
+
+
+def test_seam_absent_and_valid_empty_ae_profile_are_inert():
+    # The fail-closed BOUNDARY (kn29 + SF-3): ABSENT (no SEAM_AE_PROFILE key) and PRESENT-but-VALIDLY-
+    # EMPTY ({"additive_classes": [], "interactions": []}) are legitimate no-declarations -> NEITHER
+    # held (the malformed screen fires ONLY on a mistyped shape, never on a well-formed empty/absent
+    # one). The non-tautology control that the fail-closed flip does not over-hold. Even against an Rx.
+    outcome = reconcile({
+        "sleep": _rich_seam_candidate("sleep", [  # ABSENT: the seam carries no ae_profile key at all
+            {domain_program.SEAM_WITH_DOMAIN: "stress"}]),
+        "stress": _rich_seam_candidate("stress", [  # PRESENT but VALIDLY EMPTY
+            {domain_program.SEAM_WITH_DOMAIN: "sleep",
+             domain_program.SEAM_AE_PROFILE: {"additive_classes": [], "interactions": []}}]),
+    }, operator_rx_classes={_SEAM_BLEED})
+    assert outcome["holds"] == {}
+    assert outcome["rx_bpmh_held"] == []
+    assert outcome["report"]["seam_additive_ae"] == []
+
+
+def test_seam_mixed_valid_and_malformed_ae_profile_still_screens_valid_field():
+    # TEST-1 (kn29 coverage): a seam ae_profile MALFORMED on one field (interactions not-a-list) but
+    # VALID on another (a proper additive_classes list) BOTH fails closed on the DECLARER (via the
+    # malformed screen) AND still screens its valid additive_classes — a counterparty sharing that class
+    # is held via the shared-class path. The malformed screen never SHADOWS the valid field: inertness is
+    # enforced PER-FIELD by the type guards, not by a whole-profile drop. Mutation-RED: make a malformed
+    # seam contribute no class to seam_classes -> the counterparty is not held via shared-class -> RED.
+    outcome = reconcile({
+        "sleep": _rich_seam_candidate("sleep", [
+            {domain_program.SEAM_WITH_DOMAIN: "stress",
+             domain_program.SEAM_AE_PROFILE: {
+                 "additive_classes": [_SEAM_BLEED], "interactions": "not-a-list"}}]),
+        "stress": _rich_seam_candidate("stress", [_seam("sleep", additive_classes=[_SEAM_BLEED])]),
+    })
+    # the DECLARER fails closed via the malformed screen (the mistyped interactions field)
+    assert outcome["holds"].get("sleep") == orchestrate.SEAM_ADDITIVE_AE_HELD
+    assert any(f["kind"] == "malformed-ae-profile" and f["from"] == "sleep"
+               for f in outcome["report"]["seam_additive_ae"])
+    # the COUNTERPARTY is held via shared-class — the valid additive_classes field is STILL screened
+    assert outcome["holds"].get("stress") == orchestrate.SEAM_ADDITIVE_AE_HELD
+    assert any(f["kind"] == "shared-class" and sorted(f["between"]) == ["sleep", "stress"]
+               for f in outcome["report"]["seam_additive_ae"])
+
+
+def test_seam_content_empty_interaction_is_inert_on_path_b():
+    # OBS-A consistency (kn29): an interaction entry with no with/mechanism/severity content ([{}]) is a
+    # VALID no-op per _seam_ae_malformed, so path (b) must NOT hold the declarer on it — a genuine no-op,
+    # consistent with the malformed screen's own classification. Mutation-RED: drop path (b)'s content
+    # filter on the `declared` list -> [{}] holds the declarer -> RED.
+    outcome = reconcile({
+        "sleep": _rich_seam_candidate("sleep", [_seam("stress", interactions=[{}])]),
+        "stress": _rich_seam_candidate("stress", []),
+    })
+    assert "sleep" not in outcome["holds"]
+    assert outcome["report"]["seam_additive_ae"] == []
+
+
+def test_seam_malformed_ae_does_not_suppress_conflict_hold():
+    # P6(ii) (NO-REGRESSION, P5-ii preserved): a seam that is BOTH nature=="conflict" AND carries a
+    # malformed ae_profile still fires the EXISTING seam-conflict hold — the malformed AE data must NOT
+    # suppress the seam's OTHER fields. Under the kn29 fail-closed flip the malformed ae_profile ALSO
+    # holds the declarer on the AE axis; the conflict hold and the AE hold are INDEPENDENT. Mutation-RED:
+    # apply malformed-inert to the WHOLE seam -> the conflict hold vanishes -> RED.
+    outcome = reconcile({
+        "sleep": _rich_seam_candidate("sleep", [{
+            domain_program.SEAM_WITH_DOMAIN: "stress",
+            domain_program.SEAM_NATURE: domain_program.SEAM_CONFLICT,
+            domain_program.SEAM_AE_PROFILE: "not-a-dict",  # malformed AE, must NOT suppress the conflict
+        }]),
+    })
+    assert "sleep" in outcome["conflict_held"]  # the conflict-nature hold STILL fires (P5-ii property)
+    # the malformed ae_profile now ALSO fails closed on the AE axis (kn29 Security HIGH), independently
+    assert outcome["holds"].get("sleep") == orchestrate.SEAM_ADDITIVE_AE_HELD
+    assert any(f["kind"] == "malformed-ae-profile" for f in outcome["report"]["seam_additive_ae"])
+
+
+def test_seam_ae_compound_band_still_holds_no_leak(tmp_path):
+    # P4-adjacent (DESIGN P3, no-regression on the compound band): a supplements+peptides pair sharing
+    # a meta.ae_profile class holds the supplement via the UNCHANGED screen 4 (report["additive_ae"]
+    # populated), and the seam key stays EMPTY (no cross-pollution between the two AE sources).
+    outcome = reconcile({
+        "supplements": _supp_candidate([_SEAM_BLEED]),
+        "peptides": _pep_candidate([_SEAM_BLEED]),
+    })
+    assert outcome["holds"]["supplements"] == ADDITIVE_AE_HELD
+    assert outcome["report"]["additive_ae"]  # the compound-band finding is populated (screen 4 unchanged)
+    assert outcome["report"]["seam_additive_ae"] == []  # the rich seam key stays empty (no leak)
+
+
+def test_seam_three_domain_shared_class_chain_holds_all():
+    # SF-2 (QA coverage): three rich domains ALL declaring the SAME seam AE class -> ALL THREE held.
+    # Each unordered pair shares the class, and the symmetric path holds both members of every pair, so
+    # the union is all three. Guards the pairwise screen scales past two domains (2-domain-only reds).
+    outcome = reconcile({
+        "sleep": _rich_seam_candidate("sleep", [_seam("stress", additive_classes=[_SEAM_BLEED])]),
+        "stress": _rich_seam_candidate("stress", [_seam("recovery", additive_classes=[_SEAM_BLEED])]),
+        "recovery": _rich_seam_candidate("recovery", [_seam("sleep", additive_classes=[_SEAM_BLEED])]),
+    })
+    for d in ("sleep", "stress", "recovery"):
+        assert outcome["holds"].get(d) == orchestrate.SEAM_ADDITIVE_AE_HELD, d
+    assert {f["ae_class"] for f in outcome["report"]["seam_additive_ae"]
+            if f["kind"] == "shared-class"} == {_SEAM_BLEED}
+
+
+def _dual_channel_supplement_author():
+    """A supplements author caught by BOTH the compound band AND a seam (kn29 tkqs regression fixture).
+
+    The top-level `reconciliation.ae_profile` shares `bleeding-risk` with the peptide (compound-band
+    screen 4 -> ADDITIVE_AE_HELD); an EXPLICIT DOMAIN PROGRAM rides a `cross_domain_seams` interaction
+    toward peptides (seam path-b -> SEAM_ADDITIVE_AE_HELD). Both channels target `holds["supplements"]`.
+    """
+    program = _uniform_program({"name": "Fish oil", "dose": "2 g"}, "compound", required_labs=["CBC"])
+    program[domain_program.CROSS_DOMAIN_SEAMS] = [{
+        domain_program.SEAM_WITH_DOMAIN: "peptides",
+        domain_program.SEAM_AE_PROFILE: {"interactions": [
+            {"with": "BPC-157", "mechanism": "additive antiplatelet effect", "severity": "high"}]},
+    }]
+    supp_rec = {**_supplement_rec("Fish oil", "2 g"), PROGRAM_KEY: program}
+    return _recon(_author(supp_rec, specialist="supplement-specialist"),
+                  ae_profile={"additive_classes": ["bleeding-risk"]})
+
+
+def test_dual_channel_supplement_preserves_compound_band_adjudication(tmp_path):
+    # BUG-1 (tkqs) REGRESSION: a supplements domain caught by BOTH the compound-band additive-AE screen
+    # (meta.ae_profile shared class, screen 4) AND a seam ae_profile interaction toward peptides (path b)
+    # must keep its ADDITIVE_AE_HELD reason so the generate_plans L828 liaison-adjudication gate fires and
+    # the additive-AE finding reaches the doctor-visit queue. The pre-fix seam OVERWRITE clobbered
+    # ADDITIVE_AE_HELD -> SEAM_ADDITIVE_AE_HELD -> the gate missed -> adjudication None -> the finding was
+    # DROPPED from the queue (proven: baseline queue=1 -> seam case queue=0). RED against the overwrite;
+    # GREEN once the seam holds write via setdefault (never clobber an existing hold reason). A CRITICAL
+    # (non-overridable) liaison keeps the block standing, so all three postconditions co-hold: the gate
+    # FIRED (adjudication is not None), the finding QUEUES, and the un-screened stack stays HELD.
+    store_read = _seed_store(tmp_path)
+    peptide = _recon(
+        _author(_peptide_rec("BPC-157", "250 mcg", "subq"), specialist="peptide-specialist"),
+        ae_profile={"additive_classes": ["bleeding-risk"]},
+    )
+    authors = {"supplements": _dual_channel_supplement_author(), "peptides": peptide}
+    liaison = _liaison("CRITICAL")  # non-overridable -> the held finding still queues (block stands)
+
+    out = generate_plans(authors, store_read, tmp_path, plan_date=PLAN_DATE, adjudicator=liaison)
+
+    # non-tautology: BOTH channels genuinely fired (the compound band AND the seam), not just one.
+    assert out["reconciliation"]["additive_ae"], "compound-band screen 4 did not fire"
+    assert any(f["kind"] == "declared-interaction"
+               for f in out["reconciliation"]["seam_additive_ae"]), "seam path-b did not fire"
+    # the fix: the compound-band reason survived the seam pass, so the L828 gate ADJUDICATES.
+    assert out["adjudication"] is not None, \
+        "L828 gate missed — the seam overwrite clobbered ADDITIVE_AE_HELD (tkqs regression)"
+    # the compound-band finding reaches the doctor-visit queue on the additive-ae axis (baseline=1).
+    queue = collate_doctor_visit_queue(out, PLAN_DATE, tmp_path)
+    assert [e["axis"] for e in queue] == ["additive-ae"], \
+        "the compound-band additive-AE finding was dropped from the doctor-visit queue"
+    # the supplement stays HELD (block stands) — never the un-screened stack on the dashboard.
+    assert out["results"]["supplements"]["recorded"] is False
+    assert store.read("plan::supplements", root=tmp_path) == []
