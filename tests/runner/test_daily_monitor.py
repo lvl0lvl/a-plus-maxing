@@ -254,22 +254,34 @@ def test_material_event_routes_through_composed_gate_in_hosted_runner(tmp_path, 
 # === AC-3: disabled by default (+ QA-4 positive control) ========================
 
 
-def test_daily_cadence_disabled_by_default_zero_active_entries(monkeypatch):
+def test_daily_cadence_disabled_by_default_zero_active_entries(tmp_path, monkeypatch):
     # AC-3: on a fresh install (no daily enable path exists — Deviation #2), the daily label reads 0
-    # real scheduler entries. Force the launchd (file) branch so the counter reads the real
-    # install-file presence (reliable, non-hanging) — the daily plist is never created, so the count is
-    # 0. QA-4 positive control: status(DAILY_MONITOR_LABEL) echoes the DAILY label with state DISABLED
-    # and active_entries 0 — a real per-label read of a working counter, so a counter that ignored the
-    # argument (reporting the WEEKLY label's state) would RED. The anti-implicit-activation scan stays
-    # clean over the daily module + the provisioning surface. RED-capable: Step-2.5 mutation #3 (name an
-    # implicit enable(DAILY_MONITOR_LABEL) on the daily/provision surface -> the scan hits -> RED).
+    # real scheduler entries. Force the launchd (file) branch AND point the agents dir at a scratch root
+    # so the read is hermetic; ARM the WEEKLY label there so the counter has a NON-ZERO label to read
+    # past. This makes the QA-4 positive control NON-VACUOUS (F2): with the weekly label armed (reads
+    # >=1) and the daily label unarmed (reads 0), an argument-ignoring counter that read the armed weekly
+    # label would report >=1 for the daily label and RED — the two labels are no longer both-read-0. The
+    # anti-implicit-activation scan stays clean over the daily module + the provisioning surface.
+    # RED-capable: F2 mutation (make active_entry_count ignore its arg / read RUNNER_LABEL -> the daily
+    # `== 0` + DISABLED-dict assertions RED); Step-2.5 mutation #3 (an implicit enable on the
+    # daily/provision surface -> the scan hits -> RED).
     monkeypatch.setattr(activate, "_launchd_available", lambda: True)
+    agents_dir = tmp_path / "LaunchAgents"
+    agents_dir.mkdir()
+    monkeypatch.setattr(activate, "_launchagents_dir", lambda: agents_dir)
+    # Arm the WEEKLY label: install its plist file — the real "armed" state `_launchd_entry_count` reads.
+    (agents_dir / f"{activate.RUNNER_LABEL}.plist").write_text("<plist/>", encoding="utf-8")
 
+    # the armed weekly label reads >=1 off real state — so the daily 0 below is a genuine per-label
+    # distinction, not the both-labels-read-0 vacuity that let an arg-ignoring counter pass.
+    assert activate.active_entry_count(activate.RUNNER_LABEL) >= 1, (
+        "arming the weekly label registered no entry (the positive control is void)"
+    )
     assert activate.active_entry_count(activate.DAILY_MONITOR_LABEL) == 0, (
         "a fresh daily label had a real scheduler entry (disabled-by-default broken)"
     )
-    # QA-4 positive control: the status echoes the DAILY label (distinct from the weekly RUNNER_LABEL),
-    # so an argument-ignoring counter reporting the weekly state would fail this exact-dict assertion.
+    # QA-4 positive control: status echoes the DAILY label DISABLED with 0 entries WHILE the weekly label
+    # is armed, so an argument-ignoring counter reporting the weekly (armed) state fails this exact dict.
     assert activate.DAILY_MONITOR_LABEL != activate.RUNNER_LABEL
     assert activate.status(activate.DAILY_MONITOR_LABEL) == {
         "state": "DISABLED", "active_entries": 0, "label": activate.DAILY_MONITOR_LABEL,
@@ -314,6 +326,12 @@ def test_tier1_auto_apply_records_bounded_adjustment_resolves_standing(tmp_path)
     assert routing["tier"] == tiered_executor.TIER_1, "the immaterial certified reading did not Tier-1 auto-apply"
     # the bounded adjustment WAS recorded (a distinct, round-trippable version)
     assert records, "the Tier-1 auto-apply recorded no bounded adjustment (record_plan_version not called)"
+    # F4: the recorded version's adjustment annotation carries the APPLIED Tier-1 routing (domain +
+    # signal + tier) — recording the UNCHANGED version (a dedupe no-op) drops this annotation and REDs.
+    adjustments = records[-1].get(daily_monitor._ADJUSTMENTS, [])
+    assert {"domain": "workout", "signal": "session_rpe", "tier": tiered_executor.TIER_1} in adjustments, (
+        f"the recorded version's adjustment annotation did not carry the applied Tier-1 routing: {adjustments}"
+    )
 
     after = plan_model.read_plan_version(_STANDING_DATE, tmp_path)
     # the recorded version resolves STANDING (0 pending pointer)
@@ -442,6 +460,76 @@ def test_daily_tick_defers_when_cadence_lock_held(tmp_path):
         assert plan_confirm.decision_for(domain, _STANDING_DATE, tmp_path) is None, (
             f"the deferred tick still wrote a {domain} pending pointer (0 store writes required)"
         )
+
+
+# === F3: no-standing-version receipt (empty store, 0 store writes) ==============
+
+
+def test_no_standing_version_returns_receipt_without_store_write(tmp_path):
+    # F3: over an EMPTY store (no standing version seeded), run() short-circuits BEFORE the lock section
+    # to the no-standing-version receipt and writes NOTHING — _read_standing resolves (None, None), so no
+    # plan-model:: / plan-confirm:: line is ever appended. Asserts the ACTUAL branch return shape AND the
+    # 0-write property (a byte-unchanged store). RED-capable: F3 mutation (`raise` in the no-standing
+    # branch -> the tick errors -> RED; dropping the guard -> version[MONITORING_CONFIG] on None ->
+    # TypeError -> RED).
+    before = _store_digest(tmp_path)  # empty store -> {}
+
+    receipt = _run(tmp_path, _NO_EVENT)
+
+    assert receipt == {
+        "deferred": False, "regenerated": False, "reason": "no-standing-version",
+        "plan_date": None, "routings": [], "recorded": [], "held": [],
+    }, f"the no-standing tick did not return the no-standing-version receipt: {receipt}"
+    # 0 store writes: no plan-model:: / plan-confirm:: line was appended (the store is byte-unchanged).
+    assert _store_digest(tmp_path) == before, "the no-standing-version tick mutated the store"
+
+
+# === F5: realistic multi-signal day (Tier-1 record + Tier-3 hold co-occur) =======
+
+
+def test_multi_signal_tick_records_tier1_and_holds_cross_domain(tmp_path):
+    # F5: a realistic MULTI-signal day the single-signal fixtures never exercise — an immaterial
+    # in-domain reading (session_rpe -> Tier-1 auto-apply) co-occurring with a material cross-domain
+    # reading (cross_load -> Tier-3 reconcile) in ONE locked pass — populates BOTH result["recorded"]
+    # (the Tier-1 bounded adjustment) AND result["held"] (the reconciliation hold on the declaring
+    # domain). RED-capable: F5 mutation (drop the Tier-1 record -> result["recorded"] empties -> RED;
+    # drop the reconcile-hold enforcement -> result["held"] empties -> RED).
+    _seed_standing(tmp_path)
+
+    result = _run(tmp_path, {"session_rpe": 0.5, "cross_load": 1.5})
+
+    # the immaterial in-domain reading Tier-1 auto-applied and was recorded
+    assert result["recorded"], "the multi-signal tick recorded no Tier-1 bounded adjustment"
+    assert any(
+        r["signal"] == "session_rpe" and r["tier"] == tiered_executor.TIER_1 for r in result["recorded"]
+    ), f"result['recorded'] does not carry the session_rpe Tier-1 auto-apply: {result['recorded']}"
+    # the material cross-domain reading drove a real reconciliation hold on the declaring domain
+    assert result["held"], "the multi-signal tick enforced no cross-domain reconciliation hold"
+    assert "workout" in result["held"], (
+        f"result['held'] does not carry the conflict-held workout domain: {result['held']}"
+    )
+
+
+def test_empty_observation_tick_regenerates_with_zero_routings_zero_writes(tmp_path):
+    # F5 (boundary): an EMPTY observation set finds the standing version, ENTERS the lock, runs the
+    # executor over 0 observed signals, and returns a "ran but did nothing" receipt — regenerated True
+    # (DISTINCT from the no-standing short-circuit's regenerated False), plan_date bound to the version's
+    # date, 0 routings/recorded/held — and writes NOTHING (no Tier-1 recording on a 0-routing day).
+    # RED-capable: dropping _record_tier1's empty-guard (record on 0 applied) appends a plan-model::
+    # line -> the digest changes -> RED.
+    _seed_standing(tmp_path)
+    before = _store_digest(tmp_path)
+
+    result = _run(tmp_path, {})
+
+    assert result["regenerated"] is True, "the empty-observation tick did not run (regenerated False)"
+    assert result["plan_date"] == _STANDING_DATE, (
+        f"the receipt's plan_date is not the standing version's date: {result['plan_date']}"
+    )
+    assert result["routings"] == [] and result["recorded"] == [] and result["held"] == [], (
+        f"the empty-observation tick surfaced routings/records/holds: {result}"
+    )
+    assert _store_digest(tmp_path) == before, "the empty-observation (0-routing) tick mutated the store"
 
 
 # === AC-6: module green + 0 spend / 0 PII =======================================
