@@ -44,22 +44,13 @@ from tests.serve.test_plan_loop import _seed_prior_standing
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _merge_base():
-    """The DURABLE per-ADR numstat base — ``git merge-base origin/main HEAD`` (== origin/main).
-
-    Computed dynamically, NOT hardcoded (TC-02): a per-task feature-branch SHA orphans on the repo's
-    squash-merge, so the numstat freeze-guard raises ``CalledProcessError`` on a fresh clone of main.
-    The merge-base is reachable + stable across the squash. Mirrors the helper in
-    ``tests/store/test_plan_model_confirm_hold.py``.
-    """
-    out = subprocess.run(
-        ["git", "merge-base", "origin/main", "HEAD"],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
-    )
-    return out.stdout.strip()
-
-
-PRE_TASK_HEAD = _merge_base()
+# The DURABLE per-wave numstat base: the Wave-4 fork-point (the pre-Wave-4 main tip = the S132-close
+# merge #335). A permanent main ancestor, so its numstat vs HEAD equals the wave's diff on the feature
+# branch, on squashed main, AND on a fresh clone. NOT an intermediate feature-branch SHA (the wdhc
+# orphan flaw) and NOT the dynamic merge-base(origin/main, HEAD): once the wave squash-merges, that
+# merge-base collapses to HEAD, emptying the per-wave diff and failing the freeze-break (PF-S133-03).
+# Mirrors test_plan_model_reader.py:32's durable-fork-point pattern (the Wave-3 SF-1/wdhc fix).
+PRE_TASK_HEAD = "ec8071503a983ed59c8dd230ded05ee5bd9087c5"
 _JUDGE_ROLE = plan_loop.JUDGE_ROLE
 
 
