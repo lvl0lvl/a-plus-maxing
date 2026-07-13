@@ -12,15 +12,39 @@ review_cadence: weekly
 
 # Session Handoff
 
-## Resume — S135 (VOLATILE)
+## Resume — S136 (VOLATILE)
 
-Stamped 2026-07-13. main @ `8e8ffad3` (comprehensive-plan Wave 6 is MERGED to main via PR #340, as of 2026-07-13 S135 close).
+Stamped 2026-07-13. main @ `e5a7e698` (kn29 rich-domain AE screening is MERGED to main via PR #342, as of 2026-07-13 S136 close).
 
-The comprehensive-plan re-architecture is **COMPLETE** — Wave 6 (terminal) LANDED on `main` (PR #340 — `ADR-0045-T3`, the daily deterministic monitoring pass `scripts/runner/daily_monitor.py` hosting the four-tier fail-closed executor inside `store_lock.cadence_lock`, disabled-by-default, wiring the 0n3t/u20d/evvs seams + an additive `activate.py` `DAILY_MONITOR_LABEL` registration). **All 6 waves / 15 tasks of ADR-0041–0046 are built + merged**; the build is mock/fixture-tested at 0 spend, LIVE runs operator-gated. The Tier-2+Tier-3 review earned its keep: Tier-2 Security caught the read-before-lock TOCTOU (beaded `a-plus-maxing-7nw7`, a HARD blocker on `glzi`), and the FULL Tier-3 `/review-pr` caught a 4-way-convergent receipt-shape inconsistency (beaded `a-plus-maxing-yeo3`, blocks `glzi`) + 4 test-quality gaps (fixed in-PR + blind-verified 4/4 revert-RED) — none suppressed. pytest 2 env-floor / 2730 passed / 8 skipped on the merged head; the frozen ADR-0032 spine byte-frozen (numstat=0 vs the durable pre-Wave-6 fork-point). **The remaining steps are operator-gated, NOT build tasks:** the operator-present LIVE comprehensive-plan run needs the DOMAIN PROGRAM `ae_profile` schema field (bead `a-plus-maxing-kn29`, P1, operator/architect-owned) FIRST; the daily-monitor LIVE co-arming is blocked on `glzi`, itself blocked on `7nw7` + `yeo3` landing. NEXT: no further build waves — the comprehensive-plan re-architecture is done; the next session is operator-directed (kick off the LIVE-run enablement path, or new scope).
+The `kn29` / SEC-W4-01 rich-domain adverse-event screening is **DONE** — merged on `main` (PR #342 — Option B: a typed `ae_profile` folded onto `cross_domain_seams` + the `orchestrate.reconcile` additive-AE/Rx-BPMH floor re-based to screen the RICH specialist DOMAIN PROGRAMs, fail-closed on malformed). The operator-present LIVE comprehensive-plan run is **no longer blocked by `kn29`** (Security ruled the value-drift is fail-closed + operator review is the live backstop; the mis-named-key residual is deferred to the chokepoint, re-scoped `kn29` P3). The FULL Tier-3 `/review-pr` earned its keep: it caught + fixed a real safety-information-loss regression (`BUG-1` — a `holds`-overwrite that silently dropped a supplement↔peptide bleeding-risk interaction from the doctor-visit queue, promoted `PF-S136-01`) + a stale safety-contract doc (`CONTRACTS-1`) before merge, all 6 findings blind-verified 6/6 revert-RED, none suppressed. pytest 2 env-floor / 2748 passed / 8 skipped on the merged head; the frozen ADR-0032 spine byte-frozen (numstat=0 vs the pre-kn29 main tip). **NEXT (operator-directed, S137): the tracker-ingestion automation** — API-pull adapters for Whoop + Oura + Garmin + Google Health (the new Google Health API, Google OAuth 2.0; the legacy Fitbit Web API sunsets Sept 2026) handing readings to the existing ADR-0003 pluggable/idempotent/schedulable land path; Apple Health via an operator Shortcut → a watched folder; the LIVE pull operator-gated (dev-app registration + OAuth credentials in the keychain). Run via the pipeline (design/ADR → build → three-tier review → merge). The daily-monitor co-arming (`7nw7`/`yeo3`/`glzi`/`4wno`) + the `kn29` chokepoint remain held/deferred.
 
-**Historical (kept for reference):** vault/sessions/session-134.md
+**Historical (kept for reference):** vault/sessions/session-135.md
 
 <!-- 3b resume-claims-audit adoption (rigor 1.19.0): this VOLATILE region carries one machine-checkable claim per sentence — a backticked project-id plus a status keyword, a main-at-SHA line, a landed-in-PR line, and the Stamped line. ADVISORY until one full session cycle passes with zero FAIL, then gate per the upstream bud bead. -->
+
+## Scope Contract — Session 136 (2026-07-13)
+
+Goal: Clear the plan-safety live-run blocker — wire the additive-AE / Rx-BPMH safety floors to screen the RICH specialist DOMAIN PROGRAMs (`kn29` / SEC-W4-01) via **Option B** (operator-decided: fold the adverse-event profile into `cross_domain_seams` as a strongly-typed sub-structure + re-base the floor to read it), through the rigor pipeline (design → build → three-tier review → `/review-pr` → `/merge` → close). The daily-monitor / live-monitoring layer (`7nw7`/`yeo3`/`glzi`/`4wno`) is HELD this session pending an operator conversation about the live feed.
+
+Acceptance criteria:
+- [x] AC1 — a design artifact (`docs/design/kn29-rich-domain-ae-screening.md`) grounds the current state + specifies the Option-B change + falsification probes. **PASS** (architect design; §4 amended fail-closed).
+- [x] AC2 — the rich specialist DOMAIN PROGRAMs are screened by the additive-AE + Rx-BPMH floors (a shared AE-class or declared interaction across two rich domains HOLDS, mutation-proven RED); the compound-band screening still holds (no regression). **PASS** (+ fail-closed on malformed, Tier-2 Security HIGH).
+- [x] AC3 — the frozen `<always-frozen>` six untouched (numstat=0); the change stays within the ADR-0041/0043-superseded surface. **PASS**.
+- [x] AC4 — three-tier review (Tier-2 QA/Architect/Security + Tier-3 `/review-pr` 6-agent → blind triage → 6 fixes → blind verify 6/6 revert-RED) all PASS; merged to main. **PASS** (#342, `e5a7e698`; BUG-1 + CONTRACTS-1 caught + fixed).
+- [x] AC5 — full close. **PASS** (this close).
+
+Files I WILL touch: `scripts/plan/{domain_program,orchestrate}.py`, `scripts/serve/care_chat.py` (if the floor-trigger read needs it), the relevant tests (`tests/plan/test_orchestrate.py` etc.), `docs/design/kn29-rich-domain-ae-screening.md` (+ any spec); close docs.
+Files I will NOT touch: the frozen `<always-frozen>` six (store/keying/pipeline/adjudicate/adjust/router.py); the daily-monitor layer (`daily_monitor.py`/`activate.py` — HELD for the live-feed conversation); `design/*` (operator PII); `main` directly (PR-only).
+NOT doing: the daily-monitor / live-monitoring co-arming (`7nw7`/`yeo3`/`glzi`/`4wno` — held pending the operator live-feed conversation); the PF-S133-02 `validate_plan_version` chokepoint backstop (defense-in-depth follow-up, out of kn29's live-blocker scope); the operator-present LIVE plan run (real spend/data — supervised).
+Invariants at risk: the frozen ADR-0032 spine (GUARDED, numstat=0); INV-CORE-CAPABILITY (this makes the LIVE core capability safe — closer, not violated); INV-ROLE-INLINING; zero-PII public repo.
+
+### S136 Scope Contract Evaluation (2026-07-13, volatile)
+
+AC1–5 PASS. **Task drift — none** (built exactly `kn29` Option-B rich-domain AE screening; the malformed-AE fail-closed + the BUG-1/CONTRACTS-1 Tier-3 fixes were in-scope review remediation, not scope-creep; the daily-monitor layer stayed HELD per the operator, and the tracker-ingestion build correctly deferred to S137). **Architecture drift — none; net HARDENING** (the frozen ADR-0032 six stayed byte-frozen numstat=0 vs `902da028`, verified at completion + Tier-2 + Tier-3 + re-verified at close; the change lives in the ADR-0041/0043-superseded surface; the malformed transform is UNCONDITIONAL fail-closed; INV-CORE-CAPABILITY closer — the LIVE plan is now AE-screened). **Vision drift — none; net CLOSER** (after S136 the system IS "a local-first, care-agent-orchestrated comprehensive adaptive health plan whose rich specialists are now cross-screened for adverse-event interactions" — the SEC-W4-01 live-run gate closed).
+
+S136 close (2026-07-13): One new process-failure promoted — PF-S136-01 (the "benign by membership" mis-assessment of a shared-state overwrite that Tier-3 caught end-to-end). The full attestation + the per-PR skill-trace table (#342; the REAL 6-agent `/review-pr` ran IN FULL → CLEAN, `/merge` via the REST-fallback full-SHA guard) + the disclosure ledger (3 caught, 0 operator-surfaced) live in `memory/process-failures.md` `## Session 136`.
+
+**Historical (kept for reference):** vault/sessions/session-135.md
 
 ## Scope Contract — Session 135 (2026-07-13)
 
