@@ -554,6 +554,9 @@ def synthesize(active, run_result, author_rich, store_read, *, on_date, root):
                 "meta": {}, "reason": None, "section": None,
             })
         outcome = collect(candidates, store_read)  # the always-on floors (SEC-W3-03 preserved)
+        # A rich domain held by the Option-B seam additive-AE screen (kn29 / SEC-W4-01) lands in
+        # `holds` (SEAM_ADDITIVE_AE_HELD) / `rx_bpmh_held`, so the existing drop below fail-closes it —
+        # the un-screened rich stack is never folded into the composed comprehensive version.
         held = (set(outcome["holds"]) | set(outcome["conflict_held"])
                 | set(outcome["rx_bpmh_held"]))
         for candidate in candidates:

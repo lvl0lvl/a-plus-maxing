@@ -241,3 +241,25 @@ def test_non_mapping_monitoring_entry_rejected():
         domain_program.validate(program)
     assert exc.value.offending_field == "monitoring_signals"
     assert exc.value.offending_signal == "weight trending up"
+
+
+# --- Option B (kn29 / SEC-W4-01): the seam ae_profile sub-structure key-name -------------------
+
+
+def test_seam_ae_profile_key_pinned():
+    """The seam ae_profile sub-structure key-name is single-sourced HERE (pule) for orchestrate to
+    reference as domain_program.SEAM_AE_PROFILE, so a divergent filler is caught by the reader."""
+    assert domain_program.SEAM_AE_PROFILE == "ae_profile"
+
+
+def test_validate_ignores_seam_ae_profile():
+    """§4: validate is NOT extended for the seam ae_profile — the seam edge stays reader-enforced
+    (ADR-0043-T2-owned). A conformant program whose cross_domain_seams carries an ae_profile
+    sub-structure (well-formed OR malformed) still validates, so W4-02's validate-before-fold is
+    unaffected (a malformed OPTIONAL seam ae_profile passes validate, handled inertly by the reader)."""
+    well_formed = _training_program(cross_domain_seams=[
+        {"with_domain": "nutrition", "ae_profile": {"additive_classes": ["bleeding-risk"]}}])
+    malformed = _training_program(cross_domain_seams=[
+        {"with_domain": "nutrition", "ae_profile": "not-a-dict"}])
+    assert domain_program.validate(well_formed) is None
+    assert domain_program.validate(malformed) is None

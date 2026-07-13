@@ -54,6 +54,8 @@ surface (covered by `tests/store/test_queue_schema.py`); this collation is a SEP
 `generate_plans` itself stays a pure compute-reconcile-record pass.
 """
 
+import itertools
+
 from scripts.plan import domain_program, router
 from scripts.plan.adjudicate import adjudicate
 from scripts.plan.assemble import PROGRAM_KEY
@@ -68,6 +70,7 @@ RED_S_LEA_CROSS_DOMAIN = RED_S_LEA_CLINICAL_ROUTING  # the nutrition screen shor
 ADDITIVE_AE_HELD = "additive-ae-held"  # supplement<->peptide additive-AE risk holds the supplement
 CONFLICT_HELD = "cross-domain-conflict-held"  # an author-declared cross-domain conflict holds the declarer
 RX_BPMH_HELD = "rx-bpmh-held"  # a compound's additive-AE class stacks against an operator Rx-interaction class
+SEAM_ADDITIVE_AE_HELD = "seam-additive-ae-held"  # a rich domain's seam-declared additive-AE holds it (kn29)
 
 # The `cross_domain_seams` edge shape (ADR-0043-T2-owned; `domain_program.validate` does not check
 # it). Each entry names a paired domain (`SEAM_WITH_DOMAIN`) + a seam-nature/conflict token
@@ -78,6 +81,7 @@ RX_BPMH_HELD = "rx-bpmh-held"  # a compound's additive-AE class stacks against a
 SEAM_WITH_DOMAIN = domain_program.SEAM_WITH_DOMAIN  # the paired-domain reference in a seam entry
 SEAM_NATURE = domain_program.SEAM_NATURE            # the seam-nature/conflict token
 SEAM_CONFLICT = domain_program.SEAM_CONFLICT        # a seam nature that holds the declaring domain
+SEAM_AE_PROFILE = domain_program.SEAM_AE_PROFILE    # the OPTIONAL Option-B seam adverse-event sub-structure
 
 
 def _compound_identities(candidate):
@@ -169,6 +173,46 @@ def _normalized_ae_classes(profile):
     if not isinstance(classes, list):
         return set()
     return {c.strip().lower() for c in classes if isinstance(c, str) and c.strip()}
+
+
+def _seam_ae_profile(seam):
+    """The Option-B adverse-event sub-structure a `cross_domain_seams` entry declares (kn29 / SEC-W4-01).
+
+    A rich domain carries no `meta.ae_profile`; its AE profile rides on each seam entry as an OPTIONAL
+    `ae_profile` sub-structure — the SAME `{additive_classes, interactions}` shape the compound band
+    reads from `meta`, so a shared-class token matches identically across both sources. A seam that
+    declares none — or a present-but-malformed declaration (an `ae_profile` that is not a dict) —
+    contributes an EMPTY profile (no finding), mirroring `_ae_profile`'s trusted-author-malformed-is-inert
+    posture. Pure; never raises.
+
+    Args:
+        seam (dict): One `cross_domain_seams` entry (already dict-filtered by `_cross_domain_seams`).
+
+    Returns:
+        (dict) The seam's `ae_profile` dict, or `{}` when absent or malformed.
+    """
+    profile = seam.get(SEAM_AE_PROFILE)
+    return profile if isinstance(profile, dict) else {}
+
+
+def _seam_ae_classes(candidate):
+    """The POOLED normalized additive-AE class set across ALL a candidate's seam `ae_profile`s (the fold).
+
+    The seam-sourced analogue of `_normalized_ae_classes(_ae_profile(candidate))`: a direction-agnostic,
+    program-wide "the AE classes this rich domain contributes" set, reconstructed from the union of every
+    seam entry's `ae_profile.additive_classes` (Option B). Empty for a candidate with no plan / no program
+    / no seams / only malformed seam profiles. Pure; never raises.
+
+    Args:
+        candidate (dict): A `compute_plan` result (or a collected rich-specialist candidate).
+
+    Returns:
+        (set) The pooled normalized additive-AE class tokens (possibly empty).
+    """
+    classes = set()
+    for seam in _cross_domain_seams(candidate):
+        classes |= _normalized_ae_classes(_seam_ae_profile(seam))
+    return classes
 
 
 def _declared_interaction_findings(profile, declaring_domain, other_identities):
@@ -410,17 +454,21 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
 
     Returns:
         (dict) `report` (`red_s_lea_cross_domain` bool, `bounce` dict | None, `overlaps` list,
-        `conflicts` list, `additive_ae` list, `rx_bpmh` list); `holds` (domain -> hold reason —
-        workout under a RED-S/LEA short-circuit, supplements under an additive-AE finding; the
-        bounce-driven holds are applied by `generate_plans`); `conflict_held` (list of declaring
-        domains held by an author-declared cross-domain conflict); and `rx_bpmh_held` (list of
-        compound domains held by a supplement<->Rx BPMH finding). `conflict_held` and `rx_bpmh_held`
-        are tracked INDEPENDENTLY of `holds` and of each other, so a domain can carry several
-        concurrent concerns (an additive-AE hold AND a conflict AND a BPMH match), each cleared on
-        its own — clearing one never releases a domain whose other concern is still open.
+        `conflicts` list, `additive_ae` list, `rx_bpmh` list, `seams` list, and `seam_additive_ae`
+        list — the Option-B rich-domain additive-AE findings sourced from `cross_domain_seams`,
+        kept DISTINCT from the compound-band `additive_ae`); `holds` (domain -> hold reason —
+        workout under a RED-S/LEA short-circuit, supplements under an additive-AE finding, a rich
+        domain under a seam additive-AE finding (`SEAM_ADDITIVE_AE_HELD`); the bounce-driven holds
+        are applied by `generate_plans`); `conflict_held` (list of declaring domains held by an
+        author-declared cross-domain conflict); and `rx_bpmh_held` (list of domains held by a
+        Rx-BPMH finding — compound-band via `meta` AND rich via the seam class source). `conflict_held`
+        and `rx_bpmh_held` are tracked INDEPENDENTLY of `holds` and of each other, so a domain can
+        carry several concurrent concerns (an additive-AE hold AND a conflict AND a BPMH match), each
+        cleared on its own — clearing one never releases a domain whose other concern is still open.
     """
     report = {"red_s_lea_cross_domain": False, "bounce": None, "overlaps": [],
-              "conflicts": [], "additive_ae": [], "rx_bpmh": [], "seams": []}
+              "conflicts": [], "additive_ae": [], "rx_bpmh": [], "seams": [],
+              "seam_additive_ae": []}
     holds = {}
     conflict_held = []  # declaring domains held by an author-conflict — INDEPENDENT of `holds`
     rx_bpmh_held = []  # compound domains held by a supplement<->Rx BPMH match — INDEPENDENT of both
@@ -545,6 +593,59 @@ def reconcile(candidates, *, operator_rx_classes=frozenset()):
                 })
                 if domain not in conflict_held:
                     conflict_held.append(domain)
+
+    # Rich-domain additive-AE screen over the seam-declared ae_profile (Option B / kn29 / SEC-W4-01):
+    # the floor coverage the compound band already has (screens 4/5), re-based to read the RICH domain's
+    # AE profile off its seams (rich candidates carry NO meta.ae_profile). Additive to the meta path —
+    # every existing meta-seeded candidate has empty seam classes, so this contributes nothing there
+    # (§3d transitional-additive). Findings land in the DISTINCT report["seam_additive_ae"] (so the
+    # compound band's report["additive_ae"] + Leg-1 adjudication/queue stay byte-identical) and hold via
+    # `holds` / `rx_bpmh_held` (reused so `synthesize` / `generate_plans` drop them with no consumer edit).
+    present = {d: c for d, c in candidates.items() if c.get("plan") is not None}
+    seam_classes = {d: _seam_ae_classes(c) for d, c in present.items()}
+    # (a) SHARED additive-AE class (symmetric): each unordered present pair sharing a class holds BOTH —
+    # component tolerability does not compose to combination safety; dropping either breaks the stack, so
+    # the fail-closed default holds both until adjudicated.
+    for x, y in itertools.combinations(sorted(present), 2):  # x < y (sorted), so [x, y] is ordered
+        shared = seam_classes[x] & seam_classes[y]
+        if not shared:
+            continue
+        for ae_class in sorted(shared):
+            report["seam_additive_ae"].append(
+                {"kind": "shared-class", "ae_class": ae_class, "between": [x, y]})
+        holds[x] = SEAM_ADDITIVE_AE_HELD
+        holds[y] = SEAM_ADDITIVE_AE_HELD
+    # (b) DECLARED interaction (directional): a seam whose ae_profile names a non-empty interactions list
+    # AND whose with_domain resolves to a present-with-plan domain holds the DECLARER (the seam's
+    # with_domain IS the pairing — rich domains expose no compound identities).
+    for domain, cand in present.items():
+        for seam in _cross_domain_seams(cand):
+            paired = seam.get(SEAM_WITH_DOMAIN)
+            if not isinstance(paired, str) or paired not in present:
+                continue
+            interactions = _seam_ae_profile(seam).get("interactions")
+            if not isinstance(interactions, list):
+                continue
+            declared = [i for i in interactions if isinstance(i, dict)]
+            if declared:
+                for i in declared:
+                    report["seam_additive_ae"].append({
+                        "kind": "declared-interaction", "from": domain, SEAM_WITH_DOMAIN: paired,
+                        "with": i.get("with"), "mechanism": i.get("mechanism"),
+                        "severity": i.get("severity"),
+                    })
+                holds[domain] = SEAM_ADDITIVE_AE_HELD
+    # (c) Rx-BPMH re-base (§3c): extend screen 5's class source to the seams — a present domain whose
+    # pooled seam classes stack against the operator's present Rx-interaction classes is held in the SAME
+    # independent `rx_bpmh_held` set. Skip a domain the compound-band screen 5 already held so the one
+    # report["rx_bpmh"] entry per domain that its consumers rely on is preserved.
+    for domain in present:
+        if domain in rx_bpmh_held:
+            continue
+        matched = seam_classes[domain] & set(operator_rx_classes)
+        if matched:
+            report["rx_bpmh"].append({"held_domain": domain, "classes": sorted(matched)})
+            rx_bpmh_held.append(domain)
 
     return {"report": report, "holds": holds, "conflict_held": conflict_held,
             "rx_bpmh_held": rx_bpmh_held}

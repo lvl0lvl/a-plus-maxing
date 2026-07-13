@@ -688,6 +688,36 @@ def test_malformed_seam_inert_documented():
     assert outcome["report"]["seams"] == [], "a malformed seam must be inert"
 
 
+def _seam_ae_program(paired, *, additive_classes):
+    """A conformant training program whose ONE cross_domain_seams edge carries an Option-B ae_profile."""
+    return _training_program(cross_domain_seams=[{
+        domain_program.SEAM_WITH_DOMAIN: paired,
+        domain_program.SEAM_AE_PROFILE: {"additive_classes": additive_classes},
+    }])
+
+
+def test_seam_ae_held_rich_domain_dropped_from_comprehensive(tmp_path):
+    # kn29 / SEC-W4-01 P7 (end-to-end fail-closed DROP): two rich domains sharing a bleeding-risk class
+    # on their cross_domain_seams ae_profile are BOTH held by the Option-B rich additive-AE screen ->
+    # DROPPED from the composed comprehensive version (the honest no-plan-for-that-domain state, never
+    # folded un-screened). The programs are CONFORMANT (so the drop is due to the HOLD, not validate) —
+    # RED if the SEAM_ADDITIVE_AE_HELD population is removed (they fold back into the composed version).
+    root = tmp_path / "store"
+    read = _seed_surface_store(root, goal_domains=["workout"])
+    run_result = {"results": {"workout": {"recorded": True, "plan": {PROGRAM_KEY: _training_program()}}}}
+
+    def _author_rich(domain):
+        other = "stress" if domain == "sleep" else "sleep"
+        return _rich_author_env(_seam_ae_program(other, additive_classes=["bleeding-risk"]))
+
+    version = care_chat.synthesize(
+        {"workout", "sleep", "stress"}, run_result, _author_rich,
+        read, on_date="2026-07-13", root=root)
+    programs = version[plan_model.DOMAIN_PROGRAMS]
+    assert "sleep" not in programs and "stress" not in programs, programs.keys()
+    assert "workout" in programs  # the un-held renderable program still composes the version
+
+
 # =========================================================================== #
 # GROUP C — contract pins (ubsp / qrg4)
 # =========================================================================== #
