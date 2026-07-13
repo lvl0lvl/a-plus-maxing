@@ -1037,14 +1037,6 @@ def test_three_of_four_domains_fires_advisory(tmp_path, monkeypatch):
         srv.server_close()
 
 
-def test_large_change_threshold_is_pinned_constant():
-    # AC-3: the large-change threshold is a fixed module-level literal a deterministic test reads
-    # (not a runtime default / env-derived value).
-    from scripts.serve import plan_loop
-
-    assert plan_loop.LARGE_CHANGE_THRESHOLD_DOMAINS == 3
-
-
 # --- Cycle 2 AC-4: the post-promote tailoring-hook seam fires exactly once --------------
 
 

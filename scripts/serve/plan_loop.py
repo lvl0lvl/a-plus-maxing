@@ -42,13 +42,34 @@ from scripts.store import biomarker_meta, plan_confirm, plan_schema, store
 # dispatch-seam consumers (T2/T3/T4) read it too when the production dispatch is wired.
 JUDGE_ROLE = "quality-judge"
 
-# The large-change HOLD threshold (ADR-0036 OQ-4 → ADR-0040) — a fixed module constant a
-# deterministic test reads, NOT a runtime default. Same pinned-number convention as the T2 debounce
-# constants below. A re-gen replacing AT LEAST this many existing STANDING plans is a materially-large
-# swap: ADR-0040 HOLDS it `pending` (it does NOT stand and is not tailored/egressed) until an explicit
-# operator confirm. At `3` with a closed 4-domain universe the hold fires on a 3-of-4 majority swap or
-# a full 4-of-4 swap.
-LARGE_CHANGE_THRESHOLD_DOMAINS = 3
+# The large-change HOLD bar (ADR-0036 OQ-4 → ADR-0040 → ADR-0046 disposition #36): a re-gen that
+# replaces a STRICT MAJORITY of the ACTIVE RENDERABLE set is a materially-large swap ADR-0040 HOLDS
+# `pending` (it does NOT stand and is not tailored/egressed) until an explicit operator confirm. The
+# strict-majority DENOMINATOR is `|renderable|` (`active & RENDERABLE_DOMAINS`, the `regenerate` local),
+# NOT `|active|`: the numerator (`_change_magnitude`, the promoted standing-plan replacements) draws
+# only from `renderable` and caps at 4, so a `len(active)` bar is structurally unreachable for
+# `|active| ≥ 8` and would fail OPEN (the hold never fires; a full renderable swap stands unconfirmed).
+# The fraction reproduces the retired fixed `3` on a 4-renderable surface (3-of-4 holds, 2-of-4 does
+# not) while scaling DOWN for a narrowed renderable surface. This re-base is the HARD PRECONDITION
+# before the ADR-0046 activation runs live against the SCALED 15+ card ROSTER — a fixed count-of-3 is a
+# MINORITY of a grown roster and must never gate it (disposition #36 resolves external ADR-0040 OQ-2).
+def _is_renderable_majority(changed_count, renderable_count):
+    """Whether `changed_count` is a STRICT majority of `renderable_count` (the large-change hold bar).
+
+    The hold fires when the promoted standing-plan replacement count (`_change_magnitude`, the
+    numerator, ≤ `|renderable|` ≤ 4) is a STRICT majority of the active RENDERABLE-set size
+    (`|renderable|`, the denominator). Strict — `> half`, i.e. `>= renderable_count // 2 + 1` — so an
+    even-sized renderable set does NOT hold at its half-point (2-of-4 does not, 3-of-4 does),
+    reproducing the retired constant's 3-of-4 boundary.
+
+    Args:
+        changed_count (int): The promoted domains replacing a differing prior standing plan.
+        renderable_count (int): The active RENDERABLE-set size (`len(active & RENDERABLE_DOMAINS)`).
+
+    Returns:
+        (bool) True when `changed_count` is a strict majority of `renderable_count`.
+    """
+    return changed_count >= renderable_count // 2 + 1
 
 
 def dispatch_route_collisions(specialists=None, judge=None, lenses=None):
@@ -299,9 +320,12 @@ def regenerate(root, *, dispatch, deid_client, plan_date=None, trigger=None, tai
     # operator confirm; the `large_change_advisory` dict is the confirm-PROMPT payload (not a
     # swap-already-landed notice). Materiality is measured against the last STANDING (confirmed /
     # no-pointer) plan — `_change_magnitude` filters the prior readings through `filter_confirmed`, so a
-    # never-confirmed held re-gen is not the baseline. `>=` fires at 3 OR 4 of the 4 domains: a
-    # majority-of-domains swap is material enough to hold.
-    if _change_magnitude(store_read, result, promoted, plan_date, root) >= LARGE_CHANGE_THRESHOLD_DOMAINS:
+    # never-confirmed held re-gen is not the baseline. The hold fires when the swap is a STRICT
+    # MAJORITY of the active RENDERABLE set (`_is_renderable_majority` over `len(renderable)`, the `:273`
+    # local) — a majority-of-renderable swap is material enough to hold.
+    if _is_renderable_majority(
+        _change_magnitude(store_read, result, promoted, plan_date, root), len(renderable)
+    ):
         # ADR-0040 hold: the whole materially-large swap is held as a unit (OQ-3). Write a `pending`
         # pointer for EVERY promoted domain (not just the content-changed subset) BEFORE this function
         # returns, so a single-process caller can never observe the swap as standing — T2's readers
