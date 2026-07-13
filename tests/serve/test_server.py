@@ -1344,6 +1344,43 @@ def test_generate_plan_records_all_domains_and_renders(tmp_path):
         srv.server_close()
 
 
+def test_generate_plan_records_comprehensive_version(tmp_path):
+    """TC-01: POST /generate-plan records the Leg-2 comprehensive plan version (server.py:827-834).
+
+    The in-app /generate-plan front door's Leg-2 additive record (`care_chat.synthesize` ->
+    `plan_model.record_plan_version`) had ZERO assertion — deleting server.py's Leg-2 block left the
+    suite green (the PF-S130-01 gap on the primary user path). This drives the REAL POST /generate-plan
+    with a mock author over a summary activating the renderable four, then reads the comprehensive
+    version back: a version STANDING for today carrying domain_programs + narrative + milestones. REDs
+    when server.py's Leg-2 synthesize block is removed (no version -> read_plan_version state != None).
+    """
+    from scripts.store import plan_model
+
+    _seed_summary_store(tmp_path / "store")
+    client = _MockAuthorClient(_domain_envelopes())
+    srv, port = _server_with_author(tmp_path, client)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_generate_plan(port)
+        assert status == 200, f"POST /generate-plan returned {status}, expected 200"
+        today = datetime.date.today().isoformat()
+        resolved = plan_model.read_plan_version(today, tmp_path / "store")
+        assert resolved["state"] is None, (
+            "the Leg-2 comprehensive plan version did not stand for today "
+            f"(state={resolved['state']!r}) — server.py's synthesize record never fired"
+        )
+        version = resolved["version"]
+        programs = version[plan_model.DOMAIN_PROGRAMS]
+        assert isinstance(programs, dict) and programs, f"no domain_programs recorded: {programs!r}"
+        assert isinstance(version[plan_model.NARRATIVE], str) and version[plan_model.NARRATIVE], (
+            "the comprehensive version carries no narrative"
+        )
+        assert version[plan_model.MILESTONES], "the comprehensive version carries no dated milestones"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
 def test_generate_plan_path_b_normalizes_malformed_author_no_total_crash(tmp_path):
     """bead mk0i / API-01: Path B (the in-app POST /generate-plan front door) normalizes each model
     author envelope, so a LIST-valued scalar-contract rec field in ONE domain cannot crash the frozen

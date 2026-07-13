@@ -487,7 +487,7 @@ _PLAN_TRANSLATORS = {
     "supplements": _to_supplements_plan,
     "peptides": _to_peptides_plan,
     **{domain: _rich_domain_program_only for domain in plan_schema.PLAN_DOMAINS
-       if domain not in ("workout", "nutrition", "supplements", "peptides")},
+       if domain not in plan_schema.RENDERABLE_DOMAINS},
 }
 
 # domain -> safety veto(recommendations, gates) -> reason str | None. Every gate here MUST
