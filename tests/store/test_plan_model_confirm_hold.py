@@ -35,21 +35,13 @@ from tests.store.test_plan_model import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _merge_base():
-    """The DURABLE per-ADR numstat base — ``git merge-base origin/main HEAD`` (== origin/main).
-
-    Computed dynamically, NOT hardcoded: a per-task SHA orphans on the repo's squash-merge and
-    breaks the probe on a fresh clone (the wdhc-tracked latent-SHA flaw in ``test_plan_model.py:27``
-    / ``test_plan_model_reader.py:32``). The merge-base is reachable + stable across the squash.
-    """
-    out = subprocess.run(
-        ["git", "merge-base", "origin/main", "HEAD"],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
-    )
-    return out.stdout.strip()
-
-
-PRE_TASK_HEAD = _merge_base()
+# The DURABLE per-wave numstat base: the Wave-4 fork-point (the pre-Wave-4 main tip = the S132-close
+# merge #335). A permanent main ancestor, so its numstat vs HEAD equals the wave's diff on the feature
+# branch, on squashed main, AND on a fresh clone. NOT an intermediate feature-branch SHA (the wdhc
+# orphan flaw) and NOT the dynamic merge-base(origin/main, HEAD): once the wave squash-merges, that
+# merge-base collapses to HEAD, emptying the per-wave diff and failing the freeze-break (PF-S133-03).
+# Mirrors test_plan_model_reader.py:32's durable-fork-point pattern (the Wave-3 SF-1/wdhc fix).
+PRE_TASK_HEAD = "ec8071503a983ed59c8dd230ded05ee5bd9087c5"
 
 RENDER = "2026-07-13"  # the render date the default _comprehensive_version fixture is dated
 
