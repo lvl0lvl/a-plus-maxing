@@ -12,15 +12,40 @@ review_cadence: weekly
 
 # Session Handoff
 
-## Resume — S134 (VOLATILE)
+## Resume — S135 (VOLATILE)
 
-Stamped 2026-07-13. main @ `1b8d207a` (comprehensive-plan Wave 5 is MERGED to main via PR #338, as of 2026-07-13 S134 close).
+Stamped 2026-07-13. main @ `8e8ffad3` (comprehensive-plan Wave 6 is MERGED to main via PR #340, as of 2026-07-13 S135 close).
 
-The comprehensive-plan re-architecture **Wave 5** is LANDED on `main` (PR #338 — the `ADR-0046-T2` large-change threshold re-based to a strict majority of the active renderable set `|active ∩ RENDERABLE_DOMAINS|`, and the `ADR-0045-T2` four-tier fail-closed deterministic monitoring executor `scripts/plan/tiered_executor.py` [no-event-day 0-calls, Tier-2 re-plan through the composed gate, Tier-3 cross-domain reconcile, Tier-4 safety hold via `mark_pending`, fail-closed-by-direction; its only store write is the existing `mark_pending`]). Waves 1–5 are built + merged; the build is mock/fixture-tested at 0 spend, LIVE runs operator-gated. The review earned its keep: the Phase-4 recipe review caught 2 fail-open defects (the |active| dark-hold + the Tier-4 no-pointer) before code, and the FULL Tier-3 `/review-pr` caught 3 MORE executor fail-opens (the Tier-2 gate-injection default, per-domain crash-isolation, indeterminate-materiality) — all fixed + blind-verified (5/5 revert-RED) before merge; deferred beaded, none suppressed. pytest 2 env-floor / 2718 passed / 8 skipped on the merged head; the frozen ADR-0032 spine byte-frozen (numstat=0 vs the durable Wave-5 fork-point, the pre-Wave-5 main tip). **P1 live-run blocker still teed up:** the DOMAIN PROGRAM schema needs an `ae_profile` field before the operator-present LIVE comprehensive-plan run (bead `a-plus-maxing-kn29` / SEC-W4-01 — a schema change, operator/architect-owned). NEXT: build-plan **Wave 6** (terminal) = {`ADR-0045-T3` — the daily deterministic pass hosted in the ADR-0039 runner, disabled-by-default} — `/create-task-plan wave 6` → `/execute-plan`; the Wave-6 runner MUST inject a real `gate_dispatch` + wire the Tier-3 candidate seam (beads `a-plus-maxing-0n3t`/`a-plus-maxing-u20d`/`a-plus-maxing-evvs`); EXECUTE's LIVE runs stay operator-gated.
+The comprehensive-plan re-architecture is **COMPLETE** — Wave 6 (terminal) LANDED on `main` (PR #340 — `ADR-0045-T3`, the daily deterministic monitoring pass `scripts/runner/daily_monitor.py` hosting the four-tier fail-closed executor inside `store_lock.cadence_lock`, disabled-by-default, wiring the 0n3t/u20d/evvs seams + an additive `activate.py` `DAILY_MONITOR_LABEL` registration). **All 6 waves / 15 tasks of ADR-0041–0046 are built + merged**; the build is mock/fixture-tested at 0 spend, LIVE runs operator-gated. The Tier-2+Tier-3 review earned its keep: Tier-2 Security caught the read-before-lock TOCTOU (beaded `a-plus-maxing-7nw7`, a HARD blocker on `glzi`), and the FULL Tier-3 `/review-pr` caught a 4-way-convergent receipt-shape inconsistency (beaded `a-plus-maxing-yeo3`, blocks `glzi`) + 4 test-quality gaps (fixed in-PR + blind-verified 4/4 revert-RED) — none suppressed. pytest 2 env-floor / 2730 passed / 8 skipped on the merged head; the frozen ADR-0032 spine byte-frozen (numstat=0 vs the durable pre-Wave-6 fork-point). **The remaining steps are operator-gated, NOT build tasks:** the operator-present LIVE comprehensive-plan run needs the DOMAIN PROGRAM `ae_profile` schema field (bead `a-plus-maxing-kn29`, P1, operator/architect-owned) FIRST; the daily-monitor LIVE co-arming is blocked on `glzi`, itself blocked on `7nw7` + `yeo3` landing. NEXT: no further build waves — the comprehensive-plan re-architecture is done; the next session is operator-directed (kick off the LIVE-run enablement path, or new scope).
 
-**Historical (kept for reference):** vault/sessions/session-133.md
+**Historical (kept for reference):** vault/sessions/session-134.md
 
 <!-- 3b resume-claims-audit adoption (rigor 1.19.0): this VOLATILE region carries one machine-checkable claim per sentence — a backticked project-id plus a status keyword, a main-at-SHA line, a landed-in-PR line, and the Stamped line. ADVISORY until one full session cycle passes with zero FAIL, then gate per the upstream bud bead. -->
+
+## Scope Contract — Session 135 (2026-07-13)
+
+Goal: Build comprehensive-plan Wave 6 (terminal) end-to-end through the rigor pipeline (`/create-task-plan` → `/execute-plan` → three-tier review → `/merge` → close), driving continuously without stopping at the wave boundary; on merge the ADR-0041–0046 build is complete.
+
+Acceptance criteria:
+- [x] AC1 — the Wave-6 `ADR-0045-T3` recipe remediated (8 Phase-4 QA+Security findings) + judge-accepted ≥9 all 10 dimensions. **PASS**.
+- [x] AC2 — Wave-6 built from the recipe (`daily_monitor.py` Create + `activate.py` additive + `test_daily_monitor.py`); the frozen `<always-frozen>` six preserved (numstat=0 vs the durable fork-point `ee6dbfd1`). **PASS**.
+- [x] AC3 — the Wave-6→Done checkpoint ran green (full suite no new failure beyond the 2 env-floor; the terminal 15-module battery 262 passed; disabled-by-default). **PASS**.
+- [x] AC4 — three-tier review (Tier-1 SE 9/9 + 7-mutation battery; Tier-2 QA/Security/plan-integrity executed-PASS 0-MUST-FIX; Tier-3 6-agent → blind triage → 4 fixes → blind verify 4/4 revert-RED) all PASS; the read-before-lock TOCTOU + the receipt-shape + 4 test gaps caught + fixed-or-beaded, none suppressed. **PASS**.
+- [x] AC5 — PR merged to main. **PASS** (#340, `8e8ffad3`).
+- [x] AC6 — full close. **PASS** (this close).
+
+Files I WILL touch: `docs/task-plan/adr-0045-t3.md` (Create), `scripts/runner/daily_monitor.py` (Create), `scripts/runner/schedule/activate.py` (additive), `tests/runner/test_daily_monitor.py` (Create); close docs (HANDOFF, PF, harvest, session note).
+Files I will NOT touch: the `<always-frozen>` six + `store.py`; the frozen executor `tiered_executor.py` + composition `gate_dispatch`/`plan_orchestrator` (HOSTED, not modified); `design/*` (operator PII); `main` directly (PR-only).
+NOT doing: the operator-gated LIVE runs; the daily-interval enable path (scoped out to `glzi`, Deviation #2); SEC-W4-01's DOMAIN PROGRAM `ae_profile` schema field (beaded P1 `kn29`, operator/architect-owned); the deferred read-inside-lock + uniform-receipt fixes (beaded `7nw7`/`yeo3`, glzi co-arming preconditions).
+Invariants at risk: the frozen ADR-0032 spine + INV-CORE-CAPABILITY — both GUARDED (numstat=0), neither violated; INV-ROLE-INLINING (all dispatches full-profile); zero-PII on the public repo.
+
+### S135 Scope Contract Evaluation (2026-07-13, volatile)
+
+AC1–6 PASS. **Task drift — none** (built exactly Wave 6 {0045-T3}; the Tier-3 receipt-shape + read-before-lock deferred-to-`glzi` + the 4 test-hardening fixes were in-scope review disposition, not scope-creep; the LIVE-run blocker `kn29` correctly NOT pulled in). **Architecture drift — none; net HARDENING** (the frozen ADR-0032 spine stayed byte-frozen numstat=0 vs the durable fork-point, verified at checkpoint + Tier-2 + Tier-3 + re-verified at close; `daily_monitor` HOSTS the frozen executor/composition without weakening the fail-closed surface [EXTEND-NOT-REBUILD]; the composed-gate injection verified UNCONDITIONAL on the default arg-set; INV-CORE-CAPABILITY holds — the daily monitor EXTENDS the plan path). **Vision drift — none; net CLOSER** (after S135 the system IS "a local-first, care-agent-orchestrated comprehensive adaptive health plan with a disabled-by-default daily deterministic fail-closed monitoring pass in the scheduled runner" — the terminal ADR-0045 tier; the ADR-0041–0046 re-architecture is COMPLETE). **PF attestation — no new PF-class entries this session:** the safety-parity-unconditional, numstat-durable-fork-point, and stale-pyc disciplines HELD (referenced descriptively; no bare PF token); 3 caught, 0 operator-surfaced. The S135 per-PR skill-trace table (#340; the REAL 6-agent `/review-pr` ran IN FULL → CLEAN, `/merge` via the REST-fallback full-SHA guard) + the full PF attestation + disclosure ledger live in `memory/process-failures.md` `## Session 135`.
+
+S135 close (2026-07-13): No new PF-class entries this session. Full attestation + per-PR skill-trace table + disclosure ledger in `memory/process-failures.md` `## Session 135`.
+
+**Historical (kept for reference):** vault/sessions/session-134.md
 
 ## Scope Contract — Session 134 (2026-07-13)
 
