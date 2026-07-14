@@ -5,7 +5,7 @@
 ```yaml
 id: ADR-0047
 title: "Cross-Platform Secret Storage via an OS-Native keyring Abstraction"
-status: proposed
+status: accepted
 date: 2026-07-14
 decision-makers: [Walter McGivney]
 tags: [secret-storage, cross-platform, keyring, credential-abstraction, fallback-tier, foundation, tier-1, alpha-onboarding]
