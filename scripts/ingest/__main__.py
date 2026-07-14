@@ -24,12 +24,17 @@ from scripts.store import store
 
 # Wearable source -> (adapter module, adapter class). The scheduler auto-discovers
 # adapters for the unattended run; this operator CLI uses an explicit name map so
-# `--source` is a closed choice set. DNA is handled separately (not a time-series adapter).
+# `--source` is a closed choice set (kept congruent with the discovered wired set by
+# test_cli_and_status_source_sets_match_scheduler_wired_set). DNA is handled separately (not a
+# time-series adapter). whoop/oura/garmin map to the legacy file-drop parsers (their native manual
+# export shapes); google-health is cloud-only (no native file), so its manual load reads a staged
+# `{item, timepoint, value}` pull JSON via the cloud adapter.
 _ADAPTERS = {
     "healthkit": ("scripts.ingest.adapters.healthkit", "HealthKitAdapter"),
     "whoop": ("scripts.ingest.adapters.whoop", "WhoopAdapter"),
     "oura": ("scripts.ingest.adapters.oura", "OuraAdapter"),
     "garmin": ("scripts.ingest.adapters.garmin", "GarminAdapter"),
+    "google-health": ("scripts.ingest.adapters.google_health_cloud", "GoogleHealthCloudAdapter"),
 }
 _SOURCES = sorted([*_ADAPTERS, "dna"])
 
