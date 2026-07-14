@@ -3,7 +3,7 @@ title: Session Handoff
 type: note
 owner: Walter McGivney
 created: 2026-05-16
-last_reviewed: 2026-07-04
+last_reviewed: 2026-07-14
 status: active
 depends_on: []
 superseded_by: null
@@ -12,15 +12,39 @@ review_cadence: weekly
 
 # Session Handoff
 
-## Resume — S136 (VOLATILE)
+## Resume — S137 (VOLATILE)
 
-Stamped 2026-07-13. main @ `e5a7e698` (kn29 rich-domain AE screening is MERGED to main via PR #342, as of 2026-07-13 S136 close).
+Stamped 2026-07-14. main @ `72d73699` (tracker-ingestion API-pull adapters MERGED to main via PR #344, as of 2026-07-14 S137 close).
 
-The `kn29` / SEC-W4-01 rich-domain adverse-event screening is **DONE** — merged on `main` (PR #342 — Option B: a typed `ae_profile` folded onto `cross_domain_seams` + the `orchestrate.reconcile` additive-AE/Rx-BPMH floor re-based to screen the RICH specialist DOMAIN PROGRAMs, fail-closed on malformed). The operator-present LIVE comprehensive-plan run is **no longer blocked by `kn29`** (Security ruled the value-drift is fail-closed + operator review is the live backstop; the mis-named-key residual is deferred to the chokepoint, re-scoped `kn29` P3). The FULL Tier-3 `/review-pr` earned its keep: it caught + fixed a real safety-information-loss regression (`BUG-1` — a `holds`-overwrite that silently dropped a supplement↔peptide bleeding-risk interaction from the doctor-visit queue, promoted `PF-S136-01`) + a stale safety-contract doc (`CONTRACTS-1`) before merge, all 6 findings blind-verified 6/6 revert-RED, none suppressed. pytest 2 env-floor / 2748 passed / 8 skipped on the merged head; the frozen ADR-0032 spine byte-frozen (numstat=0 vs the pre-kn29 main tip). **NEXT (operator-directed, S137): the tracker-ingestion automation** — API-pull adapters for Whoop + Oura + Garmin + Google Health (the new Google Health API, Google OAuth 2.0; the legacy Fitbit Web API sunsets Sept 2026) handing readings to the existing ADR-0003 pluggable/idempotent/schedulable land path; Apple Health via an operator Shortcut → a watched folder; the LIVE pull operator-gated (dev-app registration + OAuth credentials in the keychain). Run via the pipeline (design/ADR → build → three-tier review → merge). The daily-monitor co-arming (`7nw7`/`yeo3`/`glzi`/`4wno`) + the `kn29` chokepoint remain held/deferred.
+The `tracker-ingestion` mechanical API-pull automation is **DONE** — merged on `main` (PR #344 — Option A: a shared OAuth/fetch layer stages each source's delta into a file-reading adapter's `{item,timepoint,value}` shape, then the UNCHANGED `ingest.run`→`store.append` lands it). Mechanical inbound ingestion is built for **Whoop + Oura + Garmin + Google-Health** (OAuth-2.0 refresh→access; Garmin an OAuth-1.0a strategy; per-source keychain refresh tokens `a-plus-maxing-<source>-oauth`) + **Apple Health** via an operator Shortcut → a gitignored watched folder (the byte-unchanged `healthkit` adapter). The `ADR-0001` inbound-only boundary is **preserved** — the pull is not a new egress class (only an OAuth token + date cursor leaves, to the vendor who already holds the data; 0 store bytes outbound, 0 model-lane calls; `oauth_pull` stdlib-only; Security-verified by execution). The frozen ADR-0032 six + `ingest.run`/`scheduler.run`/`adapter.py` are byte-frozen (numstat=0, verified on the merged main). The FULL Tier-3 `/review-pr` earned its keep — it caught `BUG-1` (the fetch-loop twin of Tier-2's M1: an off-shape but HTTP-200 vendor envelope crashing the whole unattended tick, blocking every source + the Apple folder) plus 5 more findings, all gate-caught + fixed + blind-verified revert-RED, none suppressed. pytest 2 env-floor / 2827 passed / 8 skipped on the merged head. **NEXT (operator-gated LIVE steps, teed up — NOT build tasks):** the LIVE tracker pull needs per-vendor dev-app registration + OAuth refresh tokens dropped into the keychain (supervised, no recurring spend); confirm Garmin's granted OAuth tier (built 1.0a; a one-line manifest swap if 2.0-PKCE); re-verify each source's `[VERIFY-AT-BUILD]` endpoints/scopes against live vendor docs (Whoop shipped v2). Also still operator-gated from prior sessions: the LIVE comprehensive-plan run (needs the DOMAIN PROGRAM `ae_profile` field, bead `kn29` P1) + the daily-monitor co-arming (`7nw7`/`yeo3`/`glzi`/`4wno`, held). Run any next build via the pipeline.
 
-**Historical (kept for reference):** vault/sessions/session-135.md
+**Historical (kept for reference):** vault/sessions/session-136.md
 
 <!-- 3b resume-claims-audit adoption (rigor 1.19.0): this VOLATILE region carries one machine-checkable claim per sentence — a backticked project-id plus a status keyword, a main-at-SHA line, a landed-in-PR line, and the Stamped line. ADVISORY until one full session cycle passes with zero FAIL, then gate per the upstream bud bead. -->
+
+## Scope Contract — Session 137 (2026-07-13)
+
+Goal: Build the mechanical tracker→system ingestion — API-pull adapters (OAuth-authenticated, scheduled) for **Whoop + Oura + Garmin + Google Health** (the new Google Health API / Fitbit Air + Pixel) + the **Apple-Health Shortcut → watched-folder** automation — handing readings to the EXISTING ADR-0003 pluggable/idempotent/schedulable land path (`ingest.run` / `scheduler.run`), via the pipeline (architect design note → operator sign-off → build → three-tier review → `/merge` → close). Mock/fixture-tested at 0 live spend; the LIVE pull operator-gated (dev-app registration + OAuth credentials in the OS keychain).
+
+Acceptance criteria:
+- [ ] AC1 — an architect design note grounds the existing adapter/ingest/scheduler seam + specifies the API-pull adapter pattern (OAuth model + keychain credential storage; the fetch→land contract; idempotency via the existing item+timepoint key; the inbound-fetch privacy framing vs ADR-0001; per-source Whoop/Oura/Garmin/Google-Health; the Apple watched-folder), operator-signed-off.
+- [ ] AC2 — the API-pull adapters built + mock-tested (OAuth flow, scheduled fetch, idempotent land via the existing seam; 0 live spend, synthetic API fixtures).
+- [ ] AC3 — the EXISTING ingest/store seam + the frozen ADR-0032 six untouched (extend-not-rebuild — the adapters CALL the seam; no new store key).
+- [ ] AC4 — no new EGRESS of operator data (inbound fetch only; ADR-0001 crown-jewel boundary intact); OAuth credentials in the keychain, never the repo.
+- [ ] AC5 — three-tier review → `/review-pr` → `/merge`; full close.
+
+Files I WILL touch: `scripts/ingest/adapters/{whoop,oura,garmin,google_health}.py` (+ a shared OAuth/fetch layer), `scripts/ingest/{scheduler,__main__}.py` (the API-pull mode + the Apple watched-folder), `docs/design/` / `docs/adr/` (the design), tests; close docs.
+Files I will NOT touch: the frozen `<always-frozen>` six + the plan engine; the daily-monitor co-arming layer (`daily_monitor.py`/`activate.py` — held); `design/*` (operator PII); `main` directly (PR-only); the LIVE pull (real OAuth + data — operator-gated).
+NOT doing: the operator-gated LIVE pull (dev-app registration + real credentials + real spend — supervised); the daily-monitor co-arming (`7nw7`/`yeo3`/`glzi`/`4wno`, held); the kn29 chokepoint (P3, deferred).
+Invariants at risk: ADR-0001 PII boundary (the inbound OAuth fetch must NOT create a new egress; tokens keychain-stored) — GUARDED; ADR-0003 adapter seam (EXTEND-not-rebuild); the frozen ADR-0032 six (numstat=0); INV-ROLE-INLINING; zero-PII public repo.
+
+### S137 Scope Contract Evaluation (2026-07-14, volatile)
+
+AC1–5 PASS. **AC1 PASS** (architect design note `docs/design/tracker-ingestion-api-adapters.md` grounds the ADR-0003 seam + specifies the Option-A API-pull pattern; operator-signed-off "go"; F1/F3 amended post-Tier-2). **AC2 PASS** (Build A [OAuth/fetch foundation + Whoop] + Build B [Oura/Garmin/Google-Health] built the shared OAuth layer + four `*_cloud` adapters + the Apple watched-folder, mock/fixture-tested — 51 build tests + 13 Tier-3-remediation tests, 0 live spend, synthetic fixtures + local http.server). **AC3 PASS** (the frozen `<always-frozen>` six + `ingest.run`/`scheduler.run`/`adapter.py` byte-frozen numstat=0, verified at every stage + on the merged main; no new store key/stream — the `(item,timepoint,source)` dedup inherited). **AC4 PASS** (ADR-0001 inbound-only verified by execution — 0 store bytes outbound, 0 model-lane calls, `oauth_pull` stdlib-only, no SSRF; OAuth refresh tokens keychain-stored, never the repo; the SEC-01 cross-host bearer-leak fixed fail-closed). **AC5 PASS** (Tier-2 QA/Security/Architect → 7-finding remediation → Tier-3 FULL `/review-pr` 6-agent → blind triage → 4 fix commits → blind verify 6/6 revert-RED → `/merge` #344 squash → this close). **Task drift — none** (built exactly the tracker-ingestion API-pull automation; the Tier-2/Tier-3 remediations were in-scope review fixes, not scope-creep; the daily-monitor layer stayed HELD; the LIVE pull correctly deferred operator-gated). **Architecture drift — none; net HARDENING** (frozen ADR-0032 six byte-frozen numstat=0; ADR-0003 EXTENDED-not-rebuilt — the adapters CALL the seam; ADR-0001 inbound-only preserved + mechanically enforced by the wire-scan; the disabled-by-default `activate.py` untouched). **Vision drift — none; net CLOSER** (after S137 the system IS "a local-first, care-agent-orchestrated comprehensive adaptive health plan whose wearable data now ingests MECHANICALLY from the operator's own vendor clouds + Apple, no manual export/sorting" — the operator's mechanical-ingestion goal built).
+
+S137 close (2026-07-14): No new process-failure entries this session. The full pipeline ran cleanly (design → 2 builds → Tier-2 → remediation → Tier-3 → `/merge` → this close); the Tier-3 catches (BUG-1 the fetch-side isolation twin + 5 more) are the three-tier model working as designed, captured in the disclosure ledger (13 caught, all self/gate, 0 operator-surfaced), not a protocol failure. The full attestation + the per-PR skill-trace table (#344; the REAL 6-agent `/review-pr` → CLEAN, `/merge` via the REST-fallback full-SHA guard) + the disclosure ledger live in `memory/process-failures.md` `## Session 137`.
+
+**Historical (kept for reference):** vault/sessions/session-136.md
 
 ## Scope Contract — Session 136 (2026-07-13)
 
@@ -37,14 +61,6 @@ Files I WILL touch: `scripts/plan/{domain_program,orchestrate}.py`, `scripts/ser
 Files I will NOT touch: the frozen `<always-frozen>` six (store/keying/pipeline/adjudicate/adjust/router.py); the daily-monitor layer (`daily_monitor.py`/`activate.py` — HELD for the live-feed conversation); `design/*` (operator PII); `main` directly (PR-only).
 NOT doing: the daily-monitor / live-monitoring co-arming (`7nw7`/`yeo3`/`glzi`/`4wno` — held pending the operator live-feed conversation); the PF-S133-02 `validate_plan_version` chokepoint backstop (defense-in-depth follow-up, out of kn29's live-blocker scope); the operator-present LIVE plan run (real spend/data — supervised).
 Invariants at risk: the frozen ADR-0032 spine (GUARDED, numstat=0); INV-CORE-CAPABILITY (this makes the LIVE core capability safe — closer, not violated); INV-ROLE-INLINING; zero-PII public repo.
-
-### S136 Scope Contract Evaluation (2026-07-13, volatile)
-
-AC1–5 PASS. **Task drift — none** (built exactly `kn29` Option-B rich-domain AE screening; the malformed-AE fail-closed + the BUG-1/CONTRACTS-1 Tier-3 fixes were in-scope review remediation, not scope-creep; the daily-monitor layer stayed HELD per the operator, and the tracker-ingestion build correctly deferred to S137). **Architecture drift — none; net HARDENING** (the frozen ADR-0032 six stayed byte-frozen numstat=0 vs `902da028`, verified at completion + Tier-2 + Tier-3 + re-verified at close; the change lives in the ADR-0041/0043-superseded surface; the malformed transform is UNCONDITIONAL fail-closed; INV-CORE-CAPABILITY closer — the LIVE plan is now AE-screened). **Vision drift — none; net CLOSER** (after S136 the system IS "a local-first, care-agent-orchestrated comprehensive adaptive health plan whose rich specialists are now cross-screened for adverse-event interactions" — the SEC-W4-01 live-run gate closed).
-
-S136 close (2026-07-13): One new process-failure promoted — PF-S136-01 (the "benign by membership" mis-assessment of a shared-state overwrite that Tier-3 caught end-to-end). The full attestation + the per-PR skill-trace table (#342; the REAL 6-agent `/review-pr` ran IN FULL → CLEAN, `/merge` via the REST-fallback full-SHA guard) + the disclosure ledger (3 caught, 0 operator-surfaced) live in `memory/process-failures.md` `## Session 136`.
-
-**Historical (kept for reference):** vault/sessions/session-135.md
 
 ## Scope Contract — Session 135 (2026-07-13)
 
