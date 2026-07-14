@@ -33,6 +33,7 @@ import hmac
 import json
 import secrets
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -211,17 +212,24 @@ def _write_oauth_credential(source, payload):
     (`-U` updates in place so a rotated refresh token replaces the prior one; `-A` grants the item an
     allow-all ACL so the backgrounded pull's later read is not blocked on an interactive prompt — the
     same accepted tradeoff `key_source._keychain_writer` makes). The payload is passed only as the
-    subprocess argument, never logged. Best-effort: a write failure is non-fatal (the current token
-    still works this run); it is not raised so a keychain-ACL denial cannot abort a successful pull.
+    subprocess argument, never logged. Non-fatal but LOUD (SEC-02): a write failure does NOT abort the
+    current tick (its access token already works), but unlike a silent best-effort write it emits a
+    diagnostic naming the rotation-write failure — a silently-stranded rotated refresh token would make
+    the NEXT tick 401 and fail closed blaming the token, not the write. The returncode is checked (the
+    `key_source._keychain_writer` precedent), but here we warn instead of raise (Security's guidance).
     """
     try:
-        subprocess.run(
+        completed = subprocess.run(
             ["security", "add-generic-password", "-U", "-A",
              "-a", getpass.getuser(), "-s", _oauth_service_name(source), "-w", payload],
             capture_output=True, text=True,
         )
     except (FileNotFoundError, OSError):
-        pass
+        completed = None
+    if completed is None or completed.returncode != 0:
+        print(f"tracker-pull: FAILED to write the rotated {source!r} refresh token back to the "
+              f"keychain (item {_oauth_service_name(source)!r}); the consumed token is now stranded — "
+              f"the next tick will fail closed until you re-run the authorize flow", file=sys.stderr)
 
 
 class _HttpResponse:
@@ -234,19 +242,44 @@ class _HttpResponse:
         self.body = body
 
 
+class _NoFollowRedirect(urllib.request.HTTPRedirectHandler):
+    """Decline every 3xx auto-follow on the authenticated fetch seam (SEC-01).
+
+    Python's default opener copies the request headers — including `Authorization: Bearer <token>` —
+    onto a redirect target with no cross-host stripping (verified on 3.14), and a redirect can downgrade
+    https->http, so auto-following a 3xx would leak the access token to the redirect host. Returning
+    None declines the follow, surfacing the 3xx to `_http` (which fails closed); the redirect target is
+    never contacted.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+# A module-level opener that never auto-follows a redirect (the SEC-01 posture above), built once.
+_OPENER = urllib.request.build_opener(_NoFollowRedirect)
+
+
 def _http(method, url, *, headers=None, body=None, timeout=_HTTP_TIMEOUT_S):
     """Issue one HTTP request and return an `_HttpResponse` (the default network seam; LIVE only).
 
     The single real-network site in this module — never exercised in tests (they inject a fixture
-    seam). A non-2xx HTTP response is returned as an `_HttpResponse` carrying its status (the caller
-    decides fail-closed); a genuine connection error (`URLError`) propagates for the caller to wrap.
+    seam). A 4xx/5xx response is returned as an `_HttpResponse` carrying its status (the caller decides
+    fail-closed); a genuine connection error (`URLError`) propagates for the caller to wrap. A 3xx
+    redirect FAILS CLOSED here (SEC-01): the authenticated seam never follows a redirect — that would
+    leak the bearer to the redirect host — so a 3xx raises `TrackerPullError` and is never followed.
     """
     data = body.encode() if isinstance(body, str) else body
     request = urllib.request.Request(url, method=method, data=data, headers=headers or {})
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with _OPENER.open(request, timeout=timeout) as response:
             return _HttpResponse(response.status, response.read())
     except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400:
+            raise TrackerPullError(
+                f"refusing to follow an HTTP {exc.code} redirect on the authenticated tracker fetch "
+                "seam (a redirect would leak the access token to the redirect host)"
+            ) from None
         return _HttpResponse(exc.code, exc.read())
 
 
@@ -671,51 +704,72 @@ def _oauth1_timestamp():
 
 # --- Google Health reader (OAuth-2.0 bearer; `dailyRollUp` POST; `rollupDataPoints` envelope) ---
 
+# The Google dailyRollUp pagination fields. `[VERIFY-AT-BUILD]` — transcribed from the Google Health
+# API reference and MUST be re-verified before the LIVE run (the same posture as the endpoint slugs). A
+# response `nextPageToken` absent -> a single response terminates (today's behavior, unchanged); present
+# -> the read echoes it as the request-body `pageToken` and follows the next page, bounded by
+# `_MAX_PAGES` (so a misbehaving cursor fails fast at the boundary rather than hanging the tick).
+_GOOGLE_NEXT_PAGE_FIELD = "nextPageToken"   # response: the next-page cursor
+_GOOGLE_PAGE_TOKEN_PARAM = "pageToken"      # request body: echo the cursor to fetch the next page
+
 
 def _read_google(source, manifest, *, since, credential_reader, credential_writer, http):
     """Read the Google Health API daily rollups (OAuth-2.0 bearer, `dailyRollUp` POST) into rows.
 
     Reuses the shared `access_token` refresh->access path (Google is standard OAuth 2.0), then POSTs a
-    civil-time-range `dailyRollUp` per data type and walks `rollupDataPoints`. The read shape is
-    Google-specific (a POST with a JSON body; a `rollupDataPoints` / `civilStartTime` envelope; a
-    nested value path) and lives here at the fetch seam rather than in the shared GET-pagination reader.
+    civil-time-range `dailyRollUp` per data type and walks `rollupDataPoints`, following the response's
+    `nextPageToken` across pages (mirroring the GET readers' page-follow, bounded by `_MAX_PAGES`). The
+    read shape is Google-specific (a POST with a JSON body; a `rollupDataPoints` / `civilStartTime`
+    envelope; a nested value path) and lives here at the fetch seam rather than in the shared reader.
     """
     token = access_token(source, credential_reader=credential_reader,
                          credential_writer=credential_writer, http=http)
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json",
                "Content-Type": "application/json"}
-    body = json.dumps(_google_rollup_body(since))
     rows = []
     for data_type, value_path, item in manifest["endpoints"]:
         url = f"{manifest['api_base']}/{data_type}/dataPoints:dailyRollUp"
-        response = _request(http, "POST", url, source, headers=headers, body=body)
-        if not 200 <= response.status < 300:
-            raise TrackerPullError(f"read of {data_type} for {source!r} failed (HTTP {response.status})")
-        data = _decode(response.body, source)
-        for point in data.get("rollupDataPoints", []):
-            day = _google_civil_day(point.get("civilStartTime"))
-            value = _walk(point, value_path)
-            if day and value is not None:
-                rows.append({"item": item, "timepoint": day, "value": value})
+        page_token = None
+        for _ in range(_MAX_PAGES):
+            body = json.dumps(_google_rollup_body(since, page_token))
+            response = _request(http, "POST", url, source, headers=headers, body=body)
+            if not 200 <= response.status < 300:
+                raise TrackerPullError(
+                    f"read of {data_type} for {source!r} failed (HTTP {response.status})")
+            data = _decode(response.body, source)
+            for point in data.get("rollupDataPoints", []):
+                day = _google_civil_day(point.get("civilStartTime"))
+                value = _walk(point, value_path)
+                if day and value is not None:
+                    rows.append({"item": item, "timepoint": day, "value": value})
+            page_token = data.get(_GOOGLE_NEXT_PAGE_FIELD)
+            if not page_token:       # absent cursor -> this data type is done (single-response default)
+                break
+        else:
+            raise TrackerPullError(f"read of {data_type} for {source!r} exceeded the page ceiling")
     return rows
 
 
-def _google_rollup_body(since):
+def _google_rollup_body(since, page_token=None):
     """The Google `dailyRollUp` request body: a closed-open civil-day range, window size 1 day.
 
     `since` (YYYY-MM-DD) is the range start; a None `since` starts from the Unix epoch (a full pull,
-    which the store dedupe collapses to the delta). The exact body schema is `[VERIFY-AT-BUILD]`.
+    which the store dedupe collapses to the delta). A non-None `page_token` is echoed as the body's
+    `pageToken` cursor to fetch the next page. The exact body schema is `[VERIFY-AT-BUILD]`.
     """
     start = since or "1970-01-01"
     year, month, day = (int(part) for part in start.split("-"))
     now = datetime.now(timezone.utc)
-    return {
+    body = {
         "range": {
             "start": {"year": year, "month": month, "day": day},
             "end": {"year": now.year, "month": now.month, "day": now.day},
         },
         "windowSizeDays": 1,
     }
+    if page_token:
+        body[_GOOGLE_PAGE_TOKEN_PARAM] = page_token
+    return body
 
 
 def _google_civil_day(civil):

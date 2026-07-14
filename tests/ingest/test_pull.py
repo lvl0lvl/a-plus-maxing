@@ -60,6 +60,25 @@ def _drop_healthkit_export(watched_root, records):
     return export
 
 
+def _drop_malformed_healthkit_export(watched_root):
+    """Write a TRUNCATED Apple Health export.xml (a partial Shortcut / interrupted-sync write).
+
+    Cut off mid-element so the healthkit adapter's streamed `ET.iterparse` raises `ET.ParseError`
+    during the land — the malformed-watched-export failure M1 isolates.
+    """
+    hk_dir = Path(watched_root) / "healthkit"
+    hk_dir.mkdir(parents=True, exist_ok=True)
+    export = hk_dir / "export.xml"
+    export.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<HealthData locale="en_US">\n'
+        ' <ExportDate value="2026-06-20 12:00:00 -0500"/>\n'
+        ' <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch" '
+        'startDate="2026-07-10 06:00:00 -0500" endDate="2026-07-10 06:00:00 -0500" value="48'
+    )   # truncated: no closing quote / '/>' / </HealthData> -> ET.ParseError on parse
+    return export
+
+
 def _inject_whoop_seams(monkeypatch, http=None):
     """Point the module-level oauth_pull seams at fixtures (fetch resolves them at call time).
 
@@ -201,6 +220,63 @@ def test_whoop_auth_failure_still_lands_watched_healthkit(tmp_path, monkeypatch,
     assert len(store.read("rhr", root=store_root)) == 1                              # Apple landed
     err = capsys.readouterr().err
     assert "whoop" in err.lower()      # loud: a diagnostic named the failed source
+
+
+# --- M1: a malformed watched export is isolated per-source (never crashes the tick / drops others) ---
+
+
+def test_malformed_watched_export_isolated_whoop_still_lands(tmp_path, monkeypatch, capsys):
+    """M1: a malformed watched export is skipped (loud) while the fetched Whoop data still lands.
+
+    A partial/truncated Apple export makes the healthkit adapter raise `ET.ParseError` mid-land. The
+    land phase is per-source isolated, so the already-fetched Whoop readings LAND, the malformed
+    export is skipped with a loud diagnostic, and the tick returns 0 — never crashing the whole tick
+    and dropping the wearable data. REDs pre-fix: the un-isolated single `scheduler.run` raises, and
+    Whoop (landed AFTER healthkit in the wired order) lands 0.
+    """
+    from scripts.ingest import pull
+
+    _inject_whoop_seams(monkeypatch)
+    store_root = tmp_path / "store"
+    watched = tmp_path / "inbox"
+    _drop_malformed_healthkit_export(watched)
+
+    rc = pull.main(["--root", str(store_root), "--watched-root", str(watched)])
+    assert rc == 0                                                   # the tick did NOT crash
+
+    # Whoop landed — the fetched wearable data is NOT dropped by the malformed watched export ...
+    assert store.read("recovery", root=store_root)[0]["value"] == 66
+    assert store.read("recovery", root=store_root)[0]["source"] == "whoop"
+    # ... and the malformed export imported nothing (skipped, not a partial land).
+    assert [r for r in store.read_all(store_root) if r["source"] == "healthkit"] == []
+    err = capsys.readouterr().err
+    assert "healthkit" in err.lower() and "land" in err.lower()      # loud, named the skipped source
+
+
+def test_per_source_land_split_preserves_delta_dedup(tmp_path, monkeypatch):
+    """M1 (HARD REQ): the per-source land split preserves `scheduler.run`'s delta/dedup — a re-run of
+    a MULTI-source tick (Whoop + watched HealthKit) appends 0 duplicates to either stream.
+
+    Proves per-source `scheduler.run({tag: path})` calls are equivalent to the single batched call for
+    ADR-0003-T3 delta-since-last-run + dedup (the store `(item, day, source)` key owns dedup, not the
+    batching), so isolating the land does not regress idempotency.
+    """
+    from scripts.ingest import pull
+
+    store_root = tmp_path / "store"
+    watched = tmp_path / "inbox"
+    argv = ["--root", str(store_root), "--watched-root", str(watched)]
+    _drop_healthkit_export(watched, [_hk_rhr("2026-07-10", "48")])
+
+    _inject_whoop_seams(monkeypatch)
+    pull.main(argv)
+    first = {item: len(store.read(item, root=store_root)) for item in ("recovery", "hrv", "rhr")}
+    assert first["recovery"] == 1 and first["hrv"] == 1               # the split landed both sources
+
+    _inject_whoop_seams(monkeypatch)
+    pull.main(argv)
+    for item, n in first.items():
+        assert len(store.read(item, root=store_root)) - n == 0        # re-run appends 0 after the split
 
 
 # --- the runner store lock: a busy tick defers ---

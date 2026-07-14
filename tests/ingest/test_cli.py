@@ -56,13 +56,30 @@ def test_cli_source_override_loads_a_file_autodetect_refuses(tmp_path):
 
 
 def test_cli_and_status_source_sets_match_scheduler_wired_set():
-    """The CLI's adapter map + status's wearable sources stay congruent with the scheduler's DISCOVERED
-    wired set. A new/removed/UNWIRED-flagged adapter that drifts these hardcoded lists fails loud here
-    (rather than silently mis-classifying load-state) — the single-source-of-truth guard."""
-    from scripts.ingest import scheduler, status
+    """The CLI's adapter map + status's wearable sources + pull's API-pull set stay congruent with the
+    scheduler's DISCOVERED wired set. A new/removed/UNWIRED-flagged adapter that drifts these hardcoded
+    lists fails loud here (rather than silently mis-classifying load-state) — the single-source-of-truth
+    guard. F2: `pull._API_PULL_SOURCES` is the SECOND definition axis (the fetch side), so it is guarded
+    too — it must equal the discovered wired set MINUS the watched-folder sources (a `*_cloud` adapter
+    that is wired + status-listed but never fetched would otherwise be a silent gap)."""
+    from scripts.ingest import pull, scheduler, status
     discovered = {adapter.source_tag() for adapter in scheduler._wired_adapters()}
     assert set(cli._ADAPTERS) == discovered
     assert set(status._WEARABLE_SOURCES) == discovered
+    assert set(pull._API_PULL_SOURCES) == discovered - set(pull.WATCHED_FOLDER_SOURCES)
+
+
+def test_api_pull_source_guard_reds_if_a_manifest_source_is_dropped(monkeypatch):
+    """F2 falsifiability: the API-pull congruence assertion is failing-capable, not vacuous.
+
+    Simulate the drift F2 closes — a `*_cloud` adapter wired + status-listed but dropped from the
+    fetch set (e.g. its manifest was forgotten). The `set(_API_PULL_SOURCES) == discovered - watched`
+    assertion must then RED, so a real omission would be caught rather than silently never-fetched."""
+    from scripts.ingest import pull, scheduler
+    discovered = {adapter.source_tag() for adapter in scheduler._wired_adapters()}
+    dropped = tuple(s for s in pull._API_PULL_SOURCES if s != "oura")   # forget one manifest source
+    monkeypatch.setattr(pull, "_API_PULL_SOURCES", dropped)
+    assert set(pull._API_PULL_SOURCES) != discovered - set(pull.WATCHED_FOLDER_SOURCES)
 
 
 def test_cli_missing_file_exits(tmp_path):

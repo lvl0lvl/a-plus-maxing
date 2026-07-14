@@ -30,11 +30,19 @@ from scripts.ingest import oauth_pull, scheduler
 from scripts.runner import store_lock
 from scripts.store import store
 
-# The wired API-pull sources this tick fetches. Build A shipped Whoop as the reference source; Build B
-# extends this tuple with oura / garmin / google-health on the same shared layer (each fetched via its
-# per-source manifest + read strategy in `oauth_pull`, landed by its `<source>_cloud` adapter). A
-# per-source fetch failure fails closed for THAT source only (0 readings, loud) — never the others.
-_API_PULL_SOURCES = ("whoop", "oura", "garmin", "google-health")
+# The wired API-pull sources this tick fetches, DERIVED from `oauth_pull._MANIFESTS` — the single
+# source of truth for which sources have a cloud pull manifest (whoop / oura / garmin / google-health).
+# Deriving it (rather than a second hardcoded tuple) closes the F2 silent-drift trap: a future
+# `<source>_cloud` adapter is fetched the moment its manifest is added, and one that is wired +
+# status-listed but MISSING a manifest can no longer be silently never-fetched (the cli/status/scheduler
+# congruence guard `test_cli_and_status_source_sets_match_scheduler_wired_set` reds). The dict order is
+# the fetch/land order. A per-source fetch failure fails closed for THAT source only (0 readings, loud).
+_API_PULL_SOURCES = tuple(oauth_pull._MANIFESTS)
+
+# The watched-folder source tags (ingested from the gitignored inbox drop, NOT the cloud API — Apple
+# Health has no cloud REST API). Named so the congruence guard can assert the API-pull set is exactly
+# the discovered wired set MINUS the watched-folder sources.
+WATCHED_FOLDER_SOURCES = ("healthkit",)
 
 # The gitignored Apple-Health watched folder the operator Shortcut drops exports into. The tick scans
 # `<watched-root>/healthkit/` for the newest export and ingests it via the unchanged healthkit adapter.
@@ -128,8 +136,20 @@ def main(argv=None):
                           file=sys.stderr)
             watched = _scan_watched_folder(watched_root)
             if watched is not None:
-                exports["healthkit"] = watched
-            scheduler.run(exports, root=root)
+                exports[WATCHED_FOLDER_SOURCES[0]] = watched
+            # Land each source in its OWN try/except (M1): a malformed/partial export for one source
+            # (e.g. a truncated watched Apple export raising ET.ParseError) must never crash the tick
+            # or drop the OTHER sources' already-fetched readings. A per-source `scheduler.run({tag:
+            # path})` call is equivalent to the single batched call for the ADR-0003-T3 delta/dedup —
+            # the store `(item, day, source)` key owns dedup, not the batching — so isolating the land
+            # does not change what is stored. A land failure is logged loud and skipped, exactly as the
+            # fetch loop above isolates a per-source fetch failure; the tick then returns normally.
+            for tag, path in exports.items():
+                try:
+                    scheduler.run({tag: path}, root=root)
+                except Exception as exc:
+                    print(f"tracker-pull: {tag} land failed, skipping this tick ({exc})",
+                          file=sys.stderr)
     return 0
 
 

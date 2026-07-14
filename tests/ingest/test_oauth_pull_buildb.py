@@ -24,7 +24,7 @@ import pytest
 
 from scripts.store import store
 
-from test_oauth_pull import _RecordingHttp
+from test_oauth_pull import _PagingHttp, _RecordingHttp, _resp
 
 # --- per-source fixture credentials (synthetic; never a real token) ---
 
@@ -333,6 +333,22 @@ def test_fetch_wire_scan_inbound_only(source, tmp_path, monkeypatch):
         assert sentinel not in blob                        # 0 store content in any outbound request
 
 
+def test_read_oura_records_follows_pagination(tmp_path):
+    """S1: `_read_oura_records` follows Oura's `next_token` across pages — both pages' records land and
+    the cursor is forwarded to the page-2 request. REDs if the page-follow is muted (only page 1)."""
+    from scripts.ingest import oauth_pull
+
+    page1 = {"data": [{"day": "2026-07-10", "score": 82}], "next_token": "OCURSOR"}
+    page2 = {"data": [{"day": "2026-07-11", "score": 84}], "next_token": None}
+    http = _PagingHttp(page1, page2, cursor_param="next_token", cursor="OCURSOR")
+    headers = {"Authorization": "Bearer tok", "Accept": "application/json"}
+
+    records = list(oauth_pull._read_oura_records(http, oauth_pull._OURA, "/daily_sleep", "oura",
+                                                 headers, None))
+    assert [r["day"] for r in records] == ["2026-07-10", "2026-07-11"]               # BOTH pages
+    assert any("next_token=OCURSOR" in c["url"] for c in http.calls)                 # cursor -> page 2
+
+
 def test_oura_read_carries_only_bearer_and_whitelisted_params(tmp_path):
     """P4 (a/d) for Oura: reads carry a Bearer header + only the delta cursor / paging params, no body."""
     from scripts.ingest import oauth_pull
@@ -464,6 +480,60 @@ def test_garmin_wire_scan_never_leaks_secret_outbound(tmp_path):
                            "b": c["body"].decode() if isinstance(c["body"], (bytes, bytearray)) else c["body"]})
         assert "CONSUMER-SECRET-zzz" not in blob
         assert "TOKEN-SECRET-qqq" not in blob
+
+
+# --- S2: the Google rollup reader follows pagination (was single-response, contradicting the docstring) ---
+
+
+def _google_single_endpoint_manifest():
+    """A trimmed one-data-type Google manifest so a pagination test exercises one endpoint cleanly."""
+    from scripts.ingest import oauth_pull
+
+    return {**oauth_pull._GOOGLE_HEALTH,
+            "endpoints": (("resting-heart-rate", ("restingHeartRate", "avg"), "rhr"),)}
+
+
+def test_read_google_follows_pagination(tmp_path):
+    """S2: `_read_google` follows Google's `nextPageToken` across pages — both pages' points land and
+    the cursor is echoed in the page-2 request body. REDs pre-fix (the reader read one response only)."""
+    from scripts.ingest import oauth_pull
+
+    calls = []
+
+    def seam(method, url, *, headers=None, body=None, timeout=None):
+        calls.append({"url": url, "body": body})
+        if "oauth2.googleapis.com/token" in url:
+            return _resp(200, _TOKEN_OK)
+        if json.loads(body).get("pageToken") == "PGCURSOR":
+            return _resp(200, {"rollupDataPoints": [_g_point(11, "restingHeartRate", "avg", 50)]})
+        return _resp(200, {"rollupDataPoints": [_g_point(10, "restingHeartRate", "avg", 47)],
+                           "nextPageToken": "PGCURSOR"})
+
+    rows = oauth_pull._read_google("google-health", _google_single_endpoint_manifest(), since=None,
+                                   credential_reader=_cred(_OAUTH2_CRED), credential_writer=None, http=seam)
+    assert [r["timepoint"] for r in rows] == ["2026-07-10", "2026-07-11"]        # BOTH pages
+    assert [r["value"] for r in rows] == [47, 50]
+    read_bodies = [json.loads(c["body"]) for c in calls if "token" not in c["url"]]
+    assert any(b.get("pageToken") == "PGCURSOR" for b in read_bodies)            # cursor -> page 2 body
+
+
+def test_read_google_single_response_terminates_without_crash(tmp_path):
+    """S2: an absent `nextPageToken` terminates after one response (today's behavior is unchanged — no
+    spurious page-2 request, no crash)."""
+    from scripts.ingest import oauth_pull
+
+    read_urls = []
+
+    def seam(method, url, *, headers=None, body=None, timeout=None):
+        if "oauth2.googleapis.com/token" in url:
+            return _resp(200, _TOKEN_OK)
+        read_urls.append(url)
+        return _resp(200, {"rollupDataPoints": [_g_point(10, "restingHeartRate", "avg", 47)]})  # no token
+
+    rows = oauth_pull._read_google("google-health", _google_single_endpoint_manifest(), since=None,
+                                   credential_reader=_cred(_OAUTH2_CRED), credential_writer=None, http=seam)
+    assert [r["value"] for r in rows] == [47]       # the single page landed
+    assert len(read_urls) == 1                      # absent token -> one request, terminates (no change)
 
 
 # --- the cloud adapters parse the staged rows (pure file parsers, no network) ---

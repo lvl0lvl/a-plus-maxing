@@ -257,6 +257,114 @@ def test_tracker_pull_error_message_carries_no_token(tmp_path):
     assert "SECRET-REFRESH-abc123" not in str(exc.value)
 
 
+# --- S3: atomic-stage + empty-delta robustness guarantees ---
+
+
+def test_fetch_empty_delta_stages_empty_lands_nothing(tmp_path):
+    """S3(a): an empty delta (every endpoint returns `records: []`) stages `[]`, lands nothing, no crash.
+
+    No fabricated rows, no spurious store write — a tick with no new readings is a clean no-op.
+    """
+    from scripts.ingest import ingest, oauth_pull
+    from scripts.ingest.adapters import whoop_cloud
+
+    empty = {"records": [], "next_token": None}
+    http = _RecordingHttp(_whoop_routes(recovery=empty, sleep=empty, cycle=empty))
+    staged = oauth_pull.fetch("whoop", since=None, staged_dir=tmp_path,
+                              credential_reader=_fake_keychain(), http=http)
+    assert staged.exists()
+    assert json.loads(staged.read_text()) == []          # staged an empty array (no fabricated rows)
+
+    store_root = tmp_path / "store"
+    ingest.run(whoop_cloud.WhoopCloudAdapter(), staged, root=store_root)
+    assert store.read_all(store_root) == []               # nothing landed; no spurious store write
+
+
+def test_fetch_mid_pagination_failure_is_atomic(tmp_path):
+    """S3(b): a page-2 HTTP 500 mid-fetch raises + writes 0 staged bytes + leaves the store untouched.
+
+    The atomic-stage guarantee: `fetch` writes the staged file only after every endpoint+page has
+    succeeded, so a mid-pagination failure leaves no partial file for `ingest.run` to land.
+    """
+    from scripts.ingest import oauth_pull
+
+    store_root = tmp_path / "store"
+
+    class _FailPage2Http:
+        def __call__(self, method, url, *, headers=None, body=None, timeout=None):
+            if "oauth2/token" in url:
+                return _resp(200, _TOKEN_OK)
+            if parse_qs(urlparse(url).query).get("nextToken") == ["CUR"]:
+                return _resp(500, {"error": "server_error"})            # page 2 fails mid-pagination
+            return _resp(200, {"records": [{"created_at": "2026-07-10T00:00:00Z",
+                                            "score": {"recovery_score": 66}}], "next_token": "CUR"})
+
+    with pytest.raises(oauth_pull.TrackerPullError):
+        oauth_pull.fetch("whoop", since=None, staged_dir=tmp_path,
+                         credential_reader=_fake_keychain(), http=_FailPage2Http())
+
+    assert list(tmp_path.glob("*.json")) == []            # 0 staged bytes (no partial file lands)
+    assert store.read_all(store_root) == []               # the store is untouched
+
+
+# --- S1: multi-page pagination (the page-follow was untested; single-page fixtures hid it) ---
+
+
+class _PagingHttp:
+    """A 2-page read seam: serves `page1` until a request carries `cursor_param=cursor`, then `page2`.
+
+    Records every call so a test can assert both pages' records land AND the cursor was forwarded to
+    the page-2 request — the coverage single-page fixtures could not provide.
+    """
+
+    def __init__(self, page1, page2, *, cursor_param, cursor):
+        self.page1, self.page2 = page1, page2
+        self.cursor_param, self.cursor = cursor_param, cursor
+        self.calls = []
+
+    def __call__(self, method, url, *, headers=None, body=None, timeout=None):
+        self.calls.append({"method": method, "url": url, "headers": dict(headers or {}), "body": body})
+        qs = parse_qs(urlparse(url).query)
+        page = self.page2 if qs.get(self.cursor_param) == [self.cursor] else self.page1
+        return _resp(200, page)
+
+
+def test_read_records_follows_whoop_pagination():
+    """S1: `_read_records` follows Whoop's `next_token` across pages — both pages' records land and the
+    cursor is forwarded to the page-2 request. REDs if the page-follow is muted (only page 1 lands)."""
+    from scripts.ingest import oauth_pull
+
+    page1 = {"records": [{"created_at": "2026-07-10T09:00:00.000Z", "score": {"recovery_score": 66}}],
+             "next_token": "CURSOR-2"}
+    page2 = {"records": [{"created_at": "2026-07-11T09:00:00.000Z", "score": {"recovery_score": 70}}],
+             "next_token": None}
+    http = _PagingHttp(page1, page2, cursor_param="nextToken", cursor="CURSOR-2")
+
+    records = list(oauth_pull._read_records(http, oauth_pull._WHOOP, "/v1/recovery", "whoop", "tok", None))
+    assert [r["created_at"][:10] for r in records] == ["2026-07-10", "2026-07-11"]   # BOTH pages
+    forwarded = [c for c in http.calls if "nextToken=CURSOR-2" in c["url"]]
+    assert len(forwarded) == 1                                                       # cursor -> page 2
+
+
+def test_read_records_raises_on_never_terminating_cursor():
+    """S1: a cursor that never terminates hits the `_MAX_PAGES` ceiling and fails fast (never hangs)."""
+    from scripts.ingest import oauth_pull
+
+    class _InfiniteHttp:
+        def __init__(self):
+            self.calls = 0
+
+        def __call__(self, method, url, *, headers=None, body=None, timeout=None):
+            self.calls += 1
+            return _resp(200, {"records": [{"created_at": "2026-07-10T00:00:00Z", "score": {}}],
+                               "next_token": "ALWAYS-MORE"})
+
+    http = _InfiniteHttp()
+    with pytest.raises(oauth_pull.TrackerPullError):
+        list(oauth_pull._read_records(http, oauth_pull._WHOOP, "/v1/recovery", "whoop", "tok", None))
+    assert http.calls == oauth_pull._MAX_PAGES      # stopped at the ceiling, bounded (did not hang)
+
+
 # --- P4: inbound-only wire-scan (the crown-jewel privacy probe) ---
 
 
@@ -374,7 +482,152 @@ def test_access_token_no_rotation_writes_nothing(tmp_path):
     assert written == {}
 
 
+# --- SEC-02: a failed rotation write-back is loud + non-fatal (never a silent stranded token) ---
+
+
+def _fake_completed(returncode):
+    """A duck-typed `subprocess.run` result carrying just the returncode the writer checks."""
+    import types
+
+    return lambda *a, **k: types.SimpleNamespace(returncode=returncode, stdout="", stderr="denied")
+
+
+def test_rotation_write_failure_is_loud_and_non_fatal(monkeypatch, capsys):
+    """SEC-02: a non-zero keychain write-back emits a LOUD diagnostic and does NOT raise.
+
+    Unlike `key_source._keychain_writer` (which raises on non-zero), the rotation write is non-fatal —
+    the current tick already holds its access token — but it must be loud: a silent failure strands the
+    consumed refresh token and the NEXT tick 401s, blaming the token rather than the write. REDs pre-fix
+    (no returncode check -> no diagnostic). The keychain is never touched (subprocess.run is stubbed).
+    """
+    from scripts.ingest import oauth_pull
+
+    monkeypatch.setattr(oauth_pull.subprocess, "run", _fake_completed(1))
+    oauth_pull._write_oauth_credential("whoop", "rotated-token-payload")   # must NOT raise
+
+    err = capsys.readouterr().err.lower()
+    assert "whoop" in err and "keychain" in err        # loud + names the source + the write surface
+
+
+def test_rotation_write_success_is_silent(monkeypatch, capsys):
+    """A successful (returncode 0) write-back emits no diagnostic (no spurious warning on the happy path)."""
+    from scripts.ingest import oauth_pull
+
+    monkeypatch.setattr(oauth_pull.subprocess, "run", _fake_completed(0))
+    oauth_pull._write_oauth_credential("whoop", "rotated-token-payload")
+    assert capsys.readouterr().err == ""
+
+
+def test_access_token_completes_when_rotation_write_back_fails(monkeypatch, capsys):
+    """SEC-02 integrated: a failed rotation write-back still lets `access_token` return the token.
+
+    The token response rotates the refresh token; the keychain write-back fails (non-zero). The current
+    operation still completes (the access token is returned) and the failure is surfaced loudly — the
+    tick succeeds, the operator is warned the next tick needs re-auth.
+    """
+    from scripts.ingest import oauth_pull
+
+    monkeypatch.setattr(oauth_pull.subprocess, "run", _fake_completed(1))
+    routes = _whoop_routes()
+    routes["oauth2/token"] = (200, {**_TOKEN_OK, "refresh_token": "rotated-refresh-token"})
+
+    token = oauth_pull.access_token(
+        "whoop",
+        credential_reader=_fake_keychain(token="old-refresh-token"),
+        http=_RecordingHttp(routes),      # credential_writer defaults to the real _write_oauth_credential
+    )
+    assert token == "fixture-access-token"                 # the operation completed
+    assert "whoop" in capsys.readouterr().err.lower()      # ... and the write failure was loud
+
+
 # --- the Whoop cloud adapter (the wired "whoop" file-reading parser) ---
+
+
+# --- SEC-01: the authenticated `_http` seam must not follow a cross-host redirect (bearer leak) ---
+
+
+def _serve_local(handler_cls):
+    """Start a localhost HTTP server on an ephemeral port in a daemon thread; return (server, port)."""
+    import http.server
+    import socketserver
+    import threading
+
+    server = socketserver.TCPServer(("127.0.0.1", 0), handler_cls)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, port
+
+
+def test_http_refuses_cross_host_redirect_and_never_leaks_bearer():
+    """SEC-01: `_http` does NOT follow a 3xx redirect, so the access token never leaks to the target.
+
+    A local 'vendor' returns `302 Location: http://<local-attacker>/leak`; `_http` — carrying an
+    `Authorization: Bearer` header — must raise `TrackerPullError` and the attacker must receive 0
+    requests (so it never sees the bearer). REDs on the pre-fix default opener, which FOLLOWS the
+    redirect and delivers the bearer to the attacker host (urllib 3.14 copies Authorization cross-host).
+    $0 — two local sockets, no real network.
+    """
+    import http.server
+
+    from scripts.ingest import oauth_pull
+
+    attacker_hits = []
+
+    class _Attacker(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            attacker_hits.append({"path": self.path, "auth": self.headers.get("Authorization")})
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, *a):
+            pass
+
+    attacker, attacker_port = _serve_local(_Attacker)
+
+    class _Vendor(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", f"http://127.0.0.1:{attacker_port}/leak")
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+
+    vendor, vendor_port = _serve_local(_Vendor)
+
+    try:
+        with pytest.raises(oauth_pull.TrackerPullError):
+            oauth_pull._http("GET", f"http://127.0.0.1:{vendor_port}/read",
+                             headers={"Authorization": "Bearer SECRET-BEARER-xyz"})
+        assert attacker_hits == []      # 0 requests to the redirect target; the bearer never left
+    finally:
+        attacker.shutdown()
+        vendor.shutdown()
+
+
+def test_http_returns_a_direct_2xx_normally():
+    """The SEC-01 no-follow opener still serves a direct 2xx (it refuses only redirects, not requests)."""
+    import http.server
+
+    from scripts.ingest import oauth_pull
+
+    class _Ok(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"ok": true}')
+
+        def log_message(self, *a):
+            pass
+
+    server, port = _serve_local(_Ok)
+    try:
+        resp = oauth_pull._http("GET", f"http://127.0.0.1:{port}/read")
+        assert resp.status == 200
+        assert resp.body == b'{"ok": true}'
+    finally:
+        server.shutdown()
 
 
 def test_whoop_cloud_adapter_parses_staged_rows(tmp_path):
