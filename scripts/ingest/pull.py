@@ -129,12 +129,22 @@ def main(argv=None):
                     staged = oauth_pull.fetch(source, since=_since_for(source, root),
                                               staged_dir=staged_dir)
                     exports[source] = staged
-                except oauth_pull.TrackerPullError as exc:
-                    # Fail-closed for THIS source (0 readings), loud, and decoupled: an expired token
-                    # for one source never blocks the others or the watched folder.
+                except Exception as exc:
+                    # Fail-closed for THIS source (0 readings), loud, and decoupled: ANY per-source fetch
+                    # error — an expired token (TrackerPullError) or an unanticipated one — is caught so
+                    # it never blocks the others or the watched folder (mirrors the land loop's
+                    # `except Exception`; a null/malformed vendor envelope is already coerced/failed
+                    # closed inside the reader, this is the defense-in-depth backstop).
                     print(f"tracker-pull: {source} fetch failed, skipping this tick ({exc})",
                           file=sys.stderr)
-            watched = _scan_watched_folder(watched_root)
+            try:
+                watched = _scan_watched_folder(watched_root)
+            except Exception as exc:
+                # A filesystem error scanning the watched folder cannot crash the tick either — the
+                # already-fetched cloud sources still land (per-source isolation, for the watched path).
+                print(f"tracker-pull: watched-folder scan failed, skipping it this tick ({exc})",
+                      file=sys.stderr)
+                watched = None
             if watched is not None:
                 exports[WATCHED_FOLDER_SOURCES[0]] = watched
             # Land each source in its OWN try/except (M1): a malformed/partial export for one source

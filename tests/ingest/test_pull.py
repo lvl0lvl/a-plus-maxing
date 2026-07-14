@@ -27,7 +27,7 @@ from conftest import hk_record, write_healthkit_export as _write_healthkit_expor
 
 from scripts.store import store
 
-from test_oauth_pull import _RecordingHttp, _fake_keychain, _whoop_routes
+from test_oauth_pull import _RecordingHttp, _fake_keychain, _resp, _whoop_routes
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -277,6 +277,126 @@ def test_per_source_land_split_preserves_delta_dedup(tmp_path, monkeypatch):
     pull.main(argv)
     for item, n in first.items():
         assert len(store.read(item, root=store_root)) - n == 0        # re-run appends 0 after the split
+
+
+# --- BUG-1: per-source FETCH isolation (a fetch-side error never crashes the tick / blocks others) ---
+
+
+class _MultiHostHttp:
+    """A recording HTTP seam that routes by hostname THEN URL-substring.
+
+    `host_routes` maps a hostname -> a `{needle: (status, payload)}` sub-table, so a cross-vendor needle
+    (whoop's `sleep` vs oura's `daily_sleep` vs garmin's `/sleeps`) can never mis-match another host's
+    request — the isolation a flat single-host `_RecordingHttp` cannot give a multi-source tick.
+    """
+
+    def __init__(self, host_routes):
+        self.host_routes = host_routes
+        self.calls = []
+
+    def __call__(self, method, url, *, headers=None, body=None, timeout=None):
+        self.calls.append({"method": method, "url": url, "headers": dict(headers or {}), "body": body})
+        for needle, (status, payload) in self.host_routes.get(urlparse(url).hostname, {}).items():
+            if needle in url:
+                return _resp(status, payload)
+        raise AssertionError(f"unexpected URL in test seam: {url}")
+
+
+def test_per_source_fetch_isolation_null_and_malformed(tmp_path, monkeypatch, capsys):
+    """BUG-1: a null-collection source lands 0 (empty delta) and a malformed-element source is skipped
+    loud, while a VALID cloud source + the watched folder STILL land and the tick returns 0 (no crash).
+
+    RED pre-fix: whoop's `{"records": null}` -> `for record in None` -> an uncaught TypeError escapes the
+    TrackerPullError-only fetch loop and crashes the whole tick, so healthkit lands 0. (Muting only the
+    element-dict guard instead reds via oura's `"x".get(...)` AttributeError — both guards load-bearing.)
+    """
+    from scripts.ingest import oauth_pull, pull
+    from test_oauth_pull import _TOKEN_OK
+    from test_oauth_pull_buildb import _GARMIN_CRED, _OAUTH2_CRED, _garmin_routes
+
+    null_env = (200, {"records": None})          # a present-but-null "no data in the window" envelope
+    host_routes = {
+        "api.prod.whoop.com": {"oauth2/token": (200, _TOKEN_OK),
+                               "recovery": null_env, "sleep": null_env, "cycle": null_env},
+        "api.ouraring.com": {"oauth/token": (200, _TOKEN_OK),
+                             "daily_sleep": (200, {"data": ["x"]})},   # a non-dict record element
+        "apis.garmin.com": _garmin_routes(),                          # a valid source (OAuth 1.0a, no token)
+    }
+    http = _MultiHostHttp(host_routes)
+    creds = {"whoop": "fixture-refresh-token", "oura": _OAUTH2_CRED, "garmin": _GARMIN_CRED}
+    monkeypatch.setattr(oauth_pull, "_read_oauth_credential", lambda source: creds.get(source))
+    monkeypatch.setattr(oauth_pull, "_http", http)
+
+    store_root = tmp_path / "store"
+    watched = tmp_path / "inbox"
+    _drop_healthkit_export(watched, [_hk_rhr("2026-07-10", "48")])
+
+    rc = pull.main(["--root", str(store_root), "--watched-root", str(watched)])
+    assert rc == 0                                                     # the tick did NOT crash (invariant)
+
+    rows = store.read_all(store_root)
+    assert [r for r in rows if r["source"] == "whoop"] == []           # null collection -> empty delta, 0 rows
+    assert [r for r in rows if r["source"] == "oura"] == []            # malformed element -> source skipped
+    garmin_rhr = [r for r in rows if r["source"] == "garmin" and r["item"] == "rhr"]
+    assert len(garmin_rhr) == 1 and garmin_rhr[0]["value"] == 48       # a valid cloud source STILL landed
+    assert len([r for r in rows if r["source"] == "healthkit"]) == 1   # the watched folder STILL landed
+    err = capsys.readouterr().err.lower()
+    assert "oura fetch failed" in err                                  # the malformed source was skipped LOUD
+    assert "whoop fetch failed" not in err                             # the null source LANDED (empty delta, not skipped)
+
+
+def test_unanticipated_fetch_error_isolated(tmp_path, monkeypatch, capsys):
+    """BUG-1 (belt-and-suspenders): an unanticipated (non-TrackerPullError) error in one source's fetch
+    is logged loud and skips only that source — the broadened `except Exception` fetch backstop, matching
+    the land loop. RED pre-fix: the TrackerPullError-only fetch loop let a generic error crash the tick.
+    """
+    from scripts.ingest import oauth_pull, pull
+
+    _inject_whoop_seams(monkeypatch)                 # whoop fetches normally (real fetch)
+    real_fetch = oauth_pull.fetch
+
+    def flaky_fetch(source, **kwargs):
+        if source == "oura":
+            raise ValueError("unanticipated boom in the oura fetch")
+        return real_fetch(source, **kwargs)
+
+    monkeypatch.setattr(oauth_pull, "fetch", flaky_fetch)
+
+    store_root = tmp_path / "store"
+    watched = tmp_path / "inbox"
+    _drop_healthkit_export(watched, [_hk_rhr("2026-07-10", "48")])
+
+    rc = pull.main(["--root", str(store_root), "--watched-root", str(watched)])
+    assert rc == 0                                                     # a generic fetch error did NOT crash the tick
+
+    assert store.read("recovery", root=store_root)[0]["source"] == "whoop"               # whoop still landed
+    assert len([r for r in store.read("rhr", root=store_root) if r["source"] == "healthkit"]) == 1  # watched landed
+    assert "oura" in capsys.readouterr().err.lower()                   # the generic error was surfaced loud
+
+
+def test_watched_folder_scan_error_isolated(tmp_path, monkeypatch, capsys):
+    """BUG-1 (c): a filesystem error scanning the watched folder is logged loud and does NOT crash the
+    tick — the already-fetched cloud readings still land. RED pre-fix: `_scan_watched_folder` was called
+    unguarded, so an OSError there crashed the tick and dropped the fetched wearable data.
+    """
+    from scripts.ingest import pull
+
+    _inject_whoop_seams(monkeypatch)
+
+    def _boom(_root):
+        raise OSError("boom scanning the watched folder")
+
+    monkeypatch.setattr(pull, "_scan_watched_folder", _boom)
+
+    store_root = tmp_path / "store"
+    watched = tmp_path / "inbox"
+
+    rc = pull.main(["--root", str(store_root), "--watched-root", str(watched)])
+    assert rc == 0                                                     # the scan error did NOT crash the tick
+
+    assert store.read("recovery", root=store_root)[0]["source"] == "whoop"   # whoop STILL landed
+    err = capsys.readouterr().err.lower()
+    assert "watched" in err or "scan" in err                          # the scan failure was surfaced loud
 
 
 # --- the runner store lock: a busy tick defers ---

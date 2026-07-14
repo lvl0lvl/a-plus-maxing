@@ -448,7 +448,7 @@ def _read_records(http, manifest, path, source, token, since):
         if not 200 <= response.status < 300:
             raise TrackerPullError(f"read of {path} for {source!r} failed (HTTP {response.status})")
         data = _decode(response.body, source)
-        for record in data.get("records", []):
+        for record in _records(data.get("records"), source):
             yield record
         next_token = data.get("next_token")
         if not next_token:
@@ -510,6 +510,25 @@ def _decode_list(body, source):
     return data
 
 
+def _records(collection, source):
+    """Coerce a decoded record collection to a list of record dicts (empty delta vs malformed shape).
+
+    A null / absent / empty collection is the common "no data in this window" steady state -> an EMPTY
+    delta (0 rows for the source, NOT an error). A present-but-non-list collection, or a non-dict record
+    element, is a genuinely malformed shape and fails closed with `TrackerPullError` (mirroring
+    `_decode_list`), so per-source isolation skips ONLY that source rather than crashing the whole tick
+    on a `for record in None` TypeError or a `record.get(...)` AttributeError.
+    """
+    if collection is None:
+        return []
+    if not isinstance(collection, list):
+        raise TrackerPullError(f"unexpected response shape from {source!r}")
+    for element in collection:
+        if not isinstance(element, dict):
+            raise TrackerPullError(f"unexpected record shape from {source!r}")
+    return collection
+
+
 # --- Oura reader (OAuth-2.0 bearer; `data` envelope; top-level day-keyed readings) ---
 
 
@@ -551,7 +570,7 @@ def _read_oura_records(http, manifest, path, source, headers, since):
         if not 200 <= response.status < 300:
             raise TrackerPullError(f"read of {path} for {source!r} failed (HTTP {response.status})")
         data = _decode(response.body, source)
-        for record in data.get("data", []):
+        for record in _records(data.get("data"), source):
             yield record
         next_token = data.get("next_token")
         if not next_token:
@@ -593,7 +612,7 @@ def _read_garmin(source, manifest, *, since, credential_reader, credential_write
                             headers={"Authorization": header, "Accept": "application/json"})
         if not 200 <= response.status < 300:
             raise TrackerPullError(f"read of {path} for {source!r} failed (HTTP {response.status})")
-        for record in _decode_list(response.body, source):
+        for record in _records(_decode_list(response.body, source), source):
             day = record.get(day_field)
             if not day:
                 continue
@@ -737,7 +756,7 @@ def _read_google(source, manifest, *, since, credential_reader, credential_write
                 raise TrackerPullError(
                     f"read of {data_type} for {source!r} failed (HTTP {response.status})")
             data = _decode(response.body, source)
-            for point in data.get("rollupDataPoints", []):
+            for point in _records(data.get("rollupDataPoints"), source):
                 day = _google_civil_day(point.get("civilStartTime"))
                 value = _walk(point, value_path)
                 if day and value is not None:
