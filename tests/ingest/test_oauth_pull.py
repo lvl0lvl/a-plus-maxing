@@ -307,6 +307,42 @@ def test_fetch_mid_pagination_failure_is_atomic(tmp_path):
     assert store.read_all(store_root) == []               # the store is untouched
 
 
+# --- BUG-1: the `_records` null-vs-malformed semantics at the fetch-layer grain ---
+
+
+def test_fetch_null_collection_is_empty_delta_not_error(tmp_path):
+    """BUG-1 semantic: a present-but-null collection (`{"records": null}`) is the common "no data in the
+    window" steady state -> an EMPTY delta (stages [], lands 0), NOT an error.
+
+    REDs if the null coercion is muted (null -> raise/crash instead of an empty delta).
+    """
+    from scripts.ingest import oauth_pull
+
+    null_env = {"records": None, "next_token": None}
+    http = _RecordingHttp(_whoop_routes(recovery=null_env, sleep=null_env, cycle=null_env))
+    staged = oauth_pull.fetch("whoop", since=None, staged_dir=tmp_path,
+                              credential_reader=_fake_keychain(), http=http)
+    assert json.loads(staged.read_text()) == []          # empty delta — no fabricated rows, no raise
+
+
+def test_fetch_malformed_record_element_fails_closed(tmp_path):
+    """BUG-1 semantic: a non-dict record element (`{"records": ["x"]}`) is a genuinely malformed shape ->
+    fail closed with `TrackerPullError` + 0 staged bytes (mirroring `_decode_list`), distinct from the
+    null "no data" envelope.
+
+    REDs if the element-dict guard is muted (the element then hits `record.get(...)` and surfaces a
+    non-TrackerPullError, which `pytest.raises(TrackerPullError)` does not catch).
+    """
+    from scripts.ingest import oauth_pull
+
+    bad = {"records": ["x"], "next_token": None}         # a non-dict record element
+    http = _RecordingHttp(_whoop_routes(recovery=bad))
+    with pytest.raises(oauth_pull.TrackerPullError):
+        oauth_pull.fetch("whoop", since=None, staged_dir=tmp_path,
+                         credential_reader=_fake_keychain(), http=http)
+    assert list(tmp_path.glob("*.json")) == []           # 0 staged bytes (atomic fail-closed)
+
+
 # --- S1: multi-page pagination (the page-follow was untested; single-page fixtures hid it) ---
 
 
@@ -538,6 +574,116 @@ def test_access_token_completes_when_rotation_write_back_fails(monkeypatch, caps
     )
     assert token == "fixture-access-token"                 # the operation completed
     assert "whoop" in capsys.readouterr().err.lower()      # ... and the write failure was loud
+
+
+# --- TEST-1: honest absence — a null score field / missing timestamp yields NO fabricated row ---
+
+
+def test_whoop_honest_absence_null_field_and_missing_timestamp(tmp_path):
+    """TEST-1: a null score field and a missing-timestamp record each yield NO row (never a fabricated
+    `{value: None}` row, never a crash) — only the present field lands.
+
+    REDs when either guard is muted: muting `if value is not None` stages the three null fields as
+    value-None rows; muting `if not timestamp` crashes on `None[:10]`.
+    """
+    from scripts.ingest import oauth_pull
+
+    recovery = {"records": [
+        {"created_at": "2026-07-10T09:00:00.000Z",
+         "score": {"recovery_score": 66, "hrv_rmssd_milli": None,
+                   "resting_heart_rate": None, "spo2_percentage": None}},   # only recovery_score present
+        {"score": {"recovery_score": 70}},                                  # missing created_at -> no row
+    ], "next_token": None}
+    empty = {"records": [], "next_token": None}
+    http = _RecordingHttp(_whoop_routes(recovery=recovery, sleep=empty, cycle=empty))
+    staged = oauth_pull.fetch("whoop", since=None, staged_dir=tmp_path,
+                              credential_reader=_fake_keychain(), http=http)
+
+    assert json.loads(staged.read_text()) == [
+        {"item": "recovery", "timepoint": "2026-07-10", "value": 66},
+    ]                                                    # the null fields + missing-timestamp record -> 0 rows
+
+
+# --- TEST-2: a degraded 200 token response fails closed (no access_token / non-dict / non-json body) ---
+
+
+def test_fetch_fails_closed_on_degraded_200_token_no_access_token(tmp_path):
+    """TEST-2: a 200 token response carrying NO access_token fails closed (`if not token: raise`).
+
+    A vendor can return HTTP 200 with an error/degraded body and no token; the layer must NOT proceed
+    with a `Bearer None` read. REDs when the guard is muted (the fetch would proceed and stage rows).
+    """
+    from scripts.ingest import oauth_pull
+
+    routes = _whoop_routes()
+    routes["oauth2/token"] = (200, {"error": "temporarily_unavailable"})   # 200, but no access_token
+    with pytest.raises(oauth_pull.TrackerPullError):
+        oauth_pull.fetch("whoop", since=None, staged_dir=tmp_path,
+                         credential_reader=_fake_keychain(), http=_RecordingHttp(routes))
+    assert list(tmp_path.glob("*.json")) == []          # 0 staged bytes
+
+
+def test_fetch_fails_closed_on_degraded_200_token_non_dict_body(tmp_path):
+    """TEST-2: a 200 token response whose body is a JSON list (not an object) fails closed in `_decode`.
+
+    REDs when `_decode`'s `if not isinstance(data, dict)` guard is muted (the list body would then hit
+    `data.get(...)` and surface a non-TrackerPullError).
+    """
+    from scripts.ingest import oauth_pull
+
+    routes = _whoop_routes()
+    routes["oauth2/token"] = (200, [{"access_token": "x"}])   # 200, but a JSON array, not an object
+    with pytest.raises(oauth_pull.TrackerPullError):
+        oauth_pull.fetch("whoop", since=None, staged_dir=tmp_path,
+                         credential_reader=_fake_keychain(), http=_RecordingHttp(routes))
+    assert list(tmp_path.glob("*.json")) == []
+
+
+def test_fetch_fails_closed_on_degraded_200_token_non_json_body(tmp_path):
+    """TEST-2: a 200 token response whose body is not JSON at all fails closed in `_decode` (malformed).
+
+    REDs when `_decode`'s `json.loads` try/except is muted (the ValueError would surface un-wrapped).
+    """
+    from scripts.ingest import oauth_pull
+
+    routes = _whoop_routes()
+    routes["oauth2/token"] = (200, b"<html>gateway timeout</html>")   # 200, but a non-JSON body
+    with pytest.raises(oauth_pull.TrackerPullError):
+        oauth_pull.fetch("whoop", since=None, staged_dir=tmp_path,
+                         credential_reader=_fake_keychain(), http=_RecordingHttp(routes))
+    assert list(tmp_path.glob("*.json")) == []
+
+
+# --- TEST-3: JSON-blob credential rotation preserves client_id/secret, updates only refresh_token ---
+
+
+def test_access_token_blob_credential_rotation_preserves_client_fields(tmp_path):
+    """TEST-3: rotating a JSON-blob credential (client_id/secret + refresh_token) writes back valid JSON
+    that PRESERVES client_id/client_secret and updates ONLY refresh_token (`_serialize_credentials`'s
+    blob branch). The bare-token rotation tests never exercise this branch.
+
+    REDs when the blob branch is muted (a bare rotated token would be written back, failing json.loads /
+    dropping the client fields).
+    """
+    from scripts.ingest import oauth_pull
+
+    routes = _whoop_routes()
+    routes["oauth2/token"] = (200, {**_TOKEN_OK, "refresh_token": "rotated-refresh-token"})
+    blob = json.dumps({"refresh_token": "old-refresh", "client_id": "cid-123", "client_secret": "csec-xyz"})
+
+    written = {}
+    token = oauth_pull.access_token(
+        "whoop",
+        credential_reader=_fake_keychain(token=blob),
+        credential_writer=lambda source, payload: written.__setitem__(source, payload),
+        http=_RecordingHttp(routes),
+    )
+    assert token == "fixture-access-token"
+
+    payload = json.loads(written["whoop"])                       # a valid JSON blob was written back
+    assert payload["refresh_token"] == "rotated-refresh-token"   # only the refresh token updated
+    assert payload["client_id"] == "cid-123"                     # client fields PRESERVED
+    assert payload["client_secret"] == "csec-xyz"
 
 
 # --- the Whoop cloud adapter (the wired "whoop" file-reading parser) ---

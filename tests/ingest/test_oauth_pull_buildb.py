@@ -536,6 +536,81 @@ def test_read_google_single_response_terminates_without_crash(tmp_path):
     assert len(read_urls) == 1                      # absent token -> one request, terminates (no change)
 
 
+# --- TEST-1: honest absence — a null field / missing day yields NO fabricated row (per source) ---
+
+
+def _oura_single_endpoint_manifest():
+    """A trimmed one-collection Oura manifest so an honest-absence test exercises one endpoint cleanly."""
+    from scripts.ingest import oauth_pull
+
+    return {**oauth_pull._OURA, "endpoints": (("/daily_sleep", "day", {"score": "sleep"}),)}
+
+
+def test_oura_honest_absence_null_score_and_missing_day():
+    """TEST-1 (Oura inline guards): a null `score` and a missing `day` each yield NO row — only the
+    present reading lands. REDs when `if value is not None` (a null-score row) or `if not day` (a
+    timepoint="" row) is muted.
+    """
+    from scripts.ingest import oauth_pull
+
+    def seam(method, url, *, headers=None, body=None, timeout=None):
+        if "oauth/token" in url:
+            return _resp(200, _TOKEN_OK)
+        return _resp(200, {"data": [
+            {"day": "2026-07-10", "score": 82},        # valid -> sleep 82
+            {"day": "2026-07-11", "score": None},       # null score -> no row
+            {"score": 90},                              # missing day -> no row
+        ], "next_token": None})
+
+    rows = oauth_pull._read_oura("oura", _oura_single_endpoint_manifest(), since=None,
+                                 credential_reader=_cred(_OAUTH2_CRED), credential_writer=None, http=seam)
+    assert rows == [{"item": "sleep", "timepoint": "2026-07-10", "value": 82}]
+
+
+def test_garmin_honest_absence_null_field_and_missing_day(tmp_path):
+    """TEST-1 (Garmin inline guards): a null field and a missing `calendarDate` each yield NO row — only
+    the present reading lands. REDs when `if value is not None` (a null-stress row) or `if not day` (a
+    timepoint=None row) is muted.
+    """
+    from scripts.ingest import oauth_pull
+
+    routes = {
+        "/dailies": (200, [
+            {"calendarDate": "2026-07-10", "restingHeartRateInBeatsPerMinute": 48,
+             "averageStressLevel": None},                                     # rhr present, stress null
+            {"restingHeartRateInBeatsPerMinute": 50},                         # missing calendarDate -> no row
+        ]),
+        "/hrv": (200, []), "/sleeps": (200, []), "/epochs": (200, []),
+    }
+    staged = oauth_pull.fetch("garmin", since=None, staged_dir=tmp_path,
+                              credential_reader=_cred(_GARMIN_CRED), http=_RecordingHttp(routes))
+    assert json.loads(staged.read_text()) == [
+        {"item": "rhr", "timepoint": "2026-07-10", "value": 48},
+    ]
+
+
+def test_google_honest_absence_null_value_and_missing_day():
+    """TEST-1 (Google inline guard): a null value and a missing `civilStartTime` each yield NO row — only
+    the present reading lands. REDs when the `if day and value is not None` guard is muted (a value-None
+    row or a timepoint-None row appears).
+    """
+    from scripts.ingest import oauth_pull
+
+    def seam(method, url, *, headers=None, body=None, timeout=None):
+        if "oauth2.googleapis.com/token" in url:
+            return _resp(200, _TOKEN_OK)
+        return _resp(200, {"rollupDataPoints": [
+            _g_point(10, "restingHeartRate", "avg", 47),                       # valid -> rhr 47
+            {"civilStartTime": {"date": {"year": 2026, "month": 7, "day": 11}},
+             "restingHeartRate": {"avg": None}},                              # null value -> no row
+            {"restingHeartRate": {"avg": 50}},                               # missing civilStartTime -> no row
+        ]})
+
+    rows = oauth_pull._read_google("google-health", _google_single_endpoint_manifest(), since=None,
+                                   credential_reader=_cred(_OAUTH2_CRED), credential_writer=None, http=seam)
+    assert rows == [{"item": "rhr", "timepoint": "2026-07-10", "value": 47}]
+
+
 # --- the cloud adapters parse the staged rows (pure file parsers, no network) ---
 
 
