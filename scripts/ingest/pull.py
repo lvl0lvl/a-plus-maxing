@@ -1,10 +1,12 @@
 """Tracker-pull orchestration — fetch the wired API sources + the watched folder, then land them.
 
 `main()` (`python -m scripts.ingest.pull`) is the NEW caller of the UNCHANGED `scheduler.run`: under
-the runner store lock it builds the `exports` map — fetch each wired API-pull source (Build A: Whoop)
-to a gitignored staged file via the shared OAuth/fetch layer, plus scan the Apple-Health watched
-folder — then calls `scheduler.run(exports, root)`, which runs the UNCHANGED `ingest.run` -> unchanged
-`store.append` per source. It is a new caller, not an edit: `scheduler.run`, `ingest.run`,
+the runner store lock it builds the `exports` map — fetch each wired API-pull source
+(whoop/oura/garmin/google-health) to a gitignored staged file via the shared OAuth/fetch layer, plus
+scan the Apple-Health watched folder — then lands each source through its OWN `scheduler.run({tag:
+path})` call so one source's land failure is isolated from the others (the per-source fetch loop
+isolates a fetch failure the same way). Each `scheduler.run` runs the UNCHANGED `ingest.run` ->
+unchanged `store.append` per source. It is a new caller, not an edit: `scheduler.run`, `ingest.run`,
 `store.append`, and the `(item, timepoint, source)` dedupe are reused byte-unchanged, so a re-run
 appends 0 duplicates and correctness rests on the store key, not on the fetch window.
 
