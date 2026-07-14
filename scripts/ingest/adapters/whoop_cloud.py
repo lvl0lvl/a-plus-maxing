@@ -15,9 +15,9 @@ device-specific (not a shared `"wearable"` tag) so a Whoop reading and another w
 the same (item, day) stay distinct under the (item, timepoint, source) dedupe key.
 """
 
-import json
-from pathlib import Path
 from typing import Iterable
+
+from scripts.ingest.adapters.staged_common import read_staged_rows
 
 
 class WhoopCloudAdapter:
@@ -35,20 +35,5 @@ class WhoopCloudAdapter:
         return "whoop"
 
     def read_readings(self, export_file) -> Iterable[dict]:
-        """Map the staged pull rows into Line-Field-Set store readings.
-
-        Reads the staged JSON array (`[{item, timepoint, value}, ...]`) the fetch layer wrote and
-        yields one reading per row, adding `source`. A missing / non-JSON staged file raises in the
-        read (the fail-loud signal of a misconfigured path), rather than silently importing nothing.
-
-        Args:
-            export_file (str | Path): Path to the staged Whoop pull JSON.
-        """
-        records = json.loads(Path(export_file).read_text())
-        for record in records:
-            yield {
-                "item": record["item"],
-                "timepoint": record["timepoint"],
-                "source": self.source_tag(),
-                "value": record["value"],
-            }
+        """Map the staged Whoop pull rows into Line-Field-Set store readings (see `read_staged_rows`)."""
+        return read_staged_rows(export_file, self.source_tag())
