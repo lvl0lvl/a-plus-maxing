@@ -26,13 +26,19 @@ Fail-closed: a missing / expired / revoked token, or any token- or read-endpoint
 message never carries the token value (NFR-3: the repo is PUBLIC).
 """
 
+import base64
 import getpass
+import hashlib
+import hmac
 import json
+import secrets
 import subprocess
+import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 
 
 class TrackerPullError(RuntimeError):
@@ -77,7 +83,87 @@ _WHOOP = {
     ),
 }
 
-_MANIFESTS = {"whoop": _WHOOP}
+# Oura API v2 (tracker Build B). `[VERIFY-AT-BUILD]` — the endpoint paths, token URL, and scope are
+# transcribed from the Oura Cloud API v2 docs (api.ouraring.com/v2/usercollection/<type>, OAuth 2.0,
+# refresh grant at /oauth/token) and MUST be re-verified against the live docs before the LIVE run.
+# Oura reuses the shared OAuth-2.0 `access_token()` refresh->access path directly; only its response
+# SHAPE differs from Whoop (envelope key `data` not `records`; the readings sit at the record top
+# level, not under a `score` sub-object; the timepoint is the record's own `day`, already YYYY-MM-DD).
+# Each endpoint is (path, day-field, {oura field -> store item}). daily_* collections carry one `score`
+# per day; the detailed `sleep` collection carries `average_hrv` / `average_heart_rate` per period.
+_OURA = {
+    "host": "api.ouraring.com",
+    "token_url": "https://api.ouraring.com/oauth/token",
+    "api_base": "https://api.ouraring.com/v2/usercollection",
+    "scope": "daily",
+    "read": "oura",
+    "endpoints": (
+        ("/daily_sleep", "day", {"score": "sleep"}),
+        ("/daily_readiness", "day", {"score": "readiness"}),
+        ("/daily_activity", "day", {"score": "activity"}),
+        ("/sleep", "day", {"average_hrv": "hrv", "average_heart_rate": "rhr"}),
+    ),
+}
+
+# Garmin Health API (tracker Build B) — the design §10.2 auth FORK. `[VERIFY-AT-BUILD]`: Garmin's Health
+# API has historically used OAuth 1.0a (per-request HMAC-SHA1 signing, a long-lived token+secret, no
+# refresh->access exchange), and the third-party integration guides still document 1.0a; Garmin's own
+# Connect Developer Program FAQ now advertises OAuth 2.0 PKCE for newly granted tiers. This manifest
+# wires the 1.0a strategy (the historically-correct Health API auth + the mandated signing test
+# vector); if the LIVE-granted tier is OAuth 2.0, drop `"auth": "oauth1a"` and the source reuses the
+# shared `access_token()` default. The summary GETs return a top-level JSON ARRAY (no pagination
+# envelope); each record's `calendarDate` is the day and the readings sit at the record top level.
+# Each endpoint is (path, day-field, {garmin field -> store item}).
+_GARMIN = {
+    "host": "apis.garmin.com",
+    "api_base": "https://apis.garmin.com/wellness-api/rest",
+    "read": "garmin",
+    "auth": "oauth1a",
+    "endpoints": (
+        ("/dailies", "calendarDate", {
+            "restingHeartRateInBeatsPerMinute": "rhr",
+            "averageStressLevel": "stress",
+        }),
+        ("/hrv", "calendarDate", {"lastNightAvg": "hrv"}),
+        ("/sleeps", "calendarDate", {"overallSleepScore": "sleep"}),
+        ("/epochs", "calendarDate", {"activeKilocalories": "activity"}),
+    ),
+}
+
+# Google Health API (tracker Build B) — the NEW API covering Fitbit / Pixel devices (the legacy Fitbit
+# Web API sunsets Sep 2026; this is greenfield on health.googleapis.com/v4/, NO migration).
+# `[VERIFY-AT-BUILD]`: the data-type slugs, the rollup value paths, the token URL, and the scopes are
+# transcribed from the Google Health API reference and MUST be re-verified before the LIVE run. Google
+# reuses the shared OAuth-2.0 `access_token()` refresh->access path (a JSON credential blob carrying
+# client_id/client_secret, which the refresh grant requires). Its READ SHAPE does NOT fit the shared
+# GET-pagination reader: the daily grain is a `dailyRollUp` POST carrying a civil-time-range body, and
+# the response is `{rollupDataPoints: [{civilStartTime: {date:{...}}, <value-path> -> scalar}]}` — so
+# Google gets a bespoke reader at the fetch seam (`_read_google`), NOT an edit to the shared routine.
+# Each endpoint is (data-type slug, value-path tuple walked to a scalar, store item).
+_GOOGLE_HEALTH = {
+    "host": "health.googleapis.com",
+    "token_url": "https://oauth2.googleapis.com/token",
+    "api_base": "https://health.googleapis.com/v4/users/me/dataTypes",
+    "scope": "https://www.googleapis.com/auth/health.health_metrics_and_measurements.readonly "
+             "https://www.googleapis.com/auth/health.activity_and_fitness.readonly "
+             "https://www.googleapis.com/auth/health.sleep.readonly",
+    "read": "google",
+    "endpoints": (
+        ("resting-heart-rate", ("restingHeartRate", "avg"), "rhr"),
+        ("heart-rate-variability", ("heartRateVariability", "avg"), "hrv"),
+        ("heart-rate", ("heartRate", "avg"), "heart-rate"),
+        ("oxygen-saturation", ("oxygenSaturation", "avg"), "spo2"),
+        ("sleep", ("sleep", "durationMillis"), "sleep"),
+        ("active-zone-minutes", ("activeZoneMinutes", "totalMinutes"), "activity"),
+    ),
+}
+
+_MANIFESTS = {
+    "whoop": _WHOOP,
+    "oura": _OURA,
+    "garmin": _GARMIN,
+    "google-health": _GOOGLE_HEALTH,
+}
 
 # The per-page record cap and the page-follow ceiling. The ceiling bounds the `next_token` pagination
 # loop so a misbehaving API (a cursor that never terminates) fails fast at the network boundary rather
@@ -287,18 +373,31 @@ def fetch(source, *, since, staged_dir, credential_reader=None, credential_write
     """
     manifest = _manifest(source)
     http = _http if http is None else http
-    token = access_token(source, credential_reader=credential_reader,
-                         credential_writer=credential_writer, http=http)
-
-    rows = []
-    for path, timestamp_field, field_items in manifest["endpoints"]:
-        for record in _read_records(http, manifest, path, source, token, since):
-            rows.extend(_rows_from_record(record, timestamp_field, field_items))
+    reader = _READERS[manifest.get("read", "whoop")]
+    rows = reader(source, manifest, since=since, credential_reader=credential_reader,
+                  credential_writer=credential_writer, http=http)
 
     staged = Path(staged_dir) / f"{source}.json"
     staged.parent.mkdir(parents=True, exist_ok=True)
     staged.write_text(json.dumps(rows))
     return staged
+
+
+def _read_whoop(source, manifest, *, since, credential_reader, credential_writer, http):
+    """Read a Whoop-shaped cloud (records/next_token envelope, values under `score`) into staged rows.
+
+    The Build-A reference reader, extracted verbatim from `fetch`: mints the OAuth-2.0 bearer via the
+    shared `access_token`, then walks each endpoint's paginated `records`, mapping the manifest's
+    score fields to `{item, timepoint, value}` rows. The default `_READERS` strategy — a source with no
+    `manifest["read"]` uses it.
+    """
+    token = access_token(source, credential_reader=credential_reader,
+                         credential_writer=credential_writer, http=http)
+    rows = []
+    for path, timestamp_field, field_items in manifest["endpoints"]:
+        for record in _read_records(http, manifest, path, source, token, since):
+            rows.extend(_rows_from_record(record, timestamp_field, field_items))
+    return rows
 
 
 def _read_records(http, manifest, path, source, token, since):
@@ -365,3 +464,284 @@ def _decode(body, source):
     if not isinstance(data, dict):
         raise TrackerPullError(f"unexpected response shape from {source!r}")
     return data
+
+
+def _decode_list(body, source):
+    """Decode a JSON response body into a list, or fail closed on a malformed / non-array payload."""
+    try:
+        data = json.loads(body)
+    except (ValueError, TypeError):
+        raise TrackerPullError(f"malformed response from {source!r}") from None
+    if not isinstance(data, list):
+        raise TrackerPullError(f"unexpected response shape from {source!r}")
+    return data
+
+
+# --- Oura reader (OAuth-2.0 bearer; `data` envelope; top-level day-keyed readings) ---
+
+
+def _read_oura(source, manifest, *, since, credential_reader, credential_writer, http):
+    """Read Oura API v2 (OAuth-2.0 bearer, `data` envelope, top-level day-keyed readings) into rows.
+
+    Reuses the shared `access_token` refresh->access path directly (Oura is standard OAuth 2.0), then
+    walks each collection's paginated `data` array. Unlike Whoop the readings sit at the record top
+    level (no `score` sub-object) and the `day` field is already the store's YYYY-MM-DD grain.
+    """
+    token = access_token(source, credential_reader=credential_reader,
+                         credential_writer=credential_writer, http=http)
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    rows = []
+    for path, day_field, field_items in manifest["endpoints"]:
+        for record in _read_oura_records(http, manifest, path, source, headers, since):
+            day = (record.get(day_field) or "")[:10]
+            if not day:
+                continue
+            for field, item in field_items.items():
+                value = record.get(field)
+                if value is not None:
+                    rows.append({"item": item, "timepoint": day, "value": value})
+    return rows
+
+
+def _read_oura_records(http, manifest, path, source, headers, since):
+    """Yield every Oura record across a collection's pages (the `data` array; `next_token` follow)."""
+    url = f"{manifest['api_base']}{path}"
+    next_token = None
+    for _ in range(_MAX_PAGES):
+        params = {}
+        if since:
+            params["start_date"] = since
+        if next_token:
+            params["next_token"] = next_token
+        query = f"?{urlencode(params)}" if params else ""
+        response = _request(http, "GET", f"{url}{query}", source, headers=headers)
+        if not 200 <= response.status < 300:
+            raise TrackerPullError(f"read of {path} for {source!r} failed (HTTP {response.status})")
+        data = _decode(response.body, source)
+        for record in data.get("data", []):
+            yield record
+        next_token = data.get("next_token")
+        if not next_token:
+            return
+    raise TrackerPullError(f"read of {path} for {source!r} exceeded the page ceiling")
+
+
+# --- Garmin reader (design §10.2 fork: OAuth 1.0a per-request HMAC-SHA1 signing; JSON-array summaries) ---
+
+
+def _read_garmin(source, manifest, *, since, credential_reader, credential_writer, http):
+    """Read the Garmin Health API (OAuth 1.0a, top-level JSON-array summaries) into staged rows.
+
+    The design §10.2 auth fork: Garmin signs EACH GET with OAuth 1.0a HMAC-SHA1 (no refresh->access
+    exchange), so this reader does NOT call the shared `access_token`; it reads the 4-part 1.0a
+    credential from the keychain seam and signs per request. Fail-closed: a missing / incomplete
+    credential raises before any network call. Each summary GET returns a top-level JSON array;
+    `calendarDate` is the day and the manifest's fields sit at the record top level. `credential_writer`
+    is unused (1.0a tokens do not rotate) but kept for the uniform `_READERS` reader signature.
+    """
+    read_credential = _read_oauth_credential if credential_reader is None else credential_reader
+    payload = read_credential(source)
+    if not payload:
+        raise TrackerPullError(
+            f"no OAuth 1.0a credential for {source!r} in the keychain (item "
+            f"'{_oauth_service_name(source)}'); run the one-time authorize flow to store it"
+        )
+    creds = _parse_oauth1_credentials(payload, source)
+    rows = []
+    for path, day_field, field_items in manifest["endpoints"]:
+        url = f"{manifest['api_base']}{path}"
+        params = _garmin_window_params(since)
+        header = _oauth1_authorization_header(
+            "GET", url, params=params, creds=creds,
+            nonce=_oauth1_nonce(), timestamp=_oauth1_timestamp(),
+        )
+        query = f"?{urlencode(params)}" if params else ""
+        response = _request(http, "GET", f"{url}{query}", source,
+                            headers={"Authorization": header, "Accept": "application/json"})
+        if not 200 <= response.status < 300:
+            raise TrackerPullError(f"read of {path} for {source!r} failed (HTTP {response.status})")
+        for record in _decode_list(response.body, source):
+            day = record.get(day_field)
+            if not day:
+                continue
+            for field, item in field_items.items():
+                value = record.get(field)
+                if value is not None:
+                    rows.append({"item": item, "timepoint": day, "value": value})
+    return rows
+
+
+def _parse_oauth1_credentials(payload, source):
+    """Parse a Garmin OAuth 1.0a keychain blob into its 4 parts, or fail closed if incomplete.
+
+    The 1.0a credential is a JSON blob `{consumer_key, consumer_secret, token, token_secret}` (unlike
+    the OAuth-2.0 refresh token, all four are needed to sign each request). A non-JSON payload or a
+    blob missing any part raises — a partial credential cannot sign, so it fails closed like a missing
+    token rather than emitting an invalid signature.
+    """
+    try:
+        blob = json.loads(payload)
+    except (ValueError, TypeError):
+        blob = None
+    required = ("consumer_key", "consumer_secret", "token", "token_secret")
+    if not isinstance(blob, dict) or not all(blob.get(k) for k in required):
+        raise TrackerPullError(
+            f"the {source!r} keychain credential is not a complete OAuth 1.0a blob "
+            f"(need {', '.join(required)})"
+        )
+    return blob
+
+
+def _percent_encode(value):
+    """RFC-3986 percent-encoding for OAuth 1.0a (unreserved ALPHA/DIGIT/-/./_/~ stay literal)."""
+    return quote(str(value), safe="")
+
+
+def _oauth1_base_string(method, url, params):
+    """The OAuth 1.0a HMAC-SHA1 signature base string (RFC 5849 §3.4.1) for a request.
+
+    `params` is the full set of request params to sign — the query params plus the oauth_* protocol
+    params, excluding oauth_signature. Deterministic given its inputs, which is what makes the signing
+    fixture-testable against a known vector: `METHOD & pct(base-url) & pct(sorted &-joined params)`.
+    """
+    parts = urlsplit(url)
+    base_url = urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path, "", ""))
+    encoded = sorted((_percent_encode(k), _percent_encode(v)) for k, v in params.items())
+    normalized = "&".join(f"{k}={v}" for k, v in encoded)
+    return "&".join([method.upper(), _percent_encode(base_url), _percent_encode(normalized)])
+
+
+def _oauth1_signature(method, url, params, consumer_secret, token_secret):
+    """Sign per OAuth 1.0a HMAC-SHA1 (RFC 5849): base64(HMAC-SHA1(base_string, signing_key)).
+
+    The signing key is `pct(consumer_secret)&pct(token_secret)`. Verified against the canonical X /
+    Twitter known-answer vector in the tests, so a mutation to the base-string construction reds.
+    """
+    base = _oauth1_base_string(method, url, params)
+    key = f"{_percent_encode(consumer_secret)}&{_percent_encode(token_secret)}"
+    return base64.b64encode(hmac.new(key.encode(), base.encode(), hashlib.sha1).digest()).decode()
+
+
+def _oauth1_authorization_header(method, url, *, params, creds, nonce, timestamp):
+    """Build the Garmin OAuth 1.0a `Authorization: OAuth ...` header for one signed request.
+
+    Merges the request's query params with the oauth_* protocol params, signs the lot with HMAC-SHA1
+    (the consumer + token secrets), and formats the signed oauth_* set as the header. `nonce` and
+    `timestamp` are injected (a fixed pair yields a deterministic signature — the signing fixture
+    test), generated fresh per-request in production. The `url` must be the bare endpoint (no query);
+    the query params are carried separately in `params` so the signature covers them.
+    """
+    oauth_params = {
+        "oauth_consumer_key": creds["consumer_key"],
+        "oauth_token": creds["token"],
+        "oauth_signature_method": "HMAC-SHA1",
+        "oauth_version": "1.0",
+        "oauth_nonce": nonce,
+        "oauth_timestamp": str(timestamp),
+    }
+    signature = _oauth1_signature(method, url, {**params, **oauth_params},
+                                  creds["consumer_secret"], creds["token_secret"])
+    signed = {**oauth_params, "oauth_signature": signature}
+    return "OAuth " + ", ".join(
+        f'{_percent_encode(k)}="{_percent_encode(v)}"' for k, v in sorted(signed.items())
+    )
+
+
+def _garmin_window_params(since):
+    """The Garmin summary upload-time window params for the delta cursor (`[VERIFY-AT-BUILD]`).
+
+    A bandwidth cursor only (the store `(item, day, source)` dedupe makes an over-fetch land 0 dups).
+    Empty when `since` is None. The exact param names are re-verified at the LIVE step.
+    """
+    if not since:
+        return {}
+    start = int(datetime.strptime(since, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
+    return {"uploadStartTimeInSeconds": str(start)}
+
+
+def _oauth1_nonce():
+    """A fresh per-request OAuth 1.0a nonce (a random hex token)."""
+    return secrets.token_hex(16)
+
+
+def _oauth1_timestamp():
+    """The current OAuth 1.0a timestamp (whole seconds since the epoch)."""
+    return str(int(time.time()))
+
+
+# --- Google Health reader (OAuth-2.0 bearer; `dailyRollUp` POST; `rollupDataPoints` envelope) ---
+
+
+def _read_google(source, manifest, *, since, credential_reader, credential_writer, http):
+    """Read the Google Health API daily rollups (OAuth-2.0 bearer, `dailyRollUp` POST) into rows.
+
+    Reuses the shared `access_token` refresh->access path (Google is standard OAuth 2.0), then POSTs a
+    civil-time-range `dailyRollUp` per data type and walks `rollupDataPoints`. The read shape is
+    Google-specific (a POST with a JSON body; a `rollupDataPoints` / `civilStartTime` envelope; a
+    nested value path) and lives here at the fetch seam rather than in the shared GET-pagination reader.
+    """
+    token = access_token(source, credential_reader=credential_reader,
+                         credential_writer=credential_writer, http=http)
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json",
+               "Content-Type": "application/json"}
+    body = json.dumps(_google_rollup_body(since))
+    rows = []
+    for data_type, value_path, item in manifest["endpoints"]:
+        url = f"{manifest['api_base']}/{data_type}/dataPoints:dailyRollUp"
+        response = _request(http, "POST", url, source, headers=headers, body=body)
+        if not 200 <= response.status < 300:
+            raise TrackerPullError(f"read of {data_type} for {source!r} failed (HTTP {response.status})")
+        data = _decode(response.body, source)
+        for point in data.get("rollupDataPoints", []):
+            day = _google_civil_day(point.get("civilStartTime"))
+            value = _walk(point, value_path)
+            if day and value is not None:
+                rows.append({"item": item, "timepoint": day, "value": value})
+    return rows
+
+
+def _google_rollup_body(since):
+    """The Google `dailyRollUp` request body: a closed-open civil-day range, window size 1 day.
+
+    `since` (YYYY-MM-DD) is the range start; a None `since` starts from the Unix epoch (a full pull,
+    which the store dedupe collapses to the delta). The exact body schema is `[VERIFY-AT-BUILD]`.
+    """
+    start = since or "1970-01-01"
+    year, month, day = (int(part) for part in start.split("-"))
+    now = datetime.now(timezone.utc)
+    return {
+        "range": {
+            "start": {"year": year, "month": month, "day": day},
+            "end": {"year": now.year, "month": now.month, "day": now.day},
+        },
+        "windowSizeDays": 1,
+    }
+
+
+def _google_civil_day(civil):
+    """Map a Google `civilStartTime` (`{date: {year, month, day}}`) to a YYYY-MM-DD string, or None."""
+    date = (civil or {}).get("date") or {}
+    if not all(key in date for key in ("year", "month", "day")):
+        return None
+    return f"{date['year']:04d}-{date['month']:02d}-{date['day']:02d}"
+
+
+def _walk(obj, path):
+    """Walk a nested dict along `path` (a key tuple) to a leaf scalar, or None if any hop is absent."""
+    for key in path:
+        if not isinstance(obj, dict):
+            return None
+        obj = obj.get(key)
+    return obj
+
+
+# The per-source read-strategy table (design §10.2 / the Google fetch-seam strategy). `fetch` resolves
+# `manifest["read"]` here; a source with no `read` key defaults to the Whoop reader. Adding a source
+# with a Whoop-shaped API needs only a manifest entry (no new reader); a source whose API shape differs
+# plugs a reader here rather than branching the shared routine.
+_READERS = {
+    "whoop": _read_whoop,
+    "oura": _read_oura,
+    "garmin": _read_garmin,
+    "google": _read_google,
+}

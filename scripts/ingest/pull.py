@@ -30,9 +30,11 @@ from scripts.ingest import oauth_pull, scheduler
 from scripts.runner import store_lock
 from scripts.store import store
 
-# The wired API-pull sources this tick fetches. Build A ships Whoop as the reference source; Build B
-# extends this tuple with oura / garmin / google-health on the same shared layer.
-_API_PULL_SOURCES = ("whoop",)
+# The wired API-pull sources this tick fetches. Build A shipped Whoop as the reference source; Build B
+# extends this tuple with oura / garmin / google-health on the same shared layer (each fetched via its
+# per-source manifest + read strategy in `oauth_pull`, landed by its `<source>_cloud` adapter). A
+# per-source fetch failure fails closed for THAT source only (0 readings, loud) — never the others.
+_API_PULL_SOURCES = ("whoop", "oura", "garmin", "google-health")
 
 # The gitignored Apple-Health watched folder the operator Shortcut drops exports into. The tick scans
 # `<watched-root>/healthkit/` for the newest export and ingests it via the unchanged healthkit adapter.

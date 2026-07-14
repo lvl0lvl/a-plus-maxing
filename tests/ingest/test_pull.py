@@ -61,11 +61,19 @@ def _drop_healthkit_export(watched_root, records):
 
 
 def _inject_whoop_seams(monkeypatch, http=None):
-    """Point the module-level oauth_pull seams at fixtures (fetch resolves them at call time)."""
+    """Point the module-level oauth_pull seams at fixtures (fetch resolves them at call time).
+
+    A WHOOP-ONLY credential: since Build B `_API_PULL_SOURCES` also wires oura / garmin / google-health,
+    `pull.main` now attempts all four each tick. This fixture supplies a token only for whoop, so the
+    other three fail closed PRE-NETWORK (0 outbound calls) — the integration tests exercise the whoop
+    path unchanged, and the added sources contribute 0 calls (which keeps the wire-scan host set exact
+    and proves an unconfigured source never dials out).
+    """
     from scripts.ingest import oauth_pull
 
     http = http if http is not None else _RecordingHttp(_whoop_routes())
-    monkeypatch.setattr(oauth_pull, "_read_oauth_credential", _fake_keychain())
+    monkeypatch.setattr(oauth_pull, "_read_oauth_credential",
+                        lambda source: "fixture-refresh-token" if source == "whoop" else None)
     monkeypatch.setattr(oauth_pull, "_http", http)
     return http
 

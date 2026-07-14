@@ -93,13 +93,23 @@ def _hk(hk_type, start_date, value):
 
 
 def _ou(item, day, avg):
-    """An Oura-shaped export record."""
-    return {"metric": item, "day": day, "average": avg}
+    """A staged Oura cloud-pull record (the wired oura_cloud adapter's {item, timepoint, value} shape).
+
+    Since the tracker-ingestion Build B API-pull build, the wired `"oura"` source is `oura_cloud`
+    (the legacy file-drop `oura.py` is UNWIRED), so the scheduler's staged export is the cloud
+    `{item, timepoint, value}` shape, not the legacy `{metric, day, average}`.
+    """
+    return {"item": item, "timepoint": day, "value": avg}
 
 
 def _ga(item, day, value):
-    """A Garmin-shaped export record."""
-    return {"summaryType": item, "calendarDate": day, "value": value}
+    """A staged Garmin cloud-pull record (the wired garmin_cloud adapter's {item, timepoint, value} shape).
+
+    Since the tracker-ingestion Build B API-pull build, the wired `"garmin"` source is `garmin_cloud`
+    (the legacy file-drop `garmin.py` is UNWIRED), so the scheduler's staged export is the cloud
+    `{item, timepoint, value}` shape, not the legacy `{summaryType, calendarDate, value}`.
+    """
+    return {"item": item, "timepoint": day, "value": value}
 
 
 def _sandbox_available():
@@ -326,6 +336,35 @@ def test_whoop_wired_via_cloud_adapter_only():
     whoop_adapters = [a for a in scheduler._wired_adapters() if a.source_tag() == "whoop"]
     assert len(whoop_adapters) == 1                           # exactly one — no dedupe collision
     assert type(whoop_adapters[0]).__name__ == "WhoopCloudAdapter"
+
+
+def test_buildb_cloud_adapters_wired_legacy_file_drop_unwired():
+    """Guard: exactly ONE wired adapter per Build-B source tag — the cloud adapter, not the legacy file-drop.
+
+    The tracker-ingestion Build B API-pull build makes oura_cloud / garmin_cloud / google_health_cloud
+    the sole wired sources for their tags and retires the legacy file-drop oura / garmin via their
+    UNWIRED marker (google-health is new — no legacy to retire). Two wired adapters both emitting the
+    same source would dedupe-collide on `(item, day, source)` (or crash on the other's staged shape); a
+    re-add of a legacy adapter to the wired set (or a drop of a cloud adapter) is the DANGEROUS
+    direction this REDs on — the same guard shape as test_whoop_wired_via_cloud_adapter_only.
+    """
+    from scripts.ingest import scheduler
+    from scripts.ingest.adapters import (
+        garmin, garmin_cloud, google_health_cloud, oura, oura_cloud,
+    )
+
+    assert getattr(oura, "UNWIRED", False) is True           # legacy file-drop retired
+    assert getattr(garmin, "UNWIRED", False) is True
+    assert getattr(oura_cloud, "UNWIRED", False) is False    # cloud adapters wired
+    assert getattr(garmin_cloud, "UNWIRED", False) is False
+    assert getattr(google_health_cloud, "UNWIRED", False) is False
+
+    wired = scheduler._wired_adapters()
+    for tag, class_name in (("oura", "OuraCloudAdapter"), ("garmin", "GarminCloudAdapter"),
+                            ("google-health", "GoogleHealthCloudAdapter")):
+        matching = [a for a in wired if a.source_tag() == tag]
+        assert len(matching) == 1, tag                       # exactly one — no dedupe collision
+        assert type(matching[0]).__name__ == class_name, tag
 
 
 def test_unwired_marker_governs_wired_set_membership():

@@ -10,8 +10,9 @@ surfaces COUNTS only, never reading values or genotype content.
 from pathlib import Path
 
 # The wearable sources whose readings land in the time-series store (the DNA/labs dropzones
-# are separate gitignored landing dirs, not the store).
-_WEARABLE_SOURCES = ("healthkit", "whoop", "oura", "garmin")
+# are separate gitignored landing dirs, not the store). Kept congruent with the scheduler's
+# discovered wired set by test_cli_and_status_source_sets_match_scheduler_wired_set.
+_WEARABLE_SOURCES = ("healthkit", "whoop", "oura", "garmin", "google-health")
 
 
 def wearable_status(store_read):
