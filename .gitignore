@@ -4,6 +4,8 @@ vault/labs/raw/
 vault/store/
 vault/scaffold/filled/
 vault/artifacts/generated/
+# Tracker-pull watched folder (operator-Shortcut Apple-Health drops + staged pulls)
+vault/inbox/
 # Operator-identity + operator-contact tokens for the PII scanner (per-instance; .example is tracked)
 vault/meta/operator-identity.txt
 vault/meta/operator-contact.txt

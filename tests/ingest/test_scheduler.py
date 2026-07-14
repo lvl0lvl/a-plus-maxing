@@ -2,8 +2,9 @@
 
 Covers AC-1..AC-7: unattended invocation over the wired adapter set (exit 0, 0
 prompts, stdin closed), delta-only append on a second run, idempotent no-new
-re-run, Whoop now WIRED (ADR-0011 D2 — the data-driven discovery includes it once
-whoop.py drops its UNWIRED marker) while scheduler.py still carries 0 `whoop`
+re-run, Whoop WIRED via the cloud adapter (the tracker-ingestion API-pull build — the
+noop on-device-SQLite adapter is UNWIRED, `whoop_cloud` is the sole wired
+`"whoop"` source) while scheduler.py still carries 0 `whoop`
 tokens (the static scan), 0 outbound egress over a
 REAL `scheduler.run()`, and the data-driven 0-edit-on-adapter-add proof. All
 store writes go to a tmp_path-based root so no test touches the real
@@ -30,9 +31,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEDULER_PATH = REPO_ROOT / "scripts" / "ingest" / "scheduler.py"
 ADAPTERS_DIR = REPO_ROOT / "scripts" / "ingest" / "adapters"
 
-# The wired set the scheduler must invoke `ingest.run` over (AC-1, AC-4a). Whoop
-# joined the wired set at ADR-0011 D2 (its UNWIRED marker removed); it is invoked
-# when an export is provided, like every other wired adapter.
+# The wired set the scheduler must invoke `ingest.run` over (AC-1, AC-4a). The `"whoop"` tag is
+# provided by the cloud adapter (`whoop_cloud`) since the tracker-ingestion API-pull build; the noop
+# on-device-SQLite adapter is UNWIRED. The set of wired source TAGS is unchanged either way.
 WIRED_SOURCES = {"healthkit", "oura", "garmin", "whoop"}
 
 
@@ -225,13 +226,12 @@ def test_rerun_no_new_appends_zero_lines(tmp_path):
 
 
 def test_wired_set_invoked_includes_whoop(tmp_path, monkeypatch):
-    """AC-4a (ADR-0011 D2): the run's invoked-adapter set now INCLUDES whoop.
+    """AC-4a: the run's invoked-adapter set INCLUDES whoop, now via the cloud adapter.
 
-    Spies on ingest.run to record which adapters scheduler.run() invokes. With
-    whoop.py's UNWIRED marker removed, the data-driven discovery includes Whoop, so
-    a run with a whoop.sqlite export invokes ingest.run over it. Inverts the prior
-    unwired-exclusion assertion: the invoked source set is the full wired set
-    INCLUDING whoop. Reds if a regression drops Whoop from the wired set.
+    Spies on ingest.run to record which adapters scheduler.run() invokes. The tracker-ingestion
+    API-pull build makes `whoop_cloud` the sole wired `"whoop"` source (the noop on-device-SQLite
+    adapter is UNWIRED), so a run with a staged Whoop export invokes ingest.run over it. The invoked
+    source set is the full wired set INCLUDING whoop; reds if a regression drops Whoop from the set.
     """
     from scripts.ingest import ingest, scheduler
 
@@ -241,9 +241,11 @@ def test_wired_set_invoked_includes_whoop(tmp_path, monkeypatch):
         oura_records=[_ou("hrv", "2026-01-01", 55)],
         garmin_records=[_ga("stress", "2026-01-01", 30)],
     )
-    whoop_db = tmp_path / "whoop.sqlite"
-    _write_whoop_sqlite(whoop_db, [{"day": "2026-01-01", "recovery": 66.0}])
-    exports["whoop"] = whoop_db
+    # The wired whoop source is now the cloud adapter, which reads the STAGED pull JSON
+    # (`{item, timepoint, value}` rows), not the noop's SQLite DB.
+    whoop_export = tmp_path / "whoop.json"
+    _write_json_export(whoop_export, [{"item": "recovery", "timepoint": "2026-01-01", "value": 66.0}])
+    exports["whoop"] = whoop_export
     store_root = tmp_path / "store"
 
     real_run = ingest.run
@@ -307,18 +309,23 @@ def test_scheduler_whoop_scan_is_falsifiable():
 # in production.
 
 
-def test_whoop_carries_no_unwired_marker():
-    """Guard (ADR-0011 D2): whoop.py no longer declares the UNWIRED marker — it is WIRED.
+def test_whoop_wired_via_cloud_adapter_only():
+    """Guard: exactly ONE wired adapter emits source="whoop" — the cloud adapter, not the noop.
 
-    Inverts the prior unwired-scaffold guard. With the marker removed, the
-    scheduler's data-driven discovery includes Whoop. A regression that re-adds
-    `UNWIRED = True` to whoop.py would silently drop Whoop from the unattended run
-    (the DANGEROUS direction) — this REDs first: the attribute must be absent or
-    falsy.
+    The tracker-ingestion API-pull build makes `whoop_cloud` the sole wired `"whoop"` source and
+    retires the noop on-device-SQLite adapter via its `UNWIRED` marker. Two wired adapters both
+    emitting `source="whoop"` would dedupe-collide on `(item, day, "whoop")`; a re-add of the noop to
+    the wired set (or a drop of the cloud adapter) is the DANGEROUS direction this REDs on.
     """
-    from scripts.ingest.adapters import whoop
+    from scripts.ingest import scheduler
+    from scripts.ingest.adapters import whoop, whoop_cloud
 
-    assert getattr(whoop, "UNWIRED", False) is False
+    assert getattr(whoop, "UNWIRED", False) is True          # the noop is retired from the wired set
+    assert getattr(whoop_cloud, "UNWIRED", False) is False   # the cloud adapter is wired
+
+    whoop_adapters = [a for a in scheduler._wired_adapters() if a.source_tag() == "whoop"]
+    assert len(whoop_adapters) == 1                           # exactly one — no dedupe collision
+    assert type(whoop_adapters[0]).__name__ == "WhoopCloudAdapter"
 
 
 def test_unwired_marker_governs_wired_set_membership():

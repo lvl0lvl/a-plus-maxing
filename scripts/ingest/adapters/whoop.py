@@ -18,14 +18,24 @@ the schema read ever proves insufficient.
 
 Conforms to the frozen `ADR-0003-T1` contract (`source_tag` + `read_readings`); all
 noop-specific names (the `dailyMetric` columns) are translated here, so the shared
-routine (`ingest.run`) and the contract (`adapter.py`) name no Whoop field. WIRED:
-this module declares no `UNWIRED` marker, so the scheduler's data-driven discovery
-includes it (ADR-0011 D2 — replaces the prior registered-but-unwired scaffold).
+routine (`ingest.run`) and the contract (`adapter.py`) name no Whoop field. UNWIRED:
+the cloud-API `whoop_cloud` adapter is now the sole WIRED `"whoop"` source (the
+tracker-ingestion API-pull build); two adapters both emitting `source="whoop"` would
+dedupe-collide on `(item, day, "whoop")`, so this noop on-device-SQLite adapter is
+retired from the scheduler's data-driven wired set via the `UNWIRED` marker below.
+It is retained as the manual-CLI (`python -m scripts.ingest --source whoop <db>`) /
+offline fallback — the class is unchanged; only its wired-set membership is dropped.
 """
 
 import sqlite3
 from pathlib import Path
 from typing import Iterable
+
+# UNWIRED (tracker-ingestion API-pull build): the scheduler's data-driven discovery excludes this
+# module because `whoop_cloud.WhoopCloudAdapter` is the sole wired `"whoop"` source. A truthy `UNWIRED`
+# is the typed exclusion contract (`scheduler._wired_adapters`); the noop adapter stays importable for
+# the manual-CLI / offline fallback path, it just no longer joins the unattended wired set.
+UNWIRED = True
 
 # noop `dailyMetric` column -> the store `item` it maps to. One DB row per calendar
 # `day`; each non-null metric below becomes one reading on the (item, day, source)
