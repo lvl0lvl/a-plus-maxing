@@ -16,6 +16,11 @@ vault/meta/operator-contact.txt
 .env.*.local
 .venv/
 
+# Secret-store fallback tier (ADR-0047-T1): per-instance at-rest secret file, permission-
+# gated (0600), weaker at rest than the OS keyring; never tracked — the block-pii-commit /
+# pre-push-pii-scan hooks are the backstop against an ignore-bypassing git add -f
+.secret-store-fallback.json
+
 # Python
 __pycache__/
 *.pyc
