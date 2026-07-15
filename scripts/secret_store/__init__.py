@@ -1,10 +1,13 @@
 """Cross-platform secret store: an OS-native keyring primary with a file/env fallback tier.
 
 Exposes `get_secret` / `set_secret` / `delete_secret` over a single injectable keyring
-backend seam (default: the OS-native `keyring` backend). When the keyring backend is
-unavailable for an operation — it raises, prompts, or blocks, symmetrically on both get and
-set — the operation falls back to a per-instance file (the read/write round-trip target)
-plus a fixed-prefix environment variable (read-only operator injection).
+backend seam (default: the OS-native `keyring` backend). The fallback tier engages when a
+keyring operation RAISES (symmetrically on both get and set) — the backend is
+locked/unavailable, or an unattended interactive prompt cannot be answered and so raises or
+blocks then times out. A prompt that SUCCEEDS interactively returns its value and is served
+from the keyring, NOT the fallback. On a raise the operation falls back to a per-instance
+file (the read/write round-trip target) plus a fixed-prefix environment variable (read-only
+operator injection).
 
 The single `service` argument maps onto the keyring `(service_name, username)` pair using
 `getpass.getuser()` as the username — set-side parity with `scripts.model.key_source`'s
@@ -22,10 +25,14 @@ labelled as encryption. Secret VALUES never enter a log record, an exception mes
 traceback: failures raise a constant-message `KeyStoreError` (the repo is PUBLIC).
 
 Fallback threat model (OQ-2 / SEC-06):
-- Keyring is PREFERRED; the fallback tier engages ONLY when the keyring is unavailable for
-  the operation (it raises, prompts, or blocks). A prompting keyring routes to the weaker
-  fallback — a prompt-induced DOWNGRADE — because the backgrounded server cannot answer an
-  interactive keychain prompt.
+- Keyring is PREFERRED; the fallback tier engages ONLY when a keyring operation is
+  unavailable — i.e. it RAISES (the backend is locked, or an unattended interactive prompt
+  cannot be answered and so raises or blocks then times out). That unanswerable prompt is
+  the prompt-induced DOWNGRADE to the weaker fallback, because the backgrounded server
+  cannot answer an interactive keychain prompt; a prompt that SUCCEEDS is served from the
+  keyring, not the fallback. (Whether the real OS keyring prompts or returns unattended
+  without prompting is validated only in a LIVE run — bead a-plus-maxing-m8ia; the mock
+  build proves the routing logic, not the live backend's unattended behavior.)
 - WHERE the key material lives: the fallback FILE is a per-instance dotfile in the repo's
   gitignored working tree (`.secret-store-fallback.json`); the read-only fixed-prefix env
   var is the other injection point. Both are env-var-EXTRACTABLE by the file owner, which is
@@ -103,19 +110,29 @@ def _read_fallback_file(path):
     p = Path(path)
     if not p.exists():
         return {}
-    return json.loads(p.read_text())
+    try:
+        return json.loads(p.read_text())
+    except (OSError, ValueError):
+        # A corrupt or unreadable fallback file is not a valid secret store: treat it as
+        # empty instead of raising JSONDecodeError (whose .doc carries the raw file bytes)
+        # out of the public API and bricking the secret path on an available keyring (LOW-2).
+        return {}
 
 
 def _write_fallback_file(path, data):
-    """Write the fallback map to `path` with mode 0600 applied ATOMICALLY at creation.
+    """Write the fallback map to `path` with owner-only mode 0600, reject a symlink target.
 
-    Creates the file via `os.open(..., O_CREAT | O_WRONLY | O_TRUNC, 0o600)`, so the
-    restrictive mode is set by the creating syscall — there is no `open('w')`-then-`chmod`
+    Creates the file via `os.open(..., O_CREAT | O_WRONLY | O_TRUNC | O_NOFOLLOW, 0o600)`, so
+    the restrictive mode is set by the creating syscall — there is no `open('w')`-then-`chmod`
     window in which the file is group/world-readable at the process umask (F9 / SEC-07).
+    O_NOFOLLOW rejects a symlink pre-placed at `path` (the write raises rather than following
+    it to an attacker-chosen target); `fchmod(fd, 0o600)` re-asserts owner-only mode on the
+    REWRITE path too, where O_CREAT's mode argument is ignored on a pre-existing file (LOW-1).
     """
     payload = json.dumps(data)
-    fd = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    fd = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "w") as handle:
+        os.fchmod(handle.fileno(), 0o600)
         handle.write(payload)
 
 

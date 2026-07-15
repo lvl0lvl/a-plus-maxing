@@ -382,3 +382,80 @@ def test_frozen_six_numstat_empty():
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "", f"frozen-six changed:\n{result.stdout}"
+
+
+# ------------- Tier-2 review hardening: corrupt-file + symlink + prompt-spy -------------
+
+
+def test_corrupt_fallback_file_set_on_available_keyring(tmp_path):
+    """LOW-2: a corrupt fallback file must not brick set on an AVAILABLE keyring.
+
+    set_secret's write-through-clear reads the fallback file OUTSIDE any guard; a corrupt
+    file would raise JSONDecodeError out of the public API even though the keyring write
+    already succeeded. A corrupt fallback is treated as empty, so the set completes.
+    """
+    fp = tmp_path / "fb.json"
+    fp.write_text("{ this is not valid json ::::")  # corrupt/hostile fallback file
+    backend = _OSKeyringFake("macOS Keychain")  # available keyring
+    set_secret("svc", "v", backend=backend, fallback_path=fp)  # must not raise
+    assert get_secret("svc", backend=backend, fallback_path=fp) == "v"
+
+
+def test_corrupt_fallback_file_get_under_outage(tmp_path, monkeypatch):
+    """LOW-2: get under keyring outage returns None on a corrupt fallback file (no raise).
+
+    A corrupt file must be treated as empty (-> None), never surface JSONDecodeError —
+    whose .doc attribute carries the raw file bytes — out of the public API.
+    """
+    fp = tmp_path / "fb.json"
+    fp.write_text("}{ not json")
+    monkeypatch.delenv(f"{secret_store._FALLBACK_ENV_PREFIX}_SVC", raising=False)
+    assert get_secret("svc", backend=_RaisingBackend(), fallback_path=fp) is None
+
+
+def test_fallback_file_mode_reasserted_on_rewrite(tmp_path):
+    """LOW-1: a pre-existing looser-mode fallback file is re-clamped to 0600 on rewrite.
+
+    O_CREAT applies the 0600 mode only on creation-from-absent; a pre-existing 0644 file
+    keeps its mode on rewrite. fchmod(fd, 0600) after open re-asserts owner-only mode.
+    """
+    fp = tmp_path / "fb.json"
+    fp.write_text("{}")
+    os.chmod(fp, 0o644)
+    assert stat.S_IMODE(os.stat(fp).st_mode) == 0o644  # precondition: looser mode
+    set_secret("svc", "v", backend=_RaisingBackend(), fallback_path=fp)
+    assert stat.S_IMODE(os.stat(fp).st_mode) == 0o600
+
+
+def test_fallback_symlink_not_followed(tmp_path):
+    """LOW-1: a symlink pre-placed at the fallback path is rejected, not followed (O_NOFOLLOW).
+
+    Without O_NOFOLLOW a pre-placed symlink is followed and the secret is written to an
+    attacker-chosen target. O_NOFOLLOW makes os.open raise, which set_secret surfaces as a
+    fail-loud KeyStoreError; the symlink target is never written.
+    """
+    target = tmp_path / "attacker_target.json"
+    target.write_text("ORIGINAL_UNTOUCHED")
+    link = tmp_path / "fb.json"
+    link.symlink_to(target)
+
+    with pytest.raises(KeyStoreError):
+        set_secret("svc", "secret-value", backend=_RaisingBackend(), fallback_path=link)
+
+    # The symlink target is NOT followed/overwritten: its original content is intact.
+    assert target.read_text() == "ORIGINAL_UNTOUCHED"
+
+
+def test_prompt_spy_counts_on_interactive_backend(tmp_path):
+    """QA-1: the AC-2 prompt spy actually counts — an interactive backend drives prompts>0.
+
+    AC-2 asserts `prompts == 0` with a NON-interactive fake, which is vacuously true. This
+    exercises the interactive path (previously dead code) so the spy's RED-capability is
+    witnessed: a backend that prompts moves the counter, proving AC-2's 0-assertion tests
+    real module behavior rather than an inert spy.
+    """
+    backend = _OSKeyringFake("macOS Keychain", interactive=True)
+    fp = tmp_path / "fb.json"
+    set_secret("api", "v", backend=backend, fallback_path=fp)
+    get_secret("api", backend=backend, fallback_path=fp)
+    assert backend.prompts > 0
