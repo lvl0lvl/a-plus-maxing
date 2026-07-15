@@ -55,9 +55,9 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 | `tests/runner/test_auth_isolation.py` | Modify | Abstraction read + 0-direct-shell-out scan for `auth_isolation` |
 | `scripts/ingest/oauth_pull.py` | Modify | Route `_read/_write_oauth_credential` through `scripts.secret_store`; PRESERVE `credential_reader`/`credential_writer` seam names (Risk-N3); keep unattended rotating-vendor write-back |
 | `tests/ingest/test_oauth_pull.py` | Modify | Abstraction round-trip + 0-direct-shell-out scan + unattended write-back for `oauth_pull` |
-| `scripts/serve/alpha_config.py` | Create | Out-of-band alpha-build config loader — shared vendor `client_id`/`client_secret` (per confidential-client vendor) + optional shared Anthropic key from an env-var-pointed path outside the repo |
-| `tests/serve/test_alpha_config.py` | Create | Out-of-band load, per-vendor client-type parameterization, tracked-file secret scan == 0, in-repo-path rejection |
-| `scripts/serve/server.py` | Modify | (T3-0048) extend the `_save_key`/`_key_status` write class to N per-source tokens + a per-source write/status handler; (T2-0048) the connect-start route that spins up the one-shot OAuth listener; (T1-0049) inject `metered_dispatch` as the server `loop_dispatch`; (T2-0049) the manual "Update my plan now" trigger wiring — four distinct sections (see Shared-file coordination) |
+| `scripts/serve/alpha_config.py` | Create | Out-of-band alpha-build config loader — shared vendor `client_id`/`client_secret` (per confidential-client vendor) + optional shared Anthropic key from an env-var-pointed path outside the repo; + the D5 shared-key provisioning bridge (exports the shared key as in-process `ANTHROPIC_API_KEY` at server start when no BYO key resolves) |
+| `tests/serve/test_alpha_config.py` | Create | Out-of-band load, per-vendor client-type parameterization, tracked-file secret scan == 0, in-repo-path rejection, shared-key bridge (resolve-returns-shared / mutate-out-REDs / BYO-precedence) |
+| `scripts/serve/server.py` | Modify | (T3-0048) extend the `_save_key`/`_key_status` write class to N per-source tokens + a per-source write/status handler; (T2-0048) the connect-start route that spins up the one-shot OAuth listener; (T1-0049) inject `metered_dispatch` as the server `loop_dispatch` + invoke the ADR-0048-T1 shared-key bridge at server start; (T2-0049) the manual "Update my plan now" trigger wiring — four distinct sections (see Shared-file coordination) |
 | `tests/serve/test_credential_writes.py` | Create | N-per-source token write→read through the ADR-0047 store; 0 tracked secrets; loopback + body-ceiling posture |
 | `scripts/serve/oauth_callback.py` | Create | One-shot 127.0.0.1 OAuth listener + PKCE code-challenge + `state`/CSRF + code→token exchange; writes via the T3 per-source write class |
 | `tests/serve/test_oauth_callback.py` | Create | `state`/PKCE/one-shot/loopback-bind assertions + the D7 crown-jewel wire-scan (0 store bytes, 0 model-lane, vendor-only outbound, mutation-RED) |
@@ -72,7 +72,7 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 | `tests/runner/test_spend_cap.py` | Create | Cap enforcement (≥1 past cap REDs), monthly rollover, per-tester isolation, D2-scan stays green after wiring |
 
 **Shared-file coordination:**
-- `scripts/serve/server.py` is Modified by four tasks (ADR-0048-T3, ADR-0048-T2, ADR-0049-T1, ADR-0049-T2), each in a **distinct section** (per-source write handlers / connect-start route / `main()`+`build_server` `loop_dispatch` injection / manual-trigger route). ADR-0048-T3→ADR-0048-T2 and ADR-0049-T1→ADR-0049-T2 are dependency-ordered; the ADR-0048 arm (write handlers/route) and the ADR-0049 arm (loop-dispatch injection/trigger) touch non-overlapping regions. The build planner serializes same-file tasks within a wave.
+- `scripts/serve/server.py` is Modified by four tasks (ADR-0048-T3, ADR-0048-T2, ADR-0049-T1, ADR-0049-T2), each in a **distinct section** (per-source write handlers / connect-start route / `main()`+`build_server` `loop_dispatch` injection + shared-key bridge call / manual-trigger route). ADR-0048-T3→ADR-0048-T2 and ADR-0049-T1→ADR-0049-T2 are dependency-ordered; the ADR-0048 arm (write handlers/route) and the ADR-0049 arm (loop-dispatch injection/trigger) touch non-overlapping regions. The build planner serializes same-file tasks within a wave.
 - `.gitignore` is Modified by ADR-0047-T1 (fallback file, wave 1) and ADR-0049-T3 (spend ledger, wave 4) — distinct append-only lines, different waves, no concurrency.
 - `vault/design/templates/app_shell.py` is Modified by ADR-0048-T4 (Connections & Keys panel) and ADR-0049-T2 (Plan updates section) — distinct sections; ADR-0049-T2 depends on ADR-0048-T4, so ordered.
 - `scripts/runner/metered_dispatch.py` is Created by ADR-0049-T1 and Modified by ADR-0049-T3 (the cap consult) — ADR-0049-T3 depends on ADR-0049-T1 (create-then-modify, ordered).
@@ -94,9 +94,10 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 3. The fallback tier engages iff keyring is unavailable: with `keyring` importable, `get_secret` performs 0 fallback reads; with `keyring` import forced to fail, the fallback serves the value and the consumer still resolves it.
 4. `keyring` is listed in `requirements.txt`; `python -c "import keyring"` exits 0 after `.venv/bin/python -m pip install -r requirements.txt` on a clean venv.
 5. `git check-ignore <fallback-encrypted-file-path>` exits 0 (the fallback secret can never be committed), and the module docstring documents the fallback threat model — where the encrypted-file key lives and the env-var extractability (OQ-2).
-6. `pytest tests/secret_store/ -q` passes and `.venv/bin/python -m pytest -q` stays green (0 regressions).
+6. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing (frozen-six byte-frozen — the guard is asserted at the FIRST build of the abstraction, per ADR-0047 Falsification "run all four at the first build of the abstraction").
+7. `pytest tests/secret_store/ -q` passes and `.venv/bin/python -m pytest -q` stays green (0 regressions).
 
-**Risk Mitigations:** ADR-0047 Consequence-Negative "keyring first third-party dep" (AC-4); "fallback weaker-at-rest / OQ-2" (AC-2, AC-5); "per-OS test matrix" (AC-1, AC-2); "fallback file gitignored / OQ-4 / ADR-0005" (AC-5)
+**Risk Mitigations:** ADR-0047 Consequence-Negative "keyring first third-party dep" (AC-4); "fallback weaker-at-rest / OQ-2" (AC-2, AC-5); "per-OS test matrix" (AC-1, AC-2); "fallback file gitignored / OQ-4 / ADR-0005" (AC-5); "frozen six untouched at first build" (AC-6)
 **Dependencies:** None (entry point)
 
 ---
@@ -115,10 +116,11 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 2. `auth_isolation.build_subscription_env(base_env, *, keychain_reader=...)` routes its DEFAULT read through `scripts.secret_store` for service `a-plus-maxing-oauth-token`; the `keychain_reader` parameter name is unchanged.
 3. `grep -rnE "security (find|add)-generic-password" scripts/model/key_source.py scripts/runner/auth_isolation.py` returns 0 hits (no direct macOS shell-out survives in either consumer).
 4. A `store`→`resolve` round-trip on `key_source` recovers the key byte-for-byte through the mocked abstraction; a `build_subscription_env` read returns the token from the mocked abstraction.
-5. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing (frozen-six byte-frozen).
-6. `pytest tests/model/test_key_source.py tests/runner/test_auth_isolation.py -q` passes and the full baseline stays green.
+5. Env-first precedence is PRESERVED across the refactor: with `ANTHROPIC_API_KEY` set, `key_source.resolve` returns the env value WITHOUT any `scripts.secret_store` read for the `a-plus-maxing-api-key` service (the env check stays ahead of the keyring backend — the pre-refactor order at `key_source.py:80-86`). Asserted by a test that REDs if `resolve` reads the abstraction while the env var is set; the existing env-precedence tests are NOT weakened to a keyring-primary order to match the refactor.
+6. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing (frozen-six byte-frozen).
+7. `pytest tests/model/test_key_source.py tests/runner/test_auth_isolation.py -q` passes and the full baseline stays green.
 
-**Risk Mitigations:** ADR-0047 Consequence-Negative "non-uniform seams reconciled without breaking mock points" (AC-1, AC-2); "frozen six untouched" (AC-5)
+**Risk Mitigations:** ADR-0047 Consequence-Negative "non-uniform seams reconciled without breaking mock points" (AC-1, AC-2); "env-first precedence preserved — BYO-via-env resolves ahead of the keyring backend, and the ADR-0048-T1 shared-key bridge rides this same env-first path" (AC-5); "frozen six untouched" (AC-6)
 **Dependencies:** ADR-0047-T1
 
 ---
@@ -145,19 +147,21 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 
 ### ADR-0048-T1: Out-of-band alpha-build config loader
 **Status:** TODO
-**ADR Source:** ADR-0048, Decision D4 (shared-alpha-credential distribution via out-of-band config, never a tracked file); ADR-0048, Validation Approach (tracked-file secret scan == 0); ADR-0048, Consequences-Negative (D4/D5 extractable-and-global-revoke shared secrets)
+**ADR Source:** ADR-0048, Decision D4 (shared-alpha-credential distribution via out-of-band config, never a tracked file); ADR-0048, Decision D5 (shared alpha Anthropic key default — testers "touch nothing"; the provisioning bridge realizes that default onto the runtime key source `key_source.resolve` reads); ADR-0048, Validation Approach (tracked-file secret scan == 0); ADR-0048, Consequences-Negative (D4/D5 extractable-and-global-revoke shared secrets)
 **Files to create/modify:**
-- `scripts/serve/alpha_config.py` -- loads shared vendor `client_id`/`client_secret` (per confidential-client vendor) + the optional shared Anthropic key from an env-var-pointed path OUTSIDE the repo tree; per-vendor client-type parameterized
-- `tests/serve/test_alpha_config.py` -- out-of-band load, per-vendor client-type parameterization, tracked-secret scan, in-repo-path rejection
+- `scripts/serve/alpha_config.py` -- loads shared vendor `client_id`/`client_secret` (per confidential-client vendor) + the optional shared Anthropic key from an env-var-pointed path OUTSIDE the repo tree; per-vendor client-type parameterized; + the D5 shared-key provisioning bridge (exports the shared Anthropic key as in-process `ANTHROPIC_API_KEY` at server start when no bring-your-own key resolves)
+- `tests/serve/test_alpha_config.py` -- out-of-band load, per-vendor client-type parameterization, tracked-secret scan, in-repo-path rejection, shared-key bridge (resolve-returns-shared / mutate-out-REDs / BYO-precedence)
 
 **Acceptance Criteria:**
 1. `alpha_config` loads the shared vendor credentials + optional shared Anthropic key from an out-of-band path named by an environment variable; with the variable unset it returns an empty config (no exception), and connect falls back to per-vendor manual/skip.
 2. The loader parameterizes each vendor's client type — confidential (shared secret) / PKCE-public (no secret) / PAT (tester's own token) — defaulting to the grounded "≥Whoop confidential-client" set, with Garmin flagged excluded-from-one-click (OAuth 1.0a); the per-vendor set is data-driven (resolvable at OQ-5 dev-app registration without a code change).
 3. A content scan of all tracked files (`git ls-files` → secret-pattern grep for `client_secret`-shaped and `sk-ant-`-shaped values) returns 0 hits.
 4. `alpha_config` rejects a config path that resolves inside the repo working tree (an in-repo config path raises) — the config can only be out-of-band.
-5. `pytest tests/serve/test_alpha_config.py -q` passes and the full baseline stays green.
+5. **Shared-key provisioning bridge (D5 default path):** at server start `alpha_config` provisions its loaded shared Anthropic key onto the source `key_source.resolve` reads — it attempts `key_source.resolve` and, ONLY if that raises `KeyUnavailableError` (no bring-your-own key in env or keychain), exports the shared key in-process as `ANTHROPIC_API_KEY` (the env-first branch at `key_source.py:80-82` then resolves it with no keychain write). A bring-your-own key set in env or written to the keychain therefore takes precedence and the bridge no-ops (D5's shared key is the "touch nothing" DEFAULT, not an override; consistent with the env-first order ADR-0047-T2 AC-5 preserves). RED-capable: with `alpha_config` carrying a shared key and NO BYO key set (env unset, mocked keychain empty), the bridge runs and `key_source.resolve` returns the shared key (not `KeyUnavailableError`); with the bridge mutated out, `key_source.resolve` raises `KeyUnavailableError` (RED); with a BYO key present the bridge exports nothing and `resolve` returns the BYO key.
+6. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing (the loader + bridge land in `scripts/serve/alpha_config.py`, outside the frozen six).
+7. `pytest tests/serve/test_alpha_config.py -q` passes and the full baseline stays green.
 
-**Risk Mitigations:** ADR-0048 Consequence-Negative "D4 shared confidential-client secret extractable/global-revoke — out-of-band discipline" (AC-1, AC-3, AC-4); "D5 shared Anthropic key out-of-band" (AC-1, AC-3)
+**Risk Mitigations:** ADR-0048 Consequence-Negative "D4 shared confidential-client secret extractable/global-revoke — out-of-band discipline" (AC-1, AC-3, AC-4); "D5 shared Anthropic key out-of-band" (AC-1, AC-3); "D5 shared-key default reaches the model lane — provisioning bridge, no BYO clobber" (AC-5); "frozen six untouched" (AC-6)
 **Dependencies:** None (entry point)
 
 ---
@@ -174,10 +178,11 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 2. The per-source write handler binds 127.0.0.1 only (inherits the ADR-0013 loopback posture) and rejects a request whose body exceeds the ADR-0013 16-KiB ceiling.
 3. A per-source token round-trips: written via the route, then recovered by `oauth_pull`'s `credential_reader` (both on the ADR-0047 store).
 4. A tracked-file content scan after a simulated per-source write returns 0 token/secret hits (the token lands only in the store).
-5. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing.
-6. `pytest tests/serve/test_credential_writes.py -q` passes and the full baseline stays green.
+5. The per-source token-write handler carries the same `application/json` CSRF gate as `_save_key` (the SEC-001 gate at `server.py:939-944`): a cross-site CORS-simple `text/plain` POST is refused 415 BEFORE any keychain write, mutation-proven by a test that REDs if the gate is dropped (the write proceeds on a `text/plain` body).
+6. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing.
+7. `pytest tests/serve/test_credential_writes.py -q` passes and the full baseline stays green.
 
-**Risk Mitigations:** ADR-0048 Consequence-Negative "D3 expands the credential-write trust boundary — N secrets off the tracked tree" (AC-1, AC-4)
+**Risk Mitigations:** ADR-0048 Consequence-Negative "D3 expands the credential-write trust boundary — N secrets off the tracked tree" (AC-1, AC-4); ADR-0013 CSRF posture "SEC-001 application/json gate on the new per-source secret-write route" (AC-5)
 **Dependencies:** ADR-0047-T2, ADR-0047-T3
 
 ---
@@ -191,15 +196,16 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 - `tests/serve/test_oauth_callback.py` -- `state`/PKCE/one-shot/loopback assertions + the D7 wire-scan
 
 **Acceptance Criteria:**
-1. The authorization request carries a `state`/CSRF parameter and a PKCE code-challenge; on a matching callback the flow exchanges the code for a token and writes it via the ADR-0048-T3 per-source write class (through the ADR-0047 store).
+1. The authorization request carries a `state`/CSRF parameter and a PKCE code-challenge; on a matching callback the flow exchanges the code for a token and writes it via the ADR-0048-T3 per-source write class (through the ADR-0047 store). PKCE's protection is on the EXCHANGE, not the authorize leg: the token-exchange request carries the `code_verifier` corresponding to the issued code-challenge, and a fixture vendor token endpoint that receives a missing or mismatched `code_verifier` rejects the exchange → 0 token writes.
 2. The callback listener binds 127.0.0.1 only — an assertion that the bind address is never `0.0.0.0`/`""` (0 non-loopback binds).
 3. The callback REJECTS a mismatched `state`: a callback whose `state` differs from the issued value produces 0 token writes.
-4. The listener is one-shot: after accepting exactly one callback it tears down (a second request to the ephemeral port is refused / the socket is closed).
-5. **D7 crown-jewel wire-scan (load-bearing):** driving the authorization + callback path under a recording network seam asserts (a) 0 bytes of store content in any outbound request body/header, (b) 0 calls to the no-train model lane, (c) the only outbound host is the vendor's own authorize/token endpoint; the scan asserts the CLEAN direction truthy first, then a stub that adds a store-content byte to the outbound leg flips it RED (non-vacuous).
-6. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing.
-7. `pytest tests/serve/test_oauth_callback.py -q` passes and the full baseline stays green.
+4. The code→token exchange client DECLINES cross-host redirects: it host-locks the token endpoint and refuses to follow any 3xx, mirroring `oauth_pull.py`'s `_NoFollowRedirect` fail-closed opener (`oauth_pull.py:245-283` — the default opener copies `Authorization`/secret headers onto a redirect target with no cross-host stripping, so following a 3xx would leak the auth code + `client_secret` to the redirect host). A fixture token endpoint returning a 3xx-to-another-host aborts the exchange with 0 credential bytes reaching the redirect target and 0 token writes.
+5. The listener is one-shot: after accepting exactly one callback it tears down (a second request to the ephemeral port is refused / the socket is closed).
+6. **D7 crown-jewel wire-scan (load-bearing):** driving the authorization + callback + token-exchange path under a recording network seam asserts (a) 0 bytes of store content in any outbound request body/header, (b) 0 calls to the no-train model lane, (c) the only outbound host is the vendor's own authorize/token endpoint. The scan asserts the CLEAN direction truthy first, then RED-gates EACH asserted family with the "the test is invalid — and fails — if that mutation does not RED it" self-invalidation clause per family (mirroring the ADR-0049-T1 AC-5 D2 gold standard): a stub that adds a store-content byte to the outbound leg MUST flip the store-content assertion RED; a fixture token endpoint returning a 302-to-attacker-host MUST flip the vendor-only-host assertion RED (asserting 0 credential bytes reach the redirect target and the exchange aborts); a stub that opens a no-train model-lane call on the auth/callback path MUST flip the model-lane assertion RED.
+7. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing.
+8. `pytest tests/serve/test_oauth_callback.py -q` passes and the full baseline stays green.
 
-**Risk Mitigations:** ADR-0048 Consequence-Negative "D1 new inbound trust boundary" (AC-2, AC-3, AC-4); ADR-0001 tension "D7 egress ruling" (AC-5)
+**Risk Mitigations:** ADR-0048 Consequence-Negative "D1 new inbound trust boundary" (AC-2, AC-3, AC-5); ADR-0048 D1 (amended 2026-07-15) "no cross-host redirect on the code→token exchange" (AC-4); ADR-0001 tension "D7 egress ruling — per-family RED-gated" (AC-6)
 **Dependencies:** ADR-0048-T1, ADR-0048-T3
 
 ---
@@ -218,9 +224,10 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 3. The credential step is skippable and resumable: a "Skip for now" / "Finish setup" path renders with 0 connections made — no connection is required to complete onboarding.
 4. Neither surface renders a `client_id` or `client_secret` input field (a tester never sees a client secret); the model-key card names the shared alpha key as the default with a keychain-storage note.
 5. Garmin's card renders the manual/deferred path (not a one-click OAuth button), consistent with its OAuth-1.0a exclusion.
-6. Both rendered surfaces carry 0 external asset references (the `render.emit` inline-only contract) and `pytest tests/serve/test_credential_onboarding_ui.py -q` passes; the full baseline stays green.
+6. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing (the UI edits touch `intake.py`/`app_shell.py` only, never the frozen six).
+7. Both rendered surfaces carry 0 external asset references (the `render.emit` inline-only contract) and `pytest tests/serve/test_credential_onboarding_ui.py -q` passes; the full baseline stays green.
 
-**Risk Mitigations:** ADR-0048 Consequence-Negative "Garmin excluded from one-click" (AC-5); "shared secret never surfaced to the tester" (AC-4)
+**Risk Mitigations:** ADR-0048 Consequence-Negative "Garmin excluded from one-click" (AC-5); "shared secret never surfaced to the tester" (AC-4); "frozen six untouched" (AC-6)
 **Dependencies:** ADR-0048-T2, ADR-0048-T3
 
 ---
@@ -230,21 +237,21 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 **ADR Source:** ADR-0049, Decision D1 (build a bounded metered dispatch factory into the injected `run_orchestrated`→`plan_driver.drive` seam, outside the frozen six; subscription adapter retained); ADR-0049, Decision D2 + Validation Approach (the lane-sensitive outbound-capturing mutation-gated egress wire-scan); ADR-0049, Consequences-Negative (subscription-lane-bypass)
 **Files to create/modify:**
 - `scripts/runner/metered_dispatch.py` -- the metered `dispatch(name, prompt, context) → author envelope` factory over the shared `a-plus-maxing-api-key` lane; mirrors `subscription_dispatch.build_dispatch`, normalizes via `normalize_author_output`
-- `scripts/serve/server.py` -- inject `metered_dispatch` as the server's `loop_dispatch` in `main()`/`build_server`
+- `scripts/serve/server.py` -- inject `metered_dispatch` as the server's `loop_dispatch` in `main()`/`build_server`, and invoke the ADR-0048-T1 shared-key provisioning bridge at server start (so the metered lane's `key_source.resolve` returns the shared key on the D5 default)
 - `tests/runner/test_metered_dispatch.py` -- the D2 wire-scan (placement / outbound-capture / lane-swap / mutation-gate) + frozen-six numstat probe
 - `tests/serve/test_loop_dispatch_wiring.py` -- reflect the metered `loop_dispatch` production injection
 
 **Acceptance Criteria:**
 1. `metered_dispatch.build_dispatch(...)` returns a `dispatch(name, prompt, context) → envelope` seam that authenticates ONLY via the shared `a-plus-maxing-api-key` metered lane (through `key_source.resolve` on the ADR-0047 abstraction) and normalizes via `normalize_author_output`; `subscription_dispatch.build_dispatch` remains built and importable (the retained North-Star adapter).
-2. `server.build_server`/`main()` injects `metered_dispatch` as `loop_dispatch`, so in-app plan generation dispatches specialists through the `run_orchestrated`→`plan_driver.drive` seam; a plan runs end-to-end for a tester with 0 subscription/OAuth credential reads.
+2. `server.build_server`/`main()` injects `metered_dispatch` as `loop_dispatch` AND invokes the ADR-0048-T1 shared-key provisioning bridge at server start, so in-app plan generation dispatches specialists through the `run_orchestrated`→`plan_driver.drive` seam authenticating on the shared `a-plus-maxing-api-key` lane; a plan runs end-to-end for a tester with 0 subscription/OAuth credential reads AND the DEFAULT shared-key path resolves via the bridge (0 `KeyUnavailableError` on the D5 default — a fixture with the shared key in `alpha_config` + no BYO key completes the plan, and mutating the bridge out REDs it to `KeyUnavailableError`).
 3. **D2 wire-scan (i) Placement:** with a sentinel-returning `deid_client` fixture (`{"deidentified": False}`), the injected metered factory is invoked EXACTLY 0 times and never receives `raw_intake` (the `deid_in` gate halts to 0 dispatches at `plan_orchestrator.py:227`).
 4. **D2 wire-scan (ii) Outbound capture:** with a clean-summary `deid_client` fixture (`set(summary) ⊆ SUMMARY_FIELD_SET`) and a synthetic legal name + store-content sentinel seeded into `raw_intake`, the metered adapter's ACTUAL OUTBOUND request payload (the bytes it sends the model API, not the seam-inbound args) has 0 field outside `SUMMARY_FIELD_SET`, 0 raw-PII hits, 0 store-sentinel hits, and the adapter performs 0 store reads.
 5. **D2 wire-scan (iii) lane-swap invariance + (iv) mutation gate:** a metered↔subscription swap changes 0 bytes of the OUTBOUND payload; and a metered-adapter stub that appends a raw field to its outbound call OR opens a store read turns the scan RED (the test is invalid — and fails — if that mutation does not RED it).
 6. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing (the factory lands in `scripts/runner/`, outside the six).
 7. `pytest tests/runner/test_metered_dispatch.py tests/serve/test_loop_dispatch_wiring.py -q` passes and the full baseline stays green.
 
-**Risk Mitigations:** ADR-0049 Consequence-Negative "subscription-lane goes unused — adapter retained + re-pointable" (AC-1); ADR-0001 tension "D2 egress no-op" (AC-3, AC-4, AC-5); "frozen six untouched" (AC-6)
-**Dependencies:** ADR-0047-T2
+**Risk Mitigations:** ADR-0049 Consequence-Negative "subscription-lane goes unused — adapter retained + re-pointable" (AC-1); ADR-0001 tension "D2 egress no-op" (AC-3, AC-4, AC-5); "frozen six untouched" (AC-6); ADR-0048 D5 "shared-key default reaches the metered lane via the ADR-0048-T1 bridge" (AC-2)
+**Dependencies:** ADR-0047-T2, ADR-0048-T1
 
 ---
 
@@ -261,10 +268,11 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 2. The My Info "Plan updates" section renders the manual trigger + an Off (default) / Weekly / Daily schedule radio, matching the enumerated elements of `credential-onboarding-mockup.html` Surface B.
 3. The schedule SETTING persists the selected cadence (Off default); selecting Weekly records the weekly cadence intent read by the schedule surface.
 4. The Daily option renders as inert / "coming soon": selecting Daily arms NO daily auto-run (the daily-INTERVAL enable path is glzi-gated — `activate.py` registers `DAILY_MONITOR_LABEL` but adds no daily enable path), and the UI states scheduled auto-runs are not yet live.
-5. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing.
-6. `pytest tests/serve/test_plan_update_trigger.py -q` passes and the full baseline stays green.
+5. The "Update my plan now" trigger reuses the CSRF-gated `_do_plan_loop` handler (the SEC `application/json` gate at `server.py:873-876`; the `/plan-loop` loop path grounded at `server.py:216`), so a cross-site CORS-simple `text/plain` POST is refused 415 BEFORE any metered spend across the specialist/judge/lens dispatch; if the trigger instead adds a NEW route, that route carries the identical `application/json` gate. Mutation-proven by a test that REDs if the gate is absent (the loop tick fires on a `text/plain` body).
+6. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing.
+7. `pytest tests/serve/test_plan_update_trigger.py -q` passes and the full baseline stays green.
 
-**Risk Mitigations:** ADR-0049 Consequence-Negative "D4 Daily-schedule partially unbuilt — honestly deferred" (AC-4); "metered cost bounded by manual-default" (AC-1)
+**Risk Mitigations:** ADR-0049 Consequence-Negative "D4 Daily-schedule partially unbuilt — honestly deferred" (AC-4); "metered cost bounded by manual-default" (AC-1); ADR-0013 CSRF posture "forced-spend trigger reuses the SEC application/json gate before any metered spend" (AC-5)
 **Dependencies:** ADR-0049-T1, ADR-0048-T4
 
 ---
@@ -299,6 +307,7 @@ ADR-0047-T1 --> ADR-0047-T3
 ADR-0047-T2 --> ADR-0048-T3
 ADR-0047-T3 --> ADR-0048-T3
 ADR-0047-T2 --> ADR-0049-T1
+ADR-0048-T1 --> ADR-0049-T1
 ADR-0048-T1 --> ADR-0048-T2
 ADR-0048-T3 --> ADR-0048-T2
 ADR-0048-T2 --> ADR-0048-T4
@@ -317,6 +326,7 @@ ADR-0048-T4 --> ADR-0049-T2
 - `ADR-0048-T2 → ADR-0048-T4`: the connect-start route the UI "Connect" cards call.
 - `ADR-0048-T3 → ADR-0048-T4`: the per-source write/status the UI PAT paste + connection status read.
 - `ADR-0047-T2 → ADR-0049-T1`: `key_source.resolve` on the abstraction (the shared-key metered lane's credential resolve).
+- `ADR-0048-T1 → ADR-0049-T1`: the shared-key provisioning bridge — `alpha_config` exports the loaded shared Anthropic key as in-process `ANTHROPIC_API_KEY` at server start so the metered lane's `key_source.resolve` returns it on the D5 default (without the bridge the default "touch nothing" path raises `KeyUnavailableError`).
 - `ADR-0049-T1 → ADR-0049-T3`: the `metered_dispatch` factory the spend cap gates.
 - `ADR-0049-T1 → ADR-0049-T2`: the metered `loop_dispatch` the manual trigger fires.
 - `ADR-0048-T4 → ADR-0049-T2`: the My Info settings shell the "Plan updates" section extends.
@@ -324,7 +334,7 @@ ADR-0048-T4 --> ADR-0049-T2
 **Topological order (Kahn's; parallel groups):**
 1. `ADR-0047-T1`, `ADR-0048-T1` (parallel — entry points, no dependencies)
 2. `ADR-0047-T2`, `ADR-0047-T3` (parallel — each depends only on ADR-0047-T1)
-3. `ADR-0048-T3`, `ADR-0049-T1` (parallel — ADR-0048-T3 after {ADR-0047-T2, ADR-0047-T3}; ADR-0049-T1 after ADR-0047-T2)
+3. `ADR-0048-T3`, `ADR-0049-T1` (parallel — ADR-0048-T3 after {ADR-0047-T2, ADR-0047-T3}; ADR-0049-T1 after {ADR-0047-T2 (tier 2), ADR-0048-T1 (tier 1)} — the max-depth predecessor is ADR-0047-T2, so ADR-0049-T1 stays tier 3)
 4. `ADR-0048-T2`, `ADR-0049-T3` (parallel — ADR-0048-T2 after {ADR-0048-T1, ADR-0048-T3}; ADR-0049-T3 after ADR-0049-T1)
 5. `ADR-0048-T4` (after {ADR-0048-T2, ADR-0048-T3})
 6. `ADR-0049-T2` (after {ADR-0049-T1, ADR-0048-T4})
@@ -338,10 +348,10 @@ Cross-cutting constraints from the ADRs and their enforcing acceptance criteria 
 
 | Constraint | Source | Enforced in | Enforcing AC |
 |-----------|--------|-------------|--------------|
-| Frozen-six numstat == 0 (`store.py`, `keying.py`, `pipeline.py`, `adjudicate.py`, `adjust.py`, `router.py`) | ADR-0047 + ADR-0049 Validation | ADR-0047-T2, ADR-0047-T3, ADR-0048-T2, ADR-0048-T3, ADR-0049-T1, ADR-0049-T2, ADR-0049-T3 | the `git diff --numstat 3ab1c3ab -- <six>` prints-nothing AC in each |
+| Frozen-six numstat == 0 (`store.py`, `keying.py`, `pipeline.py`, `adjudicate.py`, `adjust.py`, `router.py`) | ADR-0047 + ADR-0049 Validation | ADR-0047-T1, ADR-0047-T2, ADR-0047-T3, ADR-0048-T1, ADR-0048-T2, ADR-0048-T3, ADR-0048-T4, ADR-0049-T1, ADR-0049-T2, ADR-0049-T3 | the `git diff --numstat 3ab1c3ab -- <six>` prints-nothing AC in each (asserted at the first build of the abstraction per ADR-0047 Falsification) |
 | Risk-N3: preserve `credential_*` (`_key_def_count()==0` under `scripts/ingest/`) | ADR-0047 Decision/Falsification | ADR-0047-T3 | AC-1 (names unchanged), AC-2 (`_key_def_count()==0` green) |
 | 0 direct `security` shell-out in the 3 consumers | ADR-0047 Falsification | ADR-0047-T2, ADR-0047-T3 | the `grep security (find|add)-generic-password ... == 0` AC in each |
-| ADR-0001 crown-jewel: OAuth path carries 0 store bytes / 0 model-lane calls | ADR-0048 D7 | ADR-0048-T2 | AC-5 (D7 wire-scan, mutation-RED) |
+| ADR-0001 crown-jewel: OAuth path carries 0 store bytes / 0 model-lane calls; code→token exchange declines cross-host redirects | ADR-0048 D7 + D1 (amended) | ADR-0048-T2 | AC-4 (exchange declines cross-host 3xx / host-lock), AC-6 (D7 wire-scan, per-family mutation-RED) |
 | ADR-0001 crown-jewel: metered OUTBOUND payload ⊆ `SUMMARY_FIELD_SET`, 0 side-channel, injected downstream of `deid_in` | ADR-0049 D2 + constraint-propagation | ADR-0049-T1 (and ADR-0049-T3 AC-5 keeps it green) | AC-3/AC-4/AC-5 (placement / outbound-capture / lane-swap+mutation) |
 | ADR-0005: shared secrets never on the tracked tree (out-of-band only) | ADR-0048 D4/D5 | ADR-0048-T1, ADR-0048-T3 | ADR-0048-T1 AC-3/AC-4; ADR-0048-T3 AC-4 |
 | ADR-0005: fallback encrypted file gitignored + hook-covered | ADR-0047 OQ-4 | ADR-0047-T1 | AC-5 (`git check-ignore` exits 0) |
@@ -357,14 +367,14 @@ Cross-cutting constraints from the ADRs and their enforcing acceptance criteria 
 ### Integration Tests
 - **Scope:** the serve credential-write path (route → `secret_store` → `oauth_pull` reader), the OAuth connect-start → one-shot callback → per-source write chain, the `run_orchestrated`→`drive` seam with the metered factory injected as `loop_dispatch`, and the manual-trigger → loop re-gen path.
 - **Approach:** in-process serve handlers on 127.0.0.1 with a recording network seam and fixture OAuth/model clients; the SPA/template render assertions drive the UI surfaces.
-- **Criteria covered:** ADR-0047-T2 AC-4; ADR-0047-T3 AC-4; ADR-0048-T3 AC-1,3; ADR-0048-T2 AC-1,4; ADR-0048-T4 AC-1..3,6; ADR-0049-T1 AC-2; ADR-0049-T2 AC-1..4.
+- **Criteria covered:** ADR-0047-T2 AC-4; ADR-0047-T3 AC-4; ADR-0048-T3 AC-1,3; ADR-0048-T2 AC-1,5; ADR-0048-T4 AC-1..3,7; ADR-0049-T1 AC-2; ADR-0049-T2 AC-1..4.
 
 ### Risk-Specific Tests
-- **Scope:** the two crown-jewel wire-scans (ADR-0048 D7, ADR-0049 D2), the frozen-six numstat probe, the Risk-N3 `_key_def_count()==0` guard, the tracked-secret scans (ADR-0005), the loopback-bind check, the per-tester spend-cap ceiling, and the D4 Daily-inert (glzi-gated) assertion.
-- **Approach:** each risk test is mutation-gated where it is a ruling — the scan asserts the CLEAN direction truthy first, then a planted violation (a store-content byte on the OAuth outbound; a raw field / store read on the metered outbound; a `def make_key` under `scripts/ingest/`; a dispatch past the cap) must flip it RED, so the test cannot be built green-always.
-- **Criteria covered:** ADR-0048-T2 AC-2,3,5,6 (D1 inbound boundary + D7 egress); ADR-0049-T1 AC-3,4,5,6 (D2 egress + frozen six); ADR-0047-T2 AC-3,5; ADR-0047-T3 AC-2,3,5; ADR-0048-T1 AC-3,4; ADR-0048-T3 AC-2,4,5; ADR-0048-T4 AC-4,5; ADR-0049-T2 AC-4,5; ADR-0049-T3 AC-1,2,5,6.
+- **Scope:** the two crown-jewel wire-scans (ADR-0048 D7, ADR-0049 D2), the frozen-six numstat probe, the Risk-N3 `_key_def_count()==0` guard, the tracked-secret scans (ADR-0005), the `application/json` CSRF gates on the new secret-write + forced-spend routes, the code→token exchange redirect-decline, the env-first key precedence, the shared-key provisioning bridge (D5 default), the loopback-bind check, the per-tester spend-cap ceiling, and the D4 Daily-inert (glzi-gated) assertion.
+- **Approach:** each risk test is mutation-gated where it is a ruling — the scan asserts the CLEAN direction truthy first, then a planted violation (a store-content byte on the OAuth outbound; a 302-to-attacker-host on the token exchange; a `text/plain` cross-site POST on a secret-write/forced-spend route; a keyring read while `ANTHROPIC_API_KEY` is set; the provisioning bridge mutated out; a raw field / store read on the metered outbound; a `def make_key` under `scripts/ingest/`; a dispatch past the cap) must flip it RED, so the test cannot be built green-always.
+- **Criteria covered:** ADR-0048-T2 AC-2,3,4,6,7 (D1 inbound boundary + D7 egress + code→token redirect-decline); ADR-0049-T1 AC-3,4,5,6 (D2 egress + frozen six); ADR-0047-T2 AC-3,5,6; ADR-0047-T3 AC-2,3,5; ADR-0048-T1 AC-3,4,5,6; ADR-0048-T3 AC-2,4,5,6; ADR-0048-T4 AC-4,5,6; ADR-0049-T2 AC-4,5,6; ADR-0049-T3 AC-1,2,5,6.
 
-**Self-verifying ACs (covered by execution, not a separate test asset):** each task's terminal `pytest …` AC is the run itself — ADR-0047-T1 AC-6, ADR-0047-T2 AC-6, ADR-0047-T3 AC-6, ADR-0048-T1 AC-5, ADR-0048-T3 AC-6, ADR-0048-T2 AC-7, ADR-0049-T1 AC-7, ADR-0049-T2 AC-6 — and the dependency/import build AC names its own command (ADR-0047-T1 AC-4: `keyring` in `requirements.txt` + `import keyring` exits 0 on a clean venv). With these, plus the ADR-0048-T3 AC-2 loopback/body-ceiling check now mapped in Risk-Specific above, every acceptance criterion maps to a test or a verification command.
+**Self-verifying ACs (covered by execution, not a separate test asset):** each task's terminal `pytest …` AC is the run itself — ADR-0047-T1 AC-7, ADR-0047-T2 AC-7, ADR-0047-T3 AC-6, ADR-0048-T1 AC-7, ADR-0048-T3 AC-7, ADR-0048-T2 AC-8, ADR-0049-T1 AC-7, ADR-0049-T2 AC-7 — and the dependency/import build AC names its own command (ADR-0047-T1 AC-4: `keyring` in `requirements.txt` + `import keyring` exits 0 on a clean venv). With these, plus the ADR-0048-T3 AC-2 loopback/body-ceiling check now mapped in Risk-Specific above, every acceptance criterion maps to a test or a verification command.
 
 ## Repo-Grounding Ledger
 
@@ -375,10 +385,10 @@ Grounded against the live worktree on `feature/credential-onboarding-build` (Pha
 | ADR-0047-T1 | pass (`scripts/secret_store/` absent → Create; `requirements.txt`/`.gitignore` present → Modify) | pass (`keyring` absent from `scripts/`+`requirements.txt`, confirmed) | pass (`requirements.txt` = pytest+jsonschema; `.gitignore` has `.env*`) | pass (no `secret_store`/keyring module anywhere) | Grounded |
 | ADR-0047-T2 | pass (`key_source.py`, `auth_isolation.py` + their tests present → Modify) | pass (seams `resolve`@65/`store`@135/`build_subscription_env`@87 + shell-outs at cited lines) | pass (`keychain_runner`, `keychain_writer`, `keychain_reader` resolve) | pass (abstraction is the only new surface, from T1) | Grounded |
 | ADR-0047-T3 | pass (`oauth_pull.py` + `test_oauth_pull.py` present → Modify) | pass (`credential_reader`/`credential_writer`@320/382; `_key_def_count()`@107 == 0) | pass (`_read/_write_oauth_credential`@186/208 shell-out; `test_ingest.py::_key_def_count`) | pass | Grounded |
-| ADR-0048-T1 | pass (`scripts/serve/alpha_config.py` absent → Create) | pass (out-of-band posture; `block-pii-commit`/`pre-push-pii-scan` hooks present) | pass (`.gitignore` `.env*`; ADR-0005 hooks confirmed) | pass (no `alpha_config`/build-config loader present) | Grounded |
+| ADR-0048-T1 | pass (`scripts/serve/alpha_config.py` absent → Create) | pass (out-of-band posture; `block-pii-commit`/`pre-push-pii-scan` hooks present) | pass (`.gitignore` `.env*`; ADR-0005 hooks confirmed; the D5 bridge's cited input `key_source.resolve`@65 reads env `ANTHROPIC_API_KEY` first at `key_source.py:80-82` then the keychain then raises `KeyUnavailableError`@88 — the env-first branch the bridge provisions onto [VERIFIED]) | pass (no `alpha_config`/build-config loader present) | Grounded |
 | ADR-0048-T3 | pass (`server.py` present → Modify; `test_credential_writes.py` absent → Create) | pass (`_save_key`@925/`_key_status`@916; `/settings/key` route @183/201) | pass (the ADR-0013 single-key write class resolves; `oauth_pull` credential_reader) | pass | Grounded |
-| ADR-0048-T2 | pass (`oauth_callback.py` absent → Create; `server.py` → Modify; `test_oauth_callback.py` absent → Create) | pass (no `oauth`/`callback`/`redirect_uri`/`pkce` in `server.py` today — new inbound arm) | pass (`do_GET`@178/`do_POST`@194 `if self.path` chains; Garmin OAuth-1.0a@122) | pass (no callback route exists) | Grounded |
-| ADR-0048-T4 | pass (`intake.py`, `app_shell.py` present → Modify; UI test absent → Create) | **stale → actual:** the mockup frames the credential step as "Step 9 of 9", but the LIVE `intake.py` is a **6-step ADR-0004 flow** (`_step1`.._step6`); the credential step is appended to the live stepper's terminal position (the ADR's D6 "extend Step-9" = extend the terminal intake credential step whose live backing seam is `POST /settings/key`), NOT a rebuild of the intake shell into 9 steps (that 9-step onboarding shell is ADR-0033's separate, pending build). The credential-step UI itself is sourced faithfully from `credential-onboarding-mockup.html` Surface A. | pass (`_PLATFORM_SCREENS`+`screen-profile`@80, "My Info"@513; the mockup is the design source) | pass (extends existing surfaces, no new wizard) | Stale-Premise-Reconciled |
+| ADR-0048-T2 | pass (`oauth_callback.py` absent → Create; `server.py` → Modify; `test_oauth_callback.py` absent → Create) | pass (no `oauth`/`callback`/`redirect_uri`/`pkce` in `server.py` today — new inbound arm) | pass (`do_GET`@178/`do_POST`@194 `if self.path` chains; Garmin OAuth-1.0a at `oauth_pull.py:110-122` (`_GARMIN` manifest `"auth": "oauth1a"`), canonical anchor `oauth_pull.py:584` `_read_garmin`) | pass (no callback route exists) | Grounded |
+| ADR-0048-T4 | pass (`intake.py`, `app_shell.py` present → Modify; UI test absent → Create) | **stale → actual:** the mockup frames the credential step as "Step 9 of 9", but the LIVE `intake.py` is a **6-step ADR-0004 flow** (`_step1`.._step6`); the credential step is appended to the live stepper's terminal position (the ADR's D6 "extend Step-9" = extend the terminal intake credential step whose live backing seam is `POST /settings/key`), NOT a rebuild of the intake shell into 9 steps (that 9-step onboarding shell is ADR-0033's separate, pending build). The credential-step UI itself is sourced faithfully from `credential-onboarding-mockup.html` Surface A. | pass (`_PLATFORM_SCREENS`+`screen-profile` at `app_shell.py:80` — the structural anchor of the "My Info" surface, not the `@513` text label; the mockup is the design source) | pass (extends existing surfaces, no new wizard) | Stale-Premise-Reconciled |
 | ADR-0049-T1 | pass (`metered_dispatch.py` absent → Create; `server.py`/`test_loop_dispatch_wiring.py` → Modify; `test_metered_dispatch.py` → Create) | pass (`run_orchestrated`@127/`deid_in`@223/sentinel-halt@227/`_dispatch_domains`@358; `subscription_dispatch.build_dispatch`@45 the only adapter; `loop_dispatch`@170) | pass (`SUMMARY_FIELD_SET`@router:23 + `deid_in`@90; `normalize_author_output`; `session(name,prompt,context)`@subscription:67) | pass (no metered adapter for the seam exists) | Grounded |
 | ADR-0049-T2 | pass (`server.py`/`app_shell.py` → Modify; `test_plan_update_trigger.py` absent → Create) | pass (`/plan-loop`@216/`_do_plan_loop`@846 loop path; `DAILY_MONITOR_LABEL`@activate:52 label-only, no daily enable) | pass (`plan_loop.signal`→`run_orchestrated`; the mockup "Plan updates" section) | pass | Grounded |
 | ADR-0049-T3 | pass (`spend_cap.py` absent → Create; `metered_dispatch.py` → Modify from T1; `.gitignore` → Modify; `test_spend_cap.py` → Create) | pass (`DEFAULT_DISPATCH_CAP=64`@dispatch_budget:35 per-run cap; no monthly/per-tester ledger exists) | pass (`dispatch_budget` per-run cap resolves) | pass (no cumulative-spend ledger anywhere) | Grounded |
@@ -391,7 +401,7 @@ Grounded against the live worktree on `feature/credential-onboarding-build` (Pha
 - [x] All ADR IDs resolve to actual ADR files on disk (`docs/adr/ADR-0047…0049…md` read in full)
 
 ### Acceptance Criteria Quality
-- [x] Every task has at least one acceptance criterion (each has 5–7)
+- [x] Every task has at least one acceptance criterion (each has 5–8)
 - [x] All acceptance criteria are binary (a command/condition with a pass/fail outcome)
 - [x] No criterion uses "appropriate", "reasonable", "adequate", "properly", "correctly", "robust", "efficient"
 
