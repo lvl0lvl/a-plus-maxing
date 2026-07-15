@@ -5,6 +5,8 @@
 # pytest     — the V1 Python test baseline (.venv/bin/python -m pytest -q)
 # jsonschema — gate_attest.py verify-chain, used by the research-provenance audit
 #              (scripts/audit-research-provenance.sh) + the aplus-research gates
+# keyring    — the OS-native secret store backing scripts/secret_store (ADR-0047-T1);
+#              first third-party runtime dep on the secret path
 #
 # NOTE: the `anthropic` SDK is intentionally NOT listed here. The test suite runs with
 # the SDK ABSENT so no test path can ever make a live model call (the 0-live-spend
@@ -13,3 +15,4 @@
 # (see scripts/model/keychain-setup.md).
 pytest>=9.0
 jsonschema>=4.26
+keyring>=25.7
