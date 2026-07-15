@@ -87,6 +87,42 @@ class _RaisingBackend:
         raise KeyringLocked("locked")
 
 
+class _RecordingAvailableBackend(_OSKeyringFake):
+    """An AVAILABLE OS fake that records whether delete_password was invoked (FIX-1b)."""
+
+    def __init__(self, name="Recording Backend"):
+        super().__init__(name)
+        self.delete_called = False
+
+    def delete_password(self, service, username):
+        self.delete_called = True
+        return super().delete_password(service, username)
+
+
+class _WriteFailingHandle:
+    """Proxy over a real file handle whose `.write` raises — simulates a torn write (FIX-2).
+
+    Everything but `write` (fileno / flush / context-manager close) delegates to the real
+    handle, so the atomic writer opens + fchmods the temp normally, then fails on the payload
+    write; the `with` block's exit still closes the real fd.
+    """
+
+    def __init__(self, real):
+        self._real = real
+
+    def write(self, *args, **kwargs):
+        raise OSError("simulated torn write (ENOSPC)")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return self._real.__exit__(*exc)
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
 def _read_fb(path):
     """Read the on-disk fallback JSON directly (test-side inspection of residue)."""
     p = Path(path)
@@ -240,13 +276,21 @@ def test_total_failure_fails_loud(tmp_path, monkeypatch):
 
 
 def test_fallback_file_mode_0600(tmp_path, monkeypatch):
-    """AC-13: the fallback file is created ATOMICALLY with mode 0600 (no chmod window)."""
+    """AC-13: the fallback file is created ATOMICALLY at mode 0600 (no world-readable window).
+
+    The atomic writer stages the payload in a temp sibling created via tempfile.mkstemp (which
+    opens at mode 0600) and os.replaces it into place, so the fallback file is never
+    group/world-readable at the process umask — there is no open('w')-then-chmod window.
+    Reconciled for FIX-2: the at-creation proof now inspects the atomic temp sibling's open
+    mode rather than an os.open on the final path (mkstemp opens the temp, then os.replace).
+    """
     fp = tmp_path / "fb.json"
     created_modes = []
     real_os_open = os.open
 
     def spy_open(path, flags, mode=0o777, **kwargs):
-        if os.fspath(path) == os.fspath(fp):
+        # Record the creation mode of the atomic temp sibling(s) staged for this fallback file.
+        if os.path.basename(os.fspath(path)).startswith(fp.name):
             created_modes.append(mode)
         return real_os_open(path, flags, mode, **kwargs)
 
@@ -261,8 +305,9 @@ def test_fallback_file_mode_0600(tmp_path, monkeypatch):
     mode = stat.S_IMODE(os.stat(fp).st_mode)
     assert mode == 0o600, f"expected 0600, got {oct(mode)}"
     assert not (mode & 0o077), "group/world bits are set on the fallback file"
-    # At-creation proof: the file was created via os.open with mode 0o600, not open('w')+chmod.
-    assert 0o600 in created_modes, "fallback file not created atomically with mode 0600"
+    # At-creation proof: every temp sibling was opened at mode 0600, never world-readable.
+    assert created_modes, "no atomic temp sibling was created for the fallback file"
+    assert all(m == 0o600 for m in created_modes), f"temp created world-readable: {created_modes}"
 
 
 def test_fallback_env_var_fixed_prefix(tmp_path, monkeypatch):
@@ -414,10 +459,11 @@ def test_corrupt_fallback_file_get_under_outage(tmp_path, monkeypatch):
 
 
 def test_fallback_file_mode_reasserted_on_rewrite(tmp_path):
-    """LOW-1: a pre-existing looser-mode fallback file is re-clamped to 0600 on rewrite.
+    """LOW-1: a rewrite over a pre-existing looser-mode fallback file yields mode 0600.
 
-    O_CREAT applies the 0600 mode only on creation-from-absent; a pre-existing 0644 file
-    keeps its mode on rewrite. fchmod(fd, 0600) after open re-asserts owner-only mode.
+    The atomic writer replaces the target with a fresh temp inode created at mode 0600 (and
+    fchmod'd 0600 for parity), so a pre-existing 0644 file's mode does not survive the rewrite —
+    the result is owner-only 0600 regardless of the prior mode.
     """
     fp = tmp_path / "fb.json"
     fp.write_text("{}")
@@ -428,22 +474,28 @@ def test_fallback_file_mode_reasserted_on_rewrite(tmp_path):
 
 
 def test_fallback_symlink_not_followed(tmp_path):
-    """LOW-1: a symlink pre-placed at the fallback path is rejected, not followed (O_NOFOLLOW).
+    """LOW-1: a symlink at the fallback path never has the secret written through it.
 
-    Without O_NOFOLLOW a pre-placed symlink is followed and the secret is written to an
-    attacker-chosen target. O_NOFOLLOW makes os.open raise, which set_secret surfaces as a
-    fail-loud KeyStoreError; the symlink target is never written.
+    The atomic writer stages the secret in a fresh temp inode and os.replaces it over the
+    fallback path, so a symlink pre-placed there is REMOVED and replaced by a regular owner-only
+    file — its target is never written through. (The prior in-place O_NOFOLLOW open instead
+    REJECTED the symlink with a raise; the atomic rewrite replaces it, but the same
+    no-write-through-symlink security property holds — reconciled for the FIX-2 atomic write.)
     """
     target = tmp_path / "attacker_target.json"
     target.write_text("ORIGINAL_UNTOUCHED")
     link = tmp_path / "fb.json"
     link.symlink_to(target)
 
-    with pytest.raises(KeyStoreError):
-        set_secret("svc", "secret-value", backend=_RaisingBackend(), fallback_path=link)
+    set_secret("svc", "secret-value", backend=_RaisingBackend(), fallback_path=link)
 
-    # The symlink target is NOT followed/overwritten: its original content is intact.
+    # The symlink target is NEVER written through: its original content is intact.
     assert target.read_text() == "ORIGINAL_UNTOUCHED"
+    # The fallback path is now a REGULAR owner-only 0600 file (the symlink was replaced).
+    assert not link.is_symlink()
+    assert stat.S_IMODE(os.stat(link).st_mode) == 0o600
+    # The secret round-trips from the fresh inode (written to the temp, not the target).
+    assert get_secret("svc", backend=_RaisingBackend(), fallback_path=link) == "secret-value"
 
 
 def test_prompt_spy_counts_on_interactive_backend(tmp_path):
@@ -459,3 +511,92 @@ def test_prompt_spy_counts_on_interactive_backend(tmp_path):
     set_secret("api", "v", backend=backend, fallback_path=fp)
     get_secret("api", backend=backend, fallback_path=fp)
     assert backend.prompts > 0
+
+
+# --------------- Tier-3 fix cycle: fallback-tier robustness cluster (PR #352) ---------------
+
+
+def test_set_available_clear_failure_fails_loud(tmp_path, monkeypatch):
+    """FIX-1a: an available-keyring set whose stale-residue clear fails is fail-loud.
+
+    set_secret clears stale fallback residue after a successful keyring write (SEC-04). Pre-fix
+    that clear ran OUTSIDE any guard, so a clear-write failure escaped as a raw OSError. The fix
+    guards it: the failure surfaces as a constant-message KeyStoreError (never a raw OSError,
+    never the secret) and is NOT swallowed — a swallowed clear would silently leave stale
+    residue a later outage get_secret could serve.
+    """
+    fp = tmp_path / "fb.json"
+    available = _OSKeyringFake("macOS Keychain")
+    secret_store._fallback_write(fp, "svc", "STALE_RESIDUE")  # pre-existing residue
+    monkeypatch.setattr(secret_store, "_write_fallback_file", _raise_io)  # clear's write fails
+
+    with pytest.raises(KeyStoreError) as excinfo:
+        set_secret("svc", "fresh-secret-value", backend=available, fallback_path=fp)
+    assert not isinstance(excinfo.value, OSError)  # not the raw OSError
+    assert "fresh-secret-value" not in str(excinfo.value)  # constant message, no secret leak
+
+
+def test_delete_fallback_clear_failure_still_deletes_keyring(tmp_path, monkeypatch):
+    """FIX-1b: a delete whose fallback clear fails STILL attempts the keyring delete, fail-loud.
+
+    Pre-fix delete_secret cleared the fallback FIRST, unconditionally; a clear failure raised a
+    raw OSError before backend.delete_password was ever called, so the keyring credential
+    survived the delete. The fix attempts BOTH tiers regardless of a single-tier failure, then
+    surfaces a constant-message KeyStoreError (never a raw OSError) if either tier failed.
+    """
+    fp = tmp_path / "fb.json"
+    backend = _RecordingAvailableBackend()
+    secret_store._fallback_write(fp, "svc", "residue")  # pre-existing residue
+    monkeypatch.setattr(secret_store, "_write_fallback_file", _raise_io)  # clear's write fails
+
+    with pytest.raises(KeyStoreError) as excinfo:
+        delete_secret("svc", backend=backend, fallback_path=fp)
+    assert not isinstance(excinfo.value, OSError)  # not the raw OSError
+    assert backend.delete_called, "keyring delete was skipped by a fallback-clear failure"
+
+
+def test_atomic_write_preserves_siblings_on_torn_write(tmp_path, monkeypatch):
+    """FIX-2: a torn fallback write leaves prior sibling secrets intact (atomic temp + replace).
+
+    The pre-fix in-place O_TRUNC writer truncates the live file at open; a write that then fails
+    (ENOSPC / crash) empties it, permanently losing every sibling secret on the next
+    read-modify-rewrite. The atomic writer stages the payload in a fresh temp sibling and
+    os.replaces it, so a failed write leaves the live file's prior content byte-intact.
+    """
+    fp = tmp_path / "fb.json"
+    set_secret("alpha", "a", backend=_RaisingBackend(), fallback_path=fp)  # seed sibling 1
+    set_secret("beta", "b", backend=_RaisingBackend(), fallback_path=fp)   # seed sibling 2
+    assert _read_fb(fp) == {"alpha": "a", "beta": "b"}
+
+    real_fdopen = os.fdopen
+
+    def torn_fdopen(fd, *a, **k):
+        return _WriteFailingHandle(real_fdopen(fd, *a, **k))
+
+    monkeypatch.setattr(os, "fdopen", torn_fdopen)  # the payload write tears mid-way
+    with pytest.raises(KeyStoreError):
+        set_secret("gamma", "g", backend=_RaisingBackend(), fallback_path=fp)
+
+    # Atomic: the live file still holds alpha+beta; the pre-fix writer would have emptied it.
+    raw = fp.read_text()
+    survived = json.loads(raw) if raw.strip() else {}
+    assert survived == {"alpha": "a", "beta": "b"}
+
+
+@pytest.mark.parametrize("blob", ["[1, 2, 3]", "42", "null", '"x"'])
+def test_non_dict_fallback_file_treated_as_empty(tmp_path, monkeypatch, blob):
+    """FIX-3: a valid-JSON non-dict fallback file is treated as empty, never raising out the API.
+
+    json.loads on [1,2,3] / 42 / null / "x" yields a non-dict; the pre-fix .get()/in/[svc]=
+    then raise a raw AttributeError/TypeError out of the public API (the corrupt-file guard
+    catches only unparseable/OSError). A non-dict file is treated as empty: get returns None
+    and set overwrites it and round-trips.
+    """
+    fp = tmp_path / "fb.json"
+    fp.write_text(blob)
+    monkeypatch.delenv(f"{secret_store._FALLBACK_ENV_PREFIX}_SVC", raising=False)
+
+    assert get_secret("svc", backend=_RaisingBackend(), fallback_path=fp) is None
+    set_secret("svc", "v", backend=_RaisingBackend(), fallback_path=fp)
+    assert get_secret("svc", backend=_RaisingBackend(), fallback_path=fp) == "v"
+    assert _read_fb(fp) == {"svc": "v"}
