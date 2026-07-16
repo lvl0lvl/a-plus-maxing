@@ -2,10 +2,10 @@
 
 `resolve()` fetches the no-train API key from a SET env var (`ANTHROPIC_API_KEY` — the
 anthropic SDK's native var AND the operator's documented injection var) or, as a fallback,
-a macOS-keychain `security find-generic-password` command against the `a-plus-maxing-api-key`
-keychain item — AT CALL TIME, never captured at module load and never read from a tracked
-file. An absent key raises `KeyUnavailableError` fail-loud, naming the env var + the
-`keychain-setup.md` runbook.
+the `secret_store` abstraction (OS-native keyring primary + a file/env fallback tier) for
+the `a-plus-maxing-api-key` item — AT CALL TIME, never captured at module load and never
+read from a tracked file. An absent key raises `KeyUnavailableError` fail-loud, naming the
+env var + the `keychain-setup.md` runbook.
 
 This mirrors the project's runtime-config-resolution discipline (`pii_scan`'s gitignored
 identity config is resolved at call time, never tracked): no API-key literal ever lands in
@@ -57,9 +57,9 @@ def resolve(keychain_runner=_keychain_runner):
     """Resolve the no-train API key at call time from the env var or the keychain.
 
     Args:
-        keychain_runner (Callable, optional): The keychain fetch seam (returns the key or
-            None). Defaults to the macOS `security` command; injected in tests so no real
-            keychain or key is touched.
+        keychain_runner (Callable, optional): The credential fetch seam (returns the key or
+            None). Defaults to `secret_store.get_secret`; injected in tests so no real
+            keyring or key is touched.
 
     Returns:
         (str) The resolved no-train API key.
@@ -85,9 +85,10 @@ def resolve(keychain_runner=_keychain_runner):
 class KeyStoreError(RuntimeError):
     """Storing the no-train API key in the keychain failed.
 
-    Raised fail-loud when the keychain write returns non-zero or `security` is
-    unavailable. The message is CONSTANT and never carries the key value — a store
-    failure must not leak the secret into a traceback (NFR-3: the repo is PUBLIC).
+    Raised fail-loud when the `secret_store` write fails (the sibling
+    `secret_store.KeyStoreError` is translated to this class, so callers keep catching
+    `key_source.KeyStoreError`). The message is CONSTANT and never carries the key value —
+    a store failure must not leak the secret into a traceback (NFR-3: the repo is PUBLIC).
     """
 
 
@@ -112,19 +113,20 @@ def _keychain_writer(key):
 
 
 def store(key, *, keychain_writer=_keychain_writer):
-    """Store the no-train API key in the macOS keychain at call time.
+    """Store the no-train API key in the secret store at call time.
 
     Writes the key into the same `a-plus-maxing-api-key` item `resolve()` reads, so an
     in-app save (the Profile screen's POST `/settings/key`) is picked up by the next
-    runtime `resolve()` with no shell command. The key is written ONLY to the OS
-    keychain — never to a tracked file, a log, or a returned value (NFR-3: the repo is
-    PUBLIC). An empty/blank key is rejected before any write.
+    runtime `resolve()` with no shell command. The key is written to the `secret_store`
+    abstraction (the OS keyring, or — when the keyring is unavailable — its gitignored
+    owner-only file/env fallback) — never to a TRACKED file, a log, or a returned value
+    (NFR-3: the repo is PUBLIC). An empty/blank key is rejected before any write.
 
     Args:
         key (str): The no-train API key to store.
-        keychain_writer (Callable, optional): The keychain write seam (takes the key).
-            Defaults to the macOS `security add-generic-password` command; injected in
-            tests so no real keychain or key is touched.
+        keychain_writer (Callable, optional): The credential write seam (takes the key).
+            Defaults to `secret_store.set_secret`; injected in tests so no real keyring
+            or key is touched.
 
     Raises:
         ValueError: When the key is empty/blank — constant message, no key value.

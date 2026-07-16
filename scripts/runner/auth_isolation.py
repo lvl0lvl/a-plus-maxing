@@ -15,8 +15,8 @@ It returns a COPY and never mutates the caller's mapping or `os.environ`, so the
 item, at call time in the DRIVER's own process (`key_source.resolve`) — is unaffected: the
 subscription session's OAuth auth AND the de-id client's keychain auth hold simultaneously.
 
-The OAuth token is read from a NEW `a-plus-maxing-oauth-token` keychain item at call time, mirroring
-`key_source._keychain_runner`'s `security find-generic-password -w -s <service>` shape — never
+The OAuth token is read from a NEW `a-plus-maxing-oauth-token` item at call time via the
+`secret_store` abstraction (OS-native keyring primary + a file/env fallback tier) — never
 captured at module load, never written to a tracked file. `scripts/guard/pii_scan.py` is an
 operator-PII scanner with NO secret pattern, so a leaked token value in a tracked file would pass
 the PII hooks CLEAN (SEC-02); the control is that the token stays keychain-held, off the tracked
@@ -86,9 +86,9 @@ def build_subscription_env(base_env, *, keychain_reader=_oauth_keychain_reader):
 
     Args:
         base_env (Mapping): The parent env to scrub (typically a copy of `os.environ`).
-        keychain_reader (Callable, optional): The OAuth-token keychain read seam (returns the token
-            str or None). Defaults to the macOS `security` read of `a-plus-maxing-oauth-token`;
-            injected in tests so no real keychain or token is touched.
+        keychain_reader (Callable, optional): The OAuth-token read seam (returns the token
+            str or None). Defaults to `secret_store.get_secret` for `a-plus-maxing-oauth-token`;
+            injected in tests so no real keyring or token is touched.
 
     Returns:
         (dict) A copy of base_env with every `_METERED_ROUTING_ENV_VARS` var removed and
