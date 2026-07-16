@@ -186,10 +186,15 @@ def test_in_repo_config_path_rejected(tmp_path):
     oob.write_text(json.dumps({"vendors": {}, "shared_api_key": None}))
 
     # A same-case in-tree path is rejected (loaded before any read — the file need not exist).
-    with pytest.raises(alpha_config.AlphaConfigError):
+    # `match=` pins the REJECT message ("Refusing to load ...") NOT the missing-file read-failure
+    # ("Could not read ..."), so the assertion is not confounded by the fixture files not existing
+    # (QA-F): under a SEC-1 revert the case-variant falls through to the read-failure path, and
+    # this `match` then REDs instead of passing on the wrong message. NB "out-of-band" would NOT
+    # distinguish them — that substring is in BOTH messages; "Refusing to load" is reject-only.
+    with pytest.raises(alpha_config.AlphaConfigError, match="Refusing to load"):
         alpha_config.load_alpha_config(str(same_case))
     # The APFS case-variant in-tree path is ALSO rejected (SEC-1 — this is the bypass test).
-    with pytest.raises(alpha_config.AlphaConfigError):
+    with pytest.raises(alpha_config.AlphaConfigError, match="Refusing to load"):
         alpha_config.load_alpha_config(str(case_variant))
 
     # The reject predicate directly: case-variant IS in-repo (True); the sibling-prefix is NOT
@@ -334,3 +339,104 @@ def test_secret_value_never_leaks(tmp_path, monkeypatch, caplog):
         alpha_config.provision_shared_key(config, resolve=resolve)
 
     assert _SENTINEL not in caplog.text, "a secret value reached a log record"
+
+
+# --------------------------------------------------------------------------- #
+# AR-003 — a present-but-malformed config FAILS LOUD (constant msg), distinct
+#          from the unset -> EMPTY degrade
+# --------------------------------------------------------------------------- #
+
+
+def test_malformed_config_fails_loud(tmp_path, monkeypatch):
+    """AR-003: a present-but-malformed out-of-band config RAISES the constant fail-loud,
+    DISTINCT from the unset->EMPTY degrade (which returns an empty config, no exception).
+
+    Two malformed shapes land on the SAME constant `AlphaConfigError` message: a
+    syntactically-invalid file, and (FIX-1) a structurally-wrong config whose `shared_api_key`
+    is a dict — the loader validates value types INSIDE its try, so a non-string raises at LOAD
+    rather than deferring a raw `TypeError` to the bridge (`os.environ[...] = <dict>`). This is
+    the AR-003 total fail-loud, and it is independent of the AC-8 no-leak test.
+
+    RED-capable: pre-FIX-1 the dict-valued config LOADS (no raise) -> the second `raises` REDs.
+    """
+    _MSG = "missing or malformed"
+
+    # (a) A syntactically-invalid file -> the constant fail-loud (already the pre-FIX behavior).
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text("{ NOT-VALID-JSON")
+    with pytest.raises(alpha_config.AlphaConfigError, match=_MSG):
+        alpha_config.load_alpha_config(str(invalid))
+
+    # (b) A dict-valued `shared_api_key` (structurally wrong) -> the SAME constant fail-loud
+    #     (FIX-1: value-type validation inside the loader's try, no deferred raw TypeError).
+    dict_valued = tmp_path / "dict_valued.json"
+    dict_valued.write_text(json.dumps({"shared_api_key": {"nested": 1}}))
+    with pytest.raises(alpha_config.AlphaConfigError, match=_MSG):
+        alpha_config.load_alpha_config(str(dict_valued))
+
+    # DISTINCT from the unset degrade: env unset -> an EMPTY config, NO exception raised.
+    monkeypatch.delenv(alpha_config.ALPHA_CONFIG_ENV, raising=False)
+    degraded = alpha_config.load_alpha_config()
+    assert degraded.vendors == {}
+    assert degraded.shared_api_key is None
+
+
+# --------------------------------------------------------------------------- #
+# AR-004 — the ONE documented bridge-overwrite: an empty-string BYO is provisioned over
+# --------------------------------------------------------------------------- #
+
+
+def test_bridge_provisions_over_empty_string_byo(monkeypatch):
+    """AR-004: an EMPTY-string env key is treated as unset by `resolve` -> the bridge provisions
+    the shared key OVER the "" — the ONE documented case where the bridge overwrites an env value.
+
+    `key_source.resolve` guards the env tier with a truthiness check, so `ANTHROPIC_API_KEY=""`
+    is not a usable BYO key: the REAL env-first resolve still raises `KeyUnavailableError`, and
+    the bridge exports the shared key. DISTINCT from the no-clobber cases, where a REAL BYO value
+    (env or keychain) makes `resolve` return without raising and the bridge no-ops.
+    """
+    monkeypatch.setenv(key_source.ENV_VAR, "")   # empty -> falsy -> resolve treats as unset
+    resolve = partial(key_source.resolve, keychain_runner=_empty_keychain)
+    config = alpha_config.AlphaConfig(vendors={}, shared_api_key=_SHARED_KEY,
+                                      client_types=alpha_config.DEFAULT_CLIENT_TYPES)
+
+    # Precondition (genuine): a "" env value is not usable -> the REAL env-first resolve raises.
+    with pytest.raises(key_source.KeyUnavailableError):
+        resolve()
+
+    alpha_config.provision_shared_key(config, resolve=resolve)
+
+    # The bridge overwrote the empty "" with the shared key (the one documented overwrite case).
+    assert os.environ[key_source.ENV_VAR] == _SHARED_KEY
+
+
+# --------------------------------------------------------------------------- #
+# Loader combinatorial round-trips — each partial config loads cleanly (NIT)
+# --------------------------------------------------------------------------- #
+
+
+def test_loader_vendors_without_shared_key(tmp_path, monkeypatch):
+    """NIT: a config with vendors but NO `shared_api_key` loads cleanly (shared_api_key is None)."""
+    cfg = tmp_path / "alpha.json"
+    cfg.write_text(json.dumps({
+        "vendors": {"whoop": {"client_id": _WHOOP_CLIENT_ID, "client_secret": _WHOOP_CLIENT_SECRET}},
+    }))
+    monkeypatch.setenv(alpha_config.ALPHA_CONFIG_ENV, str(cfg))
+
+    config = alpha_config.load_alpha_config()
+
+    assert config.shared_api_key is None
+    assert config.vendors["whoop"].client_id == _WHOOP_CLIENT_ID
+    assert config.vendors["whoop"].client_secret == _WHOOP_CLIENT_SECRET
+
+
+def test_loader_shared_key_without_vendors(tmp_path, monkeypatch):
+    """NIT: a config with a `shared_api_key` but NO vendors loads cleanly (vendors == {})."""
+    cfg = tmp_path / "alpha.json"
+    cfg.write_text(json.dumps({"shared_api_key": _SHARED_KEY}))
+    monkeypatch.setenv(alpha_config.ALPHA_CONFIG_ENV, str(cfg))
+
+    config = alpha_config.load_alpha_config()
+
+    assert config.vendors == {}
+    assert config.shared_api_key == _SHARED_KEY

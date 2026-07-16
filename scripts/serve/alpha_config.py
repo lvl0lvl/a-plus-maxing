@@ -186,14 +186,21 @@ def load_alpha_config(path=None, *, client_types=None):
 
     try:
         raw = json.loads(Path(source).read_text(encoding="utf-8"))
-        vendors = {
-            name: VendorCredential(
-                client_id=entry["client_id"],
-                client_secret=entry.get("client_secret"),
-            )
-            for name, entry in raw.get("vendors", {}).items()
-        }
+        # Validate value types INSIDE the try: a non-string is caught by the except below and
+        # re-raised as the CONSTANT AlphaConfigError (AR-003 total fail-loud) — not a deferred
+        # raw TypeError at the bridge (`os.environ[...] = <dict>`), and no secret in the message.
+        vendors = {}
+        for name, entry in raw.get("vendors", {}).items():
+            client_id = entry["client_id"]
+            client_secret = entry.get("client_secret")
+            if not isinstance(client_id, str):
+                raise TypeError("client_id must be a string")
+            if client_secret is not None and not isinstance(client_secret, str):
+                raise TypeError("client_secret must be a string or None")
+            vendors[name] = VendorCredential(client_id=client_id, client_secret=client_secret)
         shared_api_key = raw.get("shared_api_key")
+        if shared_api_key is not None and not isinstance(shared_api_key, str):
+            raise TypeError("shared_api_key must be a string or None")
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         raise AlphaConfigError(
             "Could not read the out-of-band alpha config; the file is missing or malformed."
