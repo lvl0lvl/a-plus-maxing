@@ -338,10 +338,10 @@ def access_token(source, *, credential_reader=None, credential_writer=None, http
 
     Args:
         source (str): The wired API-pull source (e.g. "whoop").
-        credential_reader (Callable, optional): `source -> payload | None` keychain read seam.
-            Defaults to the macOS `security` read; injected in tests.
-        credential_writer (Callable, optional): `(source, payload) -> None` keychain write seam (for
-            rotation write-back). Defaults to the macOS `security` write; injected in tests.
+        credential_reader (Callable, optional): `source -> payload | None` credential read seam.
+            Defaults to `secret_store.get_secret`; injected in tests.
+        credential_writer (Callable, optional): `(source, payload) -> None` credential write seam (for
+            rotation write-back). Defaults to `secret_store.set_secret`; injected in tests.
         http (Callable, optional): `(method, url, *, headers, body) -> response` network seam.
             Defaults to `_http`; injected in tests.
 
@@ -404,8 +404,8 @@ def fetch(source, *, since, staged_dir, credential_reader=None, credential_write
         since (str | None): The lower-bound day cursor (YYYY-MM-DD) sent as the read `start` param, or
             None to fetch the source's default window.
         staged_dir (str | Path): The directory the staged export is written into (gitignored).
-        credential_reader (Callable, optional): The keychain read seam (see `access_token`).
-        credential_writer (Callable, optional): The keychain write seam (see `access_token`).
+        credential_reader (Callable, optional): The credential read seam (see `access_token`).
+        credential_writer (Callable, optional): The credential write seam (see `access_token`).
         http (Callable, optional): The network seam (see `access_token`).
 
     Returns:

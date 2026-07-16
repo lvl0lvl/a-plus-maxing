@@ -545,6 +545,7 @@ def test_rotation_write_failure_is_loud_and_non_fatal(monkeypatch, capsys):
     assert "whoop" in err and "keychain" in err        # loud + names the source + the store surface
     assert "stranded" not in err                       # softened: no false "stranded" certainty (AR-003)
     assert "will fail closed" not in err               # softened: no false "will fail closed" certainty
+    assert "rotated-token-payload" not in err          # NFR-3: the warn NEVER carries the payload value (sec-w3 LOW-1)
 
 
 def test_rotation_write_success_is_silent(monkeypatch, capsys):
