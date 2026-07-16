@@ -11,28 +11,29 @@ and the `(item, timepoint, source)` dedupe key are all reused byte-unchanged (de
 Directionality (ADR-0001): the pull is INBOUND — the operator's own data, from the operator's own
 wearable cloud account, into the local store. The outbound request carries only an OAuth bearer token
 + a date-range cursor (0 bytes of store content), and there is NO model step on the ingestion axis.
-This module imports only the standard library — never the store, never the model client — so the
-fetch path structurally cannot touch the model lane (the design §4 ruling, mechanized by the
-wire-scan probes in tests/ingest/test_oauth_pull.py).
+This module imports only the standard library plus the `secret_store` credential abstraction (itself
+store-free and model-free) — never the store, never the model client — so the fetch path structurally
+cannot touch the model lane (the design §4 ruling, mechanized by the wire-scan probes in
+tests/ingest/test_oauth_pull.py).
 
-Both the credential read/write (the macOS keychain) and the HTTP client are INJECTABLE seams
-(module-level defaults resolved at call time), exactly as `key_source.resolve(keychain_runner=...)`
-and `auth_isolation.build_subscription_env(keychain_reader=...)` inject theirs — so tests pass
-fixtures and touch no real keychain, token, or host. (The seams are named `credential_reader` /
-`credential_writer` rather than `keychain_*` so the tracker layer does not trip the Risk-N3
-dedupe-key-definition scan over scripts/ingest/; the storage is still the macOS keychain.)
+Both the credential read/write (the `secret_store` abstraction — OS-native keyring primary + a
+gitignored file/env fallback tier) and the HTTP client are INJECTABLE seams (module-level defaults
+resolved at call time), exactly as `key_source.resolve(keychain_runner=...)` and
+`auth_isolation.build_subscription_env(keychain_reader=...)` inject theirs — so tests pass fixtures and
+touch no real keychain, token, or host. (The seams are named `credential_reader` / `credential_writer`
+rather than `keychain_*` so the tracker layer does not trip the Risk-N3 dedupe-key-definition scan over
+scripts/ingest/; the storage is still the `secret_store` abstraction — the OS keyring, or the gitignored
+owner-only fallback when the keyring is unavailable.)
 Fail-closed: a missing / expired / revoked token, or any token- or read-endpoint error, raises
 `TrackerPullError` and writes 0 staged bytes (no partial or garbage file, no store write). The error
 message never carries the token value (NFR-3: the repo is PUBLIC).
 """
 
 import base64
-import getpass
 import hashlib
 import hmac
 import json
 import secrets
-import subprocess
 import sys
 import time
 import urllib.error
@@ -40,6 +41,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, urlencode, urlsplit, urlunsplit
+
+from scripts import secret_store
 
 
 class TrackerPullError(RuntimeError):
@@ -184,52 +187,59 @@ def _oauth_service_name(source):
 
 
 def _read_oauth_credential(source):
-    """Read the per-source OAuth credential from the macOS keychain at call time, or None when absent.
+    """Read the per-source OAuth credential from the `secret_store` abstraction, or None when absent/blank.
 
-    Runs `security find-generic-password -w -s a-plus-maxing-<source>-oauth` (the exact shape
-    `key_source._keychain_runner` and `auth_isolation._oauth_keychain_reader` use; `-w` prints only
-    the secret). Returns the stripped payload (a bare refresh token or a JSON credential blob), or
-    None when the item is absent or `security` is unavailable (a non-macOS host) — the absence path
-    is the caller's fail-loud trigger. Never captured at module load, never read from a tracked file.
+    Delegates to `secret_store.get_secret(a-plus-maxing-<source>-oauth)` (None-on-absent) — the OS-native
+    keyring with the gitignored file/env fallback tier — replacing the former direct `security` shell-out.
+    The read is bound to `getpass.getuser()` inside `secret_store` (set-side parity with the write
+    account). Returns the stripped payload (a bare refresh token or a JSON credential blob), or None when
+    the item is absent. `secret_store.get_secret` returns the stored value VERBATIM (no strip), so the
+    value is stripped here and a blank/whitespace-only value collapses to None (a value written
+    out-of-band can carry a trailing newline) — mirroring `key_source._keychain_runner`'s merged strip, so
+    the absence path (None) stays the caller's fail-loud trigger rather than a padded or truthy-garbage
+    credential. Never captured at module load, never read from a tracked file.
     """
-    try:
-        completed = subprocess.run(
-            ["security", "find-generic-password", "-w", "-s", _oauth_service_name(source)],
-            capture_output=True, text=True,
-        )
-    except (FileNotFoundError, OSError):
+    value = secret_store.get_secret(_oauth_service_name(source))
+    if not value:
         return None
-    if completed.returncode != 0:
-        return None
-    payload = completed.stdout.strip()
-    return payload or None
+    return value.strip() or None
 
 
 def _write_oauth_credential(source, payload):
-    """Write the per-source OAuth credential into the macOS keychain at call time (rotation write-back).
+    """Write the per-source OAuth credential to the `secret_store` abstraction (rotation write-back).
 
-    Runs `security add-generic-password -U -A -a <user> -s a-plus-maxing-<source>-oauth -w <payload>`
-    (`-U` updates in place so a rotated refresh token replaces the prior one; `-A` grants the item an
-    allow-all ACL so the backgrounded pull's later read is not blocked on an interactive prompt — the
-    same accepted tradeoff `key_source._keychain_writer` makes). The payload is passed only as the
-    subprocess argument, never logged. Non-fatal but LOUD (SEC-02): a write failure does NOT abort the
-    current tick (its access token already works), but unlike a silent best-effort write it emits a
-    diagnostic naming the rotation-write failure — a silently-stranded rotated refresh token would make
-    the NEXT tick 401 and fail closed blaming the token, not the write. The returncode is checked (the
-    `key_source._keychain_writer` precedent), but here we warn instead of raise (Security's guidance).
+    Delegates to `secret_store.set_secret(a-plus-maxing-<source>-oauth, payload)` — the OS-native keyring
+    with the gitignored file/env fallback tier — replacing the former direct `security` shell-out (the
+    former `-U` update-in-place is now the abstraction's set semantics). The write is bound to
+    `getpass.getuser()` inside `secret_store`, matching the read account. The payload is passed only as
+    the store argument, never logged.
+
+    Non-fatal but LOUD (SEC-02): unlike `key_source._keychain_writer` (which TRANSLATES the
+    `secret_store.KeyStoreError` to a raise), a rotation-write failure here does NOT abort the current
+    tick — its access token already works — but emits a diagnostic naming the failure, since an
+    unpersisted rotated refresh token would make the NEXT tick 401 and fail closed blaming the token, not
+    the write. The message is SOFTENED (AR-003): `secret_store.set_secret` raises the same `KeyStoreError`
+    for two conditions this writer cannot tell apart — the token persisted NOWHERE (keyring + fallback
+    both failed) vs the token WAS persisted and only stale fallback residue could not be cleared — so it
+    no longer asserts the token is stranded as a certainty; it says the token MAY not have persisted and
+    to re-run authorize only if the next tick fails auth.
+
+    SEC-04 downgrade (accepted): catching the `secret_store` clear-fail here turns T1's deliberately
+    fail-loud stale-residue clear into a swallowed warn on the tracker path (unlike `key_source`, which
+    raises) — a bounded erosion, since a rotated-away refresh token is dead and if the keyring is later
+    unavailable `get_secret` serves the stale fallback -> a 401 -> fail closed.
+
+    The former shell-out's `-A` allow-all ACL (so a backgrounded pull's later read was not blocked on an
+    interactive prompt) is intentionally superseded by the `secret_store` keyring write, which grants no
+    ACL; whether the backgrounded read stays unblocked without it is deferred to the operator-present live
+    run (bead a-plus-maxing-m8ia, already extended for the key_source path in ADR-0047-T2).
     """
     try:
-        completed = subprocess.run(
-            ["security", "add-generic-password", "-U", "-A",
-             "-a", getpass.getuser(), "-s", _oauth_service_name(source), "-w", payload],
-            capture_output=True, text=True,
-        )
-    except (FileNotFoundError, OSError):
-        completed = None
-    if completed is None or completed.returncode != 0:
-        print(f"tracker-pull: FAILED to write the rotated {source!r} refresh token back to the "
-              f"keychain (item {_oauth_service_name(source)!r}); the consumed token is now stranded — "
-              f"the next tick will fail closed until you re-run the authorize flow", file=sys.stderr)
+        secret_store.set_secret(_oauth_service_name(source), payload)
+    except secret_store.KeyStoreError:
+        print(f"tracker-pull: FAILED to write the rotated {source!r} refresh token back to the secret "
+              f"store (keychain item {_oauth_service_name(source)!r}); the rotated token may NOT have "
+              f"persisted — if the next tick fails auth, re-run the authorize flow", file=sys.stderr)
 
 
 class _HttpResponse:

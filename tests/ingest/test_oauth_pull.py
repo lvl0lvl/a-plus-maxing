@@ -521,35 +521,37 @@ def test_access_token_no_rotation_writes_nothing(tmp_path):
 # --- SEC-02: a failed rotation write-back is loud + non-fatal (never a silent stranded token) ---
 
 
-def _fake_completed(returncode):
-    """A duck-typed `subprocess.run` result carrying just the returncode the writer checks."""
-    import types
-
-    return lambda *a, **k: types.SimpleNamespace(returncode=returncode, stdout="", stderr="denied")
-
-
 def test_rotation_write_failure_is_loud_and_non_fatal(monkeypatch, capsys):
-    """SEC-02: a non-zero keychain write-back emits a LOUD diagnostic and does NOT raise.
+    """SEC-02: a `secret_store` write failure emits a LOUD diagnostic and does NOT raise.
 
-    Unlike `key_source._keychain_writer` (which raises on non-zero), the rotation write is non-fatal —
-    the current tick already holds its access token — but it must be loud: a silent failure strands the
-    consumed refresh token and the NEXT tick 401s, blaming the token rather than the write. REDs pre-fix
-    (no returncode check -> no diagnostic). The keychain is never touched (subprocess.run is stubbed).
+    Unlike `key_source._keychain_writer` (which TRANSLATES the `secret_store.KeyStoreError` to a raise),
+    the rotation write is non-fatal — the current tick already holds its access token — but it must be
+    loud: a silent failure would leave the consumed refresh token unpersisted and the NEXT tick 401s,
+    blaming the token rather than the write. The diagnostic is SOFTENED (AR-003): `secret_store.set_secret`
+    raises the same `KeyStoreError` for two conditions this writer cannot tell apart (the token persisted
+    nowhere vs the token WAS persisted and only stale fallback residue could not be cleared — the SEC-04
+    clear-fail), so it must NOT assert stranding as a certainty. No real keyring is touched (the
+    module-object `oauth_pull.secret_store.set_secret` is stubbed).
     """
     from scripts.ingest import oauth_pull
 
-    monkeypatch.setattr(oauth_pull.subprocess, "run", _fake_completed(1))
+    def _boom(service, value):
+        raise oauth_pull.secret_store.KeyStoreError("store write failed")
+
+    monkeypatch.setattr(oauth_pull.secret_store, "set_secret", _boom)
     oauth_pull._write_oauth_credential("whoop", "rotated-token-payload")   # must NOT raise
 
     err = capsys.readouterr().err.lower()
-    assert "whoop" in err and "keychain" in err        # loud + names the source + the write surface
+    assert "whoop" in err and "keychain" in err        # loud + names the source + the store surface
+    assert "stranded" not in err                       # softened: no false "stranded" certainty (AR-003)
+    assert "will fail closed" not in err               # softened: no false "will fail closed" certainty
 
 
 def test_rotation_write_success_is_silent(monkeypatch, capsys):
-    """A successful (returncode 0) write-back emits no diagnostic (no spurious warning on the happy path)."""
+    """A successful `secret_store` write-back emits no diagnostic (no spurious warning on the happy path)."""
     from scripts.ingest import oauth_pull
 
-    monkeypatch.setattr(oauth_pull.subprocess, "run", _fake_completed(0))
+    monkeypatch.setattr(oauth_pull.secret_store, "set_secret", lambda service, value: None)
     oauth_pull._write_oauth_credential("whoop", "rotated-token-payload")
     assert capsys.readouterr().err == ""
 
@@ -557,13 +559,17 @@ def test_rotation_write_success_is_silent(monkeypatch, capsys):
 def test_access_token_completes_when_rotation_write_back_fails(monkeypatch, capsys):
     """SEC-02 integrated: a failed rotation write-back still lets `access_token` return the token.
 
-    The token response rotates the refresh token; the keychain write-back fails (non-zero). The current
+    The token response rotates the refresh token; the default `secret_store` write-back fails. The current
     operation still completes (the access token is returned) and the failure is surfaced loudly — the
-    tick succeeds, the operator is warned the next tick needs re-auth.
+    tick succeeds, the operator is warned the next tick may need re-auth. Exercises the DEFAULT
+    `credential_writer` (the migration re-points the write seam at `oauth_pull.secret_store.set_secret`).
     """
     from scripts.ingest import oauth_pull
 
-    monkeypatch.setattr(oauth_pull.subprocess, "run", _fake_completed(1))
+    def _boom(service, value):
+        raise oauth_pull.secret_store.KeyStoreError("store write failed")
+
+    monkeypatch.setattr(oauth_pull.secret_store, "set_secret", _boom)
     routes = _whoop_routes()
     routes["oauth2/token"] = (200, {**_TOKEN_OK, "refresh_token": "rotated-refresh-token"})
 
@@ -574,6 +580,94 @@ def test_access_token_completes_when_rotation_write_back_fails(monkeypatch, caps
     )
     assert token == "fixture-access-token"                 # the operation completed
     assert "whoop" in capsys.readouterr().err.lower()      # ... and the write failure was loud
+
+
+# --- ADR-0047-T3: the DEFAULT credential seams route through the secret_store abstraction ---
+
+
+def test_default_seams_route_through_secret_store(monkeypatch):
+    """AC-1: the DEFAULT credential seams delegate to `secret_store`, keyed a-plus-maxing-<source>-oauth.
+
+    Pins the EXACT service string, derived from `source` (a whoop read + an oura write) — so a
+    transposition or a hardcoded service reds. The default read delegates to `secret_store.get_secret`;
+    the default write to `secret_store.set_secret`. No real keyring is touched (both are stubbed).
+    """
+    from scripts.ingest import oauth_pull
+
+    seen = {}
+    monkeypatch.setattr(oauth_pull.secret_store, "get_secret",
+                        lambda service: seen.__setitem__("read", service) or "fixture-token")
+    monkeypatch.setattr(oauth_pull.secret_store, "set_secret",
+                        lambda service, value: seen.__setitem__("write", (service, value)))
+
+    assert oauth_pull._read_oauth_credential("whoop") == "fixture-token"
+    assert seen["read"] == "a-plus-maxing-whoop-oauth"
+
+    oauth_pull._write_oauth_credential("oura", "rotated-payload")
+    assert seen["write"] == ("a-plus-maxing-oura-oauth", "rotated-payload")
+
+
+def test_no_security_shellout_in_oauth_pull():
+    """AC-3: no `security` shell-out survives in oauth_pull — bare-token grep + import scan, non-vacuous.
+
+    Greps the module SOURCE for the list-form invocation token `(find|add)-generic-password` — which
+    matches the actual comma-separated `["security", "find-generic-password", ...]` list literal, NOT
+    just docstring prose (the space-form regex only matched prose, so it would go green merely from
+    deleting a docstring — the T2 AC-3 defect). Also scans `subprocess.run` and the `import subprocess` /
+    `import getpass` lines. A positive control proves the pattern is RED-capable against a planted
+    list-form shell-out in perpetuity (mirrors test_ingest.py::test_key_def_scan_detects_planted_token).
+    """
+    import re
+    from pathlib import Path
+
+    from scripts.ingest import oauth_pull
+
+    src = Path(oauth_pull.__file__).read_text()
+    assert len(re.findall(r"(find|add)-generic-password", src)) == 0       # list-literal + prose both gone
+    assert len(re.findall(r"subprocess\.run", src)) == 0
+    assert len(re.findall(r"(?m)^\s*import subprocess", src)) == 0
+    assert len(re.findall(r"(?m)^\s*import getpass", src)) == 0
+
+    # Positive control: the bare-token pattern matches a real list-form shell-out (RED-capable forever).
+    planted = 'subprocess.run(["security", "find-generic-password", "-w", "-s", svc])'
+    assert len(re.findall(r"(find|add)-generic-password", planted)) > 0
+    assert len(re.findall(r"subprocess\.run", planted)) > 0
+
+
+def test_unattended_rotation_roundtrip_through_abstraction(monkeypatch):
+    """AC-4: a rotated refresh token written via the default writer round-trips through the abstraction.
+
+    The default `_write_oauth_credential` persists via `secret_store.set_secret`; a later default
+    `_read_oauth_credential` recovers it via `secret_store.get_secret` — 0 prompts (structural to the
+    shared-dict mock). Proves the unattended rotating-vendor path (Whoop) survives the refactor end to
+    end. NOT the real `backend=` kwarg (oauth_pull never threads it) — the module seams are stubbed.
+    """
+    from scripts.ingest import oauth_pull
+
+    persisted = {}
+    monkeypatch.setattr(oauth_pull.secret_store, "set_secret",
+                        lambda service, value: persisted.__setitem__(service, value))
+    monkeypatch.setattr(oauth_pull.secret_store, "get_secret", lambda service: persisted.get(service))
+
+    oauth_pull._write_oauth_credential("whoop", "rotated-refresh-token")
+    assert oauth_pull._read_oauth_credential("whoop") == "rotated-refresh-token"
+
+
+def test_default_reader_strips_and_collapses(monkeypatch):
+    """AC-4b (F1 strip pin): the default reader strips padding and collapses whitespace-only to None.
+
+    `secret_store.get_secret` returns the stored value VERBATIM (no strip), so `_read_oauth_credential`
+    must strip + collapse — else a padded refresh token flows to a 401 refresh and a whitespace-only
+    payload becomes a truthy garbage credential that bypasses the fail-closed no-token guard. RED-capable:
+    drop the strip -> the padded value is returned / the whitespace-only value is truthy, not None.
+    """
+    from scripts.ingest import oauth_pull
+
+    monkeypatch.setattr(oauth_pull.secret_store, "get_secret", lambda service: "  padded-token  ")
+    assert oauth_pull._read_oauth_credential("whoop") == "padded-token"
+
+    monkeypatch.setattr(oauth_pull.secret_store, "get_secret", lambda service: "   ")
+    assert oauth_pull._read_oauth_credential("whoop") is None
 
 
 # --- TEST-1: honest absence — a null score field / missing timestamp yields NO fabricated row ---
