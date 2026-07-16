@@ -14,6 +14,7 @@ import sys
 import threading
 
 from scripts.model.client import ModelClient
+from scripts.serve import alpha_config
 from scripts.serve import server as serve_server
 
 
@@ -49,6 +50,15 @@ def main(argv=None, *, build=serve_server.build_server, client_factory=ModelClie
     re-renders rather than making a metered call — extraction is wired here, at the entry
     point, not by a handler self-default.
 
+    Also invokes the D5 shared-key bridge (ADR-0049-T1): `provision_shared_key` closes the
+    no-BYO key default so the `/upload` extraction lane's `key_source.resolve` returns the shared
+    `a-plus-maxing-api-key`. It does NOT arm the plan loop: the metered dispatch factory
+    (`scripts/runner/metered_dispatch.py`) is specialist-only (`ModelClient.author` always returns a
+    plan-author envelope, never a judge score-map or a lens findings-list), so it cannot serve the
+    loop's judge/lens dispatch name-spaces — `main()` therefore passes no `loop_dispatch`/
+    `loop_deid_client` and the standalone `/plan-loop` degrades honestly (`loop-dispatch-unavailable`)
+    until a metered judge/lens surface exists (bead).
+
     On a port collision, exit non-zero with a fail-loud message; on Ctrl-C (SIGINT),
     stop the listener cleanly. `serve_forever` runs on a worker thread so the main
     thread can drive `shutdown()` (which must run off the serving thread).
@@ -66,15 +76,27 @@ def main(argv=None, *, build=serve_server.build_server, client_factory=ModelClie
     """
     port = serve_server.DEFAULT_PORT
     roots = _data_roots()  # optional scratch-store override for safe, repeatable testing
-    # The loop dispatch obligation (bead 3ge1 / ADR-0036-T1 Tier-2): `build_server` accepts
-    # `loop_dispatch`/`loop_deid_client`, but this standalone entry deliberately passes NEITHER — the
-    # loop's A' aggregate dispatch (every specialist + judge + lens on the subscription session,
-    # ADR-0036 Consequences) has no runtime in a plain Python server process. Fabricating a dispatch
-    # here would either be a fake or would arm heavy no-train spend by default. So `/plan-loop`
-    # degrades honestly (`loop-dispatch-unavailable`); a genuinely-live loop is an agent-driven
-    # scheduled runner, a separate ADR-gated + operator-spend-gated build (NOT this entry point).
+    # Invoke the D5 shared-key bridge at operator start (ADR-0049-T1). The bridge exports the shared
+    # `a-plus-maxing-api-key` onto the env-first key path when no BYO key resolves — a BYO key no-ops
+    # it (HIST01: the shared key is the default, never an override) — so the `/upload` extraction
+    # lane's `key_source.resolve` returns on the no-BYO default. `load_alpha_config` fails loud on a
+    # malformed / in-repo config and `main()` does NOT catch it: crashing loud at operator start is the
+    # intended posture (AR-006, no defensive try/except). Never print/log/repr the config or key (bead
+    # d1yz — the dataclass repr renders the secret).
+    #
+    # The metered SPECIALIST-author dispatch factory is BUILT + egress-tested (the D2 wire-scan,
+    # `scripts/runner/metered_dispatch.py`), but the loop is NOT armed here. The metered lane is
+    # specialist-only: `ModelClient.author` always returns a plan-author envelope, never a
+    # `quality-judge` score-map or a safety-lens findings-list, so it cannot serve the loop's
+    # three-name-space dispatch seam (specialist / judge / lens). Arming it as the live `loop_dispatch`
+    # would deterministically REVISE-always at the judge and AttributeError->SAFETY_BLOCK at the lens
+    # (0 plans, wasted metered spend). So `main()` passes NEITHER loop seam and `/plan-loop` degrades
+    # honestly (`loop-dispatch-unavailable`) until a metered judge/lens gate-dispatch surface lands
+    # (bead: metered loop_dispatch needs a judge/lens surface). The bridge still provisions the key.
+    alpha_config.provision_shared_key(alpha_config.load_alpha_config())
+    client = client_factory()
     try:
-        srv = build(port, client=client_factory(), **roots)
+        srv = build(port, client=client, **roots)
     except OSError as exc:
         raise SystemExit(
             f"Port {port} is already in use ({exc}); the intake server did not start. "

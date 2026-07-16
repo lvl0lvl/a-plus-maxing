@@ -15,14 +15,38 @@ Two concerns the Architect surfaced on ADR-0036-T1:
       subscription-session aggregate, not an API call). So `/plan-loop` cannot run live in the
       standalone server; it must degrade with a DISTINCT, HONEST reason (`loop-dispatch-unavailable`),
       not the generic catch-all, and without fabricating a dispatch or arming any spend.
+
+ADR-0049-T1 (S141) RE-AFFIRMED concern (a) on new grounds: the metered dispatch factory
+(`scripts/runner/metered_dispatch.py`) is SPECIALIST-ONLY (`ModelClient.author` always returns a
+plan-author envelope — never a `JUDGE_ROLE` score-map nor a lens findings-list), so it cannot serve
+the loop's three-name-space aggregate seam either. `main()` therefore STILL passes no
+`loop_dispatch`/`loop_deid_client` (the Tier-3 REJECT reverted a premature arming that would have
+SAFETY_BLOCKED every live run after burning metered spend); it DOES invoke the D5 shared-key bridge
+for the `/upload` extraction lane. Arming the live loop is blocked on the metered judge/lens surface
+(bead: metered loop_dispatch needs a judge/lens surface).
 """
 
+import pytest
+
+from scripts import secret_store
+from scripts.model import key_source
 from scripts.plan.safety_review import DEFAULT_LENSES
+from scripts.serve import __main__ as entry
+from scripts.serve import alpha_config
 from scripts.serve import plan_loop
 from scripts.serve import server as serve_server
 from scripts.store.plan_schema import PLAN_DOMAINS
 
-from tests.serve.test_plan_loop import _post_plan_loop_ctype, _serve_in_thread
+from tests.plan.test_deid_in import _FixedDeidClient
+from tests.plan.test_plan_orchestrator import _deid_summary
+from tests.serve.test_plan_loop import (
+    _LoopDispatch,
+    _clean_authors,
+    _loop_server,
+    _post_plan_loop,
+    _post_plan_loop_ctype,
+    _serve_in_thread,
+)
 
 
 # --- concern (b): the shared JUDGE_ROLE constant + the routing disjointness precondition ---
@@ -133,3 +157,125 @@ def test_plan_loop_csrf_gate_precedes_seam_check(tmp_path):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# --- ADR-0049-T1: the metered loop-seam wiring at operator start + the D5 shared-key bridge -------
+
+
+def _fixture_alpha_config(shared_key):
+    """A fixture `AlphaConfig` carrying a synthetic shared key + no vendor creds (the no-BYO default)."""
+    return alpha_config.AlphaConfig(vendors={}, shared_api_key=shared_key, client_types={})
+
+
+class _Abort(Exception):
+    """Abort the entry inside the spy `build`, before the serve loop (the house spy-build pattern)."""
+
+
+def test_main_does_not_arm_loop_but_bridge_closes_default(monkeypatch):
+    # AC-2 [AMENDED S141, Tier-3 REJECT]: `main()` must NOT arm the loop — the metered dispatch is
+    # specialist-only and cannot serve the loop's judge/lens name-spaces (arming it SAFETY_BLOCKS
+    # every live run after burning metered spend). It MUST still invoke the D5 bridge so the /upload
+    # extraction lane's `key_source.resolve` returns the shared key on the no-BYO default.
+    shared = "sk-ant-" + "shared-fixture-000"  # synthetic, sk-ant--shaped
+    monkeypatch.delenv(key_source.ENV_VAR, raising=False)  # FIRST — isolate the bridge's raw os.environ write
+    monkeypatch.setattr(secret_store, "get_secret", lambda *a, **k: None)  # empty keychain (no real keyring)
+    monkeypatch.setattr(alpha_config, "load_alpha_config", lambda *a, **k: _fixture_alpha_config(shared))
+
+    captured = {}
+
+    def _spy_build(port, *, client=None, loop_dispatch=None, loop_deid_client=None, **kwargs):
+        captured["loop_dispatch"] = loop_dispatch
+        captured["loop_deid_client"] = loop_deid_client
+        captured["client"] = client
+        raise _Abort
+
+    with pytest.raises(_Abort):
+        entry.main(build=_spy_build, client_factory=lambda: object())
+
+    assert captured["loop_dispatch"] is None, "main() armed the specialist-only metered loop_dispatch"
+    assert captured["loop_deid_client"] is None, "main() armed a loop_deid_client with no usable loop_dispatch"
+    assert captured["client"] is not None, "main() no longer wires the /upload extraction client"
+    assert key_source.resolve() == shared, "the D5 bridge did not close the no-BYO default"
+
+
+def test_main_propagates_alpha_config_error(monkeypatch):
+    # AR-006 fail-loud regression guard: a malformed / in-repo alpha config raises `AlphaConfigError`
+    # and `main()` must NOT catch it — crashing loud at operator start is the intended posture. A
+    # future defensive try/except around the bridge would silently start the server on a bad config;
+    # this test REDs on that.
+    def _raise(*a, **k):
+        raise alpha_config.AlphaConfigError("malformed alpha config (fixture)")
+
+    monkeypatch.setattr(alpha_config, "load_alpha_config", _raise)
+    with pytest.raises(alpha_config.AlphaConfigError):
+        entry.main(build=lambda *a, **k: (_ for _ in ()).throw(_Abort()), client_factory=lambda: object())
+
+
+def test_bridge_out_meta_assertion_default_stays_open(monkeypatch):
+    # AR-005 in-suite meta-assertion: run `main()` with the bridge monkeypatched to a NO-OP; the
+    # no-BYO default is NOT closed, so `key_source.resolve()` raises — the suite ITSELF fails if the
+    # bridge is not load-bearing (a prose falsifier is not enough).
+    shared = "sk-ant-" + "shared-fixture-001"
+    monkeypatch.delenv(key_source.ENV_VAR, raising=False)
+    monkeypatch.setattr(secret_store, "get_secret", lambda *a, **k: None)
+    monkeypatch.setattr(alpha_config, "load_alpha_config", lambda *a, **k: _fixture_alpha_config(shared))
+    monkeypatch.setattr(alpha_config, "provision_shared_key", lambda *a, **k: None)  # bridge no-op
+
+    def _spy_build(port, *, client=None, loop_dispatch=None, loop_deid_client=None, **kwargs):
+        raise _Abort
+
+    with pytest.raises(_Abort):
+        entry.main(build=_spy_build, client_factory=lambda: object())
+    with pytest.raises(key_source.KeyUnavailableError):
+        key_source.resolve()
+
+
+def test_plan_loop_both_seams_wired_routes_non_degraded(tmp_path):
+    # SEAM PLUMBING TEST (AR-002; scoped honestly per the Tier-3 REJECT): with BOTH loop seams wired,
+    # POST /plan-loop passes the or-guard (server.py:893) and routes confirm -> plan_loop ->
+    # run_orchestrated — the complement of this file's seamless/half-wired degraded tests. It injects
+    # `_LoopDispatch`, a THREE-name-space FIXTURE (specialist/judge/lens); it is evidence the
+    # build_server SEAM plumbs through the handler, NOT evidence the production metered dispatch
+    # survives the gate (it cannot — specialist-only; see test_metered_dispatch's judge/lens
+    # limitation tests + the bead). Production main() wires neither seam.
+    dispatch = _LoopDispatch(_clean_authors())
+    deid_client = _FixedDeidClient(_deid_summary())
+    srv, port = _loop_server(tmp_path, dispatch, deid_client)
+    _serve_in_thread(srv)
+    try:
+        status, body = _post_plan_loop(port)
+        assert status == 200, f"expected 200, got {status}"
+        assert not (body.get("degraded") is True and body.get("reason") == "loop-dispatch-unavailable"), body
+        assert dispatch.calls, "the loop_dispatch was never invoked — the request did not route to run_orchestrated"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_main_does_not_leak_shared_key(monkeypatch, capsys):
+    # AC-8: `main()`'s stdout/stderr carries the shared-key VALUE 0 times. A negative assertion is
+    # vacuously green while unmodified, so its proof is the in-suite meta-assertion below.
+    shared = "sk-ant-" + "shared-fixture-002"
+    monkeypatch.delenv(key_source.ENV_VAR, raising=False)
+    monkeypatch.setattr(secret_store, "get_secret", lambda *a, **k: None)
+    monkeypatch.setattr(alpha_config, "load_alpha_config", lambda *a, **k: _fixture_alpha_config(shared))
+
+    def _quiet_build(port, *, client=None, **kwargs):
+        raise _Abort
+
+    with pytest.raises(_Abort):
+        entry.main(build=_quiet_build, client_factory=lambda: object())
+    quiet = capsys.readouterr()
+    assert shared not in quiet.out and shared not in quiet.err, "main() leaked the shared key value"
+
+    # AR-005 meta-assertion: the SAME capsys scan MUST catch a deliberately-leaky build spy — so the
+    # suite itself fails if the no-leak scan cannot detect a leak.
+    def _leaky_build(port, **kwargs):
+        print(shared)  # simulate a leak
+        raise _Abort
+
+    with pytest.raises(_Abort):
+        entry.main(build=_leaky_build, client_factory=lambda: object())
+    leaked = capsys.readouterr()
+    with pytest.raises(AssertionError):
+        assert shared not in leaked.out and shared not in leaked.err
