@@ -2340,12 +2340,13 @@ def test_care_review_adds_no_route_no_new_client(tmp_path):
     # POST route branches match on `self.path == "/..."`: /chat, /care-chat, /settings/key,
     # /confirm-extraction, /confirm-curation (T10), /confirm-plan-change (the ADR-0040-T4 AC-5
     # sanctioned confirm route — a later phase legitimately adds it), /generate-plan,
-    # /plan-loop (ADR-0036-T1) = 8.
+    # /plan-loop (ADR-0036-T1), /settings/tracker (the ADR-0048-T3 per-source tracker
+    # credential-write route — a later phase legitimately adds it) = 9.
     # (/care-chat is the post-unlock profile-aware Care Assistant conversation; do_GET matches on a
     # query-stripped local `path` so a cache-bust `/?v=2` URL serves the app rather than 404 — it does
     # not use `self.path ==`.)
     assert 'self.path == "/care-review"' not in server_src, "T8 added a /care-review route"
-    assert server_src.count('self.path == "/') == 8, "the POST route-table branch count changed unexpectedly"
+    assert server_src.count('self.path == "/') == 9, "the POST route-table branch count changed unexpectedly"
     assert '_LOOPBACK = "127.0.0.1"' in server_src, "the loopback bind literal changed"
     # An unknown POST still 404s (the route table is unchanged).
     srv, port = _server_with_care_review(tmp_path, _CareReviewBackend())

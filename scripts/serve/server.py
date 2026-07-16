@@ -13,9 +13,10 @@ multipart body (`multipart.stage_uploads`, ADR-0013-T2) -> route the staged file
 the UNCHANGED `ingest.run`/`dna.land` seam (`route.route_upload`) -> re-render the app
 shell via `generate.run('app')` reflecting the new load-state. The server serves NO
 generated dashboard/report artifact live (ADR-0013 Falsification 3); the route table
-is {GET `/`, GET `/settings/key`, POST `/upload`, POST `/chat`, POST `/settings/key`,
+is {GET `/`, GET `/settings/key`, GET `/settings/trackers`, GET `/conversation`,
+POST `/upload`, POST `/chat`, POST `/settings/key`, POST `/settings/tracker`,
 POST `/care-chat`, POST `/confirm-extraction`, POST `/confirm-curation`,
-POST `/confirm-plan-change`, POST `/generate-plan`}. POST `/confirm-extraction`
+POST `/confirm-plan-change`, POST `/generate-plan`, POST `/plan-loop`}. POST `/confirm-extraction`
 (ADR-0030-T3) lands ONLY the operator-confirmed subset of an unrecognized-format
 upload's extracted readings through the UNCHANGED sink — the `/upload` handler surfaces
 those readings and lands 0. POST `/generate-plan` authors + records a plan for each
@@ -136,9 +137,10 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     POST `/upload` stages the multipart body, routes the staged file into the unchanged
     `ingest.run`/`dna.land` seam, and re-renders the app shell reflecting the new
     load-state. Any other POST 404s — the route table is {GET `/`, GET `/settings/key`,
-    POST `/upload`, POST `/chat`, POST `/care-chat`, POST `/settings/key`,
+    GET `/settings/trackers`, GET `/conversation`, POST `/upload`, POST `/chat`,
+    POST `/care-chat`, POST `/settings/key`, POST `/settings/tracker`,
     POST `/confirm-extraction`, POST `/confirm-curation`, POST `/confirm-plan-change`,
-    POST `/generate-plan`}, never a directory listing or an artifact-serving route.
+    POST `/generate-plan`, POST `/plan-loop`}, never a directory listing or an artifact-serving route.
 
     Attributes:
         store_root: The time-series store root the POST handler ingests into and
@@ -183,6 +185,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         if path == "/settings/key":
             self._key_status()
             return
+        if path == "/settings/trackers":
+            self._tracker_status()
+            return
         if path == "/conversation":
             self._do_get_conversation()
             return
@@ -200,6 +205,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/settings/key":
             self._save_key()
+            return
+        if self.path == "/settings/tracker":
+            self._save_tracker_token()
             return
         if self.path == "/confirm-extraction":
             self._do_confirm_extraction()
@@ -985,6 +993,104 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         import os
 
         os.environ[key_source.ENV_VAR] = key
+        self._write_json(200, {"ok": True, "connected": True})
+
+    def _tracker_status(self):
+        """Write JSON `{sources: {<source>: bool, ...}}` — per-source connected booleans, never a value.
+
+        Reports, for each WIRED tracker source, whether its OAuth credential is EFFECTIVELY present
+        (`oauth_pull._read_oauth_credential(source) is not None` — the reader's strip/blank-collapse
+        semantics, so a whitespace-only stored value reports `false`, matching what the pull actually
+        sees, and routing status through `_oauth_service_name` at one derivation site). Reports ONLY
+        booleans — never a token value (mirrors `_key_status`'s present-only contract). The wired
+        source set is read at REQUEST time from `oauth_pull`'s manifests (a function-local import) so
+        it stays data-driven, not a hand-copied list.
+        """
+        from scripts.ingest import oauth_pull
+
+        sources = {
+            source: oauth_pull._read_oauth_credential(source) is not None
+            for source in oauth_pull._MANIFESTS
+        }
+        self._write_json(200, {"sources": sources})
+
+    def _save_tracker_token(self):
+        """Read a JSON `{source, token}` body and store the per-source OAuth token via `secret_store`.
+
+        The N-per-source companion to `_save_key`: the token is written ONLY to the secret store (via
+        `secret_store.set_secret`) into the SAME `a-plus-maxing-<source>-oauth` item `oauth_pull`'s
+        default reader reads — never logged, echoed in the response, or written to a file. The gate
+        order mirrors `_save_key` EXACTLY for the shared gates, with ONE new gate — source validation
+        — inserted between shape and token: the SEC-001 `application/json` CSRF gate FIRST (before the
+        body is read), then the 16-KiB body ceiling, then JSON-parse/shape, then EXACT-membership
+        source validation (fail-closed), then strip/empty-reject, then the write. Every error body is
+        `{ok: false, error: <constant>}` and NO surface carries the token value (NFR-3). Accepted over
+        loopback only; the request thread is never dropped.
+        """
+        import json
+
+        # CSRF (SEC-001, byte-mirrors `_save_key`): a non-`application/json` POST is refused 415 BEFORE
+        # the body is read — the exact ctype normalization so `application/json; charset=utf-8` passes
+        # and a naive `!=` false-415 is avoided. A cross-site CORS-simple `text/plain` POST is refused;
+        # a genuine cross-site `application/json` POST forces a preflight the server never answers.
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"ok": False, "error": "unsupported content-type"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        if length > _SETTINGS_MAX_BYTES:
+            self._write_json(413, {"ok": False, "error": "too large"})
+            return
+        raw = self.rfile.read(length) if length else b""
+        try:
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+        except (ValueError, UnicodeDecodeError):
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        if not isinstance(body, dict):
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        # Read via `.get` (never subscript): an ABSENT source/token is None, not an uncaught KeyError
+        # that drops the request thread. A non-str source/token (incl. None-from-absent) is a 400 —
+        # the source isinstance guard also makes the membership check below safe against an unhashable
+        # source (`["whoop"] in <set>` would raise TypeError).
+        source = body.get("source")
+        token = body.get("token")
+        if not isinstance(source, str) or not isinstance(token, str):
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+
+        from scripts.ingest import oauth_pull
+
+        # Source validation (fail-closed; sec LOW-1): EXACT membership in the wired manifest set — no
+        # case-folding, no normalization (a case/homoglyph variant simply misses -> 400). Read at
+        # REQUEST time so it stays data-driven. The SAME validated string is passed VERBATIM to the
+        # service-name derivation, so the write lands in the item it validated — closing the
+        # service-name-injection surface (an unvalidated source could write an arbitrary keyring item).
+        if source not in oauth_pull._MANIFESTS:
+            self._write_json(400, {"ok": False, "error": "unknown source"})
+            return
+        token = token.strip()
+        if not token:
+            self._write_json(400, {"ok": False, "error": "empty token"})
+            return
+
+        from scripts import secret_store
+
+        # The write goes DIRECTLY through `secret_store` into the SAME item `oauth_pull`'s default
+        # reader reads (`_oauth_service_name` is MANDATED — one derivation site, no literal here).
+        try:
+            secret_store.set_secret(oauth_pull._oauth_service_name(source), token)
+        except secret_store.KeyStoreError:
+            # Constant message — never the token, and it does NOT assert the token is unstored as a
+            # certainty (`set_secret` also raises when the write SUCCEEDED but stale fallback residue
+            # could not be cleared — the T2-F2 clear-fail case).
+            self._write_json(500, {"ok": False, "error": "could not store token"})
+            return
         self._write_json(200, {"ok": True, "connected": True})
 
     def _write_json(self, status, obj):
