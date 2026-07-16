@@ -240,6 +240,30 @@ def test_abstraction_roundtrip(monkeypatch):
         resolve()  # secret_store.get_secret None-on-absent -> fail-loud unchanged
 
 
+def test_resolve_strips_padded_keychain_value(monkeypatch):
+    """The default read path strips a padded keychain value (an out-of-band write can carry a newline).
+
+    Drives the DEFAULT `_keychain_runner` via the `secret_store.get_secret` module-attr (not an
+    injected runner). RED-capable: drop the strip in `_keychain_runner` -> resolve returns the padded
+    value and this assert reds.
+    """
+    monkeypatch.delenv(ENV_VAR, raising=False)
+    monkeypatch.setattr(secret_store, "get_secret", lambda service: "  padded-key  ")
+    assert resolve() == "padded-key", "resolve did not strip a padded keychain value"
+
+
+def test_resolve_fail_loud_on_whitespace_only_keychain_value(monkeypatch):
+    """A whitespace-only keychain value collapses to absent -> fail-loud (not a truthy garbage key).
+
+    Drives the DEFAULT `_keychain_runner`. RED-capable: drop the strip/collapse -> resolve returns
+    "   " as a truthy key, no KeyUnavailableError is raised, and this `pytest.raises` reds.
+    """
+    monkeypatch.delenv(ENV_VAR, raising=False)
+    monkeypatch.setattr(secret_store, "get_secret", lambda service: "   ")
+    with pytest.raises(KeyUnavailableError):
+        resolve()
+
+
 def test_frozen_six_numstat_empty():
     """AC-6: the ADR-0032 frozen-six are byte-frozen vs the fixed fork-point (PF-S133-03)."""
     six = [

@@ -26,7 +26,8 @@ ENV_VAR = "ANTHROPIC_API_KEY"
 # This project's keychain item — the in-app Profile save (POST /settings/key, via
 # `store()`) writes the key here and `resolve()` reads it here, so an in-app paste is
 # picked up on the next call with no terminal step. The service name is a project label,
-# not a secret — the key VALUE lives only in the keychain at runtime (`keychain-setup.md`).
+# not a secret — the key VALUE lives in the OS keychain (or the gitignored owner-only
+# `secret_store` fallback when the keyring is unavailable), never a tracked file (`keychain-setup.md`).
 _KEYCHAIN_SERVICE = "a-plus-maxing-api-key"
 
 _RUNBOOK = "scripts/model/keychain-setup.md"
@@ -42,15 +43,20 @@ class KeyUnavailableError(RuntimeError):
 
 
 def _keychain_runner():
-    """Fetch the key from the secret store at call time, or None when absent.
+    """Fetch the key from the secret store at call time, or None when absent/blank.
 
     Delegates to `secret_store.get_secret(<service>)` (None-on-absent) — the OS-native keyring
     with the file/env fallback tier — replacing the former direct `security` shell-out. The read
     is bound to `getpass.getuser()` inside `secret_store` (set-side parity with this project's own
     writer's account), so an out-of-band-account credential won't resolve — the live-run check is
-    bead a-plus-maxing-m8ia. The absence path (None) is the caller's fail-loud trigger.
+    bead a-plus-maxing-m8ia. The value is stripped and a blank/whitespace-only value collapses to
+    None (an out-of-band `security add-generic-password` write can carry a trailing newline), so the
+    absence path (None) stays the caller's fail-loud trigger rather than a padded or blank key.
     """
-    return secret_store.get_secret(_KEYCHAIN_SERVICE)
+    value = secret_store.get_secret(_KEYCHAIN_SERVICE)
+    if not value:
+        return None
+    return value.strip() or None
 
 
 def resolve(keychain_runner=_keychain_runner):
@@ -98,10 +104,16 @@ def _keychain_writer(key):
     Delegates to `secret_store.set_secret(<service>, key)` — the OS-native keyring with the
     file/env fallback tier — replacing the former direct `security add-generic-password` shell-out.
     The write is bound to `getpass.getuser()` inside `secret_store`, matching the read account (the
-    live-run check is bead a-plus-maxing-m8ia). On a total failure `secret_store` raises the sibling
-    `secret_store.KeyStoreError`; this TRANSLATES it to `key_source.KeyStoreError` (the class
-    `server.py`'s `/settings/key` catch depends on) with a CONSTANT message that never carries the
-    key value — a store failure must not leak the secret into a traceback (NFR-3: the repo is PUBLIC).
+    live-run check is bead a-plus-maxing-m8ia). `secret_store` raises the sibling
+    `secret_store.KeyStoreError` on failure; this TRANSLATES it to `key_source.KeyStoreError` (the
+    class `server.py`'s `/settings/key` catch depends on) with a CONSTANT message that never carries
+    the key value — a store failure must not leak the secret into a traceback (NFR-3: the repo is
+    PUBLIC). NOTE: `set_secret` also raises on a SUCCESSFUL keyring write whose stale fallback-tier
+    residue could not be cleared (the deliberate SEC-04 fail-loud), so a raised `KeyStoreError` does
+    NOT guarantee the key is unstored. The former shell-out's `-A` allow-all-ACL (fix 7c793432, so a
+    backgrounded server never blocked on a keychain prompt) is intentionally superseded by the
+    `secret_store` keyring write; whether the backgrounded-read path stays unblocked without it is
+    deferred to the operator-present live run (bead a-plus-maxing-m8ia).
 
     Args:
         key (str): The no-train API key to store.
@@ -130,7 +142,8 @@ def store(key, *, keychain_writer=_keychain_writer):
 
     Raises:
         ValueError: When the key is empty/blank — constant message, no key value.
-        KeyStoreError: When the keychain write fails.
+        KeyStoreError: When the secret-store write fails — OR when the key was written but stale
+            fallback-tier residue could not be cleared (so it does not guarantee the key is unstored).
     """
     key = (key or "").strip()
     if not key:

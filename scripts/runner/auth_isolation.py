@@ -19,8 +19,10 @@ The OAuth token is read from a NEW `a-plus-maxing-oauth-token` item at call time
 `secret_store` abstraction (OS-native keyring primary + a file/env fallback tier) — never
 captured at module load, never written to a tracked file. `scripts/guard/pii_scan.py` is an
 operator-PII scanner with NO secret pattern, so a leaked token value in a tracked file would pass
-the PII hooks CLEAN (SEC-02); the control is that the token stays keychain-held, off the tracked
-tree (NFR-3: the repo is PUBLIC). An absent token raises `OAuthTokenUnavailableError` fail-loud,
+the PII hooks CLEAN (SEC-02); the control is that the token stays off the tracked tree — either
+OS-keychain-held or, when the keyring is unavailable, in the gitignored owner-only `secret_store`
+fallback guarded by `.gitignore` + the block-pii-commit / pre-push-pii-scan hooks
+(NFR-3: the repo is PUBLIC). An absent token raises `OAuthTokenUnavailableError` fail-loud,
 never an env that would run the session unauthenticated.
 """
 
@@ -45,8 +47,9 @@ _METERED_ROUTING_ENV_VARS = frozenset({
 })
 
 # The OAuth token's keychain item — a project label DISTINCT from `a-plus-maxing-api-key` (the
-# no-train API key `key_source` owns). The service NAME is a label; the token VALUE lives only in
-# the keychain at runtime, never a tracked file.
+# no-train API key `key_source` owns). The service NAME is a label; the token VALUE lives in the OS
+# keychain (or the gitignored owner-only `secret_store` fallback when the keyring is unavailable),
+# never a tracked file.
 _KEYCHAIN_SERVICE = "a-plus-maxing-oauth-token"
 
 _RUNBOOK = "scripts/model/keychain-setup.md"
