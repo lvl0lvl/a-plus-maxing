@@ -327,12 +327,20 @@ def test_ac4_structural_no_scripts_store_import():
     # primary 0-store-read guarantee; the module-level spy + mutant is the non-tautological backstop).
     # AST-inspected (not a substring scan — the module docstring names `scripts.store` in prose).
     tree = ast.parse(_METERED_SOURCE.read_text(encoding="utf-8"))
+    package_parts = ["scripts", "runner"]  # metered_dispatch.py's containing package
     imported = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             imported += [alias.name for alias in node.names]
         elif isinstance(node, ast.ImportFrom):
-            imported.append(node.module or "")
+            if node.level == 0:
+                imported.append(node.module or "")
+            else:  # resolve a RELATIVE import to its absolute module (Sec Tier-2 LOW)
+                anchor = package_parts[: len(package_parts) - (node.level - 1)]
+                if node.module:
+                    imported.append(".".join(anchor + [node.module]))
+                else:  # bare `from .. import X` — each name is a submodule of the anchor
+                    imported += [".".join(anchor + [alias.name]) for alias in node.names]
     store_imports = [m for m in imported if m == "scripts.store" or m.startswith("scripts.store.")]
     assert store_imports == [], f"metered_dispatch must import no scripts.store symbol: {store_imports}"
 
@@ -359,6 +367,15 @@ def _drive_subscription(summary, *, gates=None):
     return session
 
 
+def _assert_clean_subscription_egress(session):
+    """The subscription lane's egress carries 0 raw-PII, 0 store-content, operator-state ⊆ allowlist."""
+    serialized = json.dumps(session.received, default=str)
+    assert LEGAL_NAME not in serialized, "raw-PII crossed on the subscription lane"
+    assert STORE_SENTINEL not in serialized, "store-content crossed on the subscription lane"
+    assert set(session.received["context"]) <= set(SUMMARY_FIELD_SET), (
+        "subscription operator-state outside SUMMARY_FIELD_SET")
+
+
 def test_ac5_lane_swap_deid_guarantee_holds_identically(monkeypatch):
     # AC-5: scan EACH lane's egress (not the shared input). The invariant is the de-id guarantee
     # (0 raw-PII, 0 store-content, operator-state ⊆ SUMMARY_FIELD_SET) — NOT byte-identity: the
@@ -370,13 +387,19 @@ def test_ac5_lane_swap_deid_guarantee_holds_identically(monkeypatch):
     _assert_clean_metered_egress(recorder, store_spy)
 
     session = _drive_subscription(summary)
-    sub_serialized = json.dumps(session.received, default=str)
-    assert LEGAL_NAME not in sub_serialized, "raw-PII crossed on the subscription lane"
-    assert STORE_SENTINEL not in sub_serialized, "store-content crossed on the subscription lane"
-    assert set(session.received["context"]) <= set(SUMMARY_FIELD_SET), (
-        "subscription operator-state outside SUMMARY_FIELD_SET")
+    _assert_clean_subscription_egress(session)
     # the lanes are NOT byte-identical — the invariant is the de-id guarantee, not the byte count
     assert session.received["prompt"] != recorder["messages"][0]["content"]
+
+
+def test_ac5_lane_swap_subscription_falsifier_reds():
+    # In-suite RED-capability proof for the SUBSCRIPTION lane's egress scan (QA Tier-2 SHOULD-FIX;
+    # AR-005 parity with the metered mutants — a negative assertion needs an in-suite falsifier, not
+    # only out-of-band reasoning): a raw legal name injected under an allowlisted key into the summary
+    # the subscription lane forwards → the subscription egress scan REDs.
+    session = _drive_subscription({**_deid_summary(), "recovery-status-band": LEGAL_NAME})
+    with pytest.raises(AssertionError, match="raw-PII crossed on the subscription lane"):
+        _assert_clean_subscription_egress(session)
 
 
 def test_ac5_lane_swap_falsifier_context_injection_reds(monkeypatch):
