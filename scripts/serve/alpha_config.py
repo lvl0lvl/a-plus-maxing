@@ -193,6 +193,7 @@ def load_alpha_config(path=None, *, client_types=None):
         for name, entry in raw.get("vendors", {}).items():
             client_id = entry["client_id"]
             client_secret = entry.get("client_secret")
+            # These TypeError strings are internal shape assertions — deliberately never surfaced (collapsed into the constant fail-loud below); routing one out would regress AC-8's no-secret-in-message.
             if not isinstance(client_id, str):
                 raise TypeError("client_id must be a string")
             if client_secret is not None and not isinstance(client_secret, str):
@@ -201,7 +202,12 @@ def load_alpha_config(path=None, *, client_types=None):
         shared_api_key = raw.get("shared_api_key")
         if shared_api_key is not None and not isinstance(shared_api_key, str):
             raise TypeError("shared_api_key must be a string or None")
-    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, RecursionError):
+        # RecursionError (a deeply-nested config past the C JSON scanner's stack budget) is a
+        # RuntimeError subclass OUTSIDE the value-error family, so it is listed explicitly to keep
+        # the AR-003 total-fail-loud contract (the C decoder raises with ample Python-stack
+        # headroom, so building + raising the constant below runs cleanly). NOT MemoryError — a
+        # multi-GB config is not cleanly recoverable and is an operator/LIVE concern (out of scope).
         raise AlphaConfigError(
             "Could not read the out-of-band alpha config; the file is missing or malformed."
         ) from None

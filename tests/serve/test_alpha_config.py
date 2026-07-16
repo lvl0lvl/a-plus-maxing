@@ -381,6 +381,50 @@ def test_malformed_config_fails_loud(tmp_path, monkeypatch):
     assert degraded.shared_api_key is None
 
 
+def test_deeply_nested_config_fails_loud(tmp_path):
+    """AR-003 (BUG01): a config nested past the JSON scanner's stack budget lands on the SAME
+    constant fail-loud, NOT a raw RecursionError.
+
+    `json.loads` on a deeply-nested config raises `RecursionError`, whose MRO
+    (RecursionError -> RuntimeError -> Exception) sits OUTSIDE the loader's original
+    (OSError, ValueError, KeyError, TypeError, AttributeError) except tuple, so pre-fix it
+    ESCAPES raw — the AR-003 total-fail-loud hole. The C decoder raises with ample Python-stack
+    headroom, so the handler builds + raises the constant `AlphaConfigError` cleanly.
+
+    RED-capable: pre-fix the raw RecursionError escapes the constant-message contract, so this
+    `pytest.raises(AlphaConfigError, match=...)` REDs; post-fix it lands on the constant.
+    """
+    deep = tmp_path / "deep.json"
+    depth = 200_000
+    deep.write_text("[" * depth + "]" * depth)
+    # Out-of-tree (tmp_path is under the system temp dir), so the in-repo reject cannot fire
+    # first; the `match` pins the malformed-read message, NOT the "Refusing to load" reject.
+    assert alpha_config._within_repo(str(deep)) is False
+    with pytest.raises(alpha_config.AlphaConfigError, match="missing or malformed"):
+        alpha_config.load_alpha_config(str(deep))
+
+
+@pytest.mark.parametrize("bad_vendors", [
+    pytest.param({"whoop": {"client_id": 123}}, id="non-string-client_id"),
+    pytest.param({"whoop": {"client_id": _WHOOP_CLIENT_ID, "client_secret": {"n": 1}}}, id="dict-client_secret"),
+    pytest.param({"whoop": {"client_secret": _WHOOP_CLIENT_SECRET}}, id="missing-client_id"),
+])
+def test_malformed_vendor_entry_fails_loud(bad_vendors, tmp_path):
+    """TEST01: a vendor entry with a bad value type or a MISSING `client_id` RAISES the constant
+    fail-loud — exercises the vendor-validation arm the shared_api_key case does not reach.
+
+    `test_malformed_config_fails_loud` covers only the `shared_api_key` arm, so a mutation
+    dropping the per-vendor validation (the `client_id` KeyError + the `client_id`/`client_secret`
+    isinstance guards) would ship all tests GREEN. RED-capable: against a loader whose vendor
+    validation is stripped (`entry.get("client_id")` + no isinstance) each case LOADS with no
+    raise, so this `pytest.raises` REDs; against the real loader each lands on the constant.
+    """
+    cfg = tmp_path / "bad_vendor.json"
+    cfg.write_text(json.dumps({"vendors": bad_vendors}))
+    with pytest.raises(alpha_config.AlphaConfigError, match="missing or malformed"):
+        alpha_config.load_alpha_config(str(cfg))
+
+
 # --------------------------------------------------------------------------- #
 # AR-004 — the ONE documented bridge-overwrite: an empty-string BYO is provisioned over
 # --------------------------------------------------------------------------- #
@@ -440,3 +484,15 @@ def test_loader_shared_key_without_vendors(tmp_path, monkeypatch):
 
     assert config.vendors == {}
     assert config.shared_api_key == _SHARED_KEY
+
+
+def test_loader_vendor_without_client_secret(tmp_path, monkeypatch):
+    """NIT: a vendor with NO `client_secret` (the PKCE-public branch) loads with client_secret None."""
+    cfg = tmp_path / "alpha.json"
+    cfg.write_text(json.dumps({"vendors": {"google": {"client_id": "google-id-fixture"}}}))
+    monkeypatch.setenv(alpha_config.ALPHA_CONFIG_ENV, str(cfg))
+
+    config = alpha_config.load_alpha_config()
+
+    assert config.vendors["google"].client_id == "google-id-fixture"
+    assert config.vendors["google"].client_secret is None
