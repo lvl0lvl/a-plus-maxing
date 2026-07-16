@@ -15,16 +15,18 @@ It returns a COPY and never mutates the caller's mapping or `os.environ`, so the
 item, at call time in the DRIVER's own process (`key_source.resolve`) — is unaffected: the
 subscription session's OAuth auth AND the de-id client's keychain auth hold simultaneously.
 
-The OAuth token is read from a NEW `a-plus-maxing-oauth-token` keychain item at call time, mirroring
-`key_source._keychain_runner`'s `security find-generic-password -w -s <service>` shape — never
+The OAuth token is read from a NEW `a-plus-maxing-oauth-token` item at call time via the
+`secret_store` abstraction (OS-native keyring primary + a file/env fallback tier) — never
 captured at module load, never written to a tracked file. `scripts/guard/pii_scan.py` is an
 operator-PII scanner with NO secret pattern, so a leaked token value in a tracked file would pass
-the PII hooks CLEAN (SEC-02); the control is that the token stays keychain-held, off the tracked
-tree (NFR-3: the repo is PUBLIC). An absent token raises `OAuthTokenUnavailableError` fail-loud,
+the PII hooks CLEAN (SEC-02); the control is that the token stays off the tracked tree — either
+OS-keychain-held or, when the keyring is unavailable, in the gitignored owner-only `secret_store`
+fallback guarded by `.gitignore` + the block-pii-commit / pre-push-pii-scan hooks
+(NFR-3: the repo is PUBLIC). An absent token raises `OAuthTokenUnavailableError` fail-loud,
 never an env that would run the session unauthenticated.
 """
 
-import subprocess
+from scripts import secret_store
 
 # Claude Code's subscription OAuth env var (the `claude setup-token` output). Setting it in the
 # session's process env — with the metered-API key dropped — makes the session authenticate via the
@@ -45,8 +47,9 @@ _METERED_ROUTING_ENV_VARS = frozenset({
 })
 
 # The OAuth token's keychain item — a project label DISTINCT from `a-plus-maxing-api-key` (the
-# no-train API key `key_source` owns). The service NAME is a label; the token VALUE lives only in
-# the keychain at runtime, never a tracked file.
+# no-train API key `key_source` owns). The service NAME is a label; the token VALUE lives in the OS
+# keychain (or the gitignored owner-only `secret_store` fallback when the keyring is unavailable),
+# never a tracked file.
 _KEYCHAIN_SERVICE = "a-plus-maxing-oauth-token"
 
 _RUNBOOK = "scripts/model/keychain-setup.md"
@@ -63,25 +66,15 @@ class OAuthTokenUnavailableError(RuntimeError):
 
 
 def _oauth_keychain_reader():
-    """Fetch the subscription OAuth token from the macOS keychain at call time, or None when absent.
+    """Fetch the subscription OAuth token from the secret store at call time, or None when absent.
 
-    Runs `security find-generic-password -w -s a-plus-maxing-oauth-token` (mirroring
-    `key_source._keychain_runner`; the `-w` flag prints only the password). Returns the stripped
-    token, or None when the item is absent or `security` is unavailable (a non-macOS host) — the
-    absence path is the caller's fail-loud trigger.
+    Delegates to `secret_store.get_secret(<service>)` (None-on-absent) — the OS-native keyring with
+    the file/env fallback tier — replacing the former direct `security` shell-out (mirroring
+    `key_source._keychain_runner`). The read is bound to `getpass.getuser()` inside `secret_store`,
+    so an out-of-band-account token won't resolve — the live-run check is bead a-plus-maxing-m8ia.
+    The absence path (None) is the caller's fail-loud trigger.
     """
-    try:
-        completed = subprocess.run(
-            ["security", "find-generic-password", "-w", "-s", _KEYCHAIN_SERVICE],
-            capture_output=True,
-            text=True,
-        )
-    except (FileNotFoundError, OSError):
-        return None
-    if completed.returncode != 0:
-        return None
-    token = completed.stdout.strip()
-    return token or None
+    return secret_store.get_secret(_KEYCHAIN_SERVICE)
 
 
 def build_subscription_env(base_env, *, keychain_reader=_oauth_keychain_reader):
@@ -96,9 +89,9 @@ def build_subscription_env(base_env, *, keychain_reader=_oauth_keychain_reader):
 
     Args:
         base_env (Mapping): The parent env to scrub (typically a copy of `os.environ`).
-        keychain_reader (Callable, optional): The OAuth-token keychain read seam (returns the token
-            str or None). Defaults to the macOS `security` read of `a-plus-maxing-oauth-token`;
-            injected in tests so no real keychain or token is touched.
+        keychain_reader (Callable, optional): The OAuth-token read seam (returns the token
+            str or None). Defaults to `secret_store.get_secret` for `a-plus-maxing-oauth-token`;
+            injected in tests so no real keyring or token is touched.
 
     Returns:
         (dict) A copy of base_env with every `_METERED_ROUTING_ENV_VARS` var removed and
