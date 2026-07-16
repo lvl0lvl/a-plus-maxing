@@ -339,9 +339,12 @@ def access_token(source, *, credential_reader=None, credential_writer=None, http
     Args:
         source (str): The wired API-pull source (e.g. "whoop").
         credential_reader (Callable, optional): `source -> payload | None` credential read seam.
-            Defaults to `secret_store.get_secret`; injected in tests.
+            Defaults to `_read_oauth_credential` (which delegates to `secret_store.get_secret` and adds
+            the strip / blank-collapse); injected in tests.
         credential_writer (Callable, optional): `(source, payload) -> None` credential write seam (for
-            rotation write-back). Defaults to `secret_store.set_secret`; injected in tests.
+            rotation write-back). Defaults to `_write_oauth_credential` (which delegates to
+            `secret_store.set_secret` and adds the non-fatal warn — do NOT default this to
+            `secret_store.set_secret` directly or a rotation `KeyStoreError` aborts the fetch); injected in tests.
         http (Callable, optional): `(method, url, *, headers, body) -> response` network seam.
             Defaults to `_http`; injected in tests.
 
