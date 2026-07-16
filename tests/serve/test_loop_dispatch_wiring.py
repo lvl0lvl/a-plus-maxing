@@ -15,6 +15,15 @@ Two concerns the Architect surfaced on ADR-0036-T1:
       subscription-session aggregate, not an API call). So `/plan-loop` cannot run live in the
       standalone server; it must degrade with a DISTINCT, HONEST reason (`loop-dispatch-unavailable`),
       not the generic catch-all, and without fabricating a dispatch or arming any spend.
+
+ADR-0049-T1 (S141) RE-AFFIRMED concern (a) on new grounds: the metered dispatch factory
+(`scripts/runner/metered_dispatch.py`) is SPECIALIST-ONLY (`ModelClient.author` always returns a
+plan-author envelope — never a `JUDGE_ROLE` score-map nor a lens findings-list), so it cannot serve
+the loop's three-name-space aggregate seam either. `main()` therefore STILL passes no
+`loop_dispatch`/`loop_deid_client` (the Tier-3 REJECT reverted a premature arming that would have
+SAFETY_BLOCKED every live run after burning metered spend); it DOES invoke the D5 shared-key bridge
+for the `/upload` extraction lane. Arming the live loop is blocked on the metered judge/lens surface
+(bead: metered loop_dispatch needs a judge/lens surface).
 """
 
 import pytest
@@ -162,9 +171,11 @@ class _Abort(Exception):
     """Abort the entry inside the spy `build`, before the serve loop (the house spy-build pattern)."""
 
 
-def test_main_wires_metered_seams_and_bridge_closes_default(monkeypatch):
-    # AC-2: `main()` hands `build` a non-None loop_dispatch + loop_deid_client, and the D5 bridge
-    # closes the no-BYO default (`key_source.resolve` returns the shared key after `main()`).
+def test_main_does_not_arm_loop_but_bridge_closes_default(monkeypatch):
+    # AC-2 [AMENDED S141, Tier-3 REJECT]: `main()` must NOT arm the loop — the metered dispatch is
+    # specialist-only and cannot serve the loop's judge/lens name-spaces (arming it SAFETY_BLOCKS
+    # every live run after burning metered spend). It MUST still invoke the D5 bridge so the /upload
+    # extraction lane's `key_source.resolve` returns the shared key on the no-BYO default.
     shared = "sk-ant-" + "shared-fixture-000"  # synthetic, sk-ant--shaped
     monkeypatch.delenv(key_source.ENV_VAR, raising=False)  # FIRST — isolate the bridge's raw os.environ write
     monkeypatch.setattr(secret_store, "get_secret", lambda *a, **k: None)  # empty keychain (no real keyring)
@@ -175,14 +186,29 @@ def test_main_wires_metered_seams_and_bridge_closes_default(monkeypatch):
     def _spy_build(port, *, client=None, loop_dispatch=None, loop_deid_client=None, **kwargs):
         captured["loop_dispatch"] = loop_dispatch
         captured["loop_deid_client"] = loop_deid_client
+        captured["client"] = client
         raise _Abort
 
     with pytest.raises(_Abort):
         entry.main(build=_spy_build, client_factory=lambda: object())
 
-    assert captured["loop_dispatch"] is not None, "main() wired no metered loop_dispatch"
-    assert captured["loop_deid_client"] is not None, "main() wired no loop_deid_client"
+    assert captured["loop_dispatch"] is None, "main() armed the specialist-only metered loop_dispatch"
+    assert captured["loop_deid_client"] is None, "main() armed a loop_deid_client with no usable loop_dispatch"
+    assert captured["client"] is not None, "main() no longer wires the /upload extraction client"
     assert key_source.resolve() == shared, "the D5 bridge did not close the no-BYO default"
+
+
+def test_main_propagates_alpha_config_error(monkeypatch):
+    # AR-006 fail-loud regression guard: a malformed / in-repo alpha config raises `AlphaConfigError`
+    # and `main()` must NOT catch it — crashing loud at operator start is the intended posture. A
+    # future defensive try/except around the bridge would silently start the server on a bad config;
+    # this test REDs on that.
+    def _raise(*a, **k):
+        raise alpha_config.AlphaConfigError("malformed alpha config (fixture)")
+
+    monkeypatch.setattr(alpha_config, "load_alpha_config", _raise)
+    with pytest.raises(alpha_config.AlphaConfigError):
+        entry.main(build=lambda *a, **k: (_ for _ in ()).throw(_Abort()), client_factory=lambda: object())
 
 
 def test_bridge_out_meta_assertion_default_stays_open(monkeypatch):
@@ -205,9 +231,13 @@ def test_bridge_out_meta_assertion_default_stays_open(monkeypatch):
 
 
 def test_plan_loop_both_seams_wired_routes_non_degraded(tmp_path):
-    # AC-2 (AR-002 integration mandate): with BOTH loop seams wired, POST /plan-loop passes the
-    # or-guard (server.py:893) and routes confirm -> plan_loop -> run_orchestrated to a real
-    # recording-backed result — the complement of this file's seamless/half-wired degraded tests.
+    # SEAM PLUMBING TEST (AR-002; scoped honestly per the Tier-3 REJECT): with BOTH loop seams wired,
+    # POST /plan-loop passes the or-guard (server.py:893) and routes confirm -> plan_loop ->
+    # run_orchestrated — the complement of this file's seamless/half-wired degraded tests. It injects
+    # `_LoopDispatch`, a THREE-name-space FIXTURE (specialist/judge/lens); it is evidence the
+    # build_server SEAM plumbs through the handler, NOT evidence the production metered dispatch
+    # survives the gate (it cannot — specialist-only; see test_metered_dispatch's judge/lens
+    # limitation tests + the bead). Production main() wires neither seam.
     dispatch = _LoopDispatch(_clean_authors())
     deid_client = _FixedDeidClient(_deid_summary())
     srv, port = _loop_server(tmp_path, dispatch, deid_client)

@@ -75,12 +75,18 @@ def _parseable_author_response():
 
 
 class _RecordingMessages:
-    """Records the `messages.create(**kwargs)` payload (`system` + `messages`) — the true egress."""
+    """Records the FULL `messages.create(**kwargs)` payload — the true egress.
+
+    The whole kwargs dict is recorded (Tier-3 Sec hardening), not an enumerated subset: if a future
+    backend change routes operator data through a different kwarg (`output_config`, `metadata`, a new
+    param), the D2 scan must still see it — an enumerated `system`+`messages` capture would false-green.
+    """
 
     def __init__(self, recorder):
         self._recorder = recorder
 
     def create(self, **kwargs):
+        self._recorder["all_kwargs"] = kwargs
         self._recorder["system"] = kwargs.get("system")
         self._recorder["messages"] = kwargs.get("messages")
         return _parseable_author_response()
@@ -135,13 +141,20 @@ def _drive_metered(build_adapter, summary, monkeypatch, *, gates=None):
 def _crossed_summary(recorder):
     """Parse the de-identified summary out of the recorded user-message content (the crossed bytes)."""
     content = recorder["messages"][0]["content"]
+    # `_ClaudeNoTrainBackend.author` builds its user prompt as "<one header line>\n<json.dumps(summary)>"
+    # (client.py: `f"Author your {domain} recommendations...:\n{json.dumps(summary, sort_keys=True)}"`),
+    # so the JSON after the FIRST newline is exactly the crossed summary. Fails loud (IndexError /
+    # JSONDecodeError) if that prompt structure ever changes — re-anchor this parse then.
     return json.loads(content.split("\n", 1)[1])
 
 
 def _assert_clean_metered_egress(recorder, store_spy):
-    """The four D2 outbound sub-assertions over the RECORDED `messages.create` payload (the egress)."""
-    serialized = json.dumps({"system": recorder.get("system"), "messages": recorder.get("messages")},
-                            default=str)
+    """The four D2 outbound sub-assertions over the RECORDED `messages.create` payload (the egress).
+
+    Scans the FULL recorded kwargs serialization (Tier-3 Sec hardening) — everything crossing the
+    boundary, not an enumerated subset.
+    """
+    serialized = json.dumps(recorder.get("all_kwargs"), default=str)
     assert LEGAL_NAME not in serialized, "raw-PII (legal name) crossed to the SDK boundary"
     assert STORE_SENTINEL not in serialized, "store-content sentinel crossed to the SDK boundary"
     crossed = _crossed_summary(recorder)
@@ -247,6 +260,34 @@ def test_ac2_metered_loop_constructs_no_subscription_session(tmp_path, monkeypat
     assert factory_calls == [], "a subscription session factory was constructed on the metered loop path"
 
 
+# --- the specialist-only limitation: WHY the metered dispatch is NOT wired as loop_dispatch -------
+
+
+def test_metered_dispatch_serves_only_the_specialist_name_space():
+    # Tier-3 REJECT documentation (bead: metered loop_dispatch needs a judge/lens surface): the loop's
+    # dispatch(name, ...) seam is a THREE-name-space aggregate (specialist / plan_loop.JUDGE_ROLE / a
+    # safety_review.DEFAULT_LENSES lens), but the metered adapter routes EVERY name through
+    # client.author — which always returns a plan-author ENVELOPE, never a judge {dimension: score}
+    # map nor a lens findings-LIST. Driving the judge + a lens name through the REAL adapter pins the
+    # honest limitation — the executable reason main() does NOT arm it as the live loop_dispatch
+    # (armed, a live /plan-loop deterministically SAFETY_BLOCKS after burning metered spend). If
+    # either assertion here ever fails, a metered judge/lens surface exists — re-evaluate arming.
+    from scripts.plan.safety_review import DEFAULT_LENSES
+    from scripts.serve.plan_loop import JUDGE_ROLE
+
+    dispatch = metered_dispatch.build_dispatch(_SpyAuthorClient())
+
+    judge_out = dispatch(JUDGE_ROLE, "judge prompt", {"workout": {"plan": "x"}})
+    assert judge_out.get("specialist") == JUDGE_ROLE and "recommendations" in judge_out, (
+        "expected the author-envelope misroute; a different shape means the adapter changed")
+    assert not all(isinstance(v, (int, float)) for v in judge_out.values()), (
+        "a numeric score-map means a metered judge surface exists — re-evaluate arming the loop")
+
+    lens_out = dispatch(next(iter(DEFAULT_LENSES)), "lens prompt", {"workout": {"recommendations": []}})
+    assert not isinstance(lens_out, list), (
+        "a findings-list means a metered lens surface exists — re-evaluate arming the loop")
+
+
 # --- AC-3: the deid_in sentinel halts to 0 metered dispatches; a clean summary dispatches ---------
 
 
@@ -336,7 +377,9 @@ def test_ac4_structural_no_scripts_store_import():
             if node.level == 0:
                 imported.append(node.module or "")
             else:  # resolve a RELATIVE import to its absolute module (Sec Tier-2 LOW)
-                anchor = package_parts[: len(package_parts) - (node.level - 1)]
+                # clamp at 0: a level beyond the package depth (an ImportError at runtime anyway)
+                # must resolve to an empty anchor, never a wrong non-empty one (Tier-3 BH O1)
+                anchor = package_parts[: max(0, len(package_parts) - (node.level - 1))]
                 if node.module:
                     imported.append(".".join(anchor + [node.module]))
                 else:  # bare `from .. import X` — each name is a submodule of the anchor

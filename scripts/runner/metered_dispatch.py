@@ -1,10 +1,15 @@
 """The metered specialist-author dispatch seam — the metered-lane analog of subscription_dispatch (ADR-0049-T1).
 
-`build_dispatch(client)` adapts an injected metered-lane model client into the unified
-`dispatch(name, prompt, context) -> author envelope` seam the built plan loop consumes
-(`plan_orchestrator._dispatch_domains`): it routes each specialist / judge / lens call through the
-client's `.author(name, context)` — authenticating on the shared `a-plus-maxing-api-key` metered lane
-(`key_source.resolve` through `_ClaudeNoTrainBackend`) — and returns the author envelope. It reads no
+`build_dispatch(client)` adapts an injected metered-lane model client into the
+`dispatch(name, prompt, context) -> author envelope` seam (`plan_orchestrator._dispatch_domains`). It
+serves ONLY the SPECIALIST name-space: it routes the call through the client's `.author(name, context)`
+— authenticating on the shared `a-plus-maxing-api-key` metered lane (`key_source.resolve` through
+`_ClaudeNoTrainBackend`) — and `ModelClient.author` ALWAYS returns a plan-author envelope, never a
+`quality-judge` per-dimension score-map nor a safety-lens findings-list. So this factory is NOT wired
+as the live `loop_dispatch`: the built loop's `dispatch(name, ...)` seam is a THREE-name-space
+aggregate (a specialist / `plan_loop.JUDGE_ROLE` / a `safety_review.DEFAULT_LENSES` lens — `plan_loop`
+asserts the three are pairwise disjoint), and the judge/lens name-spaces need a metered gate-dispatch
+surface that does not exist yet (bead: metered loop_dispatch needs a judge/lens surface). It reads no
 store, de-identifies nothing, and re-hosts no loop logic: the already-de-identified `context` (the
 summary) is the ONLY operator-state that crosses (the de-id-IN happens INSIDE the loop, upstream).
 
