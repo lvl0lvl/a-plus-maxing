@@ -15,10 +15,13 @@ The key tests use a SET env var or an injected fake keychain runner — never a 
 never a real key.
 """
 
+import inspect
 import subprocess
+from pathlib import Path
 
 import pytest
 
+from scripts import secret_store
 from scripts.model import key_source
 from scripts.model.key_source import ENV_VAR, KeyUnavailableError, resolve
 
@@ -145,3 +148,107 @@ def test_no_api_key_literal_in_tracked_tree():
     assert result.returncode == 1, (
         "an API-key literal is in the tracked tree (PUBLIC repo):\n" + result.stdout
     )
+
+
+# --- ADR-0047-T2: key_source routed through the secret-store abstraction --------
+#
+# The DEFAULT resolve/store seams now route through scripts.secret_store (the ADR-0047-T1
+# abstraction) instead of a direct `security` shell-out, KEEPING the seam names, env-first
+# order, None-on-absent contract, and the key_source.KeyStoreError write-error class. The
+# default-driving tests mock secret_store's module functions ($0, no real keychain).
+
+_ROUNDTRIP_KEY = "adr-0047-t2-roundtrip-fixture"  # synthetic, not sk-ant-shaped
+_T2_CONSUMER_FILES = ["scripts/model/key_source.py", "scripts/runner/auth_isolation.py"]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_seam_params_unchanged():
+    """AC-1: resolve/store keep their keychain_* seam names; an injected fake still overrides."""
+    assert "keychain_runner" in inspect.signature(key_source.resolve).parameters
+    assert "keychain_writer" in inspect.signature(key_source.store).parameters
+    seen = []
+    key_source.store(_ROUNDTRIP_KEY, keychain_writer=seen.append)
+    assert seen == [_ROUNDTRIP_KEY], "the injected keychain_writer did not override the default"
+
+
+def test_no_security_shellout():
+    """AC-3 (CODE-FORM): 0 list-form `security` shell-outs + 0 `import subprocess` in the consumers."""
+    code_form = subprocess.run(
+        ["grep", "-rnE", r'\[\s*"security"\s*,\s*"(find|add)-generic-password"', *_T2_CONSUMER_FILES],
+        cwd=_REPO_ROOT, capture_output=True, text=True,
+    )
+    assert code_form.returncode == 1, f"a list-form `security` shell-out survives:\n{code_form.stdout}"
+    imports = subprocess.run(
+        ["grep", "-rn", "import subprocess", *_T2_CONSUMER_FILES],
+        cwd=_REPO_ROOT, capture_output=True, text=True,
+    )
+    assert imports.returncode == 1, f"a dead `import subprocess` survives in a consumer:\n{imports.stdout}"
+
+
+def test_consumers_call_secret_store_module_qualified():
+    """SF-2: the consumers call `secret_store.<fn>` module-qualified, never `from scripts.secret_store import`.
+
+    A from-import binding would make the AC-5 module-attr spy observe 0 falsely (defeating the
+    env-first falsification), so it is gated mechanically.
+    """
+    from_import = subprocess.run(
+        ["grep", "-rn", "from scripts.secret_store import", *_T2_CONSUMER_FILES],
+        cwd=_REPO_ROOT, capture_output=True, text=True,
+    )
+    assert from_import.returncode == 1, (
+        "a from-import of secret_store defeats the module-attr spy:\n" + from_import.stdout
+    )
+    module_qualified = subprocess.run(
+        ["grep", "-rnE", r"secret_store\.(get|set)_secret", *_T2_CONSUMER_FILES],
+        cwd=_REPO_ROOT, capture_output=True, text=True,
+    )
+    assert module_qualified.returncode == 0, "the consumers never call secret_store module-qualified (vacuous)"
+
+
+def test_resolve_env_first_no_abstraction_read(monkeypatch):
+    """AC-5: a set ANTHROPIC_API_KEY resolves WITHOUT reading the abstraction (env-first preserved).
+
+    Spies on the secret_store.get_secret MODULE attribute (not an injected keychain_runner, which
+    would only re-test the pre-existing env-vs-seam order). RED-capable: reorder resolve to read the
+    abstraction before the env check -> the spy count is >= 1.
+    """
+    monkeypatch.setenv(ENV_VAR, "env-wins-token")
+    calls = []
+    monkeypatch.setattr(secret_store, "get_secret", lambda service: calls.append(service))
+    assert resolve() == "env-wins-token"
+    assert calls == [], "resolve read secret_store before the env var (env-first regressed)"
+
+
+def test_abstraction_roundtrip(monkeypatch):
+    """AC-4: store->resolve round-trips through the abstraction; None-on-absent -> fail-loud unchanged.
+
+    SF-1: the mock is SERVICE-KEYED and the api-key default asserts the EXACT service string, so a
+    transposition to the oauth-token service reds. RED-capable (absent): a default returning a truthy
+    sentinel on absent -> resolve returns it instead of raising -> the KeyUnavailableError assert reds.
+    """
+    monkeypatch.delenv(ENV_VAR, raising=False)
+    vault = {}
+    monkeypatch.setattr(secret_store, "set_secret", lambda service, value: vault.__setitem__(service, value))
+    monkeypatch.setattr(secret_store, "get_secret", lambda service: vault.get(service))
+
+    key_source.store(_ROUNDTRIP_KEY)
+    assert vault == {"a-plus-maxing-api-key": _ROUNDTRIP_KEY}, "store routed to the wrong service"
+    assert resolve() == _ROUNDTRIP_KEY, "resolve did not recover the stored key byte-for-byte"
+
+    vault.clear()
+    with pytest.raises(KeyUnavailableError):
+        resolve()  # secret_store.get_secret None-on-absent -> fail-loud unchanged
+
+
+def test_frozen_six_numstat_empty():
+    """AC-6: the ADR-0032 frozen-six are byte-frozen vs the fixed fork-point (PF-S133-03)."""
+    six = [
+        "scripts/store/store.py", "scripts/store/keying.py",
+        "scripts/plan/pipeline.py", "scripts/plan/adjudicate.py",
+        "scripts/plan/adjust.py", "scripts/plan/router.py",
+    ]
+    result = subprocess.run(
+        ["git", "diff", "--numstat", "3ab1c3abb6c995fbaaadcb179735759e4a61d73d", "--", *six],
+        cwd=_REPO_ROOT, capture_output=True, text=True, check=True,
+    )
+    assert result.stdout == "", f"a frozen-six file changed:\n{result.stdout}"

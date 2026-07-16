@@ -10,6 +10,7 @@ SEC-02 time-bomb the recipe forbids). The token-VALUE regex literal below carrie
 character class, so the regex does not match its own source text either.
 """
 
+import inspect
 import os
 import re
 import subprocess
@@ -17,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts import secret_store
 from scripts.model import key_source
 from scripts.runner import auth_isolation, subscription_dispatch
 
@@ -212,3 +214,38 @@ def test_default_spawn_seam_constructs_inertly_and_dispatch_fail_louds(monkeypat
     assert session.env["CLAUDE_CODE_OAUTH_TOKEN"] == _FIXTURE_OAUTH_TOKEN
     with pytest.raises(subscription_dispatch.SubscriptionSessionNotLive):
         session("workout", "PROMPT-TEXT", {"goal-domains": ["strength"]})
+
+
+# =====================================================================================
+# ADR-0047-T2 — the OAuth-token default reader routed through the secret-store abstraction
+# =====================================================================================
+
+
+def test_build_subscription_env_seam_param_unchanged():
+    # AC-2: build_subscription_env keeps its keychain_reader seam name; an injected fake still overrides
+    # the new secret_store-backed default. RED-capable: a renamed param reds the signature assertion.
+    assert "keychain_reader" in inspect.signature(auth_isolation.build_subscription_env).parameters
+    result = auth_isolation.build_subscription_env(
+        {"PATH": "/usr/bin"}, keychain_reader=lambda: _FIXTURE_OAUTH_TOKEN)
+    assert result["CLAUDE_CODE_OAUTH_TOKEN"] == _FIXTURE_OAUTH_TOKEN
+
+
+def test_oauth_default_reader_routes_through_abstraction(monkeypatch):
+    # AC-2/AC-4: the DEFAULT keychain_reader routes through secret_store.get_secret for the EXACT
+    # `a-plus-maxing-oauth-token` service (SF-1 service-keyed — a transposition to the api-key service
+    # returns None here and reds). None-on-absent -> OAuthTokenUnavailableError unchanged. Drives the
+    # DEFAULT reader (no injected seam) so it proves the default itself re-points onto the abstraction.
+    seen = []
+
+    def _fake_get(service):
+        seen.append(service)
+        return _FIXTURE_OAUTH_TOKEN if service == "a-plus-maxing-oauth-token" else None
+
+    monkeypatch.setattr(secret_store, "get_secret", _fake_get)
+    result = auth_isolation.build_subscription_env({"PATH": "/usr/bin"})
+    assert seen == ["a-plus-maxing-oauth-token"], "the default reader read the wrong keychain service"
+    assert result["CLAUDE_CODE_OAUTH_TOKEN"] == _FIXTURE_OAUTH_TOKEN
+
+    monkeypatch.setattr(secret_store, "get_secret", lambda service: None)
+    with pytest.raises(auth_isolation.OAuthTokenUnavailableError):
+        auth_isolation.build_subscription_env({"PATH": "/usr/bin"})

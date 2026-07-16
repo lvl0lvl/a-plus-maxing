@@ -13,9 +13,9 @@ the repo (NFR-3 — the repo is PUBLIC). The client's default backend calls `res
 call time, so the key is fetched at runtime, never imported from a constant.
 """
 
-import getpass
 import os
-import subprocess
+
+from scripts import secret_store
 
 # The anthropic SDK's native var AND the operator's documented runtime-injection var
 # (S90 directive: `export ANTHROPIC_API_KEY=$(security find-generic-password -s
@@ -42,24 +42,15 @@ class KeyUnavailableError(RuntimeError):
 
 
 def _keychain_runner():
-    """Fetch the key from the macOS keychain at call time, or None when absent.
+    """Fetch the key from the secret store at call time, or None when absent.
 
-    Runs `security find-generic-password -w -s <service>` (the `-w` flag prints only the
-    password). Returns the stripped key, or None when the item is absent or `security` is
-    unavailable (a non-macOS host) — the absence path is the caller's fail-loud trigger.
+    Delegates to `secret_store.get_secret(<service>)` (None-on-absent) — the OS-native keyring
+    with the file/env fallback tier — replacing the former direct `security` shell-out. The read
+    is bound to `getpass.getuser()` inside `secret_store` (set-side parity with this project's own
+    writer's account), so an out-of-band-account credential won't resolve — the live-run check is
+    bead a-plus-maxing-m8ia. The absence path (None) is the caller's fail-loud trigger.
     """
-    try:
-        completed = subprocess.run(
-            ["security", "find-generic-password", "-w", "-s", _KEYCHAIN_SERVICE],
-            capture_output=True,
-            text=True,
-        )
-    except (FileNotFoundError, OSError):
-        return None
-    if completed.returncode != 0:
-        return None
-    key = completed.stdout.strip()
-    return key or None
+    return secret_store.get_secret(_KEYCHAIN_SERVICE)
 
 
 def resolve(keychain_runner=_keychain_runner):
@@ -101,34 +92,22 @@ class KeyStoreError(RuntimeError):
 
 
 def _keychain_writer(key):
-    """Write the key into the macOS login keychain at call time (fail-loud on error).
+    """Store the key in the secret store at call time (fail-loud, error-class-translated).
 
-    Runs `security add-generic-password -U -A -a <user> -s <service> -w <key>` (`-U`
-    updates the existing item, so an in-app save rotates in place; `-A` grants the item
-    an allow-all ACL so the backgrounded server's later `find-generic-password -w` read
-    is not blocked on an interactive keychain-access prompt it cannot answer — the
-    accepted tradeoff for the in-app key flow on a local single-operator machine). Raises
-    `KeyStoreError` on a
-    non-zero exit or an unavailable `security` binary (a non-macOS host). The key VALUE
-    is passed only as the subprocess argument — never logged, echoed, or written to a
-    file; on failure the constant-message error carries no key.
+    Delegates to `secret_store.set_secret(<service>, key)` — the OS-native keyring with the
+    file/env fallback tier — replacing the former direct `security add-generic-password` shell-out.
+    The write is bound to `getpass.getuser()` inside `secret_store`, matching the read account (the
+    live-run check is bead a-plus-maxing-m8ia). On a total failure `secret_store` raises the sibling
+    `secret_store.KeyStoreError`; this TRANSLATES it to `key_source.KeyStoreError` (the class
+    `server.py`'s `/settings/key` catch depends on) with a CONSTANT message that never carries the
+    key value — a store failure must not leak the secret into a traceback (NFR-3: the repo is PUBLIC).
 
     Args:
         key (str): The no-train API key to store.
     """
     try:
-        completed = subprocess.run(
-            ["security", "add-generic-password", "-U", "-A",
-             "-a", getpass.getuser(), "-s", _KEYCHAIN_SERVICE, "-w", key],
-            capture_output=True,
-            text=True,
-        )
-    except (FileNotFoundError, OSError):
-        raise KeyStoreError(
-            f"Could not store the key — the macOS keychain is unavailable on this host "
-            f"(set the {ENV_VAR} env var instead, per {_RUNBOOK})."
-        ) from None
-    if completed.returncode != 0:
+        secret_store.set_secret(_KEYCHAIN_SERVICE, key)
+    except secret_store.KeyStoreError:
         raise KeyStoreError("Could not store the key in the macOS keychain.") from None
 
 

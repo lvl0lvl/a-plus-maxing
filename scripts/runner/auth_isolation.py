@@ -24,7 +24,7 @@ tree (NFR-3: the repo is PUBLIC). An absent token raises `OAuthTokenUnavailableE
 never an env that would run the session unauthenticated.
 """
 
-import subprocess
+from scripts import secret_store
 
 # Claude Code's subscription OAuth env var (the `claude setup-token` output). Setting it in the
 # session's process env — with the metered-API key dropped — makes the session authenticate via the
@@ -63,25 +63,15 @@ class OAuthTokenUnavailableError(RuntimeError):
 
 
 def _oauth_keychain_reader():
-    """Fetch the subscription OAuth token from the macOS keychain at call time, or None when absent.
+    """Fetch the subscription OAuth token from the secret store at call time, or None when absent.
 
-    Runs `security find-generic-password -w -s a-plus-maxing-oauth-token` (mirroring
-    `key_source._keychain_runner`; the `-w` flag prints only the password). Returns the stripped
-    token, or None when the item is absent or `security` is unavailable (a non-macOS host) — the
-    absence path is the caller's fail-loud trigger.
+    Delegates to `secret_store.get_secret(<service>)` (None-on-absent) — the OS-native keyring with
+    the file/env fallback tier — replacing the former direct `security` shell-out (mirroring
+    `key_source._keychain_runner`). The read is bound to `getpass.getuser()` inside `secret_store`,
+    so an out-of-band-account token won't resolve — the live-run check is bead a-plus-maxing-m8ia.
+    The absence path (None) is the caller's fail-loud trigger.
     """
-    try:
-        completed = subprocess.run(
-            ["security", "find-generic-password", "-w", "-s", _KEYCHAIN_SERVICE],
-            capture_output=True,
-            text=True,
-        )
-    except (FileNotFoundError, OSError):
-        return None
-    if completed.returncode != 0:
-        return None
-    token = completed.stdout.strip()
-    return token or None
+    return secret_store.get_secret(_KEYCHAIN_SERVICE)
 
 
 def build_subscription_env(base_env, *, keychain_reader=_oauth_keychain_reader):

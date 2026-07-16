@@ -9,6 +9,7 @@ fixture key is synthetic.
 
 import pytest
 
+from scripts import secret_store
 from scripts.model import key_source
 
 # A non-secret fixture that is deliberately NOT shaped like a real key (no `sk-ant-…`
@@ -42,27 +43,37 @@ def test_store_error_message_never_carries_the_key():
     assert _SYNTHETIC_KEY not in str(exc.value)
 
 
-def test_keychain_writer_invokes_security_add_and_fails_loud_on_nonzero(monkeypatch):
-    """_keychain_writer runs `security add-generic-password -U ... -w <key>`; nonzero raises."""
-    calls = {}
+def test_default_writer_delegates_to_secret_store_set_secret(monkeypatch):
+    """SF-4a/AC-1: the DEFAULT keychain_writer delegates to secret_store.set_secret (exact service+key).
 
-    class _Ok:
-        returncode = 0
+    Migrated from the removed `security add-generic-password` ARGV test — the direct shell-out is gone,
+    so the writer's contract is now delegation to the abstraction. SF-1 service-keyed: the exact
+    `a-plus-maxing-api-key` service is asserted so a transposition reds.
+    """
+    seen = {}
 
-    def fake_run(argv, **_kw):
-        calls["argv"] = argv
-        return _Ok()
+    def _spy_set(service, value):
+        seen["service"] = service
+        seen["value"] = value
 
-    monkeypatch.setattr(key_source.subprocess, "run", fake_run)
+    monkeypatch.setattr(secret_store, "set_secret", _spy_set)
     key_source._keychain_writer(_SYNTHETIC_KEY)
-    argv = calls["argv"]
-    assert argv[:3] == ["security", "add-generic-password", "-U"]
-    assert "-s" in argv and key_source._KEYCHAIN_SERVICE in argv
-    assert argv[-2:] == ["-w", _SYNTHETIC_KEY]  # the key is the -w value, not logged
+    assert seen == {"service": "a-plus-maxing-api-key", "value": _SYNTHETIC_KEY}
 
-    class _Fail:
-        returncode = 1
 
-    monkeypatch.setattr(key_source.subprocess, "run", lambda *_a, **_k: _Fail())
-    with pytest.raises(key_source.KeyStoreError):
-        key_source._keychain_writer(_SYNTHETIC_KEY)
+def test_store_default_writer_translates_error_class(monkeypatch):
+    """AC-8/F2: the DEFAULT writer translates secret_store.KeyStoreError -> key_source.KeyStoreError.
+
+    server.py:976 catches key_source.KeyStoreError; the sibling secret_store.KeyStoreError is NOT a
+    subclass, so a naive delegate that let it escape would leave a /settings/key write failure uncaught
+    (a production regression). Drives the DEFAULT writer (not an injected fake — the factory-bypass
+    mandate). RED-capable: a default that propagates secret_store.KeyStoreError -> pytest.raises reds.
+    The message is CONSTANT and carries no key value.
+    """
+    def _boom(service, value):
+        raise secret_store.KeyStoreError("secret-store write failed")
+
+    monkeypatch.setattr(secret_store, "set_secret", _boom)
+    with pytest.raises(key_source.KeyStoreError) as exc:
+        key_source.store(_SYNTHETIC_KEY)
+    assert _SYNTHETIC_KEY not in str(exc.value)
