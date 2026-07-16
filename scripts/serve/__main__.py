@@ -14,7 +14,10 @@ import sys
 import threading
 
 from scripts.model.client import ModelClient
+from scripts.runner import metered_dispatch
+from scripts.serve import alpha_config
 from scripts.serve import server as serve_server
+from scripts.serve.intake_aggregate import AggregatingDeidClient
 
 
 def _data_roots():
@@ -49,6 +52,11 @@ def main(argv=None, *, build=serve_server.build_server, client_factory=ModelClie
     re-renders rather than making a metered call — extraction is wired here, at the entry
     point, not by a handler self-default.
 
+    Also arms the loop-live metered lane (ADR-0049-T1): the D5 shared-key bridge closes the
+    no-BYO key default, and the SAME client is wired as the server's metered `loop_dispatch`
+    + `loop_deid_client`, so an in-app `/plan-loop` dispatches specialists on the shared
+    `a-plus-maxing-api-key` metered lane (0-spend at construct; metered only when a loop fires).
+
     On a port collision, exit non-zero with a fail-loud message; on Ctrl-C (SIGINT),
     stop the listener cleanly. `serve_forever` runs on a worker thread so the main
     thread can drive `shutdown()` (which must run off the serving thread).
@@ -66,15 +74,25 @@ def main(argv=None, *, build=serve_server.build_server, client_factory=ModelClie
     """
     port = serve_server.DEFAULT_PORT
     roots = _data_roots()  # optional scratch-store override for safe, repeatable testing
-    # The loop dispatch obligation (bead 3ge1 / ADR-0036-T1 Tier-2): `build_server` accepts
-    # `loop_dispatch`/`loop_deid_client`, but this standalone entry deliberately passes NEITHER — the
-    # loop's A' aggregate dispatch (every specialist + judge + lens on the subscription session,
-    # ADR-0036 Consequences) has no runtime in a plain Python server process. Fabricating a dispatch
-    # here would either be a fake or would arm heavy no-train spend by default. So `/plan-loop`
-    # degrades honestly (`loop-dispatch-unavailable`); a genuinely-live loop is an agent-driven
-    # scheduled runner, a separate ADR-gated + operator-spend-gated build (NOT this entry point).
+    # Arm the loop-LIVE metered lane at operator start (ADR-0049 D1). The D5 shared-key bridge exports
+    # the shared `a-plus-maxing-api-key` onto the env-first key path when no BYO key resolves — a BYO
+    # key no-ops it (HIST01: the shared key is the default, never an override) — so the metered lane's
+    # `key_source.resolve` returns on the no-BYO default. `load_alpha_config` fails loud on a malformed
+    # / in-repo config and `main()` does NOT catch it: crashing loud at operator start is the intended
+    # posture (AR-006, no defensive try/except). Never print/log/repr the config or key (bead d1yz —
+    # the dataclass repr renders the secret). ONE `client` feeds the server, the metered `loop_dispatch`,
+    # and the `loop_deid_client`, so the injectable `client_factory` seam drives the metered lane too
+    # (0-spend at construct — the ModelClient backend is lazy; metered only when a loop actually fires),
+    # replacing the prior honest-degraded 0-loop posture (bead 3ge1) with a genuinely-live loop.
+    alpha_config.provision_shared_key(alpha_config.load_alpha_config())
+    client = client_factory()
     try:
-        srv = build(port, client=client_factory(), **roots)
+        srv = build(
+            port, client=client,
+            loop_dispatch=metered_dispatch.build_dispatch(client),
+            loop_deid_client=AggregatingDeidClient(client),
+            **roots,
+        )
     except OSError as exc:
         raise SystemExit(
             f"Port {port} is already in use ({exc}); the intake server did not start. "
