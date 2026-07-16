@@ -144,6 +144,24 @@ def test_status_reports_per_source_connected_booleans(monkeypatch):
         assert _SYNTHETIC_TOKEN not in text  # the status surface carries booleans only
     finally:
         srv.shutdown()
+
+
+def test_status_get_tolerates_a_query_string(monkeypatch):
+    """GET /settings/trackers?v=2 is served (dispatch matches the query-stripped path — AR-009).
+
+    A cache-busting query on the status poll must still route; RED if the GET dispatch matches
+    raw `self.path` instead of the query-stripped `path` var the sibling /settings/key GET uses.
+    """
+    _mock_secret_store(monkeypatch)
+    srv = serve_server.build_server(0)
+    port = srv.server_address[1]
+    _serve_in_thread(srv)
+    try:
+        status, text = _request(port, "GET", "/settings/trackers?v=2")
+        assert status == 200
+        assert "sources" in json.loads(text)
+    finally:
+        srv.shutdown()
         srv.server_close()
 
 
