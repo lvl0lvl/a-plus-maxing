@@ -15,8 +15,11 @@ shell via `generate.run('app')` reflecting the new load-state. The server serves
 generated dashboard/report artifact live (ADR-0013 Falsification 3); the route table
 is {GET `/`, GET `/settings/key`, GET `/settings/trackers`, GET `/conversation`,
 POST `/upload`, POST `/chat`, POST `/settings/key`, POST `/settings/tracker`,
-POST `/care-chat`, POST `/confirm-extraction`, POST `/confirm-curation`,
-POST `/confirm-plan-change`, POST `/generate-plan`, POST `/plan-loop`}. POST `/confirm-extraction`
+POST `/settings/connect`, POST `/care-chat`, POST `/confirm-extraction`, POST `/confirm-curation`,
+POST `/confirm-plan-change`, POST `/generate-plan`, POST `/plan-loop`}. POST `/settings/connect`
+(ADR-0048-T2) spins up a one-shot loopback OAuth callback listener + opens the vendor authorize URL;
+the exchanged refresh token is written by `oauth_callback` (a separate module — no `ModelClient`
+here). POST `/confirm-extraction`
 (ADR-0030-T3) lands ONLY the operator-confirmed subset of an unrecognized-format
 upload's extracted readings through the UNCHANGED sink — the `/upload` handler surfaces
 those readings and lands 0. POST `/generate-plan` authors + records a plan for each
@@ -176,6 +179,11 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
     # pass-through (0 spend); the deferred OQ-5 confirm UX wires it through this class-attr seam,
     # mirroring `loop_dispatch`/`identity_config`.
     tailor_client = None
+    # The alpha config (client-type + shared client_id record) the POST /settings/connect route reads
+    # (ADR-0048-T2). None -> resolved at request time via `load_alpha_config()` (env-driven, degrades
+    # to an empty config). `connect_start` is the OAuth connect seam; None -> `oauth_callback.start_connect`.
+    alpha_config = None
+    connect_start = None
 
     def do_GET(self):
         # Match on the PATH only, ignoring any `?query`/`#fragment`. A query string must not 404 the
@@ -208,6 +216,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/settings/tracker":
             self._save_tracker_token()
+            return
+        if self.path == "/settings/connect":
+            self._do_connect_start()
             return
         if self.path == "/confirm-extraction":
             self._do_confirm_extraction()
@@ -1064,34 +1075,81 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._write_json(400, {"ok": False, "error": "bad request"})
             return
 
-        from scripts.ingest import oauth_pull
+        from scripts import secret_store
+        from scripts.serve import oauth_callback
 
-        # Source validation (fail-closed; sec LOW-1): EXACT membership in the wired manifest set — no
-        # case-folding, no normalization (a case/homoglyph variant simply misses -> 400). Read at
-        # REQUEST time so it stays data-driven. The SAME validated string is passed VERBATIM to the
-        # service-name derivation, so the write lands in the item it validated — closing the
-        # service-name-injection surface (an unvalidated source could write an arbitrary keyring item).
-        if source not in oauth_pull._MANIFESTS:
+        # The write goes through the ONE extracted validated helper (ADR-0048-T2 contract §A): EXACT
+        # source-membership validation (fail-closed; sec LOW-1 — no case-folding, read at REQUEST time
+        # so it stays data-driven) -> strip/empty-reject -> `secret_store.set_secret` into the item the
+        # reader reads (`_oauth_service_name`, one derivation site). The ADR-0048-T2 callback calls the
+        # SAME helper — one validated writer, no second unvalidated path, closing the service-name-
+        # injection surface. `KeyStoreError` is a constant 500 that does NOT assert the token is unstored
+        # as certainty (`set_secret` also raises on a succeeded-write-but-stale-residue-clear-fail).
+        try:
+            oauth_callback.store_oauth_credential(source, token)
+        except oauth_callback.UnknownSourceError:
             self._write_json(400, {"ok": False, "error": "unknown source"})
             return
-        token = token.strip()
-        if not token:
+        except oauth_callback.EmptyCredentialError:
             self._write_json(400, {"ok": False, "error": "empty token"})
             return
-
-        from scripts import secret_store
-
-        # The write goes DIRECTLY through `secret_store` into the SAME item `oauth_pull`'s default
-        # reader reads (`_oauth_service_name` is MANDATED — one derivation site, no literal here).
-        try:
-            secret_store.set_secret(oauth_pull._oauth_service_name(source), token)
         except secret_store.KeyStoreError:
-            # Constant message — never the token, and it does NOT assert the token is unstored as a
-            # certainty (`set_secret` also raises when the write SUCCEEDED but stale fallback residue
-            # could not be cleared — the T2-F2 clear-fail case).
             self._write_json(500, {"ok": False, "error": "could not store token"})
             return
         self._write_json(200, {"ok": True, "connected": True})
+
+    def _do_connect_start(self):
+        """Start the app-mediated OAuth authorization-code connect for a servable tracker source.
+
+        Byte-mirrors `_save_tracker_token`'s SHARED gates — the SEC-001 `application/json` 415 CSRF gate
+        FIRST (before any listener bind or browser-open: a cross-site CORS-simple `text/plain`/no-ctype
+        POST is refused), then the 16-KiB `_SETTINGS_MAX_BYTES` ceiling + JSON-parse/shape gates. The
+        SOURCE gate DIFFERS from `_save_tracker_token`'s `_MANIFESTS` membership (AR-004/AR-009): admit
+        ONLY an OAuth-2.0-authorization-code-servable vendor (`servable_vendor` — a CONFIDENTIAL or
+        PKCE_PUBLIC client with a shared `client_id`), rejecting garmin (OAuth-1.0a/EXCLUDED), oura
+        (PAT), an unmapped source (MANUAL), and an empty/partial config with a clean 400. Then spins up
+        the one-shot loopback listener + opens the vendor authorize URL. The write `source` is this
+        server-side validated value, never re-parsed from the attacker-influenceable callback request.
+        Constructs no model client — the callback lives in `oauth_callback`, a separate module.
+        """
+        import json
+
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"ok": False, "error": "unsupported content-type"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        if length > _SETTINGS_MAX_BYTES:
+            self._write_json(413, {"ok": False, "error": "too large"})
+            return
+        raw = self.rfile.read(length) if length else b""
+        try:
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+        except (ValueError, UnicodeDecodeError):
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        if not isinstance(body, dict):
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        source = body.get("source")
+        if not isinstance(source, str):
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+
+        from scripts.serve import alpha_config as alpha_config_mod
+        from scripts.serve import oauth_callback
+
+        config = self.alpha_config if self.alpha_config is not None else alpha_config_mod.load_alpha_config()
+        if oauth_callback.servable_vendor(source, config) is None:
+            self._write_json(400, {"ok": False, "error": "source not connectable"})
+            return
+        start = self.connect_start or oauth_callback.start_connect
+        start(source, config=config)
+        self._write_json(200, {"ok": True, "connected": False, "authorizing": True})
 
     def _write_json(self, status, obj):
         """Write a JSON response body (the `/chat` turn-receipt response-write site)."""
@@ -1129,7 +1187,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
 
 def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
                  identity_config=None, client=None, key_resolver=None, key_store=None,
-                 loop_dispatch=None, loop_deid_client=None):
+                 loop_dispatch=None, loop_deid_client=None, alpha_config=None, connect_start=None):
     """Construct the loopback-bound intake server on `port`.
 
     The POST `/upload` handler ingests file uploads into `store_root`/`dna_root`,
@@ -1166,7 +1224,9 @@ def build_server(port, *, store_root=None, dna_root=None, scaffold_root=None,
                     "scaffold_root": scaffold_root, "identity_config": identity_config,
                     "client": client,
                     "loop_deid_client": loop_deid_client,
+                    "alpha_config": alpha_config,
                     "loop_dispatch": staticmethod(loop_dispatch) if loop_dispatch is not None else None,
+                    "connect_start": staticmethod(connect_start) if connect_start is not None else None,
                     "key_resolver": staticmethod(key_resolver) if key_resolver is not None else None,
                     "key_store": staticmethod(key_store) if key_store is not None else None})
     return ThreadingHTTPServer((_LOOPBACK, port), handler)

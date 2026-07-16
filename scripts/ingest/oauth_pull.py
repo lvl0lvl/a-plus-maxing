@@ -392,6 +392,67 @@ def access_token(source, *, credential_reader=None, credential_writer=None, http
     return token
 
 
+def exchange_authorization_code(source, code, code_verifier, redirect_uri, *,
+                                client_id, client_secret=None, token_endpoint=None, opener=None):
+    """Trade a one-time OAuth authorization `code` (+ PKCE verifier) for the token set, or None.
+
+    The one-time app-mediated connect exchange (ADR-0048-T2): the serve-layer callback delegates its
+    single outbound HTTP leg here (the serve layer is egress-free by construction — ADR-0001 / the
+    `test_serve_no_egress` guard family — so the token POST lives in this egress-permitted ingest
+    layer, reusing the same host-locked no-follow `_OPENER` `access_token` uses). POSTs the
+    authorization-code grant through the fail-closed opener: a 3xx is DECLINED (the `_NoFollowRedirect`
+    guarantee), so the auth code + `client_secret` never leak to a redirect host — the redirect target
+    is never contacted (the D7 wire-scan RED-gates this via the injectable `opener`).
+
+    Fail-closed (NFR-3, the repo is PUBLIC): a declined 3xx redirect, any non-2xx status, a transport
+    error, or an unparseable / non-object body returns None (the caller writes 0 credentials); no
+    surface carries the code or the secret.
+
+    Args:
+        source (str): The wired OAuth-pull source; its token URL is resolved from the manifest when
+            `token_endpoint` is not given.
+        code (str): The vendor authorization code from the callback.
+        code_verifier (str): The PKCE verifier for the issued challenge.
+        redirect_uri (str): The loopback redirect_uri registered in the authorize request.
+        client_id (str): The vendor client id.
+        client_secret (str, optional): The confidential-client secret; omitted for a PKCE-public client.
+        token_endpoint (str, optional): The token URL; defaults to the source manifest's `token_url`.
+        opener (optional): The urllib opener; defaults to the module `_OPENER` (host-locked no-follow).
+            Injected in tests to capture the exchange at the true wire (`opener.open(request)`).
+
+    Returns:
+        (dict | None) The parsed token response on a 2xx, else None (fail-closed).
+    """
+    if token_endpoint is None:
+        token_endpoint = _manifest(source)["token_url"]
+    opener = _OPENER if opener is None else opener
+    params = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "code_verifier": code_verifier,
+        "redirect_uri": redirect_uri,
+        "client_id": client_id,
+    }
+    if client_secret:
+        params["client_secret"] = client_secret
+    request = urllib.request.Request(
+        token_endpoint, data=urlencode(params).encode("ascii"), method="POST",
+        headers={"Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        with opener.open(request, timeout=_HTTP_TIMEOUT_S) as response:
+            status = getattr(response, "status", None)
+            body = response.read()
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError):
+        return None
+    if status is not None and not 200 <= status < 300:
+        return None
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, AttributeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def fetch(source, *, since, staged_dir, credential_reader=None, credential_writer=None, http=None):
     """Pull a source's readings-new-since into a staged export file; return its path.
 
