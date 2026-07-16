@@ -144,6 +144,7 @@ def test_status_reports_per_source_connected_booleans(monkeypatch):
         assert _SYNTHETIC_TOKEN not in text  # the status surface carries booleans only
     finally:
         srv.shutdown()
+        srv.server_close()  # pair both — shutdown alone leaks the listening socket fd (Tier-3 BUG-001/QUAL-1/TEST-02)
 
 
 def test_status_get_tolerates_a_query_string(monkeypatch):
@@ -344,6 +345,32 @@ def test_text_plain_post_is_415_before_any_write(monkeypatch):
         assert status == 415
         assert store == {}  # 0 writes — the gate fired before the body was read
         assert _SYNTHETIC_TOKEN not in text
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_no_content_type_header_is_415_before_any_write(monkeypatch):
+    """A POST with NO Content-Type header is 415 before any write (the `or ""` None-guard — TEST-01).
+
+    Exercises the CSRF gate's `(get("Content-Type") or "")` None-fallback. RED-capable: dropping the
+    `or ""` makes a no-header POST call `None.split(";", 1)` -> AttributeError -> a dropped request
+    thread (the DoS-shaped class the ctype battery must cover on the secret-write surface). Mirrors
+    the house `content_type=None` "no-header CSRF case" (test_server.py, test_confirm_plan_change.py)
+    the recipe should have carried forward (PF-S140-01).
+    """
+    store = _mock_secret_store(monkeypatch)
+    srv = serve_server.build_server(0)
+    port = srv.server_address[1]
+    _serve_in_thread(srv)
+    try:
+        status, _ = _raw_post(
+            port, "/settings/tracker",
+            json.dumps({"source": "whoop", "token": _SYNTHETIC_TOKEN}).encode("utf-8"),
+            content_type=None,
+        )
+        assert status == 415
+        assert store == {}  # 0 writes — the None-guard 415s before the body is read
     finally:
         srv.shutdown()
         srv.server_close()
