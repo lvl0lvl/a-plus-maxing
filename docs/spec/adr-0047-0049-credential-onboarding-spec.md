@@ -74,7 +74,7 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 **Shared-file coordination:**
 - `scripts/serve/server.py` is Modified by four tasks (ADR-0048-T3, ADR-0048-T2, ADR-0049-T1, ADR-0049-T2), each in a **distinct section** (per-source write handlers / connect-start route / `main()`+`build_server` `loop_dispatch` injection + shared-key bridge call / manual-trigger route). ADR-0048-T3→ADR-0048-T2 and ADR-0049-T1→ADR-0049-T2 are dependency-ordered; the ADR-0048 arm (write handlers/route) and the ADR-0049 arm (loop-dispatch injection/trigger) touch non-overlapping regions. The build planner serializes same-file tasks within a wave.
 - `.gitignore` is Modified by ADR-0047-T1 (fallback file, wave 1) and ADR-0049-T3 (spend ledger, wave 4) — distinct append-only lines, different waves, no concurrency.
-- `vault/design/templates/app_shell.py` is Modified by ADR-0048-T4 (Connections & Keys panel) and ADR-0049-T2 (Plan updates section) — distinct sections; ADR-0049-T2 depends on ADR-0048-T4, so ordered.
+- **[AMENDED S143 — PF-S142-01]** `vault/design/templates/app_view.html` is Modified by ADR-0048-T4 (the credential step 9 + Connections & Keys panel markup + the client-side `/settings/trackers` status JS). `vault/design/templates/app_shell.py` is Modified ONLY by ADR-0049-T2 (the Plan-updates section render-state) — ADR-0048-T4 no longer touches `app_shell.py` (Surface B's status is client-side, not a server render-state seam). ADR-0049-T2 depends on ADR-0048-T4, so ordered.
 - `scripts/runner/metered_dispatch.py` is Created by ADR-0049-T1 and Modified by ADR-0049-T3 (the cap consult) — ADR-0049-T3 depends on ADR-0049-T1 (create-then-modify, ordered).
 
 ## Tasks
