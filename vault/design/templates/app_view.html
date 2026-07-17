@@ -1362,23 +1362,27 @@ function pickWizKey(mode){
 // ---------- Plan updates: manual trigger (reuses /plan-loop) + Off/Weekly/Daily schedule (ADR-0049-T2) ----------
 // The trigger POSTs the already-routed CSRF-gated /plan-loop (no new spend route). /plan-loop carries NO
 // `ok` field: today it answers 200 {degraded:true, reason:"loop-dispatch-unavailable"} (loop_dispatch is
-// None), a bare result on success, or {error} on the 415 refusal. Gate success on `!d.degraded && !d.error`
-// — never d.ok/r.ok: r.ok is true on the degraded 200, so gating on it paints a fake success on the honest
-// not-yet-available body (the T4-A1 failure). The degraded state is the only reachable click outcome today.
+// None), a promoted result carrying a NON-EMPTY `results` on success, a bare-200 HALT (a `reason` + empty
+// `results` — SAFETY_BLOCKED / DEID_HALTED / cap) on a blocked run, or {error} on the 415 refusal. Gate
+// success on `!d.degraded && !d.error && non-empty results` — never d.ok/r.ok: r.ok is true on the degraded
+// 200, so gating on it paints a fake success on the honest not-yet-available body (the T4-A1 failure); the
+// results-leg likewise keeps a bare-200 HALT (empty results) from false-greening, falling to the honest
+// not-updated copy. The degraded state is the only reachable click outcome today.
 function _planUpdate(){
  var act=document.getElementById('pf-plan-act'); if(!act) return;
+ var btn='<button type="button" class="btn primary" onclick="_planUpdate()">Update my plan now</button>';
  act.innerHTML='<span class="conn-status working"><span class="spin"></span> Reviewing your plan…</span>';
  fetch('/plan-loop',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
   .then(function(r){return r.json();})
   .then(function(d){
-    if(d && !d.degraded && !d.error){
-      act.innerHTML='<span class="conn-status ok">Plan updated · just now</span><button type="button" class="btn primary" onclick="_planUpdate()">Update my plan now</button>';
+    if(d && !d.degraded && !d.error && d.results && Object.keys(d.results).length>0){
+      act.innerHTML='<span class="conn-status ok">Plan updated · just now</span>'+btn;
     } else {
-      var why=(d&&d.reason==='loop-dispatch-unavailable')?'Automatic plan updates are not live yet — your plan is unchanged.':'Could not update your plan just now — try again.';
-      act.innerHTML='<span class="conn-status">'+why+'</span><button type="button" class="btn primary" onclick="_planUpdate()">Update my plan now</button>';
+      var why=(d&&d.reason==='loop-dispatch-unavailable')?'Plan review is not live in the alpha yet — your plan is unchanged.':'Could not update your plan just now — try again.';
+      act.innerHTML='<span class="conn-status">'+why+'</span>'+btn;
     }
   })
-  .catch(function(){ act.innerHTML='<span class="conn-status">Could not reach the app — try again.</span><button type="button" class="btn primary" onclick="_planUpdate()">Update my plan now</button>'; });
+  .catch(function(){ act.innerHTML='<span class="conn-status">Could not reach the app — try again.</span>'+btn; });
 }
 // Record the cadence INTENT via POST /settings/schedule. Daily is INERT: the pick records intent but the
 // help copy states scheduled reviews are not live; nothing arms a run (the schedule surface is operator-owned).
@@ -1389,6 +1393,7 @@ function _pickSched(el, val){
  if(help){ help.innerHTML=(val==='off')
    ? 'A scheduled review only spends if something meaningful changed since last time.'
    : 'Scheduled reviews are not live in the alpha yet — for now, tap <b>Update my plan now</b>.'; }
+ // Fire-and-forget: an inert intent-only setting; _schedInit re-reads + self-corrects on next load, so a failed save needs no inline error (unlike the _pfKeySave/_trackerSaveToken write handlers).
  fetch('/settings/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cadence:val})}).catch(function(){});
 }
 // The current cadence, read CLIENT-SIDE on load (mirrors the pf-key pill) and reflected into the radio.
