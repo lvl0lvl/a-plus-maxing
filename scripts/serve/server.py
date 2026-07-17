@@ -82,6 +82,13 @@ MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_MARGIN
 # generous margin that still rejects a giant body before it is read into RAM.
 _SETTINGS_MAX_BYTES = 16 * 1024
 
+# The plan-update cadence setting (ADR-0049-T2): the store item the /settings/schedule route
+# records the cadence INTENT under, and the accepted cadence values. Daily is a recorded intent
+# only — it arms no runner (the schedule surface is operator-owned; C3).
+_SCHEDULE_ITEM = "plan-update-cadence"
+_SCHEDULE_CADENCES = ("off", "weekly", "daily")
+_SCHEDULE_DEFAULT = "off"
+
 # The whole-body ceiling for POST /confirm-extraction. The confirmed subset is a small JSON
 # array of Line-Field-Set readings; 1 MiB is a generous margin for a full lab panel that
 # still rejects a giant body on Content-Length BEFORE it is read into RAM (the same
@@ -196,6 +203,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
         if path == "/settings/trackers":
             self._tracker_status()
             return
+        if path == "/settings/schedule":
+            self._schedule_status()
+            return
         if path == "/conversation":
             self._do_get_conversation()
             return
@@ -234,6 +244,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/plan-loop":
             self._do_plan_loop()
+            return
+        if self.path == "/settings/schedule":
+            self._save_schedule()
             return
         if self.path != "/upload":
             self.send_error(404)
@@ -914,6 +927,77 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             self._write_json(200, result)
         except Exception:
             self._write_json(200, {"results": {}, "degraded": True, "reason": "could not run plan loop"})
+
+    def _save_schedule(self):
+        """Record the plan-update cadence INTENT as a store reading (ADR-0049-T2).
+
+        The setting the "Automatic updates" Off/Weekly/Daily radio writes. It records the cadence
+        INTENT ONLY — it MUST NOT arm launchd: the weekly cadence runner + the Daily label are the
+        operator-owned `scripts/runner/schedule/activate` surface (C3), so Daily is a recorded intent
+        that arms nothing. The reading is CONSTRUCTED here conformant to `keying.LINE_FIELDS` with
+        `source: "settings"` (the producing surface — a Profile settings write is not an intake
+        capture) and appended through the UNCHANGED `store.append` sink (no second sink/gate/key). The
+        store is append-only, so each pick is a fresh series point (an intended cadence history).
+
+        CSRF gate (mirrors `_save_key`): a non-`application/json` POST is refused 415 BEFORE any work —
+        a cross-site CORS-simple `text/plain` POST cannot drive this store write. Then the
+        Content-Length parse (400) + the `_SETTINGS_MAX_BYTES` ceiling (413) bound the body before it
+        is read; an unknown cadence is rejected 400 BEFORE the sink (validate before the append).
+        """
+        import datetime
+        import json
+
+        from scripts.store import store
+
+        # CSRF gate (SEC): require application/json so a cross-site CORS-simple text/plain POST cannot drive this store write (mirrors _save_key).
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            self._write_json(415, {"ok": False, "error": "unsupported content-type"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        if length > _SETTINGS_MAX_BYTES:
+            self._write_json(413, {"ok": False, "error": "too large"})
+            return
+        raw = self.rfile.read(length) if length else b""
+        try:
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+        except (ValueError, UnicodeDecodeError):
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        if not isinstance(body, dict):
+            self._write_json(400, {"ok": False, "error": "bad request"})
+            return
+        cadence = body.get("cadence")
+        if cadence not in _SCHEDULE_CADENCES:
+            self._write_json(400, {"ok": False, "error": "unknown cadence"})
+            return
+        store_root = self.store_root if self.store_root is not None else store.DEFAULT_ROOT
+        reading = {
+            "item": _SCHEDULE_ITEM,
+            "timepoint": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "source": "settings",
+            "value": cadence,
+        }
+        store.append(_SCHEDULE_ITEM, reading, root=store_root)
+        self._write_json(200, {"ok": True, "cadence": cadence})
+
+    def _schedule_status(self):
+        """Write JSON `{cadence}` — the current plan-update cadence intent (ADR-0049-T2).
+
+        The append-only store keeps every pick as a series point, so the current cadence is the LAST
+        `plan-update-cadence` reading by timepoint; an unset setting defaults to `off`. Reports the
+        recorded intent only — it reads no scheduler state and arms nothing.
+        """
+        from scripts.store import store
+
+        store_root = self.store_root if self.store_root is not None else store.DEFAULT_ROOT
+        readings = store.read(_SCHEDULE_ITEM, root=store_root)
+        cadence = readings[-1]["value"] if readings else _SCHEDULE_DEFAULT
+        self._write_json(200, {"cadence": cadence})
 
     def _key_available(self):
         """Whether a no-train key resolves at runtime — the Profile 'connected' availability check.
