@@ -27,7 +27,7 @@ Trust boundary (SEC-4 — stated assumptions, not code defects):
 import enum
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from scripts.model import key_source
@@ -86,7 +86,7 @@ class VendorCredential:
     """
 
     client_id: str
-    client_secret: str | None
+    client_secret: str | None = field(repr=False)
 
 
 @dataclass(frozen=True)
@@ -101,7 +101,7 @@ class AlphaConfig:
     """
 
     vendors: dict
-    shared_api_key: str | None
+    shared_api_key: str | None = field(repr=False)
     client_types: dict
 
     def client_type(self, vendor):
