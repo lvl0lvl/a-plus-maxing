@@ -411,10 +411,17 @@ def test_spa_fetch_targets_are_all_same_origin_loopback():
     # is likewise a LOCAL same-origin POST: the operator-confirmed de-identified interaction-class
     # tokens persist through the unchanged on-device store sink (never a raw drug string, never
     # off-machine) — the same LOCAL class as /confirm-extraction, adding no new egress class.
+    # /settings/trackers (GET) + /settings/tracker (POST) + /settings/connect (POST) (ADR-0048-T4) are
+    # likewise LOCAL same-origin routes: /settings/trackers reports keychain-presence booleans (never a
+    # token value), /settings/tracker writes a pasted OAuth token to the on-device keychain, and
+    # /settings/connect starts the app-mediated OAuth server-side — the fetch itself never leaves the
+    # machine, adding no new egress class (the same LOCAL keychain class as /settings/key).
     assert set(targets) <= {"/chat", "/care-chat", "/upload", "/settings/key", "/confirm-extraction",
-                            "/generate-plan", "/confirm-curation", "/conversation"}, (
+                            "/generate-plan", "/confirm-curation", "/conversation",
+                            "/settings/trackers", "/settings/tracker", "/settings/connect"}, (
         f"the SPA fetches a path beyond the known loopback routes "
-        f"(/chat + /upload + /settings/key + /confirm-extraction + /generate-plan + /confirm-curation): "
+        f"(/chat + /upload + /settings/key + /confirm-extraction + /generate-plan + /confirm-curation "
+        f"+ /settings/trackers + /settings/tracker + /settings/connect): "
         f"{sorted(set(targets))}"
     )
 
@@ -1072,11 +1079,13 @@ def test_prefill_consumer_integrity_no_silent_noop(tmp_path):
 # and the inline-asset render gate. Rendered-HTML / real-emit, 0 live spend.
 # --------------------------------------------------------------------------- #
 
-# The 9 wizard step headings in mockup order (`prototype/intake-onboarding-mockup.html`), as
-# they appear in the rendered markup (the `&` in three headings is HTML-escaped to `&amp;`).
+# The 9 wizard step headings in mockup order, as they appear in the rendered markup (the `&` in the
+# headings is HTML-escaped to `&amp;`). Steps 1-8 are the intake-onboarding-mockup headings; step 9 was
+# retargeted by ADR-0048-T4 to the credential-onboarding "Connect your data & keys" surface (so the
+# heading is the real step-9 title, not the incidental "API key" substring in the BYO input label).
 _WIZARD_STEP_HEADINGS = (
     "Demographics", "Goals", "Training &amp; activity", "Diet", "Supplements &amp; peptides",
-    "Medications", "Health &amp; lifestyle", "Documents", "API key",
+    "Medications", "Health &amp; lifestyle", "Documents", "Connect your data &amp; keys",
 )
 
 # The generic multi-source wearable/DNA names the wizard Documents step lists (parsed locally),
@@ -1085,7 +1094,8 @@ _GENERIC_SOURCES = ("Apple Health", "Garmin", "Whoop", "Oura", "Fitbit", "23andM
 
 # Every same-origin loopback path the SPA may fetch/POST to (no new route — ADR-0033).
 _KNOWN_LOOPBACK = {"/chat", "/care-chat", "/upload", "/settings/key", "/confirm-extraction",
-                   "/generate-plan", "/confirm-curation", "/conversation"}
+                   "/generate-plan", "/confirm-curation", "/conversation",
+                   "/settings/trackers", "/settings/tracker", "/settings/connect"}
 
 
 def _wizard_html(html):
