@@ -342,6 +342,34 @@ def test_secret_value_never_leaks(tmp_path, monkeypatch, caplog):
 
 
 # --------------------------------------------------------------------------- #
+# d1yz (SEC MEDIUM-4) — no secret value in AlphaConfig/VendorCredential repr
+# --------------------------------------------------------------------------- #
+
+
+def test_secret_never_in_repr():
+    """d1yz: `repr()` of AlphaConfig / VendorCredential redacts the shared key + client secret.
+
+    The default dataclass repr renders every field, so `print(config)` / `logger.info(..., config)`
+    / a traceback that formats the config would emit the shared Anthropic key + `client_secret` in
+    PLAINTEXT to the operator server's stdout/logs (a global-revoke credential on a PUBLIC repo).
+    `field(repr=False)` on `shared_api_key` + `client_secret` redacts them from repr WITHOUT
+    dropping the value (the fields stay accessible for provisioning). RED-capable: removing
+    `field(repr=False)` renders the secret back into repr and surfaces it here.
+    """
+    vc = alpha_config.VendorCredential(client_id=_WHOOP_CLIENT_ID, client_secret=_SENTINEL)
+    config = alpha_config.AlphaConfig(
+        vendors={"whoop": vc}, shared_api_key=_SHARED_KEY,
+        client_types=alpha_config.DEFAULT_CLIENT_TYPES,
+    )
+    assert _SHARED_KEY not in repr(config), "shared_api_key leaked into AlphaConfig repr"
+    assert _SENTINEL not in repr(vc), "client_secret leaked into VendorCredential repr"
+    assert _SENTINEL not in repr(config), "nested client_secret leaked into AlphaConfig repr"
+    # Redaction is repr-only — the values remain readable for provisioning (no data loss).
+    assert config.shared_api_key == _SHARED_KEY
+    assert vc.client_secret == _SENTINEL
+
+
+# --------------------------------------------------------------------------- #
 # AR-003 — a present-but-malformed config FAILS LOUD (constant msg), distinct
 #          from the unset -> EMPTY degrade
 # --------------------------------------------------------------------------- #
