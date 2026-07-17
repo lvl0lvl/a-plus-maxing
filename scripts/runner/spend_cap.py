@@ -25,8 +25,9 @@ Three load-bearing contracts (the Phase-4 review pinned these):
     — the correct intra-process-threads tool; `store_lock`'s `fcntl.flock LOCK_NB` skip-on-contention
     would DROP a charge). The write is atomic (`mkstemp`->`fchmod(0o600)`->`fsync`->`os.replace`, mirroring
     `secret_store._write_fallback_file`), so a torn write leaves the prior count byte-intact. A
-    present-but-corrupt/unreadable/non-dict ledger fails CLOSED (raise — refusing when the count cannot
-    be verified is the safe direction for a spend control; recovery = the operator deletes the ledger).
+    present-but-corrupt/unreadable/non-dict ledger — or a valid dict whose stored count is corrupt
+    (negative / non-int / bool, which would otherwise BYPASS the ceiling fail-OPEN) — fails CLOSED
+    (raise — refusing when the count cannot be verified is the safe direction; recovery = delete the ledger).
     A missing ledger is count 0 (first run — nobody has spent).
 
 The module imports no `scripts.store` symbol and adds 0 field to the outbound metered payload: the cap
@@ -76,25 +77,34 @@ def _ledger_lock_for(ledger_path):
     return lock
 
 
+def _valid_count(value):
+    """True when a ledger's stored count is a usable non-negative dispatch count (int, not bool)."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
 class SpendCapExceeded(dispatch_budget.DispatchCapExceeded):
     """The fail-closed halt signal: a charge would push a `(tester, month)` count past the ceiling.
 
     Subclasses `dispatch_budget.DispatchCapExceeded` (C1) so the metered loop's cap-halt handler
     (`plan_orchestrator.py:314`) catches it and surfaces honest-no-plan when armed. Defines its OWN
     `__init__` that sets the DISTINCT `SPEND_CAP_EXCEEDED` reason token WITHOUT calling the parent
-    `__init__(count, cap)` — which would clobber `reason` to `DISPATCH_CAP_EXCEEDED` (AR-3).
+    `__init__(count, cap)` — which would clobber `reason` to `DISPATCH_CAP_EXCEEDED` (AR-3). It carries
+    the REAL ceiling in `.cap` (not None), honoring the parent's `.cap (int)` contract so a future
+    `except DispatchCapExceeded` reading `.cap` never gets None (LSP, Arch F2).
 
     Attributes:
-        count (int): The persisted current count (the ceiling on a refusal; 0 on a corrupt ledger).
-        cap (None): Base-attr parity with the parent (the ceiling is not surfaced on the exception).
+        count (int): The persisted current count (the ceiling on a refusal; 0 on a corrupt/value-corrupt
+            ledger).
+        cap (int): The configured monthly ceiling (passed at every raise site — never None in practice).
         reason (str): The honest no-plan reason token (`SPEND_CAP_EXCEEDED`).
     """
 
-    def __init__(self, count):
+    def __init__(self, count, cap=None):
         # Bypass DispatchCapExceeded.__init__ (which sets reason=DISPATCH_CAP_EXCEEDED) via Exception
-        # directly, so the distinct SPEND_CAP_EXCEEDED token C1 depends on is preserved (AR-3).
+        # directly, so the distinct SPEND_CAP_EXCEEDED token C1 depends on is preserved (AR-3). `.cap`
+        # carries the real ceiling (LSP parity with the parent's `.cap (int)`, Arch F2).
         self.count = count
-        self.cap = None
+        self.cap = cap
         self.reason = SPEND_CAP_EXCEEDED
         Exception.__init__(self, f"monthly spend cap exceeded: count {count}")
 
@@ -136,8 +146,9 @@ class SpendCap:
         Computes the `(tester, month)` key from `clock()` BEFORE acquiring the charge lock (the month
         is invariant across the microsecond critical section — so a test barrier can align concurrent
         threads at the read without touching the lock, C3/AR-1). Under the lock, reads the current
-        count; if `count + 1` would exceed the ceiling raises `SpendCapExceeded(count)` WITHOUT writing
-        (check-then-increment, C2); otherwise increments and atomically persists the ledger.
+        count; a corrupt stored value (negative / non-int / bool) fails CLOSED (C3); if `count + 1`
+        would exceed the ceiling raises `SpendCapExceeded` WITHOUT writing (check-then-increment, C2);
+        otherwise increments and atomically persists the ledger.
 
         Returns:
             (int) The post-increment count (when under the ceiling).
@@ -147,8 +158,14 @@ class SpendCap:
         with self._lock:
             ledger = self._read_ledger()
             count = ledger.get(key, 0)
+            if not _valid_count(count):
+                # A valid-JSON dict whose stored count is corrupt (negative / non-int / bool) cannot be
+                # trusted — fail CLOSED under the SAME C3 umbrella as an unreadable/non-dict ledger. A
+                # negative value would otherwise BYPASS the ceiling (fail-OPEN); a non-int would
+                # TypeError out of the :314 catch (Security LOW-1). A missing key defaults to 0 (valid).
+                raise SpendCapExceeded(0, self._ceiling)
             if count + 1 > self._ceiling:
-                raise SpendCapExceeded(count)
+                raise SpendCapExceeded(count, self._ceiling)
             ledger[key] = count + 1
             self._write_ledger(ledger)
             return ledger[key]
@@ -163,9 +180,9 @@ class SpendCap:
         except (OSError, ValueError):
             # The count cannot be verified — refuse (the safe direction for a spend control). Diverges
             # from secret_store's fail-open-to-empty read, which is safe for a secret but unsafe here.
-            raise SpendCapExceeded(0)
+            raise SpendCapExceeded(0, self._ceiling)
         if not isinstance(data, dict):
-            raise SpendCapExceeded(0)
+            raise SpendCapExceeded(0, self._ceiling)
         return data
 
     def _write_ledger(self, data):

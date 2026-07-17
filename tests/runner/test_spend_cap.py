@@ -98,12 +98,12 @@ def test_ac1_ledger_created_owner_only(tmp_path):
 
 
 def test_spend_cap_exceeded_subclasses_dispatch_cap_exceeded_with_distinct_reason():
-    """C1/AR-3: SpendCapExceeded IS-A DispatchCapExceeded, carries the DISTINCT reason (not clobbered)."""
-    exc = SpendCapExceeded(7)
+    """C1/AR-3/F2: SpendCapExceeded IS-A DispatchCapExceeded, distinct reason, `.cap` = the real ceiling."""
+    exc = SpendCapExceeded(7, 64)
     assert isinstance(exc, dispatch_budget.DispatchCapExceeded)  # caught at plan_orchestrator:314
     assert exc.reason == SPEND_CAP_EXCEEDED  # NOT clobbered to DISPATCH_CAP_EXCEEDED by the parent __init__
     assert exc.count == 7  # the persisted current count
-    assert exc.cap is None  # base-attr parity
+    assert exc.cap == 64  # the real ceiling — honors the parent's `.cap (int)` contract (LSP, F2)
 
 
 # --- AC-2: cap enforcement + fail-closed persist, check-then-increment ----------------------------
@@ -121,6 +121,7 @@ def test_ac2_cap_enforcement_and_check_then_increment_persist(tmp_path):
     with pytest.raises(SpendCapExceeded) as exc:
         cap.charge()  # 3 + 1 > 3 -> refuse WITHOUT writing
     assert exc.value.count == 3, "the halt carries the persisted current (ceiling), not ceiling+1"
+    assert exc.value.cap == 3, "the halt carries the real ceiling in `.cap` (F2)"
     # persist assertion (MF-1): the ledger re-read is the ceiling, NOT ceiling+1 (drops the persist-
     # then-check mutant, whose re-read would show 4).
     assert json.loads(ledger.read_text())[key] == 3
@@ -275,6 +276,33 @@ def test_ac4c_corrupt_ledger_fails_closed(tmp_path):
     with pytest.raises(SpendCapExceeded) as exc:
         cap.charge()
     assert exc.value.count == 0
+
+    # FIX-2 (QA S1): an OSError on read (a directory in the ledger slot) is caught by the read-arm and
+    # fails CLOSED — narrowing the `except (OSError, ValueError)` to just ValueError REDs this.
+    as_dir = tmp_path / "as_dir"
+    as_dir.mkdir()
+    cap_dir = SpendCap(ledger_path=as_dir, ceiling=5, tester=_TESTER, clock=_fixed_clock("2026-07-16"))
+    with pytest.raises(SpendCapExceeded) as exc:
+        cap_dir.charge()
+    assert exc.value.count == 0
+    assert exc.value.cap == 5  # the fail-closed raise carries the real ceiling (F2)
+
+
+@pytest.mark.parametrize("bad_value", [-1000000, -1, "abc", None, [1, 2], True])
+def test_ac4c_value_corrupt_ledger_fails_closed(tmp_path, bad_value):
+    """FIX-1/C3: a valid dict whose stored count is corrupt (negative / non-int / bool) fails CLOSED."""
+    ledger = tmp_path / "ledger.json"
+    key = _key(_TESTER, "2026-07")
+    ledger.write_text(json.dumps({key: bad_value}))
+    cap = SpendCap(ledger_path=ledger, ceiling=5, tester=_TESTER, clock=_fixed_clock("2026-07-16"))
+    # a negative value would BYPASS the ceiling (fail-OPEN); a non-int would TypeError past the :314
+    # catch — both fail CLOSED as a SpendCapExceeded instead.
+    with pytest.raises(SpendCapExceeded) as exc:
+        cap.charge()
+    assert exc.value.count == 0
+    assert exc.value.cap == 5
+    # a fail-closed refusal never writes — the corrupt ledger is left untouched
+    assert json.loads(ledger.read_text()) == {key: bad_value}
 
 
 def test_ac4c_torn_write_leaves_prior_count(tmp_path, monkeypatch):
