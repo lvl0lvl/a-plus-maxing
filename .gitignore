@@ -21,6 +21,11 @@ vault/meta/operator-contact.txt
 # pre-push-pii-scan hooks are the backstop against an ignore-bypassing git add -f
 .secret-store-fallback.json
 
+# Per-tester monthly spend-cap ledger (ADR-0049-T3/D5): per-instance at-rest cumulative
+# dispatch count, permission-gated (0600); never tracked (it carries no secret, but is
+# instance-local runtime state — same never-track posture as the fallback tier)
+.spend-cap-ledger.json
+
 # Python
 __pycache__/
 *.pyc
