@@ -17,6 +17,7 @@ import hashlib
 import http.client
 import http.server
 import json
+import socket
 import threading
 import urllib.error
 import urllib.request
@@ -27,7 +28,8 @@ import pytest
 
 from scripts.ingest import oauth_pull
 from scripts.serve import oauth_callback
-from scripts.serve.alpha_config import DEFAULT_CLIENT_TYPES, AlphaConfig, VendorCredential
+from scripts.serve.alpha_config import (
+    DEFAULT_CLIENT_TYPES, AlphaConfig, ClientType, VendorCredential)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -35,6 +37,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # short enough that the tracked-tree scans cannot self-match this file's own definition line.
 STORE_SENTINEL = "STORE-CONTENT-SENTINEL-xyz"
 _CODE_SENTINEL = "auth-code-sentinel"
+_VERIFIER_SENTINEL = "verifier-sentinel-xyz"
 _CLIENT_SECRET = "whoop-secret-sentinel"
 _WHOOP_CID = "whoop-client-id"
 _GOOGLE_CID = "google-client-id"
@@ -355,16 +358,32 @@ def test_ac1_falsifier_pkce_mismatch_writes_nothing(monkeypatch):
     assert store == {}, "a rejected (non-2xx) exchange must write nothing"
 
 
-def test_ac1_falsifier_storing_access_token_reds_reader_round_trip(monkeypatch):
-    """Wrong-value falsifier: if the ACCESS token were stored, the refresh-token round-trip REDs."""
+def test_ac1_wrong_value_guard_drives_real_write_and_excludes_access_token(monkeypatch):
+    """Wrong-value guard driving the REAL production write: a token response with a DISTINCT
+    access_token sentinel → production stores the REFRESH token; the reader round-trip carries the
+    refresh sentinel and the access sentinel appears NOWHERE. Would RED if production stored the
+    access token (the earlier hand-built assert never drove the write, so it could not — Sec-LOW-2)."""
     from scripts.ingest import oauth_pull
 
-    # Simulate the mutant's stored value (the access token instead of the refresh token).
-    wrong = json.dumps({"refresh_token": "ACCESS-not-refresh", "client_id": _WHOOP_CID,
-                        "client_secret": _CLIENT_SECRET})
-    parsed = oauth_pull._parse_credentials(wrong)
-    with pytest.raises(AssertionError):
-        assert parsed["refresh_token"] == "RT-whoop"   # the reader needs the refresh token; it's absent
+    store = _mock_secret_store(monkeypatch)
+    token = _TokenEndpoint(response={"access_token": "ACCESS-SENTINEL", "refresh_token": "REFRESH-SENTINEL"})
+    browser = []
+    try:
+        handle = oauth_callback.start_connect(
+            "whoop", config=_config(whoop=(_WHOOP_CID, _CLIENT_SECRET)),
+            opener=_RecordingOpener(oauth_pull._OPENER, []),
+            browser_open=lambda url: browser.append(url),
+            authorize_endpoint="http://127.0.0.1:1/authorize", token_endpoint=token.url,
+        )
+        q = _authorize_query(browser[0])
+        token.expected_challenge = q["code_challenge"]
+        _drive_callback(handle, state=q["state"])
+    finally:
+        token.close()
+
+    written = store["a-plus-maxing-whoop-oauth"]
+    assert "ACCESS-SENTINEL" not in written, "the access token was stored (production wrong-value bug)"
+    assert oauth_pull._parse_credentials(written)["refresh_token"] == "REFRESH-SENTINEL"
 
 
 # --------------------------------------------------------------------------------------------------
@@ -693,34 +712,66 @@ def _assert_no_secret_echo(surfaces, sentinels):
             assert sentinel not in surface, f"a secret sentinel leaked onto a surface: {sentinel!r}"
 
 
+def _closed_loopback_endpoint():
+    """A loopback URL whose port is bound-then-closed → a connection there is refused (a transport error)."""
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return f"http://127.0.0.1:{port}/token"
+
+
 def test_ac8_no_secret_echo_on_any_path(monkeypatch, capfd):
-    """The success + every error path echoes NONE of code / verifier / client_secret (browser + stderr)."""
-    sentinels = [_CODE_SENTINEL, _CLIENT_SECRET]
+    """Success + EVERY error path echoes NONE of code / code_verifier / client_secret, and writes 0
+    stderr bytes (AC-8). The six paths: success, non-2xx, no-refresh-token, the 3xx-redirect abort, a
+    transport error (unreachable token endpoint), and a KeyStoreError write-fail. Regression guard —
+    no production echo exists today; the echo-mutant meta-assertion proves the scan is RED-capable."""
+    import scripts.secret_store as secret_store
+
+    # Pin the minted PKCE verifier to a known sentinel so it is scannable on every surface (the
+    # verifier is otherwise random). code + client_secret are always in scope for the connect flow.
+    monkeypatch.setattr(oauth_callback, "_pkce_pair",
+                        lambda: (_VERIFIER_SENTINEL, _s256(_VERIFIER_SENTINEL)))
+    sentinels = [_CODE_SENTINEL, _VERIFIER_SENTINEL, _CLIENT_SECRET]
+
     surfaces = []
 
-    scenarios = [
-        _TokenEndpoint(response={"access_token": "AT", "refresh_token": "RT"}),   # success
-        _TokenEndpoint(status=400, response={"error": "bad"}),                    # non-2xx
-        _TokenEndpoint(status=200, response={"no": "refresh"}),                   # no refresh token
-    ]
+    def _drive(token_endpoint, *, set_secret_raises=False):
+        _mock_secret_store(monkeypatch)
+        if set_secret_raises:
+            def _boom(service, value):
+                raise secret_store.KeyStoreError("write failed")
+            monkeypatch.setattr(secret_store, "set_secret", _boom)
+        browser = []
+        handle = oauth_callback.start_connect(
+            "whoop", config=_config(whoop=(_WHOOP_CID, _CLIENT_SECRET)),
+            opener=_RecordingOpener(oauth_pull._OPENER, []),
+            browser_open=lambda url: browser.append(url),
+            authorize_endpoint="http://127.0.0.1:1/authorize", token_endpoint=token_endpoint)
+        q = _authorize_query(browser[0])
+        surfaces.append(_drive_callback(handle, state=q["state"], code=_CODE_SENTINEL))
+
+    success = _TokenEndpoint(response={"access_token": "AT", "refresh_token": "RT"})
+    non_2xx = _TokenEndpoint(status=400, response={"error": "bad"})
+    no_refresh = _TokenEndpoint(status=200, response={"no": "refresh"})
+    attacker = _AttackerEndpoint()
+    redirect = _TokenEndpoint(redirect_to=attacker.url)
+    write_fail = _TokenEndpoint(response={"access_token": "AT", "refresh_token": "RT"})
+    closers = [success, non_2xx, no_refresh, attacker, redirect, write_fail]
     try:
-        for token in scenarios:
-            _mock_secret_store(monkeypatch)
-            browser = []
-            handle = oauth_callback.start_connect(
-                "whoop", config=_config(whoop=(_WHOOP_CID, _CLIENT_SECRET)),
-                opener=_RecordingOpener(oauth_pull._OPENER, []),
-                browser_open=lambda url: browser.append(url),
-                authorize_endpoint="http://127.0.0.1:1/authorize", token_endpoint=token.url,
-            )
-            q = _authorize_query(browser[0])
-            surfaces.append(_drive_callback(handle, state=q["state"], code=_CODE_SENTINEL))
+        _drive(success.url)                             # 1 success
+        _drive(non_2xx.url)                             # 2 non-2xx token response
+        _drive(no_refresh.url)                          # 3 2xx with no refresh_token
+        _drive(redirect.url)                            # 4 the 3xx-redirect abort
+        _drive(_closed_loopback_endpoint())             # 5 transport error (unreachable endpoint)
+        _drive(write_fail.url, set_secret_raises=True)  # 6 KeyStoreError write-fail
     finally:
-        for token in scenarios:
-            token.close()
+        for c in closers:
+            c.close()
 
     out, err = capfd.readouterr()
     surfaces.append(err)
+    assert err == "", f"the connect flow wrote to stderr: {err!r}"   # 0 stderr bytes on every path
     _assert_no_secret_echo(surfaces, sentinels)
 
 
@@ -763,6 +814,13 @@ def test_servable_vendor_maps_and_gates():
     # AR-006: a servable client type but NO client_id in the config → not servable
     empty = AlphaConfig(vendors={}, shared_api_key=None, client_types=dict(DEFAULT_CLIENT_TYPES))
     assert oauth_callback.servable_vendor("whoop", empty) is None
+    # Arch F2: a servable client type + a client_id but NO authorize endpoint (oura marked
+    # CONFIDENTIAL) → not servable, so "servable" fully implies "startable" (no start_connect KeyError).
+    oura_conf = AlphaConfig(
+        vendors={"oura": VendorCredential("oura-cid", "oura-secret")}, shared_api_key=None,
+        client_types={**DEFAULT_CLIENT_TYPES, "oura": ClientType.CONFIDENTIAL})
+    assert oauth_callback.servable_vendor("oura", oura_conf) is None
+    assert "oura" not in oauth_callback._AUTHORIZE_ENDPOINTS   # the precondition that makes it endpoint-less
 
 
 # --------------------------------------------------------------------------------------------------
@@ -872,6 +930,29 @@ def test_ac7b_empty_config_missing_client_id_is_400(monkeypatch):
     try:
         status, text = _request(port, "POST", "/settings/connect", json.dumps({"source": "whoop"}))
         assert status == 400
+        assert json.loads(text)["ok"] is False
+        assert recorder.calls == []
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_ac7b_endpoint_less_servable_vendor_is_400(monkeypatch):
+    """Arch F2: a config marking an endpoint-less mapped vendor (oura) CONFIDENTIAL + a client_id → a
+    clean 400, no side effect — the `servable_vendor` authorize-endpoint gate makes "servable" imply
+    "startable", so `start_connect` never raises `_AUTHORIZE_ENDPOINTS[vendor]` KeyError → 500."""
+    from scripts.serve import server as serve_server
+
+    recorder = _RecordingStart()
+    oura_conf = AlphaConfig(
+        vendors={"oura": VendorCredential("oura-cid", "oura-secret")}, shared_api_key=None,
+        client_types={**DEFAULT_CLIENT_TYPES, "oura": ClientType.CONFIDENTIAL})
+    srv = serve_server.build_server(0, alpha_config=oura_conf, connect_start=recorder)
+    port = srv.server_address[1]
+    _serve_in_thread(srv)
+    try:
+        status, text = _request(port, "POST", "/settings/connect", json.dumps({"source": "oura"}))
+        assert status == 400, f"an endpoint-less servable vendor returned {status}, expected a clean 400"
         assert json.loads(text)["ok"] is False
         assert recorder.calls == []
     finally:

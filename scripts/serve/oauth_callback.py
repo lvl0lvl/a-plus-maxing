@@ -123,8 +123,11 @@ def servable_vendor(source, config):
     """Return the mapped vendor if `source` is authorization-code-servable under `config`, else None.
 
     Servable iff the source maps to a vendor whose `config.client_type` is CONFIDENTIAL or
-    PKCE_PUBLIC (AR-004) AND the config carries that vendor's `client_id` (AR-006: an empty/partial
-    config degrades to non-servable rather than emitting an authorize URL with a None client_id).
+    PKCE_PUBLIC (AR-004), the config carries that vendor's `client_id` (AR-006: an empty/partial
+    config degrades to non-servable rather than emitting an authorize URL with a None client_id), AND
+    the vendor has a known authorize endpoint (Arch F2: "servable" must fully imply "startable" — a
+    config marking an endpoint-less vendor like oura/garmin CONFIDENTIAL must reject with a clean 400,
+    NOT reach `start_connect` and raise `_AUTHORIZE_ENDPOINTS[vendor]` KeyError -> 500).
 
     Args:
         source (str): The OAuth-pull source key.
@@ -140,6 +143,8 @@ def servable_vendor(source, config):
         return None
     cred = config.vendors.get(vendor)
     if cred is None or not cred.client_id:
+        return None
+    if vendor not in _AUTHORIZE_ENDPOINTS:
         return None
     return vendor
 
