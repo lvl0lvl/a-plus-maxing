@@ -34,7 +34,7 @@ call) — importing the seam arms nothing.
 from scripts.serve.intake_aggregate import normalize_author_output
 
 
-def build_dispatch(client):
+def build_dispatch(client, *, spend_cap=None):
     """Adapt a metered-lane model client into the built loop's unified dispatch seam.
 
     Returns the `dispatch(name, prompt, context) -> author envelope` seam
@@ -48,15 +48,33 @@ def build_dispatch(client):
     docstring): only the de-identified `context` crosses. Reads no store, de-identifies nothing,
     re-hosts no loop logic.
 
+    When a `spend_cap` is injected (ADR-0049-T3), the dispatch closure consults it (`spend_cap.charge()`)
+    BEFORE each outbound `client.author(...)` — a `spend_cap.SpendCapExceeded` (a
+    `dispatch_budget.DispatchCapExceeded` subclass) then propagates fail-closed and the outbound metered
+    call is never issued. `spend_cap=None` (the default) issues NO consult, so the ADR-0049-T1 D2 tests
+    are byte-for-byte unchanged. This adds 0 outbound field and 0 `scripts.store` read (the cap reads
+    its own ledger). The metered loop is NOT armed in production today; the arming task (bead
+    `a-plus-maxing-23xr`) MUST inject a real cap here — the `run_orchestrated` cap-halt catch
+    (`plan_orchestrator.py:314`) is already satisfied because `SpendCapExceeded` subclasses
+    `DispatchCapExceeded`, so a monthly-cap refusal surfaces honest-no-plan rather than crashing.
+
     Args:
         client: The metered-lane model client, `client.author(name, context) -> envelope` (a real
             `ModelClient` in production authenticating via the shared `a-plus-maxing-api-key`; a
             fixture recording client in tests).
+        spend_cap (SpendCap, optional): The injectable per-tester monthly spend cap
+            (`scripts.runner.spend_cap.SpendCap`), consulted argless before each dispatch. Default
+            `None` -> no consult (the backward-compatible D2 path).
 
     Returns:
         (Callable) The `dispatch(name, prompt, context)` seam the built loop consumes.
     """
     def dispatch(name, prompt, context):
+        # Consult the injected monthly spend cap BEFORE the outbound call so a refusal fail-closes
+        # before the metered author is invoked (the SpendCapExceeded propagates to the run's cap-halt
+        # handler). Default-OFF (`spend_cap is None`) keeps the D2 path byte-unchanged.
+        if spend_cap is not None:
+            spend_cap.charge()
         # The metered author builds its own prompt from (name, context); the pre-built role-inlined
         # `prompt` is DISCARDED (gate-blindness, module docstring). Normalize the model AUTHOR
         # envelope's scalar rec fields to the frozen `assemble` shape UPSTREAM of run_orchestrated
