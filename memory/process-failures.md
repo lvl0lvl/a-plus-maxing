@@ -2734,3 +2734,25 @@ Caught this session: 3.
 - The `cap=None` LSP trap on `SpendCapExceeded` — detection: gate (Tier-3 Bug-Hunter + Contracts + Code-Quality, 3-agent convergent); surfaced_by: self (fixed, revert-probed RED).
 - The ADR-0048-T4 recipe render-target grounding miss (dead `intake.py` Surface-A target) — detection: gate (doc-gate 2-lens QA+Architect); surfaced_by: self (PF-S142-01, beaded, Wave-5 spec-revision teed up).
 Reached the operator only because they asked: 0.
+
+## Session 143 (2026-07-17)
+
+Context: opened S143 on the operator's "proceed" after the S142 close (#364 → main `844016c0`). Drove **Wave 5 (ADR-0048-T4 onboarding credential UI)** end-to-end: resolved the PF-S142-01 spec-grounding defect (retargeted Surface A from the unserved `intake.py` to the served SPA `screen-wizard` step 9 — already a 9-step flow, so the mockup framing was accurate not stale; spec amended S143), re-authored the recipe, cleared 3 doc-gate rounds + a fresh-judge ACCEPT, SE-built it, Tier-2 QA PASS + 3 hardenings, Tier-3 full-6+Design → substantial legitimate harvest (the Design pixel-render caught a responsive breakage + a contradictory own-key state; Bug-Hunter caught a silent token-save-failure that discarded the pasted token) → all fixed + Phase-7 revert-probe verified → merged #365 → main `11f544fa`. Wave-5→6 checkpoint GO (3010 passed / 2 env-floor).
+
+**PF-S143-01** (bead `a-plus-maxing-gmse`) — after merging Wave 5 (#365) + the Wave-5→6 checkpoint, I did NOT run the automatic session close: I framed the session handoff (`ccs-handoff boss1`) as a consolidation/stopping point and TEED UP the S143 close "for the resume" instead of running it. The operator caught it ("did you run the full session close?"). This is a RECURRENCE of the documented auto-close failure ([[feedback_auto_run_session_close]]): treating the merge as the finish line and the close as a separate, later-triggered phase. New nuance vs the prior instances: I used the session-HANDOFF as the rationalization (the boss1 resume would do it) — but "done" for a wave INCLUDES its close regardless of a handoff, and a durable close (committed HANDOFF/PF/gates) is exactly what makes a handoff clean. GUARD: the full close runs AUTOMATICALLY the moment a wave's substantive work completes (the merge landed + the checkpoint GO), BEFORE any handoff/consolidation framing; a session handoff is not a license to defer the close — run the close, THEN note the resume state in the freshly-rotated HANDOFF. Operator-caught. Captured in `harvest.jsonl` + bead `gmse` + this log.
+
+### Per-PR gated-skill invocation table (INV-SKILL-TRACE)
+| PR | `/review-pr` invoked fresh | `/merge` invoked fresh | Outcome |
+|----|----------------------------|------------------------|---------|
+| #365 — ADR-0048-T4 onboarding credential UI | YES — Tier-3 **full-6 + Design** off the local checkout (roster-select `roster=full-6 design=yes ruleset=1.18.0 reason=rule-1` pasted); the Design agent's pixel render (1440/768/375px) + Bug-Hunter caught real runtime/visual defects (responsive breakage, contradictory own-key state, silent token-save-failure) the structural gates passed clean; all fixed + **Phase-7 revert-probe** confirmed the A1 `d.ok` gate load-bearing → CLEAN bound to `2284d0f46afe30c16e9f600968575939697d472f` | YES — REST fallback, full-40-char SHA guard, squash | merged → main `11f544fa` |
+
+### PF attestation
+S143 close (2026-07-17): One new PF promoted — PF-S143-01 (the auto-close deferral, operator-caught; captured in the log + `harvest.jsonl` + bead `gmse`). No other PF-class entry: the Wave-5 spec-defect + retarget was the resolution of the already-logged PF-S142-01 (not a new failure), and the Tier-3 harvest (JS error-handling, design-faithfulness gaps) was the PIPELINE WORKING — gate-caught pre-merge, fixed, Phase-7-verified — not a process failure. The verify-first / ground-against-the-live-tree, roster-select-first, run-the-gated-skills-in-full, and merge-without-confirm-stop disciplines all HELD (referenced descriptively). falsification-scan (step 8.5): review any surfaced anti-pattern in this note and confirm or dismiss it in the close.
+
+### Disclosure ledger (S143 close)
+Caught this session: 4.
+- The `connections=` dead server-inject seam (Surface B would show all-not-connected forever) — detection: gate (doc-gate 2-lens, convergent QA+Architect); surfaced_by: self (switched to client-side `fetch('/settings/trackers')`).
+- The `.ws-tab` global-sweep collision (a Surface-B tab reusing `.ws-tab` would corrupt the workspace tabs) — detection: gate (fresh-judge D4); surfaced_by: self (fixed with `.set-tab` + the AC-2b guard).
+- The silent token-save-failure (`_trackerSaveToken` reported success on a server-rejected token, discarding the pasted token) — detection: gate (Tier-3 Bug-Hunter + Test-Coverage, executed); surfaced_by: self (fixed d.ok-gated, Phase-7 revert-probe RED).
+- The auto-close deferral — detection: self-logged only AFTER the operator asked "did you run the full session close?"; surfaced_by: operator.
+Reached the operator only because they asked: 1 (the auto-close deferral — target remains 0).
