@@ -117,8 +117,9 @@ def test_ac2_surface_b_connections_panel_and_status_hook():
     """AC-2: the "Connections & Keys" panel (`.set-tab` sub-tabs), per-source rows, the PAT
     update, the AI model key card, AND the `fetch('/settings/trackers')` status hook render.
 
-    Co-located NEGATIVE: NO Wave-6 "Update my plan now". Falsifiers: panel absent -> RED;
-    inject "Update my plan now" -> the negative REDs; remove the fetch -> the hook REDs.
+    Co-located sibling: the Wave-6 "Plan updates" section (ADR-0049-T2) now renders in the same
+    panel (its own faithfulness is covered by `test_plan_update_trigger`). Falsifiers: panel
+    absent -> RED; remove the fetch -> the hook REDs.
     """
     html = _surface_b()
     region = _profile_region(html)
@@ -143,8 +144,8 @@ def test_ac2_surface_b_connections_panel_and_status_hook():
     assert "shared alpha key" in region.lower()
     # the client-side status hook is wired (not a dead server render-seam)
     assert "fetch('/settings/trackers')" in html
-    # co-located negative: the Wave-6 "Plan updates" section is NOT here
-    assert "Update my plan now" not in html
+    # co-located sibling: the Wave-6 "Plan updates" section (ADR-0049-T2) now renders in this panel
+    assert "Update my plan now" in region
 
 
 # --------------------------------------------------------------------------- #

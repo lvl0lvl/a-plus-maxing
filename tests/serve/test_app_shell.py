@@ -415,13 +415,18 @@ def test_spa_fetch_targets_are_all_same_origin_loopback():
     # likewise LOCAL same-origin routes: /settings/trackers reports keychain-presence booleans (never a
     # token value), /settings/tracker writes a pasted OAuth token to the on-device keychain, and
     # /settings/connect starts the app-mediated OAuth server-side — the fetch itself never leaves the
-    # machine, adding no new egress class (the same LOCAL keychain class as /settings/key).
+    # machine, adding no new egress class (the same LOCAL keychain class as /settings/key). /plan-loop
+    # (ADR-0036-T1) is the already-routed CSRF-gated in-app plan-loop trigger the ADR-0049-T2 "Update my
+    # plan now" button reuses (the SAME no-train author lane as /generate-plan, never a new egress
+    # class); /settings/schedule (ADR-0049-T2, POST set / GET read) records the plan-update cadence
+    # INTENT through the on-device store sink — a LOCAL same-origin route, the same class as /settings/key.
     assert set(targets) <= {"/chat", "/care-chat", "/upload", "/settings/key", "/confirm-extraction",
                             "/generate-plan", "/confirm-curation", "/conversation",
-                            "/settings/trackers", "/settings/tracker", "/settings/connect"}, (
+                            "/settings/trackers", "/settings/tracker", "/settings/connect",
+                            "/plan-loop", "/settings/schedule"}, (
         f"the SPA fetches a path beyond the known loopback routes "
         f"(/chat + /upload + /settings/key + /confirm-extraction + /generate-plan + /confirm-curation "
-        f"+ /settings/trackers + /settings/tracker + /settings/connect): "
+        f"+ /settings/trackers + /settings/tracker + /settings/connect + /plan-loop + /settings/schedule): "
         f"{sorted(set(targets))}"
     )
 
@@ -1092,10 +1097,12 @@ _WIZARD_STEP_HEADINGS = (
 # so no single operator source is the sole affordance (NFR-4 recurring-flag class).
 _GENERIC_SOURCES = ("Apple Health", "Garmin", "Whoop", "Oura", "Fitbit", "23andMe", "AncestryDNA")
 
-# Every same-origin loopback path the SPA may fetch/POST to (no new route — ADR-0033).
+# Every same-origin loopback path the SPA may fetch/POST to (no new route — ADR-0033;
+# /plan-loop + /settings/schedule admitted ADR-0049-T2, both same-origin 127.0.0.1 loopback).
 _KNOWN_LOOPBACK = {"/chat", "/care-chat", "/upload", "/settings/key", "/confirm-extraction",
                    "/generate-plan", "/confirm-curation", "/conversation",
-                   "/settings/trackers", "/settings/tracker", "/settings/connect"}
+                   "/settings/trackers", "/settings/tracker", "/settings/connect",
+                   "/plan-loop", "/settings/schedule"}
 
 
 def _wizard_html(html):
