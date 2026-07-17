@@ -122,12 +122,17 @@ def store_oauth_credential(source, value):
 def servable_vendor(source, config):
     """Return the mapped vendor if `source` is authorization-code-servable under `config`, else None.
 
-    Servable iff the source maps to a vendor whose `config.client_type` is CONFIDENTIAL or
-    PKCE_PUBLIC (AR-004), the config carries that vendor's `client_id` (AR-006: an empty/partial
-    config degrades to non-servable rather than emitting an authorize URL with a None client_id), AND
-    the vendor has a known authorize endpoint (Arch F2: "servable" must fully imply "startable" — a
-    config marking an endpoint-less vendor like oura/garmin CONFIDENTIAL must reject with a clean 400,
-    NOT reach `start_connect` and raise `_AUTHORIZE_ENDPOINTS[vendor]` KeyError -> 500).
+    "Servable" fully implies "start_connect-ready" — every subscript/lookup `start_connect` performs is
+    gated here, so a servable source never fails closed with a 500. Servable iff ALL hold:
+      * the source maps to a vendor AND is in `oauth_pull._MANIFESTS` (BUG-3: `start_connect` subscripts
+        `_MANIFESTS[source]["token_url"]` — a mapped-but-unwired source would raise KeyError -> 500);
+      * `config.client_type(vendor)` is CONFIDENTIAL or PKCE_PUBLIC (AR-004);
+      * the config carries the vendor's `client_id` (AR-006: an empty/partial config degrades to
+        non-servable rather than emitting an authorize URL with a None client_id);
+      * for a CONFIDENTIAL vendor, the config ALSO carries `client_secret` (BUG-2: a confidential-client
+        exchange omitting the secret is 400'd by a real vendor — a silent failure; gate it like client_id);
+      * the vendor has a known authorize endpoint (Arch F2: an endpoint-less vendor like oura/garmin
+        marked CONFIDENTIAL must reject with a clean 400, not reach `_AUTHORIZE_ENDPOINTS[vendor]` -> 500).
 
     Args:
         source (str): The OAuth-pull source key.
@@ -136,13 +141,20 @@ def servable_vendor(source, config):
     Returns:
         (str | None) The mapped vendor name when servable, else None.
     """
+    from scripts.ingest import oauth_pull
+
     vendor = _SOURCE_TO_VENDOR.get(source)
     if vendor is None:
         return None
-    if config.client_type(vendor) not in _SERVABLE_CLIENT_TYPES:
+    if source not in oauth_pull._MANIFESTS:
+        return None
+    client_type = config.client_type(vendor)
+    if client_type not in _SERVABLE_CLIENT_TYPES:
         return None
     cred = config.vendors.get(vendor)
     if cred is None or not cred.client_id:
+        return None
+    if client_type is ClientType.CONFIDENTIAL and not cred.client_secret:
         return None
     if vendor not in _AUTHORIZE_ENDPOINTS:
         return None

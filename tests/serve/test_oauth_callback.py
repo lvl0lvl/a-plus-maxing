@@ -568,7 +568,8 @@ def _serialize_outbound(records, authorize_url):
 
 
 def _run_clean_flow(monkeypatch, *, opener_wrap=None, redirect_to=None):
-    """Drive whoop auth→callback→exchange; return (records, authorize_url, store, store_spy, model_spy)."""
+    """Drive whoop auth→callback→exchange; return
+    (records, authorize_url, store, store_spy, model_spy, token_netloc)."""
     store = _mock_secret_store(monkeypatch, {"plan::sentinel": STORE_SENTINEL})
     store_spy = _install_store_read_spy(monkeypatch)
     model_spy = _install_model_lane_spy(monkeypatch)
@@ -669,7 +670,8 @@ def test_ac6_mutant_store_read_reds(monkeypatch):
 
 
 def test_ac6_mutant_vendor_host_reds(monkeypatch):
-    """Mutant (c-host): a 302-to-attacker + a following opener → the vendor-only-host assertion REDs."""
+    """Mutant (c-host): a 302-to-attacker + a following opener → the "attacker host was contacted"
+    assertion (the operationalized vendor-only-host guarantee — the attacker's connection-count) REDs."""
     attacker = _AttackerEndpoint()
 
     def _wrap(inner):
@@ -821,6 +823,20 @@ def test_servable_vendor_maps_and_gates():
         client_types={**DEFAULT_CLIENT_TYPES, "oura": ClientType.CONFIDENTIAL})
     assert oauth_callback.servable_vendor("oura", oura_conf) is None
     assert "oura" not in oauth_callback._AUTHORIZE_ENDPOINTS   # the precondition that makes it endpoint-less
+    # BUG-2: a CONFIDENTIAL vendor with a client_id but NO client_secret → not servable (the exchange
+    # would omit the secret → a real confidential endpoint 400s → silent failure).
+    whoop_no_secret = _config(whoop=(_WHOOP_CID, None))
+    assert oauth_callback.servable_vendor("whoop", whoop_no_secret) is None
+
+
+def test_servable_vendor_requires_manifest_membership(monkeypatch):
+    """BUG-3: a mapped + endpoint-having source that is NOT in `oauth_pull._MANIFESTS` is not servable
+    (else `start_connect` subscripts `_MANIFESTS[source]["token_url"]` → KeyError → 500)."""
+    config = _config(whoop=(_WHOOP_CID, _CLIENT_SECRET))
+    assert oauth_callback.servable_vendor("whoop", config) == "whoop"        # baseline: wired + servable
+    monkeypatch.setattr(oauth_pull, "_MANIFESTS",
+                        {k: v for k, v in oauth_pull._MANIFESTS.items() if k != "whoop"})
+    assert oauth_callback.servable_vendor("whoop", config) is None           # unwired source → not servable
 
 
 # --------------------------------------------------------------------------------------------------
@@ -840,6 +856,25 @@ def _request(port, method, path, body=None, *, content_type="application/json"):
     if content_type is not None:
         headers["Content-Type"] = content_type
     conn.request(method, path, body=body, headers=headers)
+    resp = conn.getresponse()
+    text = resp.read().decode("utf-8")
+    conn.close()
+    return resp.status, text
+
+
+def _raw_post(port, path, body_bytes, *, content_type="application/json", content_length=None):
+    """POST raw bytes with an explicit Content-Length (mirrors test_credential_writes.py::_raw_post).
+
+    Drives the over-ceiling branch the json `_request` helper cannot reach (`content_length` overrides
+    the true byte length so a 413 fires on the declared length before the body is read).
+    """
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.putrequest("POST", path, skip_host=False, skip_accept_encoding=True)
+    if content_type is not None:
+        conn.putheader("Content-Type", content_type)
+    conn.putheader("Content-Length", content_length if content_length is not None else str(len(body_bytes)))
+    conn.endheaders()
+    conn.send(body_bytes)
     resp = conn.getresponse()
     text = resp.read().decode("utf-8")
     conn.close()
@@ -954,6 +989,81 @@ def test_ac7b_endpoint_less_servable_vendor_is_400(monkeypatch):
         status, text = _request(port, "POST", "/settings/connect", json.dumps({"source": "oura"}))
         assert status == 400, f"an endpoint-less servable vendor returned {status}, expected a clean 400"
         assert json.loads(text)["ok"] is False
+        assert recorder.calls == []
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_ac7b_confidential_without_secret_is_400(monkeypatch):
+    """BUG-2: a CONFIDENTIAL config carrying client_id but NO client_secret → clean 400, no side effect
+    (a secret-less confidential exchange would be 400'd by a real vendor — a silent failure)."""
+    from scripts.serve import server as serve_server
+
+    recorder = _RecordingStart()
+    config = _config(whoop=(_WHOOP_CID, None))   # whoop is CONFIDENTIAL; no secret
+    srv = serve_server.build_server(0, alpha_config=config, connect_start=recorder)
+    port = srv.server_address[1]
+    _serve_in_thread(srv)
+    try:
+        status, text = _request(port, "POST", "/settings/connect", json.dumps({"source": "whoop"}))
+        assert status == 400, f"a secret-less CONFIDENTIAL config returned {status}, expected 400"
+        assert json.loads(text)["ok"] is False
+        assert recorder.calls == []
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def _connect_recorder_server(config=None):
+    """A build_server on an ephemeral port with a recording start-seam; return (srv, port, recorder)."""
+    from scripts.serve import server as serve_server
+
+    recorder = _RecordingStart()
+    config = config or _config(whoop=(_WHOOP_CID, _CLIENT_SECRET))
+    srv = serve_server.build_server(0, alpha_config=config, connect_start=recorder)
+    return srv, srv.server_address[1], recorder
+
+
+def test_ac7_connect_start_oversize_body_is_413_without_side_effect():
+    """QA FINDING 1(a): a declared Content-Length over the 16-KiB ceiling → 413 before any side effect."""
+    from scripts.serve import server as serve_server
+
+    srv, port, recorder = _connect_recorder_server()
+    _serve_in_thread(srv)
+    try:
+        status, _ = _raw_post(port, "/settings/connect", b"x",
+                              content_length=str(serve_server._SETTINGS_MAX_BYTES + 1))
+        assert status == 413
+        assert recorder.calls == []   # the ceiling fired before the listener/browser
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_ac7_connect_start_malformed_json_is_400_without_side_effect():
+    """QA FINDING 1(b): a malformed-JSON body → 400, no side effect."""
+    srv, port, recorder = _connect_recorder_server()
+    _serve_in_thread(srv)
+    try:
+        status, text = _request(port, "POST", "/settings/connect", "{not json")
+        assert status == 400
+        assert json.loads(text)["ok"] is False
+        assert recorder.calls == []
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_ac7_connect_start_non_dict_body_is_400_without_side_effect():
+    """QA FINDING 1(c): a top-level non-object JSON body → 400, no side effect."""
+    srv, port, recorder = _connect_recorder_server()
+    _serve_in_thread(srv)
+    try:
+        for bad in ("[]", "42", '"x"', "true", "null"):
+            status, text = _request(port, "POST", "/settings/connect", bad)
+            assert status == 400, f"{bad!r} returned {status}, expected 400"
+            assert json.loads(text)["ok"] is False
         assert recorder.calls == []
     finally:
         srv.shutdown()

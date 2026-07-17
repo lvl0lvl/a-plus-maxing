@@ -271,10 +271,11 @@ _OPENER = urllib.request.build_opener(_NoFollowRedirect)
 
 
 def _http(method, url, *, headers=None, body=None, timeout=_HTTP_TIMEOUT_S):
-    """Issue one HTTP request and return an `_HttpResponse` (the default network seam; LIVE only).
+    """Issue one HTTP request and return an `_HttpResponse` (the default fetch network seam; LIVE only).
 
-    The single real-network site in this module — never exercised in tests (they inject a fixture
-    seam). A 4xx/5xx response is returned as an `_HttpResponse` carrying its status (the caller decides
+    One of two real-network sites in this module (the other is `exchange_authorization_code`'s token
+    POST, ADR-0048-T2); both go through the fail-closed `_OPENER` and are never exercised in tests (they
+    inject a fixture seam). A 4xx/5xx response is returned as an `_HttpResponse` carrying its status (the caller decides
     fail-closed); a genuine connection error (`URLError`) propagates for the caller to wrap. A 3xx
     redirect FAILS CLOSED here (SEC-01): the authenticated seam never follows a redirect — that would
     leak the bearer to the redirect host — so a 3xx raises `TrackerPullError` and is never followed.
