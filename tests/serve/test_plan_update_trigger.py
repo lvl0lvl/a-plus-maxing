@@ -73,6 +73,19 @@ def _post_schedule(port, cadence, content_type="application/json"):
     return resp.status, (json.loads(raw) if raw else {})
 
 
+def _post_schedule_raw(port, raw, content_type="application/json"):
+    """POST an arbitrary raw body (Content-Length = len(raw)) to `/settings/schedule`; return the status."""
+    headers = {"Content-Length": str(len(raw))}
+    if content_type is not None:
+        headers["Content-Type"] = content_type
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("POST", "/settings/schedule", body=raw, headers=headers)
+    resp = conn.getresponse()
+    resp.read()
+    conn.close()
+    return resp.status
+
+
 def _get_schedule(port):
     """GET `/settings/schedule`; return (status, body)."""
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
@@ -146,8 +159,19 @@ def test_ac1b_success_render_gated_on_not_degraded():
     assert error_i != -1, "the trigger does not also gate on d.error"
     assert success_i != -1, "the trigger has no success-render text"
     assert degraded_i < success_i, "the success render is not gated behind the !d.degraded check"
+    # the non-empty-results leg: success is gated on a surfaced plan, so a bare-200 HALT (a `reason` +
+    # empty `results` — SAFETY_BLOCKED / DEID_HALTED / cap) falls to the honest not-updated copy rather
+    # than false-greening (mirrors the /confirm-extraction surfaced-count `n` leg). Falsifier: drop the
+    # results-leg -> Object.keys/d.results vanish ahead of the success token -> RED.
+    results_i = win.find("d.results")
+    objkeys_i = win.find("Object.keys")
+    assert results_i != -1, "the success gate does not require d.results (a bare-200 HALT false-greens)"
+    assert objkeys_i != -1, "the success gate does not check Object.keys(d.results).length"
+    assert results_i < success_i and objkeys_i < success_i, (
+        "the non-empty-results leg is not ahead of the success render"
+    )
     # the degraded branch renders the honest not-yet-available copy, keyed on the reason
-    assert "Automatic plan updates are not live yet" in win, (
+    assert "Plan review is not live in the alpha yet" in win, (
         "the degraded branch has no honest not-yet-available affordance"
     )
     # no empty .catch (the T4-A1 lesson): the failure path surfaces a retry affordance
@@ -166,7 +190,7 @@ def test_ac2_plan_updates_section_renders():
     Falsifier: drop any enumerated element -> RED.
     """
     region = _profile_region(_surface_b())
-    assert "Plan updates" in region, "no 'Plan updates' seclab"
+    assert '<div class="seclab">Plan updates</div>' in region, "no 'Plan updates' seclab"
     assert "Update my plan now" in region, "no 'Update my plan now' trigger button"
     assert "Automatic updates" in region, "no 'Automatic updates' klab"
     assert "Coming soon" in region, "no 'Coming soon' pill"
@@ -320,6 +344,40 @@ def test_ac5b_schedule_textplain_refused_415_zero_append(tmp_path, monkeypatch):
         assert status == 415, f"text/plain /settings/schedule returned {status}, expected 415"
         assert len(calls) == 0, "the CSRF-refused text/plain POST still appended a reading"
         assert store.read(_SCHEDULE_ITEM, root=tmp_path / "store") == [], "a reading landed on the 415 path"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_ac5c_schedule_body_validation_rejects_before_append(tmp_path, monkeypatch):
+    """AC-5(c): the `_save_schedule` body guards refuse BEFORE the append — each with 0 `store.append`.
+
+    Three application/json branches, each non-vacuous (the CSRF gate already passed, so the append is
+    the very next sink): (a) Content-Length past the `_SETTINGS_MAX_BYTES` ceiling -> 413; (b) a
+    malformed-JSON body -> 400; (c) a JSON non-object (`[]`) -> 400. Falsifier: drop the 413 ceiling
+    -> the oversize valid body appends -> RED; drop the parse/non-dict guard -> the branch no longer
+    returns 400 (it 500s or appends) -> RED.
+    """
+    calls = _append_spy(monkeypatch)
+    srv, port = _build(tmp_path)
+    _serve_in_thread(srv)
+    try:
+        # (a) Content-Length > the 16KiB ceiling -> 413 (a valid cadence body padded past the ceiling,
+        # so ONLY the ceiling — not a parse/validate guard — can reject it)
+        oversize = b'{"cadence":"weekly","pad":"' + b"x" * (serve_server._SETTINGS_MAX_BYTES + 1) + b'"}'
+        assert _post_schedule_raw(port, oversize) == 413, "an oversize body was not refused 413"
+        assert len(calls) == 0, "the oversize body appended a reading"
+
+        # (b) malformed JSON -> 400
+        assert _post_schedule_raw(port, b"{not valid json") == 400, "a malformed-JSON body was not refused 400"
+        assert len(calls) == 0, "the malformed-JSON body appended a reading"
+
+        # (c) a JSON non-object -> 400
+        assert _post_schedule_raw(port, b"[]") == 400, "a JSON non-object body was not refused 400"
+        assert len(calls) == 0, "the JSON non-object body appended a reading"
+
+        # belt-and-braces: the store carries nothing across all three refused bodies
+        assert store.read(_SCHEDULE_ITEM, root=tmp_path / "store") == [], "a reading landed on a refused body"
     finally:
         srv.shutdown()
         srv.server_close()
