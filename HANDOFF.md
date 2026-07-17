@@ -24,6 +24,22 @@ Stamped 2026-07-17. `main @ 11f544fa` (Wave 5 of the credential-onboarding code 
 
 <!-- 3b resume-claims-audit adoption (rigor 1.19.0): this VOLATILE region carries one machine-checkable claim per sentence — a backticked project-id plus a status keyword, a main-at-SHA line, a landed-in-PR line, and the Stamped line. ADVISORY until one full session cycle passes with zero FAIL, then gate per the upstream bud bead. -->
 
+## Scope Contract — Session 144 (2026-07-17)
+
+Goal: Build **Wave 6** (ADR-0049-T2 — the TERMINAL task) via `/run-pipeline`: the manual "Update my plan now" trigger + the Off/Weekly/Daily schedule setting (CSRF-gated forced-spend), then the Wave-6→Done TERMINAL checkpoint (the whole-spec falsification battery) + the terminal close — completing the 6-wave credential-onboarding build. Mock/fixture at `$0`; the metered loop stays UNARMED (`23xr`), so the trigger lands against the honest-degraded posture.
+
+Acceptance criteria:
+- [ ] AC1 — the ADR-0049-T2 spec-manifest retarget landed. Grounded at session-open per the PF-S142-01 guard: the spec names `app_shell.py` for the "Plan updates" section, but `screen-profile`'s markup lives in `app_view.html` (11 refs; `app_shell.py` holds only the `_PLATFORM_SCREENS` id-tuple) — the SAME mis-grounding class S143 HALTed on, caught BEFORE authoring this time. Spec amended S144.
+- [ ] AC2 — ADR-0049-T2 built through the full pipeline + merged (recipe → doc gates [3-lens + judge + adversarial] → SE build → Tier-2 → Tier-3 `/review-pr` → `/merge`).
+- [ ] AC3 — the CSRF **415-before-any-metered-spend** gate mutation-proven (spec AC-5, the load-bearing security AC): a cross-site CORS-simple `text/plain` POST is refused 415 BEFORE any specialist/judge/lens dispatch; RED if the gate is absent. (Reuse target grounded: `/plan-loop` at `server.py:235` → `_do_plan_loop`, covered by the `application/json` gate at `:442-444`.)
+- [ ] AC4 — the frozen ADR-0032 six byte-frozen (numstat=0 vs `3ab1c3ab`); no secret/PII; `$0` (no live spend — `loop_dispatch = None` at `server.py:175`).
+- [ ] AC5 — the Wave-6→Done TERMINAL checkpoint ran green executed (the whole-spec falsification battery) + the terminal close.
+
+Files I WILL touch: `vault/design/templates/app_view.html` (the "Plan updates" markup + the trigger/schedule JS in `screen-profile`); `scripts/serve/server.py` (the schedule-persistence route — no existing cadence-setting mechanism; mirrors `/settings/key`); `tests/serve/test_plan_update_trigger.py` (create); `docs/spec/adr-0047-0049-credential-onboarding-spec.md` (the S144 retarget amendment); `docs/task-plan/adr-0049-t2.md`; close docs + `memory/process-failures.md` + `harvest.jsonl`.
+Files I will NOT touch: the frozen ADR-0032 six; `vault/design/templates/app_shell.py` (the markup lives in `app_view.html` — the AC1 retarget); `main` directly (PR-only); the metered arming (`23xr`); the LIVE runs (`m8ia`).
+NOT doing: arming the metered `loop_dispatch` (`23xr` — the trigger fires the honestly-degraded loop, 0 metered spend); the daily auto-run enable path (glzi-gated — AC-4 renders Daily inert); the operator-gated LIVE runs.
+Invariants at risk: the frozen ADR-0032 six (GUARDED, numstat=0); INV-ROLE-INLINING (full profiles per dispatch); zero-PII public repo; the **ADR-0013 CSRF posture** (the forced-spend gate — AC3 is its guard); INV-CORE-CAPABILITY (the plan path stays wired).
+
 ## Scope Contract — Session 143 (2026-07-17)
 
 Goal: Complete **Wave 5** (ADR-0048-T4 onboarding credential UI) — resolve the PF-S142-01 spec-grounding defect (retarget Surface A from the unserved `intake.py` to the served SPA), re-author the recipe, build through the full pipeline, review, merge; the Wave-5→6 checkpoint green. Mock/fixture at `$0`. (Opened on the operator's "proceed" after the S142 close — the standing run-until-everything directive.)
