@@ -95,14 +95,15 @@ class SpendCapExceeded(dispatch_budget.DispatchCapExceeded):
     Attributes:
         count (int): The persisted current count (the ceiling on a refusal; 0 on a corrupt/value-corrupt
             ledger).
-        cap (int): The configured monthly ceiling (passed at every raise site — never None in practice).
+        cap (int): The configured monthly ceiling — a REQUIRED arg (every raise site passes the real
+            ceiling), so `.cap` is never None (closes the LSP trap at the signature, F2).
         reason (str): The honest no-plan reason token (`SPEND_CAP_EXCEEDED`).
     """
 
-    def __init__(self, count, cap=None):
+    def __init__(self, count, cap):
         # Bypass DispatchCapExceeded.__init__ (which sets reason=DISPATCH_CAP_EXCEEDED) via Exception
         # directly, so the distinct SPEND_CAP_EXCEEDED token C1 depends on is preserved (AR-3). `.cap`
-        # carries the real ceiling (LSP parity with the parent's `.cap (int)`, Arch F2).
+        # is a REQUIRED arg carrying the real ceiling (LSP parity with the parent's `.cap (int)`, F2).
         self.count = count
         self.cap = cap
         self.reason = SPEND_CAP_EXCEEDED
@@ -125,16 +126,19 @@ class SpendCap:
         """Bind the cap to its ledger / ceiling / tester / clock.
 
         Args:
-            ledger_path (str | Path, optional): The JSON ledger path. Defaults to the gitignored
-                repo-root `.spend-cap-ledger.json` (`_DEFAULT_LEDGER_PATH`); injected to a tmp path in
-                tests.
+            ledger_path (str | Path, optional): The JSON ledger path, normalized via `.resolve()` so the
+                lock registry key is canonical. Defaults to the gitignored repo-root
+                `.spend-cap-ledger.json` (`_DEFAULT_LEDGER_PATH`); injected to a tmp path in tests.
             ceiling (int, optional): The per-tester monthly ceiling. Defaults to the named
                 `DEFAULT_MONTHLY_CAP`.
             tester (str, optional): The tester identity. Defaults to `getpass.getuser()`.
             clock (Callable, optional): A `() -> datetime` clock (the month key source). Defaults to
                 `datetime.now`; injected for the monthly-rollover + concurrency tests.
         """
-        self._ledger_path = Path(ledger_path) if ledger_path is not None else _DEFAULT_LEDGER_PATH
+        # `.resolve()` canonicalizes the injected path so the lock registry key (`str(path)`) is the
+        # same for two spellings of one file (`.../l.json` vs `.../sub/../l.json`) — else they'd get
+        # distinct locks and lose updates (BUG-LOW-1). The default path is already resolved.
+        self._ledger_path = Path(ledger_path).resolve() if ledger_path is not None else _DEFAULT_LEDGER_PATH
         self._ceiling = ceiling
         self._tester = tester if tester is not None else getpass.getuser()
         self._clock = clock if clock is not None else datetime.now
@@ -197,6 +201,7 @@ class SpendCap:
         payload = json.dumps(data)
         fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.", suffix=".tmp")
         try:
+            # os.fdopen takes ownership of fd; close fd directly only if it raises first.
             try:
                 handle = os.fdopen(fd, "w")
             except BaseException:
@@ -209,6 +214,8 @@ class SpendCap:
                 os.fsync(handle.fileno())
             os.replace(tmp, path)
         except BaseException:
+            # Broader than Exception on purpose: an interrupt mid-write must still unlink the orphan
+            # temp so no stray sibling is left behind in the repo root.
             if os.path.exists(tmp):
                 os.unlink(tmp)
             raise

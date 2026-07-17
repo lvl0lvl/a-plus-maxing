@@ -1,6 +1,6 @@
 """The metered specialist-author dispatch seam — the metered-lane analog of subscription_dispatch (ADR-0049-T1).
 
-`build_dispatch(client)` adapts an injected metered-lane model client into the
+`build_dispatch(client, *, spend_cap=None)` adapts an injected metered-lane model client into the
 `dispatch(name, prompt, context) -> author envelope` seam (`plan_orchestrator._dispatch_domains`). It
 serves ONLY the SPECIALIST name-space: it routes the call through the client's `.author(name, context)`
 — authenticating on the shared `a-plus-maxing-api-key` metered lane (`key_source.resolve` through

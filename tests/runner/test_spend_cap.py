@@ -106,6 +106,12 @@ def test_spend_cap_exceeded_subclasses_dispatch_cap_exceeded_with_distinct_reaso
     assert exc.cap == 64  # the real ceiling — honors the parent's `.cap (int)` contract (LSP, F2)
 
 
+def test_spend_cap_exceeded_requires_cap_arg():
+    """FIX-A: `cap` is a REQUIRED arg — there is no None-defaulting construction to violate `.cap (int)`."""
+    with pytest.raises(TypeError):
+        SpendCapExceeded(5)  # missing the required `cap`
+
+
 # --- AC-2: cap enforcement + fail-closed persist, check-then-increment ----------------------------
 
 
@@ -258,6 +264,48 @@ def test_ac4b_concurrent_charge_exactly_one_succeeds(tmp_path):
     assert json.loads(ledger.read_text())[_key(_TESTER, "2026-07")] == 1
 
 
+def test_ac4b_two_instance_concurrent_charge_shares_the_lock(tmp_path):
+    """FIX-C/BUG-LOW-1: two SpendCaps over the SAME file (different spellings) share ONE lock (registry
+    keyed on the RESOLVED path) -> exactly one of 8 barrier-aligned charges across both succeeds."""
+    (tmp_path / "sub").mkdir()
+    ledger_a = tmp_path / "ledger.json"
+    ledger_b = tmp_path / "sub" / ".." / "ledger.json"  # a different spelling of the SAME file
+    n = 8
+    barrier = threading.Barrier(n)
+    fixed = datetime(2026, 7, 16)
+
+    def clock():
+        barrier.wait()
+        return fixed
+
+    caps = [
+        SpendCap(ledger_path=ledger_a, ceiling=1, tester=_TESTER, clock=clock),
+        SpendCap(ledger_path=ledger_b, ceiling=1, tester=_TESTER, clock=clock),
+    ]
+    successes = []
+    guard = threading.Lock()
+
+    def worker(i):
+        try:
+            caps[i % 2].charge()  # split the 8 charges across both path-spelling instances
+            with guard:
+                successes.append(1)
+        except SpendCapExceeded:
+            pass
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # a per-instance lock OR a non-`.resolve()`d registry key -> the two instances don't serialize
+    # (both read count 0 -> both write 1) -> >1 succeeds -> RED. The shared registry lock keyed on the
+    # resolved path -> exactly one.
+    assert len(successes) == 1, f"expected exactly one success across two spellings, got {len(successes)}"
+    assert json.loads(ledger_a.read_text())[_key(_TESTER, "2026-07")] == 1
+
+
 # --- AC-4c: corrupt / torn ledger fail-closed (Security M2) --------------------------------------
 
 
@@ -326,6 +374,9 @@ def test_ac4c_torn_write_leaves_prior_count(tmp_path, monkeypatch):
     # the atomic write's temp is not os.replace'd on the failure -> the live ledger keeps the prior
     # count. A bare-`open('w')` mutant writes in place (no os.replace) -> the re-read shows 3 -> RED.
     assert json.loads(ledger.read_text())[key] == 2, "a persist failure corrupted/advanced the ledger"
+    # SF-1: the atomic-write cleanup unlinked the orphan temp on the os.replace failure — no leaked
+    # `.tmp` sibling remains (dropping `os.unlink(tmp)` REDs this).
+    assert list(tmp_path.glob("ledger.json.*.tmp")) == [], "a torn write leaked an orphan temp sibling"
 
 
 # --- AC-5: the D2 wire-scan stays green with a cap injected + a spend_cap-scoped no-store AST check
