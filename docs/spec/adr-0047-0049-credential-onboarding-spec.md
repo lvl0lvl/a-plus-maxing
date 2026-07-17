@@ -223,7 +223,7 @@ This spec consumes the accepted ADR-0047/0048/0049 records and produces the task
 3. The credential step is skippable and resumable: a "Skip for now" / "Finish setup" path renders with 0 connections made — no connection is required to complete onboarding.
 4. Neither surface renders a `client_id` or `client_secret` input field (a tester never sees a client secret); the model-key card names the shared alpha key as the default with a keychain-storage note.
 5. Garmin's card renders the manual/deferred path (not a one-click OAuth button), consistent with its OAuth-1.0a exclusion.
-6. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing (**[AMENDED S143]** the UI edits touch `app_view.html`/`app_shell.py` only, never the frozen six).
+6. `git diff --numstat 3ab1c3ab -- scripts/store/store.py scripts/store/keying.py scripts/plan/pipeline.py scripts/plan/adjudicate.py scripts/plan/adjust.py scripts/plan/router.py` prints nothing (**[AMENDED S143]** the T4 UI edits touch `app_view.html` only, never the frozen six).
 7. Both rendered surfaces carry 0 external asset references (the `render.emit` inline-only contract) and `pytest tests/serve/test_credential_onboarding_ui.py -q` passes; the full baseline stays green.
 
 **Risk Mitigations:** ADR-0048 Consequence-Negative "Garmin excluded from one-click" (AC-5); "shared secret never surfaced to the tester" (AC-4); "frozen six untouched" (AC-6)

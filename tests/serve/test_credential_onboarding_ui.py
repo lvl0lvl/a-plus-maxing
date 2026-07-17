@@ -186,6 +186,31 @@ def test_surface_b_data_src_keys_are_server_manifest_sources_apple_excluded():
 
 
 # --------------------------------------------------------------------------- #
+# A1 (Tier-3) -- the token save clears + closes ONLY on a server-confirmed ok
+# --------------------------------------------------------------------------- #
+def test_tracker_save_gated_on_response_ok():
+    """Tier-3 A1 (no false success / no token loss): `_trackerSaveToken` clears the input + closes the
+    drawer ONLY when the parsed body says `ok`. The /settings/tracker error bodies carry `{ok:false}`,
+    so an unconditional `.then` that clears + closes on any status would paint success on a keychain-write
+    failure AND discard the pasted token. The clear (`inp.value=''`) and drawer-close
+    (`classList.remove('open')`) must sit BEHIND the `d.ok` gate (mirroring _pfKeySave/wizKeySave), with a
+    failure branch that KEEPS the token. Falsifier: revert to the unconditional `.then` -> the `d.ok`
+    gate vanishes (nothing precedes the clear/close) -> RED.
+    """
+    html = _surface_b()
+    fi = html.find("function _trackerSaveToken")
+    assert fi != -1, "no _trackerSaveToken handler to check"
+    window = html[fi:fi + 900]
+    ok_i = window.find("d.ok")
+    clear_i = window.find("inp.value=''")
+    close_i = window.find("classList.remove('open')")
+    assert ok_i != -1, "the token save does not gate on the parsed body ok (d.ok)"
+    assert clear_i != -1 and ok_i < clear_i, "the input-clear is not gated behind d.ok (token lost on failure)"
+    assert close_i != -1 and ok_i < close_i, "the drawer-close is not gated behind the d.ok check"
+    assert "Could not save the token" in window, "the token save has no failure branch that keeps the token"
+
+
+# --------------------------------------------------------------------------- #
 # AC-3 -- skippable: the advance affordance + optional connect cards
 # --------------------------------------------------------------------------- #
 def test_ac3_skippable_connections_optional():

@@ -1167,9 +1167,12 @@ def test_wizard_carries_rich_domain_and_safety_controls_no_cannabis():
 def test_wizard_documents_and_key_reuse_existing_seams_with_key_affordance():
     """W4/AC-4: Documents reuses /upload→/confirm-extraction, the key step /settings/key; no new route.
 
-    Every fetch target stays within the known same-origin loopback set (the wizard adds NO new path),
-    and the API-key step carries the empty-vs-saved keystate affordance (masked + greyed `disabled` +
-    `✓ Saved`). Failing-capable: reds if a new fetch path appears or the key affordance is absent.
+    Every fetch target stays within the known same-origin loopback set, and the credential-onboarding key
+    step (the ADR-0048-T4 redesign of step 9) carries its bring-your-own affordance: the `sk-ant-` key
+    input (`wiz-key`) + the Save-key handler (`wizKeySave` → /settings/key) + the `a-plus-maxing-api-key`
+    keychain-sink note. (The prior masked/greyed-`disabled`/`✓ Saved` demo card was DROPPED by the T4
+    own-key redesign — Design F2 — since on an unsaved first run it rendered a contradictory
+    unsaved-yet-saved state.) Failing-capable: reds if a new fetch path appears or the key affordance is gone.
     """
     html = _spa_html()
     assert "fetch('/upload'" in html, "the existing /upload flow the wizard Documents step reuses is gone"
@@ -1178,9 +1181,9 @@ def test_wizard_documents_and_key_reuse_existing_seams_with_key_affordance():
     targets = {t.split("?", 1)[0] for t in re.findall(r"fetch\(\s*['\"]([^'\"]+)['\"]", html)}
     assert targets and targets <= _KNOWN_LOOPBACK, f"the wizard added a fetch path beyond the known set: {sorted(targets - _KNOWN_LOOPBACK)}"
     wiz = _wizard_html(html)
-    assert "keymask" in wiz, "the wizard key step carries no masked key affordance"
-    assert "disabled" in wiz, "the wizard key step carries no greyed (disabled) saved-key state"
-    assert "✓ Saved" in wiz, "the wizard key step carries no '✓ Saved' affordance"
+    assert 'id="wiz-key"' in wiz, "the wizard key step dropped the sk-ant bring-your-own key input"
+    assert "wizKeySave" in wiz, "the wizard key step dropped the Save-key affordance"
+    assert "a-plus-maxing-api-key" in wiz, "the wizard key step dropped the keychain-sink note"
 
 
 def test_wizard_and_doc_cards_use_generic_render_state_driven_source_labels():
