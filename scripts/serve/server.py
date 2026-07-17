@@ -949,6 +949,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
 
         from scripts.store import store
 
+        # CSRF gate (SEC): require application/json so a cross-site CORS-simple text/plain POST cannot drive this store write (mirrors _save_key).
         ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
         if ctype != "application/json":
             self._write_json(415, {"ok": False, "error": "unsupported content-type"})
