@@ -411,10 +411,17 @@ def test_spa_fetch_targets_are_all_same_origin_loopback():
     # is likewise a LOCAL same-origin POST: the operator-confirmed de-identified interaction-class
     # tokens persist through the unchanged on-device store sink (never a raw drug string, never
     # off-machine) — the same LOCAL class as /confirm-extraction, adding no new egress class.
+    # /settings/trackers (GET) + /settings/tracker (POST) + /settings/connect (POST) (ADR-0048-T4) are
+    # likewise LOCAL same-origin routes: /settings/trackers reports keychain-presence booleans (never a
+    # token value), /settings/tracker writes a pasted OAuth token to the on-device keychain, and
+    # /settings/connect starts the app-mediated OAuth server-side — the fetch itself never leaves the
+    # machine, adding no new egress class (the same LOCAL keychain class as /settings/key).
     assert set(targets) <= {"/chat", "/care-chat", "/upload", "/settings/key", "/confirm-extraction",
-                            "/generate-plan", "/confirm-curation", "/conversation"}, (
+                            "/generate-plan", "/confirm-curation", "/conversation",
+                            "/settings/trackers", "/settings/tracker", "/settings/connect"}, (
         f"the SPA fetches a path beyond the known loopback routes "
-        f"(/chat + /upload + /settings/key + /confirm-extraction + /generate-plan + /confirm-curation): "
+        f"(/chat + /upload + /settings/key + /confirm-extraction + /generate-plan + /confirm-curation "
+        f"+ /settings/trackers + /settings/tracker + /settings/connect): "
         f"{sorted(set(targets))}"
     )
 
@@ -1072,11 +1079,13 @@ def test_prefill_consumer_integrity_no_silent_noop(tmp_path):
 # and the inline-asset render gate. Rendered-HTML / real-emit, 0 live spend.
 # --------------------------------------------------------------------------- #
 
-# The 9 wizard step headings in mockup order (`prototype/intake-onboarding-mockup.html`), as
-# they appear in the rendered markup (the `&` in three headings is HTML-escaped to `&amp;`).
+# The 9 wizard step headings in mockup order, as they appear in the rendered markup (the `&` in the
+# headings is HTML-escaped to `&amp;`). Steps 1-8 are the intake-onboarding-mockup headings; step 9 was
+# retargeted by ADR-0048-T4 to the credential-onboarding "Connect your data & keys" surface (so the
+# heading is the real step-9 title, not the incidental "API key" substring in the BYO input label).
 _WIZARD_STEP_HEADINGS = (
     "Demographics", "Goals", "Training &amp; activity", "Diet", "Supplements &amp; peptides",
-    "Medications", "Health &amp; lifestyle", "Documents", "API key",
+    "Medications", "Health &amp; lifestyle", "Documents", "Connect your data &amp; keys",
 )
 
 # The generic multi-source wearable/DNA names the wizard Documents step lists (parsed locally),
@@ -1085,7 +1094,8 @@ _GENERIC_SOURCES = ("Apple Health", "Garmin", "Whoop", "Oura", "Fitbit", "23andM
 
 # Every same-origin loopback path the SPA may fetch/POST to (no new route — ADR-0033).
 _KNOWN_LOOPBACK = {"/chat", "/care-chat", "/upload", "/settings/key", "/confirm-extraction",
-                   "/generate-plan", "/confirm-curation", "/conversation"}
+                   "/generate-plan", "/confirm-curation", "/conversation",
+                   "/settings/trackers", "/settings/tracker", "/settings/connect"}
 
 
 def _wizard_html(html):
@@ -1157,9 +1167,12 @@ def test_wizard_carries_rich_domain_and_safety_controls_no_cannabis():
 def test_wizard_documents_and_key_reuse_existing_seams_with_key_affordance():
     """W4/AC-4: Documents reuses /upload→/confirm-extraction, the key step /settings/key; no new route.
 
-    Every fetch target stays within the known same-origin loopback set (the wizard adds NO new path),
-    and the API-key step carries the empty-vs-saved keystate affordance (masked + greyed `disabled` +
-    `✓ Saved`). Failing-capable: reds if a new fetch path appears or the key affordance is absent.
+    Every fetch target stays within the known same-origin loopback set, and the credential-onboarding key
+    step (the ADR-0048-T4 redesign of step 9) carries its bring-your-own affordance: the `sk-ant-` key
+    input (`wiz-key`) + the Save-key handler (`wizKeySave` → /settings/key) + the `a-plus-maxing-api-key`
+    keychain-sink note. (The prior masked/greyed-`disabled`/`✓ Saved` demo card was DROPPED by the T4
+    own-key redesign — Design F2 — since on an unsaved first run it rendered a contradictory
+    unsaved-yet-saved state.) Failing-capable: reds if a new fetch path appears or the key affordance is gone.
     """
     html = _spa_html()
     assert "fetch('/upload'" in html, "the existing /upload flow the wizard Documents step reuses is gone"
@@ -1168,9 +1181,9 @@ def test_wizard_documents_and_key_reuse_existing_seams_with_key_affordance():
     targets = {t.split("?", 1)[0] for t in re.findall(r"fetch\(\s*['\"]([^'\"]+)['\"]", html)}
     assert targets and targets <= _KNOWN_LOOPBACK, f"the wizard added a fetch path beyond the known set: {sorted(targets - _KNOWN_LOOPBACK)}"
     wiz = _wizard_html(html)
-    assert "keymask" in wiz, "the wizard key step carries no masked key affordance"
-    assert "disabled" in wiz, "the wizard key step carries no greyed (disabled) saved-key state"
-    assert "✓ Saved" in wiz, "the wizard key step carries no '✓ Saved' affordance"
+    assert 'id="wiz-key"' in wiz, "the wizard key step dropped the sk-ant bring-your-own key input"
+    assert "wizKeySave" in wiz, "the wizard key step dropped the Save-key affordance"
+    assert "a-plus-maxing-api-key" in wiz, "the wizard key step dropped the keychain-sink note"
 
 
 def test_wizard_and_doc_cards_use_generic_render_state_driven_source_labels():

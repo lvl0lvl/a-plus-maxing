@@ -234,8 +234,10 @@ def test_markup_carries_the_wiring_contract(tmp_path):
     )
     assert "a weight unit (kg or lbs)" in locked, "submitProfile does not require an explicit weight unit"
     # Draft autosave: the locked wizard persists entries to localStorage and restores them on load
-    # (a refresh mid-wizard never loses typed work; the store is written only on the final submit).
-    assert "aplus_wizard_draft_v1" in locked, "the Create-Profile draft autosave (localStorage) is not wired"
+    # (a refresh mid-wizard never loses typed work; the store is written only on the final submit). The
+    # key is v2 as of ADR-0048-T4 (the D5 model-key radios are excluded from the draft-tracked .opt set,
+    # so the tracked-set shape changed and a v1 draft would mis-index — the bump invalidates stale v1).
+    assert "aplus_wizard_draft_v2" in locked, "the Create-Profile draft autosave (localStorage) is not wired"
     assert "!data[r[0]] && !saved[r[0]]" in locked, "submitProfile does not honor fields already in the store (forces needless re-entry)"
     assert "_wizClearDraft" in locked, "the draft is not cleared once the profile completes"
     assert "if(classes.length){" in locked, "the meds-curation Confirm button is not gated on there being classes to confirm"

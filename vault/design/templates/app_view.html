@@ -399,6 +399,52 @@ select.inp{cursor:pointer}
 .equip .eq-chk svg{width:16px;height:16px}
 .equip:has(input:checked){border-color:var(--accent);background:var(--soft)}
 .equip:has(input:checked) .eq-chk{display:flex}
+/* ===== ADR-0048-T4: credential-onboarding connection cards + settings sub-tabs ===== */
+.conn{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:13px;background:#fff;padding:14px 16px;margin-bottom:11px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.conn.connected{border-color:#9FE0D7;background:#FCFFFD}
+.conn-main{display:flex;align-items:center;gap:14px}
+.conn-logo{width:42px;height:42px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px}
+.conn-logo svg{width:22px;height:22px}
+.conn-info{flex:1;min-width:0}
+.conn-name{font-size:14.5px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px}
+.conn-sub{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.conn-act{flex:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.conn-status{font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.conn-status.ok{color:var(--good)}
+.conn-status.working{color:var(--accent)}
+.conn-note{font-size:11.5px;color:var(--ink2);line-height:1.45;margin-top:10px;display:flex;gap:7px;align-items:flex-start}
+.conn-note svg{width:14px;height:14px;flex:none;color:var(--faint);margin-top:1px}
+.conn-alt{margin-top:11px}
+.conn-alt-toggle{font-size:12.5px;font-weight:600;color:var(--accent);cursor:pointer;background:none;border:none;padding:0}
+.conn-alt-toggle:hover{text-decoration:underline}
+.conn-pat{display:none;margin-top:11px;border-top:1px dashed var(--line);padding-top:12px}
+.conn-pat.open{display:block}
+.linkbtn{font-size:12.5px;font-weight:600;color:var(--accent);cursor:pointer;background:none;border:none;padding:6px 3px}
+.linkbtn:hover{text-decoration:underline}
+.tag{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);background:var(--soft);border:1px solid var(--soft-bd);border-radius:6px;padding:2px 7px}
+.conn-apple{background:#FFFCFC;border-color:#F3DFE4}
+.apple-steps{margin-top:12px;border-top:1px dashed var(--line);padding-top:13px}
+.apple-steps ol{margin:0 0 11px 0;padding-left:20px}
+.apple-steps li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
+.apple-steps li b{color:var(--ink)}
+.set-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.set-tab{padding:13px 14px;font-size:13.5px;font-weight:600;color:var(--ink2);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.set-tab:hover{color:var(--ink)}
+.set-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.set-panel{display:none}
+.set-panel.active{display:block}
+/* ADR-0048-T4 B1: responsive safety net (ported from the credential mockup) — below 860px the fixed
+   252px stepper column would push the credential content off-screen; collapse to one column. */
+@media(max-width:860px){
+  .wizard{grid-template-columns:1fr;gap:14px}
+  .stepper{position:static}
+  .stepper .step-item{width:auto}
+  .stepper .step-item:not(.active){display:none}
+  .conn-main{flex-wrap:wrap}
+  .conn-act{width:100%;justify-content:flex-end}
+  .gatehead .ghp{min-width:0}
+  .tb-nav .lbl{display:none}
+}
 </style></head>
 <body>
 <div class="app">
@@ -607,23 +653,106 @@ select.inp{cursor:pointer}
     <section class="screen" id="screen-profile">
       <div class="pagehead"><div><div class="h1">Profile</div><div class="sub">Your account and the connection that powers your chat and plan. Everything here stays on your device.</div></div></div>
 
-      <div class="card" style="margin-bottom:22px">
-        <div class="seclab" style="margin-top:0">Account</div>
-        <div class="grid2">
-          <div class="field"><label>Display name</label><input class="inp" id="pf-name" placeholder="What should we call you?" autocomplete="off"></div>
-        </div>
-        <div style="font-size:12px;color:var(--muted);margin-top:12px">Your health details — demographics, labs, history — are captured in <b>Chat with Team</b> (right column). Your name is kept only on this device.</div>
+      <div class="set-tabs">
+        <button type="button" class="set-tab active" data-set="profile">Profile</button>
+        <button type="button" class="set-tab" data-set="connections">Connections &amp; Keys</button>
       </div>
 
-      <div class="card">
-        <div class="seclab" style="margin-top:0">API connection</div>
-        <div class="sub" style="margin:2px 0 4px">The Care Assistant needs an Anthropic API key to answer. Paste yours below — it's stored in your device's secure keychain as <b>a-plus-maxing-api-key</b> (find it anytime in Keychain Access), never uploaded, never written to a file, and never shown again.</div>
-        <div style="margin:14px 0"><span id="pf-key-status" class="pill muted">Checking…</span></div>
-        <div class="field"><label>Anthropic API key</label><input class="inp" id="pf-key" type="password" placeholder="sk-ant-…" autocomplete="off"></div>
-        <div style="display:flex;align-items:center;gap:13px;margin-top:14px">
-          <button class="btn primary" id="pf-key-save">Save key</button>
-          <span id="pf-key-msg" style="font-size:12.5px;color:var(--muted)"></span>
+      <div class="set-panel active" id="set-panel-profile">
+        <div class="card" style="margin-bottom:22px">
+          <div class="seclab" style="margin-top:0">Account</div>
+          <div class="grid2">
+            <div class="field"><label>Display name</label><input class="inp" id="pf-name" placeholder="What should we call you?" autocomplete="off"></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:12px">Your health details — demographics, labs, history — are captured in <b>Chat with Team</b> (right column). Your name is kept only on this device.</div>
         </div>
+
+        <div class="card">
+          <div class="seclab" style="margin-top:0">API connection</div>
+          <div class="sub" style="margin:2px 0 4px">The Care Assistant needs an Anthropic API key to answer. Paste yours below — it's stored in your device's secure keychain as <b>a-plus-maxing-api-key</b> (find it anytime in Keychain Access), never uploaded, never written to a file, and never shown again.</div>
+          <div style="margin:14px 0"><span id="pf-key-status" class="pill muted">Checking…</span></div>
+          <div class="field"><label>Anthropic API key</label><input class="inp" id="pf-key" type="password" placeholder="sk-ant-…" autocomplete="off"></div>
+          <div style="display:flex;align-items:center;gap:13px;margin-top:14px">
+            <button class="btn primary" id="pf-key-save">Save key</button>
+            <span id="pf-key-msg" style="font-size:12.5px;color:var(--muted)"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-panel" id="set-panel-connections">
+        <div class="seclab" style="margin-top:0">Wearables &amp; trackers</div>
+
+        <div class="conn" id="s-whoop" data-src="whoop">
+          <div class="conn-main">
+            <div class="conn-logo" style="background:#000"><span>W</span></div>
+            <div class="conn-info"><div class="conn-name">Whoop</div><div class="conn-sub">Recovery, strain, sleep &amp; HRV</div></div>
+            <div class="conn-act"><span class="conn-status">Checking…</span><button type="button" class="linkbtn" data-conn-manage onclick="_trackerConnect('whoop', this)">Connect</button></div>
+          </div>
+          <div class="conn-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Token stored in your device's keychain.</div>
+        </div>
+
+        <div class="conn" id="s-oura" data-src="oura">
+          <div class="conn-main">
+            <div class="conn-logo" style="background:#17171F"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.2"/></svg></div>
+            <div class="conn-info"><div class="conn-name">Oura <span class="tag">via token</span></div><div class="conn-sub">Sleep, readiness &amp; temperature</div></div>
+            <div class="conn-act"><span class="conn-status">Checking…</span><button type="button" class="linkbtn" onclick="_togglePat('s-oura')">Update token</button></div>
+          </div>
+          <div class="conn-pat" id="pat-s-oura">
+            <div class="field"><label>Replace Oura Personal Access Token</label><input class="inp" type="password" placeholder="Paste a new PAT" autocomplete="off"></div>
+            <div style="margin-top:11px;display:flex;align-items:center;gap:12px"><button type="button" class="btn primary" onclick="_trackerSaveToken('oura', this)">Save new token</button><span class="conn-token-msg" style="font-size:12.5px;color:var(--muted)"></span></div>
+          </div>
+        </div>
+
+        <div class="conn" id="s-garmin" data-src="garmin">
+          <div class="conn-main">
+            <div class="conn-logo" style="background:#0072C6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 4 4 19h16z"/></svg></div>
+            <div class="conn-info"><div class="conn-name">Garmin</div><div class="conn-sub">Activities, heart rate &amp; body battery</div></div>
+            <div class="conn-act"><span class="conn-status">Checking…</span><button type="button" class="linkbtn" onclick="_togglePat('s-garmin')">Paste a token</button></div>
+          </div>
+          <div class="conn-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Garmin's sign-in differs — if it can't complete in one click, paste a token instead.</div>
+          <div class="conn-pat" id="pat-s-garmin">
+            <div class="field"><label>Garmin token</label><input class="inp" type="password" placeholder="Paste your Garmin token" autocomplete="off"></div>
+            <div style="margin-top:11px;display:flex;align-items:center;gap:12px"><button type="button" class="btn primary" onclick="_trackerSaveToken('garmin', this)">Save token</button><span class="conn-token-msg" style="font-size:12.5px;color:var(--muted)"></span></div>
+          </div>
+        </div>
+
+        <div class="conn" id="s-google" data-src="google-health">
+          <div class="conn-main">
+            <div class="conn-logo" style="background:#4285F4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+            <div class="conn-info"><div class="conn-name">Google Health</div><div class="conn-sub">Steps, activity &amp; heart data</div></div>
+            <div class="conn-act"><span class="conn-status">Checking…</span><button type="button" class="linkbtn" data-conn-manage onclick="_trackerConnect('google-health', this)">Connect</button></div>
+          </div>
+          <div class="conn-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Token stored in your device's keychain.</div>
+        </div>
+
+        <div class="conn conn-apple" id="s-apple">
+          <div class="conn-main">
+            <div class="conn-logo" style="background:#FFE9ED;color:#FF2D55"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21.35 10.55 20C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z"/></svg></div>
+            <div class="conn-info"><div class="conn-name">Apple Health <span class="tag">Shortcut</span></div><div class="conn-sub">iPhone health data via a Shortcut — no account to connect</div></div>
+            <div class="conn-act"><button type="button" class="btn ghost" onclick="_appleShortcut(this)">Get the Shortcut</button></div>
+          </div>
+          <div class="apple-steps" style="display:none">
+            <ol>
+              <li><b>Install the A+ Maxing Shortcut</b> on your iPhone (opens the Shortcuts app).</li>
+              <li><b>Point it at a folder</b> your Mac or PC can see (e.g. an iCloud Drive folder).</li>
+              <li>It exports your Health data there on a schedule — parsed locally, never uploaded.</li>
+            </ol>
+            <div class="drop">Watched folder: <b>~/A+Maxing/AppleHealth</b> — click to change</div>
+          </div>
+          <div class="conn-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg>Apple Health has no web sign-in — a Shortcut writes an export to a folder we watch, different from the one-click cards.</div>
+        </div>
+
+        <div class="seclab">AI model key</div>
+        <div class="card">
+          <div class="conn-main" style="align-items:flex-start">
+            <div class="conn-logo" style="background:#CC785C"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg></div>
+            <div class="conn-info"><div class="conn-name">Anthropic (Claude)</div><div class="conn-sub">Using the <b>shared alpha key</b> — nothing to manage; spend is covered centrally. Bring your own on the <b>Profile</b> tab.</div></div>
+            <div class="conn-act"><span class="pill good">Alpha key</span><button type="button" class="linkbtn" onclick="_gotoProfileKey()">Use my own key</button></div>
+          </div>
+          <div class="conn-note" style="margin-top:13px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Keys and tokens are stored in your device's keychain as <b>a-plus-maxing-api-key</b> — never in a file, never uploaded.</div>
+        </div>
+
+        <div class="note" style="margin-top:18px">Reconnect refreshes a token that expired; pasting a new token replaces it in your keychain. Health data already ingested stays on your device.</div>
       </div>
     </section>
 
@@ -646,7 +775,7 @@ select.inp{cursor:pointer}
             <button type="button" class="step-item" data-go="6" onclick="gotoStep(6)"><span class="step-num">6</span>Medications</button>
             <button type="button" class="step-item" data-go="7" onclick="gotoStep(7)"><span class="step-num">7</span>Health &amp; lifestyle</button>
             <button type="button" class="step-item" data-go="8" onclick="gotoStep(8)"><span class="step-num">8</span>Documents</button>
-            <button type="button" class="step-item" data-go="9" onclick="gotoStep(9)"><span class="step-num">9</span>API key</button>
+            <button type="button" class="step-item" data-go="9" onclick="gotoStep(9)"><span class="step-num">9</span>Connect your data &amp; keys</button>
           </nav>
           <div id="wsteps">
             <div class="wstep active" data-step="1">
@@ -749,21 +878,109 @@ select.inp{cursor:pointer}
               <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="nextStep()">Save &amp; continue →</button></div>
             </div>
             <div class="wstep" data-step="9">
-              <div class="h1">API key</div>
-              <div class="sub">The Care Assistant needs an Anthropic API key to answer. Stored in your device keychain as <b>a-plus-maxing-api-key</b> — never uploaded, never written to a file.</div>
-              <div class="card" style="margin-top:18px">
-                <div class="keystate">
-                  <div class="klab">Before you save</div>
-                  <div style="margin-bottom:10px"><span class="pill muted" id="wiz-key-pill">No key saved</span></div>
-                  <div class="field"><label>Anthropic API key</label><input class="inp" id="wiz-key" type="password" placeholder="sk-ant-…" autocomplete="off"></div>
-                  <div style="margin-top:12px;display:flex;align-items:center;gap:12px"><button type="button" class="btn primary" onclick="wizKeySave(this)">Save key</button><span id="wiz-key-msg" style="font-size:12.5px;color:var(--muted)"></span></div>
+              <div class="h1">Connect your data &amp; keys</div>
+              <div class="sub">Link your trackers and set your model key. Most connections are one click — you approve access on the vendor's own sign-in page, and the token is stored in your device's keychain.</div>
+              <div class="note"><b>You never enter a client ID or a secret.</b> Connecting opens the vendor's own sign-in in your browser; we only receive the access token it hands back. Everything here is optional and can be added later in Settings.</div>
+
+              <div class="statusbar">
+                <div class="row"><span style="font-weight:600">Connections</span><span style="color:var(--muted)"><b id="wiz-prog-count">0 of 5 connected</b></span></div>
+                <div class="bar"><i id="wiz-prog-bar" style="width:0%"></i></div>
+                <div style="font-size:11.5px;color:var(--muted);margin-top:9px">Connect what you have now — you can add the rest any time from <b>My Info → Connections &amp; Keys</b>.</div>
+              </div>
+
+              <div class="seclab">Wearables &amp; trackers</div>
+
+              <div class="conn" id="c-whoop">
+                <div class="conn-main">
+                  <div class="conn-logo" style="background:#000"><span>W</span></div>
+                  <div class="conn-info"><div class="conn-name">Whoop</div><div class="conn-sub">Recovery, strain, sleep &amp; HRV</div></div>
+                  <div class="conn-act"><button type="button" class="btn primary" onclick="_trackerConnect('whoop', this)">Connect</button></div>
                 </div>
-                <div class="keystate">
-                  <div class="klab">After you save</div>
-                  <div class="field"><label>Anthropic API key</label><input class="inp keymask" type="text" value="••••••••••••••••••••" disabled></div>
-                  <div style="display:flex;align-items:center;gap:13px;margin-top:12px"><button type="button" class="btn ghost">Replace key</button><span style="font-size:13px;font-weight:600;color:var(--good);display:inline-flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>✓ Saved to keychain · stored, never shown again</span></div>
+                <div class="conn-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Opens Whoop's sign-in in your browser — approve access there. Your password never reaches us.</div>
+              </div>
+
+              <div class="conn" id="c-oura">
+                <div class="conn-main">
+                  <div class="conn-logo" style="background:#17171F"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.2"/></svg></div>
+                  <div class="conn-info"><div class="conn-name">Oura</div><div class="conn-sub">Sleep, readiness &amp; temperature</div></div>
+                  <div class="conn-act"><button type="button" class="btn primary" onclick="_togglePat('oura')">Connect</button></div>
+                </div>
+                <div class="conn-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Oura connects with a personal access token from cloud.ouraring.com.</div>
+                <div class="conn-alt">
+                  <button type="button" class="conn-alt-toggle" onclick="_togglePat('oura')">Already have a token? Paste it instead →</button>
+                  <div class="conn-pat" id="pat-oura">
+                    <div class="field"><label>Oura Personal Access Token</label><input class="inp" type="password" placeholder="Paste your PAT from cloud.ouraring.com" autocomplete="off"></div>
+                    <div style="margin-top:11px;display:flex;align-items:center;gap:12px"><button type="button" class="btn primary" onclick="_trackerSaveToken('oura', this)">Save token</button><span class="conn-token-msg" style="font-size:12.5px;color:var(--muted)"></span></div>
+                  </div>
                 </div>
               </div>
+
+              <div class="conn" id="c-garmin">
+                <div class="conn-main">
+                  <div class="conn-logo" style="background:#0072C6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 4 4 19h16z"/></svg></div>
+                  <div class="conn-info"><div class="conn-name">Garmin</div><div class="conn-sub">Activities, heart rate &amp; body battery</div></div>
+                  <div class="conn-act"><button type="button" class="btn primary" onclick="_togglePat('garmin')">Connect</button></div>
+                </div>
+                <div class="conn-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Garmin's sign-in differs — if it can't complete in one click, you'll be offered a token paste.</div>
+                <div class="conn-alt">
+                  <button type="button" class="conn-alt-toggle" onclick="_togglePat('garmin')">Paste a token instead →</button>
+                  <div class="conn-pat" id="pat-garmin">
+                    <div class="field"><label>Garmin token</label><input class="inp" type="password" placeholder="Paste your Garmin token" autocomplete="off"></div>
+                    <div style="margin-top:11px;display:flex;align-items:center;gap:12px"><button type="button" class="btn primary" onclick="_trackerSaveToken('garmin', this)">Save token</button><span class="conn-token-msg" style="font-size:12.5px;color:var(--muted)"></span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="conn" id="c-google">
+                <div class="conn-main">
+                  <div class="conn-logo" style="background:#4285F4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                  <div class="conn-info"><div class="conn-name">Google Health</div><div class="conn-sub">Steps, activity &amp; heart data</div></div>
+                  <div class="conn-act"><button type="button" class="btn primary" onclick="_trackerConnect('google-health', this)">Connect</button></div>
+                </div>
+                <div class="conn-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Opens Google's sign-in in your browser — approve access there.</div>
+              </div>
+
+              <div class="seclab">Apple Health</div>
+              <div class="conn conn-apple" id="c-apple">
+                <div class="conn-main">
+                  <div class="conn-logo" style="background:#FFE9ED;color:#FF2D55"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21.35 10.55 20C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z"/></svg></div>
+                  <div class="conn-info"><div class="conn-name">Apple Health <span class="tag">Shortcut, not a login</span></div><div class="conn-sub">iPhone health data — there's no account to connect</div></div>
+                  <div class="conn-act"><button type="button" class="btn ghost" onclick="_appleShortcut(this)">Get the Shortcut</button></div>
+                </div>
+                <div class="apple-steps" style="display:none">
+                  <ol>
+                    <li><b>Install the A+ Maxing Shortcut</b> on your iPhone (opens the Shortcuts app).</li>
+                    <li><b>Point it at a folder</b> your Mac or PC can see (e.g. an iCloud Drive folder).</li>
+                    <li>It exports your Health data to that folder on a schedule — parsed locally, never uploaded.</li>
+                  </ol>
+                  <div class="drop">Watched folder: <b>~/A+Maxing/AppleHealth</b> — click to change</div>
+                </div>
+                <div class="conn-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg>Apple Health has no web sign-in. A Shortcut on your iPhone writes an export to a folder we watch — different from the one-click cards above.</div>
+              </div>
+
+              <div class="seclab">AI model key</div>
+              <div class="card">
+                <div class="conn-main" style="align-items:flex-start">
+                  <div class="conn-logo" style="background:#CC785C"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg></div>
+                  <div class="conn-info"><div class="conn-name">Anthropic (Claude)</div><div class="conn-sub">Powers your Care Assistant and the plan reasoning. <b>This is the one swappable choice</b> — use the shared alpha key, or bring your own.</div></div>
+                </div>
+                <div class="opts" style="margin-top:14px">
+                  <label class="opt radio on nodraft" id="wiz-opt-alpha" onclick="pickWizKey('alpha')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Use the shared alpha key</label>
+                  <label class="opt radio nodraft" id="wiz-opt-own" onclick="pickWizKey('own')"><span class="obox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Bring my own key</label>
+                </div>
+                <div class="keystate" id="wiz-key-alpha">
+                  <div class="klab">Default for alpha</div>
+                  <div><span class="pill good">Provided for alpha — nothing to do here</span></div>
+                  <div class="conn-note" style="margin-top:11px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>The alpha ships with a shared Anthropic key, so you can start right away. Switch to your own any time.</div>
+                </div>
+                <div class="keystate" id="wiz-key-own" style="display:none">
+                  <div class="klab">Your own key</div>
+                  <div class="field"><label>Anthropic API key</label><input class="inp" id="wiz-key" type="password" placeholder="sk-ant-…" autocomplete="off"></div>
+                  <div style="margin-top:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><button type="button" class="btn primary" onclick="wizKeySave(this)">Save key</button><button type="button" class="conn-alt-toggle" onclick="_howToKey()">How to get an Anthropic key →</button><span id="wiz-key-msg" style="font-size:12.5px;color:var(--muted)"></span></div>
+                  <div class="conn-note" style="margin-top:11px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Stored in your device's keychain as <b>a-plus-maxing-api-key</b> — never uploaded, never written to a file.</div>
+                </div>
+              </div>
+
               <div class="wform-foot"><button type="button" class="btn ghost" onclick="prevStep()">← Back</button><button type="button" class="btn primary" onclick="show('equipment')">Save &amp; review →</button></div>
             </div>
           </div>
@@ -1025,6 +1242,96 @@ function _pfKeySave(){
  _pfApplyName(saved);
  var av=document.getElementById('top-av'); if(av) av.addEventListener('click',function(){ go('profile'); });
  var sb=document.getElementById('pf-key-save'); if(sb) sb.addEventListener('click', _pfKeySave);
+})();
+
+// ---------- Connections & Keys: per-source tracker status + connect/token affordances (ADR-0048-T4) ----------
+// Renders against the merged ADR-0048-T2 (POST /settings/connect) + T3 (POST /settings/tracker,
+// GET /settings/trackers) routes; the vendor sign-in opens server-side — no client_id/secret here.
+var _appleGot=false;  // client-side Apple-Shortcut flag (Apple is not an OAuth /settings/trackers source)
+function _togglePat(key){ var el=document.getElementById('pat-'+key); if(el) el.classList.toggle('open'); }
+function _howToKey(){ window.open('https://console.anthropic.com/settings/keys','_blank','noopener'); }
+function _appleShortcut(btn){
+ var card=btn.closest('.conn'), steps=card&&card.querySelector('.apple-steps'); if(steps) steps.style.display='block';
+ _appleGot=true; _step9Progress();
+}
+// Bring-your-own routes to the Profile sub-tab where the single pf-key input lives (no duplicate input).
+function _gotoProfileKey(){
+ document.querySelectorAll('#screen-profile .set-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.set==='profile'); });
+ document.querySelectorAll('#screen-profile .set-panel').forEach(function(p){ p.classList.toggle('active', p.id==='set-panel-profile'); });
+ var k=document.getElementById('pf-key'); if(k){ try{ k.scrollIntoView({block:'center'}); }catch(e){} k.focus(); }
+}
+// Start the app-mediated OAuth (server opens the vendor sign-in); gate on the parsed body + surface a
+// failure so the button is never silently inert. The keychain truth refreshes on the next status read.
+function _trackerConnect(src, btn){
+ var row=btn&&btn.closest('.conn'), st=row&&row.querySelector('.conn-status');
+ var say=function(cls,txt){ if(st){ st.className='conn-status'+(cls?' '+cls:''); st.textContent=txt; } else if(btn){ btn.textContent=txt; } };
+ if(btn) btn.disabled=true; say('working','Connecting…');
+ fetch('/settings/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:src})})
+  .then(function(r){return r.json();}).then(function(d){
+    if(btn) btn.disabled=false;
+    if(d&&(d.ok||d.authorizing)){ say('working','Approve in your browser'); }
+    else { say('','Could not start — retry'); }
+  }).catch(function(){ if(btn) btn.disabled=false; say('','Could not reach the app'); });
+}
+// Gate the clear+close on the parsed body's ok (mirrors _pfKeySave/wizKeySave): a keychain-write failure
+// must NOT read as success, or the pasted token is silently lost.
+function _trackerSaveToken(src, btn){
+ var wrap=btn.closest('.conn-pat'), inp=wrap&&wrap.querySelector('input'),
+     msg=wrap&&wrap.querySelector('.conn-token-msg'), token=inp?(inp.value||'').trim():'';
+ if(!token){ if(msg) msg.textContent='Paste a token first.'; return; }
+ if(msg) msg.textContent='Saving…';
+ fetch('/settings/tracker',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:src,token:token})})
+  .then(function(r){return r.json();}).then(function(d){
+    if(d&&d.ok){ if(inp) inp.value=''; if(wrap) wrap.classList.remove('open'); if(msg) msg.textContent=''; _trackerStatus(); _step9Progress(); }
+    else { if(msg) msg.textContent='Could not save the token — check it and try again.'; }
+  }).catch(function(){ if(msg) msg.textContent='Could not reach the app to save the token.'; });
+}
+// The keychain-derived per-source truth via GET /settings/trackers (mirrors the /settings/key pill): sets
+// each OAuth source's status + affordance client-side. Apple Health is a separate ingest signal (not in
+// the OAuth manifests), so its row is NOT driven from this map.
+function _trackerStatus(){
+ fetch('/settings/trackers').then(function(r){return r.json();}).then(function(d){
+   var sources=(d&&d.sources)||{};
+   document.querySelectorAll('#screen-profile .conn[data-src]').forEach(function(row){
+     var on=!!sources[row.dataset.src];
+     row.classList.toggle('connected', on);
+     var st=row.querySelector('.conn-status'); if(st){ st.className='conn-status'+(on?' ok':''); st.textContent=on?'Connected':'Not connected'; }
+     var mng=row.querySelector('[data-conn-manage]'); if(mng) mng.textContent=on?'Reconnect':'Connect';
+   });
+ }).catch(function(){
+   document.querySelectorAll('#screen-profile .conn[data-src] .conn-status').forEach(function(st){ st.className='conn-status'; st.textContent='Not connected'; });
+ });
+}
+// Surface-A step-9 progress: "N of 5 connected" from the same keychain truth (+ the client Apple flag).
+function _step9Progress(){
+ var count=document.getElementById('wiz-prog-count'); if(!count) return;  // only when the step-9 statusbar is present
+ fetch('/settings/trackers').then(function(r){return r.json();}).then(function(d){
+   var s=(d&&d.sources)||{}, keys=['whoop','oura','garmin','google-health'];
+   var n=keys.reduce(function(a,k){return a+(s[k]?1:0);},0)+(_appleGot?1:0), total=keys.length+1;
+   count.textContent=n+' of '+total+' connected';
+   var bar=document.getElementById('wiz-prog-bar'); if(bar) bar.style.width=(n/total*100)+'%';
+ }).catch(function(){});
+}
+// Surface-A step-9 model-key choice (D5): the shared alpha key (default) vs bring-your-own.
+function pickWizKey(mode){
+ var a=document.getElementById('wiz-opt-alpha'), o=document.getElementById('wiz-opt-own');
+ if(a) a.classList.toggle('on', mode==='alpha'); if(o) o.classList.toggle('on', mode==='own');
+ var ka=document.getElementById('wiz-key-alpha'), ko=document.getElementById('wiz-key-own');
+ if(ka) ka.style.display=mode==='alpha'?'block':'none'; if(ko) ko.style.display=mode==='own'?'block':'none';
+}
+(function(){
+ // The Profile / Connections & Keys sub-tab switch — SCOPED to #screen-profile so it never touches the
+ // global .ws-tab workspace tabs (whose own sweep handler drives the My-Plan/My-Info/Generate panels).
+ document.querySelectorAll('#screen-profile .set-tab').forEach(function(t){
+   t.addEventListener('click',function(){
+     document.querySelectorAll('#screen-profile .set-tab').forEach(function(x){ x.classList.toggle('active', x===t); });
+     document.querySelectorAll('#screen-profile .set-panel').forEach(function(p){ p.classList.toggle('active', p.id==='set-panel-'+t.dataset.set); });
+   });
+ });
+ // On-load: the Connections rows' status (Settings) + the step-9 progress (onboarding); each no-ops when
+ // its surface is absent (the locked body has step 9 but not #screen-profile; the unlocked body has both).
+ if(document.querySelector('#screen-profile .conn[data-src]')) _trackerStatus();
+ _step9Progress();
 })();
 
 // ---------- My-Info: per-section Edit enables the fields; Save re-submits the /upload seam ----------
@@ -1401,10 +1708,13 @@ function wizKeySave(btn){
    draft is cleared once the profile completes (this reload lands the unlocked shell, which has the
    platform screens). Local to the operator's own browser — the same on-device posture as the store. */
 (function(){
-  var KEY='aplus_wizard_draft_v1';
+  var KEY='aplus_wizard_draft_v2';  // v2: the D5 model-key radios (.nodraft) are excluded from optLabels
   var SCOPE='#wsteps [name], #screen-equipment [name]';
   function LS(){ try{ return window.localStorage; }catch(e){ return null; } }
-  function optLabels(){ return Array.prototype.slice.call(document.querySelectorAll('#wsteps .opt, #screen-equipment .opt')); }
+  // The D5 model-key radios carry `.nodraft` — they're a display toggle (pickWizKey), not draft data (no
+  // `name`, not in collect()), so tracking them positionally would mis-index the rest + double-select on
+  // the add-only restore. Excluding them keeps the draft `.opt` set = the genuine multi-select controls.
+  function optLabels(){ return Array.prototype.slice.call(document.querySelectorAll('#wsteps .opt:not(.nodraft), #screen-equipment .opt:not(.nodraft)')); }
   function activeStep(){ var a=document.querySelector('#wsteps .wstep.active'); return a?a.getAttribute('data-step'):null; }
   function saveDraft(){
     var s=LS(); if(!s) return;
@@ -1464,7 +1774,6 @@ function wizKeySave(btn){
     try{ fetch('/settings/key').then(function(r){return r.json();}).then(function(d){
       if(d&&d.connected){
         var m=document.getElementById('wiz-key-msg'); if(m){ m.style.color='var(--good)'; m.textContent='✓ Already connected — you can skip this step.'; }
-        var p=document.getElementById('wiz-key-pill'); if(p){ p.className='pill good'; p.textContent='Key connected'; }
       }
     }).catch(function(){}); }catch(e){}
   }
