@@ -21,6 +21,7 @@ import subprocess
 from pathlib import Path
 
 from scripts.generate import generate
+from scripts.ingest import oauth_pull
 from vault.design.templates import app_shell
 from tests.serve.test_app_shell import _complete_profile_readings, _seed_complete_profile
 
@@ -67,6 +68,17 @@ def _stepper_step9_label(html):
     """The stepper's `data-go="9"` button label text (positive-identity check for AC-1)."""
     m = re.search(r'data-go="9"[^>]*>\s*<span class="step-num">9</span>([^<]*)</button>', html)
     return m.group(1) if m else None
+
+
+def _oauth_row(region, src):
+    """The Surface-B `.conn` card carrying `data-src=<src>` (up to the next source row / the AI-key card).
+
+    The card's `id="s-<src>"` precedes its `data-src` on the same tag, so the slice starts at the
+    `data-src` and ends at the NEXT `id="s-"` (or the "AI model key" seclab for the last row).
+    """
+    tail = region[region.index(f'data-src="{src}"'):]
+    ends = [i for i in (tail.find('id="s-', 1), tail.find("AI model key")) if i != -1]
+    return tail[:min(ends)] if ends else tail
 
 
 # --------------------------------------------------------------------------- #
@@ -117,9 +129,14 @@ def test_ac2_surface_b_connections_panel_and_status_hook():
     # per-source rows by name
     for name in ("Whoop", "Oura", "Garmin", "Google Health", "Apple Health"):
         assert name in region, f"missing Surface-B source row: {name}"
-    # the four OAuth rows the status JS drives, keyed to the /settings/trackers source keys
+    # the four OAuth rows the status JS drives, keyed to the /settings/trackers source keys; each row
+    # carries the `.conn-status` span `_trackerStatus()`'s `row.querySelector('.conn-status')` sets +
+    # a connect/manage affordance (else a dropped `.conn-status` would silently no-op the status JS)
     for src in ("whoop", "oura", "garmin", "google-health"):
         assert f'data-src="{src}"' in region, f"missing OAuth status row: {src}"
+        row = _oauth_row(region, src)
+        assert 'class="conn-status"' in row, f"{src} row has no .conn-status span for the status JS to set"
+        assert 'class="linkbtn"' in row, f"{src} row has no connect/manage affordance"
     # the Oura PAT update affordance + the AI model key card
     assert "Update token" in region
     assert "AI model key" in region
@@ -147,17 +164,42 @@ def test_ac2b_no_ws_tab_collision_in_screen_profile():
 
 
 # --------------------------------------------------------------------------- #
+# Seam -- Surface-B data-src keys stay a subset of the server OAuth manifests
+# --------------------------------------------------------------------------- #
+def test_surface_b_data_src_keys_are_server_manifest_sources_apple_excluded():
+    """Seam guard: every `data-src` the status JS drives is a real `oauth_pull._MANIFESTS` source
+    (a server-side manifest rename would otherwise desync the client silently), AND the Apple row
+    carries NO `data-src` -- Apple is an ingest/Shortcut signal, not an OAuth source, so it must not
+    be driven off `/settings/trackers`. Falsifier: add `data-src="apple"` to the Apple row -> RED
+    (apple is not in _MANIFESTS, and the Apple-row check REDs).
+    """
+    region = _profile_region(_surface_b())
+    data_srcs = set(re.findall(r'data-src="([^"]+)"', region))
+    assert data_srcs, "Surface B renders no data-src status rows"
+    assert data_srcs <= set(oauth_pull._MANIFESTS), (
+        f"Surface-B data-src keys are not all server OAuth sources: "
+        f"{sorted(data_srcs - set(oauth_pull._MANIFESTS))}"
+    )
+    apple_start = region.index('id="s-apple"')
+    apple_row = region[apple_start:region.index("AI model key", apple_start)]
+    assert "data-src" not in apple_row, "the Apple row carries a data-src (would drive it off the OAuth map)"
+
+
+# --------------------------------------------------------------------------- #
 # AC-3 -- skippable: the advance affordance + optional connect cards
 # --------------------------------------------------------------------------- #
 def test_ac3_skippable_connections_optional():
-    """AC-3: step 9 renders the "Save & review ->" advance affordance and the connect cards
-    carry no connection-gate (no `required`) -- a 0-connection render advances. Falsifier:
-    gate advancement on a connection (a `required` attribute) -> RED.
+    """AC-3: step 9 renders the "Save & review ->" advance button NOT disabled, and no connect card
+    `<input>` carries `required` -- a 0-connection render advances. Attribute-scoped (not a bare
+    "required" substring, which prose would false-RED, and which is blind to a `disabled` advance
+    gate). Falsifier: mark the advance button `disabled`, or add `required` to a connect input -> RED.
     """
     region = _step9_region(_surface_a())
+    advance = re.search(r"<button[^>]*onclick=\"show\('equipment'\)\"[^>]*>", region)
+    assert advance is not None, "no 'Save & review ->' advance button in step 9"
     assert "Save &amp; review" in region
-    assert "show('equipment')" in region
-    assert "required" not in region
+    assert "disabled" not in advance.group(0), "the advance button is disabled (gates advancement)"
+    assert not re.search(r"<input[^>]*\brequired\b", region), "a connect card input is `required` (gates skip)"
 
 
 # --------------------------------------------------------------------------- #
