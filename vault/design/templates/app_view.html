@@ -640,7 +640,8 @@ select.inp{cursor:pointer}
             </div>
           </div>
           <div class="ws-panel" id="panel-generate">
-            <div style="display:flex;gap:10px;margin-top:2px;margin-bottom:9px"><button class="btn primary" style="flex:1">Generate plan</button><button class="btn ghost" style="flex:1">Update plan</button></div>
+            <div style="display:flex;gap:10px;margin-top:2px;margin-bottom:9px"><button id="plan-gen-run" class="btn primary" style="flex:1">Generate plan</button><button class="btn ghost" style="flex:1">Update plan</button></div>
+            <div id="plan-gen-status" class="sub" style="display:none;margin-top:8px"></div>
             <div style="font-size:11.5px;color:var(--ink2);line-height:1.45;margin-bottom:14px"><b>Generate plan</b> builds a fresh plan from scratch. <b>Update plan</b> re-runs your existing plan with your latest data.</div>
             <div class="seclab" style="margin-top:0">Care-team build status</div>
             <div class="gen-roster"></div>
@@ -1616,6 +1617,8 @@ function renderGenerate(){
        // with the button if nothing recorded so the operator can retry).
        var zone=document.getElementById('plan-zone');
        if(zone && typeof d.plan_html==='string'){ zone.innerHTML=d.plan_html; }
+       // The generate control lives on a different screen than #plan-zone; surface the result.
+       if(typeof go==='function'){ try{ go('plan'); }catch(_){} }
        // Surface honest per-domain no-plan reasons for any domain that produced nothing.
        var results=d.results||{}, names=Object.keys(results);
        var noplan=names.filter(function(k){return results[k]!=='recorded';});
