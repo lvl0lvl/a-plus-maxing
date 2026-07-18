@@ -10,6 +10,9 @@ vault/inbox/
 vault/meta/operator-identity.txt
 vault/meta/operator-contact.txt
 
+# operator-grounded (PII) reference docs — never commit
+design/*.operator-grounded.md
+
 # Environment
 .env
 .env.local
