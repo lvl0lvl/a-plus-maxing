@@ -60,7 +60,7 @@ from scripts.plan import domain_program, router
 from scripts.plan.adjudicate import adjudicate
 from scripts.plan.assemble import PROGRAM_KEY
 from scripts.plan.generate_plan import RED_S_LEA_CLINICAL_ROUTING, compute_plan
-from scripts.store import plan_schema, queue_schema
+from scripts.store import plan_schema, queue_schema, store
 
 # Reconciler hold reasons: a candidate computed a plan, but a cross-domain check holds it from
 # recording — the honest no-plan state, never an unsafe / un-fuelable plan on the dashboard.
@@ -733,9 +733,19 @@ def _recorded_result(candidate, plan_date, root):
     plan = candidate.get("plan")
     recorded = plan is not None
     if recorded:
-        plan_schema.record_plan(
-            candidate["domain"], plan, plan_date, candidate["specialist"], root
+        domain, specialist = candidate["domain"], candidate["specialist"]
+        item = f"{plan_schema._PREFIX_PLAN}{domain}"
+        source = f"{plan_schema._PREFIX_PLAN}{specialist}"
+        # A same-day re-generation supersedes (correct_plan) rather than no-ops: the
+        # (item, date, source) dedupe identity drops a changed-value re-record via `append`,
+        # so a re-run's fresh plan would otherwise never reach the render. `correct` appends
+        # a superseding line the reader resolves to; a first write still records.
+        already = any(
+            r.get("timepoint") == plan_date and r.get("source") == source
+            for r in store.read(item, root=root)
         )
+        writer = plan_schema.correct_plan if already else plan_schema.record_plan
+        writer(domain, plan, plan_date, specialist, root)
     return {
         "domain": candidate.get("domain"), "specialist": candidate.get("specialist"),
         "recorded": recorded, "plan": plan, "section": candidate.get("section"),
