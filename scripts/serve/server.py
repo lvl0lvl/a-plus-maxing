@@ -863,9 +863,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             # programs + any active rich domain authored via the no-train client, reconciled through
             # the always-on floors) — ON TOP of the KEPT thin write. When nothing promoted, no record.
             if any(record.get("recorded") for record in outcome["results"].values()):
-                def _author_rich(domain, _summary=assembled):
+                def _author_rich(domain, _assembled=assembled):
                     try:
-                        return normalize_author_output(self.client.author(domain, _summary))
+                        return normalize_author_output(self.client.author(domain, _assembled))
                     except Exception:
                         return None
                 care_chat.synthesize(active, outcome, _author_rich, store_read,
