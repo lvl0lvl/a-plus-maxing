@@ -793,7 +793,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
 
         try:
             from scripts.model.client import ModelCallError
-            from scripts.plan import orchestrate, router
+            from scripts.plan import context_assembler, orchestrate, router
             from scripts.plan.generate_plan import AUTHOR_CALL_FAILED
             from scripts.serve import care_chat, plan_loop
             from scripts.serve.intake_aggregate import normalize_author_output
@@ -816,6 +816,12 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             active = plan_loop.active_plan_domains(summary)
             renderable_active = sorted(active & set(plan_schema.RENDERABLE_DOMAINS))
 
+            # ADR-0050-T1: author against the identity-stripped FULL record, not the coarse band.
+            # Computed ONCE (same one-arg call shape as summarize @815) and threaded to both author
+            # sites; domain SELECTION above still reads the band. Raises fail-closed on smuggled
+            # operator PII / a raw genotype -> the whole-run degrade envelope below.
+            assembled = context_assembler.assemble_context(store_read)
+
             # Gather each active domain's author envelope through the no-train client (the ONE model
             # call per domain), isolated per domain: a ModelCallError degrades to the honest
             # author-call-failed reason; an un-importable SDK / un-constructable client degrades to
@@ -829,7 +835,7 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
                     # envelope's scalar-contract rec fields UPSTREAM of the frozen composer, exactly
                     # as the cadence path does at build_dispatch (bead mk0i — a list/dict rec field
                     # otherwise crashes the frozen generate_plans composer mid-run for ALL domains).
-                    authors[domain] = normalize_author_output(self.client.author(domain, summary))
+                    authors[domain] = normalize_author_output(self.client.author(domain, assembled))
                 except ModelCallError:
                     author_errors[domain] = AUTHOR_CALL_FAILED
                 except (ImportError, ModuleNotFoundError):
@@ -857,9 +863,9 @@ class IntakeRequestHandler(BaseHTTPRequestHandler):
             # programs + any active rich domain authored via the no-train client, reconciled through
             # the always-on floors) — ON TOP of the KEPT thin write. When nothing promoted, no record.
             if any(record.get("recorded") for record in outcome["results"].values()):
-                def _author_rich(domain, _summary=summary):
+                def _author_rich(domain, _assembled=assembled):
                     try:
-                        return normalize_author_output(self.client.author(domain, _summary))
+                        return normalize_author_output(self.client.author(domain, _assembled))
                     except Exception:
                         return None
                 care_chat.synthesize(active, outcome, _author_rich, store_read,
