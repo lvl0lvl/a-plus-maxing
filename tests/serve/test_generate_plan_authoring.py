@@ -12,8 +12,10 @@ Everything is SYNTHETIC — a scratch tmp store, a spy author (0 live API, 0 key
 untouched. Author counts are DERIVED from the seeded store's active set, never observed-then-hardcoded.
 """
 
+import datetime
 import functools
 import io
+import json
 import subprocess
 from email.message import Message
 from pathlib import Path
@@ -262,3 +264,35 @@ def test_module_is_zero_spend_no_live_client(tmp_path):
     assert ("@gmail" + ".com") not in src, "no real operator email literal"
     h = _run(tmp_path)
     assert h["spy"].calls, "the spy-driven front door made no author call"
+
+
+def test_front_door_fail_closes_before_any_author_call(tmp_path):
+    # SAFETY: the @823 assemble_context(store_read) runs BEFORE the author loop, so a raw genotype
+    # smuggled into an allowlisted health-substance free-text field fail-closes the WHOLE run into
+    # the @876 degrade envelope — with NO operator PII reaching the no-train author. router.summarize
+    # (@815) neither carries nor scans raw-symptom-free-text, so assemble_context is the gate that
+    # trips. Seed the active PII-free state, then overwrite the symptom text with a genotype.
+    root = tmp_path / "store"
+    _seed(root)
+    store.append(
+        "raw-symptom-free-text",
+        {f: None for f in keying.LINE_FIELDS}
+        | {"item": "raw-symptom-free-text", "timepoint": "2026-07-14", "source": "intake",
+           "value": "left shoulder pain; MTHFR rs1801133 = (C;T) flagged in report"},
+        root=root,
+    )
+    spy = _SpyAuthorClient(_envelopes())
+    raw = _drive_generate_plan_inproc(root, spy)
+    body = json.loads(raw.split(b"\r\n\r\n", 1)[1].decode("utf-8"))
+    # (a) the whole-run fail-closed degrade envelope (server.py:881-882).
+    assert body["degraded"] is True, body
+    assert body["reason"] == "could not generate plan", body
+    assert body["plan_html"] is None, body
+    # (b) LOAD-BEARING: the fail-closed raise fired BEFORE any author call, so NO operator PII
+    # reached the model client — the spy captured zero author calls. REDs if @823 moves past the loop.
+    assert spy.calls == [], f"an author call fired despite the fail-close: {spy.calls}"
+    # (c) nothing was recorded — every plan domain resolves to NO_PLAN for today.
+    today = datetime.date.today().isoformat()
+    for domain in plan_schema.PLAN_DOMAINS:
+        resolved = plan_schema.read_plan(domain, today, root)
+        assert resolved["plan"] is None, (domain, resolved)
