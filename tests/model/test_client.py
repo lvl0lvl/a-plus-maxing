@@ -1919,7 +1919,7 @@ def test_converse_parses_prose_reply_and_rejects_wrong_shape_json():
 _CONTRACT_ANCHOR = {
     "workout": "dose-response lever order",                       # §1 personal-trainer
     "nutrition": "energy > macro > timing > supplements",         # §2 nutritionist
-    "peptides": "Wolverine stack",                                # §3 peptide-specialist
+    "peptides": "regenerative-peptide combination inherits the weakest evidence rung",  # §3 peptide-specialist
     "supplements": "adulteration/interaction circuit-breaker",    # §4 supplement-specialist
 }
 
@@ -1930,9 +1930,9 @@ def test_author_prompt_carries_own_contract_section(domain, anchor):
 
     The section-unique anchor (one occurrence apiece in specialist-plan-contracts.md) is a
     substring of the domain's prompt, over the full domain->section map (a mis-mapped domain
-    REDs its case). The peptides anchor ("Wolverine stack") sits below §3's `### 1` sub-heading,
-    so this also guards the section extractor's trailing-space `## ` boundary. RED against the
-    pre-rewrite prompt, which carries no contract content.
+    REDs its case). The peptides anchor sits below §3's `### 1` sub-heading, so this also guards
+    the section extractor's trailing-space `## ` boundary. RED against the pre-rewrite prompt,
+    which carries no contract content.
     """
     from scripts.model.client import _author_system_prompt
 
@@ -1980,8 +1980,8 @@ def test_author_prompt_carries_uncertainty_directive():
     [
         ("workout", "dose-response lever order", "energy > macro > timing > supplements"),
         ("nutrition", "energy > macro > timing > supplements", "dose-response lever order"),
-        ("peptides", "Wolverine stack", "adulteration/interaction circuit-breaker"),
-        ("supplements", "adulteration/interaction circuit-breaker", "Wolverine stack"),
+        ("peptides", "regenerative-peptide combination inherits the weakest evidence rung", "adulteration/interaction circuit-breaker"),
+        ("supplements", "adulteration/interaction circuit-breaker", "regenerative-peptide combination inherits the weakest evidence rung"),
     ],
 )
 def test_author_prompt_scoped_to_own_section(domain, own, other):
@@ -2022,3 +2022,86 @@ def test_author_prompt_single_sourced_from_contracts_file(monkeypatch, tmp_path)
     prompt = client._author_system_prompt("workout")
     assert s1 in prompt      # the §1 change propagates through the runtime read
     assert s2 not in prompt  # section scoping holds through the runtime path
+
+
+# --- ADR-0050-T2 fix: no operator PII reaches the model via the system prompt ---
+# The specialist contract section is READ into the author system prompt (_contract_section),
+# and `author` transmits that prompt to the live no-train MODEL API — UNSCANNED (the pii_scan
+# de-id gate covers only the user-message summary, never the system prompt). So the committed
+# contract doc MUST be the GENERIC specialist-methodology doc: no operator identity, record,
+# medications, stack, or vault paths. A rendered prompt carrying any of these tokens is a PII
+# egress of the operator's real record to the model. Case-sensitive for a name/acronym/compound
+# (a lowercase hit would be a generic word); case-insensitive for a common word/path.
+_AUTHOR_PROMPT_PII_CASE_SENSITIVE = (
+    "Walter", "TRT", "BPC-157", "TB-500", "Wolverine",
+    "Wim Hof", "Oura", "KOT", "Norwegian", "108", "100 kg",
+)
+_AUTHOR_PROMPT_PII_CASE_INSENSITIVE = (
+    "retatrutide", "shoulder", "jan-2026", "january-2026",
+    "operator-profile", "goals.md", "current-state", "care.md", "vault/dna",
+)
+
+
+@pytest.mark.parametrize("domain", sorted(_CONTRACT_ANCHOR))
+def test_author_prompt_carries_no_operator_pii(domain):
+    """Negative-PII: no operator-identifying token reaches the model via the system prompt.
+
+    For each renderable domain, the assembled author system prompt (which interpolates that
+    domain's contract section) carries NONE of the operator's real identifiers — name, medication
+    names, supplement/peptide stack, bodyweight, injury site, dated health issue, wearable, or
+    internal vault paths. RED against the pre-rewrite PII-laden contract file (the operator-grounded
+    doc); GREEN once the committed doc is the generic specialist-methodology doc.
+    """
+    from scripts.model.client import _author_system_prompt
+
+    prompt = _author_system_prompt(domain)
+    lower = prompt.lower()
+    for token in _AUTHOR_PROMPT_PII_CASE_SENSITIVE:
+        assert token not in prompt, f"{domain} prompt leaks operator token {token!r}"
+    for token in _AUTHOR_PROMPT_PII_CASE_INSENSITIVE:
+        assert token not in lower, f"{domain} prompt leaks operator token {token!r}"
+
+
+def test_author_contracts_file_is_git_tracked():
+    """Finding 1 (portability): the prompt's read target is committed, so a fresh clone runs green.
+
+    `_author_system_prompt` reads `_CONTRACTS_PATH` at call time; if that file is git-untracked, a
+    fresh clone / CI raises FileNotFoundError and the author tests ERROR + core plan-generation
+    produces no plan. Asserting the path is tracked (`git ls-files --error-unmatch` exits 0) pins
+    that the committed generic doc — not the untracked operator-grounded reference — is what the
+    prompt depends on. RED while the file is untracked; GREEN once the generic doc is `git add`-ed.
+    """
+    from scripts.model.client import _CONTRACTS_PATH
+
+    repo_root = _CONTRACTS_PATH.resolve().parents[1]
+    result = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", str(_CONTRACTS_PATH)],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"{_CONTRACTS_PATH} is not git-tracked — a fresh clone cannot build the author prompt: "
+        f"{result.stderr.strip()}"
+    )
+
+
+def test_author_prompt_nonrenderable_domain_raises_clear_error():
+    """Finding 2 pin: a non-renderable PLAN_DOMAINS member raises a CLEAR, domain-named error.
+
+    `endocrine` is a `PLAN_DOMAINS` member with no `_AUTHOR_CONTRACT_SECTION` mapping (its rich
+    card is deliberately omitted from the comprehensive plan). That omission must be EXPLICIT: the
+    prompt builder raises a domain-named error, NOT a bare `KeyError('endocrine')` that
+    `server._author_rich`'s `except Exception: return None` silently swallows (dropping the rich
+    domain from the plan with no signal). RED against the pre-fix bare `KeyError`; GREEN once
+    `_contract_section` raises the explicit guard.
+    """
+    from scripts.store.plan_schema import PLAN_DOMAINS
+    from scripts.model.client import _AUTHOR_CONTRACT_SECTION, _author_system_prompt
+
+    domain = "endocrine"
+    assert domain in PLAN_DOMAINS and domain not in _AUTHOR_CONTRACT_SECTION  # a non-renderable member
+    with pytest.raises(ValueError) as exc:
+        _author_system_prompt(domain)
+    assert domain in str(exc.value)            # the error names the offending domain
+    assert "non-renderable" in str(exc.value)  # ...and states why (not a bare KeyError)

@@ -530,7 +530,17 @@ def _contract_section(domain):
     EOF), keeping all four `### N — …` sub-parts and trimming a trailing `---` rule. Matching the
     FULL heading (section number AND specialist slug) makes a contract-file re-order fail loud —
     a renumbered or renamed section finds no heading rather than mis-slicing another domain's text.
+    A domain with no `_AUTHOR_CONTRACT_SECTION` mapping (a non-renderable `PLAN_DOMAINS` member)
+    raises a clear domain-named `ValueError` — the deliberate rich-card omission is an explicit
+    signal, not a bare `KeyError` for a downstream `except` to swallow.
     """
+    if domain not in _AUTHOR_CONTRACT_SECTION:
+        raise ValueError(
+            f"author domain {domain!r} is non-renderable: no specialist contract section is mapped "
+            f"for it (renderable domains: {sorted(_AUTHOR_CONTRACT_SECTION)}). Its rich card is "
+            f"deliberately omitted from the comprehensive plan — this is an explicit signal, not a "
+            f"bare KeyError to swallow."
+        )
     number, slug = _AUTHOR_CONTRACT_SECTION[domain]
     heading = f"## {number}. {slug} —"
     lines = _CONTRACTS_PATH.read_text().splitlines()
