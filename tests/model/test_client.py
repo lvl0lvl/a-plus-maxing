@@ -1908,3 +1908,117 @@ def test_converse_parses_prose_reply_and_rejects_wrong_shape_json():
 
     with pytest.raises(ValueError):
         _parse_converse_turn(_Empty())
+
+
+# --- ADR-0050-T2: contract-driven, genetics-aware author prompt ----------------
+# `_author_system_prompt` now sources each specialist's OWN section from
+# design/specialist-plan-contracts.md at runtime (single-source, AC-1/AC-4/AC-6),
+# frames the input as the operator's identity-stripped FULL record and interprets raw
+# genotype calls (AC-2), and flags confidence on uncurated genotypes (AC-3). Each anchor
+# below occurs exactly once in the contract file (verified with grep -c).
+_CONTRACT_ANCHOR = {
+    "workout": "dose-response lever order",                       # §1 personal-trainer
+    "nutrition": "energy > macro > timing > supplements",         # §2 nutritionist
+    "peptides": "Wolverine stack",                                # §3 peptide-specialist
+    "supplements": "adulteration/interaction circuit-breaker",    # §4 supplement-specialist
+}
+
+
+@pytest.mark.parametrize("domain,anchor", sorted(_CONTRACT_ANCHOR.items()))
+def test_author_prompt_carries_own_contract_section(domain, anchor):
+    """AC-1: each of the 4 renderable domains' prompt carries that specialist's OWN section.
+
+    The section-unique anchor (one occurrence apiece in specialist-plan-contracts.md) is a
+    substring of the domain's prompt, over the full domain->section map (a mis-mapped domain
+    REDs its case). The peptides anchor ("Wolverine stack") sits below §3's `### 1` sub-heading,
+    so this also guards the section extractor's trailing-space `## ` boundary. RED against the
+    pre-rewrite prompt, which carries no contract content.
+    """
+    from scripts.model.client import _author_system_prompt
+
+    assert anchor in _author_system_prompt(domain)
+
+
+@pytest.mark.parametrize("domain", sorted(_CONTRACT_ANCHOR))
+def test_author_prompt_personalizes_and_interprets_genotype(domain):
+    """AC-2: personalize + raw-genotype-interpretation directive present; stale band absent.
+
+    The prompt names the literal `(C;C)` genotype shape and instructs interpretation of such
+    genotype calls, ties authoring to the personalized record, and drops the stale band framing
+    ("no raw values" / "band/class summary"). RED against the pre-rewrite prompt, which lacks the
+    directives and still carries "no raw values".
+    """
+    from scripts.model.client import _author_system_prompt
+
+    prompt = _author_system_prompt(domain)
+    lower = prompt.lower()
+    assert "(C;C)" in prompt                       # the literal raw-genotype shape
+    assert "interpret" in lower                    # the interpretation verb...
+    assert "genotype" in lower                     # ...applied to genotype calls
+    assert "personaliz" in lower                   # authored to the personalized record
+    assert "no raw values" not in prompt           # stale band claim removed
+    assert "band/class summary" not in prompt      # stale framing removed
+
+
+def test_author_prompt_carries_uncertainty_directive():
+    """AC-3: uncertainty directive bound to the real discriminator `uncurated`.
+
+    Bound to `uncurated` (grep-confirmed absent from client.py today) plus the directive phrase
+    "flag confidence when interpreting" near genotype/uncurated — NOT bare `confidence`, which the
+    pre-existing `confidence_tier` already satisfies (that would be tautological). REDs against the
+    pre-rewrite prompt AND against a future edit that drops the directive but keeps `confidence_tier`.
+    """
+    from scripts.model.client import _author_system_prompt
+
+    lower = _author_system_prompt("workout").lower()
+    assert "uncurated" in lower
+    assert "flag confidence when interpreting" in lower
+
+
+@pytest.mark.parametrize(
+    "domain,own,other",
+    [
+        ("workout", "dose-response lever order", "energy > macro > timing > supplements"),
+        ("nutrition", "energy > macro > timing > supplements", "dose-response lever order"),
+        ("peptides", "Wolverine stack", "adulteration/interaction circuit-breaker"),
+        ("supplements", "adulteration/interaction circuit-breaker", "Wolverine stack"),
+    ],
+)
+def test_author_prompt_scoped_to_own_section(domain, own, other):
+    """AC-4: each prompt carries its OWN section only, never another domain's section.
+
+    The prompt for a domain contains its own section-unique phrase and NOT another domain's — so
+    it is that one domain's section, never all 18 / the whole file / a sub-slice.
+    """
+    from scripts.model.client import _author_system_prompt
+
+    prompt = _author_system_prompt(domain)
+    assert own in prompt
+    assert other not in prompt
+
+
+def test_author_prompt_single_sourced_from_contracts_file(monkeypatch, tmp_path):
+    """AC-6: the prompt is derived at runtime from `_CONTRACTS_PATH`, not an embedded copy.
+
+    A fixture contracts file with a §1 sentinel and a DIFFERENT §2 sentinel is monkeypatched onto
+    `client._CONTRACTS_PATH`; workout's prompt (which sources §1) carries the §1 sentinel and NOT the
+    §2 sentinel (re-proving section scoping through the runtime read). RED-capable against the
+    ADR-0050 Alternative-C embedded copy: a hand-embedded §1 string would not reflect the fixture, so
+    the §1 sentinel would be absent and this REDs (confirmed by the scratch-mutation check).
+    """
+    import uuid
+
+    from scripts.model import client
+
+    s1 = f"SENTINEL-{uuid.uuid4()}"
+    s2 = f"SENTINEL-{uuid.uuid4()}"
+    fixture = tmp_path / "contracts.md"
+    fixture.write_text(
+        f"## 1. personal-trainer — Training\n\ntraining body {s1} detail\n\n"
+        f"## 2. nutritionist — Nutrition\n\nnutrition body {s2} detail\n"
+    )
+    monkeypatch.setattr(client, "_CONTRACTS_PATH", fixture)
+
+    prompt = client._author_system_prompt("workout")
+    assert s1 in prompt      # the §1 change propagates through the runtime read
+    assert s2 not in prompt  # section scoping holds through the runtime path

@@ -21,6 +21,8 @@ envelope and RAISES on a malformed shape, while the captured-envelope adapter
 authored, so the adapter re-wrap fires no second model call and adds no second check).
 """
 
+from pathlib import Path
+
 
 class ModelCallError(RuntimeError):
     """A model-backend call failed — failed, empty, errored, or timed out.
@@ -479,9 +481,10 @@ def _parse_extract_readings(response):
     return payload["readings"]
 
 
-# The plan-author specialist persona per domain. The author sees ONLY the de-identified band/class
-# summary (no raw PII), and its envelope flows through `assemble`'s safety filters + the per-domain
-# gates downstream — so the prompt's job is honest, evidence-grounded, conservative recommendations,
+# The plan-author specialist persona per domain. The author sees the operator's identity-stripped
+# FULL record (raw health values present; no raw identity — name/DOB/contact/MRN — reaches the
+# model), and its envelope flows through `assemble`'s safety filters + the per-domain gates
+# downstream — so the prompt's job is honest, evidence-grounded, conservative recommendations,
 # not a finished prescription. Unsupported or speculative claims are to be omitted, not invented; the
 # downstream HALT/coverage-gap filters render an honest no-plan rather than a fabricated regimen.
 _AUTHOR_SPECIALIST = {
@@ -505,19 +508,74 @@ _AUTHOR_PAYLOAD_GUIDE = {
     "peptides": 'ONE compound regimen total — `payload` is {"compound": non-empty str, "dose": str, '
                 '"route": str, "cycle_length_weeks": int (optional), "evidence": str (optional)}',
 }
+# Domain -> the (section-number, specialist-slug) that anchor its heading in the contract file.
+_AUTHOR_CONTRACT_SECTION = {
+    "workout": (1, "personal-trainer"),
+    "nutrition": (2, "nutritionist"),
+    "peptides": (3, "peptide-specialist"),
+    "supplements": (4, "supplement-specialist"),
+}
+# The single-source authoring contract (ADR-0050 Alternative-C rejected the embed-fork): each
+# domain's section is READ from this file at author time, never hand-embedded — an embedded copy
+# could silently diverge from the canonical contract.
+_CONTRACTS_PATH = Path(__file__).resolve().parents[2] / "design" / "specialist-plan-contracts.md"
+
+
+def _contract_section(domain):
+    """Return `domain`'s full section from the single-source specialist contract file.
+
+    Reads `_CONTRACTS_PATH` fresh on every call (never cached — a cache would ignore a test's
+    monkeypatched path and defeat the single-source invariant) and returns the text from the
+    domain's full `## <N>. <slug> —` heading up to the line before the next `## ` heading (or
+    EOF), keeping all four `### N — …` sub-parts and trimming a trailing `---` rule. Matching the
+    FULL heading (section number AND specialist slug) makes a contract-file re-order fail loud —
+    a renumbered or renamed section finds no heading rather than mis-slicing another domain's text.
+    """
+    number, slug = _AUTHOR_CONTRACT_SECTION[domain]
+    heading = f"## {number}. {slug} —"
+    lines = _CONTRACTS_PATH.read_text().splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(heading))
+    end = start + 1
+    while end < len(lines) and not lines[end].startswith("## "):
+        end += 1
+    section = lines[start:end]
+    while section and section[-1].strip() in ("", "---"):
+        section.pop()
+    return "\n".join(section)
 
 
 def _author_system_prompt(domain):
-    """Build the plan-author system prompt for `domain` (the live-author persona instruction)."""
+    """Build the plan-author system prompt for `domain` (the live-author persona instruction).
+
+    Sources the specialist's own authoring contract from `design/specialist-plan-contracts.md`
+    at call time (single-source; see `_contract_section`) and frames the input as the operator's
+    identity-stripped FULL record — the real program, symptoms, and raw genetics detail with only
+    the identity removed — so the plan is personalized to that record rather than band-generic.
+    """
     specialist = _AUTHOR_SPECIALIST.get(domain, "Specialist")
     payload_guide = _AUTHOR_PAYLOAD_GUIDE.get(domain, "each `payload` is the actionable detail")
+    contract = _contract_section(domain)
     return (
         f"You are a {specialist}, one of a panel of independent specialists composing a single "
-        f"operator's health plan. You receive ONLY a de-identified band/class summary of the "
-        f"operator (no names, no raw values) and must produce {domain} recommendations grounded in "
-        f"that summary.\n\n"
+        f"operator's health plan. You receive the operator's identity-stripped FULL record — the "
+        f"real program, symptoms, medications, labs, and raw genetics detail, with only the "
+        f"identity removed (no name, DOB, contact, or MRN), NOT a coarse band-level summary — and "
+        f"must produce {domain} recommendations grounded in that record.\n\n"
+        f"Author to THIS specialist contract (your own section of the plan-contract):\n"
+        f"{contract}\n\n"
+        f"Directives:\n"
+        f"- PERSONALIZE: author to the specifics of the identity-stripped record — this operator's "
+        f"actual program, goals, medications, and constraints — never a generic band-level plan.\n"
+        f"- INTERPRET RAW GENETICS: the record may carry raw genotype calls in the shape "
+        f"`GENE rsID = (C;C)` (for example `MTHFR rs1801133 = (C;T)`). Interpret such a genotype "
+        f"call yourself — read the allele pair and reason about its effect on your {domain} "
+        f"recommendation; never pass the raw call through uninterpreted.\n"
+        f"- UNCERTAINTY: many of these genotype calls are uncurated (not vetted against a reviewed "
+        f"evidence base). When you interpret an uncurated genotype from your own knowledge, flag "
+        f"confidence when interpreting it — state your certainty and defer rather than overclaim on "
+        f"a thin or uncurated variant.\n\n"
         f"Rules:\n"
-        f"- Recommend ONLY what the summary supports and what is evidence-grounded. If the summary "
+        f"- Recommend ONLY what the record supports and what is evidence-grounded. If the record "
         f"is too thin to responsibly recommend anything in {domain}, return an empty "
         f"recommendations list — never invent or speculate.\n"
         f"- Each recommendation carries ALL of: `claim` (the one-line recommendation), `category` "
@@ -749,7 +807,8 @@ class _ClaudeNoTrainBackend:
     def author(self, domain, summary):
         """Author a domain's recommendations against the no-train API (the live author call).
 
-        Sends the de-identified band/class `summary` (no raw PII) to the `MODEL` no-train API under
+        Sends the operator's identity-stripped FULL record (`summary` — raw health values, no raw
+        identity) to the `MODEL` no-train API under
         a bounded retry-with-timeout loop, with an `output_config.format` json_schema constraining
         the response to the `{"specialist", "recommendations": [...]}` envelope, and returns the
         parsed envelope. The summary is held in memory only (the prompt string); it is written to no
@@ -758,7 +817,8 @@ class _ClaudeNoTrainBackend:
 
         Args:
             domain (str): A `plan_schema.PLAN_DOMAINS` member (the specialist persona to author as).
-            summary (dict): The de-identified band/class summary `assemble` hands the specialist.
+            summary (dict): The operator's identity-stripped FULL record `assemble` hands the
+                specialist (raw health values present; no raw identity).
 
         Returns:
             (dict) The author envelope `{"specialist": str, "recommendations": list}`.
