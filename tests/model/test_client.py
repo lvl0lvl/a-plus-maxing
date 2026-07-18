@@ -1908,3 +1908,225 @@ def test_converse_parses_prose_reply_and_rejects_wrong_shape_json():
 
     with pytest.raises(ValueError):
         _parse_converse_turn(_Empty())
+
+
+# --- ADR-0050-T2: contract-driven, genetics-aware author prompt ----------------
+# `_author_system_prompt` now sources each specialist's OWN section from
+# design/specialist-plan-contracts.md at runtime (single-source, AC-1/AC-4/AC-6),
+# frames the input as the operator's identity-stripped FULL record and interprets raw
+# genotype calls (AC-2), and flags confidence on uncurated genotypes (AC-3). Each anchor
+# below occurs exactly once in the contract file (verified with grep -c).
+_CONTRACT_ANCHOR = {
+    "workout": "dose-response lever order",                       # §1 personal-trainer
+    "nutrition": "energy > macro > timing > supplements",         # §2 nutritionist
+    "peptides": "regenerative-peptide combination inherits the weakest evidence rung",  # §3 peptide-specialist
+    "supplements": "adulteration/interaction circuit-breaker",    # §4 supplement-specialist
+}
+
+
+@pytest.mark.parametrize("domain,anchor", sorted(_CONTRACT_ANCHOR.items()))
+def test_author_prompt_carries_own_contract_section(domain, anchor):
+    """AC-1: each of the 4 renderable domains' prompt carries that specialist's OWN section.
+
+    The section-unique anchor (one occurrence apiece in specialist-plan-contracts.md) is a
+    substring of the domain's prompt, over the full domain->section map (a mis-mapped domain
+    REDs its case). The peptides anchor sits below §3's `### 1` sub-heading, so this also guards
+    the section extractor's trailing-space `## ` boundary. RED against the pre-rewrite prompt,
+    which carries no contract content.
+    """
+    from scripts.model.client import _author_system_prompt
+
+    assert anchor in _author_system_prompt(domain)
+
+
+@pytest.mark.parametrize("domain", sorted(_CONTRACT_ANCHOR))
+def test_author_prompt_personalizes_and_interprets_genotype(domain):
+    """AC-2: personalize + raw-genotype-interpretation directive present; stale band absent.
+
+    The prompt names the literal `(C;C)` genotype shape and instructs interpretation of such
+    genotype calls, ties authoring to the personalized record, and drops the stale band framing
+    ("no raw values" / "band/class summary"). RED against the pre-rewrite prompt, which lacks the
+    directives and still carries "no raw values".
+    """
+    from scripts.model.client import _author_system_prompt
+
+    prompt = _author_system_prompt(domain)
+    lower = prompt.lower()
+    assert "(C;C)" in prompt                       # the literal raw-genotype shape
+    assert "interpret" in lower                    # the interpretation verb...
+    assert "genotype" in lower                     # ...applied to genotype calls
+    assert "personaliz" in lower                   # authored to the personalized record
+    assert "no raw values" not in prompt           # stale band claim removed
+    assert "band/class summary" not in prompt      # stale framing removed
+
+
+def test_author_prompt_carries_uncertainty_directive():
+    """AC-3: uncertainty directive bound to the real discriminator `uncurated`.
+
+    Bound to `uncurated` (grep-confirmed absent from client.py today) plus the directive phrase
+    "flag confidence when interpreting" near genotype/uncurated — NOT bare `confidence`, which the
+    pre-existing `confidence_tier` already satisfies (that would be tautological). REDs against the
+    pre-rewrite prompt AND against a future edit that drops the directive but keeps `confidence_tier`.
+    """
+    from scripts.model.client import _author_system_prompt
+
+    lower = _author_system_prompt("workout").lower()
+    assert "uncurated" in lower
+    assert "flag confidence when interpreting" in lower
+
+
+@pytest.mark.parametrize(
+    "domain,own,other",
+    [
+        ("workout", "dose-response lever order", "energy > macro > timing > supplements"),
+        ("nutrition", "energy > macro > timing > supplements", "dose-response lever order"),
+        ("peptides", "regenerative-peptide combination inherits the weakest evidence rung", "adulteration/interaction circuit-breaker"),
+        ("supplements", "adulteration/interaction circuit-breaker", "regenerative-peptide combination inherits the weakest evidence rung"),
+    ],
+)
+def test_author_prompt_scoped_to_own_section(domain, own, other):
+    """AC-4: each prompt carries its OWN section only, never another domain's section.
+
+    The prompt for a domain contains its own section-unique phrase and NOT another domain's — so
+    it is that one domain's section, never all 18 / the whole file / a sub-slice.
+    """
+    from scripts.model.client import _author_system_prompt
+
+    prompt = _author_system_prompt(domain)
+    assert own in prompt
+    assert other not in prompt
+
+
+def test_author_prompt_single_sourced_from_contracts_file(monkeypatch, tmp_path):
+    """AC-6: the prompt is derived at runtime from `_CONTRACTS_PATH`, not an embedded copy.
+
+    A fixture contracts file with a §1 sentinel and a DIFFERENT §2 sentinel is monkeypatched onto
+    `client._CONTRACTS_PATH`; workout's prompt (which sources §1) carries the §1 sentinel and NOT the
+    §2 sentinel (re-proving section scoping through the runtime read). RED-capable against the
+    ADR-0050 Alternative-C embedded copy: a hand-embedded §1 string would not reflect the fixture, so
+    the §1 sentinel would be absent and this REDs (confirmed by the scratch-mutation check).
+    """
+    import uuid
+
+    from scripts.model import client
+
+    s1 = f"SENTINEL-{uuid.uuid4()}"
+    s2 = f"SENTINEL-{uuid.uuid4()}"
+    fixture = tmp_path / "contracts.md"
+    fixture.write_text(
+        f"## 1. personal-trainer — Training\n\ntraining body {s1} detail\n\n"
+        f"## 2. nutritionist — Nutrition\n\nnutrition body {s2} detail\n"
+    )
+    monkeypatch.setattr(client, "_CONTRACTS_PATH", fixture)
+
+    prompt = client._author_system_prompt("workout")
+    assert s1 in prompt      # the §1 change propagates through the runtime read
+    assert s2 not in prompt  # section scoping holds through the runtime path
+
+
+# --- ADR-0050-T2 fix: no operator PII reaches the model via the system prompt ---
+# The specialist contract section is READ into the author system prompt (_contract_section),
+# and `author` transmits that prompt to the live no-train MODEL API — UNSCANNED (the pii_scan
+# de-id gate covers only the user-message summary, never the system prompt). So the committed
+# contract doc MUST be the GENERIC specialist-methodology doc: no operator identity, record,
+# medications, stack, or vault paths. A rendered prompt carrying any of these tokens is a PII
+# egress of the operator's real record to the model. Case-sensitive for a name/acronym/compound
+# (a lowercase hit would be a generic word); case-insensitive for a common word/path.
+_AUTHOR_PROMPT_PII_CASE_SENSITIVE = (
+    "Walter", "TRT", "BPC-157", "TB-500", "Wolverine",
+    "Wim Hof", "Oura", "KOT", "Norwegian", "108", "100 kg",
+)
+_AUTHOR_PROMPT_PII_CASE_INSENSITIVE = (
+    "retatrutide", "shoulder", "jan-2026", "january-2026",
+    "operator-profile", "goals.md", "current-state", "care.md", "vault/dna",
+)
+
+
+@pytest.mark.parametrize("domain", sorted(_CONTRACT_ANCHOR))
+def test_author_prompt_carries_no_operator_pii(domain):
+    """Negative-PII: no operator-identifying token reaches the model via the system prompt.
+
+    For each renderable domain, the assembled author system prompt (which interpolates that
+    domain's contract section) carries NONE of the operator's real identifiers — name, medication
+    names, supplement/peptide stack, bodyweight, injury site, dated health issue, wearable, or
+    internal vault paths. RED against the pre-rewrite PII-laden contract file (the operator-grounded
+    doc); GREEN once the committed doc is the generic specialist-methodology doc.
+    """
+    from scripts.model.client import _author_system_prompt
+
+    prompt = _author_system_prompt(domain)
+    lower = prompt.lower()
+    for token in _AUTHOR_PROMPT_PII_CASE_SENSITIVE:
+        assert token not in prompt, f"{domain} prompt leaks operator token {token!r}"
+    for token in _AUTHOR_PROMPT_PII_CASE_INSENSITIVE:
+        assert token not in lower, f"{domain} prompt leaks operator token {token!r}"
+
+
+def test_author_contracts_file_is_git_tracked():
+    """Finding 1 (portability): the prompt's read target is committed, so a fresh clone runs green.
+
+    `_author_system_prompt` reads `_CONTRACTS_PATH` at call time; if that file is git-untracked, a
+    fresh clone / CI raises FileNotFoundError and the author tests ERROR + core plan-generation
+    produces no plan. Asserting the path is tracked (`git ls-files --error-unmatch` exits 0) pins
+    that the committed generic doc — not the untracked operator-grounded reference — is what the
+    prompt depends on. RED while the file is untracked; GREEN once the generic doc is `git add`-ed.
+    """
+    from scripts.model.client import _CONTRACTS_PATH
+
+    repo_root = _CONTRACTS_PATH.resolve().parents[1]
+    result = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", str(_CONTRACTS_PATH)],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"{_CONTRACTS_PATH} is not git-tracked — a fresh clone cannot build the author prompt: "
+        f"{result.stderr.strip()}"
+    )
+
+
+def test_author_prompt_nonrenderable_domain_raises_clear_error():
+    """Finding 2 pin: a non-renderable PLAN_DOMAINS member raises a CLEAR, domain-named error.
+
+    `endocrine` is a `PLAN_DOMAINS` member with no `_AUTHOR_CONTRACT_SECTION` mapping (its rich
+    card is deliberately omitted from the comprehensive plan). That omission must be EXPLICIT: the
+    prompt builder raises a domain-named error, NOT a bare `KeyError('endocrine')` that
+    `server._author_rich`'s `except Exception: return None` silently swallows (dropping the rich
+    domain from the plan with no signal). RED against the pre-fix bare `KeyError`; GREEN once
+    `_contract_section` raises the explicit guard.
+    """
+    from scripts.store.plan_schema import PLAN_DOMAINS
+    from scripts.model.client import _AUTHOR_CONTRACT_SECTION, _author_system_prompt
+
+    domain = "endocrine"
+    assert domain in PLAN_DOMAINS and domain not in _AUTHOR_CONTRACT_SECTION  # a non-renderable member
+    with pytest.raises(ValueError) as exc:
+        _author_system_prompt(domain)
+    assert domain in str(exc.value)            # the error names the offending domain
+    assert "non-renderable" in str(exc.value)  # ...and states why (not a bare KeyError)
+
+
+def test_contract_section_missing_heading_raises_clear_error(monkeypatch, tmp_path):
+    """A renamed/re-ordered contract heading raises a domain-named ValueError, not bare StopIteration.
+
+    Monkeypatches `_CONTRACTS_PATH` to a fixture doc whose §1 heading is RENAMED
+    (`## 1. personal-coach — Training`, so workout's `## 1. personal-trainer —` no longer matches)
+    while the rest of the structure is intact, then asserts `_author_system_prompt("workout")` raises
+    a `ValueError` naming the domain and the missing heading — matching the sibling non-renderable
+    guard's fail-loud style. RED against the pre-fix code: the bare `next(...)` raises `StopIteration`,
+    not `ValueError`, so `pytest.raises(ValueError)` fails to match.
+    """
+    from scripts.model import client
+
+    fixture = tmp_path / "contracts.md"
+    fixture.write_text(
+        "## 1. personal-coach — Training\n\ntraining body\n\n"
+        "## 2. nutritionist — Nutrition\n\nnutrition body\n"
+    )
+    monkeypatch.setattr(client, "_CONTRACTS_PATH", fixture)
+
+    with pytest.raises(ValueError) as exc:
+        client._author_system_prompt("workout")
+    assert "workout" in str(exc.value)          # the error names the offending domain
+    assert "personal-trainer" in str(exc.value)  # ...and names the missing heading
