@@ -2105,3 +2105,28 @@ def test_author_prompt_nonrenderable_domain_raises_clear_error():
         _author_system_prompt(domain)
     assert domain in str(exc.value)            # the error names the offending domain
     assert "non-renderable" in str(exc.value)  # ...and states why (not a bare KeyError)
+
+
+def test_contract_section_missing_heading_raises_clear_error(monkeypatch, tmp_path):
+    """A renamed/re-ordered contract heading raises a domain-named ValueError, not bare StopIteration.
+
+    Monkeypatches `_CONTRACTS_PATH` to a fixture doc whose §1 heading is RENAMED
+    (`## 1. personal-coach — Training`, so workout's `## 1. personal-trainer —` no longer matches)
+    while the rest of the structure is intact, then asserts `_author_system_prompt("workout")` raises
+    a `ValueError` naming the domain and the missing heading — matching the sibling non-renderable
+    guard's fail-loud style. RED against the pre-fix code: the bare `next(...)` raises `StopIteration`,
+    not `ValueError`, so `pytest.raises(ValueError)` fails to match.
+    """
+    from scripts.model import client
+
+    fixture = tmp_path / "contracts.md"
+    fixture.write_text(
+        "## 1. personal-coach — Training\n\ntraining body\n\n"
+        "## 2. nutritionist — Nutrition\n\nnutrition body\n"
+    )
+    monkeypatch.setattr(client, "_CONTRACTS_PATH", fixture)
+
+    with pytest.raises(ValueError) as exc:
+        client._author_system_prompt("workout")
+    assert "workout" in str(exc.value)          # the error names the offending domain
+    assert "personal-trainer" in str(exc.value)  # ...and names the missing heading

@@ -62,11 +62,12 @@ class ModelClient:
         return result
 
     def author(self, domain, summary):
-        """Author a domain's plan recommendations over a de-identified summary.
+        """Author a domain's plan recommendations over the operator's identity-stripped FULL record.
 
         Args:
             domain (str): The plan domain (e.g. "workout").
-            summary (dict): The de-identified `router.summarize` summary mapping.
+            summary (dict): The operator's identity-stripped FULL record (raw health values
+                present; no raw identity), passed through to the backend author call.
 
         Returns:
             (dict) The plan-author envelope `{"specialist": slug, "recommendations": [...]}` with each
@@ -544,7 +545,12 @@ def _contract_section(domain):
     number, slug = _AUTHOR_CONTRACT_SECTION[domain]
     heading = f"## {number}. {slug} —"
     lines = _CONTRACTS_PATH.read_text().splitlines()
-    start = next(i for i, line in enumerate(lines) if line.startswith(heading))
+    start = next((i for i, line in enumerate(lines) if line.startswith(heading)), None)
+    if start is None:
+        raise ValueError(
+            f"contract section heading {heading!r} for domain {domain!r} not found in "
+            f"{_CONTRACTS_PATH} — the contract file was renamed or re-ordered"
+        )
     end = start + 1
     while end < len(lines) and not lines[end].startswith("## "):
         end += 1
