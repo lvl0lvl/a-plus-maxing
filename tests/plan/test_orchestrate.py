@@ -1367,6 +1367,31 @@ def test_orchestrator_dedupe_key_boundary_date(tmp_path):
     assert len(store.read("plan::workout", root=tmp_path)) == 2
 
 
+def test_orchestrator_regen_supersedes_same_day_plan(tmp_path):
+    # Same-day re-generation for the SAME (domain, date, specialist) with a CHANGED plan value
+    # must SUPERSEDE (correct_plan), not no-op: the (item, date, source) dedupe drops a changed
+    # re-record via `append`, so an unconditional `record_plan` would leave the reader resolving
+    # to the stale FIRST plan and the re-run's fresh plan would never reach the render.
+    # MUTATION: revert `_recorded_result` to unconditional `record_plan` and this goes RED.
+    store_read = _seed_store(tmp_path)
+
+    generate_plans(
+        {"workout": _author(_workout_rec("Goblet squat", 3))},
+        store_read, tmp_path, plan_date=PLAN_DATE,
+    )
+    generate_plans(
+        {"workout": _author(_workout_rec("Front squat", 4))},
+        store_read, tmp_path, plan_date=PLAN_DATE,
+    )
+
+    # the re-generation superseded in place: ONE resolved record, and the reader resolves to the
+    # NEW plan — not the stale first.
+    assert len(store.read("plan::workout", root=tmp_path)) == 1
+    resolved = plan_schema.read_plan("workout", PLAN_DATE, tmp_path)["plan"]
+    assert resolved["exercises"][0]["name"] == "Front squat"
+    assert resolved["exercises"][0]["sets"] == 4
+
+
 # --- production path end-to-end (integration-verification mandate) -------------
 
 
