@@ -1617,8 +1617,12 @@ function renderGenerate(){
        // with the button if nothing recorded so the operator can retry).
        var zone=document.getElementById('plan-zone');
        if(zone && typeof d.plan_html==='string'){ zone.innerHTML=d.plan_html; }
+       // Reset the control regardless of the nav below: a successful generation must not leave
+       // the button stuck disabled on 'Generating…', and the status line's work is done.
+       if(btn){ btn.disabled=false; btn.textContent='Generate plan →'; }
+       if(st){ st.style.display='none'; }
        // The generate control lives on a different screen than #plan-zone; surface the result.
-       if(typeof go==='function'){ try{ go('plan'); }catch(_){} }
+       try{ go('plan'); }catch(_){}
        // Surface honest per-domain no-plan reasons for any domain that produced nothing.
        var results=d.results||{}, names=Object.keys(results);
        var noplan=names.filter(function(k){return results[k]!=='recorded';});
