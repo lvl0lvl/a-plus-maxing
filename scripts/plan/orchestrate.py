@@ -8,7 +8,8 @@ the terminal gate over a held additive-AE finding.
 
 Under runtime A the orchestrator dispatches each plan-domain author, captures their output,
 computes each domain's candidate plan via `generate_plan.compute_plan` (no record yet),
-reconciles across domains, then records the reconciled set via `record_plan`. Recording is
+reconciles across domains, then records the reconciled set (a first write via `record_plan`;
+a same-day re-generation supersedes via `correct_plan`). Recording is
 held until after reconciliation so a cross-domain check can stop an unsafe / un-fuelable plan
 from ever being written. The five cross-domain behaviors in this slice:
 
@@ -47,7 +48,8 @@ from ever being written. The five cross-domain behaviors in this slice:
      is an operator/liaison CURATION step at the store layer.
 
 The reconciliation report is RETURNED (`generate_plans` persists no new store stream — plans are
-recorded via the existing `record_plan`). After the run, `collate_doctor_visit_queue` records the
+recorded via the existing `record_plan`, a same-day re-generation superseding via `correct_plan`).
+After the run, `collate_doctor_visit_queue` records the
 ADJUDICATED safety findings (additive-AE / conflict / rx-bpmh) into the doctor-visit-queue store
 stream (`scripts/store/queue_schema.py`, the `dvq::queue` namespace) — a NEW store-adversarial-battery
 surface (covered by `tests/store/test_queue_schema.py`); this collation is a SEPARATE call, so
@@ -729,7 +731,11 @@ def _held_result(candidate, reason):
 
 
 def _recorded_result(candidate, plan_date, root):
-    """Record a candidate's plan (if any) via `record_plan` and return its result record."""
+    """Record a candidate's plan (if any) and return its result record.
+
+    A first write for a (domain, date, specialist) records via `record_plan`; a same-day
+    re-generation with a changed value supersedes via `correct_plan` rather than no-oping.
+    """
     plan = candidate.get("plan")
     recorded = plan is not None
     if recorded:
@@ -761,7 +767,8 @@ def generate_plans(authors, store_read, root, *, plan_date, gates=None, reauthor
     `compute_plan`, reconciles across domains (the RED-S/LEA cross-domain short-circuit + the
     nutrition->workout energy bounce + overlap detection + the supplement<->peptide additive-AE
     screen), applies a single bounce re-author when the energy budget is unsustainable, and
-    records the surviving plans via `record_plan`. When a domain is held — under an additive-AE
+    records the surviving plans (a first write via `record_plan`; a same-day re-generation
+    supersedes via `correct_plan`). When a domain is held — under an additive-AE
     finding (supplements) OR an author-declared cross-domain conflict (`cfaj`, the declaring domain) —
     and an `adjudicator` is provided, the medical-liaison terminal gate (`adjudicate`) adjudicates the
     held finding: a content-valid override RELEASES the hold (the domain records); a non-overridable /
