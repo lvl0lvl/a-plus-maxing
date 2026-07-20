@@ -50,9 +50,17 @@ JUDGE_ROLE = "quality-judge"
 # only from `renderable` and caps at 4, so a `len(active)` bar is structurally unreachable for
 # `|active| ≥ 8` and would fail OPEN (the hold never fires; a full renderable swap stands unconfirmed).
 # The fraction reproduces the retired fixed `3` on a 4-renderable surface (3-of-4 holds, 2-of-4 does
-# not) while scaling DOWN for a narrowed renderable surface. This re-base is the HARD PRECONDITION
-# before the ADR-0046 activation runs live against the SCALED 15+ card ROSTER — a fixed count-of-3 is a
-# MINORITY of a grown roster and must never gate it (disposition #36 resolves external ADR-0040 OQ-2).
+# not). It once ALSO scaled DOWN for a narrowed renderable surface (`|renderable| < 4`), but ADR-0052-T2
+# made `active_plan_domains` floor UNCONDITIONALLY to the always-on ten (⊇ all four renderable), so
+# `|renderable|` (`active & RENDERABLE_DOMAINS`) is now pinned at 4 for EVERY front-door plan — the
+# narrowed-renderable surface is UNREACHABLE via `regenerate`. The scale-down survives only as the
+# predicate's general (unit-level) property, NOT a reachable runtime behavior; the front door's only
+# reachable hold magnitudes are 3 (holds) and 4 (holds). Consequence: a genuinely-narrow operator's
+# 2-domain swap is a 2-of-4 minority that no longer prompts — accepted (Architect ruling, ADR-0052
+# Consequences): under-hold-only direction, the fail-closed safety gate + cross-domain holds are
+# untouched, and the plan surfaces visibly. This re-base is the HARD PRECONDITION before the ADR-0046
+# activation runs live against the SCALED 15+ card ROSTER — a fixed count-of-3 is a MINORITY of a grown
+# roster and must never gate it (disposition #36 resolves external ADR-0040 OQ-2).
 def _is_renderable_majority(changed_count, renderable_count):
     """Whether `changed_count` is a STRICT majority of `renderable_count` (the large-change hold bar).
 
@@ -220,19 +228,21 @@ def derive_operator_surface(summary):
 
 
 def active_plan_domains(summary):
-    """The active card-emitting domains for the front door (RULING 2 + the renderable-core floor).
+    """The active card-emitting domains for the front door (RULING 2 + the always-on-ten floor).
 
-    `activation.active_domains(derive_operator_surface(summary))`, FLOORED at the renderable core four
-    when the surface carries NO renderable-domain signal — the baseline plan (backward-compatible with
-    the pre-growth always-four behavior). Progressive activation ADDS a rich domain when the surface
-    signals it, and NARROWS the renderable subset only when the surface explicitly signals a proper
-    renderable subset (AC-4 / AC-S2). The result never zeroes out an existing operator's plan.
+    `activation.active_domains(derive_operator_surface(summary))`, floored UNCONDITIONALLY at the
+    always-on ten (§1-§10, `activation.ALWAYS_ON_DOMAINS`) — the baseline comprehensive plan every
+    operator gets (ADR-0052). The floor is unconditional, not the pre-T2 conditional renderable-core
+    idiom: a PARTIAL-signal surface (touching only, say, `workout`) still floors to the full ten, not
+    one (AR-006 — a conditional floor that fires only on no-renderable-signal silently returned a
+    single domain). Progressive activation ADDS a §11-§13 domain (dermatology/gi/lymphatic) only when
+    the surface signals it — the floor never fabricates an empty-state progressive card. The result
+    never zeroes out an operator's plan.
     """
     from scripts.plan import activation
 
     active = set(activation.active_domains(derive_operator_surface(summary)))
-    if not (active & set(plan_schema.RENDERABLE_DOMAINS)):
-        active |= set(plan_schema.RENDERABLE_DOMAINS)
+    active |= set(activation.ALWAYS_ON_DOMAINS)
     return active
 
 

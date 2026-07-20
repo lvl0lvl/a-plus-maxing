@@ -393,7 +393,12 @@ def test_frozen_spine_and_only_regenerate_changed():
     # tests/runner/test_cadence_runner.py::test_crownjewel_faithful_zero_raw_pii + tests/plan/
     # test_activation.py. Wave-4 frozen-guard reconciliation (F-011), Architect Option-A ruling.
     # `_prior_standing_plan` stays byte-unchanged.
-    changed_defs = ("regenerate", "_change_magnitude", "_post_promote_tailoring", "_last_regen_date")
+    # ADR-0052-T2 CARVED `active_plan_domains` into the changed set: it replaces the conditional
+    # renderable-core floor with the UNCONDITIONAL always-on-ten floor (`active |= ALWAYS_ON_DOMAINS`).
+    # Behavioral guarantor: tests/serve/test_plan_loop.py (the floor probes) + the coupled-test
+    # migrations in tests/serve/test_orchestrator_synthesize.py. `_prior_standing_plan` stays unchanged.
+    changed_defs = ("regenerate", "_change_magnitude", "_post_promote_tailoring", "_last_regen_date",
+                    "active_plan_domains")
     for name, src in origin.items():
         if name in changed_defs:
             continue
@@ -412,3 +417,11 @@ def test_frozen_spine_and_only_regenerate_changed():
     for name in changed_defs:
         assert current[name] != pretask.get(name), \
             f"{name} did not change vs the pre-ADR-0040 baseline (fix not applied)"
+    # `active_plan_domains` was ADDED after PRE_TASK_HEAD (PR #336), so the pretask baseline lacks it and
+    # the loop above passes for it merely because it now exists (HIST-003). Pin it structurally against
+    # origin/main's body — which DOES carry the pre-T2 conditional floor — so a revert of the T2
+    # unconditional-floor edit is caught here, not only by the behavioral floor probes in test_plan_loop.py.
+    assert current["active_plan_domains"] != origin["active_plan_domains"], (
+        "active_plan_domains did not change vs origin/main — the ADR-0052-T2 unconditional-floor edit "
+        "is not applied (a revert to the conditional renderable-core floor would trip this)"
+    )

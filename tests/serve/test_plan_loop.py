@@ -1149,3 +1149,78 @@ def test_rationale_adherence_path_writes_no_new_stream(tmp_path, monkeypatch):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# --- ADR-0052-T2: the active-domain floor is the always-on ten, UNCONDITIONALLY -----
+# active_plan_domains floors EVERY surface to a superset of the always-on ten (§1-§10), not the
+# pre-T2 conditional renderable-core-four. The progressive three (§11-§13) stay progressive — the
+# floor fabricates no empty-state card. activation.ALWAYS_ON_DOMAINS is the single-source vocabulary.
+_ALWAYS_ON_TEN = frozenset({
+    "workout", "nutrition", "peptides", "supplements", "endocrine",
+    "cardiovascular", "recovery", "sleep", "longevity", "mental-performance",
+})
+
+
+def test_always_on_domains_partition():
+    """AC-6: ALWAYS_ON_DOMAINS is the §1-§10 subset; the complement is exactly the progressive three."""
+    from scripts.plan import activation
+
+    assert activation.ALWAYS_ON_DOMAINS <= activation.CARD_DOMAINS
+    assert activation.ALWAYS_ON_DOMAINS.isdisjoint(activation.CROSS_CUTTING_INPUTS)
+    assert activation.CARD_DOMAINS - activation.ALWAYS_ON_DOMAINS == frozenset({"dermatology", "gi", "lymphatic"})
+    assert len(activation.ALWAYS_ON_DOMAINS) == 10
+    assert set(activation.ALWAYS_ON_DOMAINS) == _ALWAYS_ON_TEN
+
+
+def test_signal_less_surface_floors_to_the_always_on_ten():
+    """AC-1 + AC-5: a signal-less surface floors to EXACTLY the ten (never zeroes, no §11-§13)."""
+    from scripts.plan import activation
+    from scripts.serve import plan_loop
+
+    summary = {"genetic-trait-classes": "genetics"}  # no active card domain
+    assert activation.active_domains(plan_loop.derive_operator_surface(summary)) == frozenset()
+    result = plan_loop.active_plan_domains(summary)
+    assert set(activation.ALWAYS_ON_DOMAINS) <= result            # AC-1: superset of ten, never zeroes
+    assert result == set(activation.ALWAYS_ON_DOMAINS)            # AC-5: EXACTLY ten, no §11-§13 fabricated
+    assert result.isdisjoint({"dermatology", "gi", "lymphatic"})
+
+
+def test_partial_signal_surface_floors_to_the_always_on_ten():
+    """AC-2 (AR-006): a partial-signal surface (workout only) floors to a superset of the ten, len >= 10."""
+    from scripts.plan import activation
+    from scripts.serve import plan_loop
+
+    summary = {"goal-domains": ["workout"]}
+    result = plan_loop.active_plan_domains(summary)
+    assert set(activation.ALWAYS_ON_DOMAINS) <= result
+    assert len(result) >= 10
+
+
+def test_all_signal_surface_floors_to_at_least_the_always_on_ten():
+    """AC-3: an all-signal surface contains the ten (progressive §11-§13 may additionally appear)."""
+    from scripts.plan import activation
+    from scripts.serve import plan_loop
+
+    summary = {"goal-domains": sorted(activation.CARD_DOMAINS)}
+    result = plan_loop.active_plan_domains(summary)
+    assert set(activation.ALWAYS_ON_DOMAINS) <= result
+
+
+def test_conditional_floor_idiom_reds_the_partial_signal():
+    """AC-4: the pre-T2 conditional floor idiom returns {workout} (len 1) for a workout-only surface.
+
+    Proves AC-2 is non-tautological: reverting active_plan_domains to the conditional
+    `if not (active & RENDERABLE): active |= RENDERABLE` idiom makes the partial-signal case RED
+    (len 1, not the ten) — the silent regression a signal-less-only probe would miss.
+    """
+    from scripts.plan import activation
+    from scripts.serve import plan_loop
+
+    summary = {"goal-domains": ["workout"]}
+    assert len(plan_loop.active_plan_domains(summary)) >= 10   # clean direction (unconditional floor)
+    # inline the exact conditional idiom T2 removed, and prove it would RED AC-2:
+    active = set(activation.active_domains(plan_loop.derive_operator_surface(summary)))
+    if not (active & set(plan_schema.RENDERABLE_DOMAINS)):
+        active |= set(plan_schema.RENDERABLE_DOMAINS)
+    assert active == {"workout"}   # a workout-touched surface never triggers the conditional floor
+    assert len(active) < 10        # ...so the ten-domain assertion would RED under it

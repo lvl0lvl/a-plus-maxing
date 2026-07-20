@@ -1335,9 +1335,15 @@ def test_generate_plan_records_all_domains_and_renders(tmp_path):
         for token in ("Goblet squat", "Breakfast", "Creatine monohydrate", "BPC-157"):
             assert token in plan_html, f"the re-rendered Plan zone does not carry {token!r}"
 
-        # The author was reached exactly once per domain (no live API, no duplicate calls).
-        assert sorted(client.calls) == sorted(plan_schema.RENDERABLE_DOMAINS), (
-            f"the author was not reached once per domain: {client.calls}"
+        # The author is reached exactly once per ALWAYS-ON domain (ADR-0052-T2: the front door
+        # floors dispatch to the always-on ten). The four renderable record via the thin path (the
+        # mock provides their envelopes); the six §5-§10 rich domains are dispatched (floored) but
+        # drop HERE for want of a mock envelope — their first-class rich recording is T3's composition
+        # gate. No duplicate calls (once each).
+        from scripts.plan import activation
+
+        assert sorted(client.calls) == sorted(activation.ALWAYS_ON_DOMAINS), (
+            f"the author was not reached once per always-on domain: {client.calls}"
         )
     finally:
         srv.shutdown()

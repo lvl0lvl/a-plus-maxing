@@ -1921,6 +1921,15 @@ _CONTRACT_ANCHOR = {
     "nutrition": "energy > macro > timing > supplements",         # §2 nutritionist
     "peptides": "regenerative-peptide combination inherits the weakest evidence rung",  # §3 peptide-specialist
     "supplements": "adulteration/interaction circuit-breaker",    # §4 supplement-specialist
+    # ADR-0052-T1: the six always-on rich domains (§5-§10). Each anchor occurs exactly once in
+    # design/specialist-plan-contracts.md (grep -c == 1). Extending this map expands the
+    # carries-own-section / personalize-genotype / no-operator-PII parametrized tests to the ten.
+    "endocrine": "HPA/HPG/HPT coupled-axis interpreter",              # §5 endocrine-specialist
+    "cardiovascular": "recognize-and-route cardiac safety instrument",  # §6 cardiovascular-specialist
+    "recovery": "respond when I'm overtrained/primed",               # §7 recovery-specialist
+    "sleep": "Orthosomnia-aware",                                    # §8 sleep-coach
+    "longevity": "over-claim control for the longevity domain",      # §9 longevity-strategist
+    "mental-performance": "nootropic over-claim circuit-breaker",    # §10 mental-performance-coach
 }
 
 
@@ -2024,6 +2033,75 @@ def test_author_prompt_single_sourced_from_contracts_file(monkeypatch, tmp_path)
     assert s2 not in prompt  # section scoping holds through the runtime path
 
 
+# --- ADR-0052-T1: the always-on ten are authorable (§5-§10 mapped) --------------
+# T1 maps the six always-on rich domains (endocrine/cardiovascular/recovery/sleep/longevity/
+# mental-performance) into _AUTHOR_CONTRACT_SECTION so _contract_section sources their §5-§10
+# sections without ValueError. The progressive three (§11-§13) stay UN-mapped (OQ-5 / bead 00kh).
+_ALWAYS_ON_TEN = frozenset({
+    "workout", "nutrition", "peptides", "supplements", "endocrine",
+    "cardiovascular", "recovery", "sleep", "longevity", "mental-performance",
+})
+# Each §5-§10 domain -> the NEXT section's heading text, for the no-bleed slice assertion.
+_NEXT_HEADING = {
+    "endocrine": "## 6. cardiovascular-specialist —",
+    "cardiovascular": "## 7. recovery-specialist —",
+    "recovery": "## 8. sleep-coach —",
+    "sleep": "## 9. longevity-strategist —",
+    "longevity": "## 10. mental-performance-coach —",
+    "mental-performance": "## 11. dermatologist —",
+}
+
+
+def test_author_contract_map_is_exactly_the_always_on_ten():
+    """AC-1: _AUTHOR_CONTRACT_SECTION carries exactly the always-on ten (the pinned vocabulary).
+
+    All ten resolve via _contract_section with NO ValueError, and the map's key set equals the ten
+    (the moderate-reversibility vocabulary is pinned — a fifth-through-tenth typo or a drop REDs).
+    RED-today: before T1 the six §5-§10 domains raise ValueError (6/10).
+    """
+    from scripts.model.client import _AUTHOR_CONTRACT_SECTION, _contract_section
+
+    assert set(_AUTHOR_CONTRACT_SECTION) == _ALWAYS_ON_TEN
+    for domain in _ALWAYS_ON_TEN:
+        assert len(_contract_section(domain)) > 0, f"{domain} section resolved empty"
+
+
+@pytest.mark.parametrize("domain,next_heading", sorted(_NEXT_HEADING.items()))
+def test_author_contract_slice_no_bleed_into_next_section(domain, next_heading):
+    """AC-2: each §5-§10 slice is that domain's OWN section only — never bleeds into the next.
+
+    The slice contains the domain's own section-unique anchor AND does NOT contain the NEXT
+    domain's `## N. slug —` heading (so the heading-bounded extractor stops at the section boundary,
+    never returning two domains' text). RED against a no-space `## `-boundary bug or a wrong slice.
+    """
+    from scripts.model.client import _contract_section
+
+    section = _contract_section(domain)
+    assert _CONTRACT_ANCHOR[domain] in section          # own section present
+    assert next_heading not in section                   # ...and it stops before the next section
+
+
+def test_author_contract_entry_removal_reds_the_domain():
+    """AC-4: removing an added §5-§10 entry makes _contract_section raise again (RED-capability).
+
+    Proves the AC-1 non-ValueError assertion is non-tautological: the CLEAN direction (endocrine
+    resolves) holds, then deleting endocrine's entry from a COPY of the map restores the ValueError.
+    The test is invalid unless the entry-removal REDs it.
+    """
+    from scripts.model import client
+
+    assert len(client._contract_section("endocrine")) > 0  # clean direction first
+    trimmed = dict(client._AUTHOR_CONTRACT_SECTION)
+    del trimmed["endocrine"]
+    original = client._AUTHOR_CONTRACT_SECTION
+    try:
+        client._AUTHOR_CONTRACT_SECTION = trimmed
+        with pytest.raises(ValueError):
+            client._contract_section("endocrine")
+    finally:
+        client._AUTHOR_CONTRACT_SECTION = original
+
+
 # --- ADR-0050-T2 fix: no operator PII reaches the model via the system prompt ---
 # The specialist contract section is READ into the author system prompt (_contract_section),
 # and `author` transmits that prompt to the live no-train MODEL API — UNSCANNED (the pii_scan
@@ -2062,6 +2140,24 @@ def test_author_prompt_carries_no_operator_pii(domain):
         assert token not in lower, f"{domain} prompt leaks operator token {token!r}"
 
 
+def test_pii_scan_covers_every_author_contract_domain():
+    """Fail-closed coupling: the negative-PII scan's domain set == the PRODUCTION author map.
+
+    `test_author_prompt_carries_no_operator_pii` is parametrized over the test-local `_CONTRACT_ANCHOR`,
+    but the code that reads a contract section into the UNSCANNED author system prompt reads
+    `client._AUTHOR_CONTRACT_SECTION`. Pinning `set(_CONTRACT_ANCHOR) == set(_AUTHOR_CONTRACT_SECTION)`
+    forces every domain ever mapped into the production author map through the PII scan — so a future
+    widening (e.g. OQ-5 / bead 00kh mapping §11-§13) that adds a domain to `_AUTHOR_CONTRACT_SECTION`
+    without adding its anchor here FAILS this test rather than silently shipping an un-scanned section.
+    """
+    from scripts.model.client import _AUTHOR_CONTRACT_SECTION
+
+    assert set(_CONTRACT_ANCHOR) == set(_AUTHOR_CONTRACT_SECTION), (
+        "the negative-PII scan (_CONTRACT_ANCHOR) does not cover every production author-map domain: "
+        f"unscanned = {set(_AUTHOR_CONTRACT_SECTION) - set(_CONTRACT_ANCHOR)}"
+    )
+
+
 def test_author_contracts_file_is_git_tracked():
     """Finding 1 (portability): the prompt's read target is committed, so a fresh clone runs green.
 
@@ -2089,17 +2185,18 @@ def test_author_contracts_file_is_git_tracked():
 def test_author_prompt_nonrenderable_domain_raises_clear_error():
     """Finding 2 pin: a non-renderable PLAN_DOMAINS member raises a CLEAR, domain-named error.
 
-    `endocrine` is a `PLAN_DOMAINS` member with no `_AUTHOR_CONTRACT_SECTION` mapping (its rich
-    card is deliberately omitted from the comprehensive plan). That omission must be EXPLICIT: the
-    prompt builder raises a domain-named error, NOT a bare `KeyError('endocrine')` that
-    `server._author_rich`'s `except Exception: return None` silently swallows (dropping the rich
-    domain from the plan with no signal). RED against the pre-fix bare `KeyError`; GREEN once
-    `_contract_section` raises the explicit guard.
+    `dermatology` is a §11-§13 progressive `PLAN_DOMAINS` member with no `_AUTHOR_CONTRACT_SECTION`
+    mapping (still un-mapped after ADR-0052-T1 — OQ-5 / bead 00kh maps §11-§13 later; endocrine was
+    the pre-T1 example but is now one of the always-on ten). Its rich card is deliberately omitted
+    from the comprehensive plan. That omission must be EXPLICIT: the prompt builder raises a
+    domain-named error, NOT a bare `KeyError('dermatology')` that `server._author_rich`'s
+    `except Exception: return None` silently swallows (dropping the rich domain with no signal).
+    RED against a bare `KeyError`; GREEN once `_contract_section` raises the explicit guard.
     """
     from scripts.store.plan_schema import PLAN_DOMAINS
     from scripts.model.client import _AUTHOR_CONTRACT_SECTION, _author_system_prompt
 
-    domain = "endocrine"
+    domain = "dermatology"
     assert domain in PLAN_DOMAINS and domain not in _AUTHOR_CONTRACT_SECTION  # a non-renderable member
     with pytest.raises(ValueError) as exc:
         _author_system_prompt(domain)

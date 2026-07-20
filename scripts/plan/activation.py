@@ -52,6 +52,29 @@ assert CARD_DOMAINS.isdisjoint(CROSS_CUTTING_INPUTS), (
     f"CARD_DOMAINS overlaps the cross-cutting inputs: {CARD_DOMAINS & CROSS_CUTTING_INPUTS}"
 )
 
+# The §1-§10 ALWAYS-ON card domains (ADR-0052): the non-progressive set every comprehensive plan
+# authors. The progressive three (§11-§13: dermatology/gi/lymphatic) stay progressive — activated
+# only on a surface signal (`active_domains`), NEVER floored (`plan_loop.active_plan_domains` unions
+# THIS set unconditionally). The single source of the always-on vocabulary; ADR-0052-T2 is the one
+# edit point if a §9 longevity-strategist re-home (OQ-3) later narrows the set to nine cards.
+ALWAYS_ON_DOMAINS = frozenset({
+    "workout", "nutrition", "peptides", "supplements", "endocrine",
+    "cardiovascular", "recovery", "sleep", "longevity", "mental-performance",
+})
+
+# Substantive load-time pin (NOT `ALWAYS_ON_DOMAINS.isdisjoint(CARD_DOMAINS - ALWAYS_ON_DOMAINS)` —
+# that is a tautology, any set is disjoint from its own relative complement, and guards nothing):
+# the always-on ten are a proper subset of the card roster and their complement is EXACTLY the
+# progressive three, so a slug added/dropped in either set fails closed at import.
+assert ALWAYS_ON_DOMAINS <= CARD_DOMAINS, (
+    f"ALWAYS_ON_DOMAINS leaks a non-card slug: {ALWAYS_ON_DOMAINS - CARD_DOMAINS}"
+)
+assert len(ALWAYS_ON_DOMAINS) == 10, f"ALWAYS_ON_DOMAINS must be the §1-§10 ten, got {len(ALWAYS_ON_DOMAINS)}"
+assert CARD_DOMAINS - ALWAYS_ON_DOMAINS == frozenset({"dermatology", "gi", "lymphatic"}), (
+    "the progressive three (§11-§13) must be exactly CARD_DOMAINS minus the always-on ten: "
+    f"{CARD_DOMAINS - ALWAYS_ON_DOMAINS}"
+)
+
 # The operator-surface activation channels (disposition #23). A card domain is ACTIVE when the
 # surface carries a signal for it in ANY channel: a stated goal, tracked-stream data / a reading, a
 # care-conversation mention, or a lab-value / genetic-trait-class touch.
