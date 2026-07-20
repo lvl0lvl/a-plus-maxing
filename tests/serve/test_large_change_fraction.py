@@ -134,6 +134,21 @@ def test_renderable_swap_holds_even_with_rich_active(tmp_path):
         f"the promoted set is not the four renderable (only renderable carry the thin swap): {promoted}")
 
 
+def test_full_renderable_swap_holds_4_of_4(tmp_path):
+    # qa-0052-01 (the apex): ALL four renderable swapped over a differing prior (magnitude 4,
+    # |renderable|=4) — the single largest materially-large re-gen the hold exists to catch. Post-T2
+    # active_plan_domains pins |renderable| at 4, so 3 (test_renderable_swap_holds_even_with_rich_active)
+    # and 4 (here) are the ONLY reachable front-door hold magnitudes; this pins the 4-of-4 apex that
+    # shares the True branch with 3-of-4 but had no integration or unit pin before.
+    root = tmp_path / "store"
+    _seed_surface_store(root, goal_domains=[*plan_schema.RENDERABLE_DOMAINS, *_RICH_SIX])
+    _seed_prior_standing(root, tuple(plan_schema.RENDERABLE_DOMAINS))  # magnitude 4 (all four replaced)
+    result = _drive(root, _LoopDispatch(_clean_authors()))
+    promoted = _assert_held(result, root, swapped=tuple(plan_schema.RENDERABLE_DOMAINS))
+    assert set(promoted) == set(plan_schema.RENDERABLE_DOMAINS), (
+        f"the promoted set is not the four renderable: {promoted}")
+
+
 def test_narrow_signal_change_is_minority_of_floored_renderable(tmp_path):
     # ADR-0052-T2 INTERACTION with the ADR-0046-T2 large-change hold (flagged for review):
     # Pre-T2 a narrow-signal surface (workout+nutrition) had |renderable| = |active & RENDERABLE| = 2
@@ -151,7 +166,7 @@ def test_narrow_signal_change_is_minority_of_floored_renderable(tmp_path):
     _seed_surface_store(root, goal_domains=["workout", "nutrition"])
     _seed_prior_standing(root, ("workout", "nutrition"))  # magnitude 2, but |renderable| now floors to 4
     result = _drive(root, _LoopDispatch(_clean_authors()))
-    assert result["large_change"] is not True, (
+    assert result["large_change"] is False, (
         "a 2-of-4 minority swap must NOT trip the large-change hold post-T2 (floored |renderable|=4)")
     for domain in ("workout", "nutrition"):
         assert plan_schema.read_plan(domain, _PLAN_DATE, root)["plan"] is not None, (
@@ -171,7 +186,8 @@ def test_narrow_signal_change_is_minority_of_floored_renderable(tmp_path):
     (1, 3, False),  # 1 < 3/2
     (3, 4, True),   # 3 > 4/2 (reproduces the retired 3-of-4)
     (2, 4, False),  # 2 == 4/2, not strict (2-of-4 stays below)
-])
+    (4, 4, True),   # 4 > 4/2 (the apex — post-T2 |renderable| is pinned at 4, so 3 and 4 are the only
+])                  # reachable magnitudes; this pins the maximal full-renderable swap holds)
 def test_renderable_majority_predicate_points(changed, renderable, expected):
     # AC-1/boundary: the STRICT-majority curve over renderable sizes 1..4 (the numerator cap). Strict
     # `> half`, NOT `>= ceil` — 2-of-4 does NOT hold, 3-of-4 does. Never (6, 10): a magnitude-6 swap is

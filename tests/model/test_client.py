@@ -2140,6 +2140,24 @@ def test_author_prompt_carries_no_operator_pii(domain):
         assert token not in lower, f"{domain} prompt leaks operator token {token!r}"
 
 
+def test_pii_scan_covers_every_author_contract_domain():
+    """Fail-closed coupling: the negative-PII scan's domain set == the PRODUCTION author map.
+
+    `test_author_prompt_carries_no_operator_pii` is parametrized over the test-local `_CONTRACT_ANCHOR`,
+    but the code that reads a contract section into the UNSCANNED author system prompt reads
+    `client._AUTHOR_CONTRACT_SECTION`. Pinning `set(_CONTRACT_ANCHOR) == set(_AUTHOR_CONTRACT_SECTION)`
+    forces every domain ever mapped into the production author map through the PII scan — so a future
+    widening (e.g. OQ-5 / bead 00kh mapping §11-§13) that adds a domain to `_AUTHOR_CONTRACT_SECTION`
+    without adding its anchor here FAILS this test rather than silently shipping an un-scanned section.
+    """
+    from scripts.model.client import _AUTHOR_CONTRACT_SECTION
+
+    assert set(_CONTRACT_ANCHOR) == set(_AUTHOR_CONTRACT_SECTION), (
+        "the negative-PII scan (_CONTRACT_ANCHOR) does not cover every production author-map domain: "
+        f"unscanned = {set(_AUTHOR_CONTRACT_SECTION) - set(_CONTRACT_ANCHOR)}"
+    )
+
+
 def test_author_contracts_file_is_git_tracked():
     """Finding 1 (portability): the prompt's read target is committed, so a fresh clone runs green.
 

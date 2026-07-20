@@ -50,9 +50,17 @@ JUDGE_ROLE = "quality-judge"
 # only from `renderable` and caps at 4, so a `len(active)` bar is structurally unreachable for
 # `|active| ≥ 8` and would fail OPEN (the hold never fires; a full renderable swap stands unconfirmed).
 # The fraction reproduces the retired fixed `3` on a 4-renderable surface (3-of-4 holds, 2-of-4 does
-# not) while scaling DOWN for a narrowed renderable surface. This re-base is the HARD PRECONDITION
-# before the ADR-0046 activation runs live against the SCALED 15+ card ROSTER — a fixed count-of-3 is a
-# MINORITY of a grown roster and must never gate it (disposition #36 resolves external ADR-0040 OQ-2).
+# not). It once ALSO scaled DOWN for a narrowed renderable surface (`|renderable| < 4`), but ADR-0052-T2
+# made `active_plan_domains` floor UNCONDITIONALLY to the always-on ten (⊇ all four renderable), so
+# `|renderable|` (`active & RENDERABLE_DOMAINS`) is now pinned at 4 for EVERY front-door plan — the
+# narrowed-renderable surface is UNREACHABLE via `regenerate`. The scale-down survives only as the
+# predicate's general (unit-level) property, NOT a reachable runtime behavior; the front door's only
+# reachable hold magnitudes are 3 (holds) and 4 (holds). Consequence: a genuinely-narrow operator's
+# 2-domain swap is a 2-of-4 minority that no longer prompts — accepted (Architect ruling, ADR-0052
+# Consequences): under-hold-only direction, the fail-closed safety gate + cross-domain holds are
+# untouched, and the plan surfaces visibly. This re-base is the HARD PRECONDITION before the ADR-0046
+# activation runs live against the SCALED 15+ card ROSTER — a fixed count-of-3 is a MINORITY of a grown
+# roster and must never gate it (disposition #36 resolves external ADR-0040 OQ-2).
 def _is_renderable_majority(changed_count, renderable_count):
     """Whether `changed_count` is a STRICT majority of `renderable_count` (the large-change hold bar).
 

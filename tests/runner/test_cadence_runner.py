@@ -197,8 +197,8 @@ def test_crownjewel_faithful_zero_raw_pii(tmp_path):
     expected = _plan_loop.active_plan_domains(_router.summarize(store_read))
     assert captured_domains, "the dispatched active subset is empty (payload set not proven-non-empty)"
     assert captured_domains == expected, (
-        f"the dispatched set {captured_domains} is not the active ∩ renderable subset {expected} "
-        "(active-subset narrowing reverted)"
+        f"the dispatched set {captured_domains} is not the floored always-on active set {expected} "
+        "(ADR-0052-T2 active-floor narrowing reverted)"
     )
     assert len(spec) >= 1
     wire = json.dumps(session.calls)
