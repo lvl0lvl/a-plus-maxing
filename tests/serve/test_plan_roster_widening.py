@@ -2,10 +2,10 @@
 
 Drives the REAL POST /generate-plan front door with a fixture client returning conformant envelopes
 for all ten always-on domains (four thin renderable + six `domain_program`-valid rich §5-§10), and
-asserts the composed `plan-model::` version records >=10 authored programs (the COUNT the rich render
-will lay out, NOT the rendered card count) while `RENDERABLE_DOMAINS` stays four (the widening is
-AUTHORING, not RENDERING). An empty-state surface authors no §11-§13 program (no progressive
-fabrication). $0 — fixture/spy client + synthetic store, no live SDK call, no spend.
+asserts the composed `plan-model::` version records >=10 authored programs (the count of authored
+programs composed into the comprehensive record — widening is AUTHORING, not RENDERING; the renderable
+card surface stays four) while `RENDERABLE_DOMAINS` stays four. An empty-state surface authors no
+§11-§13 program (no progressive fabrication). $0 — fixture/spy client + synthetic store, no live SDK.
 """
 import datetime
 import subprocess
@@ -99,6 +99,10 @@ def test_composition_records_ten_authored_into_plan_model(tmp_path):
         for domain in _RICH_SIX:
             assert domain in programs, (
                 f"the always-on rich domain {domain!r} did not author into plan-model:: : {sorted(programs)}")
+        # Upper bound: NO domain outside the always-on ten composed in — catches an over-fabrication
+        # regression (an 11th non-progressive domain folding into plan-model::) the >=10 floor misses.
+        assert set(programs) <= _ALWAYS_ON_TEN, (
+            f"a domain outside the always-on ten composed into plan-model:: : {sorted(set(programs) - _ALWAYS_ON_TEN)}")
     finally:
         srv.shutdown()
         srv.server_close()
@@ -119,7 +123,10 @@ def test_floor_set_equals_authorable_set():
 
 def test_empty_state_authors_no_progressive_program(tmp_path):
     # AC-5: an empty-state surface (no dermatology / GI / lymphatic signal) authors NO §11-§13 program
-    # — the floor never fabricates a progressive card. RED if a §11-§13 slug were added to ALWAYS_ON.
+    # — the T2 floor never fabricates a progressive card for the always-on ten. (Floor-set membership —
+    # that no §11-§13 slug is IN ALWAYS_ON — is guarded by activation.py's load-time asserts + AC-4, not
+    # here; a genuine RED of THIS test needs the full fabrication path: a §11-§13 domain floored AND
+    # mapped in _AUTHOR_CONTRACT_SECTION AND given an envelope — the OQ-5/bead-00kh regression.)
     _seed_summary_store(tmp_path / "store")  # no skin / gut / lymphatic signal
     srv, port = _server_with_author(tmp_path, _ContractGroundedClient(_ten_domain_envelopes()))
     _serve_in_thread(srv)
@@ -140,5 +147,8 @@ def test_frozen_surface_and_no_synthesize_leg_edit():
     # AC-6: the composition used the ALREADY-WIRED synthesize leg + T1/T2 — no frozen surface changed
     # and server.py / care_chat.py are byte-unchanged vs main (the Stale-Premise-Reconciliation held).
     assert _git_numstat(_FROZEN_ANCHOR, _FROZEN_SIX_PLUS_TRACK) == "", "the frozen ADR-0032 surface changed"
-    assert _git_numstat("main", ("scripts/serve/server.py", "scripts/serve/care_chat.py")) == "", (
-        "server.py / care_chat.py changed vs main — the no-edit reconciliation was violated")
+    # Anchor on `origin/main` (the always-fetched remote-tracking ref) to match the sibling frozen-surface
+    # probe in test_plan_loop_hold.py and avoid a bare local-`main` ref that a CI checkout may not
+    # materialize (would ERROR the subprocess rather than assert). == "" does not self-invalidate on merge.
+    assert _git_numstat("origin/main", ("scripts/serve/server.py", "scripts/serve/care_chat.py")) == "", (
+        "server.py / care_chat.py changed vs origin/main — the no-edit reconciliation was violated")
