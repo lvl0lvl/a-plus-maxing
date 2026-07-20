@@ -417,11 +417,9 @@ def test_frozen_spine_and_only_regenerate_changed():
     for name in changed_defs:
         assert current[name] != pretask.get(name), \
             f"{name} did not change vs the pre-ADR-0040 baseline (fix not applied)"
-    # `active_plan_domains` was ADDED after PRE_TASK_HEAD (PR #336), so the pretask baseline lacks it and
-    # the loop above passes for it merely because it now exists (HIST-003). Pin it structurally against
-    # origin/main's body — which DOES carry the pre-T2 conditional floor — so a revert of the T2
-    # unconditional-floor edit is caught here, not only by the behavioral floor probes in test_plan_loop.py.
-    assert current["active_plan_domains"] != origin["active_plan_domains"], (
-        "active_plan_domains did not change vs origin/main — the ADR-0052-T2 unconditional-floor edit "
-        "is not applied (a revert to the conditional renderable-core floor would trip this)"
-    )
+    # NB: `active_plan_domains` (carved above for ADR-0052-T2) has NO durable structural non-vacuity
+    # baseline here — it was added after PRE_TASK_HEAD (PR #336, so `!= pretask` passes merely because
+    # it now exists), and a `!= origin/main` pin SELF-INVALIDATES once T2 squash-merges to main
+    # (origin catches up, the bodies become identical — the exact bead-2deg trap). Its T2
+    # unconditional-floor behavior is instead pinned, mutation-RED-proven, by the floor probes in
+    # tests/serve/test_plan_loop.py (test_conditional_floor_idiom_reds_the_partial_signal et al.).
