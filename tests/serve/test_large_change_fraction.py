@@ -134,16 +134,28 @@ def test_renderable_swap_holds_even_with_rich_active(tmp_path):
         f"the promoted set is not the four renderable (only renderable carry the thin swap): {promoted}")
 
 
-def test_narrow_surface_2_of_2_holds(tmp_path):
-    # AC-2 narrow-surface (constant-vs-fraction distinguisher): a 2-of-2-renderable swap
-    # (|active|=|renderable|=2, magnitude 2) is a STRICT majority (2 > 2/2, bar 2//2+1=2) and HOLDS
-    # under the fraction. The retired constant `2 >= 3` would NOT hold -> the Step-2.5 revert to `>= 3`
-    # REDs this test.
+def test_narrow_signal_change_is_minority_of_floored_renderable(tmp_path):
+    # ADR-0052-T2 INTERACTION with the ADR-0046-T2 large-change hold (flagged for review):
+    # Pre-T2 a narrow-signal surface (workout+nutrition) had |renderable| = |active & RENDERABLE| = 2
+    # (the conditional floor did not add supplements/peptides), so a 2-domain swap was a STRICT majority
+    # (2 > 2/2) and HELD for confirmation. Post-T2 the UNCONDITIONAL always-on-ten floor makes ALL four
+    # renderable active (|renderable| = 4) — supplements/peptides floor in as ESTABLISHES (no prior
+    # standing, so they raise |renderable| WITHOUT adding to _change_magnitude). The SAME 2-domain swap
+    # is therefore now a MINORITY (2-of-4, 2 not > 4/2=2) and does NOT hold: it applies without a
+    # confirmation prompt. This is consistent with the strict-majority rule (2-of-4 does not hold — the
+    # module docstring), but it DILUTES the pre-T2 "narrow surface scales the denominator down" property
+    # (ADR-0046-T2) that this test used to exercise: the narrowed-renderable surface is now unreachable
+    # via the front door. The reachable majority-holds path is test_renderable_swap_holds_even_with_rich_active
+    # (3-of-4); the fraction-vs-constant boundary is test_renderable_majority_predicate_points[(2,4,False)].
     root = tmp_path / "store"
     _seed_surface_store(root, goal_domains=["workout", "nutrition"])
-    _seed_prior_standing(root, ("workout", "nutrition"))  # magnitude 2
+    _seed_prior_standing(root, ("workout", "nutrition"))  # magnitude 2, but |renderable| now floors to 4
     result = _drive(root, _LoopDispatch(_clean_authors()))
-    _assert_held(result, root, swapped=("workout", "nutrition"))
+    assert result["large_change"] is not True, (
+        "a 2-of-4 minority swap must NOT trip the large-change hold post-T2 (floored |renderable|=4)")
+    for domain in ("workout", "nutrition"):
+        assert plan_schema.read_plan(domain, _PLAN_DATE, root)["plan"] is not None, (
+            f"{domain}: a non-held minority swap must SURFACE its new plan (not be withheld)")
 
 
 # =========================================================================== #

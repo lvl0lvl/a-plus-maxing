@@ -220,19 +220,21 @@ def derive_operator_surface(summary):
 
 
 def active_plan_domains(summary):
-    """The active card-emitting domains for the front door (RULING 2 + the renderable-core floor).
+    """The active card-emitting domains for the front door (RULING 2 + the always-on-ten floor).
 
-    `activation.active_domains(derive_operator_surface(summary))`, FLOORED at the renderable core four
-    when the surface carries NO renderable-domain signal — the baseline plan (backward-compatible with
-    the pre-growth always-four behavior). Progressive activation ADDS a rich domain when the surface
-    signals it, and NARROWS the renderable subset only when the surface explicitly signals a proper
-    renderable subset (AC-4 / AC-S2). The result never zeroes out an existing operator's plan.
+    `activation.active_domains(derive_operator_surface(summary))`, floored UNCONDITIONALLY at the
+    always-on ten (§1-§10, `activation.ALWAYS_ON_DOMAINS`) — the baseline comprehensive plan every
+    operator gets (ADR-0052). The floor is unconditional, not the pre-T2 conditional renderable-core
+    idiom: a PARTIAL-signal surface (touching only, say, `workout`) still floors to the full ten, not
+    one (AR-006 — a conditional floor that fires only on no-renderable-signal silently returned a
+    single domain). Progressive activation ADDS a §11-§13 domain (dermatology/gi/lymphatic) only when
+    the surface signals it — the floor never fabricates an empty-state progressive card. The result
+    never zeroes out an operator's plan.
     """
     from scripts.plan import activation
 
     active = set(activation.active_domains(derive_operator_surface(summary)))
-    if not (active & set(plan_schema.RENDERABLE_DOMAINS)):
-        active |= set(plan_schema.RENDERABLE_DOMAINS)
+    active |= set(activation.ALWAYS_ON_DOMAINS)
     return active
 
 

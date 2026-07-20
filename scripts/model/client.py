@@ -510,11 +510,20 @@ _AUTHOR_PAYLOAD_GUIDE = {
                 '"route": str, "cycle_length_weeks": int (optional), "evidence": str (optional)}',
 }
 # Domain -> the (section-number, specialist-slug) that anchor its heading in the contract file.
+# The always-on ten (§1-§10) — the non-progressive set every comprehensive plan authors (ADR-0052).
+# The progressive three (§11-§13: dermatology/gi/lymphatic) stay UN-mapped (OQ-5 / bead 00kh): an
+# activated progressive domain still `_author_rich`->None (honest containment, no partial card).
 _AUTHOR_CONTRACT_SECTION = {
     "workout": (1, "personal-trainer"),
     "nutrition": (2, "nutritionist"),
     "peptides": (3, "peptide-specialist"),
     "supplements": (4, "supplement-specialist"),
+    "endocrine": (5, "endocrine-specialist"),
+    "cardiovascular": (6, "cardiovascular-specialist"),
+    "recovery": (7, "recovery-specialist"),
+    "sleep": (8, "sleep-coach"),
+    "longevity": (9, "longevity-strategist"),
+    "mental-performance": (10, "mental-performance-coach"),
 }
 # The single-source authoring contract (ADR-0050 Alternative-C rejected the embed-fork): each
 # domain's section is READ from this file at author time, never hand-embedded — an embedded copy

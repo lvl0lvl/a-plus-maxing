@@ -210,16 +210,18 @@ def test_regenerate_wraps_gate_then_synthesizes(tmp_path, monkeypatch):
     assert recorded, "Leg 2's record_plan_version (the additive comprehensive record) never fired"
 
 
-def test_front_door_dispatches_active_domains(tmp_path):
-    # AC-4: the front door dispatches activation.active_domains(surface), NOT the closed grown tuple.
-    # A narrow surface dispatches a proper subset of the renderable four.
+def test_front_door_dispatches_the_always_on_ten(tmp_path):
+    # AC-4 (ADR-0052-T2): the front door dispatches the FLOORED active set — the always-on ten,
+    # UNCONDITIONALLY — NOT the raw active_domains(surface) subset and NOT the closed §1-§13 tuple.
+    # A narrow {workout, nutrition} surface floors to the ten (the baseline comprehensive plan) but
+    # never fabricates a progressive §11-§13 dispatch.
     root = tmp_path / "store"
     _seed_surface_store(root, goal_domains=["workout", "nutrition"])
     dispatch = _LoopDispatch(_clean_authors())
     _drive_regenerate(root, dispatch, plan_date="2026-07-13")
     dispatched_specialists = {c for c in dispatch.calls
                               if c not in DEFAULT_LENSES and c != _JUDGE_ROLE}
-    assert dispatched_specialists == {"workout", "nutrition"}, dispatched_specialists
+    assert dispatched_specialists == set(activation.ALWAYS_ON_DOMAINS), dispatched_specialists
     assert dispatched_specialists != set(plan_schema.PLAN_DOMAINS)
 
 
@@ -284,13 +286,19 @@ def test_plan_domains_grown_to_card_roster():
 
 
 def test_front_door_records_active_subset_not_all_domains(tmp_path):
-    # AC-9: the front door records the active SUBSET (via plan_model), NOT set(results)==PLAN_DOMAINS.
+    # AC-9 (ADR-0052-T2): the front door records the floored-active domains that HAVE an author, NOT
+    # all PLAN_DOMAINS. The always-on-ten floor widens the active set, but _clean_authors() supplies
+    # only the four renderable authors — so the four record and the §5-§10 rich domains floor in yet
+    # drop here for want of an author (their first-class recording WITH an author is covered by
+    # test_rich_domain_dispatches_and_records_first_class). The progressive three (§11-§13) are NEVER
+    # floored, so they never record on this empty-state surface — no fabrication.
     root = tmp_path / "store"
     _seed_surface_store(root, goal_domains=["workout", "nutrition"])
     _drive_regenerate(root, _LoopDispatch(_clean_authors()), plan_date="2026-07-13")
     programs = plan_model.read_plan_version("2026-07-13", root)["version"][plan_model.DOMAIN_PROGRAMS]
-    assert set(programs) == {"workout", "nutrition"}
+    assert set(programs) == {"workout", "nutrition", "supplements", "peptides"}
     assert set(programs) != set(plan_schema.PLAN_DOMAINS)
+    assert set(programs).isdisjoint({"dermatology", "gi", "lymphatic"})  # no §11-§13 fabrication
 
 
 def test_registries_coherent_over_grown_roster():
@@ -364,31 +372,34 @@ def test_operator_surface_deriver_is_deid_safe(tmp_path):
     assert "RAW" not in flat and "example.invalid" not in flat and "rs9999" not in flat
 
 
-def test_front_door_derives_surface_then_dispatches_active_subset(tmp_path):
-    # AC-S2: the front door DERIVES the surface then dispatches exactly active_domains(surface).
+def test_front_door_floors_dispatch_to_the_always_on_ten(tmp_path):
+    # AC-S2 (ADR-0052-T2): the front door DERIVES the surface, then dispatches the FLOORED active set.
+    # The surface still activates only its signalled domains, but active_plan_domains floors that to
+    # the always-on ten UNCONDITIONALLY, so a {workout, sleep} surface dispatches the full ten (the
+    # baseline comprehensive plan) — not the two-domain subset it did under the pre-T2 conditional floor.
     root = tmp_path / "store"
     read = _seed_surface_store(root, goal_domains=["workout", "sleep"])
     from scripts.plan import router
 
     surface = plan_loop.derive_operator_surface(router.summarize(read))
     active = activation.active_domains(surface)
-    assert active == {"workout", "sleep"}, active
+    assert active == {"workout", "sleep"}, active  # the SURFACE is unchanged; the FLOOR widens it
     dispatch = _LoopDispatch(_clean_authors(extra={"sleep": _rich_author("sleep")}))
     _drive_regenerate(root, dispatch, plan_date="2026-07-13")
     dispatched = {c for c in dispatch.calls if c not in DEFAULT_LENSES and c != _JUDGE_ROLE}
-    assert dispatched == {"workout", "sleep"}, dispatched
+    assert dispatched == set(activation.ALWAYS_ON_DOMAINS), dispatched
 
 
-def test_rich_only_surface_floors_to_renderable_core():
-    # AC-S4 (renderable-core floor, plan_loop.active_plan_domains): a RICH-only surface — a
-    # genetics/labs cross-cutting touch with NO renderable-domain signal — activates NO card
-    # domain, so active_plan_domains FLOORS it to EXACTLY the four RENDERABLE_DOMAINS (the
-    # baseline plan; never zero out an existing operator's plan). RED capability: drop the
-    # `active |= RENDERABLE_DOMAINS` floor and the surface resolves to the EMPTY set instead.
+def test_rich_only_surface_floors_to_the_always_on_ten():
+    # AC-S4 (always-on-ten floor, plan_loop.active_plan_domains; ADR-0052-T2): a RICH-only surface —
+    # a genetics/labs cross-cutting touch with NO card-domain signal — activates NO card domain, so
+    # active_plan_domains FLOORS it (UNCONDITIONALLY) to EXACTLY the always-on ten (the baseline
+    # comprehensive plan; never zero out an operator's plan; no §11-§13 fabricated). RED capability:
+    # drop the `active |= ALWAYS_ON_DOMAINS` floor and the surface resolves to the EMPTY set instead.
     summary = {"genetic-trait-classes": "genetics"}  # rich cross-cutting substrate, no card domain
     surface = plan_loop.derive_operator_surface(summary)
     assert activation.active_domains(surface) == frozenset(), "surface must carry no active card domain"
-    assert plan_loop.active_plan_domains(summary) == set(plan_schema.RENDERABLE_DOMAINS)
+    assert plan_loop.active_plan_domains(summary) == set(activation.ALWAYS_ON_DOMAINS)
 
 
 def test_debounce_floor_engages_after_comprehensive_regen(tmp_path):
